@@ -1,33 +1,15 @@
 // app/api/admin/company/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
 import { getCompanyBySlug, updateCompanyBySlug } from "@/lib/repos/companyRepo";
 
 export const runtime = "nodejs";
 export const revalidate = 0;
 
-function bad(status: number, msg: string, headers?: HeadersInit) {
+function bad(status: number, msg: string) {
   return new NextResponse(JSON.stringify({ error: msg }), {
     status,
-    headers: { "Content-Type": "application/json", ...(headers || {}) },
+    headers: { "Content-Type": "application/json" },
   });
-}
-
-function ssrClient(req: NextRequest, res: NextResponse) {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll: () => req.cookies.getAll(),
-        setAll: (cookiesToSet) => {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            res.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
 }
 
 export async function GET(req: NextRequest) {
@@ -42,15 +24,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const res = new NextResponse();
   try {
     const slug = (new URL(req.url).searchParams.get("company") || "").toLowerCase();
-    if (!slug) return bad(400, "Missing 'company' param", res.headers);
-
-    // requiere sesión para escribir
-    const supabaseSSR = ssrClient(req, res);
-    const { data: sess } = await supabaseSSR.auth.getSession();
-    if (!sess?.session) return bad(401, "Not authenticated", res.headers);
+    if (!slug) return bad(400, "Missing 'company' param");
 
     const body = await req.json().catch(() => ({}));
     await updateCompanyBySlug(slug, {
@@ -63,8 +39,9 @@ export async function POST(req: NextRequest) {
       active: body?.active,
     });
 
-    return NextResponse.json({ ok: true }, { headers: res.headers });
+    return NextResponse.json({ ok: true });
   } catch (e: any) {
-    return bad(400, e?.message || "Cannot save company", res.headers);
+    // devolvemos mensaje exacto para que el front deje de decir "No pude guardar" genérico
+    return bad(400, e?.message || "Cannot save company");
   }
 }
