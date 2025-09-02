@@ -15,14 +15,12 @@ export default function AuthCallbackPage() {
       try {
         const supabase = supabaseBrowser();
 
-        // 1) Recomendado por Supabase: pasar la URL completa
+        // Con PKCE, Supabase espera `code` en la URL y el `code_verifier` en localStorage
         const { error } = await supabase.auth.exchangeCodeForSession(
           window.location.href
         );
-
         if (error) throw error;
 
-        // 2) Redirige a donde te pedían volver (o al home)
         const redirect = params.get("redirect") || "/";
         router.replace(redirect);
       } catch (e: any) {
