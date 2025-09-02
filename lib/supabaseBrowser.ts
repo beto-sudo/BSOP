@@ -1,5 +1,5 @@
+// lib/supabaseBrowser.ts
 "use client";
-
 import { createClient } from "@supabase/supabase-js";
 
 export const supabaseBrowser = () =>
@@ -8,10 +8,9 @@ export const supabaseBrowser = () =>
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       auth: {
-        // guardamos sesión en el navegador
         persistSession: true,
         autoRefreshToken: true,
-        // NO intentes leer tokens de la URL automáticamente (usaremos PKCE)
+        // esto solo gestiona el flujo implícito (#access_token). Con PKCE no hace falta.
         detectSessionInUrl: false,
       },
     }
