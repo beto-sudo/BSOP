@@ -1,46 +1,47 @@
-// app/(auth)/signin/page.tsx
-"use client";
-import { useCallback, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { supabaseBrowser } from "@/lib/supabaseBrowser";
+'use client';
+
+import { useState, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL!; // p.ej. https://bsop-alpha.vercel.app
 
 export default function SignInPage() {
   const params = useSearchParams();
-  const redirect = params.get("redirect") || "/";
+  const redirect = useMemo(() => params.get('redirect') ?? '/', [params]);
   const [loading, setLoading] = useState(false);
 
-  const APP_URL =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    (typeof window !== "undefined" ? window.location.origin : "");
-
-  const signIn = useCallback(async () => {
+  const onClick = async () => {
     setLoading(true);
-    try {
-      const supabase = supabaseBrowser();
-      await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          flowType: "pkce",
-          // Ya no vamos a /auth/callback: regresamos a la raíz con ?code=...
-          redirectTo: `${APP_URL}?redirect=${encodeURIComponent(redirect)}`,
-          queryParams: { prompt: "select_account" },
-        },
-      });
-    } finally {
+    const supabase = supabaseBrowser();
+
+    // PKCE sin ruta /auth/callback: volvemos a la raíz con ?code=...
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      // Nota: tu versión no tipa 'flowType'; lo forzamos con `as any`.
+      options: {
+        flowType: 'pkce',
+        redirectTo: `${APP_URL}?redirect=${encodeURIComponent(redirect)}`,
+        queryParams: { prompt: 'select_account' },
+      } as any,
+    });
+
+    if (error) {
+      console.error(error);
       setLoading(false);
     }
-  }, [APP_URL, redirect]);
+  };
 
   return (
-    <div className="min-h-[60vh] grid place-items-center">
-      <div className="rounded-xl border p-6 shadow">
-        <h1 className="mb-4 text-xl font-semibold">Inicia sesión</h1>
+    <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="rounded-xl border p-8 shadow-sm">
+        <h1 className="mb-6 text-xl font-semibold">Inicia sesión</h1>
         <button
-          onClick={signIn}
+          onClick={onClick}
           disabled={loading}
           className="rounded-md bg-black px-4 py-2 text-white disabled:opacity-50"
         >
-          {loading ? "Redirigiendo…" : "Continuar con Google"}
+          {loading ? 'Redirigiendo…' : 'Continuar con Google'}
         </button>
       </div>
     </div>
