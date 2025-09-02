@@ -7,7 +7,11 @@ let cachedTable: string | null = null;
 function coerceStr(v: any): string {
   if (v == null) return "";
   if (typeof v === "string") return v;
-  return JSON.stringify(v);
+  try {
+    return JSON.stringify(v);
+  } catch {
+    return String(v);
+  }
 }
 function toBool(x: any): boolean {
   if (typeof x === "boolean") return x;
@@ -27,7 +31,7 @@ export type CompanyDTO = {
   rfc?: string;
   email?: string;
   phone?: string;
-  address?: string;
+  address?: string; // el front manda string (si el campo real es jsonb lo parseamos aquí)
   active?: boolean;
   settings?: any;
 };
@@ -98,7 +102,6 @@ export async function listCompanies(): Promise<Array<Pick<CompanyDTO, "id"|"name
   const db = dbOrThrow();
   const table = await resolveCompanyTable();
 
-  // Intentamos columnas comunes; si falla, traemos todo.
   const q = await db.from(table).select("id,name,slug").order("name", { ascending: true });
   if (!q.error) {
     return (q.data ?? []).map((r: any) => ({
@@ -124,11 +127,17 @@ export async function getCompanyBySlug(slug: string): Promise<CompanyDTO> {
   return normalize(data);
 }
 
+/**
+ * Actualización tolerante:
+ * - Solo actualiza columnas que EXISTEN en la fila.
+ * - Si `address/direccion` es JSONB en la DB, intentamos parsear el string del form.
+ * - Si el UPDATE queda sin columnas (payload vacío), NO llama a PostgREST y regresa ok.
+ * - Solo toca `settings` si la tabla tiene esa columna.
+ */
 export async function updateCompanyBySlug(slug: string, patch: Partial<CompanyDTO>) {
   const db = dbOrThrow();
   const table = await resolveCompanyTable();
 
-  // Leemos la fila completa para saber QUÉ columnas existen
   const { data: current, error: e1 } = await db.from(table).select("*").ilike("slug", slug).single();
   if (e1) throw e1;
 
@@ -148,10 +157,27 @@ export async function updateCompanyBySlug(slug: string, patch: Partial<CompanyDT
     if (has("phone")) upd.phone = patch.phone;
     else if (has("telefono")) upd.telefono = patch.phone;
   }
+
   if (patch.address !== undefined) {
-    if (has("address")) upd.address = patch.address;
-    else if (has("direccion")) upd.direccion = patch.address;
+    // Si la columna real parece JSONB (el valor actual es objeto/array), parseamos el string del form.
+    const looksJsonb =
+      (has("address") && typeof current.address === "object" && current.address !== null) ||
+      (has("direccion") && typeof current.direccion === "object" && current.direccion !== null);
+
+    let value: any = patch.address;
+    if (looksJsonb && typeof patch.address === "string") {
+      try {
+        value = JSON.parse(patch.address);
+      } catch {
+        // si no es JSON válido, guardamos el string tal cual
+        value = patch.address;
+      }
+    }
+
+    if (has("address")) upd.address = value;
+    else if (has("direccion")) upd.direccion = value;
   }
+
   if (patch.active !== undefined) {
     if (has("active")) upd.active = patch.active;
     else if (has("is_active")) upd.is_active = patch.active;
@@ -159,7 +185,7 @@ export async function updateCompanyBySlug(slug: string, patch: Partial<CompanyDT
     else if (has("status")) upd.status = patch.active ? "active" : "inactive";
   }
 
-  // Sólo si la tabla TIENE columna settings
+  // Solo si la tabla TIENE columna settings
   if (has("settings")) {
     upd.settings = mergeSettings(current, {
       id: current.id,
@@ -172,6 +198,11 @@ export async function updateCompanyBySlug(slug: string, patch: Partial<CompanyDT
       address: patch.address,
       active: patch.active,
     });
+  }
+
+  // Si no hay nada que actualizar (evitamos 400 por payload vacío), salimos OK
+  if (Object.keys(upd).length === 0) {
+    return { ok: true, noop: true };
   }
 
   const { error: e2 } = await db.from(table).update(upd).eq("id", current.id);
