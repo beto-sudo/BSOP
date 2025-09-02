@@ -1,41 +1,55 @@
 "use client";
-import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+
+import { useCallback, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
-export default function SignIn() {
-  const redirect = useSearchParams().get("redirect") || "/";
+export default function SignInPage() {
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
 
-  async function signInWithGoogle() {
-    setErr(null);
-    setLoading(true);
-    const supabase = supabaseBrowser();
-    const appOrigin = window.location.origin;
+  const handleGoogle = useCallback(async () => {
+    try {
+      setLoading(true);
+      const supabase = supabaseBrowser();
 
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      // Cast para que el compilador de Vercel no se queje del 'flowType'
-      options: {
-        flowType: "pkce",
-        redirectTo: `${appOrigin}/auth/callback?redirect=${encodeURIComponent(redirect)}`,
-        skipBrowserRedirect: true,
-        queryParams: { prompt: "select_account" },
-      } as any,
-    });
+      const origin =
+        typeof window !== "undefined" ? window.location.origin : "";
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || origin;
+      const params = new URLSearchParams(window.location.search);
+      const redirect = params.get("redirect") || "/";
 
-    if (error) { setErr(error.message); setLoading(false); return; }
-    if (data?.url) window.location.href = data.url;
-  }
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          // flowType está en la CONFIG del cliente, no aquí
+          redirectTo: `${appUrl}/auth/callback?redirect=${encodeURIComponent(
+            redirect
+          )}`,
+          queryParams: { prompt: "select_account" },
+          skipBrowserRedirect: false, // dejamos que redirija
+        },
+      });
+
+      if (error) throw error;
+      // en skipBrowserRedirect:false, el navegador ya se redirigió
+      if (data?.url) window.location.href = data.url;
+    } catch (e) {
+      console.error(e);
+      alert("No se pudo iniciar sesión.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   return (
-    <div className="w-full max-w-sm space-y-4 rounded-2xl border bg-white p-6 shadow-sm">
-      <h1 className="text-xl font-semibold">Inicia sesión</h1>
-      <button onClick={signInWithGoogle} disabled={loading} className="w-full rounded-xl border px-4 py-2 text-sm">
-        {loading ? "Conectando..." : "Continuar con Google"}
+    <div className="mx-auto my-16 max-w-xl rounded-2xl border p-6">
+      <h1 className="mb-6 text-2xl font-semibold">Inicia sesión</h1>
+      <button
+        onClick={handleGoogle}
+        className="w-full rounded-lg bg-neutral-900 px-4 py-3 font-medium text-white hover:bg-neutral-800"
+        disabled={loading}
+      >
+        {loading ? "Abriendo Google…" : "Continuar con Google"}
       </button>
-      {err && <p className="text-sm text-red-600">{err}</p>}
     </div>
   );
 }
