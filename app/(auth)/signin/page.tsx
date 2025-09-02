@@ -14,23 +14,23 @@ export default function SignInPage() {
       const origin =
         typeof window !== "undefined" ? window.location.origin : "";
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || origin;
+
       const params = new URLSearchParams(window.location.search);
       const redirect = params.get("redirect") || "/";
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          // flowType está en la CONFIG del cliente, no aquí
+          // flowType ya quedó en el cliente (supabaseBrowser)
           redirectTo: `${appUrl}/auth/callback?redirect=${encodeURIComponent(
             redirect
           )}`,
           queryParams: { prompt: "select_account" },
-          skipBrowserRedirect: false, // dejamos que redirija
+          skipBrowserRedirect: false,
         },
       });
 
       if (error) throw error;
-      // en skipBrowserRedirect:false, el navegador ya se redirigió
       if (data?.url) window.location.href = data.url;
     } catch (e) {
       console.error(e);
