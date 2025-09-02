@@ -4,6 +4,7 @@ import { createServerClient } from "@supabase/ssr";
 
 const PUBLIC_PATHS = new Set<string>([
   "/signin",
+  "/favicon.ico",
 ]);
 
 function isStatic(pathname: string) {
@@ -18,10 +19,9 @@ export async function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
   if (isStatic(pathname)) return NextResponse.next();
 
-  // APIs siempre pasan
   if (pathname.startsWith("/api")) return NextResponse.next();
 
-  // Si venimos de OAuth (hay code en la URL), deja pasar para que el cliente intercambie
+  // permite el intercambio PKCE
   const hasOAuthCode = req.nextUrl.searchParams.has("code");
   if (hasOAuthCode) return NextResponse.next();
 
@@ -32,10 +32,8 @@ export async function middleware(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return req.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
+        getAll: () => req.cookies.getAll(),
+        setAll: (cookiesToSet) => {
           cookiesToSet.forEach(({ name, value, options }) =>
             res.cookies.set(name, value, options)
           );
@@ -44,11 +42,9 @@ export async function middleware(req: NextRequest) {
     }
   );
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+  const { data, error } = await supabase.auth.getSession().catch(() => ({ data: { session: null }, error: null }));
+  const session = data?.session ?? null;
 
-  // Sin sesión y ruta no pública => manda a /signin con redirect
   if (!session && !PUBLIC_PATHS.has(pathname)) {
     const url = req.nextUrl.clone();
     url.pathname = "/signin";
@@ -56,7 +52,6 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Con sesión, evita /signin
   if (session && pathname === "/signin") {
     const url = req.nextUrl.clone();
     url.pathname = "/";
@@ -67,6 +62,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Aplica a todo lo que no tenga extensión (para no re-evaluar estáticos)
   matcher: ["/((?!.*\\.).*)"],
 };
