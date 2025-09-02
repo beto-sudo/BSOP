@@ -5,16 +5,15 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
-type UserInfo = {
-  name?: string;
-  email?: string;
-  picture?: string;
-};
+type UserInfo = { name?: string; email?: string; picture?: string };
+type Branding = { brandName?: string };
 
 export default function Topbar() {
   const router = useRouter();
   const qp = useSearchParams();
+  const company = qp.get("company") || "";
   const [user, setUser] = useState<UserInfo | null>(null);
+  const [brand, setBrand] = useState<Branding>({});
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -30,15 +29,28 @@ export default function Topbar() {
     })();
   }, []);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!company) return;
+        const r = await fetch(`/api/admin/company?company=${company}`, { cache: "no-store" });
+        const json = await r.json();
+        const b = json?.settings?.branding || {};
+        setBrand({ brandName: b.brandName || json?.name || "" });
+      } catch {
+        setBrand({});
+      }
+    })();
+  }, [company]);
+
   const onLogout = async () => {
     try {
       const supabase = supabaseBrowser();
-      await supabase.auth.signOut(); // limpia cliente
-      await fetch("/api/auth/signout", { method: "POST", credentials: "include" }); // limpia cookies server
+      await supabase.auth.signOut();
+      await fetch("/api/auth/signout", { method: "POST", credentials: "include" });
     } finally {
       const redirect = encodeURIComponent(window.location.pathname + (window.location.search || ""));
       router.replace(`/signin?redirect=${redirect}`);
-      // navegación dura para evitar estado viejo
       window.location.assign(`/signin?redirect=${redirect}`);
     }
   };
@@ -50,12 +62,10 @@ export default function Topbar() {
     .slice(0, 2)
     .toUpperCase();
 
-  const company = qp.get("company") || "";
-
   return (
     <header className="h-14 border-b bg-white/80 backdrop-blur flex items-center justify-between px-4">
       <div className="text-sm text-slate-500">
-        {company ? <span>Empresa: <span className="font-medium">{company}</span></span> : <span>&nbsp;</span>}
+        {brand?.brandName ? <span className="font-medium">{brand.brandName}</span> : <span>&nbsp;</span>}
       </div>
 
       <div className="relative">
@@ -87,10 +97,7 @@ export default function Topbar() {
               <div className="text-sm font-medium truncate">{user?.name || "Usuario"}</div>
               {user?.email && <div className="text-xs text-slate-500 truncate">{user.email}</div>}
             </div>
-            <button
-              className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
-              onClick={onLogout}
-            >
+            <button className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50" onClick={onLogout}>
               Cerrar sesión
             </button>
           </div>
