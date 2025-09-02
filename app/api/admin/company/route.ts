@@ -37,7 +37,9 @@ async function write(req: NextRequest) {
     active:    body?.active,
   });
 
-  return NextResponse.json({ ok: true });
+  // <- devolvemos la empresa normalizada para repoblar el form
+  const company = await getCompanyBySlug(slug);
+  return NextResponse.json({ ok: true, company });
 }
 
 export async function GET(req: NextRequest)   { try { return await read(req);  } catch (e:any){ return bad(400, e?.message || "Cannot load company"); } }
