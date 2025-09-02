@@ -1,24 +1,41 @@
 // app/auth/callback/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
 
-export async function GET(req: NextRequest) {
+export async function GET(req: Request) {
   const url = new URL(req.url);
-  const redirectTo = url.searchParams.get("redirect") || "/";
-  const res = NextResponse.redirect(new URL(redirectTo, url.origin));
+  const next = url.searchParams.get("redirect") ?? "/";
+
+  const cookieStore = cookies();
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get: (name) => req.cookies.get(name)?.value,
-        set: (name, value, options: CookieOptions) => res.cookies.set({ name, value, ...options }),
-        remove: (name, options: CookieOptions) => res.cookies.set({ name, value: "", ...options, maxAge: 0 }),
+        // ← interfaz nueva
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // Ignorable si viene de un Server Component
+          }
+        },
       },
     }
   );
 
-  await supabase.auth.exchangeCodeForSession(); // crea cookies sb-*
-  return res;
+  const code = url.searchParams.get("code");
+  if (code) {
+    await supabase.auth.exchangeCodeForSession(code);
+  }
+
+  // redirige a la app
+  return NextResponse.redirect(new URL(next, url.origin));
 }
