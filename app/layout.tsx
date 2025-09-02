@@ -1,6 +1,6 @@
-// app/layout.tsx (o el layout “raíz” de tu app)
+// app/layout.tsx
+import "./globals.css";
 import ThemeLoader from "./_components/ThemeLoader";
-import Sidebar from "./_components/Sidebar";
 import OAuthHandler from "./_components/OAuthHandler";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -8,13 +8,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es">
       <body>
         <ThemeLoader />
+        {/* Maneja el intercambio ?code=... una sola vez a nivel global */}
         <OAuthHandler />
-        <div className="flex min-h-screen">
-          <Sidebar />
-          <main className="flex-1 p-6">
-            <div className="mx-auto max-w-6xl">{children}</div>
-          </main>
-        </div>
+        {children}
       </body>
     </html>
   );
