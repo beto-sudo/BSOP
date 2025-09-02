@@ -15,22 +15,18 @@ export default function AuthCallbackPage() {
       try {
         const supabase = supabaseBrowser();
 
-        // 1) Leer el code de la URL
         const code = params.get("code");
         const redirect = params.get("redirect") || "/";
 
         if (!code) {
-          // No llegó el code => la redirección no salió de Supabase con PKCE.
           setMsg("No se pudo completar el inicio de sesión. Intenta de nuevo.");
           setDetails("La URL no contiene ?code=. Revisa URL Configuration en Supabase y NEXT_PUBLIC_APP_URL.");
           return;
         }
 
-        // 2) Intercambiar code -> sesión (PKCE)
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (error) throw error;
 
-        // 3) Adelante a donde ibas
         router.replace(redirect);
       } catch (e: any) {
         console.error(e);
