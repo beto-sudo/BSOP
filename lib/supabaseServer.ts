@@ -1,23 +1,26 @@
-// Cliente para Server Components / Route Handlers con cookies de Next.
+// Cliente para Server Components y Route Handlers con cookies de Next
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 
 export function supabaseServer() {
-  const cookieStore = cookies();
+  const store = cookies();
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
+        getAll() {
+          return store.getAll();
         },
-        set(name: string, value: string, options: any) {
-          cookieStore.set({ name, value, ...options });
-        },
-        remove(name: string, options: any) {
-          cookieStore.set({ name, value: "", ...options, maxAge: 0 });
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              store.set(name, value, options)
+            );
+          } catch {
+            // Ignorable si se llama en un Server Component
+          }
         },
       },
     }
