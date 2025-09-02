@@ -1,45 +1,82 @@
+// app/api/legal/docs/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin as db } from "@/lib/supabaseAdmin";
+import { dbOrThrow } from "@/lib/db";
 
+export const runtime = "nodejs";
 export const revalidate = 0;
 
-/**
- * PUT /api/legal/docs/:id
- * body: campos a actualizar (title, category, issuedAt, expiresAt, notaryName, notaryNumber, city, state, summary)
- */
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const b = await req.json().catch(() => ({}));
-  const patch: any = {};
-  ["title","category","issuedAt","expiresAt","notaryName","notaryNumber","city","state","summary"].forEach(k => {
-    if (b[k] !== undefined) patch[k] = b[k] || null;
-  });
-  if (!Object.keys(patch).length) return NextResponse.json({ error: "no changes" }, { status: 400 });
+type Ctx = { params: { id: string } };
 
-  const { data, error } = await db
-    .from("CompanyDocument")
-    .update(patch)
-    .eq("id", params.id)
-    .select("id, category, title, issuedAt, expiresAt, notaryName, notaryNumber, city, state, summary, storage_path, createdAt")
-    .single();
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+// Si necesitas transformar la fila antes de regresar, hazlo aquí.
+function mapRow<T>(r: T): T {
+  return r;
 }
 
 /**
- * DELETE /api/legal/docs/:id
- * Elimina registro y archivo de Storage.
+ * GET /api/legal/docs/[id]
+ * Devuelve un documento por id.
  */
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  const { data: doc, error: e1 } = await db
-    .from("CompanyDocument").select("storage_path").eq("id", params.id).single();
-  if (e1) return NextResponse.json({ error: e1.message }, { status: 500 });
+export async function GET(_req: NextRequest, { params }: Ctx) {
+  try {
+    const db = dbOrThrow();
 
-  if (doc?.storage_path) {
-    await db.storage.from("legal").remove([doc.storage_path]);
+    const { data, error } = await db
+      .from("CompanyDocument") // ajusta el nombre si tu tabla se llama distinto
+      .select("*")
+      .eq("id", params.id)
+      .single();
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json(mapRow(data));
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || "Server error" }, { status: 500 });
   }
-  const { error } = await db.from("CompanyDocument").delete().eq("id", params.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+}
 
-  return NextResponse.json({ ok: true });
+/**
+ * PATCH /api/legal/docs/[id]
+ * Actualiza campos del documento por id.
+ * Body: JSON con el patch (campos a actualizar).
+ */
+export async function PATCH(req: NextRequest, { params }: Ctx) {
+  try {
+    const patch = await req.json().catch(() => ({} as Record<string, unknown>));
+    if (!patch || typeof patch !== "object" || Object.keys(patch).length === 0) {
+      return NextResponse.json({ error: "no changes" }, { status: 400 });
+    }
+
+    const db = dbOrThrow();
+
+    const { data, error } = await db
+      .from("CompanyDocument") // ajusta si aplica
+      .update(patch)
+      .eq("id", params.id)
+      .select("*")
+      .single();
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(mapRow(data));
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || "Server error" }, { status: 500 });
+  }
+}
+
+/**
+ * DELETE /api/legal/docs/[id]
+ * Elimina el documento por id.
+ */
+export async function DELETE(_req: NextRequest, { params }: Ctx) {
+  try {
+    const db = dbOrThrow();
+
+    const { error } = await db
+      .from("CompanyDocument") // ajusta si aplica
+      .delete()
+      .eq("id", params.id);
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || "Server error" }, { status: 500 });
+  }
 }
