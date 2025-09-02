@@ -1,21 +1,20 @@
 // app/(auth)/signin/page.tsx
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL!; // ej. https://bsop.vercel.app
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL!; // ej: https://bsop.vercel.app
 
 export default function SignInPage() {
-  const params = useSearchParams();
-  const redirect = useMemo(() => params.get("redirect") ?? "/", [params]);
+  const qp = useSearchParams();
+  const redirect = useMemo(() => qp.get("redirect") ?? "/", [qp]);
   const [loading, setLoading] = useState(false);
 
   const onClick = async () => {
     setLoading(true);
     const supabase = supabaseBrowser();
-
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -24,7 +23,6 @@ export default function SignInPage() {
         queryParams: { prompt: "select_account" },
       } as any,
     });
-
     if (error) {
       console.error(error);
       setLoading(false);
