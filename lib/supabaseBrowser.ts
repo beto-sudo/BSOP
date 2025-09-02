@@ -1,3 +1,5 @@
+"use client";
+
 import { createClient } from "@supabase/supabase-js";
 
 export const supabaseBrowser = () =>
@@ -6,12 +8,11 @@ export const supabaseBrowser = () =>
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       auth: {
-        flowType: "pkce",            // <- IMPORTANTÍSIMO
+        // guardamos sesión en el navegador
         persistSession: true,
         autoRefreshToken: true,
-        detectSessionInUrl: true,
-        // storageKey fijo (opcional, ayuda a evitar claves raras)
-        storageKey: "bsop-auth",
+        // NO intentes leer tokens de la URL automáticamente (usaremos PKCE)
+        detectSessionInUrl: false,
       },
     }
   );
