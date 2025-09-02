@@ -6,6 +6,7 @@ import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
 export default function AuthCallbackPage() {
   const [msg, setMsg] = useState("Procesando inicio de sesión…");
+  const [details, setDetails] = useState<string | null>(null);
   const router = useRouter();
   const params = useSearchParams();
 
@@ -14,25 +15,41 @@ export default function AuthCallbackPage() {
       try {
         const supabase = supabaseBrowser();
 
-        // Intercambia ?code=... por sesión y setea cookies en el navegador
-        const { error } = await supabase.auth.exchangeCodeForSession(
-          window.location.href
-        );
+        // 1) Leer el code de la URL
+        const code = params.get("code");
+        const redirect = params.get("redirect") || "/";
+
+        if (!code) {
+          // No llegó el code => la redirección no salió de Supabase con PKCE.
+          setMsg("No se pudo completar el inicio de sesión. Intenta de nuevo.");
+          setDetails("La URL no contiene ?code=. Revisa URL Configuration en Supabase y NEXT_PUBLIC_APP_URL.");
+          return;
+        }
+
+        // 2) Intercambiar code -> sesión (PKCE)
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (error) throw error;
 
-        const redirect = params.get("redirect") || "/";
+        // 3) Adelante a donde ibas
         router.replace(redirect);
-      } catch (e) {
+      } catch (e: any) {
         console.error(e);
         setMsg("No se pudo completar el inicio de sesión. Intenta de nuevo.");
+        setDetails(e?.message ?? String(e));
       }
     };
     run();
-  }, [router, params]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
-    <div className="mx-auto my-24 max-w-md text-center">
-      <p className="text-sm text-neutral-600">{msg}</p>
+    <div className="mx-auto my-24 max-w-md text-center space-y-2">
+      <p className="text-sm text-neutral-700">{msg}</p>
+      {details ? (
+        <pre className="mt-4 rounded bg-neutral-100 p-3 text-left text-xs text-neutral-700 overflow-auto">
+{details}
+        </pre>
+      ) : null}
     </div>
   );
 }
