@@ -1,9 +1,8 @@
 // app/api/admin/company/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
-/** Crea un cliente SSR con cookies del request/response para leer la sesión */
 function ssrClient(req: NextRequest, res: NextResponse) {
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,64 +20,78 @@ function ssrClient(req: NextRequest, res: NextResponse) {
   );
 }
 
+function bad(status: number, msg: string, headers?: HeadersInit) {
+  return new NextResponse(JSON.stringify({ error: msg }), {
+    status,
+    headers: { "Content-Type": "application/json", ...(headers || {}) },
+  });
+}
+
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const slug = (url.searchParams.get("company") || "").toLowerCase();
+  if (!slug) return bad(400, "Missing 'company' param");
 
-  if (!slug) {
-    return NextResponse.json({ error: "Missing 'company' param" }, { status: 400 });
-  }
+  const admin = getSupabaseAdmin();
+  if (!admin) return bad(500, "Missing SUPABASE_SERVICE_ROLE_KEY env var on server");
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await admin
     .from("companies")
     .select("id, slug, name, settings")
     .eq("slug", slug)
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return bad(400, error.message);
+  if (!data) return bad(404, `Company not found for slug '${slug}'`);
+
   return NextResponse.json(data);
 }
 
 export async function POST(req: NextRequest) {
   const url = new URL(req.url);
   const slug = (url.searchParams.get("company") || "").toLowerCase();
+  if (!slug) return bad(400, "Missing 'company' param");
 
-  if (!slug) {
-    return NextResponse.json({ error: "Missing 'company' param" }, { status: 400 });
-  }
-
-  // Verifica sesión (no permitimos anónimos aunque usemos service-role)
+  // 1) Verifica sesión (no permitimos anónimos)
   const res = new NextResponse();
   const supabaseSSR = ssrClient(req, res);
   const { data: sess } = await supabaseSSR.auth.getSession();
-  if (!sess?.session) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401, headers: res.headers });
+  if (!sess?.session) return bad(401, "Not authenticated", res.headers);
+
+  // 2) Valida payload
+  let body: any = {};
+  try {
+    body = await req.json();
+  } catch {}
+  const incomingSettings = body?.settings;
+  if (!incomingSettings || typeof incomingSettings !== "object") {
+    return bad(400, "Invalid payload: expecting { settings: { ... } }", res.headers);
   }
 
-  // Lee cuerpo (espera { settings: { branding: {...} } })
-  const body = await req.json().catch(() => ({}));
-  const incomingSettings = body?.settings ?? {};
-  if (typeof incomingSettings !== "object") {
-    return NextResponse.json({ error: "Invalid payload: settings" }, { status: 400, headers: res.headers });
-  }
+  // 3) Cliente admin (RLS bypass)
+  const admin = getSupabaseAdmin();
+  if (!admin) return bad(500, "Missing SUPABASE_SERVICE_ROLE_KEY env var on server", res.headers);
 
-  // Obtén fila actual
-  const { data: current, error: e1 } = await supabaseAdmin
+  // 4) Busca la empresa
+  const { data: current, error: e1 } = await admin
     .from("companies")
     .select("id, settings")
     .eq("slug", slug)
     .single();
 
-  if (e1) return NextResponse.json({ error: e1.message }, { status: 400, headers: res.headers });
+  if (e1) return bad(400, e1.message, res.headers);
+  if (!current) return bad(404, `Company not found for slug '${slug}'`, res.headers);
 
-  const merged = { ...(current?.settings || {}), ...incomingSettings };
+  // 5) Merge de settings
+  const merged = { ...(current.settings || {}), ...incomingSettings };
 
-  const { error: e2 } = await supabaseAdmin
+  // 6) Update
+  const { error: e2 } = await admin
     .from("companies")
     .update({ settings: merged })
-    .eq("id", current!.id);
+    .eq("id", current.id);
 
-  if (e2) return NextResponse.json({ error: e2.message }, { status: 400, headers: res.headers });
+  if (e2) return bad(400, e2.message, res.headers);
 
   return NextResponse.json({ ok: true }, { headers: res.headers });
 }
