@@ -1,17 +1,20 @@
-import "./globals.css";
-import type { Metadata } from "next";
-
-export const metadata: Metadata = {
-  title: "BSOP",
-  description: "BSOP Core v1",
-};
+// app/layout.tsx (o el layout “raíz” de tu app)
+import ThemeLoader from "./_components/ThemeLoader";
+import Sidebar from "./_components/Sidebar";
+import OAuthHandler from "./_components/OAuthHandler";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  // IMPORTANTE: sólo html/body en el root; nada de Sidebar aquí
   return (
     <html lang="es">
-      <body className="min-h-screen bg-slate-50 antialiased">
-        {children}
+      <body>
+        <ThemeLoader />
+        <OAuthHandler />
+        <div className="flex min-h-screen">
+          <Sidebar />
+          <main className="flex-1 p-6">
+            <div className="mx-auto max-w-6xl">{children}</div>
+          </main>
+        </div>
       </body>
     </html>
   );
