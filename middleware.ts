@@ -2,7 +2,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const PUBLIC_PATHS = new Set<string>(["/signin", "/favicon.ico", "/auth/callback"]);
+const PUBLIC_PATHS = new Set<string>([
+  "/signin",
+  "/favicon.ico",
+  "/auth/bridge",
+]);
 
 function isStatic(pathname: string) {
   return (
