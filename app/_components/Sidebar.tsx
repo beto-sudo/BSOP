@@ -1,10 +1,17 @@
+// app/_components/Sidebar.tsx
 "use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import CompanyAvatar from "./CompanyAvatar";
-import { ChevronRight, ShoppingCart, Boxes, FileText, Settings } from "lucide-react";
+import {
+  ChevronRight,
+  ShoppingCart,
+  Boxes,
+  FileText,
+  Settings,
+} from "lucide-react";
 
 type Company = { id: string; name: string; slug: string };
 type NavItem = { label: string; href: string; icon?: React.ReactNode };
@@ -15,8 +22,10 @@ const SECTIONS: Section[] = [
     key: "operacion",
     label: "OPERACIÓN",
     items: [
-      { label: "Órdenes de Compra", href: "/purchases", icon: <ShoppingCart className="h-4 w-4" /> },
-      { label: "Inventario · Productos", href: "/inventory/products", icon: <Boxes className="h-4 w-4" /> },
+      { label: "Órdenes de Compra", href: "/purchases/po", icon: <ShoppingCart className="h-4 w-4" /> },
+      { label: "Recepciones", href: "/purchases/receiving", icon: <ShoppingCart className="h-4 w-4" /> },
+      { label: "Movimientos de Inventario", href: "/inventory/moves", icon: <Boxes className="h-4 w-4" /> },
+      { label: "Productos", href: "/products", icon: <Boxes className="h-4 w-4" /> },
     ],
   },
   {
@@ -45,11 +54,23 @@ export default function Sidebar() {
   const [brandName, setBrandName] = useState<string>("");
   const [loadErr, setLoadErr] = useState<string | null>(null);
 
-  // Carga empresas
+  // secciones: solo una abierta
+  const [openKey, setOpenKey] = useState<string | null>("operacion");
+
+  const activeKeyFromPath = useMemo(() => {
+    for (const s of SECTIONS) {
+      if (s.items.some((i) => pathname.startsWith(i.href))) return s.key;
+    }
+    return null;
+  }, [pathname]);
+
+  useEffect(() => {
+    if (activeKeyFromPath) setOpenKey(activeKeyFromPath);
+  }, [activeKeyFromPath]);
+
   useEffect(() => {
     (async () => {
       try {
-        setLoadErr(null);
         const r = await fetch("/api/companies", { cache: "no-store" });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const data = await r.json();
@@ -61,12 +82,12 @@ export default function Sidebar() {
     })();
   }, []);
 
-  // Si no hay ?company y sí hay empresas, auto-selecciona la primera
+  // Auto-selecciona empresa si falta el ?company
   useEffect(() => {
     if (!company && companies.length > 0) {
       const slug = companies[0].slug;
       document.cookie = `company=${slug}; path=/; max-age=31536000; samesite=lax`;
-      router.replace(`/?company=${slug}`); // replace para no ensuciar el historial
+      router.replace(`/?company=${slug}`);
     }
   }, [company, companies, router]);
 
@@ -82,40 +103,21 @@ export default function Sidebar() {
         setLogoUrl(b.logoUrl || null);
         setBrandName(b.brandName || json?.name || "");
       } catch (e) {
-        console.warn("No pude cargar la empresa");
-        // No alert aquí para no bloquear; el UI sigue funcionando
+        console.error(e);
+        setLogoUrl(null);
+        setBrandName("");
       }
     })();
   }, [company]);
-
-  const withCompany = (href: string) =>
-    href.includes("?") ? `${href}&company=${company}` : `${href}?company=${company}`;
-
-  const storageKey = useMemo(() => `bsop:sidebar:${company || "none"}`, [company]);
-  const [open, setOpen] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    const saved = typeof window !== "undefined" ? localStorage.getItem(storageKey) : null;
-    let initial: Record<string, boolean> = saved ? JSON.parse(saved) : {};
-    const contains = (s: Section) => s.items.some((i) => pathname?.startsWith(i.href));
-    if (!Object.values(initial).some(Boolean)) {
-      const target = SECTIONS.find(contains);
-      if (target) initial[target.key] = true;
-    }
-    setOpen(initial);
-  }, [pathname, storageKey]);
-
-  useEffect(() => {
-    if (Object.keys(open).length) localStorage.setItem(storageKey, JSON.stringify(open));
-  }, [open, storageKey]);
-
-  const isActive = (href: string) => pathname?.startsWith(href);
-  const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }));
 
   function onChangeCompany(slug: string) {
     document.cookie = `company=${slug}; path=/; max-age=31536000; samesite=lax`;
     router.push(`/?company=${slug}`);
     router.refresh();
+  }
+
+  function toggleKey(k: string) {
+    setOpenKey((curr) => (curr === k ? null : k));
   }
 
   return (
@@ -145,45 +147,50 @@ export default function Sidebar() {
             ))
           )}
         </select>
-        {loadErr && <div className="mt-1 text-[11px] text-red-600">{loadErr}</div>}
+        {loadErr && <p className="mt-2 text-xs text-red-600">{loadErr}</p>}
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-2 pb-4">
-        {SECTIONS.map((sec) => (
-          <div key={sec.key} className="mb-2">
-            <button
-              onClick={() => toggle(sec.key)}
-              aria-expanded={!!open[sec.key]}
-              className={`w-full flex items-center justify-between text-[11px] tracking-wide px-3 py-2 rounded-xl 
-                         ${open[sec.key] ? "bg-white border" : "hover:bg-white/60"} border`}
-            >
-              <span className="font-semibold text-slate-600">{sec.label}</span>
-              <ChevronRight className={`h-4 w-4 opacity-60 transition-transform ${open[sec.key] ? "rotate-90" : ""}`} />
-            </button>
+      <nav className="flex-1 overflow-y-auto px-2 pb-4 space-y-2">
+        {SECTIONS.map((s) => {
+          const isOpen = openKey === s.key;
+          return (
+            <div key={s.key} className="rounded-xl border bg-white">
+              <button
+                onClick={() => toggleKey(s.key)}
+                className="w-full flex items-center justify-between px-3 py-2 text-left"
+              >
+                <span className="text-[11px] font-semibold tracking-wider text-slate-600">
+                  {s.label}
+                </span>
+                <ChevronRight
+                  className={`h-4 w-4 transition-transform ${isOpen ? "rotate-90" : ""}`}
+                />
+              </button>
 
-            {open[sec.key] && (
-              <ul className="mt-1 space-y-1">
-                {sec.items.map((item) => (
-                  <li key={item.href}>
-                    <Link
-                      href={withCompany(item.href)}
-                      aria-current={isActive(item.href) ? "page" : undefined}
-                      className={`group flex items-center gap-2 px-3 py-2 rounded-xl border 
-                                  ${isActive(item.href)
-                                    ? "bg-[var(--brand-50)] border-[var(--brand-200)] text-[var(--brand-900)]"
-                                    : "bg-white border-transparent hover:border-[var(--brand-200)]"}`}
-                    >
-                      <span className={`opacity-70 ${isActive(item.href) ? "text-[var(--brand-700)]" : "text-slate-500"}`}>
-                        {item.icon ?? <ChevronRight className="h-4 w-4" />}
-                      </span>
-                      <span className="text-sm">{item.label}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        ))}
+              {isOpen && (
+                <ul className="py-1">
+                  {s.items.map((item) => {
+                    const active = pathname === item.href || pathname.startsWith(item.href + "/");
+                    return (
+                      <li key={item.href}>
+                        <Link
+                          href={company ? `${item.href}?company=${company}` : item.href}
+                          className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors
+                            ${active ? "text-[var(--brand-700)] bg-[var(--brand-50)]" : "text-slate-700 hover:bg-slate-50"}
+                          `}
+                          onClick={() => setOpenKey(s.key)}
+                        >
+                          <span className="opacity-80">{item.icon ?? <ChevronRight className="h-4 w-4" />}</span>
+                          <span className="truncate">{item.label}</span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          );
+        })}
       </nav>
     </aside>
   );
