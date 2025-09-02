@@ -6,9 +6,12 @@ export const supabaseBrowser = () =>
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       auth: {
-        flowType: "pkce",           // evita #access_token
+        flowType: "pkce",            // <- IMPORTANTÍSIMO
+        persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
+        // storageKey fijo (opcional, ayuda a evitar claves raras)
+        storageKey: "bsop-auth",
       },
     }
   );
