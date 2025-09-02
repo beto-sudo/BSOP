@@ -7,18 +7,14 @@ let cachedTable: string | null = null;
 function coerceStr(v: any): string {
   if (v == null) return "";
   if (typeof v === "string") return v;
-  try {
-    return JSON.stringify(v);
-  } catch {
-    return String(v);
-  }
+  try { return JSON.stringify(v); } catch { return String(v); }
 }
 function toBool(x: any): boolean {
   if (typeof x === "boolean") return x;
   if (typeof x === "number") return x === 1;
   if (typeof x === "string") {
     const v = x.toLowerCase();
-    return ["1", "true", "activo", "active", "enabled", "yes", "sí", "si"].includes(v);
+    return ["1","true","activo","active","enabled","yes","sí","si"].includes(v);
   }
   return false;
 }
@@ -26,13 +22,14 @@ function toBool(x: any): boolean {
 export type CompanyDTO = {
   id: string | number;
   slug: string;
-  name: string;
-  legalName?: string;
+  name: string;         // comercial
+  legalName?: string;   // razón social
+  tradeName?: string;   // alias comercial si lo usas aparte
   rfc?: string;
   email?: string;
   phone?: string;
-  address?: string; // el front manda string (si el campo real es jsonb lo parseamos aquí)
-  active?: boolean;
+  address?: string;     // UI envía string; si la columna es jsonb la parseamos aquí
+  active?: boolean;     // checkbox del UI
   settings?: any;
 };
 
@@ -41,34 +38,35 @@ async function resolveCompanyTable(): Promise<string> {
   const db = dbOrThrow();
   for (const t of TABLE_CANDIDATES) {
     const { error } = await db.from(t).select("id").limit(1);
-    if (!error) {
-      cachedTable = t;
-      return t;
-    }
+    if (!error) { cachedTable = t; return t; }
   }
-  throw new Error("Companies table not found (tried Company/company/companies)");
+  throw new Error("Companies table not found (Company/company/companies)");
 }
 
 function normalize(row: any): CompanyDTO {
-  const s = row?.settings ?? {};
+  const s  = row?.settings ?? {};
   const sc = s?.company ?? {};
 
+  // nombre comercial priorizamos tradeName si lo usas, si no name
+  const name = row.tradeName ?? row.name ?? sc.name ?? "";
+
   const legalName =
-    row.legal_name ?? row.razon_social ?? sc.legalName ?? sc.razonSocial ?? "";
-  const phone = row.phone ?? row.telefono ?? sc.phone ?? "";
+    row.legalName ?? row.legal_name ?? row.razon_social ?? sc.legalName ?? sc.razonSocial ?? "";
+
   const address = coerceStr(row.address ?? row.direccion ?? sc.address ?? "");
-  const active =
+  const phone   = row.phone ?? sc.phone ?? "";
+  const active  =
     row.active !== undefined ? toBool(row.active)
+    : row.isActive !== undefined ? toBool(row.isActive)
     : row.is_active !== undefined ? toBool(row.is_active)
-    : row.enabled !== undefined ? toBool(row.enabled)
-    : row.status !== undefined ? toBool(row.status)
     : sc.active !== undefined ? toBool(sc.active)
-    : false;
+    : true;
 
   return {
     id: row.id,
     slug: row.slug ?? sc.slug ?? "",
-    name: row.name ?? sc.name ?? "",
+    name,
+    tradeName: row.tradeName ?? sc.tradeName,
     legalName,
     rfc: row.rfc ?? sc.rfc ?? "",
     email: row.email ?? sc.email ?? "",
@@ -80,13 +78,14 @@ function normalize(row: any): CompanyDTO {
 }
 
 function mergeSettings(current: any, dto: CompanyDTO) {
-  const s = current?.settings ?? {};
+  const s  = current?.settings ?? {};
   const sc = s.company ?? {};
   return {
     ...s,
     company: {
       ...sc,
       name: dto.name ?? sc.name,
+      tradeName: dto.tradeName ?? sc.tradeName,
       slug: dto.slug ?? sc.slug,
       legalName: dto.legalName ?? sc.legalName,
       rfc: dto.rfc ?? sc.rfc,
@@ -98,24 +97,16 @@ function mergeSettings(current: any, dto: CompanyDTO) {
   };
 }
 
-export async function listCompanies(): Promise<Array<Pick<CompanyDTO, "id"|"name"|"slug">>> {
+export async function listCompanies() {
   const db = dbOrThrow();
   const table = await resolveCompanyTable();
-
-  const q = await db.from(table).select("id,name,slug").order("name", { ascending: true });
-  if (!q.error) {
-    return (q.data ?? []).map((r: any) => ({
-      id: r.id,
-      name: r.name ?? "",
-      slug: r.slug ?? (r.name ? r.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") : String(r.id)),
-    }));
-  }
-  const all = await db.from(table).select("*");
-  if (all.error) throw all.error;
-  return (all.data ?? []).map((r: any) => ({
+  // name + slug sí existen en tu schema
+  const { data, error } = await db.from(table).select("id,name,tradeName,slug").order("name", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((r: any) => ({
     id: r.id,
-    name: r.name ?? "",
-    slug: r.slug ?? (r.name ? r.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") : String(r.id)),
+    name: r.tradeName ?? r.name ?? "",
+    slug: r.slug ?? (r.name ? r.name.toLowerCase().replace(/[^a-z0-9]+/g,"-") : String(r.id)),
   }));
 }
 
@@ -128,11 +119,13 @@ export async function getCompanyBySlug(slug: string): Promise<CompanyDTO> {
 }
 
 /**
- * Actualización tolerante:
- * - Solo actualiza columnas que EXISTEN en la fila.
- * - Si `address/direccion` es JSONB en la DB, intentamos parsear el string del form.
- * - Si el UPDATE queda sin columnas (payload vacío), NO llama a PostgREST y regresa ok.
- * - Solo toca `settings` si la tabla tiene esa columna.
+ * Update “a prueba de balas” para tu schema:
+ * - Mapea camelCase reales: legalName, tradeName, isActive, address(jsonb).
+ * - Si la columna existe en la fila, se actualiza; si no, se ignora.
+ * - address: si es jsonb y el UI manda string, intentamos JSON.parse.
+ * - actualiza 'active' e 'isActive' si ambas existen (se mantienen consistentes).
+ * - settings: solo si existe la columna.
+ * - Si el patch queda vacío, no disparo update y devuelvo ok.
  */
 export async function updateCompanyBySlug(slug: string, patch: Partial<CompanyDTO>) {
   const db = dbOrThrow();
@@ -144,53 +137,54 @@ export async function updateCompanyBySlug(slug: string, patch: Partial<CompanyDT
   const has = (k: string) => Object.prototype.hasOwnProperty.call(current, k);
   const upd: any = {};
 
-  if (has("name") && patch.name !== undefined) upd.name = patch.name;
+  // Nombre comercial: si existe tradeName lo sincronizamos también
+  if (patch.name !== undefined) {
+    if (has("name"))      upd.name = patch.name;
+    if (has("tradeName")) upd.tradeName = patch.name;
+  }
+  if (patch.tradeName !== undefined) {
+    if (has("tradeName")) upd.tradeName = patch.tradeName;
+    // y si no hay tradeName, al menos name
+    else if (has("name")) upd.name = patch.tradeName;
+  }
 
   if (patch.legalName !== undefined) {
-    if (has("legal_name")) upd.legal_name = patch.legalName;
+    if (has("legalName"))    upd.legalName = patch.legalName;
+    else if (has("legal_name")) upd.legal_name = patch.legalName;
     else if (has("razon_social")) upd.razon_social = patch.legalName;
   }
+
   if (patch.rfc !== undefined && has("rfc")) upd.rfc = patch.rfc;
   if (patch.email !== undefined && has("email")) upd.email = patch.email;
-
-  if (patch.phone !== undefined) {
-    if (has("phone")) upd.phone = patch.phone;
-    else if (has("telefono")) upd.telefono = patch.phone;
-  }
+  if (patch.phone !== undefined && has("phone")) upd.phone = patch.phone;
 
   if (patch.address !== undefined) {
-    // Si la columna real parece JSONB (el valor actual es objeto/array), parseamos el string del form.
     const looksJsonb =
-      (has("address") && typeof current.address === "object" && current.address !== null) ||
+      (has("address")   && typeof current.address   === "object" && current.address   !== null) ||
       (has("direccion") && typeof current.direccion === "object" && current.direccion !== null);
 
     let value: any = patch.address;
     if (looksJsonb && typeof patch.address === "string") {
-      try {
-        value = JSON.parse(patch.address);
-      } catch {
-        // si no es JSON válido, guardamos el string tal cual
-        value = patch.address;
-      }
+      try { value = JSON.parse(patch.address); } catch { value = patch.address; }
     }
-
-    if (has("address")) upd.address = value;
-    else if (has("direccion")) upd.direccion = value;
+    if (has("address"))   upd.address   = value;
+    if (has("direccion")) upd.direccion = value;
   }
 
   if (patch.active !== undefined) {
-    if (has("active")) upd.active = patch.active;
-    else if (has("is_active")) upd.is_active = patch.active;
-    else if (has("enabled")) upd.enabled = patch.active;
-    else if (has("status")) upd.status = patch.active ? "active" : "inactive";
+    // Actualizamos ambos si existen, para mantener coherencia
+    if (has("active"))   upd.active   = patch.active;
+    if (has("isActive")) upd.isActive = patch.active;
+    if (has("is_active")) upd.is_active = patch.active;
   }
 
-  // Solo si la tabla TIENE columna settings
+  // settings solo si existe
   if (has("settings")) {
     upd.settings = mergeSettings(current, {
       id: current.id,
       slug: current.slug ?? slug,
-      name: patch.name ?? current.name ?? "",
+      name: patch.name ?? current.name ?? current.tradeName ?? "",
+      tradeName: patch.tradeName,
       legalName: patch.legalName,
       rfc: patch.rfc,
       email: patch.email,
@@ -200,7 +194,6 @@ export async function updateCompanyBySlug(slug: string, patch: Partial<CompanyDT
     });
   }
 
-  // Si no hay nada que actualizar (evitamos 400 por payload vacío), salimos OK
   if (Object.keys(upd).length === 0) {
     return { ok: true, noop: true };
   }
