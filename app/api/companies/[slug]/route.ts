@@ -12,10 +12,7 @@ function bad(status: number, msg: string) {
   });
 }
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { slug: string } }
-) {
+export async function GET(_req: NextRequest, { params }: { params: { slug: string } }) {
   try {
     const slug = (params.slug || "").toLowerCase();
     if (!slug) return bad(400, "Missing slug");
@@ -26,10 +23,7 @@ export async function GET(
   }
 }
 
-async function write(
-  req: NextRequest,
-  { params }: { params: { slug: string } }
-) {
+async function write(req: NextRequest, { params }: { params: { slug: string } }) {
   const slug = (params.slug || "").toLowerCase();
   if (!slug) return bad(400, "Missing slug");
 
@@ -46,7 +40,8 @@ async function write(
     active:    body?.active,
   });
 
-  return NextResponse.json({ ok: true });
+  const company = await getCompanyBySlug(slug);
+  return NextResponse.json({ ok: true, company });
 }
 
 export async function PUT(req: NextRequest, ctx: { params: { slug: string } }) {
