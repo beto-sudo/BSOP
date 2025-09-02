@@ -164,22 +164,30 @@ export default function BrandingPage() {
   }
 
   async function saveBranding() {
-    const payload = { settings: { branding: state } };
-    const r = await fetch(`/api/admin/company?company=${company}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!r.ok) {
-      const txt = await r.text();
-      console.error("saveBranding:", txt);
-      alert("No pude guardar el branding.");
-      return;
+  const payload = { settings: { branding: state } };
+  const r = await fetch(`/api/admin/company?company=${company}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!r.ok) {
+    let msg = r.statusText;
+    try {
+      const j = await r.json();
+      msg = j?.error || msg;
+    } catch {
+      try { msg = await r.text(); } catch {}
     }
-    // Notifica a ThemeLoader y a otras pestañas
-    window.dispatchEvent(new CustomEvent("branding:updated", { detail: { company } }));
-    try { localStorage.setItem("branding:updated", String(Date.now())); } catch {}
+    alert("No pude guardar el branding: " + msg);
+    return;
   }
+
+  // Notifica a ThemeLoader y otras pestañas
+  window.dispatchEvent(new CustomEvent("branding:updated", { detail: { company } }));
+  try { localStorage.setItem("branding:updated", String(Date.now())); } catch {}
+}
+
 
   return (
     <div className="p-6">
