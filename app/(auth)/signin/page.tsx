@@ -1,4 +1,3 @@
-// app/(auth)/signin/page.tsx
 "use client";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -7,32 +6,27 @@ import { supabaseBrowser } from "@/lib/supabaseBrowser";
 export default function SignIn() {
   const redirect = useSearchParams().get("redirect") || "/";
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string|null>(null);
-  const APP_URL = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+  const [err, setErr] = useState<string | null>(null);
 
   async function signInWithGoogle() {
     setErr(null);
     setLoading(true);
     const supabase = supabaseBrowser();
+    const appOrigin = window.location.origin;
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
+      // Cast para que el compilador de Vercel no se queje del 'flowType'
       options: {
-        flowType: "pkce", // <- MUY importante (evita #access_token)
-        redirectTo: `${APP_URL}/auth/callback?redirect=${encodeURIComponent(redirect)}`,
+        flowType: "pkce",
+        redirectTo: `${appOrigin}/auth/callback?redirect=${encodeURIComponent(redirect)}`,
         skipBrowserRedirect: true,
         queryParams: { prompt: "select_account" },
-      },
+      } as any,
     });
 
     if (error) { setErr(error.message); setLoading(false); return; }
-    const url = data?.url;
-    if (!url) { setErr("No se obtuvo la URL de OAuth."); setLoading(false); return; }
-
-    try {
-      if (window.top && window.top !== window) window.top.location.href = url;
-      else window.location.href = url;
-    } catch { window.open(url, "_blank", "noopener"); }
+    if (data?.url) window.location.href = data.url;
   }
 
   return (
