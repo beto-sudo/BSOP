@@ -1,4 +1,4 @@
-// Cliente para Server Components y Route Handlers con cookies de Next
+// lib/supabaseServer.ts
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 
@@ -19,7 +19,7 @@ export function supabaseServer() {
               store.set(name, value, options)
             );
           } catch {
-            // Ignorable si se llama en un Server Component
+            // Ignorable al llamarse en Server Components
           }
         },
       },
