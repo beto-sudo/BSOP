@@ -1,11 +1,8 @@
-// app/(auth)/signin/page.tsx
 "use client";
 
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL!; // p.ej. https://bsop-alpha.vercel.app
 
 export default function SignInPage() {
   const qp = useSearchParams();
@@ -15,15 +12,22 @@ export default function SignInPage() {
   const onClick = async () => {
     setLoading(true);
     const supabase = supabaseBrowser();
+
+    // Usa SIEMPRE el origen actual para evitar mismatch apex/www/alpha
+    const origin =
+      typeof window !== "undefined"
+        ? window.location.origin
+        : (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         flowType: "pkce",
-        // IMPORTANTE: regresamos al bridge cliente
-        redirectTo: `${APP_URL}/auth/bridge?redirect=${encodeURIComponent(redirect)}`,
+        redirectTo: `${origin}/auth/bridge?redirect=${encodeURIComponent(redirect)}`,
         queryParams: { prompt: "select_account" },
       } as any,
     });
+
     if (error) {
       console.error(error);
       setLoading(false);
