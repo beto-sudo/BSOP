@@ -1,8 +1,8 @@
 // lib/supabaseBrowser.ts
-import { createClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
 
 export function supabaseBrowser() {
-  return createClient(
+  return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -11,6 +11,10 @@ export function supabaseBrowser() {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
+      },
+      cookies: {
+        // @supabase/ssr se encarga de crear la cookie PKCE first-party.
+        // No necesitamos implementar get/set aquí en cliente.
       },
     }
   );
