@@ -1,5 +1,5 @@
+// app/(auth)/signin/page.tsx
 "use client";
-
 import { useCallback, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
@@ -9,7 +9,7 @@ export default function SignInPage() {
   const redirect = params.get("redirect") || "/";
   const [loading, setLoading] = useState(false);
 
-  const appUrl =
+  const APP_URL =
     process.env.NEXT_PUBLIC_APP_URL ||
     (typeof window !== "undefined" ? window.location.origin : "");
 
@@ -17,25 +17,19 @@ export default function SignInPage() {
     setLoading(true);
     try {
       const supabase = supabaseBrowser();
-
       await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          // **Forzamos PKCE**, que es lo que necesita exchangeCodeForSession
           flowType: "pkce",
-          redirectTo: `${appUrl}/auth/callback?redirect=${encodeURIComponent(
-            redirect
-          )}`,
-          // Para obligar selector de cuenta
+          // Ya no vamos a /auth/callback: regresamos a la raíz con ?code=...
+          redirectTo: `${APP_URL}?redirect=${encodeURIComponent(redirect)}`,
           queryParams: { prompt: "select_account" },
-          // dejamos que redirija solo
-          skipBrowserRedirect: false,
         },
       });
     } finally {
       setLoading(false);
     }
-  }, [redirect, appUrl]);
+  }, [APP_URL, redirect]);
 
   return (
     <div className="min-h-[60vh] grid place-items-center">
