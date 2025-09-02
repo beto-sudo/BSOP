@@ -19,7 +19,8 @@ export default function SignInPage() {
       provider: "google",
       options: {
         flowType: "pkce",
-        redirectTo: `${APP_URL}/auth/callback?redirect=${encodeURIComponent(redirect)}`,
+        // IMPORTANTE: regresamos al bridge cliente
+        redirectTo: `${APP_URL}/auth/bridge?redirect=${encodeURIComponent(redirect)}`,
         queryParams: { prompt: "select_account" },
       } as any,
     });
