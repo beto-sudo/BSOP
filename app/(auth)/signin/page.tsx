@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL!; // ej: https://bsop.vercel.app
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL!; // ej: https://bsop-alpha.vercel.app
 
 export default function SignInPage() {
   const qp = useSearchParams();
@@ -19,7 +19,8 @@ export default function SignInPage() {
       provider: "google",
       options: {
         flowType: "pkce",
-        redirectTo: `${APP_URL}?redirect=${encodeURIComponent(redirect)}`,
+        // MUY IMPORTANTE: regresamos al callback server
+        redirectTo: `${APP_URL}/auth/callback?redirect=${encodeURIComponent(redirect)}`,
         queryParams: { prompt: "select_account" },
       } as any,
     });
