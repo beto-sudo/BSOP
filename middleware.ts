@@ -5,6 +5,7 @@ import { createServerClient } from "@supabase/ssr";
 const PUBLIC_PATHS = new Set<string>([
   "/signin",
   "/favicon.ico",
+  "/auth/callback",
 ]);
 
 function isStatic(pathname: string) {
@@ -18,12 +19,7 @@ function isStatic(pathname: string) {
 export async function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
   if (isStatic(pathname)) return NextResponse.next();
-
   if (pathname.startsWith("/api")) return NextResponse.next();
-
-  // permite el intercambio PKCE
-  const hasOAuthCode = req.nextUrl.searchParams.has("code");
-  if (hasOAuthCode) return NextResponse.next();
 
   const res = NextResponse.next();
 
@@ -42,7 +38,7 @@ export async function middleware(req: NextRequest) {
     }
   );
 
-  const { data, error } = await supabase.auth.getSession().catch(() => ({ data: { session: null }, error: null }));
+  const { data } = await supabase.auth.getSession().catch(() => ({ data: { session: null } as any }));
   const session = data?.session ?? null;
 
   if (!session && !PUBLIC_PATHS.has(pathname)) {
@@ -61,6 +57,4 @@ export async function middleware(req: NextRequest) {
   return res;
 }
 
-export const config = {
-  matcher: ["/((?!.*\\.).*)"],
-};
+export const config = { matcher: ["/((?!.*\\.).*)"] };
