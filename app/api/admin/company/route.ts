@@ -30,18 +30,18 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json().catch(() => ({}));
     await updateCompanyBySlug(slug, {
-      name: body?.name,
+      name:      body?.name,
+      tradeName: body?.tradeName,           // si el UI decide enviarlo
       legalName: body?.legalName ?? body?.razonSocial,
-      rfc: body?.rfc,
-      email: body?.email,
-      phone: body?.phone ?? body?.telefono,
-      address: body?.address ?? body?.direccion,
-      active: body?.active,
+      rfc:       body?.rfc,
+      email:     body?.email,
+      phone:     body?.phone ?? body?.telefono,
+      address:   body?.address ?? body?.direccion,
+      active:    body?.active,
     });
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {
-    // devolvemos mensaje exacto para que el front deje de decir "No pude guardar" genérico
     return bad(400, e?.message || "Cannot save company");
   }
 }
