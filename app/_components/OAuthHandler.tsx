@@ -1,5 +1,6 @@
 // app/_components/OAuthHandler.tsx
 "use client";
+
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
@@ -11,9 +12,9 @@ export default function OAuthHandler() {
   useEffect(() => {
     const code = params.get("code");
     const error = params.get("error");
-    if (!code && !error) return; // no venimos de OAuth
+    if (!code && !error) return;
 
-    const run = async () => {
+    (async () => {
       if (error) {
         console.error("OAuth error:", params.get("error_description") || error);
         router.replace(params.get("redirect") || "/");
@@ -21,15 +22,14 @@ export default function OAuthHandler() {
       }
 
       const supabase = supabaseBrowser();
-      const { error: exErr } =
-        await supabase.auth.exchangeCodeForSession(window.location.href);
-      if (exErr) console.error(exErr);
+      const { error: exErr } = await supabase.auth.exchangeCodeForSession(window.location.href);
+      if (exErr) {
+        console.error("exchangeCodeForSession", exErr);
+      }
 
       const redirect = params.get("redirect") || "/";
-      router.replace(redirect); // limpia la URL y manda a donde corresponde
-    };
-
-    run();
+      router.replace(redirect);
+    })();
   }, [params, router]);
 
   return null;
