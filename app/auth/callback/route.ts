@@ -13,8 +13,6 @@ function redirectWithError(origin: string, redirect: string, code: string, detai
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const redirect = url.searchParams.get("redirect") || "/";
-
-  // Preparamos la respuesta de redirección final (donde ya estará la sesión)
   const res = NextResponse.redirect(new URL(redirect, url.origin));
 
   const supabase = createServerClient(
@@ -32,15 +30,11 @@ export async function GET(req: NextRequest) {
     }
   );
 
-  // Intenta el intercambio
   const { error } = await supabase.auth.exchangeCodeForSession(req.url);
-
   if (error) {
-    // Diagnóstico rápido en la URL para que sepamos exactamente qué pasó
     return redirectWithError(url.origin, redirect, "oauth", error.message || error.name);
   }
 
-  // Extra: verifica que realmente haya sesión (defensa adicional)
   const { data: sessionData, error: sessErr } = await supabase.auth.getSession();
   if (sessErr || !sessionData?.session) {
     return redirectWithError(url.origin, redirect, "no_session", sessErr?.message || "No session after exchange");
