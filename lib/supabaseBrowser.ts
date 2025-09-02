@@ -1,4 +1,4 @@
-// Cliente para el navegador (usa PKCE). No meter cookies aquí.
+// Cliente del navegador (OAuth PKCE)
 import { createClient } from "@supabase/supabase-js";
 
 export const supabaseBrowser = () =>
@@ -7,7 +7,7 @@ export const supabaseBrowser = () =>
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       auth: {
-        flowType: "pkce",           // <- importante para evitar #access_token
+        flowType: "pkce",
         autoRefreshToken: true,
         detectSessionInUrl: true,
       },
