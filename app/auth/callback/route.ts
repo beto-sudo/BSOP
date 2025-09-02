@@ -1,31 +1,24 @@
-// app/auth/callback/route.ts
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const next = url.searchParams.get("redirect") ?? "/";
+  const redirect = url.searchParams.get("redirect") || "/";
 
-  const cookieStore = cookies();
-
+  const store = cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        // ← interfaz nueva
         getAll() {
-          return cookieStore.getAll();
+          return store.getAll();
         },
         setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignorable si viene de un Server Component
-          }
+          cookiesToSet.forEach(({ name, value, options }) =>
+            store.set(name, value, options)
+          );
         },
       },
     }
@@ -33,9 +26,9 @@ export async function GET(req: Request) {
 
   const code = url.searchParams.get("code");
   if (code) {
+    // Completa la sesión (PKCE/OAuth)
     await supabase.auth.exchangeCodeForSession(code);
   }
 
-  // redirige a la app
-  return NextResponse.redirect(new URL(next, url.origin));
+  return NextResponse.redirect(new URL(redirect, url.origin));
 }
