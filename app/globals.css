@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Variables de tema (se sobreescriben en runtime) */
+:root {
+  --brand: #0f172a;
+  --brand-50:  #f8fafc;
+  --brand-100: #f1f5f9;
+  --brand-200: #e2e8f0;
+  --brand-300: #cbd5e1;
+  --brand-400: #94a3b8;
+  --brand-500: #64748b;
+  --brand-600: #475569;
+  --brand-700: #334155;
+  --brand-800: #1e293b;
+  --brand-900: #0f172a;
+}
+
+html, body { height: 100%; }
+
+/* Utilidades mínimas ligadas a brand */
+.brand-text { color: var(--brand); }
+.brand-bg   { background-color: var(--brand); color: white; }
+.brand-muted-bg { background-color: var(--brand-50); }
+.brand-border { border-color: var(--brand-300); }
+
+/* Ejemplos para botones/links si quieres usar sin Tailwind dinámico */
+.btn-primary {
+  background: var(--brand);
+  color: #fff;
+  border-radius: 0.75rem;
+  padding: 0.5rem 1rem;
+}
+.btn-primary:hover { filter: brightness(0.95); }
+
+.link-active { color: var(--brand); font-weight: 600; }
