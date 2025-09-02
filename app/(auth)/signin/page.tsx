@@ -17,13 +17,18 @@ export default function SignInPage() {
     setLoading(true);
     try {
       const supabase = supabaseBrowser();
+
       await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
+          // **Forzamos PKCE**, que es lo que necesita exchangeCodeForSession
+          flowType: "pkce",
           redirectTo: `${appUrl}/auth/callback?redirect=${encodeURIComponent(
             redirect
           )}`,
+          // Para obligar selector de cuenta
           queryParams: { prompt: "select_account" },
+          // dejamos que redirija solo
           skipBrowserRedirect: false,
         },
       });
