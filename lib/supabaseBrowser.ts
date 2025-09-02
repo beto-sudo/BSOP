@@ -12,10 +12,6 @@ export function supabaseBrowser() {
         autoRefreshToken: true,
         detectSessionInUrl: true,
       },
-      cookies: {
-        // @supabase/ssr se encarga de crear la cookie PKCE first-party.
-        // No necesitamos implementar get/set aquí en cliente.
-      },
     }
   );
 }
