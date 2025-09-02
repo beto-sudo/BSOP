@@ -1,16 +1,26 @@
-// NO uses cookies() aquí. Este módulo solo exporta un factory.
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
+// lib/supabaseServer.ts
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 
-type CookieFns = {
-  get: (name: string) => string | undefined;
-  set: (name: string, value: string, options: CookieOptions) => void;
-  remove: (name: string, options: CookieOptions) => void;
-};
+export const supabaseServer = () => {
+  const cookieStore = cookies();
 
-export function createSupabaseServer(cookieFns: CookieFns) {
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: cookieFns }
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {}
+        },
+      },
+    }
   );
-}
+};
