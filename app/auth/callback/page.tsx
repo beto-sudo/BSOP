@@ -15,18 +15,15 @@ export default function AuthCallbackPage() {
       try {
         const supabase = supabaseBrowser();
 
-        const code = params.get("code");
-        const redirect = params.get("redirect") || "/";
+        // 1) Recomendado por Supabase: pasar la URL completa
+        const { error } = await supabase.auth.exchangeCodeForSession(
+          window.location.href
+        );
 
-        if (!code) {
-          setMsg("No se pudo completar el inicio de sesión. Intenta de nuevo.");
-          setDetails("La URL no contiene ?code=. Revisa URL Configuration en Supabase y NEXT_PUBLIC_APP_URL.");
-          return;
-        }
-
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (error) throw error;
 
+        // 2) Redirige a donde te pedían volver (o al home)
+        const redirect = params.get("redirect") || "/";
         router.replace(redirect);
       } catch (e: any) {
         console.error(e);
