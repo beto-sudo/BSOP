@@ -12,36 +12,37 @@ function bad(status: number, msg: string) {
   });
 }
 
-export async function GET(req: NextRequest) {
-  try {
-    const slug = (new URL(req.url).searchParams.get("company") || "").toLowerCase();
-    if (!slug) return bad(400, "Missing 'company' param");
-    const dto = await getCompanyBySlug(slug);
-    return NextResponse.json(dto);
-  } catch (e: any) {
-    return bad(400, e?.message || "Cannot load company");
-  }
+async function handleRead(req: NextRequest) {
+  const slug = (new URL(req.url).searchParams.get("company") || "").toLowerCase();
+  if (!slug) return bad(400, "Missing 'company' param");
+  const dto = await getCompanyBySlug(slug);
+  return NextResponse.json(dto);
 }
 
-export async function POST(req: NextRequest) {
-  try {
-    const slug = (new URL(req.url).searchParams.get("company") || "").toLowerCase();
-    if (!slug) return bad(400, "Missing 'company' param");
+async function handleWrite(req: NextRequest) {
+  const url = new URL(req.url);
+  let slug = (url.searchParams.get("company") || "").toLowerCase();
 
-    const body = await req.json().catch(() => ({}));
-    await updateCompanyBySlug(slug, {
-      name:      body?.name,
-      tradeName: body?.tradeName,           // si el UI decide enviarlo
-      legalName: body?.legalName ?? body?.razonSocial,
-      rfc:       body?.rfc,
-      email:     body?.email,
-      phone:     body?.phone ?? body?.telefono,
-      address:   body?.address ?? body?.direccion,
-      active:    body?.active,
-    });
+  const body = await req.json().catch(() => ({}));
+  if (!slug) slug = (body?.slug || body?.company || "").toLowerCase();
+  if (!slug) return bad(400, "Missing 'company' slug");
 
-    return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    return bad(400, e?.message || "Cannot save company");
-  }
+  await updateCompanyBySlug(slug, {
+    name:      body?.name,
+    tradeName: body?.tradeName,
+    legalName: body?.legalName ?? body?.razonSocial,
+    rfc:       body?.rfc,
+    email:     body?.email,
+    phone:     body?.phone ?? body?.telefono,
+    address:   body?.address ?? body?.direccion,
+    active:    body?.active,
+  });
+
+  return NextResponse.json({ ok: true });
 }
+
+export async function GET(req: NextRequest)   { try { return await handleRead(req); }  catch (e:any){ return bad(400, e?.message||"Cannot load company"); } }
+export async function POST(req: NextRequest)  { try { return await handleWrite(req);}  catch (e:any){ return bad(400, e?.message||"Cannot save company"); } }
+export async function PUT(req: NextRequest)   { try { return await handleWrite(req);}  catch (e:any){ return bad(400, e?.message||"Cannot save company"); } }
+export async function PATCH(req: NextRequest) { try { return await handleWrite(req);}  catch (e:any){ return bad(400, e?.message||"Cannot save company"); } }
+export async function OPTIONS() { return new NextResponse(null, { status: 204 }); }
