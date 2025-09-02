@@ -1,6 +1,5 @@
 // lib/supabaseBrowser.ts
-"use client";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from '@supabase/supabase-js';
 
 export const supabaseBrowser = () =>
   createClient(
@@ -10,8 +9,7 @@ export const supabaseBrowser = () =>
       auth: {
         persistSession: true,
         autoRefreshToken: true,
-        // esto solo gestiona el flujo implícito (#access_token). Con PKCE no hace falta.
-        detectSessionInUrl: false,
+        detectSessionInUrl: true,
       },
     }
   );
