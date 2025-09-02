@@ -4,17 +4,18 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import {
-  ChevronRight,
-  ShoppingCart,
-  Boxes,
-  FileText,
-  Settings,
-} from "lucide-react";
+import { ChevronRight, ShoppingCart, Boxes, FileText, Settings } from "lucide-react";
 
 type Company = { id: string; name: string; slug: string };
 type NavItem = { label: string; href: string; icon?: React.ReactNode };
 type Section = { key: string; label: string; items: NavItem[] };
+
+type Branding = {
+  brandName?: string;
+  primary?: string;
+  secondary?: string;
+  logoUrl?: string;
+};
 
 const SECTIONS: Section[] = [
   {
@@ -42,6 +43,21 @@ const SECTIONS: Section[] = [
   },
 ];
 
+function InitialsIcon({ name }: { name: string }) {
+  const initials =
+    (name || "")
+      .split(" ")
+      .map((s) => s[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "B";
+  return (
+    <div className="h-9 w-9 rounded-xl bg-[var(--brand-100)] grid place-items-center text-[var(--brand-800)] text-xs font-semibold">
+      {initials}
+    </div>
+  );
+}
+
 export default function Sidebar() {
   const router = useRouter();
   const qp = useSearchParams();
@@ -49,6 +65,7 @@ export default function Sidebar() {
   const company = (qp.get("company") || "").toLowerCase();
 
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [branding, setBranding] = useState<Branding | null>(null);
   const [openKey, setOpenKey] = useState<string | null>("operacion");
 
   const activeKeyFromPath = useMemo(() => {
@@ -62,6 +79,7 @@ export default function Sidebar() {
     if (activeKeyFromPath) setOpenKey(activeKeyFromPath);
   }, [activeKeyFromPath]);
 
+  // Carga lista de empresas
   useEffect(() => {
     (async () => {
       try {
@@ -83,6 +101,27 @@ export default function Sidebar() {
     }
   }, [company, companies, router]);
 
+  // Branding de la empresa activa
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!company) return;
+        const r = await fetch(`/api/admin/company?company=${company}`, { cache: "no-store" });
+        const json = await r.json();
+        const b: Branding = json?.settings?.branding ?? {};
+        setBranding({
+          brandName: b.brandName || json?.name || "",
+          primary: b.primary,
+          secondary: b.secondary,
+          logoUrl: b.logoUrl || "",
+        });
+      } catch (e) {
+        console.error("Sidebar branding fetch:", e);
+        setBranding(null);
+      }
+    })();
+  }, [company]);
+
   function onChangeCompany(slug: string) {
     document.cookie = `company=${slug}; path=/; max-age=31536000; samesite=lax`;
     const url = new URL(window.location.href);
@@ -95,13 +134,31 @@ export default function Sidebar() {
     setOpenKey((curr) => (curr === k ? null : k));
   }
 
+  const brandTitle = branding?.brandName || "BSOP";
+  const logoUrl = branding?.logoUrl || "";
+
   return (
     <aside className="w-72 border-r bg-white h-screen flex flex-col">
-      <div className="p-4">
-        <div className="text-sm font-semibold">BSOP · Multiempresa</div>
-        <label className="block text-xs text-slate-500 mt-3 mb-1">Empresa</label>
+      <div className="flex items-center gap-3 p-4">
+        {logoUrl ? (
+          <img
+            src={logoUrl}
+            alt={brandTitle}
+            className="h-9 w-9 rounded-xl object-cover border"
+          />
+        ) : (
+          <InitialsIcon name={brandTitle} />
+        )}
+        <div className="min-w-0">
+          <div className="text-sm font-semibold truncate">{brandTitle}</div>
+          <div className="text-[11px] text-slate-500">BSOP · Multiempresa</div>
+        </div>
+      </div>
+
+      <div className="px-4 pb-3">
+        <label className="block text-xs text-slate-500 mb-1">Empresa</label>
         <select
-          className="w-full rounded-2xl border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black/20"
+          className="w-full rounded-2xl border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--brand-500)]"
           value={company || ""}
           onChange={(e) => onChangeCompany(e.target.value)}
         >
@@ -142,7 +199,7 @@ export default function Sidebar() {
                         <Link
                           href={href}
                           className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors
-                            ${active ? "text-black bg-slate-50" : "text-slate-700 hover:bg-slate-50"}
+                            ${active ? "text-[var(--brand-800)] bg-[var(--brand-50)]" : "text-slate-700 hover:bg-slate-50"}
                           `}
                           onClick={() => setOpenKey(s.key)}
                         >
