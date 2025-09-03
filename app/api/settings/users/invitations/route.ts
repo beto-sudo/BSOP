@@ -27,43 +27,76 @@ export async function POST(req: Request) {
       return bad("Email inválido", 400);
     }
 
+    const redirectTo =
+      (process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") || "") + "/auth/callback" || undefined;
+
     let userId: string | undefined;
+    let invitationUrl: string | undefined;
+    let inviteErrText: string | undefined;
 
-    // 1) Intentar INVITE oficial
-    {
-      const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-        redirectTo:
-          process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") + "/auth/callback" ||
-          undefined,
-      });
-
+    // 1) Intentar enviar invitación por correo
+    try {
+      const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, { redirectTo });
       if (data?.user?.id) userId = data.user.id;
+      if (error) inviteErrText = String(error.message || error);
+    } catch (e: any) {
+      inviteErrText = String(e?.message || e);
+    }
 
-      // fallback: generateLink
-      if (!userId) {
-        const { data: linkData, error: linkErr } = (await supabaseAdmin.auth.admin.generateLink({
+    // 2) Generar link de invitación (no envía correo, pero te da el URL)
+    if (!userId || !invitationUrl) {
+      try {
+        const { data: linkData } = (await supabaseAdmin.auth.admin.generateLink({
           type: "invite",
           email,
-          options: {
-            redirectTo:
-              process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") + "/auth/callback" ||
-              undefined,
-          },
-        })) as any; // 👈 aquí forzamos any para evitar TS "never"
+          options: { redirectTo },
+        })) as any;
 
-        if (linkErr && !(linkData?.user?.id)) {
-          console.error("generateLink error:", linkErr);
-        }
-        if (linkData?.user?.id) userId = linkData.user.id;
-      }
+        // Estructuras posibles según SDK:
+        // linkData?.properties?.action_link  |  linkData?.action_link
+        invitationUrl =
+          linkData?.properties?.action_link ||
+          linkData?.action_link ||
+          invitationUrl;
 
-      if (!userId && error) {
-        console.error("inviteUserByEmail error:", error);
-        return bad("No se pudo enviar la invitación (Auth).", 500);
+        if (linkData?.user?.id && !userId) userId = linkData.user.id;
+      } catch (_) {
+        // silencio: seguiremos intentando
       }
     }
 
-    // 2) company_members
+    // 3) Si aún no hay user, tratar de crearlo y volver a generar link
+    if (!userId) {
+      try {
+        const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+          email,
+          email_confirm: false, // no obliga confirmación inmediata
+        });
+        if (created?.user?.id) userId = created.user.id;
+
+        if (!invitationUrl) {
+          const { data: l2 } = (await supabaseAdmin.auth.admin.generateLink({
+            type: "invite",
+            email,
+            options: { redirectTo },
+          })) as any;
+          invitationUrl =
+            l2?.properties?.action_link || l2?.action_link || invitationUrl;
+        }
+      } catch (_) {
+        // si tampoco se puede, continuamos como "pendiente" sin link
+      }
+    }
+
+    if (!userId) {
+      // No logramos conseguir userId de ninguna forma
+      const msg = inviteErrText
+        ? `No se pudo preparar la invitación (Auth): ${inviteErrText}`
+        : "No se pudo preparar la invitación (Auth).";
+      return bad(msg, 500);
+    }
+
+    // 4) Asegurar miembro en la empresa
     {
       const { error: upsertMemberErr } = await supabaseAdmin
         .from("company_members")
@@ -75,14 +108,13 @@ export async function POST(req: Request) {
           },
           { onConflict: "company_id,user_id" }
         );
-
       if (upsertMemberErr) {
         console.error("upsert company_members error:", upsertMemberErr);
         return bad("No se pudo registrar el miembro en la empresa.", 500);
       }
     }
 
-    // 3) company_role_members (opcional)
+    // 5) Rol inicial (opcional)
     if (roleId) {
       const { error: roleErr } = await supabaseAdmin
         .from("company_role_members")
@@ -94,17 +126,26 @@ export async function POST(req: Request) {
           },
           { onConflict: "company_id,role_id,user_id" }
         );
-
       if (roleErr) {
         console.error("upsert company_role_members error:", roleErr);
         return NextResponse.json(
-          { ok: true, userId, warning: "Miembro creado pero no se pudo asignar el rol" },
+          {
+            ok: true,
+            userId,
+            invitationUrl,
+            warning: "Miembro creado pero no se pudo asignar el rol",
+          },
           { status: 207 }
         );
       }
     }
 
-    return NextResponse.json({ ok: true, userId }, { status: 200 });
+    // 6) Respuesta final: si no se pudo mandar email, devolvemos el link (si existe)
+    const payload: any = { ok: true, userId };
+    if (invitationUrl) payload.invitationUrl = invitationUrl;
+    if (inviteErrText) payload.warning = "No se envió email; usa el link manualmente.";
+
+    return NextResponse.json(payload, { status: 200 });
   } catch (e: any) {
     console.error("POST /settings/users/invitations", e);
     return bad("Error inesperado en invitación", 500);
