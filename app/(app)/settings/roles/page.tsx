@@ -1,35 +1,46 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import PermissionMatrix from "@/_components/PermissionMatrix";
 
-export default function RolesPage({
-  searchParams,
-}: {
-  searchParams: { companyId?: string; company?: string };
-}) {
-  const [companyId, setCompanyId] = useState<string | undefined>(searchParams.companyId);
-  const companySlug = searchParams.company;
+export default function RolesPage() {
+  const sp = useSearchParams();
+  const qpCompanyId = sp.get("companyId") || undefined;
+  const qpCompany = sp.get("company") || undefined;
 
+  const [companyId, setCompanyId] = useState<string | undefined>(qpCompanyId);
   const [roles, setRoles] = useState<any[]>([]);
   const [selected, setSelected] = useState<any | null>(null);
   const [mods, setMods] = useState<Array<{ key: string; label: string }>>([]);
   const [perms, setPerms] = useState<Array<{ key: string; label: string }>>([]);
   const [items, setItems] = useState<Array<{ module_key: string; permission_key: string; allowed: boolean }>>([]);
   const [loading, setLoading] = useState(false);
+  const [resolving, setResolving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Resolver companyId si sólo viene company (slug)
+  // Re-sincroniza si cambian los query params
+  useEffect(() => {
+    if (qpCompanyId && qpCompanyId !== companyId) setCompanyId(qpCompanyId);
+  }, [qpCompanyId]);
+
+  // Resolver companyId si sólo llega company (slug)
   useEffect(() => {
     (async () => {
-      if (companyId || !companySlug) return;
+      if (companyId || !qpCompany) return;
+      setResolving(true);
+      setErrorMsg(null);
 
       try {
-        const r1 = await fetch(`/api/admin/company?company=${encodeURIComponent(companySlug)}`, { cache: "no-store" });
+        const r1 = await fetch(`/api/admin/company?company=${encodeURIComponent(qpCompany)}`, { cache: "no-store" });
         if (r1.ok) {
           const j = await r1.json();
           const maybeId = j?.id || j?.companyId || j?.Company?.id || j?.data?.id;
-          if (maybeId) { setCompanyId(maybeId); setErrorMsg(null); return; }
+          if (maybeId) {
+            setCompanyId(maybeId);
+            setResolving(false);
+            return;
+          }
         }
       } catch {}
 
@@ -37,22 +48,30 @@ export default function RolesPage({
         const r2 = await fetch("/api/companies", { cache: "no-store" });
         if (r2.ok) {
           const list = await r2.json();
-          const c = (Array.isArray(list) ? list : []).find(
-            (x: any) => x?.slug?.toLowerCase() === companySlug.toLowerCase()
+          const found = (Array.isArray(list) ? list : []).find(
+            (x: any) => x?.slug?.toLowerCase() === qpCompany.toLowerCase()
           );
-          if (c?.id) { setCompanyId(c.id); setErrorMsg(null); return; }
+          if (found?.id) {
+            setCompanyId(found.id);
+            setResolving(false);
+            return;
+          }
         }
       } catch {}
 
+      setResolving(false);
       setErrorMsg("No pude resolver el companyId a partir del slug.");
     })();
-  }, [companyId, companySlug]);
+  }, [companyId, qpCompany]);
 
+  // Cargar catálogos y roles al tener companyId
   useEffect(() => {
     if (!companyId) return;
-    fetch(`/api/settings/roles?companyId=${companyId}`).then((r) => r.json()).then(setRoles);
 
-    // catálogos en memoria (UI)
+    fetch(`/api/settings/roles?companyId=${companyId}`)
+      .then((r) => r.json())
+      .then(setRoles);
+
     setMods([
       { key: "purchases", label: "Compras" },
       { key: "inventory", label: "Inventario" },
@@ -95,7 +114,9 @@ export default function RolesPage({
     if (!res.ok) alert("Error guardando permisos");
   }
 
-  if (!companyId) return <div className="p-6">{errorMsg ?? "Cargando empresa…"}</div>;
+  if (!companyId) {
+    return <div className="p-6">{errorMsg ?? (resolving ? "Cargando empresa…" : "Cargando empresa…")}</div>;
+  }
 
   return (
     <div className="p-6 space-y-6">
