@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ChevronRight, ShoppingCart, Boxes, FileText, Settings } from "lucide-react";
+import { ChevronRight, ShoppingCart, Boxes, FileText, Settings, Users, Shield } from "lucide-react";
 
 type Company = { id: string; name: string; slug: string };
 type NavItem = { label: string; href: string; icon?: React.ReactNode };
@@ -39,6 +39,10 @@ const SECTIONS: Section[] = [
     items: [
       { label: "Empresa", href: "/admin/company", icon: <Settings className="h-4 w-4" /> },
       { label: "Branding", href: "/admin/branding", icon: <Settings className="h-4 w-4" /> },
+
+      // ✅ Nuevos ítems:
+      { label: "Usuarios", href: "/settings/users", icon: <Users className="h-4 w-4" /> },
+      { label: "Roles", href: "/settings/roles", icon: <Shield className="h-4 w-4" /> },
     ],
   },
 ];
@@ -137,11 +141,13 @@ export default function Sidebar() {
   const brandTitle = branding?.brandName || "BSOP";
   const logoUrl = branding?.logoUrl || "";
 
+  // 👉 Identificamos la empresa activa (para agregar ?companyId además del ?company)
+  const currentCompany = companies.find((c) => c.slug === company);
+
   return (
     <aside className="w-72 border-r bg-white h-screen flex flex-col">
       <div className="flex items-center gap-3 p-4">
         {logoUrl ? (
-          // Contenedor cuadrado sin recortar el logo: object-contain + padding
           <div className="h-10 w-10 rounded-md border bg-white p-1 grid place-items-center">
             <img
               src={logoUrl}
@@ -198,7 +204,15 @@ export default function Sidebar() {
                 <ul className="py-1">
                   {s.items.map((item) => {
                     const active = pathname === item.href || pathname.startsWith(item.href + "/");
-                    const href = company ? `${item.href}?company=${company}` : item.href;
+
+                    // ✅ Construimos href con ?company=slug y, si tenemos, &companyId=<uuid>
+                    let href = item.href;
+                    if (company) {
+                      const params = new URLSearchParams({ company });
+                      if (currentCompany?.id) params.set("companyId", currentCompany.id);
+                      href = `${item.href}?${params.toString()}`;
+                    }
+
                     return (
                       <li key={item.href}>
                         <Link
