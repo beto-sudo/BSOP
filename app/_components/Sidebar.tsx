@@ -38,7 +38,6 @@ const SECTIONS: Section[] = [
     items: [
       { label: "Empresa", href: "/admin/company", icon: <Settings className="h-4 w-4" /> },
       { label: "Branding", href: "/admin/branding", icon: <Settings className="h-4 w-4" /> },
-      // nuevos:
       { label: "Usuarios", href: "/settings/users", icon: <Users className="h-4 w-4" /> },
       { label: "Roles", href: "/settings/roles", icon: <Shield className="h-4 w-4" /> },
     ],
@@ -64,7 +63,7 @@ export default function Sidebar() {
   const router = useRouter();
   const qp = useSearchParams();
   const pathname = usePathname();
-  const company = (qp.get("company") || "").toLowerCase();
+  const companySlug = (qp.get("company") || "").toLowerCase();
 
   const [companies, setCompanies] = useState<Company[]>([]);
   const [branding, setBranding] = useState<Branding | null>(null);
@@ -96,19 +95,19 @@ export default function Sidebar() {
 
   // Autoseleccionar empresa si falta ?company
   useEffect(() => {
-    if (!company && companies.length > 0) {
+    if (!companySlug && companies.length > 0) {
       const slug = companies[0].slug;
       document.cookie = `company=${slug}; path=/; max-age=31536000; samesite=lax`;
       router.replace(`/?company=${slug}`);
     }
-  }, [company, companies, router]);
+  }, [companySlug, companies, router]);
 
   // Branding de la empresa activa
   useEffect(() => {
     (async () => {
       try {
-        if (!company) return;
-        const r = await fetch(`/api/admin/company?company=${company}`, { cache: "no-store" });
+        if (!companySlug) return;
+        const r = await fetch(`/api/admin/company?company=${companySlug}`, { cache: "no-store" });
         const json = await r.json();
         const b: Branding = json?.settings?.branding ?? {};
         setBranding({
@@ -122,7 +121,7 @@ export default function Sidebar() {
         setBranding(null);
       }
     })();
-  }, [company]);
+  }, [companySlug]);
 
   function onChangeCompany(slug: string) {
     document.cookie = `company=${slug}; path=/; max-age=31536000; samesite=lax`;
@@ -140,7 +139,7 @@ export default function Sidebar() {
   const logoUrl = branding?.logoUrl || "";
 
   // Empresa activa (para agregar companyId al href)
-  const currentCompany = companies.find((c) => c.slug?.toLowerCase() === company);
+  const currentCompany = companies.find((c) => c.slug?.toLowerCase() === companySlug);
 
   return (
     <aside className="w-72 border-r bg-white h-screen flex flex-col">
@@ -162,7 +161,7 @@ export default function Sidebar() {
         <label className="block text-xs text-slate-500 mb-1">Empresa</label>
         <select
           className="w-full rounded-2xl border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--brand-500)]"
-          value={company || ""}
+          value={companySlug || ""}
           onChange={(e) => onChangeCompany(e.target.value)}
         >
           {companies.length === 0 ? (
@@ -192,10 +191,10 @@ export default function Sidebar() {
                   {s.items.map((item) => {
                     const active = pathname === item.href || pathname.startsWith(item.href + "/");
 
-                    // 👉 Construye href con ?company y, si existe, &companyId
+                    // 👉 Construye href con ?company y, si existe, también &companyId
                     let href = item.href;
-                    if (company) {
-                      const params = new URLSearchParams({ company });
+                    if (companySlug) {
+                      const params = new URLSearchParams({ company: companySlug });
                       if (currentCompany?.id) params.set("companyId", currentCompany.id);
                       href = `${item.href}?${params.toString()}`;
                     }
