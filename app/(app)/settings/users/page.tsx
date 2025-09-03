@@ -114,34 +114,47 @@ export default function UsersPage() {
       .catch(() => setRoles([]));
   }, [companyId]);
 
-  async function sendInvitation() {
-    if (!companyId) return;
-    setInviting(true);
-    setInviteMsg(null);
-    try {
-      const res = await fetch(`/api/settings/users/invitations`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          companyId,
-          email: inviteEmail.trim(),
-          roleId: inviteRoleId || null, // opcional
-        }),
-      });
-      if (!res.ok) {
-        const t = await res.text();
-        throw new Error(t || "Error enviando invitación");
-      }
-      setInviteMsg("Invitación enviada.");
-      setInviteEmail("");
-      // Refrescar lista
-      fetchUsers();
-    } catch (e: any) {
-      setInviteMsg(e?.message || "No se pudo enviar la invitación");
-    } finally {
-      setInviting(false);
+async function sendInvitation() {
+  if (!companyId) return;
+  setInviting(true);
+  setInviteMsg(null);
+  try {
+    const res = await fetch(`/api/settings/users/invitations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        companyId,
+        email: inviteEmail.trim(),
+        roleId: inviteRoleId || null,
+      }),
+    });
+
+    const txt = await res.text();
+    let json: any = null;
+    try { json = JSON.parse(txt); } catch { /* puede no ser JSON en error */ }
+
+    if (!res.ok) {
+      throw new Error(json?.error || json || txt || "Error enviando invitación");
     }
+
+    // Mensaje de éxito + mostrar link si viene
+    if (json?.invitationUrl) {
+      setInviteMsg(`Invitación lista. Comparte este link: ${json.invitationUrl}`);
+    } else if (json?.warning) {
+      setInviteMsg(`Invitación preparada. ${json.warning}`);
+    } else {
+      setInviteMsg("Invitación enviada.");
+    }
+
+    setInviteEmail("");
+    // refrescar lista
+    fetchUsers();
+  } catch (e: any) {
+    setInviteMsg(e?.message || "No se pudo enviar la invitación");
+  } finally {
+    setInviting(false);
   }
+}
 
   if (!companyId) {
     return <div className="p-6">{errorMsg ?? (resolving ? "Cargando empresa…" : "Cargando empresa…")}</div>;
