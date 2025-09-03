@@ -1,4 +1,3 @@
-// app/_components/Sidebar.tsx
 "use client";
 
 import Link from "next/link";
@@ -39,8 +38,7 @@ const SECTIONS: Section[] = [
     items: [
       { label: "Empresa", href: "/admin/company", icon: <Settings className="h-4 w-4" /> },
       { label: "Branding", href: "/admin/branding", icon: <Settings className="h-4 w-4" /> },
-
-      // ✅ Nuevos ítems:
+      // 👉 nuevos ítems
       { label: "Usuarios", href: "/settings/users", icon: <Users className="h-4 w-4" /> },
       { label: "Roles", href: "/settings/roles", icon: <Shield className="h-4 w-4" /> },
     ],
@@ -141,7 +139,7 @@ export default function Sidebar() {
   const brandTitle = branding?.brandName || "BSOP";
   const logoUrl = branding?.logoUrl || "";
 
-  // 👉 Identificamos la empresa activa (para agregar ?companyId además del ?company)
+  // 👉 Empresa activa (para agregar companyId al href)
   const currentCompany = companies.find((c) => c.slug === company);
 
   return (
@@ -205,7 +203,7 @@ export default function Sidebar() {
                   {s.items.map((item) => {
                     const active = pathname === item.href || pathname.startsWith(item.href + "/");
 
-                    // ✅ Construimos href con ?company=slug y, si tenemos, &companyId=<uuid>
+                    // 👉 Construimos href con ?company y, si tenemos, también &companyId
                     let href = item.href;
                     if (company) {
                       const params = new URLSearchParams({ company });
