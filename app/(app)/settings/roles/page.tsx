@@ -3,14 +3,32 @@
 import { useEffect, useState } from "react";
 import PermissionMatrix from "@/_components/PermissionMatrix";
 
-export default function RolesPage({ searchParams }: { searchParams: { companyId?: string } }) {
-  const companyId = searchParams.companyId;
+export default function RolesPage({ searchParams }: { searchParams: { companyId?: string; company?: string } }) {
+  const [companyId, setCompanyId] = useState<string | undefined>(searchParams.companyId);
+  const companySlug = searchParams.company;
+
   const [roles, setRoles] = useState<any[]>([]);
   const [selected, setSelected] = useState<any | null>(null);
   const [mods, setMods] = useState<Array<{ key: string; label: string }>>([]);
   const [perms, setPerms] = useState<Array<{ key: string; label: string }>>([]);
   const [items, setItems] = useState<Array<{ module_key: string; permission_key: string; allowed: boolean }>>([]);
   const [loading, setLoading] = useState(false);
+
+  // Fallback: resolver companyId desde company
+  useEffect(() => {
+    (async () => {
+      if (!companyId && companySlug) {
+        try {
+          const r = await fetch("/api/companies", { cache: "no-store" });
+          const list = await r.json();
+          const c = (Array.isArray(list) ? list : []).find((x: any) => x.slug?.toLowerCase() === companySlug.toLowerCase());
+          if (c?.id) setCompanyId(c.id);
+        } catch (e) {
+          console.error("resolve companyId:", e);
+        }
+      }
+    })();
+  }, [companyId, companySlug]);
 
   useEffect(() => {
     if (!companyId) return;
@@ -57,7 +75,7 @@ export default function RolesPage({ searchParams }: { searchParams: { companyId?
     if (!res.ok) alert("Error guardando permisos");
   }
 
-  if (!companyId) return <div className="p-6">Falta <code>companyId</code> en la URL.</div>;
+  if (!companyId) return <div className="p-6">Cargando empresa…</div>;
 
   return (
     <div className="p-6 space-y-6">
