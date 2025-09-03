@@ -35,7 +35,7 @@ export async function POST(req: Request) {
         "/auth/callback" ||
       undefined;
 
-    // 1) Generar invitación en AUTH → authUserId + link (funciona aunque no haya SMTP)
+    // 1) Generar link de invitación en Auth (funciona sin SMTP)
     let authUserId: string | undefined;
     let invitationUrl: string | undefined;
 
@@ -50,35 +50,30 @@ export async function POST(req: Request) {
       linkData?.properties?.action_link || linkData?.action_link || null;
 
     if (!authUserId) {
-      return bad("No se pudo crear usuario en Auth", 500);
+      return bad("No se pudo preparar la invitación en Auth", 500);
     }
 
-    // 2) Asegurar PROFILE (porque company_member.user_id → profile.id)
+    // 2) Asegurar PROFILE (company_member.user_id → profile.id)
+    //    Tu tabla profile tiene defaults para todos los demás campos,
+    //    así que con id + email basta.
     let profileId: string | undefined;
 
-    // a) buscar profile por email
+    // a) buscar por email (usa = por ser UNIQUE)
     {
       const { data, error } = await supabaseAdmin
         .from("profile")
         .select("id")
-        .ilike("email", email)
+        .eq("email", email)
         .maybeSingle();
       if (!error && data?.id) profileId = data.id;
     }
 
-    // b) si no existe, insertarlo con UUID
+    // b) si no existe, crear con UUID
     if (!profileId) {
       const newId = randomUUID();
       const { data, error } = await supabaseAdmin
         .from("profile")
-        .insert({
-          id: newId,
-          email,
-          // puedes añadir aquí defaults opcionales si tu tabla los tiene:
-          // full_name: null,
-          // avatar_url: null,
-          // locale: "es-MX",
-        } as any)
+        .insert({ id: newId, email } as any)
         .select("id")
         .maybeSingle();
 
@@ -89,7 +84,7 @@ export async function POST(req: Request) {
       profileId = data?.id || newId;
     }
 
-    // 3) Insertar en company_member con user_id = profileId
+    // 3) Insertar membership en company_member (user_id = profileId)
     const { data: cm, error: cmErr } = await supabaseAdmin
       .from("company_member")
       .insert({
@@ -109,7 +104,7 @@ export async function POST(req: Request) {
     }
     const memberId = cm?.id;
 
-    // 4) Rol inicial en member_role (tu tabla usa member_id + role_id)
+    // 4) Rol inicial (tu tabla usa member_id + role_id)
     if (roleId && memberId) {
       const { error } = await supabaseAdmin
         .from("member_role")
@@ -117,7 +112,7 @@ export async function POST(req: Request) {
       if (error) console.error("member_role insert error:", error);
     }
 
-    // 5) Guardar la invitación para listar pendientes
+    // 5) Guardar invitación correctamente atada a la empresa
     await supabaseAdmin.from("invitation").insert({
       company_id: companyId,
       email,
