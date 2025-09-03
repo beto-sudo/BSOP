@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 type Row = {
@@ -15,26 +15,53 @@ type Row = {
   profile_is_active: boolean;
 };
 
-export default function UsersPage({ searchParams }: { searchParams: { companyId?: string; company?: string } }) {
-  const [companyId, setCompanyId] = useState<string | undefined>(searchParams.companyId);
+export default function UsersPage({
+  searchParams,
+}: {
+  searchParams: { companyId?: string; company?: string };
+}) {
+  const [companyId, setCompanyId] = useState<string | undefined>(
+    searchParams.companyId
+  );
   const companySlug = searchParams.company;
+
   const [q, setQ] = useState("");
   const [rows, setRows] = useState<Row[]>([]);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  // Fallback: si no viene companyId pero sí company, lo resolvemos
+  // Resolver companyId si no viene en la URL:
   useEffect(() => {
     (async () => {
-      if (!companyId && companySlug) {
-        try {
-          const r = await fetch("/api/companies", { cache: "no-store" });
-          const list = await r.json();
-          const c = (Array.isArray(list) ? list : []).find((x: any) => x.slug?.toLowerCase() === companySlug.toLowerCase());
-          if (c?.id) setCompanyId(c.id);
-        } catch (e) {
-          console.error("resolve companyId:", e);
+      if (companyId || !companySlug) return;
+
+      // 1) Usa /api/admin/company?company=slug (más directo)
+      try {
+        const r1 = await fetch(`/api/admin/company?company=${companySlug}`, {
+          cache: "no-store",
+        });
+        if (r1.ok) {
+          const json = await r1.json();
+          if (json?.id) {
+            setCompanyId(json.id);
+            return;
+          }
         }
+      } catch (_) {}
+
+      // 2) Respaldo: /api/companies y buscar por slug
+      try {
+        const r2 = await fetch("/api/companies", { cache: "no-store" });
+        if (r2.ok) {
+          const list = await r2.json();
+          const c = (Array.isArray(list) ? list : []).find(
+            (x: any) =>
+              x.slug?.toLowerCase() === companySlug.toLowerCase() && x.id
+          );
+          if (c?.id) setCompanyId(c.id);
+        }
+      } catch (e) {
+        console.error("resolve companyId fallback:", e);
       }
     })();
   }, [companyId, companySlug]);
@@ -42,7 +69,9 @@ export default function UsersPage({ searchParams }: { searchParams: { companyId?
   useEffect(() => {
     if (!companyId) return;
     setLoading(true);
-    const url = `/api/settings/users?companyId=${companyId}&query=${encodeURIComponent(q)}`;
+    const url = `/api/settings/users?companyId=${companyId}&query=${encodeURIComponent(
+      q
+    )}`;
     fetch(url)
       .then((r) => r.json())
       .then((res) => {
@@ -52,15 +81,18 @@ export default function UsersPage({ searchParams }: { searchParams: { companyId?
       .finally(() => setLoading(false));
   }, [companyId, q]);
 
-  if (!companyId) {
-    return <div className="p-6">Cargando empresa…</div>;
-  }
+  if (!companyId) return <div className="p-6">Cargando empresa…</div>;
 
   return (
     <div className="p-6 space-y-4">
       <h1 className="text-xl font-semibold">Usuarios</h1>
       <div className="flex gap-2">
-        <input className="border rounded px-2 py-1 w-80" placeholder="Buscar por nombre o email" value={q} onChange={(e)=>setQ(e.target.value)} />
+        <input
+          className="border rounded px-2 py-1 w-80"
+          placeholder="Buscar por nombre o email"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
         {loading && <span className="text-sm">Cargando…</span>}
       </div>
       <div className="border rounded overflow-hidden">
@@ -74,13 +106,20 @@ export default function UsersPage({ searchParams }: { searchParams: { companyId?
             </tr>
           </thead>
           <tbody>
-            {rows.map(r => (
+            {rows.map((r) => (
               <tr key={r.member_id} className="border-t">
                 <td className="px-3 py-2">{r.full_name || "(sin nombre)"}</td>
                 <td className="px-3 py-2">{r.email}</td>
-                <td className="px-3 py-2">{r.member_is_active ? "Activo" : "Inactivo"}</td>
+                <td className="px-3 py-2">
+                  {r.member_is_active ? "Activo" : "Inactivo"}
+                </td>
                 <td className="px-3 py-2 text-right">
-                  <Link href={`./users/${r.user_id}?companyId=${companyId}` } className="text-blue-600 hover:underline">Abrir</Link>
+                  <Link
+                    href={`./users/${r.user_id}?companyId=${companyId}`}
+                    className="text-blue-600 hover:underline"
+                  >
+                    Abrir
+                  </Link>
                 </td>
               </tr>
             ))}
