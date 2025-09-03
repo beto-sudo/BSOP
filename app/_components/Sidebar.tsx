@@ -38,7 +38,7 @@ const SECTIONS: Section[] = [
     items: [
       { label: "Empresa", href: "/admin/company", icon: <Settings className="h-4 w-4" /> },
       { label: "Branding", href: "/admin/branding", icon: <Settings className="h-4 w-4" /> },
-      // 👉 nuevos ítems
+      // nuevos:
       { label: "Usuarios", href: "/settings/users", icon: <Users className="h-4 w-4" /> },
       { label: "Roles", href: "/settings/roles", icon: <Shield className="h-4 w-4" /> },
     ],
@@ -81,7 +81,7 @@ export default function Sidebar() {
     if (activeKeyFromPath) setOpenKey(activeKeyFromPath);
   }, [activeKeyFromPath]);
 
-  // Carga lista de empresas
+  // Cargar empresas
   useEffect(() => {
     (async () => {
       try {
@@ -94,7 +94,7 @@ export default function Sidebar() {
     })();
   }, []);
 
-  // Autoselecciona empresa si falta ?company
+  // Autoseleccionar empresa si falta ?company
   useEffect(() => {
     if (!company && companies.length > 0) {
       const slug = companies[0].slug;
@@ -139,21 +139,15 @@ export default function Sidebar() {
   const brandTitle = branding?.brandName || "BSOP";
   const logoUrl = branding?.logoUrl || "";
 
-  // 👉 Empresa activa (para agregar companyId al href)
-  const currentCompany = companies.find((c) => c.slug === company);
+  // Empresa activa (para agregar companyId al href)
+  const currentCompany = companies.find((c) => c.slug?.toLowerCase() === company);
 
   return (
     <aside className="w-72 border-r bg-white h-screen flex flex-col">
       <div className="flex items-center gap-3 p-4">
         {logoUrl ? (
           <div className="h-10 w-10 rounded-md border bg-white p-1 grid place-items-center">
-            <img
-              src={logoUrl}
-              alt={brandTitle}
-              className="h-full w-full object-contain"
-              loading="eager"
-              referrerPolicy="no-referrer"
-            />
+            <img src={logoUrl} alt={brandTitle} className="h-full w-full object-contain" loading="eager" referrerPolicy="no-referrer" />
           </div>
         ) : (
           <InitialsIcon name={brandTitle} />
@@ -188,13 +182,8 @@ export default function Sidebar() {
           const isOpen = openKey === s.key;
           return (
             <div key={s.key} className="rounded-xl border bg-white">
-              <button
-                onClick={() => toggleKey(s.key)}
-                className="w-full flex items-center justify-between px-3 py-2 text-left"
-              >
-                <span className="text-[11px] font-semibold tracking-wider text-slate-600">
-                  {s.label}
-                </span>
+              <button onClick={() => toggleKey(s.key)} className="w-full flex items-center justify-between px-3 py-2 text-left">
+                <span className="text-[11px] font-semibold tracking-wider text-slate-600">{s.label}</span>
                 <ChevronRight className={`h-4 w-4 transition-transform ${isOpen ? "rotate-90" : ""}`} />
               </button>
 
@@ -203,7 +192,7 @@ export default function Sidebar() {
                   {s.items.map((item) => {
                     const active = pathname === item.href || pathname.startsWith(item.href + "/");
 
-                    // 👉 Construimos href con ?company y, si tenemos, también &companyId
+                    // 👉 Construye href con ?company y, si existe, &companyId
                     let href = item.href;
                     if (company) {
                       const params = new URLSearchParams({ company });
@@ -215,9 +204,9 @@ export default function Sidebar() {
                       <li key={item.href}>
                         <Link
                           href={href}
-                          className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors
-                            ${active ? "text-[var(--brand-800)] bg-[var(--brand-50)]" : "text-slate-700 hover:bg-slate-50"}
-                          `}
+                          className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
+                            active ? "text-[var(--brand-800)] bg-[var(--brand-50)]" : "text-slate-700 hover:bg-slate-50"
+                          }`}
                           onClick={() => setOpenKey(s.key)}
                         >
                           <span className="opacity-80">{item.icon ?? <ChevronRight className="h-4 w-4" />}</span>
