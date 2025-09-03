@@ -50,7 +50,7 @@ export async function POST(req: Request) {
       inviteErrText = String(e?.message || e);
     }
 
-    // 2) Generar link de invitación (funciona sin SMTP)
+    // 2) Generar link (funciona sin SMTP)
     if (!userId || !invitationUrl) {
       try {
         const { data: linkData } = (await supabaseAdmin.auth.admin.generateLink({
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
       } catch {}
     }
 
-    // 3) Si aún no hay usuario, créalo y vuelve a generar link
+    // 3) Crear usuario si todavía no existe
     if (!userId) {
       try {
         const { data: created } =
@@ -97,21 +97,25 @@ export async function POST(req: Request) {
       return bad(msg, 500);
     }
 
-    // 4) Asegurar/activar membership en TU tabla: company_member
+    // 4) Intentar registrar en TU tabla 'company_member'
+    let memberUpsertError: any = null;
     {
       const { error } = await supabaseAdmin
         .from("company_member")
         .upsert(
+          // ⚠️ SOLO los mínimos conocidos; si tu tabla exige más campos,
+          // esta operación fallará y te devolvemos el detalle en la respuesta.
           { company_id: companyId, user_id: userId, is_active: true },
           { onConflict: "company_id,user_id" }
         );
       if (error) {
+        memberUpsertError = String(error.message || error);
         console.error("upsert company_member error:", error);
-        return bad("No se pudo registrar el miembro en la empresa.", 500);
       }
     }
 
-    // 5) Asignar rol inicial en TU tabla: member_role (opcional)
+    // 5) Asignar rol inicial en 'member_role' (opcional)
+    let roleUpsertError: any = null;
     if (roleId) {
       const { error } = await supabaseAdmin
         .from("member_role")
@@ -119,10 +123,13 @@ export async function POST(req: Request) {
           { company_id: companyId, user_id: userId, role_id: roleId },
           { onConflict: "company_id,user_id,role_id" }
         );
-      if (error) console.error("upsert member_role error:", error);
+      if (error) {
+        roleUpsertError = String(error.message || error);
+        console.error("upsert member_role error:", error);
+      }
     }
 
-    // 6) Guardar/actualizar invitación en TU tabla: invitation
+    // 6) Registrar invitación (siempre)
     {
       const { error } = await supabaseAdmin
         .from("invitation")
@@ -137,10 +144,15 @@ export async function POST(req: Request) {
       if (error) console.error("insert invitation error:", error);
     }
 
-    const payload: any = { ok: true, userId };
-    if (invitationUrl) payload.invitationUrl = invitationUrl;
+    // 7) Respuesta – no bloqueamos por el fallo del member:
+    const payload: any = { ok: true, userId, invitationUrl };
     if (inviteErrText) payload.warning = "No se envió email; usa el link manualmente.";
-    return NextResponse.json(payload, { status: 200 });
+    if (memberUpsertError) payload.memberWarning = `No se registró en company_member: ${memberUpsertError}`;
+    if (roleUpsertError) payload.roleWarning = `No se asignó rol: ${roleUpsertError}`;
+
+    // Si falló el member, regresamos 207 (Multi-Status) para que la UI avise
+    const status = memberUpsertError || roleUpsertError ? 207 : 200;
+    return NextResponse.json(payload, { status });
   } catch (e: any) {
     console.error("POST /settings/users/invitations", e);
     return bad("Error inesperado en invitación", 500);
