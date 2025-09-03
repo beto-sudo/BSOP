@@ -13,45 +13,32 @@ export async function GET(req: Request) {
 
     if (!companyId) return NextResponse.json({ rows: [], count: 0 });
 
-    // 1) Miembros activos (company_member) + perfil (profile)
-    //    Asumo que profile tiene columnas: user_id, full_name, avatar_url, locale, email
-    const { data: members, error: mErr } = await supabaseAdmin
-      .from("company_member")
-      .select(
-        `
-        company_id,
-        user_id,
-        is_active,
-        profile:user_id (
-          full_name,
-          avatar_url,
-          locale,
-          email
-        )
-      `
-      )
+    // 1) Miembros vía la VISTA existente (company_member_view)
+    //    Esta vista suele traer ya email / full_name / etc. La leemos "lo que haya".
+    const { data: viewRows, error: vErr } = await supabaseAdmin
+      .from("company_member_view")
+      .select("*")
       .eq("company_id", companyId);
 
-    if (mErr) {
-      console.error("company_member select error:", mErr);
-      return NextResponse.json({ rows: [], count: 0 });
+    if (vErr) {
+      console.error("company_member_view error:", vErr);
     }
 
     const memberRows =
-      (members || []).map((m: any) => ({
-        member_id: `${m.company_id}:${m.user_id}`,
-        company_id: m.company_id,
-        user_id: m.user_id,
-        email: m?.profile?.email || "",
-        full_name: m?.profile?.full_name || "",
-        avatar_url: m?.profile?.avatar_url || "",
-        locale: m?.profile?.locale || "es-MX",
-        member_is_active: !!m?.is_active,
+      (viewRows || []).map((r: any) => ({
+        member_id: `${r.company_id}:${r.user_id}`,
+        company_id: r.company_id,
+        user_id: r.user_id,
+        email: r.email || r.user_email || "",
+        full_name: r.full_name || r.user_full_name || "",
+        avatar_url: r.avatar_url || r.user_avatar_url || "",
+        locale: r.locale || "es-MX",
+        member_is_active: r.is_active ?? true,
         profile_is_active: true,
-        status: "active",
+        status: "active" as const,
       })) || [];
 
-    // 2) Invitaciones pendientes (invitation)
+    // 2) Invitaciones pendientes
     const { data: invites, error: iErr } = await supabaseAdmin
       .from("invitation")
       .select("id, email, role_id, invitation_url, status, created_at")
@@ -72,7 +59,7 @@ export async function GET(req: Request) {
         locale: "es-MX",
         member_is_active: false,
         profile_is_active: false,
-        status: "pending",
+        status: "pending" as const,
         invitation_url: i.invitation_url || null,
       })) || [];
 
