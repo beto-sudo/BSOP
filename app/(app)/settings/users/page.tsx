@@ -15,7 +15,11 @@ type Row = {
   profile_is_active: boolean;
 };
 
-export default function UsersPage({ searchParams }: { searchParams: { companyId?: string; company?: string } }) {
+export default function UsersPage({
+  searchParams,
+}: {
+  searchParams: { companyId?: string; company?: string };
+}) {
   const [companyId, setCompanyId] = useState<string | undefined>(searchParams.companyId);
   const companySlug = searchParams.company;
 
@@ -31,7 +35,7 @@ export default function UsersPage({ searchParams }: { searchParams: { companyId?
       if (companyId || !companySlug) return;
 
       try {
-        // 1) más directo
+        // 1) Endpoint directo por slug
         const r1 = await fetch(`/api/admin/company?company=${encodeURIComponent(companySlug)}`, { cache: "no-store" });
         if (r1.ok) {
           const j = await r1.json();
@@ -45,7 +49,7 @@ export default function UsersPage({ searchParams }: { searchParams: { companyId?
       } catch {}
 
       try {
-        // 2) respaldo
+        // 2) Respaldo: listado de companies
         const r2 = await fetch("/api/companies", { cache: "no-store" });
         if (r2.ok) {
           const list = await r2.json();
@@ -82,7 +86,12 @@ export default function UsersPage({ searchParams }: { searchParams: { companyId?
     <div className="p-6 space-y-4">
       <h1 className="text-xl font-semibold">Usuarios</h1>
       <div className="flex gap-2">
-        <input className="border rounded px-2 py-1 w-80" placeholder="Buscar por nombre o email" value={q} onChange={(e)=>setQ(e.target.value)} />
+        <input
+          className="border rounded px-2 py-1 w-80"
+          placeholder="Buscar por nombre o email"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
         {loading && <span className="text-sm">Cargando…</span>}
       </div>
       <div className="border rounded overflow-hidden">
@@ -96,13 +105,15 @@ export default function UsersPage({ searchParams }: { searchParams: { companyId?
             </tr>
           </thead>
           <tbody>
-            {rows.map(r => (
+            {rows.map((r) => (
               <tr key={r.member_id} className="border-t">
                 <td className="px-3 py-2">{r.full_name || "(sin nombre)"}</td>
                 <td className="px-3 py-2">{r.email}</td>
                 <td className="px-3 py-2">{r.member_is_active ? "Activo" : "Inactivo"}</td>
                 <td className="px-3 py-2 text-right">
-                  <Link href={`./users/${r.user_id}?companyId=${companyId}`} className="text-blue-600 hover:underline">Abrir</Link>
+                  <Link href={`./users/${r.user_id}?companyId=${companyId}`} className="text-blue-600 hover:underline">
+                    Abrir
+                  </Link>
                 </td>
               </tr>
             ))}
