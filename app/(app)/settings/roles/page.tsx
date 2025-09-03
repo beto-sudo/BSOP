@@ -19,12 +19,17 @@ export default function RolesPage() {
   const [resolving, setResolving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Re-sincroniza si cambian los query params
+  // Crear rol
+  const [name, setName] = useState("");
+  const [desc, setDesc] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createMsg, setCreateMsg] = useState<string | null>(null);
+
+  // Resolver companyId si falta
   useEffect(() => {
     if (qpCompanyId && qpCompanyId !== companyId) setCompanyId(qpCompanyId);
   }, [qpCompanyId]);
 
-  // Resolver companyId si sólo llega company (slug)
   useEffect(() => {
     (async () => {
       if (companyId || !qpCompany) return;
@@ -64,14 +69,15 @@ export default function RolesPage() {
     })();
   }, [companyId, qpCompany]);
 
-  // Cargar catálogos y roles al tener companyId
+  // Cargar roles y catálogos
+  const loadRoles = () => {
+    if (!companyId) return;
+    fetch(`/api/settings/roles?companyId=${companyId}`).then((r) => r.json()).then(setRoles);
+  };
+
   useEffect(() => {
     if (!companyId) return;
-
-    fetch(`/api/settings/roles?companyId=${companyId}`)
-      .then((r) => r.json())
-      .then(setRoles);
-
+    loadRoles();
     setMods([
       { key: "purchases", label: "Compras" },
       { key: "inventory", label: "Inventario" },
@@ -114,6 +120,31 @@ export default function RolesPage() {
     if (!res.ok) alert("Error guardando permisos");
   }
 
+  async function createRole() {
+    if (!companyId || !name.trim()) return;
+    setCreating(true);
+    setCreateMsg(null);
+    try {
+      const res = await fetch(`/api/settings/roles?companyId=${companyId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), description: desc.trim() }),
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t || "Error creando rol");
+      }
+      setCreateMsg("Rol creado.");
+      setName("");
+      setDesc("");
+      loadRoles();
+    } catch (e: any) {
+      setCreateMsg(e?.message || "No se pudo crear el rol");
+    } finally {
+      setCreating(false);
+    }
+  }
+
   if (!companyId) {
     return <div className="p-6">{errorMsg ?? (resolving ? "Cargando empresa…" : "Cargando empresa…")}</div>;
   }
@@ -121,6 +152,41 @@ export default function RolesPage() {
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-xl font-semibold">Roles</h1>
+
+      {/* Crear rol */}
+      <div className="border rounded-lg p-3 space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Nombre</label>
+            <input
+              className="w-full border rounded px-2 py-1"
+              placeholder="Supervisor, Cajero, etc."
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs text-gray-500 mb-1">Descripción</label>
+            <input
+              className="w-full border rounded px-2 py-1"
+              placeholder="Permisos adecuados para..."
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+            />
+          </div>
+          <div className="flex items-end">
+            <button
+              className="px-3 py-1.5 border rounded-lg text-sm hover:bg-gray-50"
+              onClick={createRole}
+              disabled={creating || !name.trim()}
+            >
+              {creating ? "Creando..." : "Crear rol"}
+            </button>
+          </div>
+        </div>
+        {createMsg && <div className="text-sm text-gray-600">{createMsg}</div>}
+      </div>
+
       <div className="flex gap-4">
         <div className="w-64 border rounded p-2 h-[480px] overflow-auto">
           {roles.map((r) => (
@@ -133,6 +199,9 @@ export default function RolesPage() {
               <div className="text-xs text-gray-500">{r.description}</div>
             </div>
           ))}
+          {roles.length === 0 && (
+            <div className="text-sm text-gray-500 px-2 py-3">Sin roles aún.</div>
+          )}
         </div>
         <div className="flex-1 space-y-3">
           {selected ? (
