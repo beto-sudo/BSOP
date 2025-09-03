@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
 type Row = {
@@ -15,25 +15,45 @@ type Row = {
   profile_is_active: boolean;
 };
 
-export default function UsersPage({ searchParams }: { searchParams: { companyId?: string } }) {
-  const companyId = searchParams.companyId;
+export default function UsersPage({ searchParams }: { searchParams: { companyId?: string; company?: string } }) {
+  const [companyId, setCompanyId] = useState<string | undefined>(searchParams.companyId);
+  const companySlug = searchParams.company;
   const [q, setQ] = useState("");
   const [rows, setRows] = useState<Row[]>([]);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(false);
 
+  // Fallback: si no viene companyId pero sí company, lo resolvemos
+  useEffect(() => {
+    (async () => {
+      if (!companyId && companySlug) {
+        try {
+          const r = await fetch("/api/companies", { cache: "no-store" });
+          const list = await r.json();
+          const c = (Array.isArray(list) ? list : []).find((x: any) => x.slug?.toLowerCase() === companySlug.toLowerCase());
+          if (c?.id) setCompanyId(c.id);
+        } catch (e) {
+          console.error("resolve companyId:", e);
+        }
+      }
+    })();
+  }, [companyId, companySlug]);
+
   useEffect(() => {
     if (!companyId) return;
     setLoading(true);
     const url = `/api/settings/users?companyId=${companyId}&query=${encodeURIComponent(q)}`;
-    fetch(url).then(r => r.json()).then(res => {
-      setRows(res.rows || []);
-      setCount(res.count || 0);
-    }).finally(() => setLoading(false));
+    fetch(url)
+      .then((r) => r.json())
+      .then((res) => {
+        setRows(res.rows || []);
+        setCount(res.count || 0);
+      })
+      .finally(() => setLoading(false));
   }, [companyId, q]);
 
   if (!companyId) {
-    return <div className="p-6">Falta <code>companyId</code> en la URL.</div>;
+    return <div className="p-6">Cargando empresa…</div>;
   }
 
   return (
@@ -60,7 +80,7 @@ export default function UsersPage({ searchParams }: { searchParams: { companyId?
                 <td className="px-3 py-2">{r.email}</td>
                 <td className="px-3 py-2">{r.member_is_active ? "Activo" : "Inactivo"}</td>
                 <td className="px-3 py-2 text-right">
-                  <Link href={`./users/${r.user_id}?companyId=${r.company_id}`} className="text-blue-600 hover:underline">Abrir</Link>
+                  <Link href={`./users/${r.user_id}?companyId=${companyId}` } className="text-blue-600 hover:underline">Abrir</Link>
                 </td>
               </tr>
             ))}
