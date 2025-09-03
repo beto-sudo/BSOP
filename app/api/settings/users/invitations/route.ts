@@ -35,7 +35,9 @@ export async function POST(req: Request) {
         "/auth/callback" ||
       undefined;
 
-    // 1) Crear/generar invitación en Auth para obtener authUserId + link
+    // ------------------------------------------------------------
+    // 1) Crear/generar invitación en Auth → authUserId + link
+    // ------------------------------------------------------------
     let authUserId: string | undefined;
     let invitationUrl: string | undefined;
 
@@ -45,7 +47,7 @@ export async function POST(req: Request) {
       options: { redirectTo },
     })) as any;
 
-    if (linkData?.user?.id) authUserId = linkData.user.id;
+    authUserId = linkData?.user?.id;
     invitationUrl =
       linkData?.properties?.action_link || linkData?.action_link || null;
 
@@ -53,25 +55,42 @@ export async function POST(req: Request) {
       return bad("No se pudo crear usuario en Auth", 500);
     }
 
-    // 2) Asegurar usuario interno en TU tabla "User" (usa UUID manual para respetar el FK)
+    // ------------------------------------------------------------
+    // 2) Asegurar usuario interno en TU tabla "User"
+    //    - primero buscamos por email
+    //    - si no existe, intentamos insertar SIN id (si tu tabla tiene default)
+    //    - si falla, insertamos CON id (randomUUID)
+    //    - guardamos auth_id
+    // ------------------------------------------------------------
     let internalUserId: string | undefined;
 
-    // ¿Existe ya por email?
+    // a) buscar
     {
-      const { data: existing, error } = await supabaseAdmin
+      const { data, error } = await supabaseAdmin
         .from("User")
         .select("id")
         .eq("email", email)
         .maybeSingle();
+      if (!error && data?.id) internalUserId = data.id;
+    }
 
-      if (error) {
-        console.error("User select error:", error);
-      } else if (existing?.id) {
-        internalUserId = existing.id;
+    // b) insertar sin id (si tu columna id tiene default uuid)
+    if (!internalUserId) {
+      const { data, error } = await supabaseAdmin
+        .from("User")
+        .insert({
+          email,
+          auth_id: authUserId, // si no existe la columna no pasa nada (solo ignora)
+        } as any)
+        .select("id")
+        .maybeSingle();
+
+      if (!error && data?.id) {
+        internalUserId = data.id;
       }
     }
 
-    // Si no existe, créalo con un UUID que también usaremos en company_member
+    // c) insertar con id manual (si lo anterior no funcionó)
     if (!internalUserId) {
       const newId = randomUUID();
       const { data, error } = await supabaseAdmin
@@ -79,12 +98,10 @@ export async function POST(req: Request) {
         .insert({
           id: newId,
           email,
-          // descomenta si tu tabla tiene esta columna para enlazar con Auth
-          // auth_id: authUserId,
-        })
+          auth_id: authUserId,
+        } as any)
         .select("id")
         .maybeSingle();
-
       if (error) {
         console.error("User insert error:", error);
         return bad("No se pudo crear usuario interno", 500);
@@ -92,39 +109,47 @@ export async function POST(req: Request) {
       internalUserId = data?.id || newId;
     }
 
-    // 3) Crear membership en company_member (usa el id de TU tabla User)
-    let memberId: string | undefined;
-    {
-      const { data, error } = await supabaseAdmin
-        .from("company_member")
-        .insert({
-          company_id: companyId,
-          user_id: internalUserId,
-          is_active: true,
-        })
-        .select("id")
-        .maybeSingle();
+    // d) aseguramos que auth_id esté seteado aunque ya existiera el User
+    await supabaseAdmin
+      .from("User")
+      .update({ auth_id: authUserId } as any)
+      .eq("id", internalUserId);
 
-      if (error) {
-        console.error("company_member insert error:", error);
-        return bad(
-          `No se pudo registrar en company_member: ${error.message}`,
-          500
-        );
-      }
-      memberId = data?.id;
+    // ------------------------------------------------------------
+    // 3) company_member (usa User.id interno)
+    // ------------------------------------------------------------
+    const { data: cm, error: cmErr } = await supabaseAdmin
+      .from("company_member")
+      .insert({
+        company_id: companyId,
+        user_id: internalUserId,
+        is_active: true,
+      } as any)
+      .select("id")
+      .maybeSingle();
+
+    if (cmErr) {
+      console.error("company_member insert error:", cmErr);
+      return bad(
+        `No se pudo registrar en company_member: ${cmErr.message || cmErr}`,
+        500
+      );
     }
+    const memberId = cm?.id;
 
-    // 4) Rol inicial en member_role (tu tabla usa member_id + role_id)
+    // ------------------------------------------------------------
+    // 4) member_role (tu tabla usa member_id + role_id)
+    // ------------------------------------------------------------
     if (roleId && memberId) {
-      const { error } = await supabaseAdmin.from("member_role").insert({
-        member_id: memberId,
-        role_id: roleId,
-      });
+      const { error } = await supabaseAdmin
+        .from("member_role")
+        .insert({ member_id: memberId, role_id: roleId } as any);
       if (error) console.error("member_role insert error:", error);
     }
 
-    // 5) Registrar invitación en tu tabla invitation (para listar pendientes)
+    // ------------------------------------------------------------
+    // 5) invitation (para listar pendientes)
+    // ------------------------------------------------------------
     await supabaseAdmin.from("invitation").insert({
       company_id: companyId,
       email,
@@ -132,7 +157,7 @@ export async function POST(req: Request) {
       invitation_url: invitationUrl,
       status: "pending",
       invited_by: invitedBy,
-    });
+    } as any);
 
     return NextResponse.json({
       ok: true,
