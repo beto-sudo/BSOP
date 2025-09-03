@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 type Row = {
   member_id: string;
@@ -15,59 +16,67 @@ type Row = {
   profile_is_active: boolean;
 };
 
-export default function UsersPage({
-  searchParams,
-}: {
-  searchParams: { companyId?: string; company?: string };
-}) {
-  const [companyId, setCompanyId] = useState<string | undefined>(searchParams.companyId);
-  const companySlug = searchParams.company;
+export default function UsersPage() {
+  const sp = useSearchParams();
+  const qpCompanyId = sp.get("companyId") || undefined;
+  const qpCompany = sp.get("company") || undefined;
 
+  const [companyId, setCompanyId] = useState<string | undefined>(qpCompanyId);
   const [q, setQ] = useState("");
   const [rows, setRows] = useState<Row[]>([]);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [resolving, setResolving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Resolver companyId si no viene en la URL
+  // Re-sincroniza si cambian los query params
+  useEffect(() => {
+    if (qpCompanyId && qpCompanyId !== companyId) setCompanyId(qpCompanyId);
+  }, [qpCompanyId]);
+
+  // Resolver companyId si no viene en la URL pero sí tenemos company (slug)
   useEffect(() => {
     (async () => {
-      if (companyId || !companySlug) return;
+      if (companyId || !qpCompany) return;
+      setResolving(true);
+      setErrorMsg(null);
 
+      // 1) Endpoint directo por slug
       try {
-        // 1) Endpoint directo por slug
-        const r1 = await fetch(`/api/admin/company?company=${encodeURIComponent(companySlug)}`, { cache: "no-store" });
+        const r1 = await fetch(`/api/admin/company?company=${encodeURIComponent(qpCompany)}`, { cache: "no-store" });
         if (r1.ok) {
           const j = await r1.json();
           const maybeId = j?.id || j?.companyId || j?.Company?.id || j?.data?.id;
           if (maybeId) {
             setCompanyId(maybeId);
-            setErrorMsg(null);
+            setResolving(false);
             return;
           }
         }
       } catch {}
 
+      // 2) Respaldo: /api/companies
       try {
-        // 2) Respaldo: listado de companies
         const r2 = await fetch("/api/companies", { cache: "no-store" });
         if (r2.ok) {
           const list = await r2.json();
-          const c = (Array.isArray(list) ? list : []).find(
-            (x: any) => x?.slug?.toLowerCase() === companySlug.toLowerCase()
+          const found = (Array.isArray(list) ? list : []).find(
+            (x: any) => x?.slug?.toLowerCase() === qpCompany.toLowerCase()
           );
-          if (c?.id) {
-            setCompanyId(c.id);
-            setErrorMsg(null);
+          if (found?.id) {
+            setCompanyId(found.id);
+            setResolving(false);
             return;
           }
         }
       } catch {}
 
+      setResolving(false);
       setErrorMsg("No pude resolver el companyId a partir del slug.");
     })();
-  }, [companyId, companySlug]);
+  }, [companyId, qpCompany]);
 
+  // Cargar datos
   useEffect(() => {
     if (!companyId) return;
     setLoading(true);
@@ -80,11 +89,14 @@ export default function UsersPage({
       .finally(() => setLoading(false));
   }, [companyId, q]);
 
-  if (!companyId) return <div className="p-6">{errorMsg ?? "Cargando empresa…"}</div>;
+  if (!companyId) {
+    return <div className="p-6">{errorMsg ?? (resolving ? "Cargando empresa…" : "Cargando empresa…")}</div>;
+  }
 
   return (
     <div className="p-6 space-y-4">
       <h1 className="text-xl font-semibold">Usuarios</h1>
+
       <div className="flex gap-2">
         <input
           className="border rounded px-2 py-1 w-80"
@@ -94,6 +106,7 @@ export default function UsersPage({
         />
         {loading && <span className="text-sm">Cargando…</span>}
       </div>
+
       <div className="border rounded overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
@@ -111,7 +124,10 @@ export default function UsersPage({
                 <td className="px-3 py-2">{r.email}</td>
                 <td className="px-3 py-2">{r.member_is_active ? "Activo" : "Inactivo"}</td>
                 <td className="px-3 py-2 text-right">
-                  <Link href={`./users/${r.user_id}?companyId=${companyId}`} className="text-blue-600 hover:underline">
+                  <Link
+                    href={`/settings/users/${r.user_id}?companyId=${companyId}`}
+                    className="text-blue-600 hover:underline"
+                  >
                     Abrir
                   </Link>
                 </td>
@@ -120,6 +136,7 @@ export default function UsersPage({
           </tbody>
         </table>
       </div>
+
       <div className="text-sm text-gray-500">Total: {count}</div>
     </div>
   );
