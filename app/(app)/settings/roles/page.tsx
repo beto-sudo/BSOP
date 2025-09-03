@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import PermissionMatrix from "@/_components/PermissionMatrix";
 
-export default function RolesPage({ searchParams }: { searchParams: { companyId?: string; company?: string } }) {
+export default function RolesPage({
+  searchParams,
+}: {
+  searchParams: { companyId?: string; company?: string };
+}) {
   const [companyId, setCompanyId] = useState<string | undefined>(searchParams.companyId);
   const companySlug = searchParams.company;
 
@@ -15,7 +19,7 @@ export default function RolesPage({ searchParams }: { searchParams: { companyId?
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Resolver companyId si solo viene company (slug)
+  // Resolver companyId si sólo viene company (slug)
   useEffect(() => {
     (async () => {
       if (companyId || !companySlug) return;
@@ -46,7 +50,9 @@ export default function RolesPage({ searchParams }: { searchParams: { companyId?
 
   useEffect(() => {
     if (!companyId) return;
-    fetch(`/api/settings/roles?companyId=${companyId}`).then(r => r.json()).then(setRoles);
+    fetch(`/api/settings/roles?companyId=${companyId}`).then((r) => r.json()).then(setRoles);
+
+    // catálogos en memoria (UI)
     setMods([
       { key: "purchases", label: "Compras" },
       { key: "inventory", label: "Inventario" },
@@ -89,7 +95,7 @@ export default function RolesPage({ searchParams }: { searchParams: { companyId?
     if (!res.ok) alert("Error guardando permisos");
   }
 
-  if (!companyId) return <div className="p-6">{errorMsg ?? "Cargando empresa…"} </div>;
+  if (!companyId) return <div className="p-6">{errorMsg ?? "Cargando empresa…"}</div>;
 
   return (
     <div className="p-6 space-y-6">
@@ -97,7 +103,11 @@ export default function RolesPage({ searchParams }: { searchParams: { companyId?
       <div className="flex gap-4">
         <div className="w-64 border rounded p-2 h-[480px] overflow-auto">
           {roles.map((r) => (
-            <div key={r.id} className={`px-2 py-1 rounded cursor-pointer ${selected?.id===r.id ? "bg-blue-50" : "hover:bg-gray-50"}`} onClick={() => openRole(r)}>
+            <div
+              key={r.id}
+              className={`px-2 py-1 rounded cursor-pointer ${selected?.id === r.id ? "bg-blue-50" : "hover:bg-gray-50"}`}
+              onClick={() => openRole(r)}
+            >
               <div className="font-medium text-sm">{r.name}</div>
               <div className="text-xs text-gray-500">{r.description}</div>
             </div>
