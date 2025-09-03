@@ -3,36 +3,67 @@
 import { useEffect, useState } from "react";
 import PermissionMatrix from "@/_components/PermissionMatrix";
 
-export default function RolesPage({ searchParams }: { searchParams: { companyId?: string; company?: string } }) {
-  const [companyId, setCompanyId] = useState<string | undefined>(searchParams.companyId);
+export default function RolesPage({
+  searchParams,
+}: {
+  searchParams: { companyId?: string; company?: string };
+}) {
+  const [companyId, setCompanyId] = useState<string | undefined>(
+    searchParams.companyId
+  );
   const companySlug = searchParams.company;
 
   const [roles, setRoles] = useState<any[]>([]);
   const [selected, setSelected] = useState<any | null>(null);
   const [mods, setMods] = useState<Array<{ key: string; label: string }>>([]);
-  const [perms, setPerms] = useState<Array<{ key: string; label: string }>>([]);
-  const [items, setItems] = useState<Array<{ module_key: string; permission_key: string; allowed: boolean }>>([]);
+  const [perms, setPerms] = useState<Array<{ key: string; label: string }>>(
+    []
+  );
+  const [items, setItems] = useState<
+    Array<{ module_key: string; permission_key: string; allowed: boolean }>
+  >([]);
   const [loading, setLoading] = useState(false);
 
-  // Fallback: resolver companyId desde company
+  // Resolver companyId si solo viene company (slug)
   useEffect(() => {
     (async () => {
-      if (!companyId && companySlug) {
-        try {
-          const r = await fetch("/api/companies", { cache: "no-store" });
-          const list = await r.json();
-          const c = (Array.isArray(list) ? list : []).find((x: any) => x.slug?.toLowerCase() === companySlug.toLowerCase());
-          if (c?.id) setCompanyId(c.id);
-        } catch (e) {
-          console.error("resolve companyId:", e);
+      if (companyId || !companySlug) return;
+
+      try {
+        const r1 = await fetch(`/api/admin/company?company=${companySlug}`, {
+          cache: "no-store",
+        });
+        if (r1.ok) {
+          const json = await r1.json();
+          if (json?.id) {
+            setCompanyId(json.id);
+            return;
+          }
         }
+      } catch (_) {}
+
+      try {
+        const r2 = await fetch("/api/companies", { cache: "no-store" });
+        if (r2.ok) {
+          const list = await r2.json();
+          const c = (Array.isArray(list) ? list : []).find(
+            (x: any) =>
+              x.slug?.toLowerCase() === companySlug.toLowerCase() && x.id
+          );
+          if (c?.id) setCompanyId(c.id);
+        }
+      } catch (e) {
+        console.error("resolve companyId fallback:", e);
       }
     })();
   }, [companyId, companySlug]);
 
   useEffect(() => {
     if (!companyId) return;
-    fetch(`/api/settings/roles?companyId=${companyId}`).then(r => r.json()).then(setRoles);
+    fetch(`/api/settings/roles?companyId=${companyId}`)
+      .then((r) => r.json())
+      .then(setRoles);
+
     setMods([
       { key: "purchases", label: "Compras" },
       { key: "inventory", label: "Inventario" },
@@ -59,7 +90,13 @@ export default function RolesPage({ searchParams }: { searchParams: { companyId?
     setLoading(true);
     const res = await fetch(`/api/settings/roles/${r.id}/permissions`);
     const list = await res.json();
-    setItems(list.map((x: any) => ({ module_key: x.module_key, permission_key: x.permission_key, allowed: x.allowed })));
+    setItems(
+      list.map((x: any) => ({
+        module_key: x.module_key,
+        permission_key: x.permission_key,
+        allowed: x.allowed,
+      }))
+    );
     setLoading(false);
   }
 
@@ -83,7 +120,13 @@ export default function RolesPage({ searchParams }: { searchParams: { companyId?
       <div className="flex gap-4">
         <div className="w-64 border rounded p-2 h-[480px] overflow-auto">
           {roles.map((r) => (
-            <div key={r.id} className={`px-2 py-1 rounded cursor-pointer ${selected?.id===r.id ? "bg-blue-50" : "hover:bg-gray-50"}`} onClick={() => openRole(r)}>
+            <div
+              key={r.id}
+              className={`px-2 py-1 rounded cursor-pointer ${
+                selected?.id === r.id ? "bg-blue-50" : "hover:bg-gray-50"
+              }`}
+              onClick={() => openRole(r)}
+            >
               <div className="font-medium text-sm">{r.name}</div>
               <div className="text-xs text-gray-500">{r.description}</div>
             </div>
@@ -94,11 +137,20 @@ export default function RolesPage({ searchParams }: { searchParams: { companyId?
             <>
               <div className="flex items-center justify-between">
                 <h2 className="font-medium">{selected.name}</h2>
-                <button className="px-3 py-1 border rounded" onClick={saveRole} disabled={loading}>
+                <button
+                  className="px-3 py-1 border rounded"
+                  onClick={saveRole}
+                  disabled={loading}
+                >
                   {loading ? "Guardando..." : "Guardar"}
                 </button>
               </div>
-              <PermissionMatrix modules={mods} permissions={perms} value={items} onChange={setItems} />
+              <PermissionMatrix
+                modules={mods}
+                permissions={perms}
+                value={items}
+                onChange={setItems}
+              />
             </>
           ) : (
             <div className="text-sm text-gray-500">Selecciona un rol</div>
