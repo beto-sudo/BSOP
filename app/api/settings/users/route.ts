@@ -13,16 +13,13 @@ export async function GET(req: Request) {
 
     if (!companyId) return NextResponse.json({ rows: [], count: 0 });
 
-    // 1) Miembros vía la VISTA existente (company_member_view)
-    //    Esta vista suele traer ya email / full_name / etc. La leemos "lo que haya".
+    // 1) Miembros desde la vista
     const { data: viewRows, error: vErr } = await supabaseAdmin
       .from("company_member_view")
       .select("*")
       .eq("company_id", companyId);
 
-    if (vErr) {
-      console.error("company_member_view error:", vErr);
-    }
+    if (vErr) console.error("company_member_view error:", vErr);
 
     const memberRows =
       (viewRows || []).map((r: any) => ({
@@ -38,10 +35,10 @@ export async function GET(req: Request) {
         status: "active" as const,
       })) || [];
 
-    // 2) Invitaciones pendientes
+    // 2) Invitaciones PENDIENTES de ESA empresa (ignora company_id null)
     const { data: invites, error: iErr } = await supabaseAdmin
       .from("invitation")
-      .select("id, email, role_id, invitation_url, status, created_at")
+      .select("id, email, role_id, invitation_url, status, created_at, company_id")
       .eq("company_id", companyId)
       .eq("status", "pending")
       .order("created_at", { ascending: false });
@@ -49,19 +46,21 @@ export async function GET(req: Request) {
     if (iErr) console.error("invitation select error:", iErr);
 
     const inviteRows =
-      (invites || []).map((i: any) => ({
-        member_id: `invite:${i.id}`,
-        company_id: companyId,
-        user_id: "",
-        email: i.email,
-        full_name: "",
-        avatar_url: "",
-        locale: "es-MX",
-        member_is_active: false,
-        profile_is_active: false,
-        status: "pending" as const,
-        invitation_url: i.invitation_url || null,
-      })) || [];
+      (invites || [])
+        .filter((i: any) => i.company_id === companyId) // cinta y tirabuzón por si acaso
+        .map((i: any) => ({
+          member_id: `invite:${i.id}`,
+          company_id: companyId,
+          user_id: "",
+          email: i.email,
+          full_name: "",
+          avatar_url: "",
+          locale: "es-MX",
+          member_is_active: false,
+          profile_is_active: false,
+          status: "pending" as const,
+          invitation_url: i.invitation_url || null,
+        })) || [];
 
     // 3) Merge + filtro
     let rows = [...inviteRows, ...memberRows];
