@@ -16,6 +16,8 @@ type Row = {
   profile_is_active: boolean;
 };
 
+type Role = { id: string; name: string };
+
 export default function UsersPage() {
   const sp = useSearchParams();
   const qpCompanyId = sp.get("companyId") || undefined;
@@ -29,6 +31,14 @@ export default function UsersPage() {
   const [resolving, setResolving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Invitación
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRoleId, setInviteRoleId] = useState<string>("");
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [inviting, setInviting] = useState(false);
+  const [inviteMsg, setInviteMsg] = useState<string | null>(null);
+
   // Re-sincroniza si cambian los query params
   useEffect(() => {
     if (qpCompanyId && qpCompanyId !== companyId) setCompanyId(qpCompanyId);
@@ -41,7 +51,6 @@ export default function UsersPage() {
       setResolving(true);
       setErrorMsg(null);
 
-      // 1) Endpoint directo por slug
       try {
         const r1 = await fetch(`/api/admin/company?company=${encodeURIComponent(qpCompany)}`, { cache: "no-store" });
         if (r1.ok) {
@@ -55,7 +64,6 @@ export default function UsersPage() {
         }
       } catch {}
 
-      // 2) Respaldo: /api/companies
       try {
         const r2 = await fetch("/api/companies", { cache: "no-store" });
         if (r2.ok) {
@@ -76,8 +84,8 @@ export default function UsersPage() {
     })();
   }, [companyId, qpCompany]);
 
-  // Cargar datos
-  useEffect(() => {
+  // Cargar usuarios
+  const fetchUsers = () => {
     if (!companyId) return;
     setLoading(true);
     fetch(`/api/settings/users?companyId=${companyId}&query=${encodeURIComponent(q)}`)
@@ -87,7 +95,53 @@ export default function UsersPage() {
         setCount(res.count || 0);
       })
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchUsers();
   }, [companyId, q]);
+
+  // Cargar roles (para invitación)
+  useEffect(() => {
+    if (!companyId) return;
+    fetch(`/api/settings/roles?companyId=${companyId}`)
+      .then((r) => r.json())
+      .then((list) => {
+        const arr = Array.isArray(list) ? list : [];
+        setRoles(arr.map((x: any) => ({ id: x.id, name: x.name })));
+        if (arr[0]?.id) setInviteRoleId(arr[0].id);
+      })
+      .catch(() => setRoles([]));
+  }, [companyId]);
+
+  async function sendInvitation() {
+    if (!companyId) return;
+    setInviting(true);
+    setInviteMsg(null);
+    try {
+      const res = await fetch(`/api/settings/users/invitations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId,
+          email: inviteEmail.trim(),
+          roleId: inviteRoleId || null, // opcional
+        }),
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t || "Error enviando invitación");
+      }
+      setInviteMsg("Invitación enviada.");
+      setInviteEmail("");
+      // Refrescar lista
+      fetchUsers();
+    } catch (e: any) {
+      setInviteMsg(e?.message || "No se pudo enviar la invitación");
+    } finally {
+      setInviting(false);
+    }
+  }
 
   if (!companyId) {
     return <div className="p-6">{errorMsg ?? (resolving ? "Cargando empresa…" : "Cargando empresa…")}</div>;
@@ -95,7 +149,59 @@ export default function UsersPage() {
 
   return (
     <div className="p-6 space-y-4">
-      <h1 className="text-xl font-semibold">Usuarios</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold">Usuarios</h1>
+        <div className="flex gap-2">
+          <button
+            className="px-3 py-1.5 border rounded-lg text-sm hover:bg-gray-50"
+            onClick={() => setShowInvite((v) => !v)}
+          >
+            {showInvite ? "Cerrar" : "Invitar usuario"}
+          </button>
+        </div>
+      </div>
+
+      {showInvite && (
+        <div className="border rounded-lg p-3 space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Email</label>
+              <input
+                type="email"
+                className="w-full border rounded px-2 py-1"
+                placeholder="usuario@dominio.com"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Rol inicial</label>
+              <select
+                className="w-full border rounded px-2 py-1"
+                value={inviteRoleId}
+                onChange={(e) => setInviteRoleId(e.target.value)}
+              >
+                {roles.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+                {roles.length === 0 && <option value="">(sin roles)</option>}
+              </select>
+            </div>
+            <div className="flex items-end">
+              <button
+                className="px-3 py-1.5 border rounded-lg text-sm hover:bg-gray-50"
+                onClick={sendInvitation}
+                disabled={inviting || !inviteEmail}
+              >
+                {inviting ? "Enviando..." : "Enviar invitación"}
+              </button>
+            </div>
+          </div>
+          {inviteMsg && <div className="text-sm text-gray-600">{inviteMsg}</div>}
+        </div>
+      )}
 
       <div className="flex gap-2">
         <input
@@ -133,6 +239,13 @@ export default function UsersPage() {
                 </td>
               </tr>
             ))}
+            {rows.length === 0 && !loading && (
+              <tr>
+                <td colSpan={4} className="px-3 py-8 text-center text-gray-500">
+                  Sin usuarios aún.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
