@@ -16,25 +16,46 @@ type Branding = {
   logoUrl?: string;
 };
 
+function InitialsIcon({ name }: { name: string }) {
+  const initials = useMemo(() => {
+    const parts = (name || "BSOP").trim().split(" ");
+    const a = (parts[0]?.[0] || "").toUpperCase();
+    const b = (parts[1]?.[0] || "").toUpperCase();
+    return (a + b || "B").slice(0, 2);
+  }, [name]);
+
+  return (
+    <div className="h-10 w-10 rounded-md bg-[var(--brand-100)] grid place-items-center text-[var(--brand-800)] text-xs font-semibold">
+      {initials}
+    </div>
+  );
+}
+
 const SECTIONS: Section[] = [
   {
-    key: "operacion",
-    label: "OPERACIÓN",
+    key: "purchases",
+    label: "Compras",
     items: [
       { label: "Órdenes de Compra", href: "/purchases/po", icon: <ShoppingCart className="h-4 w-4" /> },
       { label: "Recepciones", href: "/purchases/receiving", icon: <ShoppingCart className="h-4 w-4" /> },
+    ],
+  },
+  {
+    key: "inventory",
+    label: "Inventario",
+    items: [
       { label: "Movimientos de Inventario", href: "/inventory/moves", icon: <Boxes className="h-4 w-4" /> },
       { label: "Productos", href: "/products", icon: <Boxes className="h-4 w-4" /> },
     ],
   },
   {
-    key: "administracion",
-    label: "ADMINISTRACIÓN",
+    key: "admin",
+    label: "Administración",
     items: [{ label: "Legal / Documentos", href: "/admin/legal", icon: <FileText className="h-4 w-4" /> }],
   },
   {
-    key: "configuracion",
-    label: "CONFIGURACIÓN",
+    key: "settings",
+    label: "Configuración",
     items: [
       { label: "Empresa", href: "/admin/company", icon: <Settings className="h-4 w-4" /> },
       { label: "Branding", href: "/admin/branding", icon: <Settings className="h-4 w-4" /> },
@@ -44,108 +65,78 @@ const SECTIONS: Section[] = [
   },
 ];
 
-function InitialsIcon({ name }: { name: string }) {
-  const initials =
-    (name || "")
-      .split(" ")
-      .map((s) => s[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase() || "B";
-  return (
-    <div className="h-10 w-10 rounded-md bg-[var(--brand-100)] grid place-items-center text-[var(--brand-800)] text-xs font-semibold">
-      {initials}
-    </div>
-  );
-}
-
 export default function Sidebar() {
+  const pathname = usePathname();
   const router = useRouter();
   const qp = useSearchParams();
-  const pathname = usePathname();
   const companySlug = (qp.get("company") || "").toLowerCase();
 
+  const [openKey, setOpenKey] = useState<string>("purchases");
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [branding, setBranding] = useState<Branding | null>(null);
-  const [openKey, setOpenKey] = useState<string | null>("operacion");
+  const [selected, setSelected] = useState<string>(companySlug);
+  const [brandTitle, setBrandTitle] = useState<string>("BSOP");
+  const [logoUrl, setLogoUrl] = useState<string>("");
 
-  const activeKeyFromPath = useMemo(() => {
-    for (const s of SECTIONS) {
-      if (s.items.some((i) => pathname.startsWith(i.href))) return s.key;
-    }
-    return null;
-  }, [pathname]);
-
-  useEffect(() => {
-    if (activeKeyFromPath) setOpenKey(activeKeyFromPath);
-  }, [activeKeyFromPath]);
-
-  // Cargar empresas
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch("/api/companies", { cache: "no-store" });
-        const data = await r.json();
-        setCompanies(Array.isArray(data) ? data : []);
+        const r = await fetch("/api/admin/company/list", { cache: "no-store" });
+        const json = await r.json();
+        const list = (json?.companies || []) as Company[];
+        setCompanies(list);
       } catch (e) {
-        console.error("Error /api/companies:", e);
+        console.error("companies load error", e);
       }
     })();
   }, []);
 
-  // Autoseleccionar empresa si falta ?company
   useEffect(() => {
-    if (!companySlug && companies.length > 0) {
-      const slug = companies[0].slug;
-      document.cookie = `company=${slug}; path=/; max-age=31536000; samesite=lax`;
-      router.replace(`/?company=${slug}`);
-    }
-  }, [companySlug, companies, router]);
-
-  // Branding de la empresa activa
-  useEffect(() => {
+    // Branding actual (opcionalmente lo puedes sacar de ThemeLoader via dataset/localStorage si así lo manejas)
     (async () => {
       try {
-        if (!companySlug) return;
+        if (!companySlug) {
+          setBrandTitle("BSOP");
+          setLogoUrl("");
+          return;
+        }
         const r = await fetch(`/api/admin/company?company=${companySlug}`, { cache: "no-store" });
         const json = await r.json();
-        const b: Branding = json?.settings?.branding ?? {};
-        setBranding({
-          brandName: b.brandName || json?.name || "",
-          primary: b.primary,
-          secondary: b.secondary,
-          logoUrl: b.logoUrl || "",
-        });
+        const b: Branding = json?.settings?.branding || {};
+        setBrandTitle(b.brandName || json?.name || "BSOP");
+        setLogoUrl(b.logoUrl || "");
       } catch (e) {
-        console.error("Sidebar branding fetch:", e);
-        setBranding(null);
+        console.error("branding load error", e);
       }
     })();
   }, [companySlug]);
 
-  function onChangeCompany(slug: string) {
-    document.cookie = `company=${slug}; path=/; max-age=31536000; samesite=lax`;
-    const url = new URL(window.location.href);
-    url.searchParams.set("company", slug);
-    router.push(url.pathname + "?" + url.searchParams.toString());
-    router.refresh();
-  }
+  useEffect(() => {
+    if (companySlug) setSelected(companySlug);
+  }, [companySlug]);
 
   function toggleKey(k: string) {
-    setOpenKey((curr) => (curr === k ? null : k));
+    setOpenKey((prev) => (prev === k ? "" : k));
   }
 
-  const brandTitle = branding?.brandName || "BSOP";
-  const logoUrl = branding?.logoUrl || "";
+  function onSelectCompany(slug: string) {
+    setSelected(slug);
+    const url = new URL(window.location.href);
+    if (slug) url.searchParams.set("company", slug);
+    else url.searchParams.delete("company");
+    router.push(url.pathname + "?" + url.searchParams.toString());
+    // Si usas ThemeLoader con event/localStorage puedes disparar aquí:
+    // window.dispatchEvent(new CustomEvent("branding:updated", { detail: { company: slug } }));
+    // localStorage.setItem("branding:updated", Date.now().toString());
+  }
 
   // Empresa activa (para agregar companyId al href)
   const currentCompany = companies.find((c) => c.slug?.toLowerCase() === companySlug);
 
   return (
-    <aside className="w-72 border-r bg-white h-screen flex flex-col">
+    <aside className="w-72 h-screen flex flex-col border-r border-[var(--brand-200)] bg-[var(--brand-50)]">
       <div className="flex items-center gap-3 p-4">
         {logoUrl ? (
-          <div className="h-10 w-10 rounded-md border bg-white p-1 grid place-items-center">
+          <div className="h-10 w-10 rounded-md border border-[var(--brand-200)] bg-[var(--brand-50)] p-1 grid place-items-center">
             <img src={logoUrl} alt={brandTitle} className="h-full w-full object-contain" loading="eager" referrerPolicy="no-referrer" />
           </div>
         ) : (
@@ -161,18 +152,13 @@ export default function Sidebar() {
         <label className="block text-xs text-slate-500 mb-1">Empresa</label>
         <select
           className="w-full rounded-2xl border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--brand-500)]"
-          value={companySlug || ""}
-          onChange={(e) => onChangeCompany(e.target.value)}
+          value={selected}
+          onChange={(e) => onSelectCompany(e.target.value)}
         >
-          {companies.length === 0 ? (
-            <option value="">(sin empresas)</option>
-          ) : (
-            companies.map((c) => (
-              <option key={c.id} value={c.slug}>
-                {c.name}
-              </option>
-            ))
-          )}
+          <option value="">Selecciona...</option>
+          {companies.map((c) => (
+            <option key={c.id} value={c.slug.toLowerCase()}>{c.name}</option>
+          ))}
         </select>
       </div>
 
@@ -180,7 +166,7 @@ export default function Sidebar() {
         {SECTIONS.map((s) => {
           const isOpen = openKey === s.key;
           return (
-            <div key={s.key} className="rounded-xl border bg-white">
+            <div key={s.key} className="rounded-xl border border-[var(--brand-200)] bg-[var(--brand-50)]">
               <button onClick={() => toggleKey(s.key)} className="w-full flex items-center justify-between px-3 py-2 text-left">
                 <span className="text-[11px] font-semibold tracking-wider text-slate-600">{s.label}</span>
                 <ChevronRight className={`h-4 w-4 transition-transform ${isOpen ? "rotate-90" : ""}`} />
@@ -191,20 +177,15 @@ export default function Sidebar() {
                   {s.items.map((item) => {
                     const active = pathname === item.href || pathname.startsWith(item.href + "/");
 
-                    // 👉 Construye href con ?company y, si existe, también &companyId
-                    let href = item.href;
-                    if (companySlug) {
-                      const params = new URLSearchParams({ company: companySlug });
-                      if (currentCompany?.id) params.set("companyId", currentCompany.id);
-                      href = `${item.href}?${params.toString()}`;
-                    }
+                    // agrega company param si hay empresa activa
+                    const href = currentCompany ? `${item.href}?company=${currentCompany.slug}` : item.href;
 
                     return (
                       <li key={item.href}>
                         <Link
                           href={href}
                           className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
-                            active ? "text-[var(--brand-800)] bg-[var(--brand-50)]" : "text-slate-700 hover:bg-slate-50"
+                            active ? "text-[var(--brand-800)] bg-[var(--brand-50)]" : "text-[var(--brand-700)] hover:bg-[var(--brand-50)] hover:text-[var(--brand-800)]"
                           }`}
                           onClick={() => setOpenKey(s.key)}
                         >
