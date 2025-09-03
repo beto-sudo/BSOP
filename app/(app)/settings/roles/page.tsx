@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import PermissionMatrix from "@/components/PermissionMatrix";
+import PermissionMatrix from "@/_components/PermissionMatrix";
 
 export default function RolesPage({ searchParams }: { searchParams: { companyId?: string } }) {
   const companyId = searchParams.companyId;
