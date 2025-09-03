@@ -1,9 +1,15 @@
-// lib/db.ts
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { createClient } from "@supabase/supabase-js";
 
-export function dbOrThrow(): SupabaseClient<any, any, any> {
-  const db = getSupabaseAdmin();
-  if (!db) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY on server");
-  return db;
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
+
+function requireEnv(v: string | undefined, key: string) {
+  if (!v) throw new Error(`Missing env ${key}`);
+  return v;
 }
+
+export const supabaseAdmin = createClient(
+  requireEnv(SUPABASE_URL, "NEXT_PUBLIC_SUPABASE_URL"),
+  requireEnv(SUPABASE_SERVICE_ROLE_KEY, "SUPABASE_SERVICE_ROLE_KEY"),
+  { auth: { persistSession: false } }
+);
