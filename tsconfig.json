@@ -11,11 +11,39 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
+
     "baseUrl": ".",
-    "paths": { "@/*": ["./*"] }
-    // Si prefieres mantener target bajo, añade además:
-    // "downlevelIteration": true
+
+    "paths": {
+      "@/*": ["./*"],
+
+      /* ✅ Tu carpeta nueva con componentes “privados” */
+      "@/_components/*": [
+        "./app/_components/*",
+        "./_components/*"
+      ],
+
+      /* ✅ Compatibilidad con imports existentes tipo '@/components/...'
+         — probará primero app/_components, luego _components de raíz y, si existiera, components de raíz */
+      "@/components/*": [
+        "./app/_components/*",
+        "./_components/*",
+        "./components/*"
+      ]
+    }
+
+    /* Si prefieres mantener target bajo, añade además:
+       "downlevelIteration": true
+    */
   },
- "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "**/*.d.ts", ".next/types/**/*.ts"],
+
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.d.ts",
+    ".next/types/**/*.ts"
+  ],
+
   "exclude": ["node_modules"]
 }
