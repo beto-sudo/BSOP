@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import PermissionMatrix from "@/components/PermissionMatrix";
+import PermissionMatrix from "@/_components/PermissionMatrix";
 
 type Profile = {
   id: string;
