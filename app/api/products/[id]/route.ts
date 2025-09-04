@@ -4,11 +4,13 @@ import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 
+// Cliente ADMIN (solo en servidor)
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY! // <- service role (no exponer en cliente)
 );
 
+// Verifica que el usuario autenticado tenga acceso a la compañía (?company=slug)
 async function assertAccess(req: NextRequest, slug: string) {
   const cookieStore = cookies();
   const supaSSR = createServerClient(
@@ -16,21 +18,29 @@ async function assertAccess(req: NextRequest, slug: string) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
   );
+
   const { data: auth } = await supaSSR.auth.getUser();
   const user = auth.user;
   if (!user) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
 
+  // Company por slug
   const { data: company } = await admin.from("Company").select("id").eq("slug", slug).maybeSingle();
   if (!company) return { error: NextResponse.json({ error: "Company not found" }, { status: 404 }) };
 
+  // profile.id puede no ser igual a auth.user.id → intentar por id y por email
   const { data: pById } = await admin.from("profile").select("id").eq("id", user.id).maybeSingle();
   let profileId = pById?.id as string | undefined;
   if (!profileId) {
-    const { data: pByEmail } = await admin.from("profile").select("id").eq("email", user.email ?? "").maybeSingle();
+    const { data: pByEmail } = await admin
+      .from("profile")
+      .select("id")
+      .eq("email", user.email ?? "")
+      .maybeSingle();
     profileId = pByEmail?.id;
   }
   if (!profileId) return { error: NextResponse.json({ error: "Profile not found" }, { status: 403 }) };
 
+  // membership
   const { data: member } = await admin
     .from("company_member")
     .select("id")
@@ -42,6 +52,7 @@ async function assertAccess(req: NextRequest, slug: string) {
   return { companyId: company.id as string };
 }
 
+// PATCH: editar nombre/sku/estado
 export async function PATCH(req: NextRequest, ctx: { params: { id: string } }) {
   const { searchParams } = new URL(req.url);
   const slug = (searchParams.get("company") || "").toLowerCase();
@@ -68,4 +79,23 @@ export async function PATCH(req: NextRequest, ctx: { params: { id: string } }) {
   if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   return NextResponse.json(data);
+}
+
+// DELETE: borrar producto de la compañía
+export async function DELETE(req: NextRequest, ctx: { params: { id: string } }) {
+  const { searchParams } = new URL(req.url);
+  const slug = (searchParams.get("company") || "").toLowerCase();
+  const check = await assertAccess(req, slug);
+  if ("error" in check) return check.error;
+  const { companyId } = check;
+
+  const id = ctx.params.id;
+  const { error } = await admin
+    .from("Product")
+    .delete()
+    .eq("id", id)
+    .eq("companyId", companyId);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
 }
