@@ -1,6 +1,7 @@
 // app/companies/page.tsx
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { isSuperadminEmail } from "@/lib/superadmin";
 import CompaniesClient from "./ui";
 
 export const revalidate = 0;
@@ -13,12 +14,33 @@ export default async function CompaniesPage() {
   const user = auth.user;
   if (!user) redirect("/signin?redirect=/companies");
 
-  // 2) Resuelve profile.id (puede no ser igual a auth.user.id)
+  // 2) Si es superadmin, listar TODAS
+  if (isSuperadminEmail(user.email)) {
+    const { data: rows, error } = await supabase
+      .from("Company")
+      .select("id,name,slug,settings")
+      .order("name", { ascending: true });
+
+    const companies =
+      error
+        ? []
+        : (rows ?? []).map((c: any) => ({
+            id: c.id,
+            name: c.name,
+            slug: c.slug,
+            logoUrl: c.settings?.branding?.logoUrl ?? "",
+            slogan: c.settings?.branding?.slogan ?? "",
+          }));
+
+    return <CompaniesClient companies={companies} emptyMessage={error ? error.message : ""} />;
+  }
+
+  // 3) Usuario normal: resolver profile.id (puede no ser igual a auth.user.id)
   let profileId: string | null = null;
   let whyEmpty = "";
 
   // a) intenta por id
-  const { data: pById, error: pByIdErr } = await supabase
+  const { data: pById } = await supabase
     .from("profile")
     .select("id,email")
     .eq("id", user.id)
@@ -27,21 +49,18 @@ export default async function CompaniesPage() {
   if (pById) {
     profileId = pById.id;
   } else {
-    // b) intenta por email (algunas instalaciones poblan profile con otro id)
-    const { data: pByEmail, error: pByEmailErr } = await supabase
+    // b) intenta por email
+    const { data: pByEmail } = await supabase
       .from("profile")
       .select("id,email")
       .eq("email", user.email ?? "")
       .maybeSingle();
 
-    if (pByEmail) {
-      profileId = pByEmail.id;
-    } else {
-      whyEmpty = "No se encontró tu perfil en la tabla 'profile'.";
-    }
+    if (pByEmail) profileId = pByEmail.id;
+    else whyEmpty = "No se encontró tu perfil en la tabla 'profile'.";
   }
 
-  // 3) Si hay profileId, busca memberships
+  // 4) Si hay profileId, busca memberships
   let companies: Array<{ id: string; name: string; slug: string; logoUrl?: string; slogan?: string }> = [];
 
   if (profileId) {
@@ -55,8 +74,7 @@ export default async function CompaniesPage() {
     } else {
       const ids = (memberships ?? []).map((m: any) => m.company_id);
       if (ids.length === 0) {
-        whyEmpty =
-          "No tienes compañías asignadas. Pide a un administrador que te agregue o crea una nueva compañía.";
+        whyEmpty = "No tienes compañías asignadas. Pide a un administrador que te agregue o crea una nueva compañía.";
       } else {
         const { data: rows, error: cErr } = await supabase
           .from("Company")
