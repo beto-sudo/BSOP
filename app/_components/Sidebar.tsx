@@ -12,29 +12,23 @@ type Features = Record<string, boolean>;
 
 function InitialsIcon({ name }: { name: string }) {
   const initials = (name || "").split(" ").map(s=>s[0]).join("").slice(0,2).toUpperCase() || "B";
-  return <div className="h-10 w-10 rounded-md bg-[var(--brand-100,#eef2ff)] text-[var(--brand-800,#1e293b)] grid place-items-center text-xs font-semibold">{initials}</div>;
-}
-
-/** Utilidad para derivar tonos de la marca */
-function shade(hex: string, percent: number) {
-  // percent: -100..100 (negro..blanco)
-  const m = hex.replace("#","").match(/.{1,2}/g);
-  if (!m) return hex;
-  const [r,g,b] = m.map(x => parseInt(x,16));
-  const t = percent < 0 ? 0 : 255;
-  const p = Math.abs(percent) / 100;
-  const rn = Math.round((t - r) * p + r);
-  const gn = Math.round((t - g) * p + g);
-  const bn = Math.round((t - b) * p + b);
-  const toHex = (n:number) => n.toString(16).padStart(2,"0");
-  return `#${toHex(rn)}${toHex(gn)}${toHex(bn)}`;
+  return (
+    <div
+      className="h-10 w-10 rounded-md grid place-items-center text-xs font-semibold"
+      style={{
+        background: "var(--brand-100, #eef2ff)",
+        color: "var(--brand-900, #0f172a)",
+      }}
+    >
+      {initials}
+    </div>
+  );
 }
 
 export default function Sidebar() {
   const router = useRouter();
   const qp = useSearchParams();
   const pathname = usePathname();
-
   const companySlug = (qp.get("company") || "").toLowerCase();
 
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -84,7 +78,7 @@ export default function Sidebar() {
     }
   }, [companySlug, companies, pathname, router]);
 
-  // branding + features por empresa (y aplicar variables CSS globales)
+  // branding + features por empresa
   useEffect(() => {
     (async () => {
       try {
@@ -95,19 +89,11 @@ export default function Sidebar() {
         const f: Features = json?.settings?.features ?? {};
         setBranding({
           brandName: b?.brandName || json?.name || "",
-          primary: b?.primary || "#334155",
-          secondary: b?.secondary || "#64748b",
+          primary: b?.primary || "",
+          secondary: b?.secondary || "",
           logoUrl: b?.logoUrl || "",
         });
         setFeatures(f || {});
-        const primary = (b?.primary || "#334155") as string;
-        const root = document.documentElement;
-        root.style.setProperty("--brand-50", shade(primary, 88));
-        root.style.setProperty("--brand-100", shade(primary, 75));
-        root.style.setProperty("--brand-200", shade(primary, 60));
-        root.style.setProperty("--brand-800", shade(primary, -10));
-        root.style.setProperty("--brand-900", shade(primary, -20));
-        root.style.setProperty("--brand-primary", primary);
       } catch {}
     })();
   }, [companySlug]);
@@ -142,7 +128,7 @@ export default function Sidebar() {
   }, [pathname, sections]);
 
   function isItemVisible(item: NavItem): boolean {
-    // Mostrar TODO el menú: no ocultamos por enabled/feature; sólo aplicamos filtros
+    // MOSTRAR TODO salvo que esté restringido por empresa o feature flag
     if (item.enabledForCompanies && item.enabledForCompanies.length > 0) {
       if (!companySlug) return false;
       if (!item.enabledForCompanies.map(s => s.toLowerCase()).includes(companySlug)) return false;
@@ -155,12 +141,17 @@ export default function Sidebar() {
   }
 
   function renderMenu(sec: Section, menu: NavMenu) {
-    const isOpen = openMenuKey === `${sec.key}:${menu.key}`;
+    const id = `${sec.key}:${menu.key}`;
+    const isOpen = openMenuKey === id;
     return (
       <div key={menu.key} className="border-t first:border-t-0">
         <button
-          className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold hover:bg-[var(--brand-50)]"
-          onClick={() => setOpenMenuKey(isOpen ? "" : `${sec.key}:${menu.key}`)}
+          className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold"
+          onClick={() => setOpenMenuKey(isOpen ? "" : id)}
+          style={{
+            background: isOpen ? "var(--brand-100, #f1f5f9)" : "transparent",
+            color: "var(--brand-900, #0f172a)",
+          }}
         >
           <span className="flex items-center gap-2">{menu.icon}<span>{menu.label}</span></span>
           <ChevronRight className={`h-3 w-3 transition-transform ${isOpen ? "rotate-90" : ""}`} />
@@ -176,9 +167,13 @@ export default function Sidebar() {
                 <li key={`${menu.key}:${item.href}`}>
                   <Link
                     href={href}
-                    className={`block px-6 py-2 text-sm hover:bg-[var(--brand-50)] ${
-                      active ? "text-[var(--brand-800)] font-medium" : "text-slate-700"
-                    }`}
+                    className="block px-6 py-2 text-sm rounded-r-md"
+                    style={{
+                      background: active ? "var(--brand-50, #f8fafc)" : "transparent",
+                      color: active ? "var(--brand-800, #1e293b)" : "#334155",
+                      borderLeft: "3px solid",
+                      borderLeftColor: active ? "var(--brand-primary, #0f172a)" : "transparent",
+                    }}
                   >
                     {item.label}
                   </Link>
@@ -196,8 +191,13 @@ export default function Sidebar() {
     return (
       <div key={sec.key} className="rounded-lg border overflow-hidden">
         <button
-          className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold bg-slate-50"
+          className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold"
           onClick={() => setOpenSectionKey(isOpen ? "" : sec.key)}
+          style={{
+            background: "var(--brand-50, #f8fafc)",
+            color: "var(--brand-900, #0f172a)",
+            borderLeft: "4px solid var(--brand-primary, #0f172a)",
+          }}
         >
           <span>{sec.label}</span>
           <ChevronRight className={`h-3 w-3 transition-transform ${isOpen ? "rotate-90" : ""}`} />
