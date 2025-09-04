@@ -6,12 +6,14 @@ export type NavItem = {
   label: string;
   href: string;
   icon?: ReactNode;
-  needsCompany?: boolean; // si true, Sidebar agrega ?company=<slug>
+  /** si true, el Sidebar agregará ?company=<slug> a la URL */
+  needsCompany?: boolean;
 };
 
 export type Section = { key: string; label: string; items: NavItem[] };
 
-const OPERACION: Section = {
+/** OPERACIÓN: módulos que requieren contexto de empresa */
+export const OPERACION: Section = {
   key: "operacion",
   label: "OPERACIÓN",
   items: [
@@ -22,8 +24,23 @@ const OPERACION: Section = {
   ],
 };
 
-const CONFIG: Section = {
-  key: "config",
+/** ADMINISTRACIÓN (operativa/contable): dejamos preparada la sección para tus módulos.
+ *  IMPORTANTE: agrega aquí las rutas reales cuando estén listas para evitar 404s.
+ *  Por ahora la dejamos vacía para no romper navegación.
+ */
+export const ADMINISTRACION: Section = {
+  key: "administracion",
+  label: "ADMINISTRACIÓN",
+  items: [
+    // Ejemplos cuando los módulos estén listos:
+    // { label: "Contabilidad", href: "/admin/accounting", icon: <FileText className="h-4 w-4" />, needsCompany: true },
+    // { label: "Recursos Humanos", href: "/admin/hr", icon: <Users className="h-4 w-4" />, needsCompany: true },
+  ],
+};
+
+/** CONFIGURACIÓN: datos de la empresa y control de acceso por compañía */
+export const CONFIGURACION: Section = {
+  key: "configuracion",
   label: "CONFIGURACIÓN",
   items: [
     { label: "Empresa (Branding)", href: "/admin/branding", icon: <Settings className="h-4 w-4" />, needsCompany: true },
@@ -34,16 +51,19 @@ const CONFIG: Section = {
   ],
 };
 
-const ADMIN: Section = {
+/** SUPERADMIN: solo visible a superadmins; NO requiere company */
+export const SUPERADMIN: Section = {
   key: "superadmin",
-  label: "ADMINISTRACIÓN",
+  label: "SUPERADMIN",
   items: [
     { label: "Panel Superadmin", href: "/settings/admin", icon: <Shield className="h-4 w-4" /> },
     { label: "Accesos", href: "/settings/access", icon: <Shield className="h-4 w-4" /> },
-    { label: "Empresas", href: "/companies", icon: <Boxes className="h-4 w-4" /> }, // ← SIEMPRE AQUÍ
+    { label: "Empresas", href: "/companies", icon: <Boxes className="h-4 w-4" /> },
   ],
 };
 
-export function buildSections(isSuperadmin: boolean): Section[] {
-  return isSuperadmin ? [OPERACION, CONFIG, ADMIN] : [OPERACION, CONFIG];
+/** Construye el menú en orden fijo. SUPERADMIN solo si isSuperadmin = true */
+export function buildSectionsOrdered(isSuperadmin: boolean): Section[] {
+  const base: Section[] = [OPERACION, ADMINISTRACION, CONFIGURACION];
+  return isSuperadmin ? [...base, SUPERADMIN] : base;
 }
