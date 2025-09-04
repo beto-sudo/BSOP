@@ -1,0 +1,18 @@
+// app/(app)/settings/access/page.tsx
+import { supabaseServer } from "@/lib/supabaseServer";
+import { isSuperadminEmail } from "@/lib/superadmin";
+import { redirect } from "next/navigation";
+import AccessClient from "./ui";
+
+export const revalidate = 0;
+
+export default async function Page() {
+  const supa = supabaseServer();
+  const { data: auth } = await supa.auth.getUser();
+  const user = auth.user;
+
+  if (!user) redirect("/signin?redirect=/settings/access");
+  if (!isSuperadminEmail(user.email)) redirect("/");
+
+  return <AccessClient />;
+}
