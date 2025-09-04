@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
-/** Helpers */
+/* Helpers */
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
@@ -55,7 +55,7 @@ function getCookie(name: string) {
   return m ? decodeURIComponent(m[2]) : "";
 }
 
-/** Componente */
+/* Componente */
 export default function ThemeLoader() {
   const qp = useSearchParams();
   const pathname = usePathname();
@@ -79,30 +79,29 @@ export default function ThemeLoader() {
         if (cancelled) return;
 
         const b = data?.settings?.branding || {};
-        // PRIMARY
+
+        // primaria
         const pal1: Record<string, string> =
           b.palette ??
           (typeof b.hue === "number" && typeof b.saturation === "number"
             ? buildPalette(b.hue, b.saturation)
             : undefined) ??
-          buildPalette(220, 83); // fallback
+          buildPalette(220, 83);
 
-        // SECONDARY (acepta string legacy o bloque)
+        // secundaria (string legacy o bloque)
         const sec = typeof b.secondary === "string" ? { primary: b.secondary } : (b.secondary || {});
         const pal2: Record<string, string> =
           sec?.palette ??
           (typeof sec?.hue === "number" && typeof sec?.saturation === "number"
             ? buildPalette(sec.hue, sec.saturation)
             : undefined) ??
-          buildPalette(180, 70); // fallback teal-ish
+          buildPalette(180, 70);
 
-        // aplica
         applyPalette("brand", pal1);
         applyPalette("brand2", pal2);
 
         lastApplied.current = company;
-      } catch (e) {
-        // evita romper UI; aplica defaults
+      } catch {
         applyPalette("brand", buildPalette(220, 83));
         applyPalette("brand2", buildPalette(180, 70));
       } finally {
@@ -110,27 +109,16 @@ export default function ThemeLoader() {
       }
     }
 
-    // evita refetch inútil si ya aplicamos para esta compañía
     if (lastApplied.current !== company) fetchAndApply();
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [company, key]);
 
-  // Escucha “branding:updated” y cambios de localStorage (para otras tabs)
+  // escucha “branding:updated” y cambios cross-tab
   useEffect(() => {
-    function refetch() {
-      // fuerza a volver a aplicar en el próximo efecto
-      lastApplied.current = "";
-      // trigger inmediato
-      const ev = new Event("visibilitychange");
-      document.dispatchEvent(ev);
-    }
+    function refetch() { lastApplied.current = ""; document.dispatchEvent(new Event("visibilitychange")); }
     const onCustom = () => refetch();
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === "branding:updated") refetch();
-    };
+    const onStorage = (e: StorageEvent) => { if (e.key === "branding:updated") refetch(); };
     window.addEventListener("branding:updated", onCustom as EventListener);
     window.addEventListener("storage", onStorage);
     return () => {
@@ -139,5 +127,5 @@ export default function ThemeLoader() {
     };
   }, []);
 
-  return null; // Solo efectos; no pinta UI
+  return null;
 }
