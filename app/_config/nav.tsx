@@ -1,27 +1,43 @@
 'use client';
 
 import { ReactNode } from "react";
-import { ShoppingCart, Boxes, FileText, Settings, Users, Shield, Link as LinkIcon } from "lucide-react";
+import {
+  ShoppingCart, Boxes, FileText, Settings, Users, Shield, Link as LinkIcon, Home
+} from "lucide-react";
 
-/**
- * Reglas:
- * - needsCompany: si true, el Sidebar agrega ?company=<slug> a la URL.
- * - enabled: si false, el ítem no se muestra (evitamos 404s en módulos no listos).
- * - enabledForCompanies: restringe por slugs de empresa (lowercase). Si está presente, solo se muestra para esos slugs.
- * - enabledByFeature: llave de feature flag (se evalúa contra settings.features[clave] de la compañía).
- */
-
+/** Tipos */
 export type NavItem = {
   label: string;
   href: string;
-  icon?: ReactNode;
   needsCompany?: boolean;
   enabled?: boolean;
-  enabledForCompanies?: string[]; // e.g., ["ansa","dilesa"]
-  enabledByFeature?: string;      // e.g., "waitry", "cfdi"
+  enabledForCompanies?: string[]; // slugs lowercase
+  enabledByFeature?: string;      // p.ej. "waitry", "cfdi"
 };
 
-export type Section = { key: string; label: string; items: NavItem[] };
+export type NavMenu = {
+  key: string;
+  label: string;
+  icon?: ReactNode;
+  items: NavItem[];
+};
+
+export type Section = {
+  key: string;
+  label: string;
+  menus: NavMenu[];
+};
+
+/** Helpers de construcción */
+const i = (
+  label: string,
+  href: string,
+  needsCompany = true,
+  enabled = true,
+  extra?: Partial<NavItem>
+): NavItem => ({ label, href, needsCompany, enabled, ...(extra || {}) });
+
+const m = (key: string, label: string, icon: ReactNode, items: NavItem[]): NavMenu => ({ key, label, icon, items });
 
 /* =========================
    1) ADMINISTRACIÓN (1°)
@@ -29,24 +45,41 @@ export type Section = { key: string; label: string; items: NavItem[] };
 export const ADMINISTRACION: Section = {
   key: "administracion",
   label: "ADMINISTRACIÓN",
-  items: [
-    // Contabilidad / Tesorería / RH (por ahora en propuesta → enabled: false)
-    { label: "Proveedores", href: "/admin/vendors", icon: <FileText className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "Clientes", href: "/admin/customers", icon: <FileText className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "Tesorería — Bancos", href: "/admin/treasury/banks", icon: <FileText className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "Tesorería — Conciliaciones", href: "/admin/treasury/reconciliations", icon: <FileText className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "CxP — Antigüedad", href: "/admin/ap/aging", icon: <FileText className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "CxP — Facturas/Órdenes", href: "/admin/ap/invoices", icon: <FileText className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "CxC — Antigüedad", href: "/admin/ar/aging", icon: <FileText className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "CxC — Cobranza", href: "/admin/ar/collections", icon: <FileText className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "Presupuestos", href: "/admin/budgeting", icon: <FileText className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "Activos fijos", href: "/admin/fixed-assets", icon: <FileText className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "Contabilidad — Catálogo", href: "/admin/accounting/chart", icon: <FileText className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "Contabilidad — Pólizas", href: "/admin/accounting/entries", icon: <FileText className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "Contabilidad — Balanza/Aux", href: "/admin/accounting/trials", icon: <FileText className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "RH — Empleados", href: "/admin/hr/employees", icon: <Users className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "RH — Nóminas", href: "/admin/hr/payroll", icon: <Users className="h-4 w-4" />, needsCompany: true, enabled: false, enabledForCompanies: [], enabledByFeature: "payroll" },
-    { label: "RH — Asistencias", href: "/admin/hr/attendance", icon: <Users className="h-4 w-4" />, needsCompany: true, enabled: false, enabledByFeature: "attendance" },
+  menus: [
+    m("proveedores", "Proveedores", <FileText className="h-4 w-4" />, [
+      i("Listado", "/admin/vendors"),
+    ]),
+    m("clientes", "Clientes", <FileText className="h-4 w-4" />, [
+      i("Listado", "/admin/customers"),
+    ]),
+    m("tesoreria", "Tesorería", <FileText className="h-4 w-4" />, [
+      i("Bancos", "/admin/treasury/banks"),
+      i("Conciliaciones", "/admin/treasury/reconciliations"),
+    ]),
+    m("cxp", "Cuentas por pagar (CxP)", <FileText className="h-4 w-4" />, [
+      i("Antigüedad", "/admin/ap/aging"),
+      i("Facturas/Órdenes", "/admin/ap/invoices"),
+    ]),
+    m("cxc", "Cuentas por cobrar (CxC)", <FileText className="h-4 w-4" />, [
+      i("Antigüedad", "/admin/ar/aging"),
+      i("Cobranza", "/admin/ar/collections"),
+    ]),
+    m("presupuestos", "Presupuestos", <FileText className="h-4 w-4" />, [
+      i("Planeación", "/admin/budgeting"),
+    ]),
+    m("activos", "Activos fijos", <FileText className="h-4 w-4" />, [
+      i("Maestro de activos", "/admin/fixed-assets"),
+    ]),
+    m("contabilidad", "Contabilidad", <FileText className="h-4 w-4" />, [
+      i("Catálogo de cuentas", "/admin/accounting/chart"),
+      i("Pólizas", "/admin/accounting/entries"),
+      i("Balanza/Auxiliares", "/admin/accounting/trials"),
+    ]),
+    m("rh", "Recursos Humanos", <Users className="h-4 w-4" />, [
+      i("Empleados", "/admin/hr/employees"),
+      i("Nóminas", "/admin/hr/payroll", true, true, { enabledByFeature: "payroll" }),
+      i("Asistencias", "/admin/hr/attendance", true, true, { enabledByFeature: "attendance" }),
+    ]),
   ],
 };
 
@@ -56,23 +89,35 @@ export const ADMINISTRACION: Section = {
 export const OPERACION: Section = {
   key: "operacion",
   label: "OPERACIÓN",
-  items: [
-    { label: "Inicio (KPIs)", href: "/", icon: <FileText className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "Compras — Requisiciones", href: "/purchases/requests", icon: <ShoppingCart className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "Compras — Órdenes de compra", href: "/purchases/po", icon: <ShoppingCart className="h-4 w-4" />, needsCompany: true, enabled: true },
-    { label: "Compras — Recepciones", href: "/purchases/receiving", icon: <ShoppingCart className="h-4 w-4" />, needsCompany: true, enabled: true },
-    { label: "Compras — Devoluciones", href: "/purchases/returns", icon: <ShoppingCart className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "Inventario — Productos", href: "/inventory/products", icon: <Boxes className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "Inventario — Almacenes", href: "/inventory/warehouses", icon: <Boxes className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "Inventario — Transferencias", href: "/inventory/transfers", icon: <Boxes className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "Inventario — Conteos físicos", href: "/inventory/counts", icon: <Boxes className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "Inventario — Ajustes", href: "/inventory/adjustments", icon: <Boxes className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "Ventas — Pedidos (Waitry)", href: "/sales/orders", icon: <FileText className="h-4 w-4" />, needsCompany: true, enabled: false, enabledByFeature: "waitry" },
-    { label: "Ventas — Tickets", href: "/sales/tickets", icon: <FileText className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "Ventas — Facturación", href: "/sales/invoicing", icon: <FileText className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "Caja — Aperturas y cierres", href: "/cash/closures", icon: <FileText className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "Caja — Movimientos", href: "/cash/movements", icon: <FileText className="h-4 w-4" />, needsCompany: true, enabled: false },
-    { label: "Reportes — Operación", href: "/reports", icon: <FileText className="h-4 w-4" />, needsCompany: true, enabled: true },
+  menus: [
+    m("inicio", "Inicio (KPIs)", <Home className="h-4 w-4" />, [
+      i("Dashboard", "/", true),
+    ]),
+    m("compras", "Compras", <ShoppingCart className="h-4 w-4" />, [
+      i("Requisiciones", "/purchases/requests"),
+      i("Órdenes de compra", "/purchases/po"),
+      i("Recepciones", "/purchases/receiving"),
+      i("Devoluciones", "/purchases/returns"),
+    ]),
+    m("inventario", "Inventario", <Boxes className="h-4 w-4" />, [
+      i("Productos", "/inventory/products"),
+      i("Almacenes", "/inventory/warehouses"),
+      i("Transferencias", "/inventory/transfers"),
+      i("Conteos físicos", "/inventory/counts"),
+      i("Ajustes", "/inventory/adjustments"),
+    ]),
+    m("ventas", "Ventas", <FileText className="h-4 w-4" />, [
+      i("Pedidos (Waitry)", "/sales/orders", true, true, { enabledByFeature: "waitry" }),
+      i("Tickets", "/sales/tickets"),
+      i("Facturación", "/sales/invoicing"),
+    ]),
+    m("caja", "Caja", <FileText className="h-4 w-4" />, [
+      i("Aperturas y cierres", "/cash/closures"),
+      i("Movimientos", "/cash/movements"),
+    ]),
+    m("reportes", "Reportes", <FileText className="h-4 w-4" />, [
+      i("Operación", "/reports"),
+    ]),
   ],
 };
 
@@ -82,21 +127,25 @@ export const OPERACION: Section = {
 export const CONFIGURACION: Section = {
   key: "configuracion",
   label: "CONFIGURACIÓN",
-  items: [
-    { label: "Empresa — Branding", href: "/admin/branding", icon: <Settings className="h-4 w-4" />, needsCompany: true, enabled: true },
-    { label: "Empresa — Datos fiscales", href: "/admin/legal", icon: <Settings className="h-4 w-4" />, needsCompany: true, enabled: true },
-    { label: "Empresa — Datos generales", href: "/admin/company", icon: <Settings className="h-4 w-4" />, needsCompany: true, enabled: true },
-    { label: "Accesos — Usuarios", href: "/settings/users", icon: <Users className="h-4 w-4" />, needsCompany: false, enabled: true },
-    { label: "Accesos — Roles", href: "/settings/roles", icon: <Shield className="h-4 w-4" />, needsCompany: false, enabled: true },
-
-    // Integraciones por empresa
-    { label: "Integraciones — Waitry", href: "/settings/integrations/waitry", icon: <LinkIcon className="h-4 w-4" />, needsCompany: true, enabled: false, enabledByFeature: "waitry" },
-    { label: "Integraciones — CFDI/Timbrado", href: "/settings/integrations/cfdi", icon: <LinkIcon className="h-4 w-4" />, needsCompany: true, enabled: false, enabledByFeature: "cfdi" },
-    { label: "Integraciones — Bancos", href: "/settings/integrations/banks", icon: <LinkIcon className="h-4 w-4" />, needsCompany: true, enabled: false, enabledByFeature: "banks" },
-    { label: "Integraciones — WhatsApp", href: "/settings/integrations/whatsapp", icon: <LinkIcon className="h-4 w-4" />, needsCompany: true, enabled: false, enabledByFeature: "whatsapp" },
-    { label: "Integraciones — Email (SMTP)", href: "/settings/integrations/email", icon: <LinkIcon className="h-4 w-4" />, needsCompany: true, enabled: false, enabledByFeature: "smtp" },
-    { label: "Integraciones — Almacenamiento (S3)", href: "/settings/integrations/storage", icon: <LinkIcon className="h-4 w-4" />, needsCompany: true, enabled: false, enabledByFeature: "storage" },
-    { label: "Integraciones — Webhooks", href: "/settings/integrations/webhooks", icon: <LinkIcon className="h-4 w-4" />, needsCompany: true, enabled: false, enabledByFeature: "webhooks" },
+  menus: [
+    m("empresa", "Empresa", <Settings className="h-4 w-4" />, [
+      i("Branding", "/admin/branding"),
+      i("Datos fiscales", "/admin/legal"),
+      i("Datos generales", "/admin/company"),
+    ]),
+    m("accesos", "Accesos (empresa)", <Shield className="h-4 w-4" />, [
+      i("Usuarios", "/settings/users", false),
+      i("Roles", "/settings/roles", false),
+    ]),
+    m("integraciones", "Integraciones (empresa)", <LinkIcon className="h-4 w-4" />, [
+      i("Waitry", "/settings/integrations/waitry", true, true, { enabledByFeature: "waitry" }),
+      i("CFDI/Timbrado", "/settings/integrations/cfdi", true, true, { enabledByFeature: "cfdi" }),
+      i("Bancos", "/settings/integrations/banks", true, true, { enabledByFeature: "banks" }),
+      i("WhatsApp", "/settings/integrations/whatsapp", true, true, { enabledByFeature: "whatsapp" }),
+      i("Email (SMTP)", "/settings/integrations/email", true, true, { enabledByFeature: "smtp" }),
+      i("Almacenamiento (S3)", "/settings/integrations/storage", true, true, { enabledByFeature: "storage" }),
+      i("Webhooks", "/settings/integrations/webhooks", true, true, { enabledByFeature: "webhooks" }),
+    ]),
   ],
 };
 
@@ -106,17 +155,23 @@ export const CONFIGURACION: Section = {
 export const SUPERADMIN: Section = {
   key: "superadmin",
   label: "SUPERADMIN",
-  items: [
-    { label: "Panel Superadmin", href: "/settings/admin", icon: <Shield className="h-4 w-4" />, enabled: true },
-    { label: "Accesos globales", href: "/settings/access", icon: <Shield className="h-4 w-4" />, enabled: true },
-    { label: "Empresas", href: "/companies", icon: <Boxes className="h-4 w-4" />, enabled: true },
-
-    // Integraciones globales (catálogo/control central)
-    { label: "Integraciones — Global", href: "/settings/integrations/global", icon: <LinkIcon className="h-4 w-4" />, enabled: false },
+  menus: [
+    m("panel", "Panel Superadmin", <Shield className="h-4 w-4" />, [
+      i("Panel", "/settings/admin", false),
+    ]),
+    m("accesosGlobal", "Accesos globales", <Shield className="h-4 w-4" />, [
+      i("Accesos", "/settings/access", false),
+    ]),
+    m("empresas", "Empresas", <Boxes className="h-4 w-4" />, [
+      i("Listado", "/companies", false),
+    ]),
+    m("integracionesGlobal", "Integraciones (global)", <LinkIcon className="h-4 w-4" />, [
+      i("Catálogo/Proveedores", "/settings/integrations/global", false),
+    ]),
   ],
 };
 
-/** Construye el menú en orden fijo. SUPERADMIN solo si isSuperadmin = true */
+/** Orden fijo. SUPERADMIN sólo si isSuperadmin = true */
 export function buildSectionsOrdered(isSuperadmin: boolean): Section[] {
   const base: Section[] = [ADMINISTRACION, OPERACION, CONFIGURACION];
   return isSuperadmin ? [...base, SUPERADMIN] : base;
