@@ -1,22 +1,32 @@
 // app/(app)/settings/admin/page.tsx
 import { supabaseServer } from "@/lib/supabaseServer";
 import { redirect } from "next/navigation";
-
-function isSuperadminEmail(email?: string | null) {
-  const raw = process.env.BSOP_SUPERADMINS || "";
-  const list = raw.split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
-  return !!email && list.includes(email.toLowerCase());
-}
+import { isSuperadminEmail } from "@/lib/superadmin";
 
 export const revalidate = 0;
+export const dynamic = "force-dynamic";
 
 export default async function Page() {
   const supa = supabaseServer();
   const { data: auth } = await supa.auth.getUser();
   const user = auth.user;
-  if (!user) redirect("/signin?redirect=/settings/admin");
-  if (!isSuperadminEmail(user.email)) redirect("/");
 
+  // si no hay sesión → a signin (sin parpadeos)
+  if (!user) redirect("/signin?redirect=/settings/admin");
+
+  // si hay sesión pero no es superadmin → mostramos 403 in situ (evita “rebote”)
+  if (!isSuperadminEmail(user.email)) {
+    return (
+      <main className="p-6">
+        <h1 className="text-base font-semibold mb-2">403 · No autorizado</h1>
+        <p className="text-sm text-slate-600">
+          Esta sección es exclusiva de superadmins.
+        </p>
+      </main>
+    );
+  }
+
+  // panel sencillo
   return (
     <main className="p-6">
       <h1 className="text-base font-semibold mb-4">Panel de superadmin</h1>
