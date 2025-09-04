@@ -1,92 +1,143 @@
-// app/_components/ThemeLoader.tsx
 "use client";
 
-import { useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 
-type Branding = {
-  brandName?: string;
-  primary?: string;   // #RRGGBB
-  secondary?: string; // #RRGGBB
-};
-
-function hexToRgb(hex: string) {
-  const h = hex.replace("#", "");
-  const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
-  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+/** Helpers */
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
 }
-function clamp(n: number, min = 0, max = 255) { return Math.min(max, Math.max(min, n)); }
-function rgbToHex(r: number, g: number, b: number) {
-  return "#" + [r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("");
-}
-/** lighten/darken by mixing with white/black */
-function shade(hex: string, percent: number) {
-  const { r, g, b } = hexToRgb(hex);
-  const p = percent / 100;
-  const mix = (c: number, towards: number) => clamp(Math.round(c + (towards - c) * Math.abs(p)));
-  return p >= 0
-    ? rgbToHex(mix(r, 255), mix(g, 255), mix(b, 255))
-    : rgbToHex(mix(r, 0), mix(g, 0), mix(b, 0));
-}
-
-function applyCssVars(primary: string, secondary: string) {
-  const root = document.documentElement.style;
-  const scale: Record<number, number> = { 50: 35, 100: 28, 200: 20, 300: 14, 400: 7, 500: 0, 600: -6, 700: -12, 800: -18, 900: -24 };
-
-  root.setProperty("--brand", primary);
-  Object.entries(scale).forEach(([k, p]) =>
-    root.setProperty(`--brand-${k}`, Number(p) === 0 ? primary : shade(primary, Number(p)))
-  );
-
-  const sec = secondary || primary;
-  root.setProperty("--brand2", sec);
-  Object.entries(scale).forEach(([k, p]) =>
-    root.setProperty(`--brand2-${k}`, Number(p) === 0 ? sec : shade(sec, Number(p)))
-  );
-}
-
-async function fetchBranding(company: string): Promise<Branding | null> {
-  try {
-    const r = await fetch(`/api/admin/company?company=${company}`, { cache: "no-store" });
-    const json = await r.json();
-    const b = json?.settings?.branding ?? {};
-    return { brandName: b.brandName || json?.name || "", primary: b.primary, secondary: b.secondary };
-  } catch (e) {
-    console.error("ThemeLoader branding fetch error:", e);
-    return null;
+function hslToHex(h: number, s: number, l: number) {
+  h = ((h % 360) + 360) % 360;
+  s = clamp(s, 0, 100) / 100;
+  l = clamp(l, 0, 100) / 100;
+  if (s === 0) {
+    const v = Math.round(l * 255);
+    const toHex = (v: number) => v.toString(16).padStart(2, "0");
+    return `#${toHex(v)}${toHex(v)}${toHex(v)}`;
   }
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const hk = h / 360;
+  const tc = [hk + 1 / 3, hk, hk - 1 / 3].map((t) => {
+    let tt = t;
+    if (tt < 0) tt += 1;
+    if (tt > 1) tt -= 1;
+    if (tt < 1 / 6) return p + (q - p) * 6 * tt;
+    if (tt < 1 / 2) return q;
+    if (tt < 2 / 3) return p + (q - p) * (2 / 3 - tt) * 6;
+    return p;
+  });
+  const toHex = (v: number) => Math.round(v * 255).toString(16).padStart(2, "0");
+  return `#${toHex(tc[0])}${toHex(tc[1])}${toHex(tc[2])}`;
+}
+const L_SCALE: Record<string, number> = {
+  "50": 97, "100": 94, "200": 86, "300": 77, "400": 66,
+  "500": 56, "600": 47, "700": 39, "800": 32, "900": 25,
+};
+function buildPalette(h: number, s: number) {
+  const out: Record<string, string> = {};
+  (Object.keys(L_SCALE) as (keyof typeof L_SCALE)[]).forEach((k) => {
+    out[k] = hslToHex(h, s, L_SCALE[k]);
+  });
+  return out;
+}
+function applyPalette(prefix: "brand" | "brand2", palette: Record<string, string>) {
+  const root = document.documentElement;
+  for (const k of Object.keys(palette)) {
+    root.style.setProperty(`--${prefix}-${k}`, palette[k]);
+  }
+  root.style.setProperty(`--${prefix}`, palette["500"] ?? (prefix === "brand" ? "#2563eb" : "#14b8a6"));
+}
+function getCookie(name: string) {
+  if (typeof document === "undefined") return "";
+  const m = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+  return m ? decodeURIComponent(m[2]) : "";
 }
 
+/** Componente */
 export default function ThemeLoader() {
   const qp = useSearchParams();
-  const company = qp.get("company") || "";
+  const pathname = usePathname();
+  const company = (qp.get("company") || getCookie("company") || "").toLowerCase();
+
+  const [loading, setLoading] = useState(false);
+  const lastApplied = useRef<string>("");
+
+  const key = useMemo(() => `${company}::${pathname}`, [company, pathname]);
 
   useEffect(() => {
-    let stop = false;
+    if (!company) return;
 
-    async function load() {
-      if (!company) return;
-      const b = await fetchBranding(company);
-      const primary = b?.primary || "#273c90";
-      const secondary = b?.secondary || "#8692c1";
-      if (!stop) applyCssVars(primary, secondary);
+    let cancelled = false;
+    async function fetchAndApply() {
+      try {
+        setLoading(true);
+        const r = await fetch(`/api/admin/company?company=${company}`, { cache: "no-store" });
+        if (!r.ok) throw new Error(String(r.status));
+        const data = await r.json();
+        if (cancelled) return;
+
+        const b = data?.settings?.branding || {};
+        // PRIMARY
+        const pal1: Record<string, string> =
+          b.palette ??
+          (typeof b.hue === "number" && typeof b.saturation === "number"
+            ? buildPalette(b.hue, b.saturation)
+            : undefined) ??
+          buildPalette(220, 83); // fallback
+
+        // SECONDARY (acepta string legacy o bloque)
+        const sec = typeof b.secondary === "string" ? { primary: b.secondary } : (b.secondary || {});
+        const pal2: Record<string, string> =
+          sec?.palette ??
+          (typeof sec?.hue === "number" && typeof sec?.saturation === "number"
+            ? buildPalette(sec.hue, sec.saturation)
+            : undefined) ??
+          buildPalette(180, 70); // fallback teal-ish
+
+        // aplica
+        applyPalette("brand", pal1);
+        applyPalette("brand2", pal2);
+
+        lastApplied.current = company;
+      } catch (e) {
+        // evita romper UI; aplica defaults
+        applyPalette("brand", buildPalette(220, 83));
+        applyPalette("brand2", buildPalette(180, 70));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
-    load();
 
-    // Reaplicar cuando alguien dispare "branding:updated" o cuando
-    // otro tab escriba "branding:updated" en localStorage
-    const handler = (e?: any) => {
-      if (!e || e.detail?.company === company || e.key === "branding:updated") load();
-    };
-    window.addEventListener("branding:updated", handler as EventListener);
-    window.addEventListener("storage", handler);
+    // evita refetch inútil si ya aplicamos para esta compañía
+    if (lastApplied.current !== company) fetchAndApply();
 
     return () => {
-      stop = true;
-      window.removeEventListener("branding:updated", handler as EventListener);
-      window.removeEventListener("storage", handler);
+      cancelled = true;
     };
-  }, [company]);
+  }, [company, key]);
 
-  return null;
+  // Escucha “branding:updated” y cambios de localStorage (para otras tabs)
+  useEffect(() => {
+    function refetch() {
+      // fuerza a volver a aplicar en el próximo efecto
+      lastApplied.current = "";
+      // trigger inmediato
+      const ev = new Event("visibilitychange");
+      document.dispatchEvent(ev);
+    }
+    const onCustom = () => refetch();
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "branding:updated") refetch();
+    };
+    window.addEventListener("branding:updated", onCustom as EventListener);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("branding:updated", onCustom as EventListener);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
+  return null; // Solo efectos; no pinta UI
 }
