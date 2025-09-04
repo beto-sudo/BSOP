@@ -4,20 +4,46 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY! // Server-only (no expongas esto al cliente)
+  process.env.SUPABASE_SERVICE_ROLE_KEY!, // server-only
+  { auth: { persistSession: false } }
 );
 
-// Merge profundo simple (objetos/arrays)
-function deepMerge<T>(base: any, extra: any): T {
-  if (Array.isArray(base) && Array.isArray(extra)) return extra as T;
-  if (base && typeof base === "object" && extra && typeof extra === "object") {
-    const out: any = { ...base };
-    for (const k of Object.keys(extra)) out[k] = deepMerge(base[k], extra[k]);
-    return out as T;
-  }
-  return (extra === undefined ? base : extra) as T;
-}
+/* ── Tipos ─────────────────────────────────────────── */
+type Palette = Record<string, string>;
 
+type BrandingSecondary = {
+  primary?: string;
+  hue?: number;
+  saturation?: number;
+  lightness?: number;
+  palette?: Palette;
+};
+
+type BrandingSettings = {
+  brandName?: string;
+  slogan?: string;
+  mission?: string;
+  vision?: string;
+  values?: string[];
+  logoUrl?: string;
+
+  primary?: string;
+  hue?: number;
+  saturation?: number;
+  lightness?: number;
+  palette?: Palette;
+
+  secondary?: BrandingSecondary | string;
+};
+
+type CompanyRow = {
+  id: string;
+  name: string;
+  slug: string;
+  settings: { branding?: BrandingSettings } | null;
+};
+
+/* ── GET /api/admin/company?company=slug ───────────────────── */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const slug = (searchParams.get("company") || "").toLowerCase().trim();
@@ -32,16 +58,19 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: "Company not found" }, { status: 404 });
 
-  return NextResponse.json(data);
+  return NextResponse.json(data as CompanyRow);
 }
 
+/* ── PATCH /api/admin/company?company=slug ─────────────────── */
 export async function PATCH(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const slug = (searchParams.get("company") || "").toLowerCase().trim();
   if (!slug) return NextResponse.json({ error: "Missing ?company" }, { status: 400 });
 
-  const payload = await req.json().catch(() => ({}));
-  const incomingBranding = payload?.settings?.branding ?? {};
+  const payload = (await req.json().catch(() => ({}))) as {
+    settings?: { branding?: Partial<BrandingSettings> };
+  };
+  const incomingBranding = (payload?.settings?.branding ?? {}) as Partial<BrandingSettings>;
 
   // 1) Trae la compañía actual
   const { data: company, error: getErr } = await supabase
@@ -54,16 +83,31 @@ export async function PATCH(req: NextRequest) {
   if (!company) return NextResponse.json({ error: "Company not found" }, { status: 404 });
 
   // 2) Mergea settings.branding sin perder otras claves
-  const currentSettings = company.settings ?? {};
-  const currentBranding = currentSettings.branding ?? {};
-  const nextBranding = deepMerge(currentBranding, incomingBranding);
+  const currentSettings = (company.settings ?? {}) as { branding?: BrandingSettings };
+  const currentBranding = (currentSettings.branding ?? {}) as BrandingSettings;
 
-  // normaliza valores/chips
+  const nextBranding: BrandingSettings = {
+    ...currentBranding,
+    ...incomingBranding,
+    // merge de nested "secondary"
+    secondary: (() => {
+      const inc = incomingBranding.secondary;
+      const cur = currentBranding.secondary;
+      if (typeof inc === "string" || typeof cur === "string") return inc ?? cur;
+      return { ...(cur ?? {}), ...(inc ?? {}) };
+    })(),
+    // preferir palette/values entrantes si llegan
+    palette: incomingBranding.palette ?? currentBranding.palette,
+    values: Array.isArray(incomingBranding.values)
+      ? incomingBranding.values
+      : currentBranding.values ?? [],
+  };
+
   if (!Array.isArray(nextBranding.values)) nextBranding.values = [];
 
-  const nextSettings = { ...currentSettings, branding: nextBranding };
+  const nextSettings = { ...currentSettings, branding: nextBranding } as Record<string, unknown>;
 
-  // 3) Persiste
+  // 3) Persiste y devuelve
   const { data: updated, error: updErr } = await supabase
     .from("Company")
     .update({ settings: nextSettings })
@@ -73,5 +117,5 @@ export async function PATCH(req: NextRequest) {
 
   if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
 
-  return NextResponse.json(updated);
+  return NextResponse.json(updated as CompanyRow);
 }
