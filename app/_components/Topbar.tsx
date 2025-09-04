@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
-import { Printer, Settings as SettingsIcon } from "lucide-react";
+import { Printer, Settings as SettingsIcon, LayoutGrid } from "lucide-react";
 
 type UserInfo = { name?: string; email?: string; picture?: string };
 type Branding = { brandName?: string };
@@ -17,7 +17,7 @@ export default function Topbar() {
   const [brand, setBrand] = useState<Branding>({});
   const [open, setOpen] = useState(false);
 
-  // Cargar usuario (Supabase)
+  // Cargar usuario
   useEffect(() => {
     (async () => {
       const supabase = supabaseBrowser();
@@ -31,7 +31,7 @@ export default function Topbar() {
     })();
   }, []);
 
-  // Cargar brandName para el topbar
+  // Cargar brandName
   useEffect(() => {
     (async () => {
       try {
@@ -40,9 +40,7 @@ export default function Topbar() {
         const json = await r.json();
         const b = json?.settings?.branding || {};
         setBrand({ brandName: b.brandName || json?.name || "" });
-      } catch {
-        // silencioso
-      }
+      } catch {}
     })();
   }, [company]);
 
@@ -59,8 +57,6 @@ export default function Topbar() {
   };
 
   function onPrint() {
-    // Minimalista: dejamos que el navegador haga "Imprimir" o "Guardar como PDF".
-    // Añadimos estilos de @media print en globals.css para que quede limpio.
     window.print();
   }
 
@@ -71,14 +67,23 @@ export default function Topbar() {
     .slice(0, 2)
     .toUpperCase();
 
-  // Link a ajustes de perfil (si no existe la ruta aún, puedes crearla después)
   const accountHref = company ? `/settings/account?company=${company}` : "/settings/account";
 
   return (
     <header className="h-14 border-b bg-white/80 backdrop-blur flex items-center justify-between px-4 print:hidden">
-      {/* Izquierda: nombre de la empresa/brand */}
-      <div className="text-sm text-slate-500">
-        {brand?.brandName ? <span className="font-medium">{brand.brandName}</span> : <span>&nbsp;</span>}
+      {/* Izquierda: botón Empresas + nombre de la empresa */}
+      <div className="flex items-center gap-2">
+        <a
+          href="/companies"
+          className="inline-flex items-center justify-center h-9 w-9 rounded-full border hover:bg-slate-50"
+          title="Empresas"
+          aria-label="Empresas"
+        >
+          <LayoutGrid className="h-4 w-4" />
+        </a>
+        <div className="text-sm text-slate-500">
+          {brand?.brandName ? <span className="font-medium">{brand.brandName}</span> : <span>&nbsp;</span>}
+        </div>
       </div>
 
       {/* Derecha: acciones */}
