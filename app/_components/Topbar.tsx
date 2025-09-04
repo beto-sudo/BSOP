@@ -13,6 +13,14 @@ type UserInfo = {
   avatar_url?: string | null;
 };
 
+function initialsFrom(nameOrEmail?: string | null) {
+  if (!nameOrEmail) return "U";
+  const name = nameOrEmail.split("@")[0];
+  const parts = name.trim().split(/\s+/);
+  const ini = parts.slice(0, 2).map((p) => p[0]?.toUpperCase() || "").join("");
+  return ini || "U";
+}
+
 function useAuthUser(): UserInfo | null {
   const [user, setUser] = useState<UserInfo | null>(null);
   useEffect(() => {
@@ -22,10 +30,12 @@ function useAuthUser(): UserInfo | null {
         const supa = supabaseBrowser();
         const { data } = await supa.auth.getUser();
         if (!alive) return;
+        const meta = (data.user?.user_metadata as any) || {};
+        const pic = meta.avatar_url || meta.picture || null;
         setUser({
           email: data.user?.email ?? null,
-          fullName: data.user?.user_metadata?.full_name ?? null,
-          avatar_url: data.user?.user_metadata?.avatar_url ?? null,
+          fullName: meta.full_name || meta.name || data.user?.email || null,
+          avatar_url: pic,
         });
       } catch {
         if (alive) setUser(null);
@@ -58,7 +68,7 @@ export default function Topbar() {
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
         if (!alive) return;
-        // Priorizar razón social (legalName), luego nombre comercial
+        // Prioriza razón social
         setCompanyLabel(j?.legalName || j?.name || slug.toUpperCase());
       })
       .catch(() => {
@@ -97,27 +107,35 @@ export default function Topbar() {
     router.push("/settings/admin");
   }
 
+  const displayName = user?.fullName || user?.email || "Cuenta";
+  const avatar = user?.avatar_url;
+
   return (
     <>
       {/* Guard global para evitar rebotes de company en rutas exentas */}
       <CompanyParamGuard />
 
       <header className="sticky top-0 z-30 h-14 bg-white/80 backdrop-blur border-b">
-        {/* pegado al sidebar */}
         <div className="h-full w-full px-3 sm:px-4 flex items-center justify-between gap-3">
           {/* IZQUIERDA: razón social */}
           <div className="min-w-0">
-            <div className="text-xs text-slate-500 leading-none">
-              {slug ? slug.toUpperCase() : ""}
-            </div>
+            <div className="text-xs text-slate-500 leading-none">{slug ? slug.toUpperCase() : ""}</div>
             <div className="text-sm font-semibold truncate">{companyLabel}</div>
           </div>
 
           {/* DERECHA: usuario */}
           <div className="ml-auto">
             <details ref={detailsRef} className="relative">
-              <summary className="list-none select-none cursor-pointer rounded-md border px-2 py-1 text-sm bg-white hover:bg-slate-50">
-                {user?.fullName || user?.email || "Cuenta"}
+              <summary className="list-none select-none cursor-pointer rounded-md border px-2 py-1 bg-white hover:bg-slate-50 flex items-center gap-2">
+                {avatar ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatar} alt="avatar" className="h-8 w-8 rounded-full object-cover" />
+                ) : (
+                  <div className="h-8 w-8 rounded-full bg-slate-200 grid place-items-center text-xs text-slate-700">
+                    {initialsFrom(displayName)}
+                  </div>
+                )}
+                <span className="text-sm">{displayName}</span>
               </summary>
               <div className="absolute right-0 mt-1 w-56 rounded-lg border bg-white shadow-md">
                 <nav className="p-1">
