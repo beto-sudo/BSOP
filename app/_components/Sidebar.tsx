@@ -11,26 +11,41 @@ type Section = { key: string; label: string; items: NavItem[] };
 type Branding = { brandName?: string; primary?: string; secondary?: string; logoUrl?: string };
 
 const SECTIONS: Section[] = [
-  { key: "operacion", label: "OPERACIÓN", items: [
+  {
+    key: "operacion",
+    label: "OPERACIÓN",
+    items: [
       { label: "Órdenes de Compra", href: "/purchases/po", icon: <ShoppingCart className="h-4 w-4" /> },
       { label: "Recepciones", href: "/purchases/receiving", icon: <ShoppingCart className="h-4 w-4" /> },
-      { label: "Movimientos de Inventario", href: "/inventory/moves", icon: <Boxes className="h-4 w-4" /> },
-      { label: "Productos", href: "/products", icon: <Boxes className="h-4 w-4" /> },
-  ]},
-  { key: "administracion", label: "ADMINISTRACIÓN", items: [
-      { label: "Legal / Documentos", href: "/admin/legal", icon: <FileText className="h-4 w-4" /> },
-  ]},
-  { key: "configuracion", label: "CONFIGURACIÓN", items: [
-      { label: "Empresa", href: "/admin/company", icon: <Settings className="h-4 w-4" /> },
-      { label: "Branding", href: "/admin/branding", icon: <Settings className="h-4 w-4" /> },
+      { label: "Inventario", href: "/inventory", icon: <Boxes className="h-4 w-4" /> },
+      { label: "Reportes", href: "/reports", icon: <FileText className="h-4 w-4" /> },
+    ],
+  },
+  {
+    key: "config",
+    label: "CONFIGURACIÓN",
+    items: [
+      { label: "Empresa (Branding)", href: "/admin/branding", icon: <Settings className="h-4 w-4" /> },
+      { label: "Datos Fiscales", href: "/admin/legal", icon: <Settings className="h-4 w-4" /> },
+      { label: "Datos Generales", href: "/admin/company", icon: <Settings className="h-4 w-4" /> },
       { label: "Usuarios", href: "/settings/users", icon: <Users className="h-4 w-4" /> },
       { label: "Roles", href: "/settings/roles", icon: <Shield className="h-4 w-4" /> },
-  ]},
+    ],
+  },
 ];
 
 function InitialsIcon({ name }: { name: string }) {
-  const initials = (name || "").split(" ").map(s=>s[0]).join("").slice(0,2).toUpperCase() || "B";
-  return <div className="h-10 w-10 rounded-md bg-[var(--brand-100)] grid place-items-center text-[var(--brand-800)] text-xs font-semibold">{initials}</div>;
+  const initials = (name || "")
+    .split(" ")
+    .map((s) => s[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase() || "B";
+  return (
+    <div className="h-10 w-10 rounded-md bg-[var(--brand-100)] text-[var(--brand-800)] grid place-items-center text-xs font-semibold">
+      {initials}
+    </div>
+  );
 }
 
 export default function Sidebar() {
@@ -44,37 +59,55 @@ export default function Sidebar() {
   const [openKey, setOpenKey] = useState<string | null>("operacion");
 
   // ancho redimensionable
-  const storageKey = `sidebar:w:${companySlug || "default"}`;
-  const [width, setWidth] = useState<number>(typeof window === "undefined" ? 288 : parseInt(localStorage.getItem(storageKey) || "288", 10));
-  const draggingRef = useRef(false);
+  const asideRef = useRef<HTMLDivElement | null>(null);
+  const resizerRef = useRef<HTMLDivElement | null>(null);
+  const [width, setWidth] = useState<number>(260);
 
   useEffect(() => {
-    // asegurar límites
-    setWidth(w => clamp(w, 240, 420));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const saved = Number(localStorage.getItem("sidebar:w"));
+    if (saved && saved >= 220 && saved <= 420) setWidth(saved);
   }, []);
+  useEffect(() => {
+    localStorage.setItem("sidebar:w", String(width));
+    if (asideRef.current) asideRef.current.style.width = `${width}px`;
+  }, [width]);
 
   useEffect(() => {
     (async () => {
       try {
         const r = await fetch("/api/companies", { cache: "no-store" });
-        const data = await r.json();
-        setCompanies(Array.isArray(data) ? data : []);
+        const list = (await r.json()) as Company[];
+        setCompanies(Array.isArray(list) ? list : []);
       } catch (e) {
         console.error("Error /api/companies:", e);
       }
     })();
   }, []);
 
+  // 🚫 Antes: si no había ?company redirigía SIEMPRE a "/?company=…"
+  // ✅ Ahora: solo en rutas que requieren contexto de empresa
   useEffect(() => {
-    if (!companySlug && companies.length > 0) {
+    const requiresCompany =
+      !(
+        pathname === "/companies" ||
+        pathname.startsWith("/companies") ||
+        pathname.startsWith("/settings") || // Settings NO requiere company
+        pathname.startsWith("/auth") ||
+        pathname.startsWith("/signin") ||
+        pathname.startsWith("/api")
+      );
+
+    if (!companySlug && companies.length > 0 && requiresCompany) {
       const first = companies[0];
       const slug = first.slug?.toLowerCase();
       if (!slug) return;
       document.cookie = `company=${slug}; path=/; max-age=31536000; samesite=lax`;
-      router.replace(`/?company=${slug}`);
+      // Mantener la ruta actual y solo inyectar ?company=slug
+      const url = new URL(window.location.href);
+      url.searchParams.set("company", slug);
+      router.replace(url.pathname + "?" + url.searchParams.toString());
     }
-  }, [companySlug, companies, router]);
+  }, [companySlug, companies, pathname, router]);
 
   useEffect(() => {
     (async () => {
@@ -85,89 +118,100 @@ export default function Sidebar() {
         const b: Branding = json?.settings?.branding ?? {};
         setBranding({
           brandName: b?.brandName || json?.name || "",
-          primary: (b as any)?.primary,
-          secondary: (b as any)?.secondary,
-          logoUrl: (b as any)?.logoUrl || "",
+          primary: b?.primary || "",
+          secondary: b?.secondary || "",
+          logoUrl: b?.logoUrl || "",
         });
+        if (b?.primary) {
+          document.documentElement.style.setProperty("--brand-50", b?.primary);
+        }
       } catch (e) {
-        console.error("Sidebar branding fetch:", e);
-        setBranding(null);
+        // no-op
       }
     })();
   }, [companySlug]);
 
-  // abrir sección según ruta
+  // qué sección abrir por default según la ruta
   const activeKeyFromPath = useMemo(() => {
-    for (const s of SECTIONS) if (s.items.some(i => pathname.startsWith(i.href))) return s.key;
-    return null;
+    const path = pathname || "";
+    if (path.startsWith("/settings") || path.startsWith("/admin")) return "config";
+    return "operacion";
   }, [pathname]);
-  useEffect(() => { if (activeKeyFromPath) setOpenKey(activeKeyFromPath); }, [activeKeyFromPath]);
 
-  const brandTitle = branding?.brandName || "BSOP";
-  const logoUrl = branding?.logoUrl || "";
-  const currentCompany = companies.find(c => c.slug?.toLowerCase() === companySlug);
+  useEffect(() => {
+    if (activeKeyFromPath) setOpenKey(activeKeyFromPath);
+  }, [activeKeyFromPath]);
 
-  // drag handlers
-  function clamp(n: number, min: number, max: number){ return Math.max(min, Math.min(max, n)); }
-  function onMouseDown(e: React.MouseEvent<HTMLDivElement>){
-    e.preventDefault();
-    draggingRef.current = true;
-    document.body.style.userSelect = "none";
-    const startX = e.clientX;
-    const startW = width;
-
-    function onMove(ev: MouseEvent){
-      if(!draggingRef.current) return;
-      const dx = ev.clientX - startX;
-      const next = clamp(startW + dx, 240, 420);
+  // drag para redimensionar
+  useEffect(() => {
+    const resizer = resizerRef.current;
+    if (!resizer) return;
+    let dragging = false;
+    let startX = 0;
+    let startW = 0;
+    function onDown(e: MouseEvent) {
+      dragging = true;
+      startX = e.clientX;
+      startW = width;
+      document.body.style.userSelect = "none";
+    }
+    function onMove(e: MouseEvent) {
+      if (!dragging) return;
+      const dx = e.clientX - startX;
+      const next = Math.max(220, Math.min(420, startW + dx));
       setWidth(next);
     }
-    function onUp(){
-      draggingRef.current = false;
+    function onUp() {
+      dragging = false;
       document.body.style.userSelect = "";
-      try { localStorage.setItem(storageKey, String(width)); } catch {}
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
     }
+    resizer.addEventListener("mousedown", onDown);
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-  }
+    return () => {
+      resizer.removeEventListener("mousedown", onDown);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [width]);
+
+  const current = companies.find((c) => c.slug.toLowerCase() === companySlug) || null;
 
   return (
     <aside
-      className="relative h-screen flex flex-col border-r border-[var(--brand-200)] bg-[var(--brand-50)]"
+      ref={asideRef}
+      className="relative border-r bg-white shrink-0"
       style={{ width }}
     >
-      {/* handle de resize */}
+      {/* Resizer */}
       <div
-        onMouseDown={onMouseDown}
-        className="absolute top-0 right-0 h-full w-1 cursor-col-resize bg-transparent hover:bg-[var(--brand-200)]"
-        title="Arrastra para ajustar el ancho"
+        ref={resizerRef}
+        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-slate-200"
+        title="Arrastra para ajustar ancho"
       />
 
-      {/* Header */}
-      <div className="flex items-center gap-3 p-4">
-        {logoUrl ? (
-          <div className="h-10 w-10 rounded-md border border-[var(--brand-200)] bg-[var(--brand-50)] p-1 grid place-items-center">
-            <img src={logoUrl} alt={brandTitle} className="h-full w-full object-contain" loading="eager" referrerPolicy="no-referrer" />
-          </div>
+      {/* Header empresa */}
+      <div className="p-4 border-b flex items-center gap-3">
+        {branding?.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={branding.logoUrl} alt="logo" className="h-10 w-10 rounded-md object-cover" />
         ) : (
-          <InitialsIcon name={brandTitle} />
+          <InitialsIcon name={branding?.brandName || current?.name || "BS"} />
         )}
         <div className="min-w-0">
-          <div className="text-sm font-semibold truncate text-[var(--brand-800)]">{brandTitle}</div>
-          <div className="text-[11px] text-slate-500">BSOP · Multiempresa</div>
+          <div className="text-sm font-semibold truncate">{branding?.brandName || current?.name || "Sin empresa"}</div>
+          <div className="text-xs text-slate-500 truncate">{current?.slug || "—"}</div>
         </div>
       </div>
 
       {/* Selector de empresa */}
-      <div className="px-4 pb-3">
+      <div className="p-3 border-b">
         <label className="block text-xs text-slate-500 mb-1">Empresa</label>
         <select
-          className="w-full rounded-2xl border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--brand-500)]"
-          value={companySlug || ""}
+          className="w-full rounded-md border px-2 py-1 text-sm"
+          value={companySlug}
           onChange={(e) => {
-            const slug=e.target.value;
+            const slug = e.target.value;
             document.cookie = `company=${slug}; path=/; max-age=31536000; samesite=lax`;
             const url = new URL(window.location.href);
             url.searchParams.set("company", slug);
@@ -177,45 +221,38 @@ export default function Sidebar() {
         >
           <option value="">Selecciona...</option>
           {companies.map((c) => (
-            <option key={c.id} value={c.slug.toLowerCase()}>{c.name}</option>
+            <option key={c.id} value={c.slug.toLowerCase()}>
+              {c.name}
+            </option>
           ))}
         </select>
       </div>
 
       {/* Navegación */}
-      <nav className="flex-1 overflow-y-auto px-2 pb-4 space-y-2">
-        {SECTIONS.map((s) => {
-          const isOpen = openKey === s.key;
+      <nav className="p-2 space-y-2">
+        {SECTIONS.map((sec) => {
+          const isOpen = openKey === sec.key;
           return (
-            <div key={s.key} className="rounded-xl border border-[var(--brand-200)] bg-[var(--brand-50)]">
-              <button onClick={() => setOpenKey(curr => curr===s.key ? null : s.key)} className="w-full flex items-center justify-between px-3 py-2 text-left">
-                <span className="text-[11px] font-semibold tracking-wider text-slate-600">{s.label}</span>
-                <ChevronRight className={`h-4 w-4 transition-transform ${isOpen ? "rotate-90" : ""}`} />
+            <div key={sec.key} className="rounded-lg border overflow-hidden">
+              <button
+                className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold bg-slate-50"
+                onClick={() => setOpenKey((k) => (k === sec.key ? null : sec.key))}
+              >
+                <span>{sec.label}</span>
+                <ChevronRight className={`h-3 w-3 transition-transform ${isOpen ? "rotate-90" : ""}`} />
               </button>
-
               {isOpen && (
                 <ul className="py-1">
-                  {s.items.map((item) => {
-                    const active = pathname === item.href || pathname.startsWith(item.href + "/");
-                    let href = item.href;
-                    if (companySlug) {
-                      const params = new URLSearchParams({ company: companySlug });
-                      if (currentCompany?.id) params.set("companyId", currentCompany.id);
-                      href = `${item.href}?${params.toString()}`;
-                    }
+                  {sec.items.map((item) => {
+                    const href = companySlug ? `${item.href}?company=${companySlug}` : item.href;
+                    const active = (pathname || "").startsWith(item.href);
                     return (
                       <li key={item.href}>
                         <Link
                           href={href}
-                          className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
-                            active
-                              ? "text-[var(--brand-800)] bg-[var(--brand-50)]"
-                              : // usa secundario para hover (si no existe, se verá como brand-50 por fallback del loader/globals)
-                                "hover:bg-[var(--brand2-50)] text-[var(--brand-700)] hover:text-[var(--brand2-800)]"
-                          }`}
-                          onClick={() => setOpenKey(s.key)}
+                          className={`flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 ${active ? "text-[var(--brand-800)] font-medium" : "text-slate-700"}`}
                         >
-                          <span className="opacity-80">{item.icon ?? <ChevronRight className="h-4 w-4" />}</span>
+                          {item.icon}
                           <span className="truncate">{item.label}</span>
                         </Link>
                       </li>
