@@ -1,7 +1,7 @@
-// app/companies/ui.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 type CompanyCard = { id: string; name: string; slug: string; logoUrl?: string; slogan?: string };
@@ -27,27 +27,19 @@ export default function CompaniesClient({
   function toggleFav(id: string) {
     setFavs((prev) => {
       const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
-      try {
-        localStorage.setItem("bsop:favs", JSON.stringify(next));
-      } catch {}
+      try { localStorage.setItem("bsop:favs", JSON.stringify(next)); } catch {}
       return next;
     });
   }
 
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
-    const list = [...companies];
-    list.sort((a, b) => {
-      const fa = favs.includes(a.id) ? -1 : 0;
-      const fb = favs.includes(b.id) ? -1 : 0;
-      return fa - fb || a.name.localeCompare(b.name);
-    });
-    return t
-      ? list.filter(
-          (c) =>
-            c.name.toLowerCase().includes(t) || (c.slogan ?? "").toLowerCase().includes(t)
-        )
-      : list;
+    const list = companies;
+    if (!t && favs.length === 0) return list;
+    return list
+      .filter((c) =>
+        !t || c.name.toLowerCase().includes(t) || (c.slogan ?? "").toLowerCase().includes(t)
+      );
   }, [companies, q, favs]);
 
   const showEmpty = filtered.length === 0;
@@ -75,8 +67,7 @@ export default function CompaniesClient({
             </a>
             <a
               href="/admin/companies/new"
-              className="inline-flex rounded-full border px-3 py-2 text-xs bg-[var(--brand-50)] border-[var(--brand-300)] text-[var(--brand-800)] hover:bg-[var(--brand-100)]"
-              title="Crear empresa"
+              className="rounded-full bg-[var(--brand-800)] text-white px-3 py-2 text-xs"
             >
               Crear empresa
             </a>
@@ -84,19 +75,20 @@ export default function CompaniesClient({
         </div>
       </header>
 
-      <section className="mx-auto max-w-6xl px-4 py-6">
+      <div className="mx-auto max-w-6xl p-4">
         {showEmpty ? (
           <EmptyState message={emptyMessage} />
         ) : (
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((c) => (
               <li key={c.id}>
-                <button
-                  onClick={() => router.push(`/?company=${encodeURIComponent(c.slug)}`)}
-                  className="group w-full text-left rounded-2xl border bg-white hover:bg-[var(--brand-50)] transition-colors p-4 flex gap-3 items-center"
+                <Link
+                  href={`/?company=${encodeURIComponent(c.slug)}`}
+                  className="group block rounded-2xl border hover:bg-[var(--brand-50)] transition-colors p-4 flex gap-3 items-center"
                 >
                   <div className="h-12 w-12 rounded-xl border bg-white grid place-items-center overflow-hidden">
                     {c.logoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img src={c.logoUrl} alt={c.name} className="max-w-full max-h-full object-contain" />
                     ) : (
                       <span className="text-xs text-slate-400">Logo</span>
@@ -115,16 +107,14 @@ export default function CompaniesClient({
                     </div>
                     {c.slogan ? (
                       <p className="truncate text-xs text-slate-500">{c.slogan}</p>
-                    ) : (
-                      <p className="truncate text-xs text-slate-400">—</p>
-                    )}
+                    ) : null}
                   </div>
-                </button>
+                </Link>
               </li>
             ))}
           </ul>
         )}
-      </section>
+      </div>
     </main>
   );
 }
@@ -132,10 +122,11 @@ export default function CompaniesClient({
 function FavButton({ active, onClick }: { active: boolean; onClick: (e: React.MouseEvent) => void }) {
   return (
     <span
+      role="button"
       onClick={onClick}
-      title={active ? "Quitar de favoritos" : "Marcar como favorito"}
-      className={`inline-flex h-6 w-6 cursor-pointer select-none items-center justify-center rounded-full border text-xs ${
-        active ? "bg-[var(--brand-100)] border-[var(--brand-300)]" : "hover:bg-slate-50"
+      title={active ? "Quitar de favoritos" : "Marcar favorito"}
+      className={`select-none text-xs leading-none px-1.5 py-0.5 rounded ${
+        active ? "bg-yellow-200 text-yellow-900" : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
       }`}
     >
       ★
@@ -146,9 +137,7 @@ function FavButton({ active, onClick }: { active: boolean; onClick: (e: React.Mo
 function EmptyState({ message }: { message?: string }) {
   return (
     <div className="rounded-2xl border p-6 text-sm text-slate-600 bg-white">
-      <p className="mb-2">
-        {message || "No hay empresas que coincidan."}
-      </p>
+      <p className="mb-2">{message || "No hay empresas que coincidan."}</p>
       <ul className="list-disc list-inside text-slate-500 text-xs space-y-1">
         <li>Verifica que tu usuario esté dado de alta en <code>company_member</code>.</li>
         <li>El campo <code>company_member.user_id</code> debe apuntar a <code>public.profile.id</code> de tu usuario.</li>
