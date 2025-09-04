@@ -6,7 +6,13 @@ import { useRouter } from "next/navigation";
 
 type CompanyCard = { id: string; name: string; slug: string; logoUrl?: string; slogan?: string };
 
-export default function CompaniesClient({ companies }: { companies: CompanyCard[] }) {
+export default function CompaniesClient({
+  companies,
+  emptyMessage,
+}: {
+  companies: CompanyCard[];
+  emptyMessage?: string;
+}) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [favs, setFavs] = useState<string[]>([]);
@@ -21,7 +27,9 @@ export default function CompaniesClient({ companies }: { companies: CompanyCard[
   function toggleFav(id: string) {
     setFavs((prev) => {
       const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
-      try { localStorage.setItem("bsop:favs", JSON.stringify(next)); } catch {}
+      try {
+        localStorage.setItem("bsop:favs", JSON.stringify(next));
+      } catch {}
       return next;
     });
   }
@@ -35,9 +43,14 @@ export default function CompaniesClient({ companies }: { companies: CompanyCard[
       return fa - fb || a.name.localeCompare(b.name);
     });
     return t
-      ? list.filter((c) => c.name.toLowerCase().includes(t) || (c.slogan ?? "").toLowerCase().includes(t))
+      ? list.filter(
+          (c) =>
+            c.name.toLowerCase().includes(t) || (c.slogan ?? "").toLowerCase().includes(t)
+        )
       : list;
   }, [companies, q, favs]);
+
+  const showEmpty = filtered.length === 0;
 
   return (
     <main className="min-h-screen bg-white">
@@ -52,13 +65,28 @@ export default function CompaniesClient({ companies }: { companies: CompanyCard[
               className="w-full rounded-full border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-500)]"
             />
           </div>
-          <div />
+          <div className="flex items-center gap-2">
+            <a
+              href="/companies"
+              className="hidden sm:inline-flex rounded-full border px-3 py-2 text-xs hover:bg-slate-50"
+              title="Recargar"
+            >
+              Recargar
+            </a>
+            <a
+              href="/admin/companies/new"
+              className="inline-flex rounded-full border px-3 py-2 text-xs bg-[var(--brand-50)] border-[var(--brand-300)] text-[var(--brand-800)] hover:bg-[var(--brand-100)]"
+              title="Crear empresa"
+            >
+              Crear empresa
+            </a>
+          </div>
         </div>
       </header>
 
       <section className="mx-auto max-w-6xl px-4 py-6">
-        {filtered.length === 0 ? (
-          <div className="text-sm text-slate-500">No hay empresas que coincidan.</div>
+        {showEmpty ? (
+          <EmptyState message={emptyMessage} />
         ) : (
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((c) => (
@@ -112,5 +140,20 @@ function FavButton({ active, onClick }: { active: boolean; onClick: (e: React.Mo
     >
       ★
     </span>
+  );
+}
+
+function EmptyState({ message }: { message?: string }) {
+  return (
+    <div className="rounded-2xl border p-6 text-sm text-slate-600 bg-white">
+      <p className="mb-2">
+        {message || "No hay empresas que coincidan."}
+      </p>
+      <ul className="list-disc list-inside text-slate-500 text-xs space-y-1">
+        <li>Verifica que tu usuario esté dado de alta en <code>company_member</code>.</li>
+        <li>El campo <code>company_member.user_id</code> debe apuntar a <code>public.profile.id</code> de tu usuario.</li>
+        <li>Si usas invitaciones, acepta la invitación o pide a un admin que te agregue.</li>
+      </ul>
+    </div>
   );
 }
