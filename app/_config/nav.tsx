@@ -1,4 +1,5 @@
-// app/_config/nav.ts
+'use client';
+
 import { ReactNode } from "react";
 import { ShoppingCart, Boxes, FileText, Settings, Users, Shield } from "lucide-react";
 
@@ -6,13 +7,13 @@ export type NavItem = {
   label: string;
   href: string;
   icon?: ReactNode;
-  /** si true, el Sidebar agregará ?company=<slug> a la URL */
+  /** Si true, el Sidebar agregará ?company=<slug> a la URL */
   needsCompany?: boolean;
 };
 
 export type Section = { key: string; label: string; items: NavItem[] };
 
-/** OPERACIÓN: módulos que requieren contexto de empresa */
+/** 1) OPERACIÓN: módulos que requieren contexto de empresa */
 export const OPERACION: Section = {
   key: "operacion",
   label: "OPERACIÓN",
@@ -24,21 +25,18 @@ export const OPERACION: Section = {
   ],
 };
 
-/** ADMINISTRACIÓN (operativa/contable): dejamos preparada la sección para tus módulos.
- *  IMPORTANTE: agrega aquí las rutas reales cuando estén listas para evitar 404s.
- *  Por ahora la dejamos vacía para no romper navegación.
- */
+/** 2) ADMINISTRACIÓN (operativa/contable) — agrega aquí tus rutas cuando estén listas */
 export const ADMINISTRACION: Section = {
   key: "administracion",
   label: "ADMINISTRACIÓN",
   items: [
-    // Ejemplos cuando los módulos estén listos:
+    // Ejemplos futuros:
     // { label: "Contabilidad", href: "/admin/accounting", icon: <FileText className="h-4 w-4" />, needsCompany: true },
     // { label: "Recursos Humanos", href: "/admin/hr", icon: <Users className="h-4 w-4" />, needsCompany: true },
   ],
 };
 
-/** CONFIGURACIÓN: datos de la empresa y control de acceso por compañía */
+/** 3) CONFIGURACIÓN: datos y accesos por compañía */
 export const CONFIGURACION: Section = {
   key: "configuracion",
   label: "CONFIGURACIÓN",
@@ -51,7 +49,7 @@ export const CONFIGURACION: Section = {
   ],
 };
 
-/** SUPERADMIN: solo visible a superadmins; NO requiere company */
+/** 4) SUPERADMIN: solo visible a superadmins; NO requiere company */
 export const SUPERADMIN: Section = {
   key: "superadmin",
   label: "SUPERADMIN",
@@ -62,7 +60,7 @@ export const SUPERADMIN: Section = {
   ],
 };
 
-/** Construye el menú en orden fijo. SUPERADMIN solo si isSuperadmin = true */
+/** Orden fijo de grupos. SUPERADMIN solo si isSuperadmin = true */
 export function buildSectionsOrdered(isSuperadmin: boolean): Section[] {
   const base: Section[] = [OPERACION, ADMINISTRACION, CONFIGURACION];
   return isSuperadmin ? [...base, SUPERADMIN] : base;
