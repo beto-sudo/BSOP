@@ -51,27 +51,25 @@ export default function Topbar() {
   const user = useAuthUser();
 
   const companySlug = (qp.get("company") || "").toUpperCase();
-  const showCompany = useMemo(() => companySlug || "", [companySlug]);
+  const showCompany = useMemo(() => companySlug || "BSOP", [companySlug]);
 
-  // --- superadmin flag (protegido por servidor) ---
+  // Flag de superadmin (consultado al backend; no expone la lista)
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   useEffect(() => {
     let alive = true;
     fetch("/api/admin/is-superadmin")
       .then((r) => (r.ok ? r.json() : { is: false }))
-      .then((j) => {
-        if (alive) setIsSuperadmin(!!j.is);
-      })
+      .then((j) => alive && setIsSuperadmin(!!j.is))
       .catch(() => {});
     return () => {
       alive = false;
     };
   }, []);
 
-  // --- dropdown simple con <details> para evitar libs ---
+  // Dropdown controlado con <details>
   const detailsRef = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
-    // cierra el dropdown al navegar
+    // Cierra el dropdown al navegar/cambiar de empresa
     detailsRef.current?.removeAttribute("open");
   }, [pathname, companySlug]);
 
@@ -83,26 +81,25 @@ export default function Topbar() {
     router.push("/signin");
   }
 
+  function goToAdmin() {
+    // cierra el dropdown y navega de forma fiable
+    detailsRef.current?.removeAttribute("open");
+    router.push("/settings/admin");
+    // Si prefieres “a prueba de balas”:
+    // window.location.href = "/settings/admin";
+  }
+
   return (
     <header className="sticky top-0 z-30 h-14 bg-white/80 backdrop-blur border-b">
       <div className="h-full mx-auto max-w-[1400px] px-3 sm:px-4 flex items-center justify-between gap-3">
         {/* IZQUIERDA: título/empresa */}
         <div className="min-w-0">
           <div className="text-xs text-slate-500 leading-none">ANSA</div>
-          <div className="text-sm font-semibold truncate">{showCompany || "BSOP"}</div>
+          <div className="text-sm font-semibold truncate">{showCompany}</div>
         </div>
 
         {/* DERECHA: acciones + usuario */}
         <div className="flex items-center gap-2">
-          {/* Ejemplo: botón imprimir (opcional) */}
-          {/* <button
-            title="Imprimir"
-            onClick={() => window.print()}
-            className="hidden sm:inline-flex h-8 rounded-full border px-3 text-xs hover:bg-slate-50"
-          >
-            Imprimir
-          </button> */}
-
           {/* Menú de usuario */}
           <details ref={detailsRef} className="relative">
             <summary className="list-none cursor-pointer select-none">
@@ -140,18 +137,18 @@ export default function Topbar() {
                 <Link
                   href="/settings/profile"
                   className="block px-3 py-2 text-sm hover:bg-slate-50 rounded-md"
+                  onClick={() => detailsRef.current?.removeAttribute("open")}
                 >
                   Perfil y ajustes
                 </Link>
 
-                {/* Solo para superadmins */}
                 {isSuperadmin && (
-                  <Link
-                    href="/settings/admin"
-                    className="block px-3 py-2 text-sm hover:bg-slate-50 rounded-md"
+                  <button
+                    onClick={goToAdmin}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 rounded-md"
                   >
                     Panel de superadmin
-                  </Link>
+                  </button>
                 )}
 
                 <button
