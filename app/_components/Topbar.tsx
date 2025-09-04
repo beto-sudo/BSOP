@@ -1,10 +1,11 @@
 // app/_components/Topbar.tsx
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
+import CompanyParamGuard from "./CompanyParamGuard";
 
 type UserInfo = {
   email: string | null;
@@ -59,7 +60,7 @@ export default function Topbar() {
     return () => { alive = false; };
   }, [slug]);
 
-  // Flag de superadmin (desde backend)
+  // Flag de superadmin
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   useEffect(() => {
     let alive = true;
@@ -85,70 +86,76 @@ export default function Topbar() {
   }
 
   return (
-    <header className="sticky top-0 z-30 h-14 bg-white/80 backdrop-blur border-b">
-      {/* pegado al sidebar: sin contenedor centrado */}
-      <div className="h-full w-full px-3 sm:px-4 flex items-center justify-between gap-3">
-        {/* IZQUIERDA: razón social */}
-        <div className="min-w-0">
-          <div className="text-xs text-slate-500 leading-none">{slug ? slug.toUpperCase() : "ANSA"}</div>
-          <div className="text-sm font-semibold truncate">{companyLabel}</div>
-        </div>
+    <>
+      {/* Guard global para evitar rebotes de company en rutas exentas */}
+      <CompanyParamGuard />
 
-        {/* DERECHA: usuario */}
-        <div className="flex items-center gap-2">
-          <details ref={detailsRef} className="relative">
-            <summary className="list-none cursor-pointer select-none">
-              <div className="h-9 rounded-full border px-2 pr-3 flex items-center gap-2 hover:bg-slate-50">
-                <div className="h-6 w-6 rounded-full overflow-hidden border bg-white grid place-items-center">
-                  {user?.avatar_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={user.avatar_url} alt="avatar" className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="text-[10px] text-slate-500">👤</span>
-                  )}
+      <header className="sticky top-0 z-30 h-14 bg-white/80 backdrop-blur border-b">
+        {/* pegado al sidebar */}
+        <div className="h-full w-full px-3 sm:px-4 flex items-center justify-between gap-3">
+          {/* IZQUIERDA: razón social */}
+          <div className="min-w-0">
+            <div className="text-xs text-slate-500 leading-none">{slug ? slug.toUpperCase() : "ANSA"}</div>
+            <div className="text-sm font-semibold truncate">{companyLabel}</div>
+          </div>
+
+          {/* DERECHA: usuario */}
+          <div className="flex items-center gap-2">
+            <details ref={detailsRef} className="relative">
+              <summary className="list-none cursor-pointer select-none">
+                <div className="h-9 rounded-full border px-2 pr-3 flex items-center gap-2 hover:bg-slate-50">
+                  <div className="h-6 w-6 rounded-full overflow-hidden border bg-white grid place-items-center">
+                    {user?.avatar_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={user.avatar_url} alt="avatar" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-[10px] text-slate-500">👤</span>
+                    )}
+                  </div>
+                  <span className="hidden sm:inline text-xs font-medium max-w-[180px] truncate">
+                    {user?.fullName || user?.email || "Cuenta"}
+                  </span>
                 </div>
-                <span className="hidden sm:inline text-xs font-medium max-w-[180px] truncate">
-                  {user?.fullName || user?.email || "Cuenta"}
-                </span>
-              </div>
-            </summary>
+              </summary>
 
-            <div className="absolute right-0 mt-2 w-64 rounded-2xl border bg-white shadow-md overflow-hidden">
-              <div className="px-3 py-2">
-                <div className="text-xs text-slate-500">Sesión</div>
-                <div className="text-sm font-medium truncate">{user?.fullName || "—"}</div>
-                <div className="text-xs text-slate-500 truncate">{user?.email || "—"}</div>
-              </div>
-              <div className="h-px bg-slate-100" />
-              <nav className="p-1">
-                <Link
-                  href="/settings/profile"
-                  className="block px-3 py-2 text-sm hover:bg-slate-50 rounded-md"
-                  onClick={() => detailsRef.current?.removeAttribute("open")}
-                >
-                  Perfil y ajustes
-                </Link>
+              <div className="absolute right-0 mt-2 w-64 rounded-2xl border bg-white shadow-md overflow-hidden">
+                <div className="px-3 py-2">
+                  <div className="text-xs text-slate-500">Sesión</div>
+                  <div className="text-sm font-medium truncate">{user?.fullName || "—"}</div>
+                  <div className="text-xs text-slate-500 truncate">{user?.email || "—"}</div>
+                </div>
+                <div className="h-px bg-slate-100" />
 
-                {isSuperadmin && (
+                <nav className="p-1">
+                  <Link
+                    href="/settings/profile"
+                    className="block px-3 py-2 text-sm hover:bg-slate-50 rounded-md"
+                    onClick={() => detailsRef.current?.removeAttribute("open")}
+                  >
+                    Perfil y ajustes
+                  </Link>
+
+                  {isSuperadmin && (
+                    <button
+                      onClick={goToAdmin}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 rounded-md"
+                    >
+                      Panel de superadmin
+                    </button>
+                  )}
+
                   <button
-                    onClick={goToAdmin}
+                    onClick={signOut}
                     className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 rounded-md"
                   >
-                    Panel de superadmin
+                    Cerrar sesión
                   </button>
-                )}
-
-                <button
-                  onClick={signOut}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 rounded-md"
-                >
-                  Cerrar sesión
-                </button>
-              </nav>
-            </div>
-          </details>
+                </nav>
+              </div>
+            </details>
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+    </>
   );
 }
