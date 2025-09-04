@@ -1,283 +1,312 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
-type Branding = {
-  brandName: string;
-  primary: string;
-  secondary: string;
-  logoUrl: string;
-};
-type CompanyResp = { name?: string; settings?: { branding?: Partial<Branding> } };
-
+/** Helpers: clamps y conversiones color */
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
 function hexToRgb(hex: string) {
-  const h = hex.replace("#", "");
-  const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
-  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+  const m = hex.trim().match(/^#?([0-9a-fA-F]{6})$/);
+  if (!m) return { r: 37, g: 99, b: 235 }; // #2563eb fallback
+  const h = m[1];
+  return {
+    r: parseInt(h.slice(0, 2), 16),
+    g: parseInt(h.slice(2, 4), 16),
+    b: parseInt(h.slice(4, 6), 16),
+  };
 }
 function rgbToHex(r: number, g: number, b: number) {
-  return "#" + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+  const toHex = (v: number) => v.toString(16).padStart(2, "0");
+  return `#${toHex(clamp(Math.round(r), 0, 255))}${toHex(
+    clamp(Math.round(b), 0, 255)
+  )}${toHex(clamp(Math.round(g), 0, 255))}`;
 }
-function luma({ r, g, b }: { r: number; g: number; b: number }) {
-  return 0.2126*(r/255) + 0.7152*(g/255) + 0.0722*(b/255);
+function rgbToHsl(r: number, g: number, b: number) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0, l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
 }
-async function extractPalette(imgUrl: string): Promise<string[]> {
-  const img = await new Promise<HTMLImageElement>((res, rej) => {
-    const im = new Image();
-    im.crossOrigin = "anonymous";
-    im.onload = () => res(im);
-    im.onerror = (e) => rej(e);
-    im.src = imgUrl;
+function hslToRgb(h: number, s: number, l: number) {
+  h = ((h % 360) + 360) % 360;
+  s = clamp(s, 0, 100) / 100;
+  l = clamp(l, 0, 100) / 100;
+  if (s === 0) {
+    const v = Math.round(l * 255);
+    return { r: v, g: v, b: v };
+  }
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const hk = h / 360;
+  const tc = [hk + 1/3, hk, hk - 1/3].map((t) => {
+    let tt = t;
+    if (tt < 0) tt += 1;
+    if (tt > 1) tt -= 1;
+    if (tt < 1/6) return p + (q - p) * 6 * tt;
+    if (tt < 1/2) return q;
+    if (tt < 2/3) return p + (q - p) * (2/3 - tt) * 6;
+    return p;
   });
-
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d")!;
-  const W = 120, H = Math.max(60, Math.round((img.height / img.width) * 120));
-  canvas.width = W; canvas.height = H;
-  ctx.drawImage(img, 0, 0, W, H);
-  const { data } = ctx.getImageData(0, 0, W, H);
-
-  const pts: number[][] = [];
-  for (let i = 0; i < data.length; i += 4 * 4) {
-    const a = data[i+3];
-    if (a < 200) continue;
-    pts.push([data[i], data[i+1], data[i+2]]);
-  }
-  if (pts.length < 6) return ["#273c90", "#8692c1", "#666666"];
-
-  const K = 3;
-  let centers = pts.sort(() => 0.5 - Math.random()).slice(0, K).map(p => p.slice());
-  for (let iter = 0; iter < 10; iter++) {
-    const buckets: number[][][] = Array.from({ length: K }, () => []);
-    for (const p of pts) {
-      let bi = 0, bd = Infinity;
-      for (let k = 0; k < K; k++) {
-        const c = centers[k];
-        const d = (p[0]-c[0])**2 + (p[1]-c[1])**2 + (p[2]-c[2])**2;
-        if (d < bd) { bd = d; bi = k; }
-      }
-      buckets[bi].push(p);
-    }
-    for (let k = 0; k < K; k++) {
-      const b = buckets[k];
-      if (b.length === 0) continue;
-      const m = b.reduce((acc, p) => [acc[0]+p[0], acc[1]+p[1], acc[2]+p[2]], [0,0,0]);
-      centers[k] = [m[0]/b.length, m[1]/b.length, m[2]/b.length];
-    }
-  }
-  const sorted = centers
-    .map((c) => ({ c, lum: luma({ r: c[0], g: c[1], b: c[2] }) }))
-    .sort((a, b) => a.lum - b.lum);
-  return sorted.map((s) => rgbToHex(s.c[0], s.c[1], s.c[2]));
+  return {
+    r: Math.round(tc[0] * 255),
+    g: Math.round(tc[1] * 255),
+    b: Math.round(tc[2] * 255),
+  };
 }
+function hslToHex(h: number, s: number, l: number) {
+  const { r, g, b } = hslToRgb(h, s, l);
+  const toHex = (v: number) => v.toString(16).padStart(2, "0");
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+/** Paleta 50–900 estilo Tailwind variando Lightness */
+const L_SCALE: Record<string, number> = {
+  "50": 97, "100": 94, "200": 86, "300": 77, "400": 66,
+  "500": 56, "600": 47, "700": 39, "800": 32, "900": 25,
+};
+function buildPalette(h: number, s: number) {
+  const out: Record<string, string> = {};
+  (Object.keys(L_SCALE) as (keyof typeof L_SCALE)[]).forEach((k) => {
+    out[k] = hslToHex(h, s, L_SCALE[k]);
+  });
+  return out;
+}
+/** Aplica paleta a las CSS vars que ya usa tu ThemeLoader */
+function applyPaletteToCssVars(palette: Record<string, string>) {
+  const root = document.documentElement;
+  for (const k of Object.keys(palette)) {
+    root.style.setProperty(`--brand-${k}`, palette[k]);
+  }
+  root.style.setProperty(`--brand`, palette["500"] ?? "#2563eb");
+}
+
+/** Tipado del GET /api/admin/company?company=... (lo que ya usas) */
+type CompanyResponse = {
+  id: string;
+  name: string;
+  slug: string;
+  settings?: {
+    branding?: {
+      brandName?: string;
+      primary?: string;        // hex base (ya lo tenías)
+      hue?: number;            // nuevo para re-editar H/S/L
+      saturation?: number;
+      lightness?: number;
+      palette?: Record<string, string>; // { "50":"#...", ... }
+      logoUrl?: string;
+      // secondary?: string;  // lo dejamos por si lo usas luego
+    };
+  };
+};
 
 export default function BrandingPage() {
   const qp = useSearchParams();
   const company = (qp.get("company") || "").toLowerCase();
 
-  const [state, setState] = useState<Branding>({
-    brandName: "", primary: "#273c90", secondary: "#8692c1", logoUrl: ""
-  });
+  // Estado H/S/L (defaults cercanos a #2563eb)
+  const [h, setH] = useState(220);
+  const [s, setS] = useState(83);
+  const [l, setL] = useState(56);
+  const [name, setName] = useState("");
   const [loading, setLoading] = useState(true);
-  const [detecting, setDetecting] = useState(false);
   const [saving, setSaving] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
 
+  const palette = useMemo(() => buildPalette(h, s), [h, s]);
+  const baseHex = useMemo(() => hslToHex(h, s, l), [h, s, l]);
+
+  // Cargar branding actual (sin mover rutas ni shape)
   useEffect(() => {
+    let alive = true;
     (async () => {
-      setLoading(true);
       try {
+        if (!company) { setLoading(false); return; }
         const r = await fetch(`/api/admin/company?company=${company}`, { cache: "no-store" });
-        const json: CompanyResp = await r.json();
-        if (!r.ok) throw new Error((json as any)?.error || r.statusText);
-        const b = json?.settings?.branding ?? {};
-        setState({
-          brandName: (b.brandName as string) || json?.name || "",
-          primary: (b.primary as string) || "#273c90",
-          secondary: (b.secondary as string) || "#8692c1",
-          logoUrl: (b.logoUrl as string) || "",
-        });
-      } catch (e: any) {
-        console.error("GET /api/admin/company:", e?.message || e);
-        alert("No pude cargar el branding: " + (e?.message || "GET failed"));
+        const data = (await r.json()) as CompanyResponse;
+        if (!alive) return;
+
+        const b = data?.settings?.branding || {};
+        setName(b.brandName || data?.name || "");
+
+        if (typeof b.hue === "number" && typeof b.saturation === "number") {
+          setH(clamp(b.hue, 0, 360));
+          setS(clamp(b.saturation, 0, 100));
+          setL(typeof b.lightness === "number" ? clamp(b.lightness, 0, 100) : 56);
+        } else if (b.primary) {
+          const { r: rr, g: gg, b: bb } = hexToRgb(b.primary);
+          const { h: hh, s: ss, l: ll } = rgbToHsl(rr, gg, bb);
+          setH(hh); setS(ss); setL(ll);
+        } else {
+          setH(220); setS(83); setL(56);
+        }
+
+        // Aplica paleta persistida, o construye a partir de H/S
+        const p = b.palette;
+        if (typeof window !== "undefined") {
+          applyPaletteToCssVars(p ?? buildPalette(h, s));
+        }
+      } catch (e) {
+        console.error("branding load error", e);
       } finally {
-        setLoading(false);
+        if (alive) setLoading(false);
       }
     })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [company]);
 
-  const textOnPrimary = useMemo(() => {
-    const lum = luma(hexToRgb(state.primary));
-    return lum > 0.55 ? "#111111" : "#ffffff";
-  }, [state.primary]);
+  // Aplicar en vivo cuando se mueven sliders
+  useEffect(() => {
+    if (typeof window !== "undefined") applyPaletteToCssVars(palette);
+  }, [palette]);
 
-  async function detectFromLogoUrl(url: string) {
-    setDetecting(true);
-    try {
-      const colors = await extractPalette(url);
-      const sorted = colors.sort((a, b) => luma(hexToRgb(a)) - luma(hexToRgb(b)));
-      const primary = sorted[1] || sorted[0] || state.primary;
-      const secondary = sorted[2] || sorted[0] || state.secondary;
-      setState((s) => ({ ...s, primary, secondary }));
-    } catch (e) {
-      console.error("Detect colors:", e);
-      alert("No pude detectar colores. Prueba con otra imagen o URL pública.");
-    } finally {
-      setDetecting(false);
-    }
-  }
-
-  async function onDetectClick() {
-    if (state.logoUrl) {
-      await detectFromLogoUrl(state.logoUrl);
-    } else {
-      fileRef.current?.click();
-    }
-  }
-
-  async function onPickFile(ev: React.ChangeEvent<HTMLInputElement>) {
-    const file = ev.target.files?.[0];
-    if (!file) return;
-    const supabase = supabaseBrowser();
-    const path = `branding/${company}/${Date.now()}-${file.name.replace(/\s+/g, "_")}`;
-    const up = await supabase.storage.from("public").upload(path, file, { upsert: true } as any);
-    if (up.error) {
-      console.error("upload:", up.error);
-      alert("No pude subir el logo: " + up.error.message);
-      return;
-    }
-    const { data } = supabase.storage.from("public").getPublicUrl(path);
-    setState((s) => ({ ...s, logoUrl: data.publicUrl }));
-    await detectFromLogoUrl(data.publicUrl);
-  }
-
-  async function saveBranding() {
+  async function onSave() {
+    if (!company) return alert("Selecciona una empresa (?company=slug).");
     setSaving(true);
     try {
-      const payload = { settings: { branding: state } };
+      const body = {
+        settings: {
+          branding: {
+            brandName: name,
+            primary: baseHex,  // guardamos base en HEX (compat con tu modelo actual)
+            hue: h,
+            saturation: s,
+            lightness: l,
+            palette,           // guardamos la 50–900
+          },
+        },
+      };
       const r = await fetch(`/api/admin/company?company=${company}`, {
-        method: "POST",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(body),
       });
-
-      let msg = "";
-      if (!r.ok) {
-        try {
-          const j = await r.json();
-          msg = j?.error || r.statusText;
-        } catch {
-          try { msg = await r.text(); } catch {}
-        }
-        throw new Error(`HTTP ${r.status}: ${msg || "Unknown error"}`);
-      }
-
-      // notifica reaplicar tema
-      window.dispatchEvent(new CustomEvent("branding:updated", { detail: { company } }));
-      try { localStorage.setItem("branding:updated", String(Date.now())); } catch {}
-      alert("Branding guardado ✅");
+      if (!r.ok) throw new Error(`Error ${r.status}: ${await r.text()}`);
+      alert("Branding guardado.");
     } catch (e: any) {
-      console.error("POST /api/admin/company:", e?.message || e);
-      alert("No pude guardar el branding: " + (e?.message || "POST failed"));
+      console.error(e);
+      alert(`No se pudo guardar: ${e?.message ?? e}`);
     } finally {
       setSaving(false);
     }
   }
 
+  if (loading) {
+    return (
+      <main className="p-6">
+        <h1 className="text-xl font-semibold mb-2">Branding</h1>
+        <p className="text-sm text-slate-500">Cargando…</p>
+      </main>
+    );
+  }
+
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-semibold">Configuración · Branding</h1>
-      {loading ? (
-        <div className="mt-6 text-sm text-slate-500">Cargando…</div>
-      ) : (
-        <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="rounded-2xl border p-4">
-            <label className="block text-sm font-medium mb-2">Nombre de marca</label>
-            <input
-              className="w-full rounded-xl border px-3 py-2"
-              value={state.brandName}
-              onChange={(e) => setState((s) => ({ ...s, brandName: e.target.value }))}
-            />
-
-            <label className="block text-sm font-medium mt-4 mb-2">Logo URL (opcional)</label>
-            <input
-              className="w-full rounded-xl border px-3 py-2"
-              value={state.logoUrl}
-              onChange={(e) => setState((s) => ({ ...s, logoUrl: e.target.value }))}
-              placeholder="https://…/logo.png"
-            />
-
-            <div className="flex items-center gap-3 mt-4">
-              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickFile} />
-              <button onClick={() => fileRef.current?.click()} className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50">
-                Subir logo (PNG/SVG)
-              </button>
-              <button
-                onClick={onDetectClick}
-                disabled={detecting}
-                className="rounded-md bg-[var(--brand-700)] text-white px-3 py-2 text-sm disabled:opacity-50"
-              >
-                {detecting ? "Detectando…" : "Detectar colores del logo"}
-              </button>
-            </div>
-
-            <div className="mt-4 flex items-center gap-3">
-              <div className="h-12 w-20 rounded-md border grid place-items-center">
-                {state.logoUrl ? (
-                  <img src={state.logoUrl} alt="logo" className="max-h-10 max-w-[76px] object-contain" />
-                ) : (
-                  <div className="text-xs text-slate-400">Sin logo</div>
-                )}
-              </div>
-              <div className="text-xs text-slate-500">Preview</div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border p-4">
-            <label className="block text-sm font-medium mb-2">Color primario</label>
-            <div className="flex items-center gap-2">
-              <input type="color" value={state.primary} onChange={(e) => setState((s) => ({ ...s, primary: e.target.value }))} className="h-10 w-10 rounded-md border p-0" />
-              <input className="flex-1 rounded-xl border px-3 py-2" value={state.primary} onChange={(e) => setState((s) => ({ ...s, primary: e.target.value }))} />
-            </div>
-            <div className="mt-4 rounded-xl border overflow-hidden">
-              <div className="h-12" style={{ background: state.primary }} />
-              <div className="p-3 flex items-center justify-between">
-                <div className="text-sm" style={{ color: luma(hexToRgb(state.primary)) > 0.55 ? "#111" : "#fff" }}>Texto sobre primario</div>
-                <div className="text-xs text-slate-500">Lum: {luma(hexToRgb(state.primary)).toFixed(2)}</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border p-4">
-            <label className="block text-sm font-medium mb-2">Color secundario</label>
-            <div className="flex items-center gap-2">
-              <input type="color" value={state.secondary} onChange={(e) => setState((s) => ({ ...s, secondary: e.target.value }))} className="h-10 w-10 rounded-md border p-0" />
-              <input className="flex-1 rounded-xl border px-3 py-2" value={state.secondary} onChange={(e) => setState((s) => ({ ...s, secondary: e.target.value }))} />
-            </div>
-            <div className="mt-4 rounded-xl border overflow-hidden">
-              <div className="h-12" style={{ background: state.secondary }} />
-              <div className="p-3 text-xs text-slate-500">Úsalo para acentos y elementos informativos.</div>
-            </div>
-          </div>
-
-          <div className="lg:col-span-3 flex items-center gap-3">
-            <button onClick={saveBranding} disabled={saving} className="rounded-md bg-[var(--brand-700)] text-white px-4 py-2 disabled:opacity-50">
-              {saving ? "Guardando…" : "Guardar branding"}
-            </button>
-            <button
-              onClick={() => {
-                window.dispatchEvent(new CustomEvent("branding:updated", { detail: { company } }));
-                try { localStorage.setItem("branding:updated", String(Date.now())); } catch {}
-              }}
-              className="rounded-md border px-4 py-2"
-            >
-              Reaplicar tema (preview)
-            </button>
-          </div>
+    <main className="p-6 space-y-8">
+      <header className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">Branding de empresa</h1>
+          <p className="text-sm text-slate-500">
+            Ajusta el color base con H/S/L; generamos la paleta <code>50–900</code> y la aplicamos en vivo.
+          </p>
         </div>
-      )}
-    </div>
+        <button
+          onClick={onSave}
+          disabled={saving}
+          className="inline-flex items-center rounded-lg px-4 py-2 text-sm font-medium border border-[var(--brand-300)] bg-[var(--brand-50)] hover:bg-[var(--brand-100)] text-[var(--brand-800)]"
+        >
+          {saving ? "Guardando…" : "Guardar"}
+        </button>
+      </header>
+
+      {/* Nombre de marca */}
+      <section className="grid gap-3 max-w-xl">
+        <label className="text-xs text-slate-500">Nombre para mostrar</label>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Acme S.A. de C.V."
+          className="rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-500)]"
+        />
+      </section>
+
+      {/* Sliders H/S/L */}
+      <section className="grid md:grid-cols-3 gap-6 max-w-4xl">
+        <div className="rounded-xl border p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium">Hue (H)</span>
+            <span className="text-xs text-slate-500">{h}</span>
+          </div>
+          <input type="range" min={0} max={360} value={h} onChange={(e) => setH(parseInt(e.target.value))} className="w-full" />
+        </div>
+
+        <div className="rounded-xl border p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium">Saturation (S)</span>
+            <span className="text-xs text-slate-500">{s}%</span>
+          </div>
+          <input type="range" min={0} max={100} value={s} onChange={(e) => setS(parseInt(e.target.value))} className="w-full" />
+        </div>
+
+        <div className="rounded-xl border p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium">Lightness (L)</span>
+            <span className="text-xs text-slate-500">{l}%</span>
+          </div>
+          <input type="range" min={0} max={100} value={l} onChange={(e) => setL(parseInt(e.target.value))} className="w-full" />
+        </div>
+      </section>
+
+      {/* Color base directo (HEX) que sincroniza H/S/L */}
+      <section className="grid gap-3 max-w-xl">
+        <label className="text-xs text-slate-500">Color base (HEX)</label>
+        <div className="flex items-center gap-3">
+          <input
+            type="color"
+            value={baseHex}
+            onChange={(e) => {
+              const { r, g, b } = hexToRgb(e.target.value);
+              const { h: hh, s: ss, l: ll } = rgbToHsl(r, g, b);
+              setH(hh); setS(ss); setL(ll);
+            }}
+            className="h-10 w-14 rounded border"
+            aria-label="Selector de color base"
+          />
+          <code className="text-sm">{baseHex}</code>
+        </div>
+        <p className="text-xs text-slate-500">
+          El selector sincroniza la base con H/S/L; la paleta 50–900 se recalcula automáticamente.
+        </p>
+      </section>
+
+      {/* Vista previa de paleta */}
+      <section className="space-y-3">
+        <h2 className="text-sm font-medium">Paleta generada</h2>
+        <div className="grid grid-cols-5 md:grid-cols-10 gap-2">
+          {(Object.keys(palette) as (keyof typeof palette)[]).map((k) => (
+            <div key={k} className="rounded-lg border overflow-hidden">
+              <div className="h-10" style={{ backgroundColor: palette[k] }} title={`${k} ${palette[k]}`} />
+              <div className="px-2 py-1 text-[10px] flex items-center justify-between">
+                <span className="font-medium">{k}</span>
+                <span className="text-slate-500">{palette[k]}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-slate-500">
+          Se aplican <code>--brand-50</code>…<code>--brand-900</code> en vivo; al guardar, persistimos en <code>settings.branding</code>.
+        </p>
+      </section>
+    </main>
   );
 }
