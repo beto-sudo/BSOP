@@ -1,4 +1,3 @@
-// app/(app)/settings/admin/page.tsx
 import { supabaseServer } from "@/lib/supabaseServer";
 import { redirect } from "next/navigation";
 import { isSuperadminEmail } from "@/lib/superadmin";
@@ -11,10 +10,8 @@ export default async function Page() {
   const { data: auth } = await supa.auth.getUser();
   const user = auth.user;
 
-  // si no hay sesión → a signin (sin parpadeos)
   if (!user) redirect("/signin?redirect=/settings/admin");
 
-  // si hay sesión pero no es superadmin → mostramos 403 in situ (evita “rebote”)
   if (!isSuperadminEmail(user.email)) {
     return (
       <main className="p-6">
@@ -26,7 +23,6 @@ export default async function Page() {
     );
   }
 
-  // panel sencillo
   return (
     <main className="p-6">
       <h1 className="text-base font-semibold mb-4">Panel de superadmin</h1>
