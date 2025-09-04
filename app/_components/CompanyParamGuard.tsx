@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 /**
  * Fuerza la presencia de ?company SOLO donde hace sentido.
- * Exenta /settings/*, /companies, /auth, /signin, /api… y manda "/" a /companies.
+ * Exenta /settings/*, /companies, /auth, /signin, /api… y permite "/" si ya trae ?company.
  */
 export default function CompanyParamGuard() {
   const router = useRouter();
@@ -23,8 +23,9 @@ export default function CompanyParamGuard() {
     pathname.startsWith("/api");
 
   useEffect(() => {
+    // Permitir "/" si ya tiene ?company=... (home de una empresa)
     if (pathname === "/") {
-      router.replace("/companies");
+      if (!company) router.replace("/companies");
       return;
     }
     if (isExempt) return;
