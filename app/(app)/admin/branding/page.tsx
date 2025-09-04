@@ -63,19 +63,27 @@ function applySecondaryVars(p: Record<string,string>) {
 }
 
 /* ── tipos ───────────────────────────────────────── */
-type BrandingColorBlock = {
+type BrandingBlock = {
   brandName?: string;
+  slogan?: string;
+  mission?: string;
+  vision?: string;
+  values?: string[];              // ← chips
   primary?: string;
   hue?: number; saturation?: number; lightness?: number;
   palette?: Record<string,string>;
   logoUrl?: string;
-  secondary?: any;
+  secondary?: {
+    primary?: string;
+    hue?: number; saturation?: number; lightness?: number;
+    palette?: Record<string,string>;
+  } | string;
 };
-type CompanyResponse = { id:string; name:string; slug:string; settings?:{ branding?: BrandingColorBlock } };
+type CompanyResponse = { id:string; name:string; slug:string; settings?:{ branding?: BrandingBlock } };
 
-/* ── color del logo ───────────────────────────────────────── */
+/* ── colores del logo ───────────────────────────────────────── */
 type ColorBin = { count:number; r:number; g:number; b:number; };
-function getDominantColorsFromImage(img: HTMLImageElement, maxW=160, step=3, maxColors=6){
+function getDominantColorsFromImage(img: HTMLImageElement, maxW=140, step=3, maxColors=6){
   const canvas=document.createElement("canvas");
   const ratio = img.width? maxW/img.width : 1;
   canvas.width = Math.min(maxW, img.width||maxW);
@@ -109,6 +117,24 @@ function getDominantColorsFromImage(img: HTMLImageElement, maxW=160, step=3, max
   return unique.slice(0,maxColors);
 }
 
+/* ── chips de valores ───────────────────────────────────────── */
+function useChips(initial: string[] = []) {
+  const [chips, setChips] = useState<string[]>(initial);
+  const [input, setInput] = useState("");
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" && input.trim()) {
+      e.preventDefault();
+      const v = input.trim();
+      if (!chips.includes(v)) setChips([...chips, v]);
+      setInput("");
+    } else if (e.key === "Backspace" && !input && chips.length) {
+      setChips(chips.slice(0, -1));
+    }
+  }
+  function remove(i: number) { setChips(chips.filter((_, idx) => idx !== i)); }
+  return { chips, setChips, input, setInput, onKeyDown, remove };
+}
+
 /* ── página ───────────────────────────────────────── */
 export default function BrandingPage(){
   const qp = useSearchParams();
@@ -124,17 +150,24 @@ export default function BrandingPage(){
   const [s2, setS2] = useState(70);
   const [l2, setL2] = useState(50);
 
+  // identidad
   const [name, setName] = useState("");
+  const [slogan, setSlogan] = useState("");
+  const mission = useInputCounter(600);
+  const vision  = useInputCounter(600);
+  const values  = useChips([]);
+
+  // ui/estado
+  const [applyTarget, setApplyTarget] = useState<"primary"|"secondary">("primary");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // logo
   const [logoUrl, setLogoUrl] = useState<string>("");
   const [logoFile, setLogoFile] = useState<File|null>(null);
   const [logoPreview, setLogoPreview] = useState<string>("");
 
-  const [applyTarget, setApplyTarget] = useState<"primary"|"secondary">("primary");
-  const [suggested, setSuggested] = useState<string[]>([]);
-
+  // paletas
   const palette  = useMemo(()=>buildPalette(h, s), [h, s]);
   const baseHex  = useMemo(()=>hslToHex(h, s, l), [h, s, l]);
   const palette2 = useMemo(()=>buildPalette(h2,s2), [h2,s2]);
@@ -150,7 +183,12 @@ export default function BrandingPage(){
         const data = (await r.json()) as CompanyResponse;
         if(!alive) return;
         const b = data?.settings?.branding || {};
+
         setName(b.brandName || data?.name || "");
+        setSlogan(b.slogan || "");
+        mission.setValue(b.mission || "");
+        vision.setValue(b.vision || "");
+        values.setChips(Array.isArray(b.values) ? b.values : []);
         setLogoUrl(b.logoUrl || "");
 
         // primary
@@ -164,7 +202,9 @@ export default function BrandingPage(){
         }
 
         // secondary
-        const sec = (typeof b.secondary === "string") ? { primary: b.secondary } as BrandingColorBlock : (b.secondary || {});
+        const sec = (typeof b.secondary === "string")
+          ? { primary: b.secondary }
+          : (b.secondary || {});
         if(typeof sec.hue==="number" && typeof sec.saturation==="number"){
           setH2(clamp(sec.hue,0,360)); setS2(clamp(sec.saturation,0,100));
           setL2(typeof sec.lightness==="number" ? clamp(sec.lightness,0,100) : 50);
@@ -174,7 +214,7 @@ export default function BrandingPage(){
           setH2(hh2); setS2(ss2); setL2(ll2);
         }
 
-        // apply persisted palettes (o derivadas)
+        // aplica persistido o derivado
         if (typeof window!=="undefined") {
           applyPrimaryVars(b.palette ?? buildPalette(h, s));
           applySecondaryVars(sec.palette ?? buildPalette(h2, s2));
@@ -192,7 +232,7 @@ export default function BrandingPage(){
   // logo
   function onPickLogo(e: React.ChangeEvent<HTMLInputElement>){
     const f = e.target.files?.[0] || null;
-    setLogoFile(f||null); setSuggested([]);
+    setLogoFile(f||null);
     if(f){ const rd=new FileReader(); rd.onload=()=>setLogoPreview(rd.result as string); rd.readAsDataURL(f); }
     else setLogoPreview("");
   }
@@ -201,8 +241,8 @@ export default function BrandingPage(){
     const img=new Image();
     img.onload=()=>{
       try{
-        const colors=getDominantColorsFromImage(img,160,3,6);
-        setSuggested(colors);
+        const colors=getDominantColorsFromImage(img,140,3,6);
+        // aplica la primera sugerencia al target seleccionado
         if(colors[0]){
           const {r,g,b}=hexToRgb(colors[0]);
           const {h:hh,s:ss,l:ll}=rgbToHsl(r,g,b);
@@ -234,6 +274,10 @@ export default function BrandingPage(){
         settings: {
           branding: {
             brandName: name,
+            slogan,
+            mission: mission.value,
+            vision: vision.value,
+            values: values.chips,
             logoUrl: uploadedUrl || logoUrl,
             // primary
             primary: baseHex, hue: h, saturation: s, lightness: l, palette,
@@ -249,7 +293,7 @@ export default function BrandingPage(){
       if(!r.ok) throw new Error(`Error ${r.status}: ${await r.text()}`);
       if(uploadedUrl) setLogoUrl(uploadedUrl);
 
-      /* 🔔 PING al ThemeLoader para refrescar paletas en toda la app */
+      // PING al ThemeLoader
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("branding:updated"));
         try { localStorage.setItem("branding:updated", String(Date.now())); } catch {}
@@ -272,9 +316,9 @@ export default function BrandingPage(){
     <main className="p-6 space-y-8">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold">Branding de empresa</h1>
-          <p className="text-sm text-slate-500">
-            Ajusta Primario y Secundario con H/S/L; generamos paletas <code>50–900</code> y las aplicamos en vivo. Sube tu logo y detecta colores.
+          <h1 className="text-base font-semibold">Branding de empresa</h1>
+          <p className="text-xs text-slate-500">
+            Minimalista: define identidad y paletas Primario/Secundario (50–900). El tema se aplica en vivo.
           </p>
         </div>
         <button
@@ -285,72 +329,92 @@ export default function BrandingPage(){
         </button>
       </header>
 
-      {/* Nombre + Logo */}
-      <section className="grid gap-6 md:grid-cols-2">
-        <div className="grid gap-3 max-w-xl">
-          <label className="text-xs text-slate-500">Nombre para mostrar</label>
-          <input
-            value={name} onChange={(e)=>setName(e.target.value)} placeholder="Acme S.A. de C.V."
-            className="rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-500)]"
-          />
-        </div>
-
+      {/* Identidad: nombre + slogan + logo */}
+      <section className="grid gap-6 md:grid-cols-[1.2fr_1fr]">
         <div className="grid gap-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium">Logo</h2>
-            <div className="flex items-center gap-3 text-xs">
-              <span className="text-slate-500">Aplicar sugerencias a:</span>
-              <label className="inline-flex items-center gap-1">
-                <input type="radio" name="applyTarget" checked={applyTarget==="primary"} onChange={()=>setApplyTarget("primary")} /> Primario
-              </label>
-              <label className="inline-flex items-center gap-1">
-                <input type="radio" name="applyTarget" checked={applyTarget==="secondary"} onChange={()=>setApplyTarget("secondary")} /> Secundario
-              </label>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-slate-500">Nombre para mostrar</label>
+              <input
+                value={name} onChange={(e)=>setName(e.target.value)} placeholder="Acme S.A. de C.V."
+                className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-500)]"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500">Slogan</label>
+              <input
+                value={slogan} maxLength={120} onChange={(e)=>setSlogan(e.target.value)} placeholder="Calidad que perdura."
+                className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-500)]"
+              />
+              <div className="text-[10px] text-slate-400 mt-1">{slogan.length}/120</div>
             </div>
           </div>
 
-          <div className="flex flex-col md:flex-row gap-6">
-            <div className="grid gap-3 max-w-sm">
-              <input type="file" accept="image/*" onChange={onPickLogo} className="text-sm" aria-label="Seleccionar logo" />
-              <div className="rounded-lg border p-3 w-56 h-56 grid place-items-center bg-white">
-                {logoPreview ? (
-                  <img src={logoPreview} alt="Preview" className="max-w-full max-h-full object-contain" />
-                ) : logoUrl ? (
-                  <img src={logoUrl} alt="Logo actual" className="max-w-full max-h-full object-contain" />
-                ) : (
-                  <span className="text-xs text-slate-500">Sin logo</span>
-                )}
-              </div>
-              <div className="flex items-center gap-3">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-slate-500">Misión</label>
+              <textarea
+                value={mission.value} onChange={mission.onChange} maxLength={mission.max}
+                className="mt-1 h-24 w-full resize-none rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-500)]"
+                placeholder="¿Qué resolvemos y para quién?"
+              />
+              <div className="text-[10px] text-slate-400 mt-1">{mission.value.length}/{mission.max}</div>
+            </div>
+            <div>
+              <label className="text-xs text-slate-500">Visión</label>
+              <textarea
+                value={vision.value} onChange={vision.onChange} maxLength={vision.max}
+                className="mt-1 h-24 w-full resize-none rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-500)]"
+                placeholder="¿Hacia dónde vamos?"
+              />
+              <div className="text-[10px] text-slate-400 mt-1">{vision.value.length}/{vision.max}</div>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs text-slate-500">Valores (Enter para agregar)</label>
+            <div className="mt-1 flex flex-wrap gap-2 rounded-lg border px-2 py-2">
+              {values.chips.map((c, i) => (
+                <span key={c+i} className="inline-flex items-center gap-1 rounded-md bg-[var(--brand-50)] px-2 py-1 text-xs border">
+                  {c}
+                  <button onClick={()=>values.remove(i)} className="opacity-60 hover:opacity-100">×</button>
+                </span>
+              ))}
+              <input
+                value={values.input} onChange={(e)=>values.setInput(e.target.value)} onKeyDown={values.onKeyDown}
+                placeholder="Innovación"
+                className="min-w-[120px] flex-1 outline-none text-sm"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-3">
+          <label className="text-xs text-slate-500">Logo</label>
+          <div className="flex items-start gap-3">
+            <div className="rounded-lg border p-2 w-36 h-36 grid place-items-center bg-white">
+              {logoPreview ? (
+                <img src={logoPreview} alt="Preview" className="max-w-full max-h-full object-contain" />
+              ) : logoUrl ? (
+                <img src={logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
+              ) : (
+                <span className="text-[11px] text-slate-500">Sin logo</span>
+              )}
+            </div>
+            <div className="space-y-2">
+              <input type="file" accept="image/*" onChange={onPickLogo} className="text-xs" />
+              <div className="flex items-center gap-2">
                 <button
                   type="button" onClick={onDetectColors}
-                  className="inline-flex items-center rounded-lg px-3 py-2 text-sm border border-[var(--brand-300)] bg-[var(--brand-50)] hover:bg-[var(--brand-100)] text-[var(--brand-800)]"
+                  className="inline-flex items-center rounded-lg px-3 py-1.5 text-xs border border-[var(--brand-300)] bg-[var(--brand-50)] hover:bg-[var(--brand-100)] text-[var(--brand-800)]"
                 >
-                  Detectar colores del logo
+                  Detectar colores
                 </button>
-                {logoFile ? <span className="text-xs text-slate-500">El logo se subirá al guardar</span> : null}
-              </div>
-            </div>
-
-            <div className="flex-1">
-              <p className="text-xs text-slate-500 mb-2">Colores sugeridos (clic para aplicar):</p>
-              <div className="flex flex-wrap gap-2">
-                {suggested.length===0 ? (
-                  <span className="text-xs text-slate-400">Sin sugerencias todavía.</span>
-                ) : suggested.map(hex=>(
-                  <button key={hex} type="button"
-                    className="rounded-md border px-2 py-1 text-xs shadow-sm"
-                    style={{ backgroundColor: hex, color:"#00000080" }} title={hex}
-                    onClick={()=>{
-                      const {r,g,b}=hexToRgb(hex);
-                      const {h:hh,s:ss,l:ll}=rgbToHsl(r,g,b);
-                      if(applyTarget==="primary"){ setH(hh); setS(ss); setL(ll); }
-                      else { setH2(hh); setS2(ss); setL2(ll); }
-                    }}
-                  >
-                    {hex}
-                  </button>
-                ))}
+                <div className="text-[11px] text-slate-500">
+                  Aplicar a:
+                  <label className="ml-2 inline-flex items-center gap-1"><input type="radio" checked={applyTarget==="primary"} onChange={()=>setApplyTarget("primary")} />Primario</label>
+                  <label className="ml-2 inline-flex items-center gap-1"><input type="radio" checked={applyTarget==="secondary"} onChange={()=>setApplyTarget("secondary")} />Secundario</label>
+                </div>
               </div>
             </div>
           </div>
@@ -358,47 +422,40 @@ export default function BrandingPage(){
       </section>
 
       {/* Primario */}
-      <section className="space-y-4">
-        <h2 className="text-sm font-semibold">Primario</h2>
-        <div className="grid md:grid-cols-3 gap-6 max-w-4xl">
-          <Slider label="Hue (H)" value={h} setValue={setH} min={0} max={360} suffix="" />
-          <Slider label="Saturation (S)" value={s} setValue={setS} min={0} max={100} suffix="%" />
-          <Slider label="Lightness (L)" value={l} setValue={setL} min={0} max={100} suffix="%" />
-        </div>
-        <ColorPicker hex={baseHex} onPick={(hex)=>{
-          const {r,g,b}=hexToRgb(hex); const {h:hh,s:ss,l:ll}=rgbToHsl(r,g,b);
-          setH(hh); setS(ss); setL(ll);
-        }} />
-        <PalettePreview palette={palette} note="Aplica --brand-50…900; --brand es el 500." />
-      </section>
+      <PaletteSection
+        title="Primario"
+        h={h} s={s} l={l}
+        setH={setH} setS={setS} setL={setL}
+        baseHex={baseHex} palette={palette}
+      />
 
       {/* Secundario */}
-      <section className="space-y-4">
-        <h2 className="text-sm font-semibold">Secundario</h2>
-        <div className="grid md:grid-cols-3 gap-6 max-w-4xl">
-          <Slider label="Hue (H)" value={h2} setValue={setH2} min={0} max={360} suffix="" />
-          <Slider label="Saturation (S)" value={s2} setValue={setS2} min={0} max={100} suffix="%" />
-          <Slider label="Lightness (L)" value={l2} setValue={setL2} min={0} max={100} suffix="%" />
-        </div>
-        <ColorPicker hex={baseHex2} onPick={(hex)=>{
-          const {r,g,b}=hexToRgb(hex); const {h:hh,s:ss,l:ll}=rgbToHsl(r,g,b);
-          setH2(hh); setS2(ss); setL2(ll);
-        }} />
-        <PalettePreview palette={palette2} note="Aplica --brand2-50…900; --brand2 es el 500." />
-      </section>
+      <PaletteSection
+        title="Secundario"
+        h={h2} s={s2} l={l2}
+        setH={setH2} setS={setS2} setL={setL2}
+        baseHex={baseHex2} palette={palette2}
+        secondary
+      />
+
     </main>
   );
 }
 
-/* ── UI bits ───────────────────────────────────────── */
+/* ── pequeños componentes ───────────────────────────────────────── */
+function useInputCounter(max: number){
+  const [value, setValue] = useState(""); 
+  return { value, setValue, max, onChange: (e: any)=>setValue(e.target.value.slice(0, max)) };
+}
+
 function Slider({ label, value, setValue, min, max, suffix }:{
   label:string; value:number; setValue:(n:number)=>void; min:number; max:number; suffix:string;
 }){
   return (
-    <div className="rounded-xl border p-4">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium">{label}</span>
-        <span className="text-xs text-slate-500">{value}{suffix}</span>
+    <div className="rounded-xl border p-3">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-xs font-medium">{label}</span>
+        <span className="text-[11px] text-slate-500">{value}{suffix}</span>
       </div>
       <input type="range" min={min} max={max} value={value} onChange={(e)=>setValue(parseInt(e.target.value))} className="w-full" />
     </div>
@@ -406,22 +463,22 @@ function Slider({ label, value, setValue, min, max, suffix }:{
 }
 function ColorPicker({ hex, onPick }:{ hex:string; onPick:(hex:string)=>void }){
   return (
-    <div className="grid gap-3 max-w-xl">
+    <div className="grid gap-2">
       <label className="text-xs text-slate-500">Color base (HEX)</label>
       <div className="flex items-center gap-3">
-        <input type="color" value={hex} onChange={(e)=>onPick(e.target.value)} className="h-10 w-14 rounded border" aria-label="Selector de color base" />
-        <code className="text-sm">{hex}</code>
+        <input type="color" value={hex} onChange={(e)=>onPick(e.target.value)} className="h-9 w-12 rounded border" aria-label="Selector de color base" />
+        <code className="text-xs">{hex}</code>
       </div>
     </div>
   );
 }
 function PalettePreview({ palette, note }:{ palette:Record<string,string>; note:string }){
   return (
-    <section className="space-y-3">
+    <section className="space-y-2">
       <div className="grid grid-cols-5 md:grid-cols-10 gap-2">
         {(Object.keys(palette) as (keyof typeof palette)[]).map(k=>(
           <div key={k} className="rounded-lg border overflow-hidden">
-            <div className="h-10" style={{ backgroundColor: palette[k] }} title={`${k} ${palette[k]}`} />
+            <div className="h-8" style={{ backgroundColor: palette[k] }} title={`${k} ${palette[k]}`} />
             <div className="px-2 py-1 text-[10px] flex items-center justify-between">
               <span className="font-medium">{k}</span>
               <span className="text-slate-500">{palette[k]}</span>
@@ -429,7 +486,31 @@ function PalettePreview({ palette, note }:{ palette:Record<string,string>; note:
           </div>
         ))}
       </div>
-      <p className="text-xs text-slate-500">{note}</p>
+      <p className="text-[11px] text-slate-500">{note}</p>
+    </section>
+  );
+}
+function PaletteSection({ title, h, s, l, setH, setS, setL, baseHex, palette, secondary }:{
+  title:string; h:number; s:number; l:number;
+  setH:(n:number)=>void; setS:(n:number)=>void; setL:(n:number)=>void;
+  baseHex:string; palette:Record<string,string>; secondary?:boolean;
+}){
+  return (
+    <section className="space-y-3">
+      <h2 className="text-sm font-semibold">{title}</h2>
+      <div className="grid md:grid-cols-3 gap-3 max-w-4xl">
+        <Slider label="Hue (H)" value={h} setValue={setH} min={0} max={360} suffix="" />
+        <Slider label="Saturation (S)" value={s} setValue={setS} min={0} max={100} suffix="%" />
+        <Slider label="Lightness (L)" value={l} setValue={setL} min={0} max={100} suffix="%" />
+      </div>
+      <ColorPicker hex={baseHex} onPick={(hex)=>{
+        const {r,g,b}=hexToRgb(hex); const {h:hh,s:ss,l:ll}=rgbToHsl(r,g,b);
+        setH(hh); setS(ss); setL(ll);
+      }} />
+      <PalettePreview
+        palette={palette}
+        note={secondary ? "Aplica --brand2-50…900; --brand2 es el 500." : "Aplica --brand-50…900; --brand es el 500."}
+      />
     </section>
   );
 }
