@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-/** ─────────────────────────── helpers: clamp + color conversions ─────────────────────────── */
+/* ── helpers de color ───────────────────────────────────────── */
 function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)); }
 function hexToRgb(hex: string) {
   const m = hex.trim().match(/^#?([0-9a-fA-F]{6})$/);
-  if (!m) return { r: 37, g: 99, b: 235 }; // fallback #2563eb
+  if (!m) return { r: 37, g: 99, b: 235 };
   const h = m[1];
   return { r: parseInt(h.slice(0,2),16), g: parseInt(h.slice(2,4),16), b: parseInt(h.slice(4,6),16) };
 }
@@ -18,33 +18,33 @@ function rgbToHex(r: number, g: number, b: number) {
 }
 function rgbToHsl(r: number, g: number, b: number) {
   r/=255; g/=255; b/=255;
-  const max = Math.max(r,g,b), min = Math.min(r,g,b);
+  const max=Math.max(r,g,b), min=Math.min(r,g,b);
   let h=0, s=0, l=(max+min)/2;
-  if (max !== min) {
-    const d = max-min;
-    s = l>0.5 ? d/(2-max-min) : d/(max+min);
-    switch (max) { case r: h=(g-b)/d+(g<b?6:0); break; case g: h=(b-r)/d+2; break; default: h=(r-g)/d+4; }
+  if(max!==min){
+    const d=max-min;
+    s=l>0.5? d/(2-max-min) : d/(max+min);
+    switch(max){ case r: h=(g-b)/d+(g<b?6:0); break; case g: h=(b-r)/d+2; break; default: h=(r-g)/d+4; }
     h/=6;
   }
   return { h: Math.round(h*360), s: Math.round(s*100), l: Math.round(l*100) };
 }
 function hslToRgb(h: number, s: number, l: number) {
-  h = ((h%360)+360)%360; s=clamp(s,0,100)/100; l=clamp(l,0,100)/100;
-  if (s===0){ const v=Math.round(l*255); return {r:v,g:v,b:v}; }
-  const q = l<0.5 ? l*(1+s) : l+s-l*s;
-  const p = 2*l-q;
-  const hk = h/360;
-  const tc = [hk+1/3, hk, hk-1/3].map(t=>{ let tt=t; if(tt<0)tt+=1; if(tt>1)tt-=1;
-    if (tt<1/6) return p+(q-p)*6*tt;
-    if (tt<1/2) return q;
-    if (tt<2/3) return p+(q-p)*(2/3-tt)*6;
+  h=((h%360)+360)%360; s=clamp(s,0,100)/100; l=clamp(l,0,100)/100;
+  if(s===0){ const v=Math.round(l*255); return { r:v,g:v,b:v }; }
+  const q=l<0.5? l*(1+s) : l+s-l*s;
+  const p=2*l-q;
+  const hk=h/360;
+  const tc=[hk+1/3, hk, hk-1/3].map(t=>{ let tt=t; if(tt<0)tt+=1; if(tt>1)tt-=1;
+    if(tt<1/6) return p+(q-p)*6*tt;
+    if(tt<1/2) return q;
+    if(tt<2/3) return p+(q-p)*(2/3-tt)*6;
     return p;
   });
   return { r:Math.round(tc[0]*255), g:Math.round(tc[1]*255), b:Math.round(tc[2]*255) };
 }
 function hslToHex(h: number, s: number, l: number){ const {r,g,b}=hslToRgb(h,s,l); return rgbToHex(r,g,b); }
 
-/** ─────────────────────────── palettes (50–900) ─────────────────────────── */
+/* ── paletas 50–900 ───────────────────────────────────────── */
 const L_SCALE: Record<string, number> = { "50":97,"100":94,"200":86,"300":77,"400":66,"500":56,"600":47,"700":39,"800":32,"900":25 };
 function buildPalette(h: number, s: number) {
   const out: Record<string,string> = {};
@@ -52,34 +52,28 @@ function buildPalette(h: number, s: number) {
   return out;
 }
 function applyPrimaryVars(p: Record<string,string>) {
-  const root = document.documentElement;
-  for (const k of Object.keys(p)) root.style.setProperty(`--brand-${k}`, p[k]);
+  const root=document.documentElement;
+  for(const k of Object.keys(p)) root.style.setProperty(`--brand-${k}`, p[k]);
   root.style.setProperty("--brand", p["500"] ?? "#2563eb");
 }
 function applySecondaryVars(p: Record<string,string>) {
-  const root = document.documentElement;
-  for (const k of Object.keys(p)) root.style.setProperty(`--brand2-${k}`, p[k]);
-  root.style.setProperty("--brand2", p["500"] ?? "#14b8a6"); // default teal-ish
+  const root=document.documentElement;
+  for(const k of Object.keys(p)) root.style.setProperty(`--brand2-${k}`, p[k]);
+  root.style.setProperty("--brand2", p["500"] ?? "#14b8a6");
 }
 
-/** ─────────────────────────── types ─────────────────────────── */
+/* ── tipos ───────────────────────────────────────── */
 type BrandingColorBlock = {
   brandName?: string;
   primary?: string;
-  hue?: number;
-  saturation?: number;
-  lightness?: number;
-  palette?: Record<string, string>;
+  hue?: number; saturation?: number; lightness?: number;
+  palette?: Record<string,string>;
   logoUrl?: string;
-  // legacy: secondary?: string | BrandingColorBlock
   secondary?: any;
 };
-type CompanyResponse = {
-  id: string; name: string; slug: string;
-  settings?: { branding?: BrandingColorBlock };
-};
+type CompanyResponse = { id:string; name:string; slug:string; settings?:{ branding?: BrandingColorBlock } };
 
-/** ─────────────────────────── logo color detection ─────────────────────────── */
+/* ── color del logo ───────────────────────────────────────── */
 type ColorBin = { count:number; r:number; g:number; b:number; };
 function getDominantColorsFromImage(img: HTMLImageElement, maxW=160, step=3, maxColors=6){
   const canvas=document.createElement("canvas");
@@ -115,42 +109,38 @@ function getDominantColorsFromImage(img: HTMLImageElement, maxW=160, step=3, max
   return unique.slice(0,maxColors);
 }
 
-/** ─────────────────────────── page ─────────────────────────── */
+/* ── página ───────────────────────────────────────── */
 export default function BrandingPage(){
   const qp = useSearchParams();
   const company = (qp.get("company")||"").toLowerCase();
 
-  // Primary HSL
+  // primary
   const [h, setH] = useState(220);
   const [s, setS] = useState(83);
   const [l, setL] = useState(56);
 
-  // Secondary HSL
+  // secondary
   const [h2, setH2] = useState(180);
   const [s2, setS2] = useState(70);
   const [l2, setL2] = useState(50);
 
-  // General
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Logo
   const [logoUrl, setLogoUrl] = useState<string>("");
   const [logoFile, setLogoFile] = useState<File|null>(null);
   const [logoPreview, setLogoPreview] = useState<string>("");
 
-  // Suggestions
   const [applyTarget, setApplyTarget] = useState<"primary"|"secondary">("primary");
   const [suggested, setSuggested] = useState<string[]>([]);
 
-  const palette = useMemo(()=>buildPalette(h,s),[h,s]);
-  const baseHex = useMemo(()=>hslToHex(h,s,l),[h,s,l]);
+  const palette  = useMemo(()=>buildPalette(h, s), [h, s]);
+  const baseHex  = useMemo(()=>hslToHex(h, s, l), [h, s, l]);
+  const palette2 = useMemo(()=>buildPalette(h2,s2), [h2,s2]);
+  const baseHex2 = useMemo(()=>hslToHex(h2,s2,l2), [h2,s2,l2]);
 
-  const palette2 = useMemo(()=>buildPalette(h2,s2),[h2,s2]);
-  const baseHex2 = useMemo(()=>hslToHex(h2,s2,l2),[h2,s2,l2]);
-
-  // Load current branding
+  // load
   useEffect(()=>{
     let alive=true;
     (async ()=>{
@@ -159,7 +149,6 @@ export default function BrandingPage(){
         const r = await fetch(`/api/admin/company?company=${company}`, { cache: "no-store" });
         const data = (await r.json()) as CompanyResponse;
         if(!alive) return;
-
         const b = data?.settings?.branding || {};
         setName(b.brandName || data?.name || "");
         setLogoUrl(b.logoUrl || "");
@@ -174,10 +163,8 @@ export default function BrandingPage(){
           setH(hh); setS(ss); setL(ll);
         }
 
-        // secondary (acepta string legacy o bloque)
-        const sec = (typeof b.secondary === "string")
-          ? { primary: b.secondary } as BrandingColorBlock
-          : (b.secondary || {});
+        // secondary
+        const sec = (typeof b.secondary === "string") ? { primary: b.secondary } as BrandingColorBlock : (b.secondary || {});
         if(typeof sec.hue==="number" && typeof sec.saturation==="number"){
           setH2(clamp(sec.hue,0,360)); setS2(clamp(sec.saturation,0,100));
           setL2(typeof sec.lightness==="number" ? clamp(sec.lightness,0,100) : 50);
@@ -187,11 +174,10 @@ export default function BrandingPage(){
           setH2(hh2); setS2(ss2); setL2(ll2);
         }
 
-        // apply live (prefer persisted palettes)
-        if (typeof window!=="undefined"){
-          applyPrimaryVars(b.palette ?? buildPalette(h,s));
-          const secPal = (sec.palette ?? buildPalette(h2,s2));
-          applySecondaryVars(secPal);
+        // apply persisted palettes (o derivadas)
+        if (typeof window!=="undefined") {
+          applyPrimaryVars(b.palette ?? buildPalette(h, s));
+          applySecondaryVars(sec.palette ?? buildPalette(h2, s2));
         }
       } catch(e){ console.error("branding load", e); }
       finally{ if(alive) setLoading(false); }
@@ -200,11 +186,10 @@ export default function BrandingPage(){
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[company]);
 
-  // Apply live on change
-  useEffect(()=>{ if(typeof window!=="undefined") applyPrimaryVars(palette); },[palette]);
-  useEffect(()=>{ if(typeof window!=="undefined") applySecondaryVars(palette2); },[palette2]);
+  useEffect(()=>{ if(typeof window!=="undefined") applyPrimaryVars(palette); }, [palette]);
+  useEffect(()=>{ if(typeof window!=="undefined") applySecondaryVars(palette2); }, [palette2]);
 
-  // Logo handlers
+  // logo
   function onPickLogo(e: React.ChangeEvent<HTMLInputElement>){
     const f = e.target.files?.[0] || null;
     setLogoFile(f||null); setSuggested([]);
@@ -216,7 +201,7 @@ export default function BrandingPage(){
     const img=new Image();
     img.onload=()=>{
       try{
-        const colors=getDominantColorsFromImage(img, 160, 3, 6);
+        const colors=getDominantColorsFromImage(img,160,3,6);
         setSuggested(colors);
         if(colors[0]){
           const {r,g,b}=hexToRgb(colors[0]);
@@ -236,7 +221,7 @@ export default function BrandingPage(){
       const r=await fetch(`/api/admin/company/logo?company=${company}`, { method:"POST", body: fd });
       if(!r.ok) throw new Error(`Upload ${r.status}`);
       const j=await r.json(); return j?.url || null;
-    }catch(e){ console.warn("Upload logo falló; conservo el anterior.", e); return null; }
+    }catch(e){ console.warn("Upload logo falló; conservo el actual.", e); return null; }
   }
 
   async function onSave(){
@@ -244,6 +229,7 @@ export default function BrandingPage(){
     setSaving(true);
     try{
       const uploadedUrl = await uploadLogoIfNeeded();
+
       const body = {
         settings: {
           branding: {
@@ -252,20 +238,30 @@ export default function BrandingPage(){
             // primary
             primary: baseHex, hue: h, saturation: s, lightness: l, palette,
             // secondary
-            secondary: {
-              primary: baseHex2, hue: h2, saturation: s2, lightness: l2, palette: palette2,
-            },
+            secondary: { primary: baseHex2, hue: h2, saturation: s2, lightness: l2, palette: palette2 },
           },
         },
       };
+
       const r=await fetch(`/api/admin/company?company=${company}`,{
         method:"PATCH", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body)
       });
       if(!r.ok) throw new Error(`Error ${r.status}: ${await r.text()}`);
       if(uploadedUrl) setLogoUrl(uploadedUrl);
+
+      /* 🔔 PING al ThemeLoader para refrescar paletas en toda la app */
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("branding:updated"));
+        try { localStorage.setItem("branding:updated", String(Date.now())); } catch {}
+      }
+
       alert("Branding guardado.");
-    }catch(e:any){ console.error(e); alert(`No se pudo guardar: ${e?.message ?? e}`); }
-    finally{ setSaving(false); }
+    }catch(e:any){
+      console.error(e);
+      alert(`No se pudo guardar: ${e?.message ?? e}`);
+    }finally{
+      setSaving(false);
+    }
   }
 
   if(loading){
@@ -305,12 +301,10 @@ export default function BrandingPage(){
             <div className="flex items-center gap-3 text-xs">
               <span className="text-slate-500">Aplicar sugerencias a:</span>
               <label className="inline-flex items-center gap-1">
-                <input type="radio" name="applyTarget" checked={applyTarget==="primary"} onChange={()=>setApplyTarget("primary")} />
-                Primario
+                <input type="radio" name="applyTarget" checked={applyTarget==="primary"} onChange={()=>setApplyTarget("primary")} /> Primario
               </label>
               <label className="inline-flex items-center gap-1">
-                <input type="radio" name="applyTarget" checked={applyTarget==="secondary"} onChange={()=>setApplyTarget("secondary")} />
-                Secundario
+                <input type="radio" name="applyTarget" checked={applyTarget==="secondary"} onChange={()=>setApplyTarget("secondary")} /> Secundario
               </label>
             </div>
           </div>
@@ -339,7 +333,7 @@ export default function BrandingPage(){
             </div>
 
             <div className="flex-1">
-              <p className="text-xs text-slate-500 mb-2">Colores sugeridos (clic para aplicar al objetivo elegido):</p>
+              <p className="text-xs text-slate-500 mb-2">Colores sugeridos (clic para aplicar):</p>
               <div className="flex flex-wrap gap-2">
                 {suggested.length===0 ? (
                   <span className="text-xs text-slate-400">Sin sugerencias todavía.</span>
@@ -363,7 +357,7 @@ export default function BrandingPage(){
         </div>
       </section>
 
-      {/* Primario: sliders + picker + paleta */}
+      {/* Primario */}
       <section className="space-y-4">
         <h2 className="text-sm font-semibold">Primario</h2>
         <div className="grid md:grid-cols-3 gap-6 max-w-4xl">
@@ -378,7 +372,7 @@ export default function BrandingPage(){
         <PalettePreview palette={palette} note="Aplica --brand-50…900; --brand es el 500." />
       </section>
 
-      {/* Secundario: sliders + picker + paleta */}
+      {/* Secundario */}
       <section className="space-y-4">
         <h2 className="text-sm font-semibold">Secundario</h2>
         <div className="grid md:grid-cols-3 gap-6 max-w-4xl">
@@ -396,7 +390,7 @@ export default function BrandingPage(){
   );
 }
 
-/** ─────────────────────────── UI bits ─────────────────────────── */
+/* ── UI bits ───────────────────────────────────────── */
 function Slider({ label, value, setValue, min, max, suffix }:{
   label:string; value:number; setValue:(n:number)=>void; min:number; max:number; suffix:string;
 }){
