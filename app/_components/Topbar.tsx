@@ -14,50 +14,59 @@ type UserInfo = {
 };
 
 function useAuthUser(): UserInfo | null {
-  const [info, setInfo] = useState<UserInfo | null>(null);
+  const [user, setUser] = useState<UserInfo | null>(null);
   useEffect(() => {
     let alive = true;
-    const supa = supabaseBrowser();
-    supa.auth.getUser()
-      .then(({ data }) => {
+    (async () => {
+      try {
+        const supa = supabaseBrowser();
+        const { data } = await supa.auth.getUser();
         if (!alive) return;
-        const u = data?.user ?? null;
-        if (!u) return setInfo(null);
-        const meta = (u.user_metadata || u.app_metadata || {}) as any;
-        setInfo({
-          email: u.email ?? null,
-          fullName:
-            meta.full_name ||
-            meta.fullName ||
-            [meta.first_name, meta.last_name].filter(Boolean).join(" ") ||
-            null,
-          avatar_url: meta.avatar_url || null,
+        setUser({
+          email: data.user?.email ?? null,
+          fullName: data.user?.user_metadata?.full_name ?? null,
+          avatar_url: data.user?.user_metadata?.avatar_url ?? null,
         });
-      })
-      .catch(() => setInfo(null));
-    return () => { alive = false; };
+      } catch {
+        if (alive) setUser(null);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
   }, []);
-  return info;
+  return user;
 }
 
 export default function Topbar() {
+  const user = useAuthUser();
+  const pathname = usePathname();
   const router = useRouter();
   const qp = useSearchParams();
-  const pathname = usePathname();
-  const user = useAuthUser();
+  const detailsRef = useRef<HTMLDetailsElement | null>(null);
 
+  // company label
   const slug = (qp.get("company") || "").toLowerCase();
-  const [companyLabel, setCompanyLabel] = useState<string>("BSOP");
-
-  // Trae razón social/nombre de la empresa (valida membresía)
+  const [companyLabel, setCompanyLabel] = useState<string>(slug ? slug.toUpperCase() : "—");
   useEffect(() => {
+    if (!slug) {
+      setCompanyLabel("—");
+      return;
+    }
     let alive = true;
-    if (!slug) { setCompanyLabel("BSOP"); return; }
-    fetch(`/api/company/lookup?slug=${encodeURIComponent(slug)}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(j => { if (!alive) return; setCompanyLabel(j?.displayName || j?.name || slug.toUpperCase()); })
-      .catch(() => { if (alive) setCompanyLabel(slug.toUpperCase()); });
-    return () => { alive = false; };
+    fetch(`/api/admin/company?company=${encodeURIComponent(slug)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!alive) return;
+        // Priorizar razón social (legalName), luego nombre comercial
+        setCompanyLabel(j?.legalName || j?.name || slug.toUpperCase());
+      })
+      .catch(() => {
+        if (alive) setCompanyLabel(slug.toUpperCase());
+      });
+    return () => {
+      alive = false;
+    };
   }, [slug]);
 
   // Flag de superadmin
@@ -68,16 +77,19 @@ export default function Topbar() {
       .then((r) => (r.ok ? r.json() : { is: false }))
       .then((j) => alive && setIsSuperadmin(!!j.is))
       .catch(() => {});
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, []);
 
-  const detailsRef = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
     detailsRef.current?.removeAttribute("open");
   }, [pathname, slug]);
 
   async function signOut() {
-    try { await supabaseBrowser().auth.signOut(); } catch {}
+    try {
+      await supabaseBrowser().auth.signOut();
+    } catch {}
     router.push("/signin");
   }
   function goToAdmin() {
@@ -95,37 +107,19 @@ export default function Topbar() {
         <div className="h-full w-full px-3 sm:px-4 flex items-center justify-between gap-3">
           {/* IZQUIERDA: razón social */}
           <div className="min-w-0">
-            <div className="text-xs text-slate-500 leading-none">{slug ? slug.toUpperCase() : "ANSA"}</div>
+            <div className="text-xs text-slate-500 leading-none">
+              {slug ? slug.toUpperCase() : ""}
+            </div>
             <div className="text-sm font-semibold truncate">{companyLabel}</div>
           </div>
 
           {/* DERECHA: usuario */}
-          <div className="flex items-center gap-2">
+          <div className="ml-auto">
             <details ref={detailsRef} className="relative">
-              <summary className="list-none cursor-pointer select-none">
-                <div className="h-9 rounded-full border px-2 pr-3 flex items-center gap-2 hover:bg-slate-50">
-                  <div className="h-6 w-6 rounded-full overflow-hidden border bg-white grid place-items-center">
-                    {user?.avatar_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={user.avatar_url} alt="avatar" className="h-full w-full object-cover" />
-                    ) : (
-                      <span className="text-[10px] text-slate-500">👤</span>
-                    )}
-                  </div>
-                  <span className="hidden sm:inline text-xs font-medium max-w-[180px] truncate">
-                    {user?.fullName || user?.email || "Cuenta"}
-                  </span>
-                </div>
+              <summary className="list-none select-none cursor-pointer rounded-md border px-2 py-1 text-sm bg-white hover:bg-slate-50">
+                {user?.fullName || user?.email || "Cuenta"}
               </summary>
-
-              <div className="absolute right-0 mt-2 w-64 rounded-2xl border bg-white shadow-md overflow-hidden">
-                <div className="px-3 py-2">
-                  <div className="text-xs text-slate-500">Sesión</div>
-                  <div className="text-sm font-medium truncate">{user?.fullName || "—"}</div>
-                  <div className="text-xs text-slate-500 truncate">{user?.email || "—"}</div>
-                </div>
-                <div className="h-px bg-slate-100" />
-
+              <div className="absolute right-0 mt-1 w-56 rounded-lg border bg-white shadow-md">
                 <nav className="p-1">
                   <Link
                     href="/settings/profile"
