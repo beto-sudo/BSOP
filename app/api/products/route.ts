@@ -1,92 +1,112 @@
 // app/api/products/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { dbOrThrow } from "@/lib/db";
+import { createClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
 
-export const runtime = "nodejs";
-export const revalidate = 0;
+const admin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY! // server-only
+);
 
-/**
- * GET /api/products?company=<slug>&q=<texto>&limit=50&offset=0
- * Lista productos de la empresa (por slug).
- */
-export async function GET(req: NextRequest) {
-  try {
-    const url = new URL(req.url);
-    const slug = (url.searchParams.get("company") || "").toLowerCase();
-
-    // Compat: si no viene company, regresa vacío (como hacía tu versión previa)
-    if (!slug) return NextResponse.json([]);
-
-    const db = dbOrThrow();
-
-    // Resuelve empresa
-    const { data: comp, error: e1 } = await db
-      .from("Company")
-      .select("id")
-      .eq("slug", slug)
-      .single();
-
-    if (e1 || !comp) {
-      return NextResponse.json({ error: "company not found" }, { status: 404 });
+async function resolveContext(req: NextRequest, slug: string) {
+  // sesión del usuario (RLS) usando cookies
+  const cookieStore = cookies();
+  const supaSSR = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: () => cookieStore.getAll(),
+        setAll: () => {},
+      },
     }
+  );
 
-    // Filtros simples
-    const q = (url.searchParams.get("q") || "").trim();
-    const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") || 50)));
-    const offset = Math.max(0, Number(url.searchParams.get("offset") || 0));
+  const { data: auth } = await supaSSR.auth.getUser();
+  const user = auth.user;
+  if (!user) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
 
-    let query = db
-      .from("Product")
-      .select("*")
-      .eq("company_id", comp.id);
+  // 1) companyId por slug
+  const { data: company, error: cErr } = await admin
+    .from("Company")
+    .select("id,slug")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (cErr || !company) return { error: NextResponse.json({ error: "Company not found" }, { status: 404 }) };
 
-    if (q) query = query.ilike("name", `%${q}%`);
+  // 2) resolver profile.id (puede no ser igual al auth.user.id)
+  let profileId: string | null = null;
 
-    const { data, error } = await query.range(offset, offset + limit - 1);
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-
-    return NextResponse.json(data ?? []);
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Server error" }, { status: 500 });
+  const { data: pById } = await admin.from("profile").select("id,email").eq("id", user.id).maybeSingle();
+  if (pById) profileId = pById.id;
+  else {
+    const { data: pByEmail } = await admin.from("profile").select("id,email").eq("email", user.email ?? "").maybeSingle();
+    if (pByEmail) profileId = pByEmail.id;
   }
+  if (!profileId) return { error: NextResponse.json({ error: "Profile not found" }, { status: 403 }) };
+
+  // 3) membership
+  const { data: member } = await admin
+    .from("company_member")
+    .select("id")
+    .eq("company_id", company.id)
+    .eq("user_id", profileId)
+    .maybeSingle();
+
+  if (!member) return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+
+  return { user, companyId: company.id as string };
 }
 
-/**
- * POST /api/products?company=<slug>
- * Crea un producto para la empresa dada. Body = JSON con campos del producto.
- */
-export async function POST(req: NextRequest) {
-  try {
-    const url = new URL(req.url);
-    const slug = (url.searchParams.get("company") || "").toLowerCase();
-    if (!slug) return NextResponse.json({ error: "company required" }, { status: 400 });
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const slug = (searchParams.get("company") || "").toLowerCase();
+  const q = (searchParams.get("q") || "").trim();
+  const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+  const size = Math.min(100, Math.max(1, parseInt(searchParams.get("size") || "20", 10)));
+  const ctx = await resolveContext(req, slug);
+  if ("error" in ctx) return ctx.error;
+  const { companyId } = ctx;
 
-    const body = await req.json().catch(() => ({}));
-    if (!body || typeof body !== "object") {
-      return NextResponse.json({ error: "invalid payload" }, { status: 400 });
-    }
+  let query = admin
+    .from("Product")
+    .select("*", { count: "exact" })
+    .eq("companyId", companyId)
+    .order("name", { ascending: true });
 
-    const db = dbOrThrow();
-
-    const { data: comp, error: e1 } = await db
-      .from("Company")
-      .select("id")
-      .eq("slug", slug)
-      .single();
-
-    if (e1 || !comp) return NextResponse.json({ error: "company not found" }, { status: 404 });
-
-    const row = { ...(body as any), company_id: comp.id };
-
-    const { data, error } = await db
-      .from("Product")
-      .insert(row)
-      .select("*")
-      .single();
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-    return NextResponse.json(data);
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Server error" }, { status: 500 });
+  if (q) {
+    query = query.or(`name.ilike.%${q}%,sku.ilike.%${q}%`);
   }
+
+  const from = (page - 1) * size;
+  const to = from + size - 1;
+
+  const { data, error, count } = await query.range(from, to);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ items: data ?? [], total: count ?? 0, page, size });
+}
+
+export async function POST(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const slug = (searchParams.get("company") || "").toLowerCase();
+  const ctx = await resolveContext(req, slug);
+  if ("error" in ctx) return ctx.error;
+  const { companyId } = ctx;
+
+  const body = await req.json().catch(() => ({}));
+  const name = (body?.name || "").trim();
+  const sku = (body?.sku || "").trim();
+
+  if (!name) return NextResponse.json({ error: "Missing name" }, { status: 400 });
+
+  const { data, error } = await admin
+    .from("Product")
+    .insert([{ companyId, name, sku, isActive: true }])
+    .select("*")
+    .single();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data);
 }
