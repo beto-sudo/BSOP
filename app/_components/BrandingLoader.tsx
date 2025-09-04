@@ -27,14 +27,25 @@ export default function BrandingLoader() {
         const r = await fetch(`/api/admin/company?company=${companySlug}`, { cache: "no-store" });
         const json = await r.json();
         const primary = json?.settings?.branding?.primary || "#334155";
+        const secondary = json?.settings?.branding?.secondary || "#94a3b8";
 
         const root = document.documentElement;
+
+        // Primario
+        root.style.setProperty("--brand-primary", primary);
         root.style.setProperty("--brand-50", shade(primary, 88));
         root.style.setProperty("--brand-100", shade(primary, 75));
         root.style.setProperty("--brand-200", shade(primary, 60));
         root.style.setProperty("--brand-800", shade(primary, -10));
         root.style.setProperty("--brand-900", shade(primary, -20));
-        root.style.setProperty("--brand-primary", primary);
+
+        // Secundario
+        root.style.setProperty("--brand-secondary", secondary);
+        root.style.setProperty("--brand-secondary-50", shade(secondary, 88));
+        root.style.setProperty("--brand-secondary-100", shade(secondary, 75));
+        root.style.setProperty("--brand-secondary-200", shade(secondary, 60));
+        root.style.setProperty("--brand-secondary-800", shade(secondary, -10));
+        root.style.setProperty("--brand-secondary-900", shade(secondary, -20));
       } catch {}
     })();
   }, [companySlug]);
