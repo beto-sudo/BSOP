@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronRight } from "lucide-react";
-import { buildSections, Section } from "@/app/_config/nav";
+import { buildSectionsOrdered, Section } from "@/app/_config/nav";
 
 type Company = { id: string; name: string; slug: string };
 type Branding = { brandName?: string; primary?: string; secondary?: string; logoUrl?: string };
@@ -25,15 +25,14 @@ export default function Sidebar() {
   const [openKey, setOpenKey] = useState<string | null>("operacion");
   const [isSuperadmin, setIsSuperadmin] = useState(false);
 
-  // ancho
+  // ancho redimensionable
   const asideRef = useRef<HTMLDivElement | null>(null);
   const resizerRef = useRef<HTMLDivElement | null>(null);
   const [width, setWidth] = useState<number>(260);
-
   useEffect(() => { const w=Number(localStorage.getItem("sidebar:w")); if (w>=220 && w<=420) setWidth(w); }, []);
   useEffect(() => { localStorage.setItem("sidebar:w", String(width)); if (asideRef.current) asideRef.current.style.width = `${width}px`; }, [width]);
 
-  // cargar empresas
+  // empresas
   useEffect(() => {
     (async () => {
       try {
@@ -44,7 +43,7 @@ export default function Sidebar() {
     })();
   }, []);
 
-  // sólo forzar ?company en rutas que lo requieren
+  // forzar ?company solo en rutas que lo requieren
   useEffect(() => {
     const requiresCompany = !(
       pathname === "/companies" ||
@@ -83,7 +82,7 @@ export default function Sidebar() {
     })();
   }, [companySlug]);
 
-  // superadmin
+  // superadmin flag
   useEffect(() => {
     let alive = true;
     fetch("/api/admin/is-superadmin")
@@ -93,12 +92,14 @@ export default function Sidebar() {
     return () => { alive = false; };
   }, []);
 
-  const sections = buildSections(isSuperadmin);
+  // Secciones en orden fijo
+  const sections: Section[] = useMemo(() => buildSectionsOrdered(isSuperadmin), [isSuperadmin]);
 
+  // Sección abierta según ruta
   const activeKeyFromPath = useMemo(() => {
     const p = pathname || "";
-    if (p.startsWith("/settings/admin") || p.startsWith("/settings/access")) return "superadmin";
-    if (p.startsWith("/settings") || p.startsWith("/admin")) return "config";
+    if (p.startsWith("/settings/admin") || p.startsWith("/settings/access") || p === "/companies") return "superadmin";
+    if (p.startsWith("/settings") || p.startsWith("/admin")) return "configuracion";
     return "operacion";
   }, [pathname]);
   useEffect(() => { if (activeKeyFromPath) setOpenKey(activeKeyFromPath); }, [activeKeyFromPath]);
@@ -117,6 +118,7 @@ export default function Sidebar() {
   const current = companies.find(c => c.slug.toLowerCase() === companySlug) || null;
 
   function renderSection(sec: Section) {
+    if (!sec.items.length) return null; // si no hay items (p. ej., ADMINISTRACIÓN aún vacía), no renderizar
     const isOpen = openKey === sec.key;
     return (
       <div key={sec.key} className="rounded-lg border overflow-hidden">
@@ -145,8 +147,10 @@ export default function Sidebar() {
 
   return (
     <aside ref={asideRef} className="relative border-r bg-white shrink-0" style={{ width }}>
+      {/* Resizer */}
       <div ref={resizerRef} className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-slate-200" title="Arrastra para ajustar ancho" />
 
+      {/* Header empresa */}
       <div className="p-4 border-b flex items-center gap-3">
         {branding?.logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -158,6 +162,7 @@ export default function Sidebar() {
         </div>
       </div>
 
+      {/* Selector de empresa */}
       <div className="p-3 border-b">
         <label className="block text-xs text-slate-500 mb-1">Empresa</label>
         <select className="w-full rounded-md border px-2 py-1 text-sm" value={companySlug}
@@ -174,6 +179,7 @@ export default function Sidebar() {
         </select>
       </div>
 
+      {/* Navegación en orden fijo */}
       <nav className="p-2 space-y-2">
         {sections.map(renderSection)}
       </nav>
