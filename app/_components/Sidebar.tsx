@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
-/* ---------------- util mínima ---------------- */
+/* utils */
 function cx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
 }
@@ -39,7 +39,7 @@ function readCompanyCookie(): string | null {
   return map.company || map.CURRENT_COMPANY_ID || null;
 }
 
-/* ---------------- navegación ---------------- */
+/* navegación */
 type MenuItem = {
   key: string;
   label: string;
@@ -47,17 +47,8 @@ type MenuItem = {
   needsCompany?: boolean;
   icon?: React.ReactNode;
 };
-
-type Section = {
-  key:
-    | "administracion"
-    | "operaciones"
-    | "configuracion"
-    | "superadmin";
-  label: string;
-  icon?: React.ReactNode;
-  items: MenuItem[];
-};
+type SectionKey = "administracion" | "operaciones" | "configuracion" | "superadmin";
+type Section = { key: SectionKey; label: string; icon?: React.ReactNode; items: MenuItem[] };
 
 const SECTIONS: Section[] = [
   {
@@ -161,10 +152,10 @@ function NavLink({
 
 export default function Sidebar() {
   const pathname = usePathname();
-  useSearchParams(); // si lo usas para flags, lo mantenemos montado
-  useRouter(); // igual: evita shaking si lo usas en handlers
+  useSearchParams();
+  useRouter();
 
-  const [open, setOpen] = useState<Record<string, boolean>>({
+  const [open, setOpen] = useState<Record<SectionKey, boolean>>({
     administracion: true,
     operaciones: true,
     configuracion: true,
@@ -173,7 +164,7 @@ export default function Sidebar() {
 
   const companyId = useMemo(() => readCompanyCookie(), []);
 
-  function toggle(k: string) {
+  function toggle(k: SectionKey) {
     setOpen((p) => ({ ...p, [k]: !p[k] }));
   }
 
@@ -216,7 +207,7 @@ export default function Sidebar() {
         {/* ADMINISTRACIÓN */}
         <div className="mb-2">
           <SectionHeader
-            open={!!open.administracion}
+            open={open.administracion}
             onToggle={() => toggle("administracion")}
             icon={<LayoutDashboard className="h-4 w-4" />}
           >
@@ -234,7 +225,7 @@ export default function Sidebar() {
         {/* OPERACIONES */}
         <div className="mb-2">
           <SectionHeader
-            open={!!open.operaciones}
+            open={open.operaciones}
             onToggle={() => toggle("operaciones")}
             icon={<Factory className="h-4 w-4" />}
           >
@@ -252,7 +243,7 @@ export default function Sidebar() {
         {/* CONFIGURACIÓN */}
         <div className="mb-2">
           <SectionHeader
-            open={!!open.configuracion}
+            open={open.configuracion}
             onToggle={() => toggle("configuracion")}
             icon={<Settings className="h-4 w-4" />}
           >
@@ -270,7 +261,7 @@ export default function Sidebar() {
         {/* SUPERADMIN */}
         <div className="mb-2">
           <SectionHeader
-            open={!!open.superadmin}
+            open={open.superadmin}
             onToggle={() => toggle("superadmin")}
             icon={<Building2 className="h-4 w-4" />}
           >
