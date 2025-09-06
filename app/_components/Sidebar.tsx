@@ -1,8 +1,8 @@
+// app/_components/Sidebar.tsx
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import {
   ChevronDown,
   ChevronRight,
@@ -16,462 +16,287 @@ import {
   FileChartColumn,
   Shield,
   Building2,
+  Users,
+  UserCog,
+  Landmark,
+  ReceiptText,
 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-/* -------------------------------- utils ----------------------------------- */
-function cx(...args: Array<string | false | null | undefined>) {
-  return args.filter(Boolean).join(" ");
+/* util mínima */
+function cx(...xs: Array<string | false | null | undefined>) {
+  return xs.filter(Boolean).join(" ");
 }
 
-/* ------------------------------ tipos ------------------------------------- */
+/* lee cookie en cliente (usamos "company" si existe; fallback a "CURRENT_COMPANY_ID") */
+function readCompanyCookie(): string | null {
+  if (typeof document === "undefined") return null;
+  const map = Object.fromEntries(
+    document.cookie.split(";").map((p) => {
+      const [k, ...r] = p.trim().split("=");
+      return [decodeURIComponent(k), decodeURIComponent(r.join("=") || "")];
+    })
+  );
+  return map.company || map.CURRENT_COMPANY_ID || null;
+}
+
+/* ==================== ÁRBOL EXACTO DEL DOCUMENTO ==================== */
+
 type MenuItem = {
   key: string;
   label: string;
-  href: string;
+  href: string;         // ruta base (sin company)
+  needsCompany?: boolean;
   icon?: React.ReactNode;
+  featureFlag?: string;            // enabledByFeature
+  enabledForCompanies?: string[];  // enabledForCompanies
 };
 
 type Section = {
-  key: string;
+  key: "administracion" | "operacion" | "configuracion" | "superadmin";
   label: string;
   icon?: React.ReactNode;
-  items?: MenuItem[];
-  href?: string; // si no tiene items, puede ser link directo
+  items: MenuItem[];
 };
 
-type CompanyLite = { id: string; name: string; slug?: string };
-
-/* -------------------------- constantes sidebar ---------------------------- */
-const LOCALSTORAGE_WIDTH_KEY = "sidebarWidth";
-const MIN_W = 220;
-const MAX_W = 420;
-const DEFAULT_W = 260;
-
-/* ---------------------------- árbol base (sin SA) ------------------------- */
 const NAV_BASE: Section[] = [
+  /* ------------------ ADMINISTRACIÓN ------------------ */
   {
     key: "administracion",
     label: "ADMINISTRACIÓN",
     icon: <Building2 className="h-4 w-4" />,
     items: [
-      {
-        key: "dashboard-admin",
-        label: "Dashboard",
-        href: "/admin/dashboard",
-        icon: <LayoutDashboard className="h-4 w-4" />,
-      },
+      { key: "admin-proveedores", label: "Proveedores", href: "/admin/vendors", needsCompany: true, icon: <ShoppingCart className="h-4 w-4" /> },
+      { key: "admin-clientes", label: "Clientes", href: "/admin/customers", needsCompany: true, icon: <Users className="h-4 w-4" /> },
+      { key: "admin-integraciones", label: "Integraciones", href: "/admin/integrations", needsCompany: true, icon: <Settings className="h-4 w-4" /> },
+      { key: "admin-finanzas", label: "Finanzas", href: "/admin/finances", needsCompany: true, icon: <Landmark className="h-4 w-4" /> },
     ],
   },
+
+  /* -------------------- OPERACIÓN --------------------- */
   {
     key: "operacion",
     label: "OPERACIÓN",
     icon: <BarChart3 className="h-4 w-4" />,
     items: [
-      {
-        key: "kpis",
-        label: "Inicio (KPIs)",
-        href: "/operacion/kpis",
-        icon: <BarChart3 className="h-4 w-4" />,
-      },
-      {
-        key: "dashboard-op",
-        label: "Dashboard",
-        href: "/operacion/dashboard",
-        icon: <LayoutDashboard className="h-4 w-4" />,
-      },
-      {
-        key: "compras",
-        label: "Compras",
-        href: "/operacion/compras",
-        icon: <ShoppingCart className="h-4 w-4" />,
-      },
-      {
-        key: "inventario",
-        label: "Inventario",
-        href: "/operacion/inventario",
-        icon: <Boxes className="h-4 w-4" />,
-      },
-      {
-        key: "ventas",
-        label: "Ventas",
-        href: "/operacion/ventas",
-        icon: <HandCoins className="h-4 w-4" />,
-      },
-      {
-        key: "caja",
-        label: "Caja",
-        href: "/operacion/caja",
-        icon: <Wallet className="h-4 w-4" />,
-      },
-      {
-        key: "reportes",
-        label: "Reportes",
-        href: "/operacion/reportes",
-        icon: <FileChartColumn className="h-4 w-4" />,
-      },
+      // Inicio (KPIs)
+      { key: "op-dashboard", label: "Dashboard", href: "/dashboard", needsCompany: true, icon: <LayoutDashboard className="h-4 w-4" /> },
+
+      // Compras
+      { key: "op-po", label: "Órdenes de compra", href: "/purchases/po", needsCompany: true, icon: <ShoppingCart className="h-4 w-4" /> },
+      { key: "op-recepciones", label: "Recepciones", href: "/purchases/receiving", needsCompany: true, icon: <ReceiptText className="h-4 w-4" /> },
+
+      // Inventario
+      { key: "op-inventario", label: "Inventario", href: "/inventory", needsCompany: true, icon: <Boxes className="h-4 w-4" /> },
+
+      // Ventas
+      { key: "op-ventas", label: "Ventas", href: "/sales", needsCompany: true, icon: <HandCoins className="h-4 w-4" /> },
+
+      // Caja
+      { key: "op-caja", label: "Caja", href: "/cash", needsCompany: true, icon: <Wallet className="h-4 w-4" /> },
+
+      // Reportes
+      { key: "op-reportes", label: "Reportes", href: "/reports", needsCompany: true, icon: <FileChartColumn className="h-4 w-4" /> },
     ],
   },
+
+  /* ------------------- CONFIGURACIÓN ------------------ */
   {
     key: "configuracion",
     label: "CONFIGURACIÓN",
     icon: <Settings className="h-4 w-4" />,
     items: [
-      {
-        key: "empresa-ajustes",
-        label: "Empresa",
-        href: "/configuracion/empresa",
-        icon: <Building2 className="h-4 w-4" />,
-      },
-      {
-        key: "ajustes",
-        label: "Ajustes",
-        href: "/configuracion/ajustes",
-        icon: <Settings className="h-4 w-4" />,
-      },
+      // Empresa (Branding)
+      { key: "cfg-branding", label: "Branding", href: "/admin/branding", needsCompany: true, icon: <Settings className="h-4 w-4" /> },
+
+      // Datos Fiscales
+      { key: "cfg-tax", label: "Datos Fiscales", href: "/settings/tax", needsCompany: true, icon: <ReceiptText className="h-4 w-4" /> },
+
+      // Datos Generales
+      { key: "cfg-general", label: "Datos Generales", href: "/settings/general", needsCompany: true, icon: <Settings className="h-4 w-4" /> },
+
+      // Usuarios
+      { key: "cfg-users", label: "Usuarios", href: "/settings/users", needsCompany: true, icon: <Users className="h-4 w-4" /> },
+
+      // Roles
+      { key: "cfg-roles", label: "Roles", href: "/settings/roles", needsCompany: true, icon: <UserCog className="h-4 w-4" /> },
     ],
   },
 ];
 
-/* ---------------------------- sección superadmin -------------------------- */
-const NAV_SUPERADMIN: Section = {
+/* SUPERADMIN se inyecta al final sólo si flag = 1 */
+const SUPERADMIN_SECTION: Section = {
   key: "superadmin",
   label: "SUPERADMIN",
   icon: <Shield className="h-4 w-4" />,
-  href: "/superadmin",
+  items: [
+    { key: "sa-companies", label: "Empresas", href: "/companies", needsCompany: false, icon: <Building2 className="h-4 w-4" /> },
+    { key: "sa-access", label: "Accesos", href: "/settings/access", needsCompany: false, icon: <Shield className="h-4 w-4" /> },
+  ],
 };
 
+/* ==================== COMPONENTE ==================== */
+
 export default function Sidebar() {
-  const pathname = usePathname() || "";
-  const asideRef = useRef<HTMLDivElement | null>(null);
-  const resizerRef = useRef<HTMLDivElement | null>(null);
+  const pathname = usePathname() || "/";
+  const search = useSearchParams();
+  const router = useRouter();
 
-  /* ancho / montaje */
-  const [width, setWidth] = useState<number>(DEFAULT_W);
-  const [mounted, setMounted] = useState(false);
+  const [openSectionKey, setOpenSectionKey] = useState<Section["key"] | null>("operacion"); // abre Operación por defecto
+  const [openItemKey, setOpenItemKey] = useState<string | null>(null);
 
-  /* apertura de secciones/menús */
-  const [openSectionKey, setOpenSectionKey] = useState<string | null>(null);
-  const [openMenuKey, setOpenMenuKey] = useState<string | null>(null);
+  const isSuperadmin = process.env.NEXT_PUBLIC_IS_SUPERADMIN === "1";
 
-  /* empresas + selección */
-  const [companies, setCompanies] = useState<CompanyLite[]>([]);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>(""); // "" => BSOP sin empresa
-  const [loadingCompanies, setLoadingCompanies] = useState<boolean>(false);
+  /* nav final respetando el orden del documento */
+  const NAV: Section[] = useMemo(
+    () => (isSuperadmin ? [...NAV_BASE, SUPERADMIN_SECTION] : NAV_BASE),
+    [isSuperadmin]
+  );
 
-  /* superadmin flag */
-  const [isSuperadmin, setIsSuperadmin] = useState<boolean>(false);
-
-  /* ancho: cargar/guardar */
+  /* === Guardas suaves de ?company (sin bucles) ===
+     - Solo en items con needsCompany
+     - Si falta ?company y existe cookie "company"/"CURRENT_COMPANY_ID", agregamos una única vez
+  */
+  const ensuredOnce = useRef(false);
   useEffect(() => {
-    setMounted(true);
-    try {
-      const saved = localStorage.getItem(LOCALSTORAGE_WIDTH_KEY);
-      if (saved) {
-        const w = Number(saved);
-        if (!Number.isNaN(w)) setWidth(Math.min(MAX_W, Math.max(MIN_W, w)));
-      }
-    } catch {}
-  }, []);
+    if (ensuredOnce.current) return;
 
+    const hasCompanyParam = !!search?.get("company");
+    if (hasCompanyParam) return;
+
+    const companyId = readCompanyCookie();
+    if (!companyId) return;
+
+    // ¿ruta actual requiere company?
+    const requiresCompany = NAV.some((sec) =>
+      sec.items.some((it) => it.needsCompany && pathname.startsWith(it.href))
+    );
+    if (!requiresCompany) return;
+
+    ensuredOnce.current = true;
+    const url = new URL(window.location.href);
+    url.searchParams.set("company", companyId);
+    router.replace(url.toString());
+  }, [pathname, search, router, NAV]);
+
+  /* detecta item activo y autoabre sección */
   useEffect(() => {
-    if (!mounted) return;
-    try {
-      localStorage.setItem(LOCALSTORAGE_WIDTH_KEY, String(width));
-    } catch {}
-  }, [width, mounted]);
-
-  /* cargar empresas + empresa actual */
-  useEffect(() => {
-    let cancelled = false;
-    async function run() {
-      setLoadingCompanies(true);
-      try {
-        const res = await fetch("/api/companies", { cache: "no-store" });
-        const json = await res.json().catch(() => ({ items: [] }));
-        if (!cancelled) setCompanies(Array.isArray(json.items) ? json.items : []);
-
-        const r2 = await fetch("/api/current-company", { cache: "no-store" });
-        if (r2.ok) {
-          const j2 = await r2.json().catch(() => ({}));
-          if (!cancelled && j2?.companyId) setSelectedCompanyId(j2.companyId as string);
+    for (const sec of NAV) {
+      for (const it of sec.items) {
+        if (pathname.startsWith(it.href)) {
+          setOpenSectionKey(sec.key);
+          setOpenItemKey(it.key);
+          return;
         }
-      } finally {
-        if (!cancelled) setLoadingCompanies(false);
       }
     }
-    run();
-    return () => { cancelled = true; };
-  }, []);
+  }, [pathname, NAV]);
 
-  /* cargar flag superadmin (si falla, no muestra la sección y no truena) */
-  useEffect(() => {
-    let cancelled = false;
-    async function checkSA() {
-      try {
-        const res = await fetch("/api/is-superadmin", { cache: "no-store" });
-        if (!res.ok) return;
-        const json = await res.json();
-        if (!cancelled) setIsSuperadmin(!!json?.isSuperadmin);
-      } catch {}
+  /* compone href (inyecta ?company si el item lo necesita y hay cookie) */
+  function makeHref(it: MenuItem): string {
+    let url = it.href;
+    if (it.needsCompany) {
+      const cid = search?.get("company") || readCompanyCookie();
+      if (cid) {
+        const u = new URL(url, typeof window !== "undefined" ? window.location.origin : "http://localhost");
+        u.searchParams.set("company", cid);
+        url = u.pathname + "?" + u.searchParams.toString();
+      }
     }
-    checkSA();
-    return () => { cancelled = true; };
-  }, []);
-
-  async function handleSelectCompany(e: React.ChangeEvent<HTMLSelectElement>) {
-    const val = e.target.value; // "" => BSOP sin empresa
-    setSelectedCompanyId(val);
-    await fetch("/api/switch-company", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ companyId: val || null }),
-    }).catch(() => {});
-    window.location.reload();
+    return url;
   }
 
-  /* auto-abrir sección/menú según ruta */
-  useEffect(() => {
-    let foundSection: string | null = null;
-    let foundItem: string | null = null;
-
-    const sectionsToSearch = [...NAV_BASE, ...(isSuperadmin ? [NAV_SUPERADMIN] : [])];
-
-    for (const sec of sectionsToSearch) {
-      if (sec.items?.length) {
-        for (const it of sec.items) {
-          if (pathname.startsWith(it.href)) {
-            foundSection = sec.key;
-            foundItem = it.key;
-            break;
-          }
-        }
-      } else if (sec.href && pathname.startsWith(sec.href)) {
-        foundSection = sec.key;
-      }
-      if (foundSection) break;
-    }
-
-    if (foundSection) setOpenSectionKey(foundSection);
-    if (foundItem) setOpenMenuKey(foundItem);
-  }, [pathname, isSuperadmin]);
-
-  /* resizer con Pointer Events */
-  useEffect(() => {
-    const aside = asideRef.current;
-    const handle = resizerRef.current;
-    if (!aside || !handle) return;
-
-    let startX = 0;
-    let startW = width;
-    let dragging = false;
-
-    const onMove = (e: PointerEvent) => {
-      if (!dragging) return;
-      const clientX = e.clientX ?? 0;
-      const delta = clientX - startX;
-      const next = Math.min(MAX_W, Math.max(MIN_W, startW + delta));
-      setWidth(next);
-    };
-
-    const onUp = () => {
-      if (!dragging) return;
-      dragging = false;
-      document.body.style.userSelect = "";
-      document.body.style.cursor = "";
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      try { handle.releasePointerCapture((handle as any)._pointerId); } catch {}
-    };
-
-    const onDown = (e: PointerEvent) => {
-      dragging = true;
-      (handle as any)._pointerId = e.pointerId;
-      try { handle.setPointerCapture(e.pointerId); } catch {}
-      startX = e.clientX ?? 0;
-      startW = aside.getBoundingClientRect().width;
-      document.body.style.userSelect = "none";
-      document.body.style.cursor = "col-resize";
-      window.addEventListener("pointermove", onMove);
-      window.addEventListener("pointerup", onUp);
-    };
-
-    handle.addEventListener("pointerdown", onDown, { passive: true });
-
-    return () => {
-      handle.removeEventListener("pointerdown", onDown);
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-    };
-  }, [width]);
-
-  /* helpers de render */
-  const compact = width < 240;
-
-  const SectionHeader: React.FC<{
+  /* estilos de grupo/ítem con CSS vars del branding */
+  function SectionHeader({
+    section,
+    open,
+    onToggle,
+  }: {
     section: Section;
     open: boolean;
     onToggle: () => void;
-    isLink?: boolean;
-  }> = ({ section, open, onToggle, isLink }) => {
-    const content = (
-      <>
-        <span className="flex items-center gap-2">
-          {section.icon}
-          {!compact && (
-            <span className="text-xs font-semibold tracking-wide">
-              {section.label}
-            </span>
-          )}
-        </span>
-        {section.items?.length ? (
-          open ? (
-            <ChevronDown className="h-4 w-4 opacity-70" />
-          ) : (
-            <ChevronRight className="h-4 w-4 opacity-70" />
-          )
-        ) : null}
-      </>
-    );
-
-    if (isLink && section.href) {
-      return (
-        <Link
-          href={section.href}
-          className={cx(
-            "group flex w-full items-center justify-between rounded-lg px-3 py-2",
-            "hover:bg-lime-100/70 text-slate-700"
-          )}
-        >
-          {content}
-        </Link>
-      );
-    }
-
+  }) {
     return (
       <button
         type="button"
         onClick={onToggle}
         className={cx(
-          "group flex w-full items-center justify-between rounded-lg px-3 py-2",
-          "hover:bg-lime-100/70 text-slate-700"
+          "group flex w-full items-center justify-between rounded-md px-3 py-2 text-left",
+          "border-l-4",
+          open ? "border-[var(--brand-primary)]" : "border-transparent",
+          "bg-[var(--brand-50)] text-[color:var(--brand-900)]"
         )}
       >
-        {content}
+        <span className="flex items-center gap-2">
+          {section.icon}
+          <span className="text-xs font-semibold tracking-wide">{section.label}</span>
+        </span>
+        {open ? (
+          <ChevronDown className="h-4 w-4 opacity-70" />
+        ) : (
+          <ChevronRight className="h-4 w-4 opacity-70" />
+        )}
       </button>
     );
-  };
+  }
 
-  const renderMenuItem = (it: MenuItem) => {
+  function MenuLink({ it }: { it: MenuItem }) {
     const active = pathname.startsWith(it.href);
-    const content = (
-      <div
+    return (
+      <Link
+        href={makeHref(it)}
+        onClick={() => setOpenItemKey(it.key)}
         className={cx(
           "flex items-center gap-2 rounded-md px-3 py-2 text-sm",
           active
-            ? "bg-lime-200/70 text-lime-900 font-medium"
-            : "text-slate-700 hover:bg-lime-100/70"
+            ? "bg-[var(--brand-50)] text-[color:var(--brand-800)] border-l-4 border-[var(--brand-primary)]"
+            : "text-slate-700 hover:bg-[var(--brand-100)] hover:text-[color:var(--brand-900)]"
         )}
-        title={compact ? it.label : undefined}
       >
         {it.icon}
-        {!compact && <span>{it.label}</span>}
-      </div>
+        <span>{it.label}</span>
+      </Link>
     );
-
-    return (
-      <li key={it.key}>
-        <Link href={it.href} onClick={() => setOpenMenuKey(it.key)}>
-          {content}
-        </Link>
-      </li>
-    );
-  };
-
-  /* nav final (inyecta SA al final si aplica) */
-  const NAV: Section[] = useMemo(
-    () => (isSuperadmin ? [...NAV_BASE, NAV_SUPERADMIN] : NAV_BASE),
-    [isSuperadmin]
-  );
+  }
 
   return (
-    <aside
-      ref={asideRef}
-      className="relative z-20 shrink-0 border-r bg-white overflow-visible"
-      style={{ width }}
-    >
-      {/* Resizer (2px, 1px fuera a la derecha) */}
-      <div
-        ref={resizerRef}
-        className="absolute -right-1 top-0 h-full w-2 cursor-col-resize z-50"
-        aria-hidden
-      >
-        <div className="h-full w-full hover:bg-slate-200/70" />
-      </div>
-
-      {/* Branding/Selector */}
+    <aside className="shrink-0 border-r bg-white" style={{ width: 260 }}>
+      {/* Header / Branding simple */}
       <div className="px-3 pt-3 pb-2">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="h-10 w-10 rounded-lg bg-lime-600/10 grid place-items-center">
-            <span className="text-lime-700 font-bold">D</span>
+        <div className="flex items-center gap-2">
+          <div className="h-10 w-10 rounded-lg bg-[color:var(--brand-50)] grid place-items-center border">
+            <span className="text-[color:var(--brand-900)] font-bold">BS</span>
           </div>
           <div className="min-w-0">
-            <div className="text-xs text-slate-500 leading-tight">Empresa</div>
+            <div className="text-xs text-slate-500 leading-tight">BSOP</div>
             <div className="text-sm font-medium text-slate-800 leading-tight truncate">
-              {selectedCompanyId
-                ? companies.find((c) => c.id === selectedCompanyId)?.name ?? "Cargando…"
-                : "Sin empresa (BSOP)"}
+              Selecciona un módulo
             </div>
           </div>
         </div>
-
-        <div>
-          <label htmlFor="company-select" className="sr-only">
-            Seleccionar empresa
-          </label>
-          <select
-            id="company-select"
-            value={selectedCompanyId}
-            onChange={handleSelectCompany}
-            disabled={loadingCompanies}
-            className={cx(
-              "w-full rounded-md border px-2 py-1.5 text-sm bg-white",
-              "focus:outline-none focus:ring-2 focus:ring-lime-400"
-            )}
-          >
-            <option value="">Sin empresa (BSOP)</option>
-            {companies.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
       </div>
 
-      {/* Separador */}
       <div className="mx-3 mb-2 border-b" />
 
-      {/* Secciones */}
       <nav className="px-2 pb-4">
         {NAV.map((sec) => {
-          const hasItems = !!sec.items?.length;
           const open = openSectionKey === sec.key;
-
           return (
             <div key={sec.key} className="mb-2">
               <SectionHeader
                 section={sec}
-                open={open}
-                isLink={!hasItems}
-                onToggle={() => {
-                  if (!hasItems) return; // link directo
-                  setOpenSectionKey((prev) => (prev === sec.key ? null : sec.key));
-                  setOpenMenuKey(null);
-                }}
+                open={!!open}
+                onToggle={() =>
+                  setOpenSectionKey((prev) => (prev === sec.key ? null : sec.key))
+                }
               />
-              {hasItems && open && (
-                <ul className={cx("mt-1 space-y-1", width < 260 ? "px-1" : "px-3")}>
-                  {sec.items!.map(renderMenuItem)}
+              {open && (
+                <ul className="mt-1 space-y-1 px-3">
+                  {sec.items.map((it) => (
+                    <li key={it.key}>
+                      <MenuLink it={it} />
+                    </li>
+                  ))}
                 </ul>
               )}
             </div>
