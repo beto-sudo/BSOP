@@ -196,81 +196,79 @@ export default function Sidebar() {
   }
 
   return (
-    {/* ⇩⇩⇩ ÚNICO CAMBIO AQUÍ: sin width fijo; altura total + scroll ⇩⇩⇩ */}
-    <aside className="shrink-0 border-r bg-white h-dvh overflow-y-auto">
-      {/* Header simple */}
-      <div className="px-3 pt-3 pb-2">
-        <div className="flex items-center gap-2">
-          <div className="h-10 w-10 rounded-lg bg-[color:var(--brand-50)] grid place-items-center border">
-            <span className="text-[color:var(--brand-900)] font-bold">BS</span>
-          </div>
-          <div className="min-w-0">
-            <div className="text-xs text-slate-500 leading-tight">BSOP</div>
-            <div className="text-sm font-medium text-slate-800 leading-tight truncate">
-              Selecciona un módulo
-            </div>
+  <aside className="shrink-0 border-r bg-white h-dvh overflow-y-auto">
+    {/* Header simple */}
+    <div className="px-3 pt-3 pb-2">
+      <div className="flex items-center gap-2">
+        <div className="h-10 w-10 rounded-lg bg-[color:var(--brand-50)] grid place-items-center border">
+          <span className="text-[color:var(--brand-900)] font-bold">BS</span>
+        </div>
+        <div className="min-w-0">
+          <div className="text-xs text-slate-500 leading-tight">BSOP</div>
+          <div className="text-sm font-medium text-slate-800 leading-tight truncate">
+            Selecciona un módulo
           </div>
         </div>
       </div>
+    </div>
 
-      {/* Navegación */}
-      <nav className="px-2 pb-4">
-        {/* ADMINISTRACIÓN */}
-        <div className="mb-2">
-          <SectionHeader open={!!open.administracion} onToggle={() => toggle("administracion")} icon={<LayoutDashboard className="h-4 w-4" />}>
-            ADMINISTRACIÓN
-          </SectionHeader>
-          {open.administracion && (
-            <div className="pl-6 space-y-0.5">
-              {SECTIONS.find(s => s.key === "administracion")!.items.map((it) => (
-                <div key={it.key}>{Item(it)}</div>
-              ))}
-            </div>
-          )}
-        </div>
+    {/* Navegación */}
+    <nav className="px-2 pb-4">
+      {/* ADMINISTRACIÓN */}
+      <div className="mb-2">
+        <SectionHeader open={!!open.administracion} onToggle={() => toggle("administracion")} icon={<LayoutDashboard className="h-4 w-4" />}>
+          ADMINISTRACIÓN
+        </SectionHeader>
+        {open.administracion && (
+          <div className="pl-6 space-y-0.5">
+            {SECTIONS.find(s => s.key === "administracion")!.items.map((it) => (
+              <div key={it.key}>{Item(it)}</div>
+            ))}
+          </div>
+        )}
+      </div>
 
-        {/* OPERACIONES */}
-        <div className="mb-2">
-          <SectionHeader open={!!open.operaciones} onToggle={() => toggle("operaciones")} icon={<Factory className="h-4 w-4" />}>
-            OPERACIONES
-          </SectionHeader>
-          {open.operaciones && (
-            <div className="pl-6 space-y-0.5">
-              {SECTIONS.find(s => s.key === "operaciones")!.items.map((it) => (
-                <div key={it.key}>{Item(it)}</div>
-              ))}
-            </div>
-          )}
-        </div>
+      {/* OPERACIONES */}
+      <div className="mb-2">
+        <SectionHeader open={!!open.operaciones} onToggle={() => toggle("operaciones")} icon={<Factory className="h-4 w-4" />}>
+          OPERACIONES
+        </SectionHeader>
+        {open.operaciones && (
+          <div className="pl-6 space-y-0.5">
+            {SECTIONS.find(s => s.key === "operaciones")!.items.map((it) => (
+              <div key={it.key}>{Item(it)}</div>
+            ))}
+          </div>
+        )}
+      </div>
 
-        {/* CONFIGURACIÓN */}
-        <div className="mb-2">
-          <SectionHeader open={!!open.configuracion} onToggle={() => toggle("configuracion")} icon={<Settings className="h-4 w-4" />}>
-            CONFIGURACIÓN
-          </SectionHeader>
-          {open.configuracion && (
-            <div className="pl-6 space-y-0.5">
-              {SECTIONS.find(s => s.key === "configuracion")!.items.map((it) => (
-                <div key={it.key}>{Item(it)}</div>
-              ))}
-            </div>
-          )}
-        </div>
+      {/* CONFIGURACIÓN */}
+      <div className="mb-2">
+        <SectionHeader open={!!open.configuracion} onToggle={() => toggle("configuracion")} icon={<Settings className="h-4 w-4" />}>
+          CONFIGURACIÓN
+        </SectionHeader>
+        {open.configuracion && (
+          <div className="pl-6 space-y-0.5">
+            {SECTIONS.find(s => s.key === "configuracion")!.items.map((it) => (
+              <div key={it.key}>{Item(it)}</div>
+            ))}
+          </div>
+        )}
+      </div>
 
-        {/* SUPERADMIN */}
-        <div className="mb-2">
-          <SectionHeader open={!!open.superadmin} onToggle={() => toggle("superadmin")} icon={<Building2 className="h-4 w-4" />}>
-            SUPERADMIN
-          </SectionHeader>
+      {/* SUPERADMIN */}
+      <div className="mb-2">
+        <SectionHeader open={!!open.superadmin} onToggle={() => toggle("superadmin")} icon={<Building2 className="h-4 w-4" />}>
+          SUPERADMIN
+        </SectionHeader>
         {open.superadmin && (
-            <div className="pl-6 space-y-0.5">
-              {SECTIONS.find(s => s.key === "superadmin")!.items.map((it) => (
-                <div key={it.key}>{Item(it)}</div>
-              ))}
-            </div>
-          )}
-        </div>
-      </nav>
-    </aside>
-  );
-}
+          <div className="pl-6 space-y-0.5">
+            {SECTIONS.find(s => s.key === "superadmin")!.items.map((it) => (
+              <div key={it.key}>{Item(it)}</div>
+            ))}
+          </div>
+        )}
+      </div>
+    </nav>
+  </aside>
+);
