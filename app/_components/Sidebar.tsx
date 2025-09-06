@@ -36,7 +36,7 @@ type Section = {
   label: string;
   icon?: React.ReactNode;
   items?: MenuItem[];
-  href?: string; // si no tiene items, puede ser link directo
+  href?: string; // si no tiene items, puede ser un link directo
 };
 
 /* -------------------------- árbol de navegación UI -------------------------- */
@@ -191,7 +191,7 @@ export default function Sidebar() {
         const json = await res.json().catch(() => ({ items: [] }));
         if (!cancelled) setCompanies(Array.isArray(json.items) ? json.items : []);
 
-        // 2) empresa actual (si tienes este endpoint; si no existe, sigue en BSOP)
+        // 2) empresa actual (si el endpoint existe)
         try {
           const r2 = await fetch("/api/current-company", { cache: "no-store" });
           if (r2.ok) {
@@ -199,7 +199,7 @@ export default function Sidebar() {
             if (!cancelled && j2?.companyId) setSelectedCompanyId(j2.companyId as string);
           }
         } catch {
-          /* noop: endpoint opcional */
+          /* noop */
         }
       } finally {
         if (!cancelled) setLoadingCompanies(false);
@@ -219,8 +219,7 @@ export default function Sidebar() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ companyId: val || null }),
     }).catch(() => {});
-    // refrescar para aplicar branding / data
-    window.location.reload();
+    window.location.reload(); // refresca branding y data
   }
 
   /* ------------------------- autoapertura según ruta ------------------------ */
@@ -258,46 +257,50 @@ export default function Sidebar() {
     let startW = width;
     let dragging = false;
 
-    const onMouseMove = (e: MouseEvent) => {
+    const onMove = (e: PointerEvent) => {
       if (!dragging) return;
-      const delta = e.clientX - startX;
+      const clientX = e.clientX ?? 0;
+      const delta = clientX - startX;
       const next = Math.min(MAX_W, Math.max(MIN_W, startW + delta));
       setWidth(next);
     };
 
-    const onMouseUp = () => {
+    const onUp = () => {
       if (!dragging) return;
       dragging = false;
       document.body.style.userSelect = "";
       document.body.style.cursor = "";
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      try {
+        handle.releasePointerCapture((handle as any)._pointerId);
+      } catch {}
     };
 
-    const onMouseDown = (e: MouseEvent) => {
+    const onDown = (e: PointerEvent) => {
       dragging = true;
-      startX = e.clientX;
+      (handle as any)._pointerId = e.pointerId;
+      try {
+        handle.setPointerCapture(e.pointerId);
+      } catch {}
+      startX = e.clientX ?? 0;
       startW = aside.getBoundingClientRect().width;
       document.body.style.userSelect = "none";
       document.body.style.cursor = "col-resize";
-      window.addEventListener("mousemove", onMouseMove);
-      window.addEventListener("mouseup", onMouseUp);
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
     };
 
-    const onDbl = () => setWidth(DEFAULT_W);
-
-    handle.addEventListener("mousedown", onMouseDown);
-    handle.addEventListener("dblclick", onDbl);
+    handle.addEventListener("pointerdown", onDown, { passive: true });
 
     return () => {
-      handle.removeEventListener("mousedown", onMouseDown);
-      handle.removeEventListener("dblclick", onDbl);
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
+      handle.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
     };
   }, [width]);
 
-  /* ------------------------------ render helpers ---------------------------- */
+  /* --------------------------------- render -------------------------------- */
   const compact = width < 240;
   const sections = useMemo(() => NAV, []);
 
@@ -381,70 +384,61 @@ export default function Sidebar() {
     );
   };
 
-  /* --------------------------------- render -------------------------------- */
   return (
     <aside
       ref={asideRef}
-      className="relative shrink-0 border-r bg-white"
+      className="relative z-20 shrink-0 border-r bg-white overflow-visible"
       style={{ width }}
     >
-      {/* Resizer a la derecha */}
+      {/* Resizer (2px, sobresale 1px hacia la derecha y con z alto) */}
       <div
         ref={resizerRef}
-        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-slate-200"
+        className="absolute -right-1 top-0 h-full w-2 cursor-col-resize z-50"
         aria-hidden
-      />
+      >
+        <div className="h-full w-full hover:bg-slate-200/70" />
+      </div>
 
-      {/* Branding/Logo + Selector de Empresa */}
+      {/* Branding/Logo + Selector de Empresa (SIEMPRE visible) */}
       <div className="px-3 pt-3 pb-2">
         <div className="flex items-center gap-2 mb-2">
           <div className="h-10 w-10 rounded-lg bg-lime-600/10 grid place-items-center">
             <span className="text-lime-700 font-bold">D</span>
           </div>
-          {!compact && (
-            <div className="min-w-0">
-              <div className="text-xs text-slate-500 leading-tight">Empresa</div>
-              <div className="text-sm font-medium text-slate-800 leading-tight truncate">
-                {selectedCompanyId
-                  ? companies.find((c) => c.id === selectedCompanyId)?.name ??
-                    "Cargando…"
-                  : "Sin empresa (BSOP)"}
-              </div>
+          <div className="min-w-0">
+            <div className="text-xs text-slate-500 leading-tight">Empresa</div>
+            <div className="text-sm font-medium text-slate-800 leading-tight truncate">
+              {selectedCompanyId
+                ? companies.find((c) => c.id === selectedCompanyId)?.name ??
+                  "Cargando…"
+                : "Sin empresa (BSOP)"}
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Selector */}
-        {!compact && (
-          <div>
-            <label
-              htmlFor="company-select"
-              className="sr-only"
-            >
-              Seleccionar empresa
-            </label>
-            <select
-              id="company-select"
-              value={selectedCompanyId}
-              onChange={handleSelectCompany}
-              disabled={loadingCompanies}
-              className={cx(
-                "w-full rounded-md border px-2 py-1.5 text-sm",
-                "focus:outline-none focus:ring-2 focus:ring-lime-400",
-                "bg-white"
-              )}
-            >
-              <option value="">
-                Sin empresa (BSOP)
+        {/* Selector: ya no depende de compact */}
+        <div>
+          <label htmlFor="company-select" className="sr-only">
+            Seleccionar empresa
+          </label>
+          <select
+            id="company-select"
+            value={selectedCompanyId}
+            onChange={handleSelectCompany}
+            disabled={loadingCompanies}
+            className={cx(
+              "w-full rounded-md border px-2 py-1.5 text-sm bg-white",
+              "focus:outline-none focus:ring-2 focus:ring-lime-400"
+            )}
+          >
+            <option value="">Sin empresa (BSOP)</option>
+            {companies.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
               </option>
-              {companies.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Separador */}
@@ -469,7 +463,7 @@ export default function Sidebar() {
                 }}
               />
               {hasItems && open && (
-                <ul className={cx("mt-1 space-y-1", compact ? "px-1" : "px-3")}>
+                <ul className={cx("mt-1 space-y-1", width < 260 ? "px-1" : "px-3")}>
                   {sec.items!.map(renderMenuItem)}
                 </ul>
               )}
