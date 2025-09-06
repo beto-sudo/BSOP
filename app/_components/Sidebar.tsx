@@ -18,12 +18,12 @@ import {
   Building2,
 } from "lucide-react";
 
-/* --------------------------- util clsx minimalista --------------------------- */
+/* -------------------------------- utils ----------------------------------- */
 function cx(...args: Array<string | false | null | undefined>) {
   return args.filter(Boolean).join(" ");
 }
 
-/* --------------------------- tipos de navegación ---------------------------- */
+/* ------------------------------ tipos ------------------------------------- */
 type MenuItem = {
   key: string;
   label: string;
@@ -36,11 +36,19 @@ type Section = {
   label: string;
   icon?: React.ReactNode;
   items?: MenuItem[];
-  href?: string; // si no tiene items, puede ser un link directo
+  href?: string; // si no tiene items, puede ser link directo
 };
 
-/* -------------------------- árbol de navegación UI -------------------------- */
-const NAV: Section[] = [
+type CompanyLite = { id: string; name: string; slug?: string };
+
+/* -------------------------- constantes sidebar ---------------------------- */
+const LOCALSTORAGE_WIDTH_KEY = "sidebarWidth";
+const MIN_W = 220;
+const MAX_W = 420;
+const DEFAULT_W = 260;
+
+/* ---------------------------- árbol base (sin SA) ------------------------- */
+const NAV_BASE: Section[] = [
   {
     key: "administracion",
     label: "ADMINISTRACIÓN",
@@ -122,25 +130,18 @@ const NAV: Section[] = [
       },
     ],
   },
-  {
-    key: "superadmin",
-    label: "SUPERADMIN",
-    icon: <Shield className="h-4 w-4" />,
-    href: "/superadmin",
-  },
 ];
 
-/* -------------------------- constantes de sidebar --------------------------- */
-const LOCALSTORAGE_WIDTH_KEY = "sidebarWidth";
-const MIN_W = 220;
-const MAX_W = 420;
-const DEFAULT_W = 260;
-
-/* --------------------------- tipos de selector UX --------------------------- */
-type CompanyLite = { id: string; name: string; slug?: string };
+/* ---------------------------- sección superadmin -------------------------- */
+const NAV_SUPERADMIN: Section = {
+  key: "superadmin",
+  label: "SUPERADMIN",
+  icon: <Shield className="h-4 w-4" />,
+  href: "/superadmin",
+};
 
 export default function Sidebar() {
-  const pathname = usePathname();
+  const pathname = usePathname() || "";
   const asideRef = useRef<HTMLDivElement | null>(null);
   const resizerRef = useRef<HTMLDivElement | null>(null);
 
@@ -157,7 +158,10 @@ export default function Sidebar() {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>(""); // "" => BSOP sin empresa
   const [loadingCompanies, setLoadingCompanies] = useState<boolean>(false);
 
-  /* --------------------------- ciclo de vida ancho --------------------------- */
+  /* superadmin flag */
+  const [isSuperadmin, setIsSuperadmin] = useState<boolean>(false);
+
+  /* ancho: cargar/guardar */
   useEffect(() => {
     setMounted(true);
     try {
@@ -166,49 +170,52 @@ export default function Sidebar() {
         const w = Number(saved);
         if (!Number.isNaN(w)) setWidth(Math.min(MAX_W, Math.max(MIN_W, w)));
       }
-    } catch {
-      /* noop */
-    }
+    } catch {}
   }, []);
 
   useEffect(() => {
     if (!mounted) return;
     try {
       localStorage.setItem(LOCALSTORAGE_WIDTH_KEY, String(width));
-    } catch {
-      /* noop */
-    }
+    } catch {}
   }, [width, mounted]);
 
-  /* ------------------------------ empresas API ------------------------------ */
+  /* cargar empresas + empresa actual */
   useEffect(() => {
     let cancelled = false;
     async function run() {
       setLoadingCompanies(true);
       try {
-        // 1) lista de empresas
         const res = await fetch("/api/companies", { cache: "no-store" });
         const json = await res.json().catch(() => ({ items: [] }));
         if (!cancelled) setCompanies(Array.isArray(json.items) ? json.items : []);
 
-        // 2) empresa actual (si el endpoint existe)
-        try {
-          const r2 = await fetch("/api/current-company", { cache: "no-store" });
-          if (r2.ok) {
-            const j2 = await r2.json().catch(() => ({}));
-            if (!cancelled && j2?.companyId) setSelectedCompanyId(j2.companyId as string);
-          }
-        } catch {
-          /* noop */
+        const r2 = await fetch("/api/current-company", { cache: "no-store" });
+        if (r2.ok) {
+          const j2 = await r2.json().catch(() => ({}));
+          if (!cancelled && j2?.companyId) setSelectedCompanyId(j2.companyId as string);
         }
       } finally {
         if (!cancelled) setLoadingCompanies(false);
       }
     }
     run();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
+  }, []);
+
+  /* cargar flag superadmin (si falla, no muestra la sección y no truena) */
+  useEffect(() => {
+    let cancelled = false;
+    async function checkSA() {
+      try {
+        const res = await fetch("/api/is-superadmin", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!cancelled) setIsSuperadmin(!!json?.isSuperadmin);
+      } catch {}
+    }
+    checkSA();
+    return () => { cancelled = true; };
   }, []);
 
   async function handleSelectCompany(e: React.ChangeEvent<HTMLSelectElement>) {
@@ -219,16 +226,17 @@ export default function Sidebar() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ companyId: val || null }),
     }).catch(() => {});
-    window.location.reload(); // refresca branding y data
+    window.location.reload();
   }
 
-  /* ------------------------- autoapertura según ruta ------------------------ */
+  /* auto-abrir sección/menú según ruta */
   useEffect(() => {
-    if (!pathname) return;
     let foundSection: string | null = null;
     let foundItem: string | null = null;
 
-    for (const sec of NAV) {
+    const sectionsToSearch = [...NAV_BASE, ...(isSuperadmin ? [NAV_SUPERADMIN] : [])];
+
+    for (const sec of sectionsToSearch) {
       if (sec.items?.length) {
         for (const it of sec.items) {
           if (pathname.startsWith(it.href)) {
@@ -245,9 +253,9 @@ export default function Sidebar() {
 
     if (foundSection) setOpenSectionKey(foundSection);
     if (foundItem) setOpenMenuKey(foundItem);
-  }, [pathname]);
+  }, [pathname, isSuperadmin]);
 
-  /* ----------------------------- drag del resizer --------------------------- */
+  /* resizer con Pointer Events */
   useEffect(() => {
     const aside = asideRef.current;
     const handle = resizerRef.current;
@@ -272,17 +280,13 @@ export default function Sidebar() {
       document.body.style.cursor = "";
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
-      try {
-        handle.releasePointerCapture((handle as any)._pointerId);
-      } catch {}
+      try { handle.releasePointerCapture((handle as any)._pointerId); } catch {}
     };
 
     const onDown = (e: PointerEvent) => {
       dragging = true;
       (handle as any)._pointerId = e.pointerId;
-      try {
-        handle.setPointerCapture(e.pointerId);
-      } catch {}
+      try { handle.setPointerCapture(e.pointerId); } catch {}
       startX = e.clientX ?? 0;
       startW = aside.getBoundingClientRect().width;
       document.body.style.userSelect = "none";
@@ -300,9 +304,8 @@ export default function Sidebar() {
     };
   }, [width]);
 
-  /* --------------------------------- render -------------------------------- */
+  /* helpers de render */
   const compact = width < 240;
-  const sections = useMemo(() => NAV, []);
 
   const SectionHeader: React.FC<{
     section: Section;
@@ -359,7 +362,7 @@ export default function Sidebar() {
   };
 
   const renderMenuItem = (it: MenuItem) => {
-    const active = pathname?.startsWith(it.href);
+    const active = pathname.startsWith(it.href);
     const content = (
       <div
         className={cx(
@@ -384,13 +387,19 @@ export default function Sidebar() {
     );
   };
 
+  /* nav final (inyecta SA al final si aplica) */
+  const NAV: Section[] = useMemo(
+    () => (isSuperadmin ? [...NAV_BASE, NAV_SUPERADMIN] : NAV_BASE),
+    [isSuperadmin]
+  );
+
   return (
     <aside
       ref={asideRef}
       className="relative z-20 shrink-0 border-r bg-white overflow-visible"
       style={{ width }}
     >
-      {/* Resizer (2px, sobresale 1px hacia la derecha y con z alto) */}
+      {/* Resizer (2px, 1px fuera a la derecha) */}
       <div
         ref={resizerRef}
         className="absolute -right-1 top-0 h-full w-2 cursor-col-resize z-50"
@@ -399,7 +408,7 @@ export default function Sidebar() {
         <div className="h-full w-full hover:bg-slate-200/70" />
       </div>
 
-      {/* Branding/Logo + Selector de Empresa (SIEMPRE visible) */}
+      {/* Branding/Selector */}
       <div className="px-3 pt-3 pb-2">
         <div className="flex items-center gap-2 mb-2">
           <div className="h-10 w-10 rounded-lg bg-lime-600/10 grid place-items-center">
@@ -409,14 +418,12 @@ export default function Sidebar() {
             <div className="text-xs text-slate-500 leading-tight">Empresa</div>
             <div className="text-sm font-medium text-slate-800 leading-tight truncate">
               {selectedCompanyId
-                ? companies.find((c) => c.id === selectedCompanyId)?.name ??
-                  "Cargando…"
+                ? companies.find((c) => c.id === selectedCompanyId)?.name ?? "Cargando…"
                 : "Sin empresa (BSOP)"}
             </div>
           </div>
         </div>
 
-        {/* Selector: ya no depende de compact */}
         <div>
           <label htmlFor="company-select" className="sr-only">
             Seleccionar empresa
@@ -446,7 +453,7 @@ export default function Sidebar() {
 
       {/* Secciones */}
       <nav className="px-2 pb-4">
-        {useMemo(() => NAV, []).map((sec) => {
+        {NAV.map((sec) => {
           const hasItems = !!sec.items?.length;
           const open = openSectionKey === sec.key;
 
