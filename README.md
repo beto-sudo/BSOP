@@ -1,5 +1,5 @@
 # BSOP
-
+ 
 Plataforma de gestión **multiempresa** construida con **Next.js (App Router)** y **TypeScript**.
 
 [![CI](https://github.com/beto-sudo/BSOP/actions/workflows/ci.yml/badge.svg)](https://github.com/beto-sudo/BSOP/actions/workflows/ci.yml)
