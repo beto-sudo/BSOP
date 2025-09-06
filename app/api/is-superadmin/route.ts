@@ -1,27 +1,23 @@
 // app/api/is-superadmin/route.ts
 import { NextResponse } from "next/server";
-import { createServerClient } from "@supabase/auth-helpers-nextjs";
-import type { Database } from "@/types/supabase";
 
-export async function GET() {
-  try {
-    const supabase = createServerClient<Database>();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ isSuperadmin: false });
+export async function GET(request: Request) {
+  // Flag global por entorno (como lo tenías en Vercel)
+  const flag = process.env.NEXT_PUBLIC_IS_SUPERADMIN === "1";
 
-    // 1) app_metadata (si lo usas)
-    const role = (user.app_metadata as any)?.role;
-    if (role === "superadmin") return NextResponse.json({ isSuperadmin: true });
+  // Validación opcional por lista de correos
+  const allowList = (process.env.SUPERADMIN_EMAILS || "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
 
-    // 2) profile.is_superadmin (si lo tienes en DB)
-    const { data: prof } = await supabase
-      .from("profile")
-      .select("is_superadmin")
-      .eq("id", user.id)
-      .maybeSingle();
+  // Si quieres validar por email, envíalo en el header x-user-email desde el cliente
+  const email = request.headers.get("x-user-email")?.toLowerCase();
 
-    return NextResponse.json({ isSuperadmin: !!prof?.is_superadmin });
-  } catch {
-    return NextResponse.json({ isSuperadmin: false });
+  let isOnList = false;
+  if (email && allowList.length > 0) {
+    isOnList = allowList.includes(email);
   }
+
+  return NextResponse.json({ isSuperadmin: flag || isOnList });
 }
