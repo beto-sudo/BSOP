@@ -2,22 +2,16 @@
 
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
+import Sidebar from "@/app/_components/Sidebar";
+import Topbar from "@/app/_components/Topbar";
 
 /**
  * Mantiene tu layout flex original:
  * [ Sidebar | handler (6px) | derecha (Topbar + Main) ]
- * - Solo gestiona el ancho (drag + persistencia).
- * - Blindajes para evitar errores de hidratación / valores NaN.
+ * - Gestiona el ancho del sidebar (drag + persistencia).
+ * - No recibe funciones desde server; renderiza Sidebar/Topbar directamente.
  */
-export default function ClientShell({
-  renderSidebar,
-  renderTopbar,
-  children,
-}: {
-  renderSidebar: (width: number) => ReactNode;
-  renderTopbar: ReactNode;
-  children: ReactNode;
-}) {
+export default function ClientShell({ children }: { children: ReactNode }) {
   const STORAGE_KEY = "bsop:sidebarWidth";
   const MIN = 224;
   const MAX = 480;
@@ -26,7 +20,7 @@ export default function ClientShell({
   const [width, setWidth] = useState<number>(260);
   const mounted = useRef(false);
 
-  // Lee localStorage al montar y normaliza el valor
+  // Inicializa desde localStorage al montar (evita mismatch SSR/CSR)
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(STORAGE_KEY);
@@ -43,9 +37,10 @@ export default function ClientShell({
     if (!mounted.current) return;
     try {
       window.localStorage.setItem(STORAGE_KEY, String(width));
-    } catch {/* ignore */}
+    } catch {}
   }, [width]);
 
+  // Drag con mouse/touch
   const dragRef = useRef<{ startX: number; startW: number } | null>(null);
 
   const onMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -54,14 +49,11 @@ export default function ClientShell({
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
   };
-
   const onMouseMove = (e: MouseEvent) => {
-    const s = dragRef.current;
-    if (!s) return;
+    const s = dragRef.current; if (!s) return;
     const next = s.startW + (e.clientX - s.startX);
     setWidth(Math.min(MAX, Math.max(MIN, next)));
   };
-
   const onMouseUp = () => {
     dragRef.current = null;
     document.body.classList.remove("select-none");
@@ -76,15 +68,12 @@ export default function ClientShell({
     window.addEventListener("touchmove", onTouchMove as any, { passive: false });
     window.addEventListener("touchend", onTouchEnd as any);
   };
-
   const onTouchMove = (e: TouchEvent) => {
-    const s = dragRef.current;
-    if (!s) return;
+    const s = dragRef.current; if (!s) return;
     const t = e.touches[0];
     const next = s.startW + (t.clientX - s.startX);
     setWidth(Math.min(MAX, Math.max(MIN, next)));
   };
-
   const onTouchEnd = () => {
     dragRef.current = null;
     document.body.classList.remove("select-none");
@@ -103,21 +92,12 @@ export default function ClientShell({
     };
   }, []);
 
-  // Indicador de vida opcional (para descartar "pantalla blanca" sin errores)
-  const SHOW_DEBUG = false; // pon true si quieres ver la barrita arriba
-
   return (
     <div className="flex min-h-screen">
-      {SHOW_DEBUG && (
-        <div className="fixed top-0 left-0 z-[9999] text-xs bg-emerald-600 text-white px-2 py-1">
-          shell ok — width: {width}px
-        </div>
-      )}
+      {/* Sidebar: el propio componente aplica style={{ width }} */}
+      <Sidebar width={width} />
 
-      {/* Sidebar (el propio componente aplica style={{ width }}) */}
-      {renderSidebar(width)}
-
-      {/* Handler */}
+      {/* Handler de ajuste */}
       <div
         role="separator"
         aria-label="Ajustar ancho del panel lateral"
@@ -130,7 +110,7 @@ export default function ClientShell({
 
       {/* Derecha: Topbar + contenido */}
       <div className="flex-1 min-w-0 flex flex-col">
-        {renderTopbar}
+        <Topbar />
         <main className="flex-1 min-w-0 overflow-auto">{children}</main>
       </div>
     </div>
