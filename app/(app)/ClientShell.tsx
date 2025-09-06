@@ -1,37 +1,42 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 
+/**
+ * Mantiene TU estructura flex:
+ * [ Sidebar (width px) | handler 6px | columna derecha (Topbar + Main) ]
+ * Solo gestiona el ancho y el drag; no toca contenidos.
+ */
 export default function ClientShell({
-  sidebar,
-  topbar,
+  renderSidebar,
+  renderTopbar,
   children,
 }: {
-  sidebar: ReactNode;
-  topbar: ReactNode;
+  renderSidebar: (width: number) => ReactNode;
+  renderTopbar: ReactNode;
   children: ReactNode;
 }) {
   const STORAGE_KEY = "bsop:sidebarWidth";
-  const MIN = 224;      // px
-  const MAX = 480;      // px
-  const HANDLE_W = 6;   // px
+  const MIN = 224;
+  const MAX = 480;
+  const HANDLE_W = 6;
 
-  const [sidebarW, setSidebarW] = useState<number>(() => {
-    if (typeof window === "undefined") return 280;
+  const [width, setWidth] = useState<number>(() => {
+    if (typeof window === "undefined") return 260; // tu valor por defecto
     const saved = window.localStorage.getItem(STORAGE_KEY);
-    const n = saved ? Number(saved) : 280;
-    return Number.isFinite(n) ? Math.min(MAX, Math.max(MIN, n)) : 280;
+    const n = saved ? Number(saved) : 260;
+    return Number.isFinite(n) ? Math.min(MAX, Math.max(MIN, n)) : 260;
   });
 
   const dragRef = useRef<{ startX: number; startW: number } | null>(null);
 
   useEffect(() => {
-    try { window.localStorage.setItem(STORAGE_KEY, String(sidebarW)); } catch {}
-  }, [sidebarW]);
+    try { window.localStorage.setItem(STORAGE_KEY, String(width)); } catch {}
+  }, [width]);
 
   const onMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    dragRef.current = { startX: e.clientX, startW: sidebarW };
+    dragRef.current = { startX: e.clientX, startW: width };
     document.body.classList.add("select-none");
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
@@ -39,9 +44,8 @@ export default function ClientShell({
   const onMouseMove = (e: MouseEvent) => {
     const s = dragRef.current;
     if (!s) return;
-    const delta = e.clientX - s.startX;
-    const next = Math.min(MAX, Math.max(MIN, s.startW + delta));
-    setSidebarW(next);
+    const next = Math.min(MAX, Math.max(MIN, s.startW + (e.clientX - s.startX)));
+    setWidth(next);
   };
   const onMouseUp = () => {
     dragRef.current = null;
@@ -52,18 +56,16 @@ export default function ClientShell({
 
   const onTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     const t = e.touches[0];
-    dragRef.current = { startX: t.clientX, startW: sidebarW };
+    dragRef.current = { startX: t.clientX, startW: width };
     document.body.classList.add("select-none");
     window.addEventListener("touchmove", onTouchMove, { passive: false });
     window.addEventListener("touchend", onTouchEnd);
   };
   const onTouchMove = (e: TouchEvent) => {
-    const s = dragRef.current;
-    if (!s) return;
+    const s = dragRef.current; if (!s) return;
     const t = e.touches[0];
-    const delta = t.clientX - s.startX;
-    const next = Math.min(MAX, Math.max(MIN, s.startW + delta));
-    setSidebarW(next);
+    const next = Math.min(MAX, Math.max(MIN, s.startW + (t.clientX - s.startX)));
+    setWidth(next);
   };
   const onTouchEnd = () => {
     dragRef.current = null;
@@ -73,37 +75,25 @@ export default function ClientShell({
   };
 
   return (
-    <div
-      className="min-h-screen w-full"
-      style={{
-        display: "grid",
-        gridTemplateColumns: `${sidebarW}px ${HANDLE_W}px 1fr`,
-        gridTemplateRows: "100vh",
-      }}
-    >
-      {/* Sidebar: altura completa */}
-      <div style={{ gridColumn: "1 / 2", gridRow: "1 / 2" }}>
-        {sidebar}
-      </div>
+    <div className="flex min-h-screen">
+      {/* Sidebar (misma columna que ya tenías) */}
+      <div style={{ width }}>{renderSidebar(width)}</div>
 
-      {/* Handler de ajuste */}
+      {/* Handler */}
       <div
         role="separator"
         aria-label="Ajustar ancho del panel lateral"
         onMouseDown={onMouseDown}
         onTouchStart={onTouchStart}
-        className="cursor-col-resize bg-transparent hover:bg-slate-200 active:bg-slate-300"
-        style={{ gridColumn: "2 / 3", gridRow: "1 / 2" }}
+        className="cursor-col-resize"
+        style={{ width: HANDLE_W }}
         title="Arrastra para ajustar el ancho"
       />
 
-      {/* Columna derecha: topbar + contenido */}
-      <div
-        style={{ gridColumn: "3 / 4", gridRow: "1 / 2", display: "grid", gridTemplateRows: "auto 1fr" }}
-        className="min-w-0"
-      >
-        {topbar}
-        <main className="min-w-0 overflow-auto">{children}</main>
+      {/* Columna derecha: Topbar y contenido (idéntico a lo tuyo) */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        {renderTopbar}
+        <main className="flex-1 min-w-0">{children}</main>
       </div>
     </div>
   );
