@@ -1,4 +1,4 @@
-# BSOP
+# BSOP 
 
 Plataforma de gestión **multiempresa** construida con **Next.js (App Router)** y **TypeScript**. 
 
