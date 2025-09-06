@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
-/* utils */
+/* ---------------- util mínima ---------------- */
 function cx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
 }
@@ -39,7 +39,7 @@ function readCompanyCookie(): string | null {
   return map.company || map.CURRENT_COMPANY_ID || null;
 }
 
-/* navegación */
+/* ---------------- navegación ---------------- */
 type MenuItem = {
   key: string;
   label: string;
@@ -150,7 +150,7 @@ function NavLink({
   );
 }
 
-export default function Sidebar() {
+export default function Sidebar({ width = 260 }: { width?: number }) {
   const pathname = usePathname();
   useSearchParams();
   useRouter();
@@ -188,7 +188,10 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="shrink-0 border-r bg-white h-dvh overflow-y-auto">
+    <aside
+      className="shrink-0 border-r bg-white h-dvh overflow-y-auto"
+      style={{ width }}
+    >
       <div className="px-3 pt-3 pb-2">
         <div className="flex items-center gap-2">
           <div className="h-10 w-10 rounded-lg bg-[color:var(--brand-50)] grid place-items-center border">
