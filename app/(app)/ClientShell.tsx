@@ -5,16 +5,16 @@ import { useEffect, useRef, useState } from "react";
 
 /**
  * Mantiene tu layout flex original:
- * [ Sidebar | handler (6px) | columna derecha (Topbar + Main) ]
- * - Solo gestiona el ancho del sidebar y el drag.
- * - Evita leer localStorage hasta montar para no desincronizar SSR/CSR.
+ * [ Sidebar | handler (6px) | derecha (Topbar + Main) ]
+ * - Solo gestiona el ancho (drag + persistencia).
+ * - Blindajes para evitar errores de hidratación / valores NaN.
  */
 export default function ClientShell({
   renderSidebar,
   renderTopbar,
   children,
 }: {
-  renderSidebar: (width: number) => ReactNode; // El Sidebar aplica style={{ width }}
+  renderSidebar: (width: number) => ReactNode;
   renderTopbar: ReactNode;
   children: ReactNode;
 }) {
@@ -23,30 +23,29 @@ export default function ClientShell({
   const MAX = 480;
   const HANDLE_W = 6;
 
-  // Inicia con 260 y luego lee localStorage al montar
   const [width, setWidth] = useState<number>(260);
-  const mountedRef = useRef(false);
+  const mounted = useRef(false);
 
+  // Lee localStorage al montar y normaliza el valor
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(STORAGE_KEY);
-      const n = saved ? Number(saved) : 260;
-      setWidth(Number.isFinite(n) ? Math.min(MAX, Math.max(MIN, n)) : 260);
+      let n = saved ? Number(saved) : 260;
+      if (!Number.isFinite(n)) n = 260;
+      n = Math.min(MAX, Math.max(MIN, n));
+      setWidth(n);
     } finally {
-      mountedRef.current = true;
+      mounted.current = true;
     }
   }, []);
 
   useEffect(() => {
-    if (!mountedRef.current) return;
+    if (!mounted.current) return;
     try {
       window.localStorage.setItem(STORAGE_KEY, String(width));
-    } catch {
-      /* ignore */
-    }
+    } catch {/* ignore */}
   }, [width]);
 
-  // Drag con mouse
   const dragRef = useRef<{ startX: number; startW: number } | null>(null);
 
   const onMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -59,8 +58,8 @@ export default function ClientShell({
   const onMouseMove = (e: MouseEvent) => {
     const s = dragRef.current;
     if (!s) return;
-    const next = Math.min(MAX, Math.max(MIN, s.startW + (e.clientX - s.startX)));
-    setWidth(next);
+    const next = s.startW + (e.clientX - s.startX);
+    setWidth(Math.min(MAX, Math.max(MIN, next)));
   };
 
   const onMouseUp = () => {
@@ -70,7 +69,6 @@ export default function ClientShell({
     window.removeEventListener("mouseup", onMouseUp);
   };
 
-  // Drag con touch
   const onTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     const t = e.touches[0];
     dragRef.current = { startX: t.clientX, startW: width };
@@ -83,8 +81,8 @@ export default function ClientShell({
     const s = dragRef.current;
     if (!s) return;
     const t = e.touches[0];
-    const next = Math.min(MAX, Math.max(MIN, s.startW + (t.clientX - s.startX)));
-    setWidth(next);
+    const next = s.startW + (t.clientX - s.startX);
+    setWidth(Math.min(MAX, Math.max(MIN, next)));
   };
 
   const onTouchEnd = () => {
@@ -94,7 +92,7 @@ export default function ClientShell({
     window.removeEventListener("touchend", onTouchEnd as any);
   };
 
-  // Limpieza por si el componente se desmonta en medio del drag
+  // Limpieza defensiva
   useEffect(() => {
     return () => {
       document.body.classList.remove("select-none");
@@ -105,12 +103,21 @@ export default function ClientShell({
     };
   }, []);
 
+  // Indicador de vida opcional (para descartar "pantalla blanca" sin errores)
+  const SHOW_DEBUG = false; // pon true si quieres ver la barrita arriba
+
   return (
     <div className="flex min-h-screen">
-      {/* Sidebar directo (el propio componente aplica style={{ width }}) */}
+      {SHOW_DEBUG && (
+        <div className="fixed top-0 left-0 z-[9999] text-xs bg-emerald-600 text-white px-2 py-1">
+          shell ok — width: {width}px
+        </div>
+      )}
+
+      {/* Sidebar (el propio componente aplica style={{ width }}) */}
       {renderSidebar(width)}
 
-      {/* Handler visible */}
+      {/* Handler */}
       <div
         role="separator"
         aria-label="Ajustar ancho del panel lateral"
