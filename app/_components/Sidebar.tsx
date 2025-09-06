@@ -1,338 +1,262 @@
-// app/_components/Sidebar.tsx
 "use client";
 
 import Link from "next/link";
-import { usePathname, useSearchParams, useRouter } from "next/navigation";
-import {
-  ChevronDown,
-  ChevronRight,
-  Settings,
-  LayoutDashboard,
-  BarChart3,
-  ShoppingCart,
-  Boxes,
-  HandCoins,
-  Wallet,
-  FileChartColumn,
-  Building2,
-  Users,
-  Shield,
-  Factory,
-  Package,
-  Truck,
-  Wrench,
-  ClipboardList,
-  FileCog,
-  ListChecks,
-  Cog,
-  ReceiptText,
-} from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { ChevronRight } from "lucide-react";
+import { buildSectionsOrdered, Section, NavMenu, NavItem } from "@/app/_config/nav";
 
-/* ---------------- util mínima ---------------- */
-function cx(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(" ");
-}
+type Company = { id: string; name: string; slug: string };
+type Branding = { brandName?: string; primary?: string; secondary?: string; logoUrl?: string };
+type Features = Record<string, boolean>;
 
-function truthyEnv(v?: string) {
-  if (!v) return false;
-  const s = v.toString().trim().toLowerCase();
-  return s === "1" || s === "true" || s === "yes";
-}
-
-/* lee cookie en cliente (usa "company" o "CURRENT_COMPANY_ID") */
-function readCompanyCookie(): string | null {
-  if (typeof document === "undefined") return null;
-  const map = Object.fromEntries(
-    document.cookie.split(";").map((p) => {
-      const [k, ...r] = p.trim().split("=");
-      return [decodeURIComponent(k), decodeURIComponent(r.join("=") || "")];
-    })
-  );
-  return map.company || map.CURRENT_COMPANY_ID || null;
-}
-
-/* ---------------- navegación (según doc) ---------------- */
-
-type MenuItem = {
-  key: string;
-  label: string;
-  href: string;
-  needsCompany?: boolean;
-  icon?: React.ReactNode;
-  featureFlag?: string;
-  enabledForCompanies?: string[];
-};
-
-type Section = {
-  key: "administracion" | "operacion" | "configuracion" | "superadmin";
-  label: string;
-  icon?: React.ReactNode;
-  items: MenuItem[];
-};
-
-const NAV_BASE: Section[] = [
-  {
-    key: "administracion",
-    label: "ADMINISTRACIÓN",
-    icon: <Building2 className="h-4 w-4" />,
-    items: [
-      { key: "admin-proveedores", label: "Proveedores", href: "/admin/providers", needsCompany: true, icon: <ShoppingCart className="h-4 w-4" /> },
-      { key: "admin-clientes", label: "Clientes", href: "/admin/customers", needsCompany: true, icon: <Users className="h-4 w-4" /> },
-      { key: "admin-usuarios", label: "Usuarios", href: "/admin/users", needsCompany: true, icon: <Users className="h-4 w-4" /> },
-      { key: "admin-sucursales", label: "Sucursales", href: "/admin/branches", needsCompany: true, icon: <Building2 className="h-4 w-4" /> },
-      { key: "admin-roles", label: "Roles y Permisos", href: "/admin/roles", needsCompany: true, icon: <Shield className="h-4 w-4" /> },
-      { key: "admin-empresa", label: "Empresa", href: "/admin/company", needsCompany: true, icon: <Building2 className="h-4 w-4" /> },
-      { key: "admin-datos-fiscales", label: "Datos Fiscales", href: "/admin/legal", needsCompany: true, icon: <ReceiptText className="h-4 w-4" /> },
-      { key: "admin-branding", label: "Branding", href: "/admin/branding", needsCompany: true, icon: <Settings className="h-4 w-4" /> },
-    ],
-  },
-  {
-    key: "operacion",
-    label: "OPERACIÓN",
-    icon: <Factory className="h-4 w-4" />,
-    items: [
-      { key: "op-compras", label: "Compras", href: "/purchases", needsCompany: true, icon: <ShoppingCart className="h-4 w-4" /> },
-      { key: "op-recepciones", label: "Recepciones", href: "/purchases/receiving", needsCompany: true, icon: <Truck className="h-4 w-4" /> },
-      { key: "op-oc", label: "Ordenes de Compra", href: "/purchases/po", needsCompany: true, icon: <ClipboardList className="h-4 w-4" /> },
-      { key: "op-inventario", label: "Inventario", href: "/inventory", needsCompany: true, icon: <Boxes className="h-4 w-4" /> },
-      { key: "op-movimientos", label: "Movimientos", href: "/inventory/moves", needsCompany: true, icon: <Package className="h-4 w-4" /> },
-      { key: "op-ventas", label: "Ventas", href: "/sales", needsCompany: true, icon: <HandCoins className="h-4 w-4" /> },
-      { key: "op-caja", label: "Caja", href: "/cash", needsCompany: true, icon: <Wallet className="h-4 w-4" /> },
-      { key: "op-mov-caja", label: "Movimientos de Caja", href: "/cash/movements", needsCompany: true, icon: <Wallet className="h-4 w-4" /> },
-      { key: "op-reportes", label: "Reportes", href: "/reports", needsCompany: true, icon: <FileChartColumn className="h-4 w-4" /> },
-      { key: "op-mantenimiento", label: "Mantenimiento", href: "/maintenance", needsCompany: true, icon: <Wrench className="h-4 w-4" /> },
-    ],
-  },
-  {
-    key: "configuracion",
-    label: "CONFIGURACIÓN",
-    icon: <Settings className="h-4 w-4" />,
-    items: [
-      { key: "cfg-catalogos", label: "Catálogos", href: "/settings/catalogs", needsCompany: true, icon: <FileCog className="h-4 w-4" /> },
-      { key: "cfg-workflows", label: "Workflows", href: "/settings/workflows", needsCompany: true, icon: <ListChecks className="h-4 w-4" /> },
-      { key: "cfg-sistema", label: "Sistema", href: "/settings/system", needsCompany: true, icon: <Cog className="h-4 w-4" /> },
-    ],
-  },
-  {
-    key: "superadmin",
-    label: "SUPERADMIN",
-    icon: <Building2 className="h-4 w-4" />,
-    items: [
-      { key: "sa-companies", label: "Empresas", href: "/superadmin/companies", icon: <Building2 className="h-4 w-4" /> },
-      { key: "sa-users", label: "Usuarios", href: "/superadmin/users", icon: <Users className="h-4 w-4" /> },
-    ],
-  },
-];
-
-/* feature flags por entorno */
-const FF_SALE = truthyEnv(process.env.NEXT_PUBLIC_FF_SALE);
-const FF_CASH = truthyEnv(process.env.NEXT_PUBLIC_FF_CASH);
-const FF_MAINTENANCE = truthyEnv(process.env.NEXT_PUBLIC_FF_MAINTENANCE);
-
-/* aplica flags a la navegación base */
-function buildNav(companyId: string | null): Section[] {
-  const can = (it: MenuItem) => {
-    if (it.needsCompany && !companyId) return false;
-    if (it.featureFlag && !truthyEnv(process.env[`NEXT_PUBLIC_${it.featureFlag}` as any])) return false;
-    return true;
-  };
-  const clone: Section[] = NAV_BASE.map((s) => ({
-    ...s,
-    items: s.items.filter(can),
-  }));
-  // ejemplo de flags puntuales
-  if (!FF_SALE) {
-    const op = clone.find((s) => s.key === "operacion");
-    if (op) op.items = op.items.filter((x) => x.key !== "op-ventas");
-  }
-  if (!FF_CASH) {
-    const op = clone.find((s) => s.key === "operacion");
-    if (op) op.items = op.items.filter((x) => x.key !== "op-caja" && x.key !== "op-mov-caja");
-  }
-  if (!FF_MAINTENANCE) {
-    const op = clone.find((s) => s.key === "operacion");
-    if (op) op.items = op.items.filter((x) => x.key !== "op-mantenimiento");
-  }
-  return clone;
-}
-
-function SectionHeader({
-  open,
-  onToggle,
-  icon,
-  children,
-}: {
-  open: boolean;
-  onToggle: () => void;
-  icon?: React.ReactNode;
-  children: React.ReactNode;
-}) {
+function InitialsIcon({ name }: { name: string }) {
+  const initials = (name || "").split(" ").map(s=>s[0]).join("").slice(0,2).toUpperCase() || "B";
   return (
-    <button
-      onClick={onToggle}
-      className="w-full flex items-center gap-2 px-2 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900"
+    <div
+      className="h-10 w-10 rounded-md grid place-items-center text-xs font-semibold"
+      style={{
+        background: "var(--brand-100, #eef2ff)",
+        color: "var(--brand-900, #0f172a)",
+      }}
     >
-      <span className="grid place-items-center">
-        {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-      </span>
-      {icon ? <span className="grid place-items-center">{icon}</span> : null}
-      <span className="tracking-wide">{children}</span>
-    </button>
+      {initials}
+    </div>
   );
 }
 
-function NavLink({
-  href,
-  active,
-  children,
-  icon,
-}: {
-  href: string;
-  active?: boolean;
-  children: React.ReactNode;
-  icon?: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className={cx(
-        "group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm",
-        active
-          ? "bg-[color:var(--brand-50)] text-[color:var(--brand-900)]"
-          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-      )}
-    >
-      {icon}
-      <span>{children}</span>
-    </Link>
-  );
-}
-
-export default function Sidebar({ width = 260 }: { width?: number }) {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+export default function Sidebar() {
   const router = useRouter();
+  const qp = useSearchParams();
+  const pathname = usePathname();
+  const companySlug = (qp.get("company") || "").toLowerCase();
 
-  const [open, setOpen] = useState<Record<string, boolean>>({
-    administracion: true,
-    operacion: true,
-    configuracion: true,
-    superadmin: true,
-  });
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [branding, setBranding] = useState<Branding | null>(null);
+  const [features, setFeatures] = useState<Features>({});
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
 
-  const companyId = useMemo(() => readCompanyCookie(), []);
+  // estado de apertura: una sección y un menú a la vez
+  const [openSectionKey, setOpenSectionKey] = useState<string>("administracion");
+  const [openMenuKey, setOpenMenuKey] = useState<string>("");
 
-  // reconstruye navegación en base a companyId y flags
-  const sections = useMemo(() => buildNav(companyId), [companyId]);
+  // ancho redimensionable
+  const asideRef = useRef<HTMLDivElement | null>(null);
+  const resizerRef = useRef<HTMLDivElement | null>(null);
+  const [width, setWidth] = useState<number>(260);
+  useEffect(() => { const w=Number(localStorage.getItem("sidebar:w")); if (w>=220 && w<=420) setWidth(w); }, []);
+  useEffect(() => { localStorage.setItem("sidebar:w", String(width)); if (asideRef.current) asideRef.current.style.width = `${width}px`; }, [width]);
 
-  function toggle(k: string) {
-    setOpen((p) => ({ ...p, [k]: !p[k] }));
+  // cargar empresas
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch("/api/companies", { cache: "no-store" });
+        const list = await r.json();
+        setCompanies(Array.isArray(list) ? list : []);
+      } catch {}
+    })();
+  }, []);
+
+  // forzar ?company solo en rutas que lo requieren
+  useEffect(() => {
+    const requiresCompany = !(
+      pathname === "/companies" ||
+      pathname.startsWith("/companies") ||
+      pathname.startsWith("/settings") ||
+      pathname.startsWith("/auth") ||
+      pathname.startsWith("/signin") ||
+      pathname.startsWith("/api")
+    );
+    if (!companySlug && companies.length > 0 && requiresCompany) {
+      const slug = companies[0]?.slug?.toLowerCase();
+      if (!slug) return;
+      document.cookie = `company=${slug}; path=/; max-age=31536000; samesite=lax`;
+      const url = new URL(window.location.href);
+      url.searchParams.set("company", slug);
+      router.replace(url.pathname + "?" + url.searchParams.toString());
+    }
+  }, [companySlug, companies, pathname, router]);
+
+  // branding + features por empresa
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!companySlug) return;
+        const r = await fetch(`/api/admin/company?company=${companySlug}`, { cache: "no-store" });
+        const json = await r.json();
+        const b: Branding = json?.settings?.branding ?? {};
+        const f: Features = json?.settings?.features ?? {};
+        setBranding({
+          brandName: b?.brandName || json?.name || "",
+          primary: b?.primary || "",
+          secondary: b?.secondary || "",
+          logoUrl: b?.logoUrl || "",
+        });
+        setFeatures(f || {});
+      } catch {}
+    })();
+  }, [companySlug]);
+
+  // superadmin flag
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/admin/is-superadmin")
+      .then(r => r.ok ? r.json() : { is:false })
+      .then(j => { if (alive) setIsSuperadmin(!!j.is); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  // construir secciones en orden fijo
+  const sections: Section[] = useMemo(() => buildSectionsOrdered(isSuperadmin), [isSuperadmin]);
+
+  // auto-abrir sección y menú del ítem activo
+  useEffect(() => {
+    const p = pathname || "";
+    for (const sec of sections) {
+      for (const menu of sec.menus) {
+        for (const item of menu.items) {
+          if (p.startsWith(item.href)) {
+            setOpenSectionKey(sec.key);
+            setOpenMenuKey(`${sec.key}:${menu.key}`);
+            return;
+          }
+        }
+      }
+    }
+  }, [pathname, sections]);
+
+  function isItemVisible(item: NavItem): boolean {
+    // MOSTRAR TODO salvo que esté restringido por empresa o feature flag
+    if (item.enabledForCompanies && item.enabledForCompanies.length > 0) {
+      if (!companySlug) return false;
+      if (!item.enabledForCompanies.map(s => s.toLowerCase()).includes(companySlug)) return false;
+    }
+    if (item.enabledByFeature) {
+      const key = item.enabledByFeature;
+      if (!features || features[key] !== true) return false;
+    }
+    return true;
   }
 
-  function isActive(href: string) {
-    if (href === "/dashboard" && (pathname === "/" || pathname === "/dashboard")) return true;
-    return pathname?.startsWith(href);
-  }
-
-  function Item(it: MenuItem) {
+  function renderMenu(sec: Section, menu: NavMenu) {
+    const id = `${sec.key}:${menu.key}`;
+    const isOpen = openMenuKey === id;
     return (
-      <NavLink href={it.href} active={isActive(it.href)} icon={it.icon}>
-        {it.label}
-      </NavLink>
+      <div key={menu.key} className="border-t first:border-t-0">
+        <button
+          className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold"
+          onClick={() => setOpenMenuKey(isOpen ? "" : id)}
+          style={{
+            background: isOpen ? "var(--brand-100, #f1f5f9)" : "transparent",
+            color: "var(--brand-900, #0f172a)",
+          }}
+        >
+          <span className="flex items-center gap-2">{menu.icon}<span>{menu.label}</span></span>
+          <ChevronRight className={`h-3 w-3 transition-transform ${isOpen ? "rotate-90" : ""}`} />
+        </button>
+        {isOpen && (
+          <ul className="py-1">
+            {menu.items.filter(isItemVisible).map((item) => {
+              const href = item.needsCompany && companySlug
+                ? `${item.href}?company=${companySlug}`
+                : item.href;
+              const active = (pathname || "").startsWith(item.href);
+              return (
+                <li key={`${menu.key}:${item.href}`}>
+                  <Link
+                    href={href}
+                    className="block px-6 py-2 text-sm rounded-r-md"
+                    style={{
+                      background: active ? "var(--brand-50, #f8fafc)" : "transparent",
+                      color: active ? "var(--brand-800, #1e293b)" : "#334155",
+                      borderLeft: "3px solid",
+                      borderLeftColor: active ? "var(--brand-primary, #0f172a)" : "transparent",
+                    }}
+                  >
+                    {item.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
     );
   }
 
+  function renderSection(sec: Section) {
+    const isOpen = openSectionKey === sec.key;
+    return (
+      <div key={sec.key} className="rounded-lg border overflow-hidden">
+        <button
+          className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold"
+          onClick={() => setOpenSectionKey(isOpen ? "" : sec.key)}
+          style={{
+            background: "var(--brand-50, #f8fafc)",
+            color: "var(--brand-900, #0f172a)",
+            borderLeft: "4px solid var(--brand-primary, #0f172a)",
+          }}
+        >
+          <span>{sec.label}</span>
+          <ChevronRight className={`h-3 w-3 transition-transform ${isOpen ? "rotate-90" : ""}`} />
+        </button>
+        {isOpen && (
+          <div className="pb-1">
+            {sec.menus.map((menu) => renderMenu(sec, menu))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const current = companies.find(c => c.slug.toLowerCase() === companySlug) || null;
+
   return (
-    <aside className="shrink-0 border-r bg-white" style={{ width }}>
-      {/* Header simple */}
-      <div className="px-3 pt-3 pb-2">
-        <div className="flex items-center gap-2">
-          <div className="h-10 w-10 rounded-lg bg-[color:var(--brand-50)] grid place-items-center border">
-            <span className="text-[color:var(--brand-900)] font-bold">BS</span>
-          </div>
-          <div className="min-w-0">
-            <div className="text-xs text-slate-500 leading-tight">BSOP</div>
-            <div className="text-sm font-medium text-slate-800 leading-tight truncate">
-              Selecciona un módulo
-            </div>
-          </div>
+    <aside ref={asideRef} className="relative border-r bg-white shrink-0" style={{ width }}>
+      {/* Resizer */}
+      <div
+        ref={resizerRef}
+        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-slate-200"
+        title="Arrastra para ajustar ancho"
+      />
+
+      {/* Header empresa */}
+      <div className="p-4 border-b flex items-center gap-3">
+        {branding?.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={branding.logoUrl} alt="logo" className="h-10 w-10 rounded-md object-cover" />
+        ) : <InitialsIcon name={branding?.brandName || current?.name || "BS"} />}
+        <div className="min-w-0">
+          <div className="text-sm font-semibold truncate">{branding?.brandName || current?.name || "Sin empresa"}</div>
+          <div className="text-xs text-slate-500 truncate">{current?.slug || "—"}</div>
         </div>
       </div>
 
-      {/* Navegación */}
-      <nav className="px-2 pb-4">
-        {/* ADMINISTRACIÓN */}
-        <div className="mb-2">
-          <SectionHeader
-            open={!!open.administracion}
-            onToggle={() => toggle("administracion")}
-            icon={<LayoutDashboard className="h-4 w-4" />}
-          >
-            ADMINISTRACIÓN
-          </SectionHeader>
-          {open.administracion && (
-            <div className="pl-6 space-y-0.5">
-              {sections
-                .find((s) => s.key === "administracion")
-                ?.items.map((it) => <div key={it.key}>{Item(it)}</div>)}
-            </div>
-          )}
-        </div>
+      {/* Selector de empresa */}
+      <div className="p-3 border-b">
+        <label className="block text-xs text-slate-500 mb-1">Empresa</label>
+        <select
+          className="w-full rounded-md border px-2 py-1 text-sm"
+          value={companySlug}
+          onChange={(e) => {
+            const slug = e.target.value;
+            document.cookie = `company=${slug}; path=/; max-age=31536000; samesite=lax`;
+            const url = new URL(window.location.href);
+            url.searchParams.set("company", slug);
+            router.push(url.pathname + "?" + url.searchParams.toString());
+            router.refresh();
+          }}
+        >
+          <option value="">Selecciona...</option>
+          {companies.map(c => <option key={c.id} value={c.slug.toLowerCase()}>{c.name}</option>)}
+        </select>
+      </div>
 
-        {/* OPERACIÓN */}
-        <div className="mb-2">
-          <SectionHeader
-            open={!!open.operacion}
-            onToggle={() => toggle("operacion")}
-            icon={<Factory className="h-4 w-4" />}
-          >
-            OPERACIÓN
-          </SectionHeader>
-        {open.operacion && (
-            <div className="pl-6 space-y-0.5">
-              {sections
-                .find((s) => s.key === "operacion")
-                ?.items.map((it) => <div key={it.key}>{Item(it)}</div>)}
-            </div>
-          )}
-        </div>
-
-        {/* CONFIGURACIÓN */}
-        <div className="mb-2">
-          <SectionHeader
-            open={!!open.configuracion}
-            onToggle={() => toggle("configuracion")}
-            icon={<Settings className="h-4 w-4" />}
-          >
-            CONFIGURACIÓN
-          </SectionHeader>
-          {open.configuracion && (
-            <div className="pl-6 space-y-0.5">
-              {sections
-                .find((s) => s.key === "configuracion")
-                ?.items.map((it) => <div key={it.key}>{Item(it)}</div>)}
-            </div>
-          )}
-        </div>
-
-        {/* SUPERADMIN */}
-        <div className="mb-2">
-          <SectionHeader
-            open={!!open.superadmin}
-            onToggle={() => toggle("superadmin")}
-            icon={<Building2 className="h-4 w-4" />}
-          >
-            SUPERADMIN
-          </SectionHeader>
-          {open.superadmin && (
-            <div className="pl-6 space-y-0.5">
-              {sections
-                .find((s) => s.key === "superadmin")
-                ?.items.map((it) => <div key={it.key}>{Item(it)}</div>)}
-            </div>
-          )}
-        </div>
+      {/* Navegación: ADMINISTRACIÓN → OPERACIÓN → CONFIGURACIÓN → (SUPERADMIN si aplica) */}
+      <nav className="p-2 space-y-2">
+        {sections.map(renderSection)}
       </nav>
     </aside>
   );

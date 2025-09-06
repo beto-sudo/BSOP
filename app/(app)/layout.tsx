@@ -1,21 +1,18 @@
 // app/(app)/layout.tsx
-
-// Fuerza SSR (evita export estático y respeta cookies/branding)
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-export const fetchCache = "force-no-store";
-
 import type { ReactNode } from "react";
 import BrandingLoader from "@/app/_components/BrandingLoader";
-import ClientShell from "./ClientShell";
+import Topbar from "@/app/_components/Topbar";
+import Sidebar from "@/app/_components/Sidebar";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
-    <>
-      {/* Server: aplica branding/tema por cookies como antes */}
-      <BrandingLoader />
-      {/* Client: sólo gestiona el ancho del sidebar y el handler */}
-      <ClientShell>{children}</ClientShell>
-    </>
+    <div className="min-h-screen bg-white text-slate-900">
+      <BrandingLoader /> {/* aplica variables CSS de marca */}
+      <Topbar />
+      <div className="flex">
+        <Sidebar />
+        <main className="flex-1 min-w-0">{children}</main>
+      </div>
+    </div>
   );
 }

@@ -1,106 +1,173 @@
 // app/_components/Topbar.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Building2, Brush, User, LogOut, Shield } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { supabaseBrowser } from "@/lib/supabaseBrowser";
+import CompanyParamGuard from "./CompanyParamGuard";
+
+type UserInfo = {
+  email: string | null;
+  fullName?: string | null;
+  avatar_url?: string | null;
+};
+
+function initialsFrom(nameOrEmail?: string | null) {
+  if (!nameOrEmail) return "U";
+  const name = nameOrEmail.split("@")[0];
+  const parts = name.trim().split(/\s+/);
+  const ini = parts.slice(0, 2).map((p) => p[0]?.toUpperCase() || "").join("");
+  return ini || "U";
+}
+
+function useAuthUser(): UserInfo | null {
+  const [user, setUser] = useState<UserInfo | null>(null);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const supa = supabaseBrowser();
+        const { data } = await supa.auth.getUser();
+        if (!alive) return;
+        const meta = (data.user?.user_metadata as any) || {};
+        const pic = meta.avatar_url || meta.picture || null;
+        setUser({
+          email: data.user?.email ?? null,
+          fullName: meta.full_name || meta.name || data.user?.email || null,
+          avatar_url: pic,
+        });
+      } catch {
+        if (alive) setUser(null);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return user;
+}
 
 export default function Topbar() {
-  const [companyName, setCompanyName] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const isBSOP = !companyName;
+  const user = useAuthUser();
+  const pathname = usePathname();
+  const router = useRouter();
+  const qp = useSearchParams();
+  const detailsRef = useRef<HTMLDetailsElement | null>(null);
 
+  // company label
+  const slug = (qp.get("company") || "").toLowerCase();
+  const [companyLabel, setCompanyLabel] = useState<string>(slug ? slug.toUpperCase() : "—");
   useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      try {
-        const res = await fetch("/api/current-company", { cache: "no-store" });
-        if (!res.ok) return;
-        const json = await res.json();
-        if (!cancelled) {
-          setCompanyName(json?.companyName ?? null);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+    if (!slug) {
+      setCompanyLabel("—");
+      return;
     }
-    load();
-    return () => { cancelled = true; };
+    let alive = true;
+    fetch(`/api/admin/company?company=${encodeURIComponent(slug)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!alive) return;
+        // Prioriza razón social
+        setCompanyLabel(j?.legalName || j?.name || slug.toUpperCase());
+      })
+      .catch(() => {
+        if (alive) setCompanyLabel(slug.toUpperCase());
+      });
+    return () => {
+      alive = false;
+    };
+  }, [slug]);
+
+  // Flag de superadmin
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/admin/is-superadmin")
+      .then((r) => (r.ok ? r.json() : { is: false }))
+      .then((j) => alive && setIsSuperadmin(!!j.is))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
   }, []);
 
-  async function clearCompany() {
-    // Limpiar empresa => modo BSOP (branding por defecto)
-    await fetch("/api/switch-company", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ companyId: null }),
-    }).catch(() => {});
-    window.location.reload();
+  useEffect(() => {
+    detailsRef.current?.removeAttribute("open");
+  }, [pathname, slug]);
+
+  async function signOut() {
+    try {
+      await supabaseBrowser().auth.signOut();
+    } catch {}
+    router.push("/signin");
+  }
+  function goToAdmin() {
+    detailsRef.current?.removeAttribute("open");
+    router.push("/settings/admin");
   }
 
+  const displayName = user?.fullName || user?.email || "Cuenta";
+  const avatar = user?.avatar_url;
+
   return (
-    <header className="sticky top-0 z-30 h-12 border-b bg-white/80 backdrop-blur">
-      <div className="mx-auto flex h-full items-center justify-between px-4">
-        {/* IZQUIERDA: Indicador de estado (Empresa / BSOP) */}
-        <div className="flex items-center gap-2">
-          <span
-            className={[
-              "inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium",
-              isBSOP
-                ? "bg-slate-900 text-white" // chip oscuro para BSOP
-                : "bg-lime-100 text-lime-900", // chip marca empresa
-            ].join(" ")}
-            title={isBSOP ? "Sin empresa seleccionada" : "Empresa actual"}
-          >
-            <Building2 className="h-4 w-4" />
-            {loading ? "Cargando…" : companyName ?? "BSOP"}
-          </span>
+    <>
+      {/* Guard global para evitar rebotes de company en rutas exentas */}
+      <CompanyParamGuard />
 
-          {/* Botón rápido para limpiar empresa */}
-          {!isBSOP && (
-            <button
-              type="button"
-              onClick={clearCompany}
-              className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-              title="Quitar selección de empresa (usar branding BSOP)"
-            >
-              <Brush className="h-4 w-4" />
-              Limpiar empresa
-            </button>
-          )}
+      <header className="sticky top-0 z-30 h-14 bg-white/80 backdrop-blur border-b">
+        <div className="h-full w-full px-3 sm:px-4 flex items-center justify-between gap-3">
+          {/* IZQUIERDA: razón social */}
+          <div className="min-w-0">
+            <div className="text-xs text-slate-500 leading-none">{slug ? slug.toUpperCase() : ""}</div>
+            <div className="text-sm font-semibold truncate">{companyLabel}</div>
+          </div>
+
+          {/* DERECHA: usuario */}
+          <div className="ml-auto">
+            <details ref={detailsRef} className="relative">
+              <summary className="list-none select-none cursor-pointer rounded-md border px-2 py-1 bg-white hover:bg-slate-50 flex items-center gap-2">
+                {avatar ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatar} alt="avatar" className="h-8 w-8 rounded-full object-cover" />
+                ) : (
+                  <div className="h-8 w-8 rounded-full bg-slate-200 grid place-items-center text-xs text-slate-700">
+                    {initialsFrom(displayName)}
+                  </div>
+                )}
+                <span className="text-sm">{displayName}</span>
+              </summary>
+              <div className="absolute right-0 mt-1 w-56 rounded-lg border bg-white shadow-md">
+                <nav className="p-1">
+                  <Link
+                    href="/settings/profile"
+                    className="block px-3 py-2 text-sm hover:bg-slate-50 rounded-md"
+                    onClick={() => detailsRef.current?.removeAttribute("open")}
+                  >
+                    Perfil y ajustes
+                  </Link>
+
+                  {isSuperadmin && (
+                    <button
+                      onClick={goToAdmin}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 rounded-md"
+                    >
+                      Panel de superadmin
+                    </button>
+                  )}
+
+                  <button
+                    onClick={signOut}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 rounded-md"
+                  >
+                    Cerrar sesión
+                  </button>
+                </nav>
+              </div>
+            </details>
+          </div>
         </div>
-
-        {/* DERECHA: Acciones de usuario */}
-        <div className="flex items-center gap-2">
-          <Link
-            href="/profile"
-            className="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm hover:bg-slate-100"
-          >
-            <User className="h-4 w-4" />
-            <span>Perfil y ajustes</span>
-          </Link>
-
-          <Link
-            href="/superadmin"
-            className="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm hover:bg-slate-100"
-          >
-            <Shield className="h-4 w-4" />
-            <span>Panel de superadmin</span>
-          </Link>
-
-          {/* Ajusta esta acción si usas otro flujo de signout */}
-          <form action="/api/auth/signout" method="post">
-            <button
-              className="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm hover:bg-slate-100"
-              type="submit"
-            >
-              <LogOut className="h-4 w-4" />
-              <span>Cerrar sesión</span>
-            </button>
-          </form>
-        </div>
-      </div>
-    </header>
+      </header>
+    </>
   );
 }
