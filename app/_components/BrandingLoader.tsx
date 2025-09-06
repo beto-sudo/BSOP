@@ -1,26 +1,20 @@
 // app/_components/BrandingLoader.tsx
-import { createServerClient } from "@supabase/auth-helpers-nextjs";
-import { getCurrentCompanyIdFromCookies } from "@/lib/company";
+// Server Component SIN dependencias de Supabase helpers.
+// Sólo detecta si hay empresa seleccionada (cookie) y deja
+// que el cliente aplique el branding por defecto (BSOP).
+
+import { cookies } from "next/headers";
 import BrandingClient from "./BrandingClient";
-import type { Database } from "@/types/supabase";
+
+const COMPANY_COOKIE_KEY = "CURRENT_COMPANY_ID";
 
 export default async function BrandingLoader() {
-  const companyId = await getCurrentCompanyIdFromCookies();
+  const c = await cookies();
+  const companyId = c.get(COMPANY_COOKIE_KEY)?.value ?? null;
 
-  if (!companyId) {
-    // sin empresa => tema BSOP por defecto
-    return <BrandingClient theme={null} companyName={null} />;
-  }
-
-  const supabase = createServerClient<Database>();
-  const { data: company } = await supabase
-    .from("Company")
-    .select("id, name, settings")
-    .eq("id", companyId)
-    .maybeSingle();
-
-  const theme = (company?.settings as any)?.theme ?? null;
-  const name = company?.name ?? null;
-
-  return <BrandingClient theme={theme} companyName={name} />;
+  // No resolvemos tema/colores aquí para evitar dependencias.
+  // BrandingClient ya aplica el tema BSOP por defecto.
+  // Si en el futuro quieres, puedes pasar companyId hacia el cliente
+  // para que éste consulte un endpoint propio y derive el tema.
+  return <BrandingClient theme={null} companyName={null} />;
 }
