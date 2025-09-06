@@ -5,12 +5,6 @@ import { useEffect, useRef, useState } from "react";
 import Sidebar from "@/app/_components/Sidebar";
 import Topbar from "@/app/_components/Topbar";
 
-/**
- * Mantiene tu layout flex original:
- * [ Sidebar | handler (6px) | derecha (Topbar + Main) ]
- * - Gestiona el ancho del sidebar (drag + persistencia).
- * - No recibe funciones desde server; renderiza Sidebar/Topbar directamente.
- */
 export default function ClientShell({ children }: { children: ReactNode }) {
   const STORAGE_KEY = "bsop:sidebarWidth";
   const MIN = 224;
@@ -35,14 +29,11 @@ export default function ClientShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!mounted.current) return;
-    try {
-      window.localStorage.setItem(STORAGE_KEY, String(width));
-    } catch {}
+    try { window.localStorage.setItem(STORAGE_KEY, String(width)); } catch {}
   }, [width]);
 
-  // Drag con mouse/touch
+  // Drag
   const dragRef = useRef<{ startX: number; startW: number } | null>(null);
-
   const onMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     dragRef.current = { startX: e.clientX, startW: width };
     document.body.classList.add("select-none");
@@ -61,6 +52,7 @@ export default function ClientShell({ children }: { children: ReactNode }) {
     window.removeEventListener("mouseup", onMouseUp);
   };
 
+  // Touch
   const onTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     const t = e.touches[0];
     dragRef.current = { startX: t.clientX, startW: width };
@@ -94,10 +86,10 @@ export default function ClientShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      {/* Sidebar: el propio componente aplica style={{ width }} */}
+      {/* Sidebar tal cual; sólo recibe width */}
       <Sidebar width={width} />
 
-      {/* Handler de ajuste */}
+      {/* Handler (no interfiere con overlays del topbar) */}
       <div
         role="separator"
         aria-label="Ajustar ancho del panel lateral"
@@ -108,7 +100,7 @@ export default function ClientShell({ children }: { children: ReactNode }) {
         title="Arrastra para ajustar el ancho"
       />
 
-      {/* Derecha: Topbar + contenido */}
+      {/* Columna derecha: Topbar original + contenido */}
       <div className="flex-1 min-w-0 flex flex-col">
         <Topbar />
         <main className="flex-1 min-w-0 overflow-auto">{children}</main>
