@@ -18,16 +18,12 @@ import {
   Building2,
 } from "lucide-react";
 
-/**
- * Util: clsx simple para clases condicionales
- */
+/* --------------------------- util clsx minimalista --------------------------- */
 function cx(...args: Array<string | false | null | undefined>) {
   return args.filter(Boolean).join(" ");
 }
 
-/**
- * Estructura de navegación (ajústala si agregas más rutas)
- */
+/* --------------------------- tipos de navegación ---------------------------- */
 type MenuItem = {
   key: string;
   label: string;
@@ -40,9 +36,10 @@ type Section = {
   label: string;
   icon?: React.ReactNode;
   items?: MenuItem[];
-  href?: string; // si no tiene items, puede ser un link directo
+  href?: string; // si no tiene items, puede ser link directo
 };
 
+/* -------------------------- árbol de navegación UI -------------------------- */
 const NAV: Section[] = [
   {
     key: "administracion",
@@ -133,24 +130,34 @@ const NAV: Section[] = [
   },
 ];
 
+/* -------------------------- constantes de sidebar --------------------------- */
 const LOCALSTORAGE_WIDTH_KEY = "sidebarWidth";
 const MIN_W = 220;
 const MAX_W = 420;
 const DEFAULT_W = 260;
+
+/* --------------------------- tipos de selector UX --------------------------- */
+type CompanyLite = { id: string; name: string; slug?: string };
 
 export default function Sidebar() {
   const pathname = usePathname();
   const asideRef = useRef<HTMLDivElement | null>(null);
   const resizerRef = useRef<HTMLDivElement | null>(null);
 
+  /* ancho / montaje */
   const [width, setWidth] = useState<number>(DEFAULT_W);
   const [mounted, setMounted] = useState(false);
 
-  // Estado: solo una sección abierta y un menú abierto
+  /* apertura de secciones/menús */
   const [openSectionKey, setOpenSectionKey] = useState<string | null>(null);
   const [openMenuKey, setOpenMenuKey] = useState<string | null>(null);
 
-  // Cargar ancho desde localStorage
+  /* empresas + selección */
+  const [companies, setCompanies] = useState<CompanyLite[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>(""); // "" => BSOP sin empresa
+  const [loadingCompanies, setLoadingCompanies] = useState<boolean>(false);
+
+  /* --------------------------- ciclo de vida ancho --------------------------- */
   useEffect(() => {
     setMounted(true);
     try {
@@ -164,7 +171,6 @@ export default function Sidebar() {
     }
   }, []);
 
-  // Persistir ancho
   useEffect(() => {
     if (!mounted) return;
     try {
@@ -174,7 +180,50 @@ export default function Sidebar() {
     }
   }, [width, mounted]);
 
-  // Autoabrir la sección y el item según la ruta
+  /* ------------------------------ empresas API ------------------------------ */
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      setLoadingCompanies(true);
+      try {
+        // 1) lista de empresas
+        const res = await fetch("/api/companies", { cache: "no-store" });
+        const json = await res.json().catch(() => ({ items: [] }));
+        if (!cancelled) setCompanies(Array.isArray(json.items) ? json.items : []);
+
+        // 2) empresa actual (si tienes este endpoint; si no existe, sigue en BSOP)
+        try {
+          const r2 = await fetch("/api/current-company", { cache: "no-store" });
+          if (r2.ok) {
+            const j2 = await r2.json().catch(() => ({}));
+            if (!cancelled && j2?.companyId) setSelectedCompanyId(j2.companyId as string);
+          }
+        } catch {
+          /* noop: endpoint opcional */
+        }
+      } finally {
+        if (!cancelled) setLoadingCompanies(false);
+      }
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function handleSelectCompany(e: React.ChangeEvent<HTMLSelectElement>) {
+    const val = e.target.value; // "" => BSOP sin empresa
+    setSelectedCompanyId(val);
+    await fetch("/api/switch-company", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ companyId: val || null }),
+    }).catch(() => {});
+    // refrescar para aplicar branding / data
+    window.location.reload();
+  }
+
+  /* ------------------------- autoapertura según ruta ------------------------ */
   useEffect(() => {
     if (!pathname) return;
     let foundSection: string | null = null;
@@ -199,7 +248,7 @@ export default function Sidebar() {
     if (foundItem) setOpenMenuKey(foundItem);
   }, [pathname]);
 
-  // Drag para el resizer
+  /* ----------------------------- drag del resizer --------------------------- */
   useEffect(() => {
     const aside = asideRef.current;
     const handle = resizerRef.current;
@@ -248,17 +297,9 @@ export default function Sidebar() {
     };
   }, [width]);
 
+  /* ------------------------------ render helpers ---------------------------- */
   const compact = width < 240;
-
-  // Empresa (muestra un nombre por defecto; adapta a tu store si ya lo tienes)
-  const companyName =
-    (typeof window !== "undefined" &&
-      (localStorage.getItem("currentCompanyName") ||
-        "Desarrollo Inmobiliario los Encinos SA de CV")) ||
-    "Desarrollo Inmobiliario los Encinos SA de CV";
-
-  const companyShort =
-    companyName.length > 28 ? companyName.slice(0, 28) + "…" : companyName;
+  const sections = useMemo(() => NAV, []);
 
   const SectionHeader: React.FC<{
     section: Section;
@@ -270,7 +311,11 @@ export default function Sidebar() {
       <>
         <span className="flex items-center gap-2">
           {section.icon}
-          {!compact && <span className="text-xs font-semibold tracking-wide">{section.label}</span>}
+          {!compact && (
+            <span className="text-xs font-semibold tracking-wide">
+              {section.label}
+            </span>
+          )}
         </span>
         {section.items?.length ? (
           open ? (
@@ -336,24 +381,23 @@ export default function Sidebar() {
     );
   };
 
-  const sections = useMemo(() => NAV, []);
-
+  /* --------------------------------- render -------------------------------- */
   return (
     <aside
       ref={asideRef}
       className="relative shrink-0 border-r bg-white"
       style={{ width }}
     >
-      {/* Resizer */}
+      {/* Resizer a la derecha */}
       <div
         ref={resizerRef}
         className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-slate-200"
         aria-hidden
       />
 
-      {/* Header de empresa / branding */}
+      {/* Branding/Logo + Selector de Empresa */}
       <div className="px-3 pt-3 pb-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 mb-2">
           <div className="h-10 w-10 rounded-lg bg-lime-600/10 grid place-items-center">
             <span className="text-lime-700 font-bold">D</span>
           </div>
@@ -361,11 +405,46 @@ export default function Sidebar() {
             <div className="min-w-0">
               <div className="text-xs text-slate-500 leading-tight">Empresa</div>
               <div className="text-sm font-medium text-slate-800 leading-tight truncate">
-                {companyShort}
+                {selectedCompanyId
+                  ? companies.find((c) => c.id === selectedCompanyId)?.name ??
+                    "Cargando…"
+                  : "Sin empresa (BSOP)"}
               </div>
             </div>
           )}
         </div>
+
+        {/* Selector */}
+        {!compact && (
+          <div>
+            <label
+              htmlFor="company-select"
+              className="sr-only"
+            >
+              Seleccionar empresa
+            </label>
+            <select
+              id="company-select"
+              value={selectedCompanyId}
+              onChange={handleSelectCompany}
+              disabled={loadingCompanies}
+              className={cx(
+                "w-full rounded-md border px-2 py-1.5 text-sm",
+                "focus:outline-none focus:ring-2 focus:ring-lime-400",
+                "bg-white"
+              )}
+            >
+              <option value="">
+                Sin empresa (BSOP)
+              </option>
+              {companies.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Separador */}
@@ -373,7 +452,7 @@ export default function Sidebar() {
 
       {/* Secciones */}
       <nav className="px-2 pb-4">
-        {sections.map((sec) => {
+        {useMemo(() => NAV, []).map((sec) => {
           const hasItems = !!sec.items?.length;
           const open = openSectionKey === sec.key;
 
@@ -384,16 +463,11 @@ export default function Sidebar() {
                 open={open}
                 isLink={!hasItems}
                 onToggle={() => {
-                  if (!hasItems) {
-                    // Si no tiene items, es link; no tocamos openSectionKey
-                    return;
-                  }
+                  if (!hasItems) return; // link directo
                   setOpenSectionKey((prev) => (prev === sec.key ? null : sec.key));
-                  // al abrir una sección, colapsamos otras y limpiamos openMenuKey
                   setOpenMenuKey(null);
                 }}
               />
-
               {hasItems && open && (
                 <ul className={cx("mt-1 space-y-1", compact ? "px-1" : "px-3")}>
                   {sec.items!.map(renderMenuItem)}
