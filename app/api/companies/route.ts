@@ -1,26 +1,68 @@
 // app/api/companies/route.ts
+// Lista las empresas a las que el usuario (según su JWT en cookie sb-access-token) tiene acceso.
+// No usa @supabase/auth-helpers-nextjs. Utiliza PostgREST directamente.
+
 import { NextResponse } from "next/server";
-import { createServerClient } from "@supabase/auth-helpers-nextjs";
-import type { Database } from "@/types/supabase";
+import { cookies } from "next/headers";
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+// Ayudante mínimo para respuestas de error uniformes
+function err(msg: string, status = 500) {
+  return NextResponse.json({ items: [], error: msg }, { status });
+}
 
 export async function GET() {
-  const supabase = createServerClient<Database>();
-  const { data: { user }, error: authErr } = await supabase.auth.getUser();
-  if (authErr || !user) return NextResponse.json({ items: [] });
+  try {
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      return err("Missing SUPABASE env (URL/ANON_KEY)", 500);
+    }
 
-  const { data, error } = await supabase
-    .from("company_member")
-    .select("company_id, company:Company(id, name, slug, isActive)")
-    .eq("user_id", user.id)
-    .eq("is_active", true);
+    const c = await cookies();
+    const jwt = c.get("sb-access-token")?.value;
+    // Sin sesión → devolver vacío (evita 401 en build/SSR)
+    if (!jwt) {
+      return NextResponse.json({ items: [] });
+    }
 
-  if (error) return NextResponse.json({ items: [], error: error.message }, { status: 500 });
+    // PostgREST: traemos membership + expand de tabla "Company"
+    // Ajusta nombres si tu FK se llama distinto.
+    const url = new URL(`${SUPABASE_URL}/rest/v1/company_member`);
+    url.searchParams.set(
+      "select",
+      "company:Company(id,name,slug,isActive)"
+    );
+    url.searchParams.set("user_id", "eq.auth.uid()"); // alternativa segura si tienes policies con auth.uid()
+    url.searchParams.set("is_active", "eq.true");
 
-  const items = (data ?? [])
-    .map((r) => r.company)
-    .filter(Boolean)
-    .filter((c) => c!.isActive)
-    .map((c) => ({ id: c!.id, name: c!.name, slug: c!.slug }));
+    const res = await fetch(url.toString(), {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${jwt}`,
+        // Para que PostgREST permita usar filtros con auth.uid(), enviamos el token del usuario
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
 
-  return NextResponse.json({ items });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      return err(`postgrest_error ${res.status}: ${txt || res.statusText}`, res.status);
+    }
+
+    const rows: Array<{ company: { id: string; name: string; slug?: string; isActive?: boolean } | null }> =
+      await res.json();
+
+    const items =
+      (rows || [])
+        .map((r) => r.company)
+        .filter(Boolean)
+        .filter((c) => c!.isActive !== false) // si existe y es false, se excluye
+        .map((c) => ({ id: c!.id, name: c!.name, slug: c!.slug }));
+
+    return NextResponse.json({ items });
+  } catch (e: any) {
+    return err(e?.message || "unexpected_error", 500);
+  }
 }
