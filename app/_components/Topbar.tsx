@@ -2,31 +2,41 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { User, LogOut, Shield } from "lucide-react";
 import Link from "next/link";
+import { User, LogOut, Shield } from "lucide-react";
 
 export default function Topbar() {
   const [companyName, setCompanyName] = useState<string | null>(null);
 
   useEffect(() => {
-    // BrandingClient ya actualiza el title; aquí sólo leemos del title por simplicidad
-    // Si prefieres: inyecta un <meta name="company-name"> desde BrandingLoader.
-    const t = document.title;
-    const parts = t.split("·");
-    if (parts.length > 1) {
-      setCompanyName(parts[0].trim());
-    } else {
-      setCompanyName(null);
+    let cancelled = false;
+    async function load() {
+      try {
+        const res = await fetch("/api/current-company", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!cancelled) {
+          setCompanyName(json?.companyName ?? null);
+        }
+      } catch {
+        /* noop */
+      }
     }
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
     <header className="sticky top-0 z-30 h-12 border-b bg-white/80 backdrop-blur">
       <div className="mx-auto flex h-full items-center justify-between px-4">
+        {/* Izquierda: nombre de empresa o BSOP */}
         <div className="text-sm font-semibold text-slate-800">
           {companyName ?? "BSOP"}
         </div>
 
+        {/* Derecha: acciones */}
         <div className="flex items-center gap-2">
           <Link
             href="/profile"
@@ -44,6 +54,7 @@ export default function Topbar() {
             <span>Panel de superadmin</span>
           </Link>
 
+          {/* Ajusta esta acción a tu flujo de signout con Supabase/NextAuth */}
           <form action="/api/auth/signout" method="post">
             <button
               className="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm hover:bg-slate-100"
