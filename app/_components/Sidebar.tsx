@@ -1,262 +1,407 @@
 "use client";
 
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ChevronRight } from "lucide-react";
-import { buildSectionsOrdered, Section, NavMenu, NavItem } from "@/app/_config/nav";
+import { usePathname } from "next/navigation";
+import {
+  ChevronDown,
+  ChevronRight,
+  Settings,
+  LayoutDashboard,
+  BarChart3,
+  ShoppingCart,
+  Boxes,
+  HandCoins,
+  Wallet,
+  FileChartColumn,
+  Shield,
+  Building2,
+} from "lucide-react";
 
-type Company = { id: string; name: string; slug: string };
-type Branding = { brandName?: string; primary?: string; secondary?: string; logoUrl?: string };
-type Features = Record<string, boolean>;
-
-function InitialsIcon({ name }: { name: string }) {
-  const initials = (name || "").split(" ").map(s=>s[0]).join("").slice(0,2).toUpperCase() || "B";
-  return (
-    <div
-      className="h-10 w-10 rounded-md grid place-items-center text-xs font-semibold"
-      style={{
-        background: "var(--brand-100, #eef2ff)",
-        color: "var(--brand-900, #0f172a)",
-      }}
-    >
-      {initials}
-    </div>
-  );
+/**
+ * Util: clsx simple para clases condicionales
+ */
+function cx(...args: Array<string | false | null | undefined>) {
+  return args.filter(Boolean).join(" ");
 }
 
+/**
+ * Estructura de navegación (ajústala si agregas más rutas)
+ */
+type MenuItem = {
+  key: string;
+  label: string;
+  href: string;
+  icon?: React.ReactNode;
+};
+
+type Section = {
+  key: string;
+  label: string;
+  icon?: React.ReactNode;
+  items?: MenuItem[];
+  href?: string; // si no tiene items, puede ser un link directo
+};
+
+const NAV: Section[] = [
+  {
+    key: "administracion",
+    label: "ADMINISTRACIÓN",
+    icon: <Building2 className="h-4 w-4" />,
+    items: [
+      {
+        key: "dashboard-admin",
+        label: "Dashboard",
+        href: "/admin/dashboard",
+        icon: <LayoutDashboard className="h-4 w-4" />,
+      },
+    ],
+  },
+  {
+    key: "operacion",
+    label: "OPERACIÓN",
+    icon: <BarChart3 className="h-4 w-4" />,
+    items: [
+      {
+        key: "kpis",
+        label: "Inicio (KPIs)",
+        href: "/operacion/kpis",
+        icon: <BarChart3 className="h-4 w-4" />,
+      },
+      {
+        key: "dashboard-op",
+        label: "Dashboard",
+        href: "/operacion/dashboard",
+        icon: <LayoutDashboard className="h-4 w-4" />,
+      },
+      {
+        key: "compras",
+        label: "Compras",
+        href: "/operacion/compras",
+        icon: <ShoppingCart className="h-4 w-4" />,
+      },
+      {
+        key: "inventario",
+        label: "Inventario",
+        href: "/operacion/inventario",
+        icon: <Boxes className="h-4 w-4" />,
+      },
+      {
+        key: "ventas",
+        label: "Ventas",
+        href: "/operacion/ventas",
+        icon: <HandCoins className="h-4 w-4" />,
+      },
+      {
+        key: "caja",
+        label: "Caja",
+        href: "/operacion/caja",
+        icon: <Wallet className="h-4 w-4" />,
+      },
+      {
+        key: "reportes",
+        label: "Reportes",
+        href: "/operacion/reportes",
+        icon: <FileChartColumn className="h-4 w-4" />,
+      },
+    ],
+  },
+  {
+    key: "configuracion",
+    label: "CONFIGURACIÓN",
+    icon: <Settings className="h-4 w-4" />,
+    items: [
+      {
+        key: "empresa-ajustes",
+        label: "Empresa",
+        href: "/configuracion/empresa",
+        icon: <Building2 className="h-4 w-4" />,
+      },
+      {
+        key: "ajustes",
+        label: "Ajustes",
+        href: "/configuracion/ajustes",
+        icon: <Settings className="h-4 w-4" />,
+      },
+    ],
+  },
+  {
+    key: "superadmin",
+    label: "SUPERADMIN",
+    icon: <Shield className="h-4 w-4" />,
+    href: "/superadmin",
+  },
+];
+
+const LOCALSTORAGE_WIDTH_KEY = "sidebarWidth";
+const MIN_W = 220;
+const MAX_W = 420;
+const DEFAULT_W = 260;
+
 export default function Sidebar() {
-  const router = useRouter();
-  const qp = useSearchParams();
   const pathname = usePathname();
-  const companySlug = (qp.get("company") || "").toLowerCase();
-
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [branding, setBranding] = useState<Branding | null>(null);
-  const [features, setFeatures] = useState<Features>({});
-  const [isSuperadmin, setIsSuperadmin] = useState(false);
-
-  // estado de apertura: una sección y un menú a la vez
-  const [openSectionKey, setOpenSectionKey] = useState<string>("administracion");
-  const [openMenuKey, setOpenMenuKey] = useState<string>("");
-
-  // ancho redimensionable
   const asideRef = useRef<HTMLDivElement | null>(null);
   const resizerRef = useRef<HTMLDivElement | null>(null);
-  const [width, setWidth] = useState<number>(260);
-  useEffect(() => { const w=Number(localStorage.getItem("sidebar:w")); if (w>=220 && w<=420) setWidth(w); }, []);
-  useEffect(() => { localStorage.setItem("sidebar:w", String(width)); if (asideRef.current) asideRef.current.style.width = `${width}px`; }, [width]);
 
-  // cargar empresas
-  useEffect(() => {
-    (async () => {
-      try {
-        const r = await fetch("/api/companies", { cache: "no-store" });
-        const list = await r.json();
-        setCompanies(Array.isArray(list) ? list : []);
-      } catch {}
-    })();
-  }, []);
+  const [width, setWidth] = useState<number>(DEFAULT_W);
+  const [mounted, setMounted] = useState(false);
 
-  // forzar ?company solo en rutas que lo requieren
+  // Estado: solo una sección abierta y un menú abierto
+  const [openSectionKey, setOpenSectionKey] = useState<string | null>(null);
+  const [openMenuKey, setOpenMenuKey] = useState<string | null>(null);
+
+  // Cargar ancho desde localStorage
   useEffect(() => {
-    const requiresCompany = !(
-      pathname === "/companies" ||
-      pathname.startsWith("/companies") ||
-      pathname.startsWith("/settings") ||
-      pathname.startsWith("/auth") ||
-      pathname.startsWith("/signin") ||
-      pathname.startsWith("/api")
-    );
-    if (!companySlug && companies.length > 0 && requiresCompany) {
-      const slug = companies[0]?.slug?.toLowerCase();
-      if (!slug) return;
-      document.cookie = `company=${slug}; path=/; max-age=31536000; samesite=lax`;
-      const url = new URL(window.location.href);
-      url.searchParams.set("company", slug);
-      router.replace(url.pathname + "?" + url.searchParams.toString());
+    setMounted(true);
+    try {
+      const saved = localStorage.getItem(LOCALSTORAGE_WIDTH_KEY);
+      if (saved) {
+        const w = Number(saved);
+        if (!Number.isNaN(w)) setWidth(Math.min(MAX_W, Math.max(MIN_W, w)));
+      }
+    } catch {
+      /* noop */
     }
-  }, [companySlug, companies, pathname, router]);
-
-  // branding + features por empresa
-  useEffect(() => {
-    (async () => {
-      try {
-        if (!companySlug) return;
-        const r = await fetch(`/api/admin/company?company=${companySlug}`, { cache: "no-store" });
-        const json = await r.json();
-        const b: Branding = json?.settings?.branding ?? {};
-        const f: Features = json?.settings?.features ?? {};
-        setBranding({
-          brandName: b?.brandName || json?.name || "",
-          primary: b?.primary || "",
-          secondary: b?.secondary || "",
-          logoUrl: b?.logoUrl || "",
-        });
-        setFeatures(f || {});
-      } catch {}
-    })();
-  }, [companySlug]);
-
-  // superadmin flag
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/admin/is-superadmin")
-      .then(r => r.ok ? r.json() : { is:false })
-      .then(j => { if (alive) setIsSuperadmin(!!j.is); })
-      .catch(() => {});
-    return () => { alive = false; };
   }, []);
 
-  // construir secciones en orden fijo
-  const sections: Section[] = useMemo(() => buildSectionsOrdered(isSuperadmin), [isSuperadmin]);
-
-  // auto-abrir sección y menú del ítem activo
+  // Persistir ancho
   useEffect(() => {
-    const p = pathname || "";
-    for (const sec of sections) {
-      for (const menu of sec.menus) {
-        for (const item of menu.items) {
-          if (p.startsWith(item.href)) {
-            setOpenSectionKey(sec.key);
-            setOpenMenuKey(`${sec.key}:${menu.key}`);
-            return;
+    if (!mounted) return;
+    try {
+      localStorage.setItem(LOCALSTORAGE_WIDTH_KEY, String(width));
+    } catch {
+      /* noop */
+    }
+  }, [width, mounted]);
+
+  // Autoabrir la sección y el item según la ruta
+  useEffect(() => {
+    if (!pathname) return;
+    let foundSection: string | null = null;
+    let foundItem: string | null = null;
+
+    for (const sec of NAV) {
+      if (sec.items?.length) {
+        for (const it of sec.items) {
+          if (pathname.startsWith(it.href)) {
+            foundSection = sec.key;
+            foundItem = it.key;
+            break;
           }
         }
+      } else if (sec.href && pathname.startsWith(sec.href)) {
+        foundSection = sec.key;
       }
+      if (foundSection) break;
     }
-  }, [pathname, sections]);
 
-  function isItemVisible(item: NavItem): boolean {
-    // MOSTRAR TODO salvo que esté restringido por empresa o feature flag
-    if (item.enabledForCompanies && item.enabledForCompanies.length > 0) {
-      if (!companySlug) return false;
-      if (!item.enabledForCompanies.map(s => s.toLowerCase()).includes(companySlug)) return false;
-    }
-    if (item.enabledByFeature) {
-      const key = item.enabledByFeature;
-      if (!features || features[key] !== true) return false;
-    }
-    return true;
-  }
+    if (foundSection) setOpenSectionKey(foundSection);
+    if (foundItem) setOpenMenuKey(foundItem);
+  }, [pathname]);
 
-  function renderMenu(sec: Section, menu: NavMenu) {
-    const id = `${sec.key}:${menu.key}`;
-    const isOpen = openMenuKey === id;
-    return (
-      <div key={menu.key} className="border-t first:border-t-0">
-        <button
-          className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold"
-          onClick={() => setOpenMenuKey(isOpen ? "" : id)}
-          style={{
-            background: isOpen ? "var(--brand-100, #f1f5f9)" : "transparent",
-            color: "var(--brand-900, #0f172a)",
-          }}
+  // Drag para el resizer
+  useEffect(() => {
+    const aside = asideRef.current;
+    const handle = resizerRef.current;
+    if (!aside || !handle) return;
+
+    let startX = 0;
+    let startW = width;
+    let dragging = false;
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!dragging) return;
+      const delta = e.clientX - startX;
+      const next = Math.min(MAX_W, Math.max(MIN_W, startW + delta));
+      setWidth(next);
+    };
+
+    const onMouseUp = () => {
+      if (!dragging) return;
+      dragging = false;
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+
+    const onMouseDown = (e: MouseEvent) => {
+      dragging = true;
+      startX = e.clientX;
+      startW = aside.getBoundingClientRect().width;
+      document.body.style.userSelect = "none";
+      document.body.style.cursor = "col-resize";
+      window.addEventListener("mousemove", onMouseMove);
+      window.addEventListener("mouseup", onMouseUp);
+    };
+
+    const onDbl = () => setWidth(DEFAULT_W);
+
+    handle.addEventListener("mousedown", onMouseDown);
+    handle.addEventListener("dblclick", onDbl);
+
+    return () => {
+      handle.removeEventListener("mousedown", onMouseDown);
+      handle.removeEventListener("dblclick", onDbl);
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [width]);
+
+  const compact = width < 240;
+
+  // Empresa (muestra un nombre por defecto; adapta a tu store si ya lo tienes)
+  const companyName =
+    (typeof window !== "undefined" &&
+      (localStorage.getItem("currentCompanyName") ||
+        "Desarrollo Inmobiliario los Encinos SA de CV")) ||
+    "Desarrollo Inmobiliario los Encinos SA de CV";
+
+  const companyShort =
+    companyName.length > 28 ? companyName.slice(0, 28) + "…" : companyName;
+
+  const SectionHeader: React.FC<{
+    section: Section;
+    open: boolean;
+    onToggle: () => void;
+    isLink?: boolean;
+  }> = ({ section, open, onToggle, isLink }) => {
+    const content = (
+      <>
+        <span className="flex items-center gap-2">
+          {section.icon}
+          {!compact && <span className="text-xs font-semibold tracking-wide">{section.label}</span>}
+        </span>
+        {section.items?.length ? (
+          open ? (
+            <ChevronDown className="h-4 w-4 opacity-70" />
+          ) : (
+            <ChevronRight className="h-4 w-4 opacity-70" />
+          )
+        ) : null}
+      </>
+    );
+
+    if (isLink && section.href) {
+      return (
+        <Link
+          href={section.href}
+          className={cx(
+            "group flex w-full items-center justify-between rounded-lg px-3 py-2",
+            "hover:bg-lime-100/70 text-slate-700"
+          )}
         >
-          <span className="flex items-center gap-2">{menu.icon}<span>{menu.label}</span></span>
-          <ChevronRight className={`h-3 w-3 transition-transform ${isOpen ? "rotate-90" : ""}`} />
-        </button>
-        {isOpen && (
-          <ul className="py-1">
-            {menu.items.filter(isItemVisible).map((item) => {
-              const href = item.needsCompany && companySlug
-                ? `${item.href}?company=${companySlug}`
-                : item.href;
-              const active = (pathname || "").startsWith(item.href);
-              return (
-                <li key={`${menu.key}:${item.href}`}>
-                  <Link
-                    href={href}
-                    className="block px-6 py-2 text-sm rounded-r-md"
-                    style={{
-                      background: active ? "var(--brand-50, #f8fafc)" : "transparent",
-                      color: active ? "var(--brand-800, #1e293b)" : "#334155",
-                      borderLeft: "3px solid",
-                      borderLeftColor: active ? "var(--brand-primary, #0f172a)" : "transparent",
-                    }}
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+          {content}
+        </Link>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={onToggle}
+        className={cx(
+          "group flex w-full items-center justify-between rounded-lg px-3 py-2",
+          "hover:bg-lime-100/70 text-slate-700"
         )}
+      >
+        {content}
+      </button>
+    );
+  };
+
+  const renderMenuItem = (it: MenuItem) => {
+    const active = pathname?.startsWith(it.href);
+    const content = (
+      <div
+        className={cx(
+          "flex items-center gap-2 rounded-md px-3 py-2 text-sm",
+          active
+            ? "bg-lime-200/70 text-lime-900 font-medium"
+            : "text-slate-700 hover:bg-lime-100/70"
+        )}
+        title={compact ? it.label : undefined}
+      >
+        {it.icon}
+        {!compact && <span>{it.label}</span>}
       </div>
     );
-  }
 
-  function renderSection(sec: Section) {
-    const isOpen = openSectionKey === sec.key;
     return (
-      <div key={sec.key} className="rounded-lg border overflow-hidden">
-        <button
-          className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold"
-          onClick={() => setOpenSectionKey(isOpen ? "" : sec.key)}
-          style={{
-            background: "var(--brand-50, #f8fafc)",
-            color: "var(--brand-900, #0f172a)",
-            borderLeft: "4px solid var(--brand-primary, #0f172a)",
-          }}
-        >
-          <span>{sec.label}</span>
-          <ChevronRight className={`h-3 w-3 transition-transform ${isOpen ? "rotate-90" : ""}`} />
-        </button>
-        {isOpen && (
-          <div className="pb-1">
-            {sec.menus.map((menu) => renderMenu(sec, menu))}
-          </div>
-        )}
-      </div>
+      <li key={it.key}>
+        <Link href={it.href} onClick={() => setOpenMenuKey(it.key)}>
+          {content}
+        </Link>
+      </li>
     );
-  }
+  };
 
-  const current = companies.find(c => c.slug.toLowerCase() === companySlug) || null;
+  const sections = useMemo(() => NAV, []);
 
   return (
-    <aside ref={asideRef} className="relative border-r bg-white shrink-0" style={{ width }}>
+    <aside
+      ref={asideRef}
+      className="relative shrink-0 border-r bg-white"
+      style={{ width }}
+    >
       {/* Resizer */}
       <div
         ref={resizerRef}
         className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-slate-200"
-        title="Arrastra para ajustar ancho"
+        aria-hidden
       />
 
-      {/* Header empresa */}
-      <div className="p-4 border-b flex items-center gap-3">
-        {branding?.logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={branding.logoUrl} alt="logo" className="h-10 w-10 rounded-md object-cover" />
-        ) : <InitialsIcon name={branding?.brandName || current?.name || "BS"} />}
-        <div className="min-w-0">
-          <div className="text-sm font-semibold truncate">{branding?.brandName || current?.name || "Sin empresa"}</div>
-          <div className="text-xs text-slate-500 truncate">{current?.slug || "—"}</div>
+      {/* Header de empresa / branding */}
+      <div className="px-3 pt-3 pb-2">
+        <div className="flex items-center gap-2">
+          <div className="h-10 w-10 rounded-lg bg-lime-600/10 grid place-items-center">
+            <span className="text-lime-700 font-bold">D</span>
+          </div>
+          {!compact && (
+            <div className="min-w-0">
+              <div className="text-xs text-slate-500 leading-tight">Empresa</div>
+              <div className="text-sm font-medium text-slate-800 leading-tight truncate">
+                {companyShort}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Selector de empresa */}
-      <div className="p-3 border-b">
-        <label className="block text-xs text-slate-500 mb-1">Empresa</label>
-        <select
-          className="w-full rounded-md border px-2 py-1 text-sm"
-          value={companySlug}
-          onChange={(e) => {
-            const slug = e.target.value;
-            document.cookie = `company=${slug}; path=/; max-age=31536000; samesite=lax`;
-            const url = new URL(window.location.href);
-            url.searchParams.set("company", slug);
-            router.push(url.pathname + "?" + url.searchParams.toString());
-            router.refresh();
-          }}
-        >
-          <option value="">Selecciona...</option>
-          {companies.map(c => <option key={c.id} value={c.slug.toLowerCase()}>{c.name}</option>)}
-        </select>
-      </div>
+      {/* Separador */}
+      <div className="mx-3 mb-2 border-b" />
 
-      {/* Navegación: ADMINISTRACIÓN → OPERACIÓN → CONFIGURACIÓN → (SUPERADMIN si aplica) */}
-      <nav className="p-2 space-y-2">
-        {sections.map(renderSection)}
+      {/* Secciones */}
+      <nav className="px-2 pb-4">
+        {sections.map((sec) => {
+          const hasItems = !!sec.items?.length;
+          const open = openSectionKey === sec.key;
+
+          return (
+            <div key={sec.key} className="mb-2">
+              <SectionHeader
+                section={sec}
+                open={open}
+                isLink={!hasItems}
+                onToggle={() => {
+                  if (!hasItems) {
+                    // Si no tiene items, es link; no tocamos openSectionKey
+                    return;
+                  }
+                  setOpenSectionKey((prev) => (prev === sec.key ? null : sec.key));
+                  // al abrir una sección, colapsamos otras y limpiamos openMenuKey
+                  setOpenMenuKey(null);
+                }}
+              />
+
+              {hasItems && open && (
+                <ul className={cx("mt-1 space-y-1", compact ? "px-1" : "px-3")}>
+                  {sec.items!.map(renderMenuItem)}
+                </ul>
+              )}
+            </div>
+          );
+        })}
       </nav>
     </aside>
   );
