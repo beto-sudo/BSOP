@@ -7,24 +7,15 @@ export const fetchCache = "force-no-store";
 
 import type { ReactNode } from "react";
 import BrandingLoader from "@/app/_components/BrandingLoader";
-import Topbar from "@/app/_components/Topbar";
-import Sidebar from "@/app/_components/Sidebar";
 import ClientShell from "./ClientShell";
-import ErrorBoundary from "./ErrorBoundary";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-white text-slate-900">
+      {/* Server: Branding/temas por cookie */}
       <BrandingLoader />
-
-      <ErrorBoundary>
-        <ClientShell
-          renderSidebar={(width) => <Sidebar width={width} />}
-          renderTopbar={<Topbar />}
-        >
-          {children}
-        </ClientShell>
-      </ErrorBoundary>
+      {/* Cliente: sidebar ajustable + topbar; sin pasar funciones como props */}
+      <ClientShell>{children}</ClientShell>
     </div>
   );
 }
