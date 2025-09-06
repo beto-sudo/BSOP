@@ -1,32 +1,26 @@
 // app/api/switch-company/route.ts
 import { NextResponse } from "next/server";
-import { createServerClient } from "@supabase/auth-helpers-nextjs";
-import { setCurrentCompanyCookie } from "@/lib/company";
-import type { Database } from "@/types/supabase";
+import { cookies } from "next/headers";
+
+const COMPANY_COOKIE_KEY = "CURRENT_COMPANY_ID";
 
 export async function POST(req: Request) {
-  const { companyId } = await req.json().catch(() => ({} as any));
-  const supabase = createServerClient<Database>();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "No auth" }, { status: 401 });
+  const { companyId } = await req.json().catch(() => ({ companyId: null as string | null }));
+  const c = await cookies();
 
-  // Si viene null/undefined => limpiar cookie (branding BSOP)
   if (!companyId) {
-    await setCurrentCompanyCookie(null);
+    // Limpiar selección => modo BSOP
+    c.delete(COMPANY_COOKIE_KEY);
     return NextResponse.json({ ok: true, cleared: true });
   }
 
-  // Verificar membresía
-  const { data: cm } = await supabase
-    .from("company_member")
-    .select("company_id")
-    .eq("user_id", user.id)
-    .eq("company_id", companyId)
-    .eq("is_active", true)
-    .maybeSingle();
+  // Guardar selección (sin validar membresía; sigues usando RLS en tus queries)
+  c.set(COMPANY_COOKIE_KEY, String(companyId), {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30, // 30 días
+  });
 
-  if (!cm) return NextResponse.json({ error: "Sin acceso a la empresa" }, { status: 403 });
-
-  await setCurrentCompanyCookie(companyId);
   return NextResponse.json({ ok: true });
 }
