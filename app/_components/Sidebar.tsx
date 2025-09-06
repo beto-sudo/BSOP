@@ -1,262 +1,269 @@
+// app/_components/Sidebar.tsx
 "use client";
 
 import Link from "next/link";
+import { usePathname, useSearchParams, useRouter } from "next/navigation";
+import {
+  ChevronDown,
+  ChevronRight,
+  Settings,
+  LayoutDashboard,
+  BarChart3,
+  ShoppingCart,
+  Boxes,
+  HandCoins,
+  Wallet,
+  FileChartColumn,
+  Shield,
+  Building2,
+  Users,
+  UserCog,
+  Landmark,
+  ReceiptText,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ChevronRight } from "lucide-react";
-import { buildSectionsOrdered, Section, NavMenu, NavItem } from "@/app/_config/nav";
 
-type Company = { id: string; name: string; slug: string };
-type Branding = { brandName?: string; primary?: string; secondary?: string; logoUrl?: string };
-type Features = Record<string, boolean>;
-
-function InitialsIcon({ name }: { name: string }) {
-  const initials = (name || "").split(" ").map(s=>s[0]).join("").slice(0,2).toUpperCase() || "B";
-  return (
-    <div
-      className="h-10 w-10 rounded-md grid place-items-center text-xs font-semibold"
-      style={{
-        background: "var(--brand-100, #eef2ff)",
-        color: "var(--brand-900, #0f172a)",
-      }}
-    >
-      {initials}
-    </div>
-  );
+/* ---------------- util mínima ---------------- */
+function cx(...xs: Array<string | false | null | undefined>) {
+  return xs.filter(Boolean).join(" ");
 }
 
+function truthyEnv(v?: string) {
+  if (!v) return false;
+  const s = v.toString().trim().toLowerCase();
+  return s === "1" || s === "true" || s === "yes";
+}
+
+/* lee cookie en cliente (usa "company" o "CURRENT_COMPANY_ID") */
+function readCompanyCookie(): string | null {
+  if (typeof document === "undefined") return null;
+  const map = Object.fromEntries(
+    document.cookie.split(";").map((p) => {
+      const [k, ...r] = p.trim().split("=");
+      return [decodeURIComponent(k), decodeURIComponent(r.join("=") || "")];
+    })
+  );
+  return map.company || map.CURRENT_COMPANY_ID || null;
+}
+
+/* ---------------- navegación (según doc) ---------------- */
+
+type MenuItem = {
+  key: string;
+  label: string;
+  href: string;
+  needsCompany?: boolean;
+  icon?: React.ReactNode;
+  featureFlag?: string;
+  enabledForCompanies?: string[];
+};
+
+type Section = {
+  key: "administracion" | "operacion" | "configuracion" | "superadmin";
+  label: string;
+  icon?: React.ReactNode;
+  items: MenuItem[];
+};
+
+const NAV_BASE: Section[] = [
+  {
+    key: "administracion",
+    label: "ADMINISTRACIÓN",
+    icon: <Building2 className="h-4 w-4" />,
+    items: [
+      { key: "admin-proveedores", label: "Proveedores", href: "/admin/vendors", needsCompany: true, icon: <ShoppingCart className="h-4 w-4" /> },
+      { key: "admin-clientes", label: "Clientes", href: "/admin/customers", needsCompany: true, icon: <Users className="h-4 w-4" /> },
+      { key: "admin-integraciones", label: "Integraciones", href: "/admin/integrations", needsCompany: true, icon: <Settings className="h-4 w-4" /> },
+      { key: "admin-finanzas", label: "Finanzas", href: "/admin/finances", needsCompany: true, icon: <Landmark className="h-4 w-4" /> },
+    ],
+  },
+  {
+    key: "operacion",
+    label: "OPERACIÓN",
+    icon: <BarChart3 className="h-4 w-4" />,
+    items: [
+      { key: "op-dashboard", label: "Dashboard", href: "/dashboard", needsCompany: true, icon: <LayoutDashboard className="h-4 w-4" /> },
+      { key: "op-po", label: "Órdenes de compra", href: "/purchases/po", needsCompany: true, icon: <ShoppingCart className="h-4 w-4" /> },
+      { key: "op-recepciones", label: "Recepciones", href: "/purchases/receiving", needsCompany: true, icon: <ReceiptText className="h-4 w-4" /> },
+      { key: "op-inventario", label: "Inventario", href: "/inventory", needsCompany: true, icon: <Boxes className="h-4 w-4" /> },
+      { key: "op-ventas", label: "Ventas", href: "/sales", needsCompany: true, icon: <HandCoins className="h-4 w-4" /> },
+      { key: "op-caja", label: "Caja", href: "/cash", needsCompany: true, icon: <Wallet className="h-4 w-4" /> },
+      { key: "op-reportes", label: "Reportes", href: "/reports", needsCompany: true, icon: <FileChartColumn className="h-4 w-4" /> },
+    ],
+  },
+  {
+    key: "configuracion",
+    label: "CONFIGURACIÓN",
+    icon: <Settings className="h-4 w-4" />,
+    items: [
+      { key: "cfg-branding", label: "Branding", href: "/admin/branding", needsCompany: true, icon: <Settings className="h-4 w-4" /> },
+      { key: "cfg-tax", label: "Datos Fiscales", href: "/settings/tax", needsCompany: true, icon: <ReceiptText className="h-4 w-4" /> },
+      { key: "cfg-general", label: "Datos Generales", href: "/settings/general", needsCompany: true, icon: <Settings className="h-4 w-4" /> },
+      { key: "cfg-users", label: "Usuarios", href: "/settings/users", needsCompany: true, icon: <Users className="h-4 w-4" /> },
+      { key: "cfg-roles", label: "Roles", href: "/settings/roles", needsCompany: true, icon: <UserCog className="h-4 w-4" /> },
+    ],
+  },
+];
+
+const SUPERADMIN_SECTION: Section = {
+  key: "superadmin",
+  label: "SUPERADMIN",
+  icon: <Shield className="h-4 w-4" />,
+  items: [
+    { key: "sa-companies", label: "Empresas", href: "/companies", needsCompany: false, icon: <Building2 className="h-4 w-4" /> },
+    { key: "sa-access", label: "Accesos", href: "/settings/access", needsCompany: false, icon: <Shield className="h-4 w-4" /> },
+  ],
+};
+
+/* ---------------- componente ---------------- */
+
 export default function Sidebar() {
+  const pathname = usePathname() || "/";
+  const search = useSearchParams();
   const router = useRouter();
-  const qp = useSearchParams();
-  const pathname = usePathname();
-  const companySlug = (qp.get("company") || "").toLowerCase();
 
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [branding, setBranding] = useState<Branding | null>(null);
-  const [features, setFeatures] = useState<Features>({});
-  const [isSuperadmin, setIsSuperadmin] = useState(false);
+  // robusto: toma cualquiera de las 3 envs
+  const isSuperadmin =
+    truthyEnv(process.env.NEXT_PUBLIC_IS_SUPERADMIN) ||
+    truthyEnv(process.env.NEXT_PUBLIC_SUPERADMIN) ||
+    truthyEnv(process.env.NEXT_PUBLIC_SA);
 
-  // estado de apertura: una sección y un menú a la vez
-  const [openSectionKey, setOpenSectionKey] = useState<string>("administracion");
-  const [openMenuKey, setOpenMenuKey] = useState<string>("");
+  const NAV: Section[] = useMemo(
+    () => (isSuperadmin ? [...NAV_BASE, SUPERADMIN_SECTION] : NAV_BASE),
+    [isSuperadmin]
+  );
 
-  // ancho redimensionable
-  const asideRef = useRef<HTMLDivElement | null>(null);
-  const resizerRef = useRef<HTMLDivElement | null>(null);
-  const [width, setWidth] = useState<number>(260);
-  useEffect(() => { const w=Number(localStorage.getItem("sidebar:w")); if (w>=220 && w<=420) setWidth(w); }, []);
-  useEffect(() => { localStorage.setItem("sidebar:w", String(width)); if (asideRef.current) asideRef.current.style.width = `${width}px`; }, [width]);
+  const [openSectionKey, setOpenSectionKey] = useState<Section["key"] | null>("operacion");
+  const [openItemKey, setOpenItemKey] = useState<string | null>(null);
 
-  // cargar empresas
+  // Guardas suaves de ?company (una sola vez; sin bucles)
+  const ensuredOnce = useRef(false);
   useEffect(() => {
-    (async () => {
-      try {
-        const r = await fetch("/api/companies", { cache: "no-store" });
-        const list = await r.json();
-        setCompanies(Array.isArray(list) ? list : []);
-      } catch {}
-    })();
-  }, []);
+    if (ensuredOnce.current) return;
+    const hasCompanyParam = !!search?.get("company");
+    if (hasCompanyParam) return;
 
-  // forzar ?company solo en rutas que lo requieren
-  useEffect(() => {
-    const requiresCompany = !(
-      pathname === "/companies" ||
-      pathname.startsWith("/companies") ||
-      pathname.startsWith("/settings") ||
-      pathname.startsWith("/auth") ||
-      pathname.startsWith("/signin") ||
-      pathname.startsWith("/api")
+    const companyId = readCompanyCookie();
+    if (!companyId) return;
+
+    const requiresCompany = NAV.some((sec) =>
+      sec.items.some((it) => it.needsCompany && pathname.startsWith(it.href))
     );
-    if (!companySlug && companies.length > 0 && requiresCompany) {
-      const slug = companies[0]?.slug?.toLowerCase();
-      if (!slug) return;
-      document.cookie = `company=${slug}; path=/; max-age=31536000; samesite=lax`;
-      const url = new URL(window.location.href);
-      url.searchParams.set("company", slug);
-      router.replace(url.pathname + "?" + url.searchParams.toString());
-    }
-  }, [companySlug, companies, pathname, router]);
+    if (!requiresCompany) return;
 
-  // branding + features por empresa
+    ensuredOnce.current = true;
+    const url = new URL(window.location.href);
+    url.searchParams.set("company", companyId);
+    router.replace(url.toString());
+  }, [pathname, search, router, NAV]);
+
+  // Detecta activo y autoabre sección
   useEffect(() => {
-    (async () => {
-      try {
-        if (!companySlug) return;
-        const r = await fetch(`/api/admin/company?company=${companySlug}`, { cache: "no-store" });
-        const json = await r.json();
-        const b: Branding = json?.settings?.branding ?? {};
-        const f: Features = json?.settings?.features ?? {};
-        setBranding({
-          brandName: b?.brandName || json?.name || "",
-          primary: b?.primary || "",
-          secondary: b?.secondary || "",
-          logoUrl: b?.logoUrl || "",
-        });
-        setFeatures(f || {});
-      } catch {}
-    })();
-  }, [companySlug]);
-
-  // superadmin flag
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/admin/is-superadmin")
-      .then(r => r.ok ? r.json() : { is:false })
-      .then(j => { if (alive) setIsSuperadmin(!!j.is); })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, []);
-
-  // construir secciones en orden fijo
-  const sections: Section[] = useMemo(() => buildSectionsOrdered(isSuperadmin), [isSuperadmin]);
-
-  // auto-abrir sección y menú del ítem activo
-  useEffect(() => {
-    const p = pathname || "";
-    for (const sec of sections) {
-      for (const menu of sec.menus) {
-        for (const item of menu.items) {
-          if (p.startsWith(item.href)) {
-            setOpenSectionKey(sec.key);
-            setOpenMenuKey(`${sec.key}:${menu.key}`);
-            return;
-          }
+    for (const sec of NAV) {
+      for (const it of sec.items) {
+        if (pathname.startsWith(it.href)) {
+          setOpenSectionKey(sec.key);
+          setOpenItemKey(it.key);
+          return;
         }
       }
     }
-  }, [pathname, sections]);
+  }, [pathname, NAV]);
 
-  function isItemVisible(item: NavItem): boolean {
-    // MOSTRAR TODO salvo que esté restringido por empresa o feature flag
-    if (item.enabledForCompanies && item.enabledForCompanies.length > 0) {
-      if (!companySlug) return false;
-      if (!item.enabledForCompanies.map(s => s.toLowerCase()).includes(companySlug)) return false;
+  function makeHref(it: MenuItem): string {
+    let url = it.href;
+    if (it.needsCompany) {
+      const cid = search?.get("company") || readCompanyCookie();
+      if (cid) {
+        const u = new URL(url, typeof window !== "undefined" ? window.location.origin : "http://localhost");
+        u.searchParams.set("company", cid);
+        url = u.pathname + "?" + u.searchParams.toString();
+      }
     }
-    if (item.enabledByFeature) {
-      const key = item.enabledByFeature;
-      if (!features || features[key] !== true) return false;
-    }
-    return true;
+    return url;
   }
 
-  function renderMenu(sec: Section, menu: NavMenu) {
-    const id = `${sec.key}:${menu.key}`;
-    const isOpen = openMenuKey === id;
+  function SectionHeader({ section, open, onToggle }: { section: Section; open: boolean; onToggle: () => void }) {
     return (
-      <div key={menu.key} className="border-t first:border-t-0">
-        <button
-          className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold"
-          onClick={() => setOpenMenuKey(isOpen ? "" : id)}
-          style={{
-            background: isOpen ? "var(--brand-100, #f1f5f9)" : "transparent",
-            color: "var(--brand-900, #0f172a)",
-          }}
-        >
-          <span className="flex items-center gap-2">{menu.icon}<span>{menu.label}</span></span>
-          <ChevronRight className={`h-3 w-3 transition-transform ${isOpen ? "rotate-90" : ""}`} />
-        </button>
-        {isOpen && (
-          <ul className="py-1">
-            {menu.items.filter(isItemVisible).map((item) => {
-              const href = item.needsCompany && companySlug
-                ? `${item.href}?company=${companySlug}`
-                : item.href;
-              const active = (pathname || "").startsWith(item.href);
-              return (
-                <li key={`${menu.key}:${item.href}`}>
-                  <Link
-                    href={href}
-                    className="block px-6 py-2 text-sm rounded-r-md"
-                    style={{
-                      background: active ? "var(--brand-50, #f8fafc)" : "transparent",
-                      color: active ? "var(--brand-800, #1e293b)" : "#334155",
-                      borderLeft: "3px solid",
-                      borderLeftColor: active ? "var(--brand-primary, #0f172a)" : "transparent",
-                    }}
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+      <button
+        type="button"
+        onClick={onToggle}
+        className={cx(
+          "group flex w-full items-center justify-between rounded-md px-3 py-2 text-left",
+          "border-l-4",
+          open ? "border-[var(--brand-primary)]" : "border-transparent",
+          "bg-[var(--brand-50)] text-[color:var(--brand-900)]"
         )}
-      </div>
+      >
+        <span className="flex items-center gap-2">
+          {section.icon}
+          <span className="text-xs font-semibold tracking-wide">{section.label}</span>
+        </span>
+        {open ? <ChevronDown className="h-4 w-4 opacity-70" /> : <ChevronRight className="h-4 w-4 opacity-70" />}
+      </button>
     );
   }
 
-  function renderSection(sec: Section) {
-    const isOpen = openSectionKey === sec.key;
+  function MenuLink({ it }: { it: MenuItem }) {
+    const active = pathname.startsWith(it.href);
     return (
-      <div key={sec.key} className="rounded-lg border overflow-hidden">
-        <button
-          className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold"
-          onClick={() => setOpenSectionKey(isOpen ? "" : sec.key)}
-          style={{
-            background: "var(--brand-50, #f8fafc)",
-            color: "var(--brand-900, #0f172a)",
-            borderLeft: "4px solid var(--brand-primary, #0f172a)",
-          }}
-        >
-          <span>{sec.label}</span>
-          <ChevronRight className={`h-3 w-3 transition-transform ${isOpen ? "rotate-90" : ""}`} />
-        </button>
-        {isOpen && (
-          <div className="pb-1">
-            {sec.menus.map((menu) => renderMenu(sec, menu))}
-          </div>
+      <Link
+        href={makeHref(it)}
+        onClick={() => setOpenItemKey(it.key)}
+        className={cx(
+          "flex items-center gap-2 rounded-md px-3 py-2 text-sm",
+          active
+            ? "bg-[var(--brand-50)] text-[color:var(--brand-800)] border-l-4 border-[var(--brand-primary)]"
+            : "text-slate-700 hover:bg-[var(--brand-100)] hover:text-[color:var(--brand-900)]"
         )}
-      </div>
+      >
+        {it.icon}
+        <span>{it.label}</span>
+      </Link>
     );
   }
-
-  const current = companies.find(c => c.slug.toLowerCase() === companySlug) || null;
 
   return (
-    <aside ref={asideRef} className="relative border-r bg-white shrink-0" style={{ width }}>
-      {/* Resizer */}
-      <div
-        ref={resizerRef}
-        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-slate-200"
-        title="Arrastra para ajustar ancho"
-      />
-
-      {/* Header empresa */}
-      <div className="p-4 border-b flex items-center gap-3">
-        {branding?.logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={branding.logoUrl} alt="logo" className="h-10 w-10 rounded-md object-cover" />
-        ) : <InitialsIcon name={branding?.brandName || current?.name || "BS"} />}
-        <div className="min-w-0">
-          <div className="text-sm font-semibold truncate">{branding?.brandName || current?.name || "Sin empresa"}</div>
-          <div className="text-xs text-slate-500 truncate">{current?.slug || "—"}</div>
+    <aside className="shrink-0 border-r bg-white" style={{ width: 260 }}>
+      {/* Header simple */}
+      <div className="px-3 pt-3 pb-2">
+        <div className="flex items-center gap-2">
+          <div className="h-10 w-10 rounded-lg bg-[color:var(--brand-50)] grid place-items-center border">
+            <span className="text-[color:var(--brand-900)] font-bold">BS</span>
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs text-slate-500 leading-tight">BSOP</div>
+            <div className="text-sm font-medium text-slate-800 leading-tight truncate">
+              Selecciona un módulo
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Selector de empresa */}
-      <div className="p-3 border-b">
-        <label className="block text-xs text-slate-500 mb-1">Empresa</label>
-        <select
-          className="w-full rounded-md border px-2 py-1 text-sm"
-          value={companySlug}
-          onChange={(e) => {
-            const slug = e.target.value;
-            document.cookie = `company=${slug}; path=/; max-age=31536000; samesite=lax`;
-            const url = new URL(window.location.href);
-            url.searchParams.set("company", slug);
-            router.push(url.pathname + "?" + url.searchParams.toString());
-            router.refresh();
-          }}
-        >
-          <option value="">Selecciona...</option>
-          {companies.map(c => <option key={c.id} value={c.slug.toLowerCase()}>{c.name}</option>)}
-        </select>
-      </div>
+      <div className="mx-3 mb-2 border-b" />
 
-      {/* Navegación: ADMINISTRACIÓN → OPERACIÓN → CONFIGURACIÓN → (SUPERADMIN si aplica) */}
-      <nav className="p-2 space-y-2">
-        {sections.map(renderSection)}
+      <nav className="px-2 pb-4">
+        {NAV.map((sec) => {
+          const open = openSectionKey === sec.key;
+          return (
+            <div key={sec.key} className="mb-2">
+              <SectionHeader
+                section={sec}
+                open={!!open}
+                onToggle={() => setOpenSectionKey((prev) => (prev === sec.key ? null : sec.key))}
+              />
+              {open && (
+                <ul className="mt-1 space-y-1 px-3">
+                  {sec.items.map((it) => (
+                    <li key={it.key}>
+                      <MenuLink it={it} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })}
       </nav>
     </aside>
   );
