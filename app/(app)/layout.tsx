@@ -1,23 +1,16 @@
 "use client";
-// app/(app)/layout.tsx
+
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import BrandingLoader from "@/app/_components/BrandingLoader";
 import Topbar from "@/app/_components/Topbar";
 import Sidebar from "@/app/_components/Sidebar";
 
-/**
- * Layout en 3 columnas:
- * [Sidebar ajustable] [handler] [columna derecha (Topbar + Main)]
- * - Sidebar ocupa toda la altura y llega hasta arriba
- * - Topbar se desprende a la derecha del sidebar
- * - El ancho del sidebar se persiste en localStorage
- */
 export default function AppLayout({ children }: { children: ReactNode }) {
   const STORAGE_KEY = "bsop:sidebarWidth";
-  const MIN = 224;        // ancho mínimo del sidebar (px)
-  const MAX = 480;        // ancho máximo del sidebar (px)
-  const HANDLE_W = 6;     // ancho del handler (px)
+  const MIN = 224;
+  const MAX = 480;
+  const HANDLE_W = 6;
 
   const [sidebarW, setSidebarW] = useState<number>(() => {
     if (typeof window === "undefined") return 280;
@@ -87,12 +80,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           gridTemplateRows: "100vh",
         }}
       >
-        {/* Sidebar altura completa */}
         <div style={{ gridColumn: "1 / 2", gridRow: "1 / 2" }}>
           <Sidebar />
         </div>
 
-        {/* Handler de ajuste */}
         <div
           role="separator"
           aria-label="Ajustar ancho del panel lateral"
@@ -103,15 +94,12 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           title="Arrastra para ajustar el ancho"
         />
 
-        {/* Columna derecha: Topbar arriba + Main abajo */}
         <div
           style={{ gridColumn: "3 / 4", gridRow: "1 / 2", display: "grid", gridTemplateRows: "auto 1fr" }}
           className="min-w-0"
         >
           <Topbar />
-          <main className="min-w-0 overflow-auto">
-            {children}
-          </main>
+          <main className="min-w-0 overflow-auto">{children}</main>
         </div>
       </div>
     </div>
