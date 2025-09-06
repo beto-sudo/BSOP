@@ -1,4 +1,3 @@
-// app/_components/Sidebar.tsx
 "use client";
 
 import Link from "next/link";
@@ -18,27 +17,17 @@ import {
   Users,
   Shield,
   Factory,
-  Package,
-  Truck,
-  Wrench,
-  ClipboardList,
   FileCog,
   ListChecks,
   Cog,
   ReceiptText,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 /* ---------------- util mínima ---------------- */
 function cx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
 }
-function truthy(v: unknown): boolean {
-  if (!v) return false;
-  const s = v.toString().trim().toLowerCase();
-  return s === "1" || s === "true" || s === "yes";
-}
-/* lee cookie en cliente (usa "company" o "CURRENT_COMPANY_ID") */
 function readCompanyCookie(): string | null {
   if (typeof document === "undefined") return null;
   const map = Object.fromEntries(
@@ -50,16 +39,13 @@ function readCompanyCookie(): string | null {
   return map.company || map.CURRENT_COMPANY_ID || null;
 }
 
-/* ---------------- navegación (según doc) ---------------- */
-
+/* ---------------- navegación ---------------- */
 type MenuItem = {
   key: string;
   label: string;
   href: string;
   needsCompany?: boolean;
   icon?: React.ReactNode;
-  featureFlag?: string;
-  enabledForCompanies?: string[];
 };
 
 type Section = {
@@ -67,18 +53,12 @@ type Section = {
     | "administracion"
     | "operaciones"
     | "configuracion"
-    | "compras"
-    | "inventarios"
-    | "ventas"
-    | "caja"
-    | "reportes"
     | "superadmin";
   label: string;
   icon?: React.ReactNode;
   items: MenuItem[];
 };
 
-/* Secciones/Items EXACTOS de tu repo (no modificados) */
 const SECTIONS: Section[] = [
   {
     key: "administracion",
@@ -127,20 +107,42 @@ const SECTIONS: Section[] = [
   },
 ];
 
-function SectionHeader({ open, onToggle, icon, children }: { open: boolean; onToggle: () => void; icon?: React.ReactNode; children: React.ReactNode }) {
+function SectionHeader({
+  open,
+  onToggle,
+  icon,
+  children,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <button
       onClick={onToggle}
       className="w-full flex items-center gap-2 px-2 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900"
     >
-      <span className="grid place-items-center">{open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</span>
+      <span className="grid place-items-center">
+        {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+      </span>
       {icon ? <span className="grid place-items-center">{icon}</span> : null}
       <span className="tracking-wide">{children}</span>
     </button>
   );
 }
 
-function NavLink({ href, active, children, icon }: { href: string; active?: boolean; children: React.ReactNode; icon?: React.ReactNode }) {
+function NavLink({
+  href,
+  active,
+  children,
+  icon,
+}: {
+  href: string;
+  active?: boolean;
+  children: React.ReactNode;
+  icon?: React.ReactNode;
+}) {
   return (
     <Link
       href={href}
@@ -159,8 +161,8 @@ function NavLink({ href, active, children, icon }: { href: string; active?: bool
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const router = useRouter();
+  useSearchParams(); // si lo usas para flags, lo mantenemos montado
+  useRouter(); // igual: evita shaking si lo usas en handlers
 
   const [open, setOpen] = useState<Record<string, boolean>>({
     administracion: true,
@@ -182,7 +184,6 @@ export default function Sidebar() {
 
   function visibleItem(it: MenuItem): boolean {
     if (it.needsCompany && !companyId) return false;
-    // feature flags por query (?ff=) o por cookie/entorno podrían entrar aquí…
     return true;
   }
 
@@ -196,79 +197,94 @@ export default function Sidebar() {
   }
 
   return (
-  <aside className="shrink-0 border-r bg-white h-dvh overflow-y-auto">
-    {/* Header simple */}
-    <div className="px-3 pt-3 pb-2">
-      <div className="flex items-center gap-2">
-        <div className="h-10 w-10 rounded-lg bg-[color:var(--brand-50)] grid place-items-center border">
-          <span className="text-[color:var(--brand-900)] font-bold">BS</span>
-        </div>
-        <div className="min-w-0">
-          <div className="text-xs text-slate-500 leading-tight">BSOP</div>
-          <div className="text-sm font-medium text-slate-800 leading-tight truncate">
-            Selecciona un módulo
+    <aside className="shrink-0 border-r bg-white h-dvh overflow-y-auto">
+      <div className="px-3 pt-3 pb-2">
+        <div className="flex items-center gap-2">
+          <div className="h-10 w-10 rounded-lg bg-[color:var(--brand-50)] grid place-items-center border">
+            <span className="text-[color:var(--brand-900)] font-bold">BS</span>
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs text-slate-500 leading-tight">BSOP</div>
+            <div className="text-sm font-medium text-slate-800 leading-tight truncate">
+              Selecciona un módulo
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    {/* Navegación */}
-    <nav className="px-2 pb-4">
-      {/* ADMINISTRACIÓN */}
-      <div className="mb-2">
-        <SectionHeader open={!!open.administracion} onToggle={() => toggle("administracion")} icon={<LayoutDashboard className="h-4 w-4" />}>
-          ADMINISTRACIÓN
-        </SectionHeader>
-        {open.administracion && (
-          <div className="pl-6 space-y-0.5">
-            {SECTIONS.find(s => s.key === "administracion")!.items.map((it) => (
-              <div key={it.key}>{Item(it)}</div>
-            ))}
-          </div>
-        )}
-      </div>
+      <nav className="px-2 pb-4">
+        {/* ADMINISTRACIÓN */}
+        <div className="mb-2">
+          <SectionHeader
+            open={!!open.administracion}
+            onToggle={() => toggle("administracion")}
+            icon={<LayoutDashboard className="h-4 w-4" />}
+          >
+            ADMINISTRACIÓN
+          </SectionHeader>
+          {open.administracion && (
+            <div className="pl-6 space-y-0.5">
+              {SECTIONS.find((s) => s.key === "administracion")!.items.map((it) => (
+                <div key={it.key}>{Item(it)}</div>
+              ))}
+            </div>
+          )}
+        </div>
 
-      {/* OPERACIONES */}
-      <div className="mb-2">
-        <SectionHeader open={!!open.operaciones} onToggle={() => toggle("operaciones")} icon={<Factory className="h-4 w-4" />}>
-          OPERACIONES
-        </SectionHeader>
-        {open.operaciones && (
-          <div className="pl-6 space-y-0.5">
-            {SECTIONS.find(s => s.key === "operaciones")!.items.map((it) => (
-              <div key={it.key}>{Item(it)}</div>
-            ))}
-          </div>
-        )}
-      </div>
+        {/* OPERACIONES */}
+        <div className="mb-2">
+          <SectionHeader
+            open={!!open.operaciones}
+            onToggle={() => toggle("operaciones")}
+            icon={<Factory className="h-4 w-4" />}
+          >
+            OPERACIONES
+          </SectionHeader>
+          {open.operaciones && (
+            <div className="pl-6 space-y-0.5">
+              {SECTIONS.find((s) => s.key === "operaciones")!.items.map((it) => (
+                <div key={it.key}>{Item(it)}</div>
+              ))}
+            </div>
+          )}
+        </div>
 
-      {/* CONFIGURACIÓN */}
-      <div className="mb-2">
-        <SectionHeader open={!!open.configuracion} onToggle={() => toggle("configuracion")} icon={<Settings className="h-4 w-4" />}>
-          CONFIGURACIÓN
-        </SectionHeader>
-        {open.configuracion && (
-          <div className="pl-6 space-y-0.5">
-            {SECTIONS.find(s => s.key === "configuracion")!.items.map((it) => (
-              <div key={it.key}>{Item(it)}</div>
-            ))}
-          </div>
-        )}
-      </div>
+        {/* CONFIGURACIÓN */}
+        <div className="mb-2">
+          <SectionHeader
+            open={!!open.configuracion}
+            onToggle={() => toggle("configuracion")}
+            icon={<Settings className="h-4 w-4" />}
+          >
+            CONFIGURACIÓN
+          </SectionHeader>
+          {open.configuracion && (
+            <div className="pl-6 space-y-0.5">
+              {SECTIONS.find((s) => s.key === "configuracion")!.items.map((it) => (
+                <div key={it.key}>{Item(it)}</div>
+              ))}
+            </div>
+          )}
+        </div>
 
-      {/* SUPERADMIN */}
-      <div className="mb-2">
-        <SectionHeader open={!!open.superadmin} onToggle={() => toggle("superadmin")} icon={<Building2 className="h-4 w-4" />}>
-          SUPERADMIN
-        </SectionHeader>
-        {open.superadmin && (
-          <div className="pl-6 space-y-0.5">
-            {SECTIONS.find(s => s.key === "superadmin")!.items.map((it) => (
-              <div key={it.key}>{Item(it)}</div>
-            ))}
-          </div>
-        )}
-      </div>
-    </nav>
-  </aside>
-);
+        {/* SUPERADMIN */}
+        <div className="mb-2">
+          <SectionHeader
+            open={!!open.superadmin}
+            onToggle={() => toggle("superadmin")}
+            icon={<Building2 className="h-4 w-4" />}
+          >
+            SUPERADMIN
+          </SectionHeader>
+          {open.superadmin && (
+            <div className="pl-6 space-y-0.5">
+              {SECTIONS.find((s) => s.key === "superadmin")!.items.map((it) => (
+                <div key={it.key}>{Item(it)}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      </nav>
+    </aside>
+  );
+}
