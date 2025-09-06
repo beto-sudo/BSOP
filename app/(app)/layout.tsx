@@ -1,6 +1,6 @@
 // app/(app)/layout.tsx
 
-// Fuerza SSR/dinámico como antes (evita export estático)
+// Fuerza SSR (evita export estático y respeta cookies/branding)
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
@@ -11,11 +11,11 @@ import ClientShell from "./ClientShell";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-white text-slate-900">
-      {/* Server: Branding/temas por cookie */}
+    <>
+      {/* Server: aplica branding/tema por cookies como antes */}
       <BrandingLoader />
-      {/* Cliente: sidebar ajustable + topbar; sin pasar funciones como props */}
+      {/* Client: sólo gestiona el ancho del sidebar y el handler */}
       <ClientShell>{children}</ClientShell>
-    </div>
+    </>
   );
 }
