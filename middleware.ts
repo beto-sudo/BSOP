@@ -1,60 +1,28 @@
-// middleware.ts
-import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
 
-const PUBLIC_PATHS = new Set<string>([
-  "/signin",
-  "/favicon.ico",
-  "/auth/bridge",
-]);
-
-function isStatic(pathname: string) {
-  return (
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/public") ||
-    pathname.match(/\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|txt|xml|woff2?)$/) !== null
-  );
-}
+const PUBLIC_PATHS = [/^\/signin$/, /^\/auth\/callback$/, /^\/api\//, /^\/_next\//, /^\/favicon\.ico$/];
 
 export async function middleware(req: NextRequest) {
-  const { pathname, search } = req.nextUrl;
-  if (isStatic(pathname)) return NextResponse.next();
-  if (pathname.startsWith("/api")) return NextResponse.next();
+  const { pathname } = req.nextUrl;
 
-  const res = NextResponse.next();
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll: () => req.cookies.getAll(),
-        setAll: (cookiesToSet) => {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            res.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
-
-  const { data } = await supabase.auth.getSession().catch(() => ({ data: { session: null } as any }));
-  const session = data?.session ?? null;
-
-  if (!session && !PUBLIC_PATHS.has(pathname)) {
-    const url = req.nextUrl.clone();
-    url.pathname = "/signin";
-    url.searchParams.set("redirect", pathname + search);
-    return NextResponse.redirect(url);
+  if (PUBLIC_PATHS.some(rx => rx.test(pathname))) {
+    return NextResponse.next();
   }
 
-  if (session && pathname === "/signin") {
+  const res = NextResponse.next();
+  const supabase = createMiddlewareClient({ req, res });
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (!session) {
     const url = req.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = '/signin';
+    url.searchParams.set('redirect', req.nextUrl.pathname + req.nextUrl.search);
     return NextResponse.redirect(url);
   }
 
   return res;
 }
 
-export const config = { matcher: ["/((?!.*\\.).*)"] };
+export const config = { matcher: ['/((?!.*\\.).*)'] };
