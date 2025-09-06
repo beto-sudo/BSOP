@@ -1,4 +1,10 @@
 // app/(app)/layout.tsx
+
+// 🔒 Fuerza SSR en todo el segmento (evita export estático)
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
+
 import type { ReactNode } from "react";
 import BrandingLoader from "@/app/_components/BrandingLoader";
 import Topbar from "@/app/_components/Topbar";
@@ -8,10 +14,10 @@ import ClientShell from "./ClientShell";
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-white text-slate-900">
-      {/* Server: deja que Branding aplique tema con cookies/headers */}
+      {/* Server: mantiene cookies/headers y aplica branding como antes */}
       <BrandingLoader />
 
-      {/* Mantiene TU layout original (flex). El ajuste de ancho vive en ClientShell. */}
+      {/* Conserva tu layout original basado en flex; el ancho lo maneja ClientShell */}
       <ClientShell
         renderSidebar={(width) => <Sidebar width={width} />}
         renderTopbar={<Topbar />}
