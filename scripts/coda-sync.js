@@ -18,7 +18,7 @@
     CODA_LIMIT (default 500)
 */
 
-const { createClient } = require("@supabase/supabase-js");
+const { Client } = require("pg");
 const fs = require("fs");
 const path = require("path");
 
@@ -56,8 +56,10 @@ function requireEnv(name) {
 
 const CODA_API_TOKEN = requireEnv("CODA_API_TOKEN");
 const CODA_DOC_ID = requireEnv("CODA_DOC_ID");
-const SUPABASE_URL = requireEnv("NEXT_PUBLIC_SUPABASE_URL");
-const SUPABASE_SERVICE_ROLE_KEY = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
+
+// Prefer direct SQL so we can write to non-public schemas (staging/erp).
+// Use Session Pooler DATABASE_URL.
+const DATABASE_URL = requireEnv("DATABASE_URL");
 
 const LIMIT = Number(process.env.CODA_LIMIT || 500);
 const TABLE_IDS = (process.env.CODA_TABLE_IDS || "")
@@ -65,9 +67,7 @@ const TABLE_IDS = (process.env.CODA_TABLE_IDS || "")
   .map((s) => s.trim())
   .filter(Boolean);
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { persistSession: false },
-});
+const pg = new Client({ connectionString: DATABASE_URL });
 
 async function codaFetch(path, params = {}) {
   const url = new URL(`https://coda.io/apis/v1${path}`);
@@ -91,38 +91,33 @@ async function codaFetch(path, params = {}) {
 }
 
 async function upsertTablesMeta(tables) {
-  const rows = tables.map((t) => ({
-    doc_id: CODA_DOC_ID,
-    table_id: t.id,
-    table_name: t.name,
-    table_type: t.tableType, // 'table' | 'view'
-    parent_page: t.parent?.name || null,
-    updated_at: new Date().toISOString(),
-  }));
-
-  const { error } = await supabase
-    .schema("staging")
-    .from("coda_tables")
-    .upsert(rows, { onConflict: "doc_id,table_id" });
-
-  if (error) throw error;
+  const now = new Date().toISOString();
+  // Use a simple loop; batch inserts can be added later.
+  for (const t of tables) {
+    await pg.query(
+      `insert into staging.coda_tables (doc_id, table_id, table_name, table_type, parent_page, updated_at)
+       values ($1,$2,$3,$4,$5,$6)
+       on conflict (doc_id, table_id)
+       do update set table_name=excluded.table_name,
+                     table_type=excluded.table_type,
+                     parent_page=excluded.parent_page,
+                     updated_at=excluded.updated_at`,
+      [CODA_DOC_ID, t.id, t.name, t.tableType, t.parent?.name || null, now]
+    );
+  }
 }
 
 async function syncTableRows(tableId) {
   // Mark state as running-ish by clearing last_error.
-  await supabase
-    .schema("staging")
-    .from("coda_sync_state")
-    .upsert(
-      {
-        doc_id: CODA_DOC_ID,
-        table_id: tableId,
-        last_sync_at: new Date().toISOString(),
-        last_error: null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "doc_id,table_id" }
-    );
+  await pg.query(
+    `insert into staging.coda_sync_state (doc_id, table_id, last_sync_at, last_error, updated_at)
+     values ($1,$2,$3,$4,$5)
+     on conflict (doc_id, table_id)
+     do update set last_sync_at=excluded.last_sync_at,
+                   last_error=excluded.last_error,
+                   updated_at=excluded.updated_at`,
+    [CODA_DOC_ID, tableId, new Date().toISOString(), null, new Date().toISOString()]
+  );
 
   let pageToken = null;
   let total = 0;
@@ -137,21 +132,24 @@ async function syncTableRows(tableId) {
 
     const items = data.items || [];
     if (items.length) {
-      const upserts = items.map((r) => ({
-        doc_id: CODA_DOC_ID,
-        table_id: tableId,
-        row_id: r.id,
-        raw: r,
-        updated_at_coda: r.updatedAt ? new Date(r.updatedAt).toISOString() : null,
-        updated_at: new Date().toISOString(),
-      }));
-
-      const { error } = await supabase
-        .schema("staging")
-        .from("coda_rows")
-        .upsert(upserts, { onConflict: "doc_id,table_id,row_id" });
-
-      if (error) throw error;
+      for (const r of items) {
+        await pg.query(
+          `insert into staging.coda_rows (doc_id, table_id, row_id, raw, updated_at_coda, updated_at)
+           values ($1,$2,$3,$4::jsonb,$5,$6)
+           on conflict (doc_id, table_id, row_id)
+           do update set raw=excluded.raw,
+                         updated_at_coda=excluded.updated_at_coda,
+                         updated_at=excluded.updated_at`,
+          [
+            CODA_DOC_ID,
+            tableId,
+            r.id,
+            JSON.stringify(r),
+            r.updatedAt ? new Date(r.updatedAt).toISOString() : null,
+            new Date().toISOString(),
+          ]
+        );
+      }
       total += items.length;
     }
 
@@ -159,25 +157,23 @@ async function syncTableRows(tableId) {
     if (!pageToken) break;
   }
 
-  await supabase
-    .schema("staging")
-    .from("coda_sync_state")
-    .upsert(
-      {
-        doc_id: CODA_DOC_ID,
-        table_id: tableId,
-        cursor: null,
-        last_success_at: new Date().toISOString(),
-        last_error: null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "doc_id,table_id" }
-    );
+  await pg.query(
+    `insert into staging.coda_sync_state (doc_id, table_id, cursor, last_success_at, last_error, updated_at)
+     values ($1,$2,$3,$4,$5,$6)
+     on conflict (doc_id, table_id)
+     do update set cursor=excluded.cursor,
+                   last_success_at=excluded.last_success_at,
+                   last_error=excluded.last_error,
+                   updated_at=excluded.updated_at`,
+    [CODA_DOC_ID, tableId, null, new Date().toISOString(), null, new Date().toISOString()]
+  );
 
   return total;
 }
 
 async function main() {
+  await pg.connect();
+
   const tablesResp = await codaFetch(`/docs/${CODA_DOC_ID}/tables`);
   const tables = tablesResp.items || [];
 
@@ -192,8 +188,11 @@ async function main() {
     : [];
 
   if (!TABLE_IDS.length) {
-    console.log("No CODA_TABLE_IDS provided; skipping row sync (meta only).\n" +
-      "Set CODA_TABLE_IDS to sync specific base tables.");
+    console.log(
+      "No CODA_TABLE_IDS provided; skipping row sync (meta only).\n" +
+        "Set CODA_TABLE_IDS to sync specific base tables."
+    );
+    await pg.end();
     return;
   }
 
@@ -209,21 +208,20 @@ async function main() {
       console.log(`  upserted ${n} rows`);
     } catch (err) {
       console.error(`  ERROR syncing ${t.id}:`, err?.message || err);
-      await supabase
-        .schema("staging")
-        .from("coda_sync_state")
-        .upsert(
-          {
-            doc_id: CODA_DOC_ID,
-            table_id: t.id,
-            last_error: String(err?.message || err).slice(0, 2000),
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "doc_id,table_id" }
-        );
+      await pg.query(
+        `insert into staging.coda_sync_state (doc_id, table_id, last_error, updated_at)
+         values ($1,$2,$3,$4)
+         on conflict (doc_id, table_id)
+         do update set last_error=excluded.last_error,
+                       updated_at=excluded.updated_at`,
+        [CODA_DOC_ID, t.id, String(err?.message || err).slice(0, 2000), new Date().toISOString()]
+      );
+      await pg.end();
       throw err;
     }
   }
+
+  await pg.end();
 }
 
 main().catch((e) => {
