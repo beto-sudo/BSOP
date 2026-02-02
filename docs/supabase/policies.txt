@@ -1,0 +1,4 @@
+ schemaname | tablename | policyname | permissive | roles | cmd | qual | with_check 
+------------+-----------+------------+------------+-------+-----+------+------------
+(0 rows)
+

@@ -1,0 +1,23 @@
+                   List of relations
+ Schema |            Name            | Type  |  Owner   
+--------+----------------------------+-------+----------
+ public | CapTableEntry              | table | postgres
+ public | Company                    | table | postgres
+ public | CompanyDocument            | table | postgres
+ public | CompanyModule              | table | postgres
+ public | ModuleRegistry             | table | postgres
+ public | Product                    | table | postgres
+ public | Role                       | table | postgres
+ public | User                       | table | postgres
+ public | audit_log                  | table | postgres
+ public | company_member             | table | postgres
+ public | invitation                 | table | postgres
+ public | member_permission_override | table | postgres
+ public | member_role                | table | postgres
+ public | module                     | table | postgres
+ public | permission                 | table | postgres
+ public | profile                    | table | postgres
+ public | role                       | table | postgres
+ public | role_permission            | table | postgres
+(18 rows)
+
