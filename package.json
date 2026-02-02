@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "sync:coda": "node scripts/coda-sync.js"
   },
   "dependencies": {
     "@prisma/client": "^6.15.0",
