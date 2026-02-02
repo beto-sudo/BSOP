@@ -19,6 +19,31 @@
 */
 
 const { createClient } = require("@supabase/supabase-js");
+const fs = require("fs");
+const path = require("path");
+
+// Minimal .env.local loader for running as a plain Node script.
+// - Does not override existing process.env keys.
+// - Supports simple KEY=VALUE lines.
+function loadEnvLocal() {
+  const p = path.join(process.cwd(), ".env.local");
+  if (!fs.existsSync(p)) return;
+  const lines = fs.readFileSync(p, "utf8").split(/\r?\n/);
+  for (const line of lines) {
+    const s = line.trim();
+    if (!s || s.startsWith("#")) continue;
+    const idx = s.indexOf("=");
+    if (idx <= 0) continue;
+    const k = s.slice(0, idx).trim();
+    let v = s.slice(idx + 1);
+    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+      v = v.slice(1, -1);
+    }
+    if (!(k in process.env)) process.env[k] = v;
+  }
+}
+
+loadEnvLocal();
 
 function requireEnv(name) {
   const v = process.env[name];
