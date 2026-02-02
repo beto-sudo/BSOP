@@ -174,8 +174,18 @@ async function syncTableRows(tableId) {
 async function main() {
   await pg.connect();
 
-  const tablesResp = await codaFetch(`/docs/${CODA_DOC_ID}/tables`);
-  const tables = tablesResp.items || [];
+  // Tables list can be paginated.
+  let tables = [];
+  let pageToken = null;
+  for (;;) {
+    const tablesResp = await codaFetch(`/docs/${CODA_DOC_ID}/tables`, {
+      limit: 100,
+      pageToken,
+    });
+    tables = tables.concat(tablesResp.items || []);
+    pageToken = tablesResp.nextPageToken || null;
+    if (!pageToken) break;
+  }
 
   console.log(`Coda tables found: ${tables.length}`);
   await upsertTablesMeta(tables);
