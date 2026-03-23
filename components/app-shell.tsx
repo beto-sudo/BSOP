@@ -84,14 +84,15 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
-    href: '/usage',
+    href: '/ai/dashboard',
     label: 'AI Operations',
     icon: '🤖',
-    matchPaths: ['/usage', '/agents', '/models'],
+    matchPaths: ['/ai', '/usage', '/agents'],
     children: [
-      { label: 'Usage / Costos', href: '/usage/costos' },
-      { label: 'Agentes', href: '/agents' },
-      { label: 'Modelos', href: '/models' },
+      { label: 'Dashboard', href: '/ai/dashboard' },
+      { label: 'Usage & Costs', href: '/ai/usage' },
+      { label: 'Agents', href: '/agents' },
+      { label: 'Models', href: '/ai/models' },
     ],
   },
   {

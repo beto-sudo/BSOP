@@ -3,17 +3,44 @@ from __future__ import annotations
 
 import json
 import re
-from collections import Counter, defaultdict
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
 SESSIONS_DIR = Path.home() / '.openclaw' / 'agents' / 'main' / 'sessions'
-OUT_PATH = Path.home() / 'BSOP' / 'data' / 'usage.json'
+OUT_PATH = Path(__file__).resolve().parent.parent / 'data' / 'usage.json'
 LOCAL_TZ = ZoneInfo('America/Matamoros')
 SESSION_FILE_RE = re.compile(r'^(?P<id>[0-9a-f-]{36})\.jsonl(?:\.(?:reset|deleted)\..+)?$')
 IGNORED_MODELS = {'delivery-mirror', 'gateway-injected', 'auto'}
+MODEL_LABELS = {
+    'claude-opus-4-6': 'Opus',
+    'claude-sonnet-4-6': 'Sonnet',
+    'claude-opus-4-5-20251101': 'Opus 4.5',
+    'claude-sonnet-4-5-20250929': 'Sonnet 4.5',
+    'claude-haiku-4-5-20251001': 'Haiku',
+    'claude-3-haiku-20240307': 'Haiku 3',
+    'gpt-5.4': 'GPT-5.4',
+    'gpt-5.4-mini': 'GPT-5.4 Mini',
+    'gpt-5.3-codex': 'Codex',
+    'gpt-5.1-codex-mini': 'Codex Mini',
+    'gpt-4.1': 'GPT-4.1',
+    'gpt-4o': 'GPT-4o',
+    'gemini-2.5-flash': 'Gemini Flash',
+    'gemini-3.1-pro-preview': 'Gemini Pro',
+    'minimax/minimax-m2.5': 'MiniMax',
+}
+PROVIDER_NORMALIZATION = {
+    'anthropic': 'anthropic',
+    'claude-proxy': 'anthropic',
+    'openai': 'openai',
+    'openai-codex': 'openai',
+    'google': 'google',
+    'openrouter': 'minimax',
+    'minimax': 'minimax',
+    'moonshot': 'other',
+}
 
 
 def parse_ts(value: str | None) -> datetime | None:
@@ -28,10 +55,8 @@ def parse_ts(value: str | None) -> datetime | None:
         return None
 
 
-
 def fmt_money(value: float) -> str:
     return f'${value:,.4f}' if value < 1 else f'${value:,.2f}'
-
 
 
 def safe_num(value: Any) -> float:
@@ -40,7 +65,6 @@ def safe_num(value: Any) -> float:
         return num if num == num and abs(num) != float('inf') else 0.0
     except Exception:
         return 0.0
-
 
 
 def get_usage_cost_total(usage: dict[str, Any]) -> float:
@@ -54,31 +78,41 @@ def get_usage_cost_total(usage: dict[str, Any]) -> float:
     return 0.0
 
 
-
 def extract_provider(message: dict[str, Any], usage: dict[str, Any], model: str | None) -> str:
     provider = message.get('provider') or usage.get('provider') or (usage.get('cost') or {}).get('provider')
     if provider:
-        return str(provider)
+        return normalize_provider(str(provider))
     model = (model or '').lower()
     if model.startswith('claude'):
         return 'anthropic'
     if model.startswith('gpt-'):
-        return 'openai-codex'
+        return 'openai'
     if 'gemini' in model:
         return 'google'
+    if 'minimax' in model:
+        return 'minimax'
     if '/' in model:
-        return model.split('/', 1)[0]
-    return 'unknown'
+        return normalize_provider(model.split('/', 1)[0])
+    return 'other'
 
+
+def normalize_provider(provider: str) -> str:
+    return PROVIDER_NORMALIZATION.get(provider.lower(), provider.lower())
 
 
 def short_model(model: str | None) -> str:
     if not model:
         return 'Unknown'
+    if model in MODEL_LABELS:
+        return MODEL_LABELS[model]
     name = model.split('/')[-1]
     lower = name.lower()
     if 'opus' in lower:
         return 'Opus'
+    if 'sonnet' in lower:
+        return 'Sonnet'
+    if 'haiku' in lower:
+        return 'Haiku'
     if lower.startswith('gpt-5'):
         return 'GPT-5.4'
     if 'gemini' in lower:
@@ -86,7 +120,6 @@ def short_model(model: str | None) -> str:
     if 'minimax' in lower:
         return 'MiniMax'
     return name.replace('-', ' ').title()
-
 
 
 def iter_usage_files() -> list[Path]:
@@ -98,7 +131,6 @@ def iter_usage_files() -> list[Path]:
             continue
         files.append(path)
     return files
-
 
 
 def iter_records(path: Path):
@@ -116,10 +148,23 @@ def iter_records(path: Path):
         return
 
 
+def extract_description(message: dict[str, Any]) -> str:
+    parts: list[str] = []
+    for item in message.get('content') or []:
+        if not isinstance(item, dict):
+            continue
+        if item.get('type') == 'text' and item.get('text'):
+            parts.append(str(item['text']))
+    text = re.sub(r'\s+', ' ', ' '.join(parts)).strip()
+    if not text:
+        return 'No text content'
+    return text[:120] + ('…' if len(text) > 120 else '')
+
 
 def build_payload() -> dict[str, Any]:
     files = iter_usage_files()
     all_sessions: dict[str, dict[str, Any]] = {}
+    message_log: list[dict[str, Any]] = []
     daily = defaultdict(lambda: {
         'cost': 0.0,
         'tokens': 0,
@@ -130,7 +175,7 @@ def build_payload() -> dict[str, Any]:
         'toolCalls': 0,
         'toolResults': 0,
         'providers': defaultdict(lambda: {'cost': 0.0, 'messages': 0, 'tokens': 0}),
-        'models': defaultdict(lambda: {'cost': 0.0, 'messages': 0, 'tokens': 0, 'provider': 'unknown'}),
+        'models': defaultdict(lambda: {'cost': 0.0, 'messages': 0, 'tokens': 0, 'provider': 'other'}),
     })
 
     history = {
@@ -147,7 +192,7 @@ def build_payload() -> dict[str, Any]:
         'cacheReadTokens': 0,
         'cacheWriteTokens': 0,
         'providers': defaultdict(lambda: {'cost': 0.0, 'messages': 0, 'tokens': 0}),
-        'models': defaultdict(lambda: {'cost': 0.0, 'messages': 0, 'tokens': 0, 'provider': 'unknown'}),
+        'models': defaultdict(lambda: {'cost': 0.0, 'messages': 0, 'tokens': 0, 'provider': 'other'}),
     }
 
     for path in files:
@@ -172,7 +217,7 @@ def build_payload() -> dict[str, Any]:
             'toolResults': 0,
             'toolCalls': 0,
             'providers': defaultdict(lambda: {'cost': 0.0, 'messages': 0, 'tokens': 0}),
-            'models': defaultdict(lambda: {'cost': 0.0, 'messages': 0, 'tokens': 0, 'provider': 'unknown'}),
+            'models': defaultdict(lambda: {'cost': 0.0, 'messages': 0, 'tokens': 0, 'provider': 'other'}),
         })
         session['files'].append(path.name)
         seen_message_ids: set[str] = set()
@@ -200,6 +245,10 @@ def build_payload() -> dict[str, Any]:
 
             if role == 'toolResult':
                 session['toolResults'] += 1
+                history['toolResults'] += 1
+                if ts:
+                    day_key = ts.astimezone(LOCAL_TZ).date().isoformat()
+                    daily[day_key]['toolResults'] += 1
                 continue
 
             session['messages'] += 1
@@ -234,6 +283,8 @@ def build_payload() -> dict[str, Any]:
             total_tokens = int(safe_num(usage.get('total')) or (input_tokens + output_tokens + cache_read + cache_write))
             cost = get_usage_cost_total(usage)
             tool_calls = sum(1 for item in (message.get('content') or []) if isinstance(item, dict) and item.get('type') == 'toolCall')
+            status = 'error' if message.get('error') or safe_num(usage.get('errorCount')) > 0 else 'ok'
+            description = extract_description(message)
 
             session['cost'] += cost
             session['inputTokens'] += input_tokens
@@ -278,6 +329,25 @@ def build_payload() -> dict[str, Any]:
             day['models'][model]['messages'] += 1
             day['models'][model]['tokens'] += total_tokens
             day['models'][model]['provider'] = provider
+
+            message_log.append({
+                'timestamp': ts.astimezone(LOCAL_TZ).isoformat() if ts else None,
+                'model': model,
+                'modelLabel': short_model(model),
+                'provider': provider,
+                'inputTokens': input_tokens,
+                'outputTokens': output_tokens,
+                'cacheReadTokens': cache_read,
+                'cacheCreationTokens': cache_write,
+                'totalTokens': total_tokens,
+                'cost': round(cost, 6),
+                'formattedCost': fmt_money(cost),
+                'durationMs': int(safe_num(message.get('durationMs') or usage.get('durationMs'))),
+                'status': status,
+                'sessionId': session_id,
+                'skillName': message.get('skillName'),
+                'description': description,
+            })
 
     session_rows: list[dict[str, Any]] = []
     for session in all_sessions.values():
@@ -329,6 +399,8 @@ def build_payload() -> dict[str, Any]:
 
     session_rows = [row for row in session_rows if row['timestamp']]
     session_rows.sort(key=lambda item: item['timestamp'])
+    message_log = [row for row in message_log if row['timestamp']]
+    message_log.sort(key=lambda item: item['timestamp'])
 
     latest_date = max((datetime.fromisoformat(row['timestamp']).date() for row in session_rows), default=datetime.now(LOCAL_TZ).date())
     snapshot = daily.get(latest_date.isoformat(), None)
@@ -351,7 +423,7 @@ def build_payload() -> dict[str, Any]:
             }
             if key_name == 'model':
                 row['label'] = short_model(key)
-                row['provider'] = values.get('provider', 'unknown')
+                row['provider'] = values.get('provider', 'other')
             rows.append(row)
         return rows
 
@@ -371,6 +443,24 @@ def build_payload() -> dict[str, Any]:
             'assistantMessages': values['assistantMessages'],
             'toolCalls': values['toolCalls'],
             'formattedCost': fmt_money(values['cost']),
+        })
+
+    recent_days = []
+    for offset in range(13, -1, -1):
+        day_date = (now.date() - timedelta(days=offset)).isoformat()
+        day_values = daily.get(day_date)
+        recent_days.append({
+            'date': day_date,
+            'models': [] if not day_values else [
+                {
+                    'model': model,
+                    'label': short_model(model),
+                    'cost': round(values['cost'], 6),
+                    'messages': values['messages'],
+                    'tokens': int(values['tokens']),
+                }
+                for model, values in sorted(day_values['models'].items(), key=lambda item: (-item[1]['cost'], -item[1]['messages'], item[0]))
+            ],
         })
 
     payload = {
@@ -425,9 +515,19 @@ def build_payload() -> dict[str, Any]:
             }
             for item in sorted(session_rows, key=lambda item: item['timestamp'], reverse=True)[:20]
         ],
+        'allSessions': [
+            {
+                **item,
+                'formattedCost': fmt_money(item['cost']),
+            }
+            for item in sorted(session_rows, key=lambda item: item['timestamp'], reverse=True)
+        ],
+        'messageLog': [
+            item for item in sorted(message_log, key=lambda item: item['timestamp'], reverse=True)[:500]
+        ],
+        'modelBreakdownHistory': recent_days,
     }
     return payload
-
 
 
 def main() -> None:
