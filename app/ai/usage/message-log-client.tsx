@@ -147,6 +147,23 @@ export function UsageDetailClient({ data }: { data: UsageData }) {
 
   const maxBreakdown = Math.max(...data.modelBreakdownHistory.map((day) => day.models.reduce((sum, item) => sum + item.cost, 0)), 1);
 
+  const filteredTotals = useMemo(() => filtered.reduce((acc, item) => ({
+    messages: acc.messages + 1,
+    inputTokens: acc.inputTokens + item.inputTokens,
+    outputTokens: acc.outputTokens + item.outputTokens,
+    cacheReadTokens: acc.cacheReadTokens + item.cacheReadTokens,
+    cacheCreationTokens: acc.cacheCreationTokens + item.cacheCreationTokens,
+    cost: acc.cost + item.cost,
+    durationMs: acc.durationMs + item.durationMs,
+  }), { messages: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, cost: 0, durationMs: 0 }), [filtered]);
+
+  const filteredCacheHitRate = filteredTotals.inputTokens + filteredTotals.cacheReadTokens > 0
+    ? filteredTotals.cacheReadTokens / (filteredTotals.inputTokens + filteredTotals.cacheReadTokens)
+    : 0;
+
+  const isFiltered = range !== 'all' || model !== 'all' || status !== 'all' || search.trim() !== '';
+  const rangeLabel = range === 'today' ? 'Today' : range === '7d' ? 'Last 7 days' : range === '30d' ? 'Last 30 days' : 'All time';
+
   const setSort = (key: SortKey) => {
     if (sortKey === key) setSortDirection((value) => (value === 'asc' ? 'desc' : 'asc'));
     else {
@@ -157,13 +174,18 @@ export function UsageDetailClient({ data }: { data: UsageData }) {
 
   return (
     <div className="space-y-10">
+      {isFiltered ? (
+        <div className="rounded-2xl border border-amber-400/20 bg-amber-400/8 px-4 py-3 text-sm text-amber-200">
+          Showing <span className="font-semibold text-white">{int(filtered.length)}</span> of {int(data.messageLog.length)} messages · Filter: {rangeLabel}{model !== 'all' ? ` · ${model}` : ''}{status !== 'all' ? ` · ${status}` : ''}{search.trim() ? ` · "${search.trim()}"` : ''}
+        </div>
+      ) : null}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {[
-          { label: 'Total Messages', value: int(data.summary.messages), sub: `${int(data.summary.assistantMessages)} assistant` },
-          { label: 'Total Cost', value: money(data.summary.totalCost), sub: 'Full parsed history' },
-          { label: 'Input Tokens', value: int(data.usageTotals.inputTokens), sub: `${int(data.usageTotals.outputTokens)} output` },
-          { label: 'Cache Read', value: int(data.usageTotals.cacheReadTokens), sub: `${int(data.usageTotals.cacheWriteTokens)} cache create` },
-          { label: 'Cache Hit Rate', value: pct(data.usageTotals.cacheHitRate), sub: 'Across assistant traffic' },
+          { label: 'Messages', value: int(filteredTotals.messages), sub: isFiltered ? `of ${int(data.summary.assistantMessages)} total` : `${int(data.summary.assistantMessages)} assistant` },
+          { label: 'Cost', value: money(filteredTotals.cost), sub: isFiltered ? `of ${money(data.summary.totalCost)} total` : 'Full parsed history' },
+          { label: 'Input Tokens', value: int(filteredTotals.inputTokens), sub: `${int(filteredTotals.outputTokens)} output` },
+          { label: 'Cache Read', value: int(filteredTotals.cacheReadTokens), sub: `${int(filteredTotals.cacheCreationTokens)} cache create` },
+          { label: 'Cache Hit Rate', value: pct(filteredCacheHitRate), sub: isFiltered ? 'Filtered selection' : 'Across assistant traffic' },
         ].map((item) => (
           <Surface key={item.label} className="p-5">
             <div className="text-xs uppercase tracking-[0.24em] text-white/40">{item.label}</div>
