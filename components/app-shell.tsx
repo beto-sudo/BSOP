@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -228,16 +229,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         ].join(' ')}
       >
         <div className="flex items-center justify-between border-b border-[var(--border)] px-3 py-4">
-          <Link href="/" className="flex min-w-0 items-center gap-3 overflow-hidden">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent)]/15 text-lg">
-              🦞
-            </div>
-            {!collapsed ? (
-              <div className="min-w-0">
-                <div className="truncate text-sm font-semibold tracking-[0.18em] text-white">BSOP</div>
-                <div className="truncate text-xs text-white/45">Beto Santos Ops</div>
-              </div>
-            ) : null}
+          <Link
+            href="/"
+            className={[
+              'flex min-w-0 items-center overflow-hidden rounded-2xl border border-white/10 bg-white/95 p-2 shadow-sm transition hover:border-white/20',
+              collapsed ? 'justify-center' : 'w-full max-w-[148px]',
+            ].join(' ')}
+            aria-label="BSOP home"
+          >
+            <Image
+              src="/logo-bsop.jpg"
+              alt="BSOP"
+              width={collapsed ? 36 : 136}
+              height={collapsed ? 36 : 46}
+              className={[
+                'h-auto w-auto object-contain',
+                collapsed ? 'max-h-9 max-w-9' : 'max-h-12 max-w-[136px]',
+              ].join(' ')}
+              priority
+            />
           </Link>
           <button
             type="button"
