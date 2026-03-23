@@ -1,41 +1,41 @@
 {
-  "generatedAt": "2026-03-23T08:26:40.588424-05:00",
+  "generatedAt": "2026-03-23T09:31:52.487260-05:00",
   "summary": {
     "sessionCount": 8,
-    "totalCost": 2.679292,
-    "totalTokens": 260074,
-    "averageCostPerSession": 0.334912,
-    "costToday": 2.45681,
-    "costThisWeek": 2.45681,
-    "costThisMonth": 2.679292,
-    "totalSubagentSpawns": 2
+    "totalCost": 5.782435,
+    "totalTokens": 270991,
+    "averageCostPerSession": 0.722804,
+    "costToday": 5.559953,
+    "costThisWeek": 5.559953,
+    "costThisMonth": 5.782435,
+    "totalSubagentSpawns": 4
   },
   "delegation": {
-    "opusTokens": 49926,
-    "delegatedTokens": 56800,
-    "delegatedShare": 0.5322,
-    "spawnedSessions": 1
+    "opusTokens": 55071,
+    "delegatedTokens": 164400,
+    "delegatedShare": 0.7491,
+    "spawnedSessions": 3
   },
   "costByModel": [
     {
       "label": "Opus",
-      "cost": 1.863797,
-      "tokens": 10412,
+      "cost": 4.964984,
+      "tokens": 15557,
       "sessions": 2,
       "models": [
         "claude-opus-4-6"
       ],
-      "formattedCost": "$1.86"
+      "formattedCost": "$4.96"
     },
     {
       "label": "GPT-5.4",
-      "cost": 0.802145,
-      "tokens": 170766,
+      "cost": 0.8041,
+      "tokens": 176538,
       "sessions": 5,
       "models": [
         "gpt-5.4"
       ],
-      "formattedCost": "$0.8021"
+      "formattedCost": "$0.8041"
     },
     {
       "label": "MiniMax",
@@ -72,25 +72,25 @@
     },
     {
       "date": "2026-03-23",
-      "cost": 2.45681,
-      "tokens": 169546,
+      "cost": 5.559953,
+      "tokens": 180463,
       "sessions": 4,
-      "formattedCost": "$2.46"
+      "formattedCost": "$5.56"
     }
   ],
   "recentSessions": [
     {
-      "id": "64e09ca4-b9ee-46d9-a663-bfef9addbd92",
-      "timestamp": "2026-03-23T08:26:17.114000-05:00",
-      "endedAt": "2026-03-23T08:26:40.525000-05:00",
-      "durationMinutes": 0.4,
+      "id": "dccec380-1ab6-40dc-b485-21a3ae50e2f8",
+      "timestamp": "2026-03-23T09:31:41.082000-05:00",
+      "endedAt": "2026-03-23T09:31:52.389000-05:00",
+      "durationMinutes": 0.2,
       "model": "gpt-5.4",
       "modelLabel": "GPT-5.4",
-      "inputTokens": 21396,
-      "outputTokens": 717,
-      "totalTokens": 22113,
-      "cost": 0.077397,
-      "assistantMessages": 4,
+      "inputTokens": 26068,
+      "outputTokens": 313,
+      "totalTokens": 26381,
+      "cost": 0.069865,
+      "assistantMessages": 2,
       "subagentSpawns": 0,
       "childSessions": 0,
       "childTokens": 0,
@@ -98,26 +98,26 @@
         {
           "model": "gpt-5.4",
           "label": "GPT-5.4",
-          "inputTokens": 21396,
-          "outputTokens": 717,
-          "totalTokens": 22113,
-          "cost": 0.077397
+          "inputTokens": 26068,
+          "outputTokens": 313,
+          "totalTokens": 26381,
+          "cost": 0.069865
         }
       ],
-      "formattedCost": "$0.0774"
+      "formattedCost": "$0.0699"
     },
     {
-      "id": "6104b733-d658-41f5-a0b1-1f832c3ab521",
-      "timestamp": "2026-03-23T07:33:02.017000-05:00",
-      "endedAt": "2026-03-23T07:38:20.361000-05:00",
-      "durationMinutes": 5.3,
+      "id": "ed0b0de2-1a0d-4218-bba7-cf638f54eab5",
+      "timestamp": "2026-03-23T08:57:40.507000-05:00",
+      "endedAt": "2026-03-23T09:00:02.410000-05:00",
+      "durationMinutes": 2.4,
       "model": "gpt-5.4",
       "modelLabel": "GPT-5.4",
-      "inputTokens": 47814,
-      "outputTokens": 8955,
-      "totalTokens": 56769,
-      "cost": 0.327428,
-      "assistantMessages": 11,
+      "inputTokens": 52961,
+      "outputTokens": 5312,
+      "totalTokens": 58273,
+      "cost": 0.336915,
+      "assistantMessages": 15,
       "subagentSpawns": 0,
       "childSessions": 0,
       "childTokens": 0,
@@ -125,13 +125,13 @@
         {
           "model": "gpt-5.4",
           "label": "GPT-5.4",
-          "inputTokens": 47814,
-          "outputTokens": 8955,
-          "totalTokens": 56769,
-          "cost": 0.327428
+          "inputTokens": 52961,
+          "outputTokens": 5312,
+          "totalTokens": 58273,
+          "cost": 0.336915
         }
       ],
-      "formattedCost": "$0.3274"
+      "formattedCost": "$0.3369"
     },
     {
       "id": "7ea8af4d-bee6-44e0-8c9d-51ac4964904f",
@@ -163,26 +163,26 @@
     {
       "id": "525128a5-0ae5-40cd-8da9-38914c254ffc",
       "timestamp": "2026-03-23T04:11:08.033000-05:00",
-      "endedAt": "2026-03-23T08:26:22.838000-05:00",
-      "durationMinutes": 255.2,
+      "endedAt": "2026-03-23T09:31:44.804000-05:00",
+      "durationMinutes": 320.6,
       "model": "claude-opus-4-6",
       "modelLabel": "Opus",
-      "inputTokens": 38103,
-      "outputTokens": 8945,
-      "totalTokens": 47048,
-      "cost": 1.870924,
-      "assistantMessages": 39,
-      "subagentSpawns": 2,
-      "childSessions": 1,
-      "childTokens": 56800,
+      "inputTokens": 38153,
+      "outputTokens": 14040,
+      "totalTokens": 52193,
+      "cost": 4.972112,
+      "assistantMessages": 69,
+      "subagentSpawns": 4,
+      "childSessions": 3,
+      "childTokens": 164400,
       "models": [
         {
           "model": "claude-opus-4-6",
           "label": "Opus",
-          "inputTokens": 47,
-          "outputTokens": 7487,
-          "totalTokens": 7534,
-          "cost": 1.863797
+          "inputTokens": 97,
+          "outputTokens": 12582,
+          "totalTokens": 12679,
+          "cost": 4.964984
         },
         {
           "model": "minimax/minimax-m2.5",
@@ -193,7 +193,7 @@
           "cost": 0.007127
         }
       ],
-      "formattedCost": "$1.87"
+      "formattedCost": "$4.97"
     },
     {
       "id": "cae1364f-1c74-4080-acd5-91ef0b917b2e",

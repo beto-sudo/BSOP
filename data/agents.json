@@ -1,16 +1,16 @@
 {
-  "generatedAt": "2026-03-23T08:26:40.618603-05:00",
+  "generatedAt": "2026-03-23T09:31:52.487263-05:00",
   "ceo": {
     "name": "Claw",
     "role": "CEO / orchestrator",
     "primaryModel": "Opus",
     "description": "Keeps the high-context conversation, chooses strategy, and delegates execution to cheaper specialist subagents.",
     "sessionCount": 8,
-    "totalTokens": 260074,
-    "totalCost": 2.679292,
-    "totalDelegations": 2,
-    "completedDelegations": 1,
-    "averageDelegationTokens": 28400
+    "totalTokens": 270991,
+    "totalCost": 5.782434,
+    "totalDelegations": 4,
+    "completedDelegations": 2,
+    "averageDelegationTokens": 41100
   },
   "architecture": {
     "headline": "Opus handles judgment and orchestration; delegated agents absorb execution-heavy work.",
@@ -34,7 +34,7 @@
     "delegationMix": [
       {
         "label": "Subagent",
-        "count": 1
+        "count": 3
       },
       {
         "label": "MiniMax",
@@ -45,6 +45,41 @@
   "recentAgents": [
     {
       "sourceSessionId": "525128a5-0ae5-40cd-8da9-38914c254ffc",
+      "toolCallId": "toolu_01TD5WQvvXk943yv59kxdZX9",
+      "spawnedAt": "2026-03-23T09:31:40.481000-05:00",
+      "task": "Regenerate BSOP usage and agents data, then deploy to bsop.io.\n\n## Steps\n\n1. Run the usage data generator:\n   ```bash\n   cd ~/BSOP && python3 scripts/generate-usage-data.py\n   ```\n\n2. Run the agents data generator:\n   ```bash\n   cd ~/BSOP && python3 scripts/generate-agent-data.py\n   ```\n\n3. Verify the output looks good:\n   - Check `data/usage.json` - how many sessions, total cost, models breakdown\n   - Check `data/agents.json` - sanity check\n\n4. Commit and push:\n   ```bash\n   cd ~/BSOP && git add -A && git commit -m \"\ud83d\udcca Refresh usage data with improved 2026.3.22 metrics\" && git push origin main\n   ```\n\n5. Print a summary of the key numbers: sessions count, total cost, cost by model, date range covered.",
+      "taskPreview": "Regenerate BSOP usage and agents data, then deploy to bsop.io. ## Steps 1. Run the usage data generator: ```bash cd ~/BSOP && python3 scripts/generate-usage-data.py ``` 2. Run the \u2026",
+      "label": null,
+      "runtime": "subagent",
+      "mode": "run",
+      "status": "running",
+      "childSessionKey": "agent:main:subagent:43b6405d-2d20-49d7-8880-11554af9ec03",
+      "runId": "075fafc8-f997-4064-be0e-984b1ecc8acc",
+      "completionSummary": null,
+      "durationMinutes": 0.0,
+      "tokenUsage": 0,
+      "resultSnippet": null
+    },
+    {
+      "sourceSessionId": "525128a5-0ae5-40cd-8da9-38914c254ffc",
+      "toolCallId": "toolu_01Wp5Da3Kg6sWeS7nwWJ7JcA",
+      "spawnedAt": "2026-03-23T08:57:40.230000-05:00",
+      "task": "Read and analyze the OpenClaw changelog to find what changed in version 2026.3.22 (the latest version just installed). Also check for any configuration changes needed.\n\n## Steps\n\n### 1. Read the CHANGELOG\n- Read `/opt/homebrew/lib/node_modules/openclaw/CHANGELOG.md` completely\n- Focus on version 2026.3.22 but also note anything significant from recent versions (since 2026.3.17 or so)\n\n### 2. Check current config\n- Read `~/.openclaw/openclaw.json` (the main config file)\n- Look for any deprecated settings, new required fields, or features that should be enabled\n\n### 3. Check OpenClaw status\n- Run `openclaw status` to see current health\n\n### 4. Review docs for new features\n- Scan `/opt/homebrew/lib/node_modules/openclaw/docs/` for any recently relevant docs\n- Check if there are new provider configs, tools, or plugins mentioned in the changelog\n\n### 5. Write your findings\nWrite a comprehensive report to `/Users/Beto/.openclaw/workspace/memory/openclaw-update-2026-03-22.md` with:\n- **What's new** (features, improvements)\n- **What changed** (breaking changes, deprecations)\n- **Action items** (config changes needed, new features to enable)\n- **Current config health** (anything wrong or suboptimal in openclaw.json)\n\nBe thorough - read the FULL changelog for this version.",
+      "taskPreview": "Read and analyze the OpenClaw changelog to find what changed in version 2026.3.22 (the latest version just installed). Also check for any configuration changes needed. ## Steps ###\u2026",
+      "label": null,
+      "runtime": "subagent",
+      "mode": "run",
+      "status": "completed",
+      "childSessionKey": "agent:main:subagent:9132a971-3a0b-49c7-9b58-9a94e5577d2f",
+      "runId": "8c752fb2-5242-4bc4-9496-2eb94d890969",
+      "completionSummary": "Read and analyze the OpenClaw changelog to find what changed in version 2026.3.22 (the latest version just installed). Also check for any configuration changes needed.",
+      "durationMinutes": 2.4,
+      "tokenUsage": 58300,
+      "resultSnippet": "Done.\n\nI:\n- read the changelog and confirmed the bundled file does **not** have a `2026.3.22` heading yet; newest tagged entry is `2026.3.13`, so the relevant upgrade changes are in the top `Unreleased` section\n- reviewed `~/.openclaw/openclaw.json`\n- ran `ope\u2026",
+      "completedAt": "2026-03-23T09:00:02.839000-05:00"
+    },
+    {
+      "sourceSessionId": "525128a5-0ae5-40cd-8da9-38914c254ffc",
       "toolCallId": "toolu_0161JpxphzThZTrrcNK1vdme",
       "spawnedAt": "2026-03-23T08:26:16.919000-05:00",
       "task": "Update the BSOP usage data with real data from OpenClaw session logs and deploy to bsop.io.\n\n## Context\n- BSOP v2 repo is at ~/BSOP (GitHub: beto-sudo/BSOP, auto-deploys to Vercel \u2192 bsop.io)\n- The script `~/BSOP/scripts/generate-usage-data.py` reads from `~/.openclaw/agents/main/sessions/*.jsonl`\n- BUT: the OUT_PATH is wrong - it points to `/tmp/BSOP/data/usage.json` instead of `~/BSOP/data/usage.json`\n\n## Tasks\n\n### 1. Fix and run the data generator\n- Edit `~/BSOP/scripts/generate-usage-data.py`: change `OUT_PATH` from `/tmp/BSOP/data/usage.json` to the correct `~/BSOP/data/usage.json` (use Path.home() / 'BSOP' / 'data' / 'usage.json')\n- Run the script to generate fresh usage data\n- Verify the output looks correct (should have real sessions with costs, models, daily trends)\n\n### 2. Similarly fix and run the agent data generator\n- Check `~/BSOP/scripts/generate-agent-data.py` for the same `/tmp/` issue and fix it\n- Run it too\n\n### 3. Review the current usage page\n- Read `~/BSOP/app/usage/page.tsx` to understand what it displays\n- Check if the data format matches what the page expects\n- Fix any mismatches\n\n### 4. Commit and push\n- `cd ~/BSOP && git add -A && git commit -m \"\ud83d\udcca Update usage data with real OpenClaw metrics\" && git push origin main`\n\n### 5. Verify\n- After push, check `gh api repos/beto-sudo/BSOP/deployments --jq '.[0].environment'` to confirm Vercel picked it up\n\nDO NOT modify the visual design. Only fix data paths and regenerate real data.",
@@ -52,13 +87,14 @@
       "label": null,
       "runtime": "subagent",
       "mode": "run",
-      "status": "running",
+      "status": "failed",
       "childSessionKey": "agent:main:subagent:74c2ae97-f2b9-42ee-b8a6-36f11e1ad968",
       "runId": "f8aa7088-72ec-40f3-9a66-9f9ef8613571",
-      "completionSummary": null,
-      "durationMinutes": 0.0,
-      "tokenUsage": 0,
-      "resultSnippet": null
+      "completionSummary": "Update the BSOP usage data with real data from OpenClaw session logs and deploy to bsop.io.",
+      "durationMinutes": 2.7,
+      "tokenUsage": 49300,
+      "resultSnippet": "Done.\n\nWhat I changed:\n- Fixed both generator output paths:\n  - `scripts/generate-usage-data.py` \u2192 `Path.home() / 'BSOP' / 'data' / 'usage.json'`\n  - `scripts/generate-agent-data.py` \u2192 `Path.home() / 'BSOP' / 'data' / 'agents.json'`\n- Regenerated:\n  - `data/us\u2026",
+      "completedAt": "2026-03-23T08:28:59.936000-05:00"
     },
     {
       "sourceSessionId": "525128a5-0ae5-40cd-8da9-38914c254ffc",
@@ -82,6 +118,41 @@
   "taskHistory": [
     {
       "sourceSessionId": "525128a5-0ae5-40cd-8da9-38914c254ffc",
+      "toolCallId": "toolu_01TD5WQvvXk943yv59kxdZX9",
+      "spawnedAt": "2026-03-23T09:31:40.481000-05:00",
+      "task": "Regenerate BSOP usage and agents data, then deploy to bsop.io.\n\n## Steps\n\n1. Run the usage data generator:\n   ```bash\n   cd ~/BSOP && python3 scripts/generate-usage-data.py\n   ```\n\n2. Run the agents data generator:\n   ```bash\n   cd ~/BSOP && python3 scripts/generate-agent-data.py\n   ```\n\n3. Verify the output looks good:\n   - Check `data/usage.json` - how many sessions, total cost, models breakdown\n   - Check `data/agents.json` - sanity check\n\n4. Commit and push:\n   ```bash\n   cd ~/BSOP && git add -A && git commit -m \"\ud83d\udcca Refresh usage data with improved 2026.3.22 metrics\" && git push origin main\n   ```\n\n5. Print a summary of the key numbers: sessions count, total cost, cost by model, date range covered.",
+      "taskPreview": "Regenerate BSOP usage and agents data, then deploy to bsop.io. ## Steps 1. Run the usage data generator: ```bash cd ~/BSOP && python3 scripts/generate-usage-data.py ``` 2. Run the \u2026",
+      "label": null,
+      "runtime": "subagent",
+      "mode": "run",
+      "status": "running",
+      "childSessionKey": "agent:main:subagent:43b6405d-2d20-49d7-8880-11554af9ec03",
+      "runId": "075fafc8-f997-4064-be0e-984b1ecc8acc",
+      "completionSummary": null,
+      "durationMinutes": 0.0,
+      "tokenUsage": 0,
+      "resultSnippet": null
+    },
+    {
+      "sourceSessionId": "525128a5-0ae5-40cd-8da9-38914c254ffc",
+      "toolCallId": "toolu_01Wp5Da3Kg6sWeS7nwWJ7JcA",
+      "spawnedAt": "2026-03-23T08:57:40.230000-05:00",
+      "task": "Read and analyze the OpenClaw changelog to find what changed in version 2026.3.22 (the latest version just installed). Also check for any configuration changes needed.\n\n## Steps\n\n### 1. Read the CHANGELOG\n- Read `/opt/homebrew/lib/node_modules/openclaw/CHANGELOG.md` completely\n- Focus on version 2026.3.22 but also note anything significant from recent versions (since 2026.3.17 or so)\n\n### 2. Check current config\n- Read `~/.openclaw/openclaw.json` (the main config file)\n- Look for any deprecated settings, new required fields, or features that should be enabled\n\n### 3. Check OpenClaw status\n- Run `openclaw status` to see current health\n\n### 4. Review docs for new features\n- Scan `/opt/homebrew/lib/node_modules/openclaw/docs/` for any recently relevant docs\n- Check if there are new provider configs, tools, or plugins mentioned in the changelog\n\n### 5. Write your findings\nWrite a comprehensive report to `/Users/Beto/.openclaw/workspace/memory/openclaw-update-2026-03-22.md` with:\n- **What's new** (features, improvements)\n- **What changed** (breaking changes, deprecations)\n- **Action items** (config changes needed, new features to enable)\n- **Current config health** (anything wrong or suboptimal in openclaw.json)\n\nBe thorough - read the FULL changelog for this version.",
+      "taskPreview": "Read and analyze the OpenClaw changelog to find what changed in version 2026.3.22 (the latest version just installed). Also check for any configuration changes needed. ## Steps ###\u2026",
+      "label": null,
+      "runtime": "subagent",
+      "mode": "run",
+      "status": "completed",
+      "childSessionKey": "agent:main:subagent:9132a971-3a0b-49c7-9b58-9a94e5577d2f",
+      "runId": "8c752fb2-5242-4bc4-9496-2eb94d890969",
+      "completionSummary": "Read and analyze the OpenClaw changelog to find what changed in version 2026.3.22 (the latest version just installed). Also check for any configuration changes needed.",
+      "durationMinutes": 2.4,
+      "tokenUsage": 58300,
+      "resultSnippet": "Done.\n\nI:\n- read the changelog and confirmed the bundled file does **not** have a `2026.3.22` heading yet; newest tagged entry is `2026.3.13`, so the relevant upgrade changes are in the top `Unreleased` section\n- reviewed `~/.openclaw/openclaw.json`\n- ran `ope\u2026",
+      "completedAt": "2026-03-23T09:00:02.839000-05:00"
+    },
+    {
+      "sourceSessionId": "525128a5-0ae5-40cd-8da9-38914c254ffc",
       "toolCallId": "toolu_0161JpxphzThZTrrcNK1vdme",
       "spawnedAt": "2026-03-23T08:26:16.919000-05:00",
       "task": "Update the BSOP usage data with real data from OpenClaw session logs and deploy to bsop.io.\n\n## Context\n- BSOP v2 repo is at ~/BSOP (GitHub: beto-sudo/BSOP, auto-deploys to Vercel \u2192 bsop.io)\n- The script `~/BSOP/scripts/generate-usage-data.py` reads from `~/.openclaw/agents/main/sessions/*.jsonl`\n- BUT: the OUT_PATH is wrong - it points to `/tmp/BSOP/data/usage.json` instead of `~/BSOP/data/usage.json`\n\n## Tasks\n\n### 1. Fix and run the data generator\n- Edit `~/BSOP/scripts/generate-usage-data.py`: change `OUT_PATH` from `/tmp/BSOP/data/usage.json` to the correct `~/BSOP/data/usage.json` (use Path.home() / 'BSOP' / 'data' / 'usage.json')\n- Run the script to generate fresh usage data\n- Verify the output looks correct (should have real sessions with costs, models, daily trends)\n\n### 2. Similarly fix and run the agent data generator\n- Check `~/BSOP/scripts/generate-agent-data.py` for the same `/tmp/` issue and fix it\n- Run it too\n\n### 3. Review the current usage page\n- Read `~/BSOP/app/usage/page.tsx` to understand what it displays\n- Check if the data format matches what the page expects\n- Fix any mismatches\n\n### 4. Commit and push\n- `cd ~/BSOP && git add -A && git commit -m \"\ud83d\udcca Update usage data with real OpenClaw metrics\" && git push origin main`\n\n### 5. Verify\n- After push, check `gh api repos/beto-sudo/BSOP/deployments --jq '.[0].environment'` to confirm Vercel picked it up\n\nDO NOT modify the visual design. Only fix data paths and regenerate real data.",
@@ -89,13 +160,14 @@
       "label": null,
       "runtime": "subagent",
       "mode": "run",
-      "status": "running",
+      "status": "failed",
       "childSessionKey": "agent:main:subagent:74c2ae97-f2b9-42ee-b8a6-36f11e1ad968",
       "runId": "f8aa7088-72ec-40f3-9a66-9f9ef8613571",
-      "completionSummary": null,
-      "durationMinutes": 0.0,
-      "tokenUsage": 0,
-      "resultSnippet": null
+      "completionSummary": "Update the BSOP usage data with real data from OpenClaw session logs and deploy to bsop.io.",
+      "durationMinutes": 2.7,
+      "tokenUsage": 49300,
+      "resultSnippet": "Done.\n\nWhat I changed:\n- Fixed both generator output paths:\n  - `scripts/generate-usage-data.py` \u2192 `Path.home() / 'BSOP' / 'data' / 'usage.json'`\n  - `scripts/generate-agent-data.py` \u2192 `Path.home() / 'BSOP' / 'data' / 'agents.json'`\n- Regenerated:\n  - `data/us\u2026",
+      "completedAt": "2026-03-23T08:28:59.936000-05:00"
     },
     {
       "sourceSessionId": "525128a5-0ae5-40cd-8da9-38914c254ffc",
@@ -118,21 +190,21 @@
   ],
   "mainSessions": [
     {
-      "id": "64e09ca4-b9ee-46d9-a663-bfef9addbd92",
-      "timestamp": "2026-03-23T08:26:17.114000-05:00",
-      "durationMinutes": 0.4,
+      "id": "dccec380-1ab6-40dc-b485-21a3ae50e2f8",
+      "timestamp": "2026-03-23T09:31:41.082000-05:00",
+      "durationMinutes": 0.2,
       "model": "GPT-5.4",
-      "tokens": 22113,
-      "cost": 0.077397,
+      "tokens": 26381,
+      "cost": 0.069865,
       "spawnCount": 0
     },
     {
-      "id": "6104b733-d658-41f5-a0b1-1f832c3ab521",
-      "timestamp": "2026-03-23T07:33:02.017000-05:00",
-      "durationMinutes": 5.3,
+      "id": "ed0b0de2-1a0d-4218-bba7-cf638f54eab5",
+      "timestamp": "2026-03-23T08:57:40.507000-05:00",
+      "durationMinutes": 2.4,
       "model": "GPT-5.4",
-      "tokens": 56769,
-      "cost": 0.327428,
+      "tokens": 58273,
+      "cost": 0.336915,
       "spawnCount": 0
     },
     {
@@ -147,11 +219,11 @@
     {
       "id": "525128a5-0ae5-40cd-8da9-38914c254ffc",
       "timestamp": "2026-03-23T04:11:08.033000-05:00",
-      "durationMinutes": 255.2,
+      "durationMinutes": 320.6,
       "model": "Opus",
-      "tokens": 47048,
-      "cost": 1.870924,
-      "spawnCount": 2
+      "tokens": 52193,
+      "cost": 4.972112,
+      "spawnCount": 4
     },
     {
       "id": "cae1364f-1c74-4080-acd5-91ef0b917b2e",
