@@ -238,7 +238,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             aria-label="BSOP home"
           >
             <Image
-              src="/logo-bsop.jpg"
+              src={collapsed ? '/logo-bs.png' : '/logo-bsop.jpg'}
               alt="BSOP"
               width={collapsed ? 36 : 136}
               height={collapsed ? 36 : 46}
