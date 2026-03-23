@@ -15,11 +15,14 @@ const money = (value: number) =>
 
 const recentSessions = usage.recentSessions.slice(0, 5);
 const nextTrip = travelTrips[0];
+const sessionCount = usage.summary.sessionCount;
 const activeSessions = usage.recentSessions.filter((session) => {
   const started = new Date(session.timestamp).getTime();
   const ended = new Date(session.endedAt).getTime();
-  return ended - started > 0;
+  return Number.isFinite(started) && Number.isFinite(ended) && ended > started;
 }).length;
+const delegationEfficiency =
+  agents.ceo.totalDelegations > 0 ? agents.ceo.completedDelegations / agents.ceo.totalDelegations : 0;
 const dilesaScore = codaDocs.find((doc) => doc.slug === 'dilesa')?.healthScore;
 
 function getGreeting() {
@@ -63,7 +66,7 @@ export default function HomePage() {
             <div className="rounded-3xl border border-[var(--border)] bg-white/5 p-4">
               <div className="text-xs uppercase tracking-[0.22em] text-white/38">Current spend</div>
               <div className="mt-2 text-2xl font-semibold text-white">{money(usage.summary.costToday)}</div>
-              <div className="mt-2 text-white/55">{usage.summary.sessionCount} sessions parsed this month.</div>
+              <div className="mt-2 text-white/55">{sessionCount} sessions parsed in total.</div>
             </div>
             <div className="rounded-3xl border border-[var(--border)] bg-white/5 p-4">
               <div className="text-xs uppercase tracking-[0.22em] text-white/38">Next trip</div>
@@ -79,8 +82,8 @@ export default function HomePage() {
           { icon: Coins, label: 'AI Spend Today', value: money(usage.summary.costToday), sub: 'Current local day' },
           { icon: Coins, label: 'AI Spend This Week', value: money(usage.summary.costThisWeek), sub: 'Monday → now' },
           { icon: Coins, label: 'AI Spend This Month', value: money(usage.summary.costThisMonth), sub: 'Month to date' },
-          { icon: Activity, label: 'Active Sessions', value: String(activeSessions), sub: 'Recent sessions captured' },
-          { icon: Bot, label: 'Delegation Efficiency', value: `${Math.round(usage.delegation.delegatedShare * 100)}%`, sub: 'Work handled by subagents' },
+          { icon: Activity, label: 'Session Count', value: String(sessionCount), sub: 'Parsed from usage history' },
+          { icon: Bot, label: 'Delegation Efficiency', value: `${Math.round(delegationEfficiency * 100)}%`, sub: 'Completed delegated tasks' },
         ].map((item) => (
           <Surface key={item.label} className="p-5">
             <item.icon className="h-5 w-5 text-[var(--accent-soft)]" />
@@ -185,6 +188,11 @@ export default function HomePage() {
               <div className="text-xs uppercase tracking-[0.22em] text-white/38">Average delegated load</div>
               <div className="mt-2 text-2xl font-semibold text-white">{agents.ceo.averageDelegationTokens.toLocaleString('en-US')}</div>
               <div className="mt-2 text-white/55">Tokens per delegated task.</div>
+            </div>
+            <div className="rounded-3xl border border-[var(--border)] bg-white/5 p-4">
+              <div className="text-xs uppercase tracking-[0.22em] text-white/38">Recently completed sessions</div>
+              <div className="mt-2 text-2xl font-semibold text-white">{activeSessions}</div>
+              <div className="mt-2 text-white/55">Sessions with a valid start and end time.</div>
             </div>
           </div>
         </Surface>
