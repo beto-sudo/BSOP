@@ -523,7 +523,7 @@ def build_payload() -> dict[str, Any]:
             for item in sorted(session_rows, key=lambda item: item['timestamp'], reverse=True)
         ],
         'messageLog': [
-            item for item in sorted(message_log, key=lambda item: item['timestamp'], reverse=True)[:500]
+            item for item in sorted(message_log, key=lambda item: item['timestamp'], reverse=True)[:2000]
         ],
         'modelBreakdownHistory': recent_days,
     }

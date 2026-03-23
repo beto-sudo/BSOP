@@ -31,7 +31,7 @@ export default function AIDashboardPage() {
           ['Total Messages', int(usage.summary.messages), `${int(usage.summary.assistantMessages)} assistant`],
           ['Total Cost', money(usage.summary.totalCost), `${usage.summary.sessionCount} sessions`],
           ['Active Models', String(usage.costByModel.filter((item) => item.messages > 0).length), 'Models with observed traffic'],
-          ['Avg Response Time', `${(usage.messageLog.reduce((sum, item) => sum + item.durationMs, 0) / Math.max(usage.messageLog.length, 1) / 1000).toFixed(1)}s`, 'Last 500 assistant messages'],
+          ['Avg Response Time', `${(usage.messageLog.reduce((sum, item) => sum + item.durationMs, 0) / Math.max(usage.messageLog.length, 1) / 1000).toFixed(1)}s`, 'Last 2,000 assistant messages'],
           ['Cache Hit Rate', pct(usage.summary.cacheHitRate), 'Across full history'],
           ['Delegations', String(agents.ceo.totalDelegations), `${agents.ceo.completedDelegations} completed`],
         ].map(([label, value, sub]) => (
