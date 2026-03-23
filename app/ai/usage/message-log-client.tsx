@@ -199,7 +199,7 @@ export function UsageDetailClient({ data }: { data: UsageData }) {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <h2 className="text-xl font-semibold text-white">Message log</h2>
-            <p className="mt-2 text-sm text-white/55">Last 2,000 assistant messages with local filtering, sorting, pagination, and per-page totals.</p>
+            <p className="mt-2 text-sm text-white/55">All assistant messages with local filtering, sorting, pagination, and per-page totals.</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <div className="xl:col-span-2">
