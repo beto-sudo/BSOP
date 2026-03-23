@@ -1,8 +1,68 @@
 import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
-import { navItems, personalContext } from '@/data/site';
+import { ArrowRight, Hammer } from 'lucide-react';
 import type { ReactNode } from 'react';
-export function Shell({children}:{children:ReactNode}){return <div className="min-h-screen px-4 pb-10 sm:px-6 lg:px-8"><div className="mx-auto max-w-7xl"><header className="sticky top-0 z-30 mb-8 border-b border-white/8 bg-black/25 backdrop-blur-xl"><div className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between"><Link href="/" className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-400/25 bg-amber-400/12 text-lg font-semibold text-amber-300">BS</div><div><div className="text-sm font-semibold tracking-[0.22em] text-white/90">{personalContext.short}</div><div className="text-xs text-white/45">Beto Santos Operations Platform</div></div></Link><nav className="flex flex-wrap gap-2 text-sm text-white/70">{navItems.map(item=><Link key={item.href} href={item.href} className="rounded-full border border-white/10 px-4 py-2 transition hover:border-amber-400/30 hover:bg-white/5 hover:text-white">{item.label}</Link>)}</nav></div></header>{children}<footer className="mt-16 border-t border-white/8 py-6 text-sm text-white/45">BSOP — Built with 🦞 by Claw &amp; Beto</footer></div></div>}
-export function SectionHeading({eyebrow,title,copy}:{eyebrow:string;title:string;copy:string}){return <div className="mb-6 max-w-3xl"><div className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-amber-300/80">{eyebrow}</div><h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">{title}</h1><p className="mt-3 text-sm leading-7 text-white/60 sm:text-base">{copy}</p></div>}
-export function Surface({children,className=''}:{children:ReactNode;className?:string}){return <div className={`rounded-3xl border border-white/8 bg-white/[0.035] ${className}`}>{children}</div>}
-export function ActionLink({href,label}:{href:string;label:string}){return <Link href={href} className="inline-flex items-center gap-2 text-sm font-medium text-amber-300 transition hover:text-amber-200">{label}<ArrowRight className="h-4 w-4" /></Link>}
+
+export function Shell({ children }: { children: ReactNode }) {
+  return <div className="mx-auto w-full max-w-7xl">{children}</div>;
+}
+
+export function SectionHeading({
+  eyebrow,
+  title,
+  copy,
+}: {
+  eyebrow: string;
+  title: string;
+  copy: string;
+}) {
+  return (
+    <div className="mb-8 max-w-3xl">
+      <div className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-[var(--accent-soft)]">{eyebrow}</div>
+      <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">{title}</h1>
+      <p className="mt-3 text-sm leading-7 text-white/60 sm:text-base">{copy}</p>
+    </div>
+  );
+}
+
+export function Surface({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return <div className={`rounded-3xl border border-[var(--border)] bg-[var(--card)] ${className}`}>{children}</div>;
+}
+
+export function ActionLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Link href={href} className="inline-flex items-center gap-2 text-sm font-medium text-[var(--accent-soft)] transition hover:text-white">
+      {label}
+      <ArrowRight className="h-4 w-4" />
+    </Link>
+  );
+}
+
+export function PlaceholderSection({
+  icon,
+  title,
+  description,
+}: {
+  icon: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <Shell>
+      <Surface className="overflow-hidden p-8 sm:p-10">
+        <div className="inline-flex items-center gap-2 rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/12 px-3 py-1 text-xs font-medium text-[var(--accent-soft)]">
+          <Hammer className="h-4 w-4" />
+          Under Construction
+        </div>
+        <div className="mt-6 flex items-start gap-4">
+          <div className="flex h-16 w-16 items-center justify-center rounded-3xl border border-[var(--border)] bg-white/5 text-3xl">
+            {icon}
+          </div>
+          <div>
+            <h1 className="text-3xl font-semibold text-white sm:text-4xl">{title}</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-white/60 sm:text-base">{description}</p>
+          </div>
+        </div>
+      </Surface>
+    </Shell>
+  );
+}
