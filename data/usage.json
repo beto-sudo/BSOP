@@ -1,160 +1,734 @@
 {
-  "generatedAt": "2026-03-23T09:31:52.487260-05:00",
-  "summary": {
-    "sessionCount": 8,
-    "totalCost": 5.782435,
-    "totalTokens": 270991,
-    "averageCostPerSession": 0.722804,
-    "costToday": 5.559953,
-    "costThisWeek": 5.559953,
-    "costThisMonth": 5.782435,
-    "totalSubagentSpawns": 4
+  "generatedAt": "2026-03-23T10:50:30.018047-05:00",
+  "source": {
+    "sessionsDir": "/Users/Beto/.openclaw/agents/main/sessions",
+    "filesParsed": 72,
+    "latestActivityDate": "2026-03-23"
   },
-  "delegation": {
-    "opusTokens": 55071,
-    "delegatedTokens": 164400,
-    "delegatedShare": 0.7491,
-    "spawnedSessions": 3
+  "summary": {
+    "sessionCount": 71,
+    "totalCost": 268.646557,
+    "totalTokens": 279767378,
+    "averageCostPerSession": 3.783754,
+    "costToday": 16.19877,
+    "costThisWeek": 16.19877,
+    "costThisMonth": 268.646561,
+    "messages": 5425,
+    "userMessages": 1197,
+    "assistantMessages": 4228,
+    "toolCalls": 3521,
+    "toolResults": 0,
+    "cacheHitRate": 0.813
+  },
+  "snapshot": {
+    "date": "2026-03-23",
+    "sessionCount": 15,
+    "totalCost": 21.612345,
+    "totalTokens": 16737995,
+    "messages": 414,
+    "userMessages": 52,
+    "assistantMessages": 362,
+    "toolCalls": 481,
+    "toolResults": 0,
+    "costByModel": [
+      {
+        "model": "claude-opus-4-6",
+        "cost": 15.368254,
+        "messages": 126,
+        "tokens": 7979317,
+        "formattedCost": "$15.37",
+        "label": "Opus",
+        "provider": "anthropic"
+      },
+      {
+        "model": "gpt-5.4",
+        "cost": 5.536889,
+        "messages": 206,
+        "tokens": 7637091,
+        "formattedCost": "$5.54",
+        "label": "GPT-5.4",
+        "provider": "openai-codex"
+      },
+      {
+        "model": "gemini-3.1-pro-preview",
+        "cost": 0.63802,
+        "messages": 6,
+        "tokens": 506023,
+        "formattedCost": "$0.6380",
+        "label": "Gemini",
+        "provider": "google"
+      },
+      {
+        "model": "minimax/minimax-m2.5",
+        "cost": 0.069182,
+        "messages": 24,
+        "tokens": 615564,
+        "formattedCost": "$0.0692",
+        "label": "MiniMax",
+        "provider": "openrouter"
+      }
+    ],
+    "costByProvider": [
+      {
+        "provider": "anthropic",
+        "cost": 15.368254,
+        "messages": 126,
+        "tokens": 7979317,
+        "formattedCost": "$15.37"
+      },
+      {
+        "provider": "openai-codex",
+        "cost": 5.536889,
+        "messages": 206,
+        "tokens": 7637091,
+        "formattedCost": "$5.54"
+      },
+      {
+        "provider": "google",
+        "cost": 0.63802,
+        "messages": 6,
+        "tokens": 506023,
+        "formattedCost": "$0.6380"
+      },
+      {
+        "provider": "openrouter",
+        "cost": 0.069182,
+        "messages": 24,
+        "tokens": 615564,
+        "formattedCost": "$0.0692"
+      }
+    ]
+  },
+  "usageTotals": {
+    "inputTokens": 47935114,
+    "outputTokens": 1196875,
+    "cacheReadTokens": 208386702,
+    "cacheWriteTokens": 22248687,
+    "cacheHitRate": 0.813
   },
   "costByModel": [
     {
+      "model": "claude-opus-4-6",
+      "cost": 140.638894,
+      "messages": 1713,
+      "tokens": 120364726,
+      "formattedCost": "$140.64",
       "label": "Opus",
-      "cost": 4.964984,
-      "tokens": 15557,
-      "sessions": 2,
-      "models": [
-        "claude-opus-4-6"
-      ],
-      "formattedCost": "$4.96"
+      "provider": "anthropic"
     },
     {
+      "model": "gpt-5.4",
+      "cost": 106.445072,
+      "messages": 1537,
+      "tokens": 125039557,
+      "formattedCost": "$106.45",
       "label": "GPT-5.4",
-      "cost": 0.8041,
-      "tokens": 176538,
-      "sessions": 5,
-      "models": [
-        "gpt-5.4"
-      ],
-      "formattedCost": "$0.8041"
+      "provider": "openai-codex"
     },
     {
+      "model": "gemini-3.1-pro-preview",
+      "cost": 18.734698,
+      "messages": 123,
+      "tokens": 14886402,
+      "formattedCost": "$18.73",
+      "label": "Gemini",
+      "provider": "google"
+    },
+    {
+      "model": "minimax/minimax-m2.5",
+      "cost": 1.338379,
+      "messages": 253,
+      "tokens": 12849385,
+      "formattedCost": "$1.34",
       "label": "MiniMax",
-      "cost": 0.01335,
-      "tokens": 78896,
-      "sessions": 2,
-      "models": [
-        "minimax/minimax-m2.5"
-      ],
-      "formattedCost": "$0.0134"
+      "provider": "openrouter"
+    },
+    {
+      "model": "gpt-5.3-codex",
+      "cost": 1.189894,
+      "messages": 57,
+      "tokens": 1459006,
+      "formattedCost": "$1.19",
+      "label": "GPT-5.4",
+      "provider": "openai-codex"
+    },
+    {
+      "model": "claude-sonnet-4-6",
+      "cost": 0.227928,
+      "messages": 11,
+      "tokens": 278801,
+      "formattedCost": "$0.2279",
+      "label": "Claude Sonnet 4 6",
+      "provider": "anthropic"
+    },
+    {
+      "model": "kimi-k2.5",
+      "cost": 0.071691,
+      "messages": 249,
+      "tokens": 4889501,
+      "formattedCost": "$0.0717",
+      "label": "Kimi K2.5",
+      "provider": "moonshot"
+    },
+    {
+      "model": "claude-opus-4",
+      "cost": 0.0,
+      "messages": 49,
+      "tokens": 0,
+      "formattedCost": "$0.0000",
+      "label": "Opus",
+      "provider": "claude-proxy"
+    },
+    {
+      "model": "claude-4-6-opus-20260301",
+      "cost": 0.0,
+      "messages": 10,
+      "tokens": 0,
+      "formattedCost": "$0.0000",
+      "label": "Opus",
+      "provider": "anthropic"
+    },
+    {
+      "model": "gpt-4o-mini",
+      "cost": 0.0,
+      "messages": 10,
+      "tokens": 0,
+      "formattedCost": "$0.0000",
+      "label": "Gpt 4O Mini",
+      "provider": "openai"
+    }
+  ],
+  "costByProvider": [
+    {
+      "provider": "anthropic",
+      "cost": 140.866822,
+      "messages": 1734,
+      "tokens": 120643527,
+      "formattedCost": "$140.87"
+    },
+    {
+      "provider": "openai-codex",
+      "cost": 107.634966,
+      "messages": 1594,
+      "tokens": 126498563,
+      "formattedCost": "$107.63"
+    },
+    {
+      "provider": "google",
+      "cost": 18.734698,
+      "messages": 123,
+      "tokens": 14886402,
+      "formattedCost": "$18.73"
+    },
+    {
+      "provider": "openrouter",
+      "cost": 1.338379,
+      "messages": 253,
+      "tokens": 12849385,
+      "formattedCost": "$1.34"
+    },
+    {
+      "provider": "moonshot",
+      "cost": 0.071691,
+      "messages": 249,
+      "tokens": 4889501,
+      "formattedCost": "$0.0717"
+    },
+    {
+      "provider": "claude-proxy",
+      "cost": 0.0,
+      "messages": 49,
+      "tokens": 0,
+      "formattedCost": "$0.0000"
+    },
+    {
+      "provider": "openai",
+      "cost": 0.0,
+      "messages": 10,
+      "tokens": 0,
+      "formattedCost": "$0.0000"
     }
   ],
   "dailyTrend": [
     {
+      "date": "2026-03-10",
+      "cost": 33.60561,
+      "tokens": 42819773,
+      "sessions": 2,
+      "messages": 378,
+      "userMessages": 67,
+      "assistantMessages": 311,
+      "toolCalls": 296,
+      "formattedCost": "$33.61"
+    },
+    {
+      "date": "2026-03-11",
+      "cost": 4.103729,
+      "tokens": 4778147,
+      "sessions": 2,
+      "messages": 161,
+      "userMessages": 48,
+      "assistantMessages": 113,
+      "toolCalls": 80,
+      "formattedCost": "$4.10"
+    },
+    {
+      "date": "2026-03-12",
+      "cost": 7.772356,
+      "tokens": 6554668,
+      "sessions": 2,
+      "messages": 159,
+      "userMessages": 46,
+      "assistantMessages": 113,
+      "toolCalls": 84,
+      "formattedCost": "$7.77"
+    },
+    {
+      "date": "2026-03-13",
+      "cost": 15.832598,
+      "tokens": 15554417,
+      "sessions": 3,
+      "messages": 288,
+      "userMessages": 74,
+      "assistantMessages": 214,
+      "toolCalls": 197,
+      "formattedCost": "$15.83"
+    },
+    {
+      "date": "2026-03-14",
+      "cost": 8.237296,
+      "tokens": 9639627,
+      "sessions": 2,
+      "messages": 163,
+      "userMessages": 45,
+      "assistantMessages": 118,
+      "toolCalls": 95,
+      "formattedCost": "$8.24"
+    },
+    {
+      "date": "2026-03-15",
+      "cost": 16.093854,
+      "tokens": 21830205,
+      "sessions": 2,
+      "messages": 289,
+      "userMessages": 65,
+      "assistantMessages": 224,
+      "toolCalls": 210,
+      "formattedCost": "$16.09"
+    },
+    {
+      "date": "2026-03-16",
+      "cost": 15.828708,
+      "tokens": 34544980,
+      "sessions": 6,
+      "messages": 543,
+      "userMessages": 134,
+      "assistantMessages": 409,
+      "toolCalls": 311,
+      "formattedCost": "$15.83"
+    },
+    {
       "date": "2026-03-17",
-      "cost": 0.0,
-      "tokens": 2878,
+      "cost": 6.729848,
+      "tokens": 22614845,
+      "sessions": 4,
+      "messages": 421,
+      "userMessages": 84,
+      "assistantMessages": 337,
+      "toolCalls": 287,
+      "formattedCost": "$6.73"
+    },
+    {
+      "date": "2026-03-18",
+      "cost": 20.898643,
+      "tokens": 13539516,
+      "sessions": 3,
+      "messages": 315,
+      "userMessages": 61,
+      "assistantMessages": 254,
+      "toolCalls": 204,
+      "formattedCost": "$20.90"
+    },
+    {
+      "date": "2026-03-19",
+      "cost": 7.171729,
+      "tokens": 5843010,
+      "sessions": 2,
+      "messages": 159,
+      "userMessages": 32,
+      "assistantMessages": 127,
+      "toolCalls": 92,
+      "formattedCost": "$7.17"
+    },
+    {
+      "date": "2026-03-20",
+      "cost": 51.156286,
+      "tokens": 25977643,
       "sessions": 1,
-      "formattedCost": "$0.0000"
+      "messages": 363,
+      "userMessages": 80,
+      "assistantMessages": 283,
+      "toolCalls": 184,
+      "formattedCost": "$51.16"
     },
     {
       "date": "2026-03-21",
-      "cost": 0.006223,
-      "tokens": 39382,
-      "sessions": 1,
-      "formattedCost": "$0.0062"
+      "cost": 34.086322,
+      "tokens": 30728077,
+      "sessions": 24,
+      "messages": 834,
+      "userMessages": 180,
+      "assistantMessages": 654,
+      "toolCalls": 437,
+      "formattedCost": "$34.09"
     },
     {
       "date": "2026-03-22",
-      "cost": 0.216259,
-      "tokens": 48268,
-      "sessions": 2,
-      "formattedCost": "$0.2163"
+      "cost": 23.188042,
+      "tokens": 24919741,
+      "sessions": 12,
+      "messages": 637,
+      "userMessages": 136,
+      "assistantMessages": 501,
+      "toolCalls": 488,
+      "formattedCost": "$23.19"
     },
     {
       "date": "2026-03-23",
-      "cost": 5.559953,
-      "tokens": 180463,
-      "sessions": 4,
-      "formattedCost": "$5.56"
+      "cost": 21.612345,
+      "tokens": 16737995,
+      "sessions": 15,
+      "messages": 414,
+      "userMessages": 52,
+      "assistantMessages": 362,
+      "toolCalls": 481,
+      "formattedCost": "$21.61"
     }
   ],
   "recentSessions": [
     {
-      "id": "dccec380-1ab6-40dc-b485-21a3ae50e2f8",
-      "timestamp": "2026-03-23T09:31:41.082000-05:00",
-      "endedAt": "2026-03-23T09:31:52.389000-05:00",
-      "durationMinutes": 0.2,
+      "id": "4c6df842-7212-4a3f-9e38-aea5289824cb",
+      "timestamp": "2026-03-23T10:42:32.991000-05:00",
+      "endedAt": "2026-03-23T10:50:29.779000-05:00",
+      "durationMinutes": 7.9,
       "model": "gpt-5.4",
       "modelLabel": "GPT-5.4",
-      "inputTokens": 26068,
-      "outputTokens": 313,
-      "totalTokens": 26381,
-      "cost": 0.069865,
-      "assistantMessages": 2,
-      "subagentSpawns": 0,
-      "childSessions": 0,
-      "childTokens": 0,
+      "inputTokens": 207054,
+      "outputTokens": 16617,
+      "cacheReadTokens": 1544448,
+      "cacheWriteTokens": 0,
+      "totalTokens": 1768119,
+      "cost": 1.153002,
+      "messages": 38,
+      "userMessages": 1,
+      "assistantMessages": 37,
+      "toolCalls": 40,
+      "toolResults": 39,
+      "files": [
+        "4c6df842-7212-4a3f-9e38-aea5289824cb.jsonl"
+      ],
       "models": [
         {
           "model": "gpt-5.4",
           "label": "GPT-5.4",
-          "inputTokens": 26068,
-          "outputTokens": 313,
-          "totalTokens": 26381,
-          "cost": 0.069865
+          "provider": "openai-codex",
+          "messages": 37,
+          "tokens": 1768119,
+          "cost": 1.153002
         }
       ],
-      "formattedCost": "$0.0699"
+      "providers": [
+        {
+          "provider": "openai-codex",
+          "messages": 37,
+          "tokens": 1768119,
+          "cost": 1.153002
+        }
+      ],
+      "formattedCost": "$1.15"
+    },
+    {
+      "id": "03fe17c4-9ae3-4161-a04f-da2e2bc609b1",
+      "timestamp": "2026-03-23T10:15:05.741000-05:00",
+      "endedAt": "2026-03-23T10:19:08.653000-05:00",
+      "durationMinutes": 4.0,
+      "model": "gpt-5.4",
+      "modelLabel": "GPT-5.4",
+      "inputTokens": 114509,
+      "outputTokens": 9645,
+      "cacheReadTokens": 358400,
+      "cacheWriteTokens": 0,
+      "totalTokens": 482554,
+      "cost": 0.520547,
+      "messages": 15,
+      "userMessages": 1,
+      "assistantMessages": 14,
+      "toolCalls": 29,
+      "toolResults": 29,
+      "files": [
+        "03fe17c4-9ae3-4161-a04f-da2e2bc609b1.jsonl"
+      ],
+      "models": [
+        {
+          "model": "gpt-5.4",
+          "label": "GPT-5.4",
+          "provider": "openai-codex",
+          "messages": 14,
+          "tokens": 482554,
+          "cost": 0.520547
+        }
+      ],
+      "providers": [
+        {
+          "provider": "openai-codex",
+          "messages": 14,
+          "tokens": 482554,
+          "cost": 0.520547
+        }
+      ],
+      "formattedCost": "$0.5205"
+    },
+    {
+      "id": "30a92192-aac7-419f-b99d-619d283c2e6b",
+      "timestamp": "2026-03-23T09:37:55.848000-05:00",
+      "endedAt": "2026-03-23T09:41:36.926000-05:00",
+      "durationMinutes": 3.7,
+      "model": "gpt-5.4",
+      "modelLabel": "GPT-5.4",
+      "inputTokens": 16791,
+      "outputTokens": 12005,
+      "cacheReadTokens": 41856,
+      "cacheWriteTokens": 0,
+      "totalTokens": 70652,
+      "cost": 0.232517,
+      "messages": 4,
+      "userMessages": 1,
+      "assistantMessages": 3,
+      "toolCalls": 2,
+      "toolResults": 2,
+      "files": [
+        "30a92192-aac7-419f-b99d-619d283c2e6b.jsonl"
+      ],
+      "models": [
+        {
+          "model": "gpt-5.4",
+          "label": "GPT-5.4",
+          "provider": "openai-codex",
+          "messages": 3,
+          "tokens": 70652,
+          "cost": 0.232517
+        }
+      ],
+      "providers": [
+        {
+          "provider": "openai-codex",
+          "messages": 3,
+          "tokens": 70652,
+          "cost": 0.232517
+        }
+      ],
+      "formattedCost": "$0.2325"
+    },
+    {
+      "id": "dccec380-1ab6-40dc-b485-21a3ae50e2f8",
+      "timestamp": "2026-03-23T09:31:41.091000-05:00",
+      "endedAt": "2026-03-23T09:32:22.748000-05:00",
+      "durationMinutes": 0.7,
+      "model": "gpt-5.4",
+      "modelLabel": "GPT-5.4",
+      "inputTokens": 30976,
+      "outputTokens": 1408,
+      "cacheReadTokens": 60160,
+      "cacheWriteTokens": 0,
+      "totalTokens": 92544,
+      "cost": 0.1136,
+      "messages": 7,
+      "userMessages": 1,
+      "assistantMessages": 6,
+      "toolCalls": 10,
+      "toolResults": 10,
+      "files": [
+        "dccec380-1ab6-40dc-b485-21a3ae50e2f8.jsonl"
+      ],
+      "models": [
+        {
+          "model": "gpt-5.4",
+          "label": "GPT-5.4",
+          "provider": "openai-codex",
+          "messages": 6,
+          "tokens": 92544,
+          "cost": 0.1136
+        }
+      ],
+      "providers": [
+        {
+          "provider": "openai-codex",
+          "messages": 6,
+          "tokens": 92544,
+          "cost": 0.1136
+        }
+      ],
+      "formattedCost": "$0.1136"
     },
     {
       "id": "ed0b0de2-1a0d-4218-bba7-cf638f54eab5",
-      "timestamp": "2026-03-23T08:57:40.507000-05:00",
+      "timestamp": "2026-03-23T08:57:40.517000-05:00",
       "endedAt": "2026-03-23T09:00:02.410000-05:00",
       "durationMinutes": 2.4,
       "model": "gpt-5.4",
       "modelLabel": "GPT-5.4",
       "inputTokens": 52961,
       "outputTokens": 5312,
-      "totalTokens": 58273,
+      "cacheReadTokens": 499328,
+      "cacheWriteTokens": 0,
+      "totalTokens": 557601,
       "cost": 0.336915,
+      "messages": 16,
+      "userMessages": 1,
       "assistantMessages": 15,
-      "subagentSpawns": 0,
-      "childSessions": 0,
-      "childTokens": 0,
+      "toolCalls": 22,
+      "toolResults": 22,
+      "files": [
+        "ed0b0de2-1a0d-4218-bba7-cf638f54eab5.jsonl"
+      ],
       "models": [
         {
           "model": "gpt-5.4",
           "label": "GPT-5.4",
-          "inputTokens": 52961,
-          "outputTokens": 5312,
-          "totalTokens": 58273,
+          "provider": "openai-codex",
+          "messages": 15,
+          "tokens": 557601,
+          "cost": 0.336915
+        }
+      ],
+      "providers": [
+        {
+          "provider": "openai-codex",
+          "messages": 15,
+          "tokens": 557601,
           "cost": 0.336915
         }
       ],
       "formattedCost": "$0.3369"
     },
     {
+      "id": "64e09ca4-b9ee-46d9-a663-bfef9addbd92",
+      "timestamp": "2026-03-23T08:26:17.118000-05:00",
+      "endedAt": "2026-03-23T08:28:59.661000-05:00",
+      "durationMinutes": 2.7,
+      "model": "gpt-5.4",
+      "modelLabel": "GPT-5.4",
+      "inputTokens": 46597,
+      "outputTokens": 2752,
+      "cacheReadTokens": 813312,
+      "cacheWriteTokens": 0,
+      "totalTokens": 862661,
+      "cost": 0.3611,
+      "messages": 23,
+      "userMessages": 1,
+      "assistantMessages": 22,
+      "toolCalls": 27,
+      "toolResults": 27,
+      "files": [
+        "64e09ca4-b9ee-46d9-a663-bfef9addbd92.jsonl.deleted.2026-03-23T14-27-07.336Z"
+      ],
+      "models": [
+        {
+          "model": "gpt-5.4",
+          "label": "GPT-5.4",
+          "provider": "openai-codex",
+          "messages": 22,
+          "tokens": 862661,
+          "cost": 0.3611
+        }
+      ],
+      "providers": [
+        {
+          "provider": "openai-codex",
+          "messages": 22,
+          "tokens": 862661,
+          "cost": 0.3611
+        }
+      ],
+      "formattedCost": "$0.3611"
+    },
+    {
+      "id": "6104b733-d658-41f5-a0b1-1f832c3ab521",
+      "timestamp": "2026-03-23T07:33:02.020000-05:00",
+      "endedAt": "2026-03-23T07:38:20.361000-05:00",
+      "durationMinutes": 5.3,
+      "model": "gpt-5.4",
+      "modelLabel": "GPT-5.4",
+      "inputTokens": 47814,
+      "outputTokens": 8955,
+      "cacheReadTokens": 294272,
+      "cacheWriteTokens": 0,
+      "totalTokens": 351041,
+      "cost": 0.327428,
+      "messages": 12,
+      "userMessages": 1,
+      "assistantMessages": 11,
+      "toolCalls": 45,
+      "toolResults": 45,
+      "files": [
+        "6104b733-d658-41f5-a0b1-1f832c3ab521.jsonl.deleted.2026-03-23T13-36-25.895Z"
+      ],
+      "models": [
+        {
+          "model": "gpt-5.4",
+          "label": "GPT-5.4",
+          "provider": "openai-codex",
+          "messages": 11,
+          "tokens": 351041,
+          "cost": 0.327428
+        }
+      ],
+      "providers": [
+        {
+          "provider": "openai-codex",
+          "messages": 11,
+          "tokens": 351041,
+          "cost": 0.327428
+        }
+      ],
+      "formattedCost": "$0.3274"
+    },
+    {
       "id": "7ea8af4d-bee6-44e0-8c9d-51ac4964904f",
-      "timestamp": "2026-03-23T07:00:00.033000-05:00",
+      "timestamp": "2026-03-23T07:00:00.037000-05:00",
       "endedAt": "2026-03-23T07:02:25.141000-05:00",
       "durationMinutes": 2.4,
       "model": "gpt-5.4",
       "modelLabel": "GPT-5.4",
       "inputTokens": 40527,
       "outputTokens": 3089,
-      "totalTokens": 43616,
+      "cacheReadTokens": 133632,
+      "cacheWriteTokens": 0,
+      "totalTokens": 177248,
       "cost": 0.181061,
+      "messages": 9,
+      "userMessages": 1,
       "assistantMessages": 8,
-      "subagentSpawns": 0,
-      "childSessions": 0,
-      "childTokens": 0,
+      "toolCalls": 21,
+      "toolResults": 21,
+      "files": [
+        "7ea8af4d-bee6-44e0-8c9d-51ac4964904f.jsonl"
+      ],
       "models": [
         {
           "model": "gpt-5.4",
           "label": "GPT-5.4",
-          "inputTokens": 40527,
-          "outputTokens": 3089,
-          "totalTokens": 43616,
+          "provider": "openai-codex",
+          "messages": 8,
+          "tokens": 177248,
+          "cost": 0.181061
+        }
+      ],
+      "providers": [
+        {
+          "provider": "openai-codex",
+          "messages": 8,
+          "tokens": 177248,
           "cost": 0.181061
         }
       ],
@@ -162,146 +736,565 @@
     },
     {
       "id": "525128a5-0ae5-40cd-8da9-38914c254ffc",
-      "timestamp": "2026-03-23T04:11:08.033000-05:00",
-      "endedAt": "2026-03-23T09:31:44.804000-05:00",
-      "durationMinutes": 320.6,
+      "timestamp": "2026-03-23T04:11:08.037000-05:00",
+      "endedAt": "2026-03-23T10:44:01.418000-05:00",
+      "durationMinutes": 392.9,
       "model": "claude-opus-4-6",
       "modelLabel": "Opus",
-      "inputTokens": 38153,
-      "outputTokens": 14040,
-      "totalTokens": 52193,
-      "cost": 4.972112,
-      "assistantMessages": 69,
-      "subagentSpawns": 4,
-      "childSessions": 3,
-      "childTokens": 164400,
+      "inputTokens": 38190,
+      "outputTokens": 20763,
+      "cacheReadTokens": 3730208,
+      "cacheWriteTokens": 1222149,
+      "totalTokens": 5011310,
+      "cost": 9.99311,
+      "messages": 112,
+      "userMessages": 26,
+      "assistantMessages": 86,
+      "toolCalls": 68,
+      "toolResults": 68,
+      "files": [
+        "525128a5-0ae5-40cd-8da9-38914c254ffc.jsonl"
+      ],
       "models": [
         {
           "model": "claude-opus-4-6",
           "label": "Opus",
-          "inputTokens": 97,
-          "outputTokens": 12582,
-          "totalTokens": 12679,
-          "cost": 4.964984
+          "provider": "anthropic",
+          "messages": 84,
+          "tokens": 4970100,
+          "cost": 9.985982
         },
         {
           "model": "minimax/minimax-m2.5",
           "label": "MiniMax",
-          "inputTokens": 38056,
-          "outputTokens": 1458,
-          "totalTokens": 39514,
+          "provider": "openrouter",
+          "messages": 2,
+          "tokens": 41210,
           "cost": 0.007127
         }
       ],
-      "formattedCost": "$4.97"
+      "providers": [
+        {
+          "provider": "anthropic",
+          "messages": 84,
+          "tokens": 4970100,
+          "cost": 9.985982
+        },
+        {
+          "provider": "openrouter",
+          "messages": 2,
+          "tokens": 41210,
+          "cost": 0.007127
+        }
+      ],
+      "formattedCost": "$9.99"
+    },
+    {
+      "id": "a560a39e-6299-473c-b8ff-97fab24979e2",
+      "timestamp": "2026-03-23T01:00:28.373000-05:00",
+      "endedAt": "2026-03-23T01:06:34.341000-05:00",
+      "durationMinutes": 6.1,
+      "model": "gpt-5.4",
+      "modelLabel": "GPT-5.4",
+      "inputTokens": 114904,
+      "outputTokens": 10434,
+      "cacheReadTokens": 282752,
+      "cacheWriteTokens": 0,
+      "totalTokens": 408090,
+      "cost": 0.514458,
+      "messages": 12,
+      "userMessages": 1,
+      "assistantMessages": 11,
+      "toolCalls": 46,
+      "toolResults": 46,
+      "files": [
+        "a560a39e-6299-473c-b8ff-97fab24979e2.jsonl.deleted.2026-03-23T07-01-11.137Z"
+      ],
+      "models": [
+        {
+          "model": "gpt-5.4",
+          "label": "GPT-5.4",
+          "provider": "openai-codex",
+          "messages": 11,
+          "tokens": 408090,
+          "cost": 0.514458
+        }
+      ],
+      "providers": [
+        {
+          "provider": "openai-codex",
+          "messages": 11,
+          "tokens": 408090,
+          "cost": 0.514458
+        }
+      ],
+      "formattedCost": "$0.5145"
+    },
+    {
+      "id": "feef3b2b-0f73-4381-8f5a-549bd0cf5ee0",
+      "timestamp": "2026-03-23T00:53:52.245000-05:00",
+      "endedAt": "2026-03-23T00:58:17.635000-05:00",
+      "durationMinutes": 4.4,
+      "model": "gpt-5.4",
+      "modelLabel": "GPT-5.4",
+      "inputTokens": 54757,
+      "outputTokens": 7968,
+      "cacheReadTokens": 346496,
+      "cacheWriteTokens": 0,
+      "totalTokens": 409221,
+      "cost": 0.343037,
+      "messages": 15,
+      "userMessages": 1,
+      "assistantMessages": 14,
+      "toolCalls": 38,
+      "toolResults": 38,
+      "files": [
+        "feef3b2b-0f73-4381-8f5a-549bd0cf5ee0.jsonl.deleted.2026-03-23T06-54-11.138Z"
+      ],
+      "models": [
+        {
+          "model": "gpt-5.4",
+          "label": "GPT-5.4",
+          "provider": "openai-codex",
+          "messages": 14,
+          "tokens": 409221,
+          "cost": 0.343037
+        }
+      ],
+      "providers": [
+        {
+          "provider": "openai-codex",
+          "messages": 14,
+          "tokens": 409221,
+          "cost": 0.343037
+        }
+      ],
+      "formattedCost": "$0.3430"
+    },
+    {
+      "id": "61b5b212-502b-4e35-ae87-f3028570a921",
+      "timestamp": "2026-03-23T00:48:50.997000-05:00",
+      "endedAt": "2026-03-23T01:12:55.689000-05:00",
+      "durationMinutes": 24.1,
+      "model": "gpt-5.4",
+      "modelLabel": "GPT-5.4",
+      "inputTokens": 89223,
+      "outputTokens": 6752,
+      "cacheReadTokens": 1090048,
+      "cacheWriteTokens": 0,
+      "totalTokens": 1186023,
+      "cost": 0.59685,
+      "messages": 37,
+      "userMessages": 1,
+      "assistantMessages": 36,
+      "toolCalls": 37,
+      "toolResults": 37,
+      "files": [
+        "61b5b212-502b-4e35-ae87-f3028570a921.jsonl.deleted.2026-03-23T06-49-11.107Z"
+      ],
+      "models": [
+        {
+          "model": "gpt-5.4",
+          "label": "GPT-5.4",
+          "provider": "openai-codex",
+          "messages": 36,
+          "tokens": 1186023,
+          "cost": 0.59685
+        }
+      ],
+      "providers": [
+        {
+          "provider": "openai-codex",
+          "messages": 36,
+          "tokens": 1186023,
+          "cost": 0.59685
+        }
+      ],
+      "formattedCost": "$0.5968"
+    },
+    {
+      "id": "3b1d64e2-cebf-4452-916c-528b23818b75",
+      "timestamp": "2026-03-23T00:28:00.412000-05:00",
+      "endedAt": "2026-03-23T00:34:24.964000-05:00",
+      "durationMinutes": 6.4,
+      "model": "gpt-5.4",
+      "modelLabel": "GPT-5.4",
+      "inputTokens": 62585,
+      "outputTokens": 16491,
+      "cacheReadTokens": 901504,
+      "cacheWriteTokens": 0,
+      "totalTokens": 980580,
+      "cost": 0.629204,
+      "messages": 19,
+      "userMessages": 1,
+      "assistantMessages": 18,
+      "toolCalls": 28,
+      "toolResults": 28,
+      "files": [
+        "3b1d64e2-cebf-4452-916c-528b23818b75.jsonl.deleted.2026-03-23T06-28-11.068Z"
+      ],
+      "models": [
+        {
+          "model": "gpt-5.4",
+          "label": "GPT-5.4",
+          "provider": "openai-codex",
+          "messages": 18,
+          "tokens": 980580,
+          "cost": 0.629204
+        }
+      ],
+      "providers": [
+        {
+          "provider": "openai-codex",
+          "messages": 18,
+          "tokens": 980580,
+          "cost": 0.629204
+        }
+      ],
+      "formattedCost": "$0.6292"
+    },
+    {
+      "id": "186e664c-c8de-4ee8-a837-ae422a8e6a3d",
+      "timestamp": "2026-03-23T00:27:11.007000-05:00",
+      "endedAt": "2026-03-23T01:05:24.357000-05:00",
+      "durationMinutes": 38.2,
+      "model": "gemini-3.1-pro-preview",
+      "modelLabel": "Gemini",
+      "inputTokens": 499928,
+      "outputTokens": 6911,
+      "cacheReadTokens": 654984,
+      "cacheWriteTokens": 0,
+      "totalTokens": 1161823,
+      "cost": 0.895941,
+      "messages": 39,
+      "userMessages": 3,
+      "assistantMessages": 36,
+      "toolCalls": 34,
+      "toolResults": 33,
+      "files": [
+        "186e664c-c8de-4ee8-a837-ae422a8e6a3d.jsonl.deleted.2026-03-23T06-27-11.079Z"
+      ],
+      "models": [
+        {
+          "model": "gemini-3.1-pro-preview",
+          "label": "Gemini",
+          "provider": "google",
+          "messages": 6,
+          "tokens": 506023,
+          "cost": 0.63802
+        },
+        {
+          "model": "gpt-5.4",
+          "label": "GPT-5.4",
+          "provider": "openai-codex",
+          "messages": 11,
+          "tokens": 290757,
+          "cost": 0.227173
+        },
+        {
+          "model": "minimax/minimax-m2.5",
+          "label": "MiniMax",
+          "provider": "openrouter",
+          "messages": 19,
+          "tokens": 365043,
+          "cost": 0.030748
+        }
+      ],
+      "providers": [
+        {
+          "provider": "google",
+          "messages": 6,
+          "tokens": 506023,
+          "cost": 0.63802
+        },
+        {
+          "provider": "openai-codex",
+          "messages": 11,
+          "tokens": 290757,
+          "cost": 0.227173
+        },
+        {
+          "provider": "openrouter",
+          "messages": 19,
+          "tokens": 365043,
+          "cost": 0.030748
+        }
+      ],
+      "formattedCost": "$0.8959"
+    },
+    {
+      "id": "6d367ae0-ff1e-4287-84a5-81cd8f1f390c",
+      "timestamp": "2026-03-22T22:33:41.526000-05:00",
+      "endedAt": "2026-03-22T22:46:17.364000-05:00",
+      "durationMinutes": 12.6,
+      "model": "gemini-3.1-pro-preview",
+      "modelLabel": "Gemini",
+      "inputTokens": 1427088,
+      "outputTokens": 23370,
+      "cacheReadTokens": 2574526,
+      "cacheWriteTokens": 0,
+      "totalTokens": 4024984,
+      "cost": 3.83575,
+      "messages": 49,
+      "userMessages": 2,
+      "assistantMessages": 47,
+      "toolCalls": 57,
+      "toolResults": 57,
+      "files": [
+        "6d367ae0-ff1e-4287-84a5-81cd8f1f390c.jsonl.deleted.2026-03-23T04-34-36.073Z"
+      ],
+      "models": [
+        {
+          "model": "gemini-3.1-pro-preview",
+          "label": "Gemini",
+          "provider": "google",
+          "messages": 13,
+          "tokens": 2508868,
+          "cost": 2.904604
+        },
+        {
+          "model": "gpt-5.4",
+          "label": "GPT-5.4",
+          "provider": "openai-codex",
+          "messages": 34,
+          "tokens": 1516116,
+          "cost": 0.931146
+        }
+      ],
+      "providers": [
+        {
+          "provider": "google",
+          "messages": 13,
+          "tokens": 2508868,
+          "cost": 2.904604
+        },
+        {
+          "provider": "openai-codex",
+          "messages": 34,
+          "tokens": 1516116,
+          "cost": 0.931146
+        }
+      ],
+      "formattedCost": "$3.84"
+    },
+    {
+      "id": "f2466fbc-5f5b-435b-a1b8-bf9cc086c997",
+      "timestamp": "2026-03-22T22:24:35.986000-05:00",
+      "endedAt": "2026-03-22T22:28:45.938000-05:00",
+      "durationMinutes": 4.2,
+      "model": "gpt-5.4",
+      "modelLabel": "GPT-5.4",
+      "inputTokens": 229453,
+      "outputTokens": 9733,
+      "cacheReadTokens": 541696,
+      "cacheWriteTokens": 0,
+      "totalTokens": 780882,
+      "cost": 0.855051,
+      "messages": 15,
+      "userMessages": 1,
+      "assistantMessages": 14,
+      "toolCalls": 18,
+      "toolResults": 18,
+      "files": [
+        "f2466fbc-5f5b-435b-a1b8-bf9cc086c997.jsonl.deleted.2026-03-23T04-24-36.058Z"
+      ],
+      "models": [
+        {
+          "model": "gpt-5.4",
+          "label": "GPT-5.4",
+          "provider": "openai-codex",
+          "messages": 14,
+          "tokens": 780882,
+          "cost": 0.855051
+        }
+      ],
+      "providers": [
+        {
+          "provider": "openai-codex",
+          "messages": 14,
+          "tokens": 780882,
+          "cost": 0.855051
+        }
+      ],
+      "formattedCost": "$0.8551"
+    },
+    {
+      "id": "c9bb1059-a705-4b89-bf52-e9a6790b84f7",
+      "timestamp": "2026-03-22T21:21:27.267000-05:00",
+      "endedAt": "2026-03-22T21:25:20.327000-05:00",
+      "durationMinutes": 3.9,
+      "model": "gpt-5.4",
+      "modelLabel": "GPT-5.4",
+      "inputTokens": 45001,
+      "outputTokens": 6861,
+      "cacheReadTokens": 212352,
+      "cacheWriteTokens": 0,
+      "totalTokens": 264214,
+      "cost": 0.268506,
+      "messages": 10,
+      "userMessages": 1,
+      "assistantMessages": 9,
+      "toolCalls": 28,
+      "toolResults": 28,
+      "files": [
+        "c9bb1059-a705-4b89-bf52-e9a6790b84f7.jsonl.deleted.2026-03-23T03-21-51.882Z"
+      ],
+      "models": [
+        {
+          "model": "gpt-5.4",
+          "label": "GPT-5.4",
+          "provider": "openai-codex",
+          "messages": 9,
+          "tokens": 264214,
+          "cost": 0.268506
+        }
+      ],
+      "providers": [
+        {
+          "provider": "openai-codex",
+          "messages": 9,
+          "tokens": 264214,
+          "cost": 0.268506
+        }
+      ],
+      "formattedCost": "$0.2685"
+    },
+    {
+      "id": "3a162b54-fb2e-4a91-a208-55c4014e69c3",
+      "timestamp": "2026-03-22T21:18:04.446000-05:00",
+      "endedAt": "2026-03-23T03:12:20.606000-05:00",
+      "durationMinutes": 354.3,
+      "model": "claude-opus-4-6",
+      "modelLabel": "Opus",
+      "inputTokens": 282576,
+      "outputTokens": 28245,
+      "cacheReadTokens": 5393480,
+      "cacheWriteTokens": 915632,
+      "totalTokens": 6619933,
+      "cost": 9.070194,
+      "messages": 156,
+      "userMessages": 30,
+      "assistantMessages": 126,
+      "toolCalls": 94,
+      "toolResults": 94,
+      "files": [
+        "3a162b54-fb2e-4a91-a208-55c4014e69c3.jsonl.reset.2026-03-23T09-11-07.949Z"
+      ],
+      "models": [
+        {
+          "model": "claude-opus-4-6",
+          "label": "Opus",
+          "provider": "anthropic",
+          "messages": 116,
+          "tokens": 6272322,
+          "cost": 9.023874
+        },
+        {
+          "model": "minimax/minimax-m2.5",
+          "label": "MiniMax",
+          "provider": "openrouter",
+          "messages": 8,
+          "tokens": 347611,
+          "cost": 0.04632
+        }
+      ],
+      "providers": [
+        {
+          "provider": "anthropic",
+          "messages": 116,
+          "tokens": 6272322,
+          "cost": 9.023874
+        },
+        {
+          "provider": "openrouter",
+          "messages": 8,
+          "tokens": 347611,
+          "cost": 0.04632
+        }
+      ],
+      "formattedCost": "$9.07"
+    },
+    {
+      "id": "35244869-2eff-4233-86fb-d7a8f3ccacd4",
+      "timestamp": "2026-03-22T21:01:51.860000-05:00",
+      "endedAt": "2026-03-22T21:11:20.650000-05:00",
+      "durationMinutes": 9.5,
+      "model": "gpt-5.4",
+      "modelLabel": "GPT-5.4",
+      "inputTokens": 266143,
+      "outputTokens": 7034,
+      "cacheReadTokens": 250624,
+      "cacheWriteTokens": 0,
+      "totalTokens": 523801,
+      "cost": 0.833524,
+      "messages": 15,
+      "userMessages": 1,
+      "assistantMessages": 14,
+      "toolCalls": 62,
+      "toolResults": 62,
+      "files": [
+        "35244869-2eff-4233-86fb-d7a8f3ccacd4.jsonl.deleted.2026-03-23T03-01-51.872Z"
+      ],
+      "models": [
+        {
+          "model": "gpt-5.4",
+          "label": "GPT-5.4",
+          "provider": "openai-codex",
+          "messages": 14,
+          "tokens": 523801,
+          "cost": 0.833524
+        }
+      ],
+      "providers": [
+        {
+          "provider": "openai-codex",
+          "messages": 14,
+          "tokens": 523801,
+          "cost": 0.833524
+        }
+      ],
+      "formattedCost": "$0.8335"
     },
     {
       "id": "cae1364f-1c74-4080-acd5-91ef0b917b2e",
-      "timestamp": "2026-03-22T19:30:00.061000-05:00",
+      "timestamp": "2026-03-22T19:30:00.069000-05:00",
       "endedAt": "2026-03-22T19:30:44.453000-05:00",
       "durationMinutes": 0.7,
       "model": "gpt-5.4",
       "modelLabel": "GPT-5.4",
       "inputTokens": 15738,
       "outputTokens": 1811,
-      "totalTokens": 17549,
+      "cacheReadTokens": 74368,
+      "cacheWriteTokens": 0,
+      "totalTokens": 91917,
       "cost": 0.085102,
+      "messages": 6,
+      "userMessages": 1,
       "assistantMessages": 5,
-      "subagentSpawns": 0,
-      "childSessions": 0,
-      "childTokens": 0,
+      "toolCalls": 8,
+      "toolResults": 8,
+      "files": [
+        "cae1364f-1c74-4080-acd5-91ef0b917b2e.jsonl"
+      ],
       "models": [
         {
           "model": "gpt-5.4",
           "label": "GPT-5.4",
-          "inputTokens": 15738,
-          "outputTokens": 1811,
-          "totalTokens": 17549,
+          "provider": "openai-codex",
+          "messages": 5,
+          "tokens": 91917,
+          "cost": 0.085102
+        }
+      ],
+      "providers": [
+        {
+          "provider": "openai-codex",
+          "messages": 5,
+          "tokens": 91917,
           "cost": 0.085102
         }
       ],
       "formattedCost": "$0.0851"
-    },
-    {
-      "id": "92243bf0-2a65-4bb7-bb47-62b241c348df",
-      "timestamp": "2026-03-22T07:00:00.048000-05:00",
-      "endedAt": "2026-03-22T07:00:56.107000-05:00",
-      "durationMinutes": 0.9,
-      "model": "gpt-5.4",
-      "modelLabel": "GPT-5.4",
-      "inputTokens": 28193,
-      "outputTokens": 2526,
-      "totalTokens": 30719,
-      "cost": 0.131157,
-      "assistantMessages": 5,
-      "subagentSpawns": 0,
-      "childSessions": 0,
-      "childTokens": 0,
-      "models": [
-        {
-          "model": "gpt-5.4",
-          "label": "GPT-5.4",
-          "inputTokens": 28193,
-          "outputTokens": 2526,
-          "totalTokens": 30719,
-          "cost": 0.131157
-        }
-      ],
-      "formattedCost": "$0.1312"
-    },
-    {
-      "id": "43732c8b-8347-4faf-8fd7-5c8178a1214f",
-      "timestamp": "2026-03-21T18:47:05.345000-05:00",
-      "endedAt": "2026-03-21T18:47:51.597000-05:00",
-      "durationMinutes": 0.8,
-      "model": "minimax/minimax-m2.5",
-      "modelLabel": "MiniMax",
-      "inputTokens": 39058,
-      "outputTokens": 324,
-      "totalTokens": 39382,
-      "cost": 0.006223,
-      "assistantMessages": 2,
-      "subagentSpawns": 0,
-      "childSessions": 0,
-      "childTokens": 0,
-      "models": [
-        {
-          "model": "minimax/minimax-m2.5",
-          "label": "MiniMax",
-          "inputTokens": 39058,
-          "outputTokens": 324,
-          "totalTokens": 39382,
-          "cost": 0.006223
-        }
-      ],
-      "formattedCost": "$0.0062"
-    },
-    {
-      "id": "cfe2e450-affa-416c-bd88-2f6df4f5e8a7",
-      "timestamp": "2026-03-17T09:23:46.833000-05:00",
-      "endedAt": "2026-03-17T09:24:51.203000-05:00",
-      "durationMinutes": 1.1,
-      "model": "claude-opus-4-6",
-      "modelLabel": "Opus",
-      "inputTokens": 7,
-      "outputTokens": 2871,
-      "totalTokens": 2878,
-      "cost": 0.0,
-      "assistantMessages": 5,
-      "subagentSpawns": 0,
-      "childSessions": 0,
-      "childTokens": 0,
-      "models": [
-        {
-          "model": "claude-opus-4-6",
-          "label": "Opus",
-          "inputTokens": 7,
-          "outputTokens": 2871,
-          "totalTokens": 2878,
-          "cost": 0.0
-        }
-      ],
-      "formattedCost": "$0.0000"
     }
   ]
 }
