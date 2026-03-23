@@ -10,7 +10,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 SESSIONS_GLOB = '~/.openclaw/agents/main/sessions/*.jsonl'
-OUT_PATH = Path('/tmp/BSOP/data/agents.json')
+OUT_PATH = Path.home() / 'BSOP' / 'data' / 'agents.json'
 LOCAL_TZ = ZoneInfo('America/Matamoros')
 
 

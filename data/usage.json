@@ -1,51 +1,51 @@
 {
-  "generatedAt": "2026-03-23T00:33:58.266525-05:00",
+  "generatedAt": "2026-03-23T08:26:40.588424-05:00",
   "summary": {
     "sessionCount": 8,
-    "totalCost": 5.486701,
-    "totalTokens": 408067,
-    "averageCostPerSession": 0.685838,
-    "costToday": 0.602359,
-    "costThisWeek": 0.602359,
-    "costThisMonth": 5.486701,
-    "totalSubagentSpawns": 5
+    "totalCost": 2.679292,
+    "totalTokens": 260074,
+    "averageCostPerSession": 0.334912,
+    "costToday": 2.45681,
+    "costThisWeek": 2.45681,
+    "costThisMonth": 2.679292,
+    "totalSubagentSpawns": 2
   },
   "delegation": {
-    "opusTokens": 99364,
-    "delegatedTokens": 291100,
-    "delegatedShare": 0.7455,
-    "spawnedSessions": 3
+    "opusTokens": 49926,
+    "delegatedTokens": 56800,
+    "delegatedShare": 0.5322,
+    "spawnedSessions": 1
   },
   "costByModel": [
     {
       "label": "Opus",
-      "cost": 4.464049,
-      "tokens": 20296,
+      "cost": 1.863797,
+      "tokens": 10412,
       "sessions": 2,
       "models": [
         "claude-opus-4-6"
       ],
-      "formattedCost": "$4.46"
+      "formattedCost": "$1.86"
     },
     {
       "label": "GPT-5.4",
-      "cost": 0.978819,
-      "tokens": 156680,
-      "sessions": 4,
+      "cost": 0.802145,
+      "tokens": 170766,
+      "sessions": 5,
       "models": [
         "gpt-5.4"
       ],
-      "formattedCost": "$0.9788"
+      "formattedCost": "$0.8021"
     },
     {
       "label": "MiniMax",
-      "cost": 0.043834,
-      "tokens": 231091,
-      "sessions": 3,
+      "cost": 0.01335,
+      "tokens": 78896,
+      "sessions": 2,
       "models": [
         "minimax/minimax-m2.5"
       ],
-      "formattedCost": "$0.0438"
+      "formattedCost": "$0.0134"
     }
   ],
   "dailyTrend": [
@@ -65,32 +65,32 @@
     },
     {
       "date": "2026-03-22",
-      "cost": 4.878119,
-      "tokens": 175504,
-      "sessions": 4,
-      "formattedCost": "$4.88"
+      "cost": 0.216259,
+      "tokens": 48268,
+      "sessions": 2,
+      "formattedCost": "$0.2163"
     },
     {
       "date": "2026-03-23",
-      "cost": 0.602359,
-      "tokens": 190303,
-      "sessions": 2,
-      "formattedCost": "$0.6024"
+      "cost": 2.45681,
+      "tokens": 169546,
+      "sessions": 4,
+      "formattedCost": "$2.46"
     }
   ],
   "recentSessions": [
     {
-      "id": "3b1d64e2-cebf-4452-916c-528b23818b75",
-      "timestamp": "2026-03-23T00:28:00.407000-05:00",
-      "endedAt": "2026-03-23T00:33:58.178000-05:00",
-      "durationMinutes": 6.0,
+      "id": "64e09ca4-b9ee-46d9-a663-bfef9addbd92",
+      "timestamp": "2026-03-23T08:26:17.114000-05:00",
+      "endedAt": "2026-03-23T08:26:40.525000-05:00",
+      "durationMinutes": 0.4,
       "model": "gpt-5.4",
       "modelLabel": "GPT-5.4",
-      "inputTokens": 61815,
-      "outputTokens": 15847,
-      "totalTokens": 77662,
-      "cost": 0.579762,
-      "assistantMessages": 16,
+      "inputTokens": 21396,
+      "outputTokens": 717,
+      "totalTokens": 22113,
+      "cost": 0.077397,
+      "assistantMessages": 4,
       "subagentSpawns": 0,
       "childSessions": 0,
       "childTokens": 0,
@@ -98,75 +98,102 @@
         {
           "model": "gpt-5.4",
           "label": "GPT-5.4",
-          "inputTokens": 61815,
-          "outputTokens": 15847,
-          "totalTokens": 77662,
-          "cost": 0.579762
+          "inputTokens": 21396,
+          "outputTokens": 717,
+          "totalTokens": 22113,
+          "cost": 0.077397
         }
       ],
-      "formattedCost": "$0.5798"
+      "formattedCost": "$0.0774"
     },
     {
-      "id": "186e664c-c8de-4ee8-a837-ae422a8e6a3d",
-      "timestamp": "2026-03-23T00:27:11.003000-05:00",
-      "endedAt": "2026-03-23T00:33:43.990000-05:00",
-      "durationMinutes": 6.5,
-      "model": "minimax/minimax-m2.5",
-      "modelLabel": "MiniMax",
-      "inputTokens": 109541,
-      "outputTokens": 3100,
-      "totalTokens": 112641,
-      "cost": 0.022597,
-      "assistantMessages": 15,
+      "id": "6104b733-d658-41f5-a0b1-1f832c3ab521",
+      "timestamp": "2026-03-23T07:33:02.017000-05:00",
+      "endedAt": "2026-03-23T07:38:20.361000-05:00",
+      "durationMinutes": 5.3,
+      "model": "gpt-5.4",
+      "modelLabel": "GPT-5.4",
+      "inputTokens": 47814,
+      "outputTokens": 8955,
+      "totalTokens": 56769,
+      "cost": 0.327428,
+      "assistantMessages": 11,
       "subagentSpawns": 0,
       "childSessions": 0,
       "childTokens": 0,
       "models": [
         {
-          "model": "minimax/minimax-m2.5",
-          "label": "MiniMax",
-          "inputTokens": 109541,
-          "outputTokens": 3100,
-          "totalTokens": 112641,
-          "cost": 0.022597
+          "model": "gpt-5.4",
+          "label": "GPT-5.4",
+          "inputTokens": 47814,
+          "outputTokens": 8955,
+          "totalTokens": 56769,
+          "cost": 0.327428
         }
       ],
-      "formattedCost": "$0.0226"
+      "formattedCost": "$0.3274"
     },
     {
-      "id": "3a162b54-fb2e-4a91-a208-55c4014e69c3",
-      "timestamp": "2026-03-22T21:18:04.445000-05:00",
-      "endedAt": "2026-03-23T00:28:06.314000-05:00",
-      "durationMinutes": 190.0,
+      "id": "7ea8af4d-bee6-44e0-8c9d-51ac4964904f",
+      "timestamp": "2026-03-23T07:00:00.033000-05:00",
+      "endedAt": "2026-03-23T07:02:25.141000-05:00",
+      "durationMinutes": 2.4,
+      "model": "gpt-5.4",
+      "modelLabel": "GPT-5.4",
+      "inputTokens": 40527,
+      "outputTokens": 3089,
+      "totalTokens": 43616,
+      "cost": 0.181061,
+      "assistantMessages": 8,
+      "subagentSpawns": 0,
+      "childSessions": 0,
+      "childTokens": 0,
+      "models": [
+        {
+          "model": "gpt-5.4",
+          "label": "GPT-5.4",
+          "inputTokens": 40527,
+          "outputTokens": 3089,
+          "totalTokens": 43616,
+          "cost": 0.181061
+        }
+      ],
+      "formattedCost": "$0.1811"
+    },
+    {
+      "id": "525128a5-0ae5-40cd-8da9-38914c254ffc",
+      "timestamp": "2026-03-23T04:11:08.033000-05:00",
+      "endedAt": "2026-03-23T08:26:22.838000-05:00",
+      "durationMinutes": 255.2,
       "model": "claude-opus-4-6",
       "modelLabel": "Opus",
-      "inputTokens": 76730,
-      "outputTokens": 19756,
-      "totalTokens": 96486,
-      "cost": 4.479062,
-      "assistantMessages": 90,
-      "subagentSpawns": 5,
-      "childSessions": 3,
-      "childTokens": 291100,
+      "inputTokens": 38103,
+      "outputTokens": 8945,
+      "totalTokens": 47048,
+      "cost": 1.870924,
+      "assistantMessages": 39,
+      "subagentSpawns": 2,
+      "childSessions": 1,
+      "childTokens": 56800,
       "models": [
         {
           "model": "claude-opus-4-6",
           "label": "Opus",
-          "inputTokens": 123,
-          "outputTokens": 17295,
-          "totalTokens": 17418,
-          "cost": 4.464049
+          "inputTokens": 47,
+          "outputTokens": 7487,
+          "totalTokens": 7534,
+          "cost": 1.863797
         },
         {
           "model": "minimax/minimax-m2.5",
           "label": "MiniMax",
-          "inputTokens": 76607,
-          "outputTokens": 2461,
-          "totalTokens": 79068,
-          "cost": 0.015014
+          "inputTokens": 38056,
+          "outputTokens": 1458,
+          "totalTokens": 39514,
+          "cost": 0.007127
         }
       ],
-      "formattedCost": "$4.48"
+      "formattedCost": "$1.87"
     },
     {
       "id": "cae1364f-1c74-4080-acd5-91ef0b917b2e",
@@ -194,33 +221,6 @@
         }
       ],
       "formattedCost": "$0.0851"
-    },
-    {
-      "id": "a93ddbc2-f7e7-48f8-ac10-85e8e36d5548",
-      "timestamp": "2026-03-22T07:00:56.948000-05:00",
-      "endedAt": "2026-03-22T07:03:33.835000-05:00",
-      "durationMinutes": 2.6,
-      "model": "gpt-5.4",
-      "modelLabel": "GPT-5.4",
-      "inputTokens": 27368,
-      "outputTokens": 3382,
-      "totalTokens": 30750,
-      "cost": 0.182798,
-      "assistantMessages": 11,
-      "subagentSpawns": 0,
-      "childSessions": 0,
-      "childTokens": 0,
-      "models": [
-        {
-          "model": "gpt-5.4",
-          "label": "GPT-5.4",
-          "inputTokens": 27368,
-          "outputTokens": 3382,
-          "totalTokens": 30750,
-          "cost": 0.182798
-        }
-      ],
-      "formattedCost": "$0.1828"
     },
     {
       "id": "92243bf0-2a65-4bb7-bb47-62b241c348df",
