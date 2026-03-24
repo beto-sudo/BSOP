@@ -165,6 +165,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const isStandaloneSharePage = pathname.startsWith('/compartir/');
 
   useEffect(() => {
     setNow(new Date());
@@ -201,6 +202,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         minute: '2-digit',
       })
     : 'Loading time...';
+
+  if (isStandaloneSharePage) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">

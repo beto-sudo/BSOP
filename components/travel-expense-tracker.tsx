@@ -310,7 +310,13 @@ export function TravelExpenseTracker({
           {shareUrl ? (
             <div className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">
               <div className="break-all">{shareUrl}</div>
-              <button onClick={() => navigator.clipboard.writeText(shareUrl)} className="mt-2 inline-flex items-center gap-2 text-xs text-emerald-100/90">
+              <button
+                onClick={async () => {
+                  await navigator.clipboard.writeText(shareUrl);
+                  setCopyState('Link copiado');
+                }}
+                className="mt-2 inline-flex items-center gap-2 text-xs text-emerald-100/90"
+              >
                 <Copy className="h-3.5 w-3.5" /> {copyState || 'Copiar link'}
               </button>
             </div>
