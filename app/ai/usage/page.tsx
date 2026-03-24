@@ -1,4 +1,3 @@
-import usage from '@/data/usage.json';
 import { SectionHeading, Shell } from '@/components/ui';
 import { UsageDetailClient } from './message-log-client';
 
@@ -8,9 +7,9 @@ export default function AIUsagePage() {
       <SectionHeading
         eyebrow="Usage"
         title="Detailed Usage & Message Log"
-        copy={`Deep operational view of OpenClaw traffic, costs, cache behavior, and the last ${usage.messageLog.length} assistant messages parsed from local transcripts.`}
+        copy="Deep operational view of OpenClaw traffic, costs, cache behavior, and the latest assistant messages parsed from Supabase-backed telemetry."
       />
-      <UsageDetailClient data={usage} />
+      <UsageDetailClient />
     </Shell>
   );
 }
