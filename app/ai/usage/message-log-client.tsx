@@ -32,6 +32,7 @@ type BreakdownDay = {
 type SummaryResponse = {
   summary: {
     total_cost: number;
+    cost_today: number;
     assistant_messages: number;
     cache_hit_rate: number;
     input_tokens: number;
@@ -215,11 +216,11 @@ export function UsageDetailClient() {
       ) : null}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {[
-          { label: 'Messages', value: int(totalRows), sub: summary ? `of ${int(summary.assistant_messages)} assistant` : 'No data yet' },
-          { label: 'Cost', value: money(visibleTotals.cost), sub: summary ? `All telemetry ${money(summary.total_cost)}` : 'No data yet' },
-          { label: 'Input Tokens', value: int(visibleTotals.inputTokens), sub: `${int(visibleTotals.outputTokens)} output` },
-          { label: 'Cache Read', value: int(visibleTotals.cacheReadTokens), sub: `${int(visibleTotals.cacheCreationTokens)} cache create` },
-          { label: 'Cache Hit Rate', value: pct(visibleCacheHitRate), sub: totalRows ? 'Visible page selection' : 'No data yet' },
+          { label: 'Messages', value: summary ? int(summary.assistant_messages) : '—', sub: summary ? `${int(summary.assistant_messages)} assistant · ${int(totalRows)} in view` : 'No data yet' },
+          { label: 'Cost', value: summary ? money(summary.total_cost) : '—', sub: summary ? `Today ${money(summary.cost_today ?? 0)}` : 'No data yet' },
+          { label: 'Input Tokens', value: summary ? int(summary.input_tokens) : '—', sub: summary ? `${int(summary.output_tokens)} output` : 'No data yet' },
+          { label: 'Cache Read', value: summary ? int(summary.cache_read_tokens) : '—', sub: summary ? `${int(summary.cache_write_tokens)} cache create` : 'No data yet' },
+          { label: 'Cache Hit Rate', value: summary ? pct(summary.cache_hit_rate) : '—', sub: summary ? 'Across all assistant traffic' : 'No data yet' },
         ].map((item) => (
           <Surface key={item.label} className="p-5">
             <div className="text-xs uppercase tracking-[0.24em] text-white/40">{item.label}</div>
