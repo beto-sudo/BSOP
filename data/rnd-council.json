@@ -1,0 +1,210 @@
+{
+  "config": {
+    "council": [
+      {
+        "id": "strategist",
+        "name": "The Strategist",
+        "model": "Sonnet",
+        "role": "Big picture, revenue opportunities, market positioning",
+        "emoji": "🎯"
+      },
+      {
+        "id": "engineer",
+        "name": "The Engineer",
+        "model": "GPT-5.4",
+        "role": "Technical feasibility, architecture, implementation paths",
+        "emoji": "⚙️"
+      },
+      {
+        "id": "analyst",
+        "name": "The Analyst",
+        "model": "Gemini",
+        "role": "Data patterns, metrics, competitive analysis",
+        "emoji": "📊"
+      },
+      {
+        "id": "critic",
+        "name": "The Critic",
+        "model": "Kimi",
+        "role": "Devil's advocate, risks, edge cases",
+        "emoji": "🔥"
+      },
+      {
+        "id": "synthesizer",
+        "name": "The Synthesizer",
+        "model": "MiniMax",
+        "role": "Consolidates debate, writes final memo",
+        "emoji": "📝"
+      }
+    ],
+    "schedule": "Weekly, Sunday nights",
+    "scope": [
+      "BSOP Platform",
+      "Coda ERP (DILESA, ANSA, ANSA-Ventas, SR Group, RDB)",
+      "Business Operations",
+      "Revenue Opportunities",
+      "Technical Architecture"
+    ]
+  },
+  "memos": [
+    {
+      "id": "rnd-2026-03-23",
+      "date": "2026-03-23",
+      "title": "Inaugural Council Session",
+      "status": "running",
+      "runStarted": "2026-03-23T20:50:00-06:00",
+      "summary": "First session — analyzing current state and generating initial recommendations for BSOP, Coda ERP modernization, and the operating system behind Beto’s portfolio.",
+      "ideas": [
+        {
+          "id": "idea-live-ops",
+          "title": "Stand up a live AI operations data layer",
+          "proposedBy": "analyst",
+          "summary": "Move BSOP AI dashboards from manually regenerated JSON snapshots toward a scheduled pipeline that syncs usage, costs, and agent activity into a live operational dataset.",
+          "impact": 9,
+          "effort": 6,
+          "votes": {
+            "strategist": 9,
+            "engineer": 8,
+            "analyst": 10,
+            "critic": 6,
+            "synthesizer": 9
+          },
+          "status": "under-review"
+        },
+        {
+          "id": "idea-rdb-stack",
+          "title": "Build an operations core for RDB around Waitry, not a replacement POS",
+          "proposedBy": "strategist",
+          "summary": "Keep Waitry where it works (QR ordering) and build the surrounding operations layer in Supabase/Coda for inventory, deduplication, and reconciliation instead of replacing the full stack prematurely.",
+          "impact": 8,
+          "effort": 5,
+          "votes": {
+            "strategist": 9,
+            "engineer": 8,
+            "analyst": 8,
+            "critic": 7,
+            "synthesizer": 8
+          },
+          "status": "promising"
+        },
+        {
+          "id": "idea-coda-tiger-team",
+          "title": "Launch a Coda architecture tiger team for DILESA first",
+          "proposedBy": "engineer",
+          "summary": "Concentrate technical cleanup and migration work on the highest-leverage document first, using DILESA as the proving ground for schema rationalization and future external-db sync.",
+          "impact": 8,
+          "effort": 7,
+          "votes": {
+            "strategist": 8,
+            "engineer": 9,
+            "analyst": 8,
+            "critic": 7,
+            "synthesizer": 8
+          },
+          "status": "backlog"
+        }
+      ],
+      "debate": [
+        {
+          "round": 1,
+          "topic": "What creates leverage fastest?",
+          "highlights": [
+            {
+              "speaker": "strategist",
+              "message": "The platform is already becoming the executive cockpit. The next leverage move is not another view — it is making the data operationally alive so decisions happen from one system."
+            },
+            {
+              "speaker": "analyst",
+              "message": "Static snapshots are good for v1 storytelling, but they break as an operating dashboard. Every stale metric erodes trust faster than a missing metric."
+            },
+            {
+              "speaker": "critic",
+              "message": "Be careful not to start three migrations at once: BSOP live data, Coda cleanup, and RDB replacement. Pick one proving ground and sequence the rest."
+            }
+          ]
+        },
+        {
+          "round": 2,
+          "topic": "Where should technical effort land first?",
+          "highlights": [
+            {
+              "speaker": "engineer",
+              "message": "Use the AI Operations stack as the testbed for a sync pipeline. It has bounded scope, clear telemetry, and visible value. That pattern can later power travel, businesses, and RDB."
+            },
+            {
+              "speaker": "critic",
+              "message": "RDB POS replacement is a trap right now. Wrap Waitry, dedupe aggressively, and build the back-office moat instead of chasing perfect front-of-house control."
+            },
+            {
+              "speaker": "strategist",
+              "message": "Agree. The business win is reliability + visibility, not owning every transaction surface on day one."
+            }
+          ]
+        },
+        {
+          "round": 3,
+          "topic": "Synthesis",
+          "highlights": [
+            {
+              "speaker": "synthesizer",
+              "message": "Consensus: create one live-data spine, use DILESA and AI Operations as the two strategic proving grounds, and keep RDB focused on augmentation rather than replacement."
+            }
+          ]
+        }
+      ],
+      "recommendations": [
+        {
+          "id": "rec-1",
+          "priority": "P0",
+          "title": "Ship a live sync pipeline for AI Operations metrics",
+          "owner": "The Engineer",
+          "rationale": "It turns BSOP from a polished snapshot into a trusted operating console and establishes the data pattern for the rest of the platform.",
+          "implementationStatus": "next-up",
+          "actionItems": [
+            "Define Supabase schema for usage, sessions, and agent runs",
+            "Build a sync script from OpenClaw JSONL/manifest outputs",
+            "Update BSOP AI pages to consume live or regenerated normalized data"
+          ]
+        },
+        {
+          "id": "rec-2",
+          "priority": "P1",
+          "title": "Treat DILESA as the first formal Coda modernization program",
+          "owner": "The Strategist",
+          "rationale": "DILESA has the highest table count and the largest downstream payoff if schema and dependencies are cleaned up deliberately.",
+          "implementationStatus": "planning",
+          "actionItems": [
+            "Identify top 10 god tables by risk and workflow centrality",
+            "Map candidate external-db sync tables",
+            "Sequence cleanup into low-risk waves"
+          ]
+        },
+        {
+          "id": "rec-3",
+          "priority": "P1",
+          "title": "For RDB, build the ops core around Waitry instead of replacing it",
+          "owner": "The Analyst",
+          "rationale": "This reduces near-term risk, preserves what already works, and focuses engineering time on data integrity, inventory flow, and reconciliations.",
+          "implementationStatus": "monitoring",
+          "actionItems": [
+            "Quantify duplicate-order patterns weekly",
+            "Design dedupe and archival rules",
+            "Scope the minimum viable Supabase back-office layer"
+          ]
+        }
+      ],
+      "scores": {
+        "strategicClarity": 8.8,
+        "technicalReadiness": 7.6,
+        "expectedImpact": 8.5,
+        "executionRisk": 6.4
+      }
+    }
+  ],
+  "stats": {
+    "totalSessions": 1,
+    "totalIdeas": 3,
+    "implementedIdeas": 0,
+    "avgScore": 8.3
+  }
+}
