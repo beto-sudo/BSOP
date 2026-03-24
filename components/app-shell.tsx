@@ -11,8 +11,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-import usage from '@/data/usage.json';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 
 type NavChild = {
   label: string;
@@ -166,6 +165,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const [costToday, setCostToday] = useState<number | null>(null);
   const isStandaloneSharePage = pathname.startsWith('/compartir/');
 
   useEffect(() => {
@@ -182,6 +182,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchCost = () => {
+      fetch('/api/usage/summary', { cache: 'no-store' })
+        .then((res) => res.json())
+        .then((data) => { if (!cancelled && data.summary) setCostToday(data.summary.cost_today ?? 0); })
+        .catch(() => {});
+    };
+    fetchCost();
+    const costTimer = window.setInterval(fetchCost, 120_000);
+    return () => { cancelled = true; window.clearInterval(costTimer); };
   }, []);
 
   useEffect(() => {
@@ -378,7 +391,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
             <div className="flex flex-wrap items-center gap-3 text-sm text-white/70">
               <InfoPill label="🕐" value={formattedDate} />
-              <InfoPill label="💰" value={`Today ${money(usage.summary.costToday)}`} />
+              <InfoPill label="💰" value={costToday !== null ? `Today ${money(costToday)}` : 'Today …'} />
               <InfoPill label="📅" value="No upcoming events" />
               <div className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2">
                 <div className="relative">
