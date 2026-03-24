@@ -42,12 +42,22 @@ type SummaryResponse = {
   } | null;
 };
 
+type MessageTotals = {
+  count: number;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_creation_tokens: number;
+  cost: number;
+};
+
 type MessagesResponse = {
   page: number;
   limit: number;
   total: number;
   totalPages: number;
   rows: MessageRow[];
+  totals: MessageTotals | null;
 };
 
 type ModelsResponse = {
@@ -85,7 +95,7 @@ function modelTone(model: string) {
 }
 
 export function UsageDetailClient() {
-  const [range, setRange] = useState<'today' | '7d' | '30d' | 'all'>('7d');
+  const [range, setRange] = useState<'today' | '7d' | '30d' | 'all'>('today');
   const [model, setModel] = useState('all');
   const [status, setStatus] = useState('all');
   const [search, setSearch] = useState('');
@@ -96,6 +106,7 @@ export function UsageDetailClient() {
   const [summary, setSummary] = useState<SummaryResponse['summary']>(null);
   const [modelsHistory, setModelsHistory] = useState<BreakdownDay[]>([]);
   const [messageRows, setMessageRows] = useState<MessageRow[]>([]);
+  const [rangeTotals, setRangeTotals] = useState<MessageTotals | null>(null);
   const [totalRows, setTotalRows] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -132,12 +143,14 @@ export function UsageDetailClient() {
       .then((data: MessagesResponse) => {
         if (cancelled) return;
         setMessageRows(data.rows ?? []);
+        setRangeTotals(data.totals ?? null);
         setTotalRows(data.total ?? 0);
         setTotalPages(data.totalPages ?? 1);
       })
       .catch(() => {
         if (cancelled) return;
         setMessageRows([]);
+        setRangeTotals(null);
         setTotalRows(0);
         setTotalPages(1);
       })
@@ -195,6 +208,30 @@ export function UsageDetailClient() {
   const visibleCacheHitRate = visibleTotals.inputTokens + visibleTotals.cacheReadTokens > 0
     ? visibleTotals.cacheReadTokens / (visibleTotals.inputTokens + visibleTotals.cacheReadTokens)
     : 0;
+  const rangeCacheHitRate = rangeTotals && rangeTotals.input_tokens + rangeTotals.cache_read_tokens > 0
+    ? rangeTotals.cache_read_tokens / (rangeTotals.input_tokens + rangeTotals.cache_read_tokens)
+    : 0;
+  const cardMetrics = rangeTotals
+    ? {
+        messages: rangeTotals.count,
+        cost: rangeTotals.cost,
+        inputTokens: rangeTotals.input_tokens,
+        outputTokens: rangeTotals.output_tokens,
+        cacheReadTokens: rangeTotals.cache_read_tokens,
+        cacheCreationTokens: rangeTotals.cache_creation_tokens,
+        cacheHitRate: rangeCacheHitRate,
+      }
+    : summary
+      ? {
+          messages: summary.assistant_messages,
+          cost: summary.total_cost,
+          inputTokens: summary.input_tokens,
+          outputTokens: summary.output_tokens,
+          cacheReadTokens: summary.cache_read_tokens,
+          cacheCreationTokens: summary.cache_write_tokens,
+          cacheHitRate: summary.cache_hit_rate,
+        }
+      : null;
 
   const isFiltered = range !== 'all' || model !== 'all' || status !== 'all' || search.trim() !== '';
   const rangeLabel = range === 'today' ? 'Today' : range === '7d' ? 'Last 7 days' : range === '30d' ? 'Last 30 days' : 'All time';
@@ -216,11 +253,11 @@ export function UsageDetailClient() {
       ) : null}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {[
-          { label: 'Messages', value: summary ? int(summary.assistant_messages) : '—', sub: summary ? `${int(summary.assistant_messages)} assistant · ${int(totalRows)} in view` : 'No data yet' },
-          { label: 'Cost', value: summary ? money(summary.total_cost) : '—', sub: summary ? `Today ${money(summary.cost_today ?? 0)}` : 'No data yet' },
-          { label: 'Input Tokens', value: summary ? int(summary.input_tokens) : '—', sub: summary ? `${int(summary.output_tokens)} output` : 'No data yet' },
-          { label: 'Cache Read', value: summary ? int(summary.cache_read_tokens) : '—', sub: summary ? `${int(summary.cache_write_tokens)} cache create` : 'No data yet' },
-          { label: 'Cache Hit Rate', value: summary ? pct(summary.cache_hit_rate) : '—', sub: summary ? 'Across all assistant traffic' : 'No data yet' },
+          { label: 'Messages', value: cardMetrics ? int(cardMetrics.messages) : '—', sub: cardMetrics ? `${rangeLabel} · ${int(totalRows)} filtered rows` : 'No data yet' },
+          { label: 'Cost', value: cardMetrics ? money(cardMetrics.cost) : '—', sub: cardMetrics ? `Range total for ${rangeLabel.toLowerCase()}` : 'No data yet' },
+          { label: 'Input Tokens', value: cardMetrics ? int(cardMetrics.inputTokens) : '—', sub: cardMetrics ? `${int(cardMetrics.outputTokens)} output` : 'No data yet' },
+          { label: 'Cache Read', value: cardMetrics ? int(cardMetrics.cacheReadTokens) : '—', sub: cardMetrics ? `${int(cardMetrics.cacheCreationTokens)} cache create` : 'No data yet' },
+          { label: 'Cache Hit Rate', value: cardMetrics ? pct(cardMetrics.cacheHitRate) : '—', sub: cardMetrics ? `Range-level hit rate · page ${pct(visibleCacheHitRate)}` : 'No data yet' },
         ].map((item) => (
           <Surface key={item.label} className="p-5">
             <div className="text-xs uppercase tracking-[0.24em] text-white/40">{item.label}</div>

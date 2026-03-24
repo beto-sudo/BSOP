@@ -83,6 +83,15 @@ export type UsageDailyModelRow = {
   tokens: number;
 };
 
+export type UsageMessageTotals = {
+  count: number;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_creation_tokens: number;
+  cost: number;
+};
+
 export function jsonResponse(body: unknown, status = 200) {
   return new NextResponse(JSON.stringify(body), {
     status,
