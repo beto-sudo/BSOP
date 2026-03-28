@@ -5,6 +5,7 @@ const ALLOWED_EMAILS = new Set(['beto@anorte.com']);
 
 function isPublicPath(pathname: string) {
   return (
+    pathname === '/login' ||
     pathname === '/auth/callback' ||
     pathname.startsWith('/compartir/') ||
     pathname.startsWith('/api/usage/') ||
