@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Menu,
   Bell,
@@ -10,8 +10,10 @@ import {
   ChevronRight,
   PanelLeftClose,
   PanelLeftOpen,
+  LogOut,
 } from 'lucide-react';
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 
 type NavChild = {
   label: string;
@@ -24,6 +26,12 @@ type NavItem = {
   icon: string;
   matchPaths?: string[];
   children?: NavChild[];
+};
+
+type AuthUser = {
+  name: string;
+  email: string;
+  avatarUrl: string | null;
 };
 
 const NAV_ITEMS: NavItem[] = [
@@ -159,14 +167,26 @@ function getGreeting(date: Date) {
   return 'Buenas noches';
 }
 
+function getInitials(name: string, email: string) {
+  const source = name.trim() || email.trim();
+  const parts = source.split(/\s+/).filter(Boolean).slice(0, 2);
+  if (parts.length === 0) return 'BS';
+  return parts.map((part) => part[0]?.toUpperCase() ?? '').join('');
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [costToday, setCostToday] = useState<number | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const isStandaloneSharePage = pathname.startsWith('/compartir/');
+  const isAuthPage = pathname === '/login';
 
   useEffect(() => {
     setNow(new Date());
@@ -180,22 +200,72 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    const supabase = createSupabaseBrowserClient();
+
+    const syncUser = async () => {
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
+
+      if (!authUser) {
+        setUser(null);
+        return;
+      }
+
+      setUser({
+        name: authUser.user_metadata.full_name ?? authUser.user_metadata.name ?? authUser.email ?? 'Beto Santos',
+        email: authUser.email ?? '',
+        avatarUrl: authUser.user_metadata.avatar_url ?? null,
+      });
+    };
+
+    void syncUser();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      const authUser = session?.user;
+      if (!authUser) {
+        setUser(null);
+        return;
+      }
+
+      setUser({
+        name: authUser.user_metadata.full_name ?? authUser.user_metadata.name ?? authUser.email ?? 'Beto Santos',
+        email: authUser.email ?? '',
+        avatarUrl: authUser.user_metadata.avatar_url ?? null,
+      });
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
+    if (isAuthPage || isStandaloneSharePage) {
+      return;
+    }
+
     let cancelled = false;
     const fetchCost = () => {
       fetch('/api/usage/summary', { cache: 'no-store' })
         .then((res) => res.json())
-        .then((data) => { if (!cancelled && data.summary) setCostToday(data.summary.cost_today ?? 0); })
+        .then((data) => {
+          if (!cancelled && data.summary) setCostToday(data.summary.cost_today ?? 0);
+        })
         .catch(() => {});
     };
     fetchCost();
     const costTimer = window.setInterval(fetchCost, 120_000);
-    return () => { cancelled = true; window.clearInterval(costTimer); };
-  }, []);
+    return () => {
+      cancelled = true;
+      window.clearInterval(costTimer);
+    };
+  }, [isAuthPage, isStandaloneSharePage]);
 
   useEffect(() => {
     window.localStorage.setItem('bsop-sidebar-collapsed', String(collapsed));
@@ -204,6 +274,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setExpandedSection(getActiveSection(pathname));
     setMobileOpen(false);
+    setMenuOpen(false);
   }, [pathname]);
 
   const sectionName = useMemo(() => getSectionName(pathname), [pathname]);
@@ -217,7 +288,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       })
     : 'Loading time...';
 
-  if (isStandaloneSharePage) {
+  const displayName = user?.name ?? 'Beto Santos';
+  const displayEmail = user?.email ?? 'beto@anorte.com';
+  const initials = getInitials(displayName, displayEmail);
+
+  const handleSignOut = async () => {
+    try {
+      setSigningOut(true);
+      const supabase = createSupabaseBrowserClient();
+      await supabase.auth.signOut();
+      router.push('/login');
+      router.refresh();
+    } finally {
+      setSigningOut(false);
+      setMenuOpen(false);
+    }
+  };
+
+  if (isStandaloneSharePage || isAuthPage) {
     return <>{children}</>;
   }
 
@@ -386,7 +474,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="pl-12 md:pl-0">
               <div className="text-xs uppercase tracking-[0.24em] text-white/35">BSOP / {sectionName}</div>
               <div className="mt-1 text-2xl font-semibold text-white">{sectionName}</div>
-              <div className="mt-1 text-sm text-white/48">{getGreeting(now ?? new Date())}, Beto</div>
+              <div className="mt-1 text-sm text-white/48">{getGreeting(now ?? new Date())}, {displayName.split(' ')[0] ?? 'Beto'}</div>
             </div>
 
             <div className="flex flex-wrap items-center gap-3 text-sm text-white/70">
@@ -400,12 +488,52 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     0
                   </span>
                 </div>
-                <div className="flex items-center gap-2 rounded-full bg-white/5 pl-1 pr-2 py-1">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)]/20 text-xs font-semibold text-white">
-                    BS
-                  </div>
-                  <span className="text-sm text-white/80">Beto Santos</span>
-                  <ChevronDown className="h-4 w-4 text-white/45" />
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setMenuOpen((value) => !value)}
+                    className="flex items-center gap-2 rounded-full bg-white/5 pl-1 pr-2 py-1 text-left transition hover:bg-white/10"
+                    aria-expanded={menuOpen}
+                    aria-label="Open account menu"
+                  >
+                    {user?.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={user.avatarUrl}
+                        alt={displayName}
+                        width={32}
+                        height={32}
+                        className="h-8 w-8 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)]/20 text-xs font-semibold text-white">
+                        {initials}
+                      </div>
+                    )}
+                    <div className="hidden min-w-0 sm:block">
+                      <div className="max-w-40 truncate text-sm text-white/90">{displayName}</div>
+                      <div className="max-w-40 truncate text-xs text-white/45">{displayEmail}</div>
+                    </div>
+                    <ChevronDown className="h-4 w-4 text-white/45" />
+                  </button>
+
+                  {menuOpen ? (
+                    <div className="absolute right-0 top-[calc(100%+0.75rem)] z-30 min-w-56 overflow-hidden rounded-2xl border border-[var(--border)] bg-[#151925] p-2 shadow-2xl">
+                      <div className="border-b border-white/6 px-3 py-2">
+                        <div className="text-sm font-medium text-white">{displayName}</div>
+                        <div className="mt-1 text-xs text-white/45">{displayEmail}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleSignOut}
+                        disabled={signingOut}
+                        className="mt-2 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-white/78 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        {signingOut ? 'Signing out…' : 'Sign out'}
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </div>
