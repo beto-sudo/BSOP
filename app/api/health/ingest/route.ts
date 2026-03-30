@@ -39,6 +39,8 @@ const METRIC_NAME_NORMALIZE: Record<string, string> = {
   six_minute_walking_test_distance: 'Six Minute Walking Test Distance',
   breathing_disturbances: 'Breathing Disturbances',
   height: 'Height',
+  blood_pressure: 'Blood Pressure',
+  sleep_analysis: 'Sleep Analysis',
   test: 'test',
 };
 
@@ -122,17 +124,32 @@ function normalizeMetricRecords(metrics: unknown[]) {
     const metricName = typeof entry.name === 'string' ? entry.name : null;
     const normalizedName = metricName ? (METRIC_NAME_NORMALIZE[metricName] ?? metricName) : null;
     const unit = typeof entry.units === 'string' ? entry.units : null;
-    const source = typeof entry.source === 'string' ? entry.source : 'Health Auto Export';
     const data = Array.isArray(entry.data) ? entry.data : [];
     const fields = normalizedName ? (METRIC_FIELD_MAP[normalizedName] ?? (metricName ? METRIC_FIELD_MAP[metricName] : undefined) ?? ['qty']) : ['qty'];
 
     if (!normalizedName) return;
+
+    // Special handling: blood_pressure comes as { systolic, diastolic } — split into two metrics
+    const isBloodPressure = metricName === 'blood_pressure' || normalizedName === 'Blood Pressure';
 
     data.forEach((sample) => {
       if (!sample || typeof sample !== 'object') return;
       const row = sample as Record<string, unknown>;
       const date = parseDate(row.date ?? row.startDate ?? row.sleepStart ?? row.start);
       if (!date) return;
+      const sampleSource = typeof row.source === 'string' ? row.source : (typeof entry.source === 'string' ? entry.source : 'Health Auto Export');
+
+      if (isBloodPressure) {
+        const systolic = parseNumber(row.systolic);
+        const diastolic = parseNumber(row.diastolic);
+        if (systolic != null) {
+          records.push({ metric_name: 'Blood Pressure Systolic', date, value: systolic, unit: 'mmHg', source: sampleSource });
+        }
+        if (diastolic != null) {
+          records.push({ metric_name: 'Blood Pressure Diastolic', date, value: diastolic, unit: 'mmHg', source: sampleSource });
+        }
+        return;
+      }
 
       const field = fields.find((key) => parseNumber(row[key]) != null);
       const value = field ? parseNumber(row[field]) : null;
@@ -143,7 +160,7 @@ function normalizeMetricRecords(metrics: unknown[]) {
         date,
         value,
         unit,
-        source,
+        source: sampleSource,
       });
     });
   });
