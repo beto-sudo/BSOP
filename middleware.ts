@@ -9,6 +9,7 @@ function isPublicPath(pathname: string) {
     pathname === '/auth/callback' ||
     pathname.startsWith('/compartir/') ||
     pathname.startsWith('/api/usage/') ||
+    pathname === '/api/health/ingest' ||
     pathname.startsWith('/_next') ||
     pathname === '/favicon.ico' ||
     pathname === '/logo-bs.png' ||
