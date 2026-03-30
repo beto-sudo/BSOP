@@ -3,11 +3,38 @@ import { HealthRangeSelector } from '@/components/health-range-selector';
 import { SectionHeading, Shell, Surface } from '@/components/ui';
 import { formatDurationHours, formatMetricValue, getHealthDashboardData, type HealthMetricRow, type HealthRangePreset } from '@/lib/health';
 
-const VITAL_CONFIG: Record<string, { label: string; unit?: string; digits?: number; icon: typeof HeartPulse }> = {
+type VitalConfig = {
+  label: string;
+  unit?: string;
+  digits?: number;
+  icon: typeof HeartPulse;
+  formatValue?: (row: HealthMetricRow | undefined, allVitals: Map<string, HealthMetricRow>) => string;
+  helperCopy?: (row: HealthMetricRow | undefined, allVitals: Map<string, HealthMetricRow>) => string;
+};
+
+const VITAL_CONFIG: Record<string, VitalConfig> = {
   'Resting Heart Rate': { label: 'Resting HR', unit: 'bpm', digits: 0, icon: HeartPulse },
   'Heart Rate Variability': { label: 'HRV', unit: 'ms', digits: 0, icon: Activity },
   'Oxygen Saturation': { label: 'SpO2', unit: '%', digits: 0, icon: Waves },
   'Step Count': { label: 'Steps', digits: 0, icon: Footprints },
+  'Blood Pressure Systolic': {
+    label: 'Blood Pressure',
+    unit: 'mmHg',
+    icon: HeartPulse,
+    formatValue: (row, allVitals) => {
+      const systolic = row?.value;
+      const diastolic = allVitals.get('Blood Pressure Diastolic')?.value;
+      if (systolic == null || diastolic == null) return '—';
+      return `${formatMetricValue(systolic)}/${formatMetricValue(diastolic)}`;
+    },
+    helperCopy: (row, allVitals) => {
+      const systolicDate = row?.date;
+      const diastolicDate = allVitals.get('Blood Pressure Diastolic')?.date;
+      if (!systolicDate || !diastolicDate) return 'Waiting for the first sync.';
+      const latestDate = new Date(Math.max(new Date(systolicDate).getTime(), new Date(diastolicDate).getTime()));
+      return latestDate.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    },
+  },
   'Apple Exercise Time': { label: 'Exercise', unit: 'min', digits: 0, icon: Timer },
   'Sleep Analysis': { label: 'Sleep', unit: 'hr', digits: 1, icon: MoonStar },
 };
@@ -48,6 +75,33 @@ function summarizeWindow(rows: HealthMetricRow[], days: number, endOffsetDays: n
   return total / filtered.length;
 }
 
+function formatTrendValue(value: number, digits = 0, formatter?: (value: number) => string) {
+  if (formatter) return formatter(value);
+  return formatMetricValue(value, digits);
+}
+
+function buildLinePath(trend: Array<{ date: string; value: number }>, min: number, range: number) {
+  return trend.map((point, index) => {
+    const x = (index / Math.max(trend.length - 1, 1)) * 300 + 10;
+    const y = 150 - ((point.value - min) / range) * 110;
+    return `${index === 0 ? 'M' : 'L'} ${x} ${Number.isFinite(y) ? y : 95}`;
+  }).join(' ');
+}
+
+function renderTrendDots(
+  trend: Array<{ date: string; value: number }>,
+  min: number,
+  range: number,
+  fill: string,
+  keyPrefix: string,
+) {
+  return trend.map((point, index) => {
+    const x = (index / Math.max(trend.length - 1, 1)) * 300 + 10;
+    const y = 150 - ((point.value - min) / range) * 110;
+    return <circle key={`${keyPrefix}-${point.date}`} cx={x} cy={Number.isFinite(y) ? y : 95} r="3.5" fill={fill} />;
+  });
+}
+
 function DeltaPill({ current, previous, comparisonLabel }: { current: number | null; previous: number | null; comparisonLabel: string }) {
   if (current == null || previous == null) {
     return <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/45">No comparison yet</span>;
@@ -70,6 +124,151 @@ function EmptyState({ title, copy }: { title: string; copy: string }) {
       <div className="text-sm font-medium text-white/78">{title}</div>
       <div className="mt-2 text-sm leading-6 text-white/45">{copy}</div>
     </div>
+  );
+}
+
+function TrendLineCard({
+  title,
+  icon: Icon,
+  trend,
+  unit,
+  gradientId,
+  emptyTitle,
+  emptyCopy,
+  formatter,
+}: {
+  title: string;
+  icon: typeof HeartPulse;
+  trend: Array<{ date: string; value: number }>;
+  unit: string;
+  gradientId: string;
+  emptyTitle: string;
+  emptyCopy: string;
+  formatter?: (value: number) => string;
+}) {
+  const min = Math.min(...trend.map((point) => point.value), Number.POSITIVE_INFINITY);
+  const max = Math.max(...trend.map((point) => point.value), 0);
+  const range = Number.isFinite(min) && max > min ? max - min : 1;
+  const latest = trend.at(-1)?.value;
+
+  return (
+    <Surface className="p-6">
+      <div className="mb-4 flex items-center gap-3 text-white">
+        <Icon className="h-5 w-5 text-amber-300" />
+        <h2 className="text-lg font-semibold">{title}</h2>
+      </div>
+      {trend.length ? (
+        <div>
+          <div className="mb-4 flex items-end gap-2">
+            <div className="text-2xl font-semibold text-white">{latest == null ? '—' : formatTrendValue(latest, 0, formatter)}</div>
+            <div className="pb-1 text-sm text-white/45">{unit}</div>
+          </div>
+          <svg viewBox="0 0 320 180" className="w-full overflow-visible">
+            <defs>
+              <linearGradient id={gradientId} x1="0%" x2="100%" y1="0%" y2="0%">
+                <stop offset="0%" stopColor="rgba(251,191,36,0.45)" />
+                <stop offset="100%" stopColor="rgba(251,191,36,1)" />
+              </linearGradient>
+            </defs>
+            <path
+              d={buildLinePath(trend, min, range)}
+              fill="none"
+              stroke={`url(#${gradientId})`}
+              strokeWidth="4"
+              strokeLinecap="round"
+            />
+            {renderTrendDots(trend, min, range, 'rgb(252 211 77)', gradientId)}
+          </svg>
+          <div className="mt-4 flex items-center justify-between text-xs text-white/45">
+            <span>{trend[0]?.date}</span>
+            <span>{trend.at(-1)?.date}</span>
+          </div>
+        </div>
+      ) : (
+        <EmptyState title={emptyTitle} copy={emptyCopy} />
+      )}
+    </Surface>
+  );
+}
+
+function BloodPressureTrendCard({
+  systolicTrend,
+  diastolicTrend,
+}: {
+  systolicTrend: Array<{ date: string; value: number }>;
+  diastolicTrend: Array<{ date: string; value: number }>;
+}) {
+  const combinedValues = [...systolicTrend.map((point) => point.value), ...diastolicTrend.map((point) => point.value)];
+  const min = Math.min(...combinedValues, Number.POSITIVE_INFINITY);
+  const max = Math.max(...combinedValues, 0);
+  const range = Number.isFinite(min) && max > min ? max - min : 1;
+
+  return (
+    <Surface className="p-6">
+      <div className="mb-4 flex items-center gap-3 text-white">
+        <HeartPulse className="h-5 w-5 text-amber-300" />
+        <h2 className="text-lg font-semibold">Blood Pressure trend</h2>
+      </div>
+      {systolicTrend.length && diastolicTrend.length ? (
+        <div>
+          <div className="mb-4 flex flex-wrap items-end gap-4">
+            <div>
+              <div className="text-xs uppercase tracking-[0.18em] text-white/35">Latest reading</div>
+              <div className="mt-2 flex items-end gap-2">
+                <div className="text-2xl font-semibold text-white">
+                  {formatMetricValue(systolicTrend.at(-1)?.value)}/{formatMetricValue(diastolicTrend.at(-1)?.value)}
+                </div>
+                <div className="pb-1 text-sm text-white/45">mmHg</div>
+              </div>
+            </div>
+          </div>
+          <svg viewBox="0 0 320 180" className="w-full overflow-visible">
+            <defs>
+              <linearGradient id="bp-systolic-line" x1="0%" x2="100%" y1="0%" y2="0%">
+                <stop offset="0%" stopColor="rgba(251,191,36,0.45)" />
+                <stop offset="100%" stopColor="rgba(251,191,36,1)" />
+              </linearGradient>
+              <linearGradient id="bp-diastolic-line" x1="0%" x2="100%" y1="0%" y2="0%">
+                <stop offset="0%" stopColor="rgba(52,211,153,0.45)" />
+                <stop offset="100%" stopColor="rgba(52,211,153,1)" />
+              </linearGradient>
+            </defs>
+            <path
+              d={buildLinePath(systolicTrend, min, range)}
+              fill="none"
+              stroke="url(#bp-systolic-line)"
+              strokeWidth="4"
+              strokeLinecap="round"
+            />
+            <path
+              d={buildLinePath(diastolicTrend, min, range)}
+              fill="none"
+              stroke="url(#bp-diastolic-line)"
+              strokeWidth="4"
+              strokeLinecap="round"
+            />
+            {renderTrendDots(systolicTrend, min, range, 'rgb(252 211 77)', 'bp-systolic')}
+            {renderTrendDots(diastolicTrend, min, range, 'rgb(110 231 183)', 'bp-diastolic')}
+          </svg>
+          <div className="mt-4 flex items-center justify-between text-xs text-white/45">
+            <span>{systolicTrend[0]?.date ?? diastolicTrend[0]?.date}</span>
+            <span>{systolicTrend.at(-1)?.date ?? diastolicTrend.at(-1)?.date}</span>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-white/60">
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
+              <span>Systolic</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-300" />
+              <span>Diastolic</span>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <EmptyState title="No blood pressure data yet" copy="Blood Pressure Systolic and Diastolic will render together here once the export app starts sending those metrics." />
+      )}
+    </Surface>
   );
 }
 
@@ -97,7 +296,20 @@ export default async function HealthPage({
 }) {
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const requestedRange = resolveRangeParams(resolvedSearchParams);
-  const { vitals, summaryMetrics, restingHrDaily, weightDaily, workouts, errors, range } = await getHealthDashboardData(requestedRange);
+  const {
+    vitals,
+    summaryMetrics,
+    hrvDaily,
+    spo2Daily,
+    stepsDaily,
+    bpSystolic,
+    bpDiastolic,
+    restingHrDaily,
+    weightDaily,
+    workouts,
+    errors,
+    range,
+  } = await getHealthDashboardData(requestedRange);
   const latestVitals = new Map<string, HealthMetricRow>();
 
   vitals.forEach((row) => {
@@ -106,6 +318,11 @@ export default async function HealthPage({
 
   const heartTrend = groupDailyAverage(restingHrDaily).slice(-Math.min(range.trendDays, 30));
   const heartTrendMax = Math.max(...heartTrend.map((item) => item.value), 1);
+  const hrvTrend = groupDailyAverage(hrvDaily).slice(-range.trendDays);
+  const spo2Trend = groupDailyAverage(spo2Daily).slice(-range.trendDays);
+  const stepsTrend = groupDailyAverage(stepsDaily).slice(-range.trendDays);
+  const bpSystolicTrend = groupDailyAverage(bpSystolic).slice(-range.trendDays);
+  const bpDiastolicTrend = groupDailyAverage(bpDiastolic).slice(-range.trendDays);
   const weightTrend = groupDailyAverage(weightDaily).slice(-Math.min(Math.max(range.trendDays, 30), 90));
   const weightMin = Math.min(...weightTrend.map((item) => item.value), Number.POSITIVE_INFINITY);
   const weightMax = Math.max(...weightTrend.map((item) => item.value), 0);
@@ -178,6 +395,16 @@ export default async function HealthPage({
             const row = latestVitals.get(metricName);
             const Icon = config.icon;
             const isSleep = metricName === 'Sleep Analysis';
+            const defaultValue = row ? (isSleep ? formatDurationHours(row.value) : formatMetricValue(row.value, config.digits ?? 0)) : '—';
+            const displayValue = config.formatValue ? config.formatValue(row, latestVitals) : defaultValue;
+            const helperText = config.helperCopy
+              ? config.helperCopy(row, latestVitals)
+              : row
+                ? new Date(row.date).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+                : isSleep
+                  ? 'No Sleep Analysis arrives from the export app yet.'
+                  : 'Waiting for the first sync.';
+
             return (
               <Surface key={metricName} className="p-5">
                 <div className="flex items-center justify-between gap-4">
@@ -187,12 +414,10 @@ export default async function HealthPage({
                   <div className="text-xs uppercase tracking-[0.22em] text-white/35">{config.label}</div>
                 </div>
                 <div className="mt-6 flex items-end gap-2">
-                  <div className="text-3xl font-semibold text-white">
-                    {row ? (isSleep ? formatDurationHours(row.value) : formatMetricValue(row.value, config.digits ?? 0)) : '—'}
-                  </div>
+                  <div className="text-3xl font-semibold text-white">{displayValue}</div>
                   {config.unit ? <div className="pb-1 text-sm text-white/45">{config.unit}</div> : null}
                 </div>
-                <div className="mt-3 text-sm text-white/50">{row ? new Date(row.date).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : isSleep ? 'No Sleep Analysis arrives from the export app yet.' : 'Waiting for the first sync.'}</div>
+                <div className="mt-3 text-sm text-white/50">{helperText}</div>
               </Surface>
             );
           })}
@@ -249,6 +474,38 @@ export default async function HealthPage({
             ))}
           </div>
         </Surface>
+      </section>
+
+      <section className="mt-10 grid gap-6 xl:grid-cols-[1fr_1fr]">
+        <TrendLineCard
+          title="HRV trend"
+          icon={Activity}
+          trend={hrvTrend}
+          unit="ms"
+          gradientId="hrv-line"
+          emptyTitle="No HRV data yet"
+          emptyCopy="Heart rate variability readings will show here once they arrive in the selected range."
+        />
+        <TrendLineCard
+          title="SpO2 trend"
+          icon={Waves}
+          trend={spo2Trend}
+          unit="%"
+          gradientId="spo2-line"
+          emptyTitle="No SpO2 data yet"
+          emptyCopy="Oxygen Saturation exports will render here automatically after the next sync."
+        />
+        <TrendLineCard
+          title="Steps trend"
+          icon={Footprints}
+          trend={stepsTrend}
+          unit="steps"
+          gradientId="steps-line"
+          emptyTitle="No steps trend yet"
+          emptyCopy="Daily Step Count averages will appear here as soon as step data is available in this window."
+          formatter={(value) => formatMetricValue(value)}
+        />
+        <BloodPressureTrendCard systolicTrend={bpSystolicTrend} diastolicTrend={bpDiastolicTrend} />
       </section>
 
       <section className="mt-10 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">

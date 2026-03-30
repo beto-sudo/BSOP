@@ -48,7 +48,16 @@ export type HealthDashboardRange = {
   preset: HealthRangePreset;
 };
 
-const SUMMARY_METRIC_NAMES = ['Resting Heart Rate', 'Heart Rate Variability', 'Oxygen Saturation', 'Step Count', 'Apple Exercise Time', 'Sleep Analysis'];
+const SUMMARY_METRIC_NAMES = [
+  'Resting Heart Rate',
+  'Heart Rate Variability',
+  'Oxygen Saturation',
+  'Step Count',
+  'Blood Pressure Systolic',
+  'Blood Pressure Diastolic',
+  'Apple Exercise Time',
+  'Sleep Analysis',
+];
 
 export function formatMetricValue(value: number | null | undefined, digits = 0) {
   if (value == null || Number.isNaN(value)) return '—';
@@ -159,6 +168,10 @@ export async function getHealthDashboardData(rangeInput?: Partial<HealthDateRang
       vitals: [] as HealthMetricRow[],
       summaryMetrics: [] as HealthMetricRow[],
       hrvDaily: [] as HealthMetricRow[],
+      spo2Daily: [] as HealthMetricRow[],
+      stepsDaily: [] as HealthMetricRow[],
+      bpSystolic: [] as HealthMetricRow[],
+      bpDiastolic: [] as HealthMetricRow[],
       restingHrDaily: [] as HealthMetricRow[],
       weightDaily: [] as HealthMetricRow[],
       workouts: [] as HealthWorkoutRow[],
@@ -169,7 +182,18 @@ export async function getHealthDashboardData(rangeInput?: Partial<HealthDateRang
 
   const weightFromIso = range.preset === 'custom' ? range.trendFromIso : startOfDayIso(Math.min(Math.max(range.trendDays - 1, 29), 89));
 
-  const [vitalsResult, summaryResult, hrvResult, restingHrResult, weightResult, workoutsResult] = await Promise.all([
+  const [
+    vitalsResult,
+    summaryResult,
+    hrvResult,
+    spo2Result,
+    stepsResult,
+    bpSystolicResult,
+    bpDiastolicResult,
+    restingHrResult,
+    weightResult,
+    workoutsResult,
+  ] = await Promise.all([
     supabase
       .from('health_metrics')
       .select('id, metric_name, date, value, unit, source')
@@ -188,6 +212,34 @@ export async function getHealthDashboardData(rangeInput?: Partial<HealthDateRang
       .from('health_metrics')
       .select('id, metric_name, date, value, unit, source')
       .eq('metric_name', 'Heart Rate Variability')
+      .gte('date', range.trendFromIso)
+      .order('date', { ascending: true })
+      .returns<HealthMetricRow[]>(),
+    supabase
+      .from('health_metrics')
+      .select('id, metric_name, date, value, unit, source')
+      .eq('metric_name', 'Oxygen Saturation')
+      .gte('date', range.trendFromIso)
+      .order('date', { ascending: true })
+      .returns<HealthMetricRow[]>(),
+    supabase
+      .from('health_metrics')
+      .select('id, metric_name, date, value, unit, source')
+      .eq('metric_name', 'Step Count')
+      .gte('date', range.trendFromIso)
+      .order('date', { ascending: true })
+      .returns<HealthMetricRow[]>(),
+    supabase
+      .from('health_metrics')
+      .select('id, metric_name, date, value, unit, source')
+      .eq('metric_name', 'Blood Pressure Systolic')
+      .gte('date', range.trendFromIso)
+      .order('date', { ascending: true })
+      .returns<HealthMetricRow[]>(),
+    supabase
+      .from('health_metrics')
+      .select('id, metric_name, date, value, unit, source')
+      .eq('metric_name', 'Blood Pressure Diastolic')
       .gte('date', range.trendFromIso)
       .order('date', { ascending: true })
       .returns<HealthMetricRow[]>(),
@@ -213,13 +265,17 @@ export async function getHealthDashboardData(rangeInput?: Partial<HealthDateRang
       .returns<HealthWorkoutRow[]>(),
   ]);
 
-  const errors = [vitalsResult, summaryResult, hrvResult, restingHrResult, weightResult, workoutsResult]
+  const errors = [vitalsResult, summaryResult, hrvResult, spo2Result, stepsResult, bpSystolicResult, bpDiastolicResult, restingHrResult, weightResult, workoutsResult]
     .flatMap((result) => (result.error ? [result.error.message] : []));
 
   return {
     vitals: vitalsResult.data ?? [],
     summaryMetrics: summaryResult.data ?? [],
     hrvDaily: hrvResult.data ?? [],
+    spo2Daily: spo2Result.data ?? [],
+    stepsDaily: stepsResult.data ?? [],
+    bpSystolic: bpSystolicResult.data ?? [],
+    bpDiastolic: bpDiastolicResult.data ?? [],
     restingHrDaily: restingHrResult.data ?? [],
     weightDaily: weightResult.data ?? [],
     workouts: workoutsResult.data ?? [],
