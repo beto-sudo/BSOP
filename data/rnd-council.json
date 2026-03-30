@@ -1,536 +1,761 @@
 {
-  "config": {
-    "council": [
-      {
-        "id": "strategist",
-        "name": "The Strategist",
-        "model": "Sonnet",
-        "role": "Big picture, revenue opportunities, market positioning",
-        "emoji": "🎯"
-      },
-      {
-        "id": "engineer",
-        "name": "The Engineer",
-        "model": "GPT-5.4",
-        "role": "Technical feasibility, architecture, implementation paths",
-        "emoji": "⚙️"
-      },
-      {
-        "id": "analyst",
-        "name": "The Analyst",
-        "model": "Gemini",
-        "role": "Data patterns, metrics, competitive analysis",
-        "emoji": "📊"
-      },
-      {
-        "id": "critic",
-        "name": "The Critic",
-        "model": "Kimi",
-        "role": "Devil's advocate, risks, edge cases",
-        "emoji": "🔥"
-      },
-      {
-        "id": "synthesizer",
-        "name": "The Synthesizer",
-        "model": "MiniMax",
-        "role": "Consolidates debate, writes final memo",
-        "emoji": "📝"
-      }
-    ],
-    "schedule": "Weekly, Sunday nights",
-    "scope": [
-      "BSOP Platform",
-      "Coda ERP (DILESA, ANSA, ANSA-Ventas, SR Group, RDB)",
-      "Business Operations",
-      "Revenue Opportunities",
-      "Technical Architecture"
-    ]
-  },
-  "memos": [
+  "generatedAt": "2026-03-30T01:00:00Z",
+  "date": "2026-03-29",
+  "summary": "The council converged on a foundation-first agenda: establish canonical sources of truth, reduce operator fragility, and build a decision-oriented operating pulse before chasing broader monetization. DILESA remains strategically important, but only through staged, low-regret migration steps. Trusted business metrics, especially for COAGAN recovery, should feed a weekly operating cadence rather than exist as passive dashboards.",
+  "members": [
     {
-      "id": "rnd-2026-03-23",
-      "date": "2026-03-23",
-      "title": "Inaugural Council Session — Live Spine, RDB Integrity, and DILESA Sequencing",
-      "status": "complete",
-      "runStarted": "2026-03-23T20:55:00-06:00",
-      "summary": "The inaugural council converged on a simple thesis: BSOP should become a live operating spine, but only through disciplined sequencing. The highest-confidence moves are to make AI Operations data live, harden RDB around Waitry instead of replacing it, and treat DILESA as the first formal modernization program while protecting Beto’s bandwidth during active deal and travel windows.",
-      "ideas": [
-        {
-          "id": "idea-strategist-ai-spine",
-          "title": "Convert BSOP from showcase to live operating spine",
-          "proposedBy": "strategist",
-          "summary": "Prioritize a live data spine for AI Operations and the most important operating surfaces so bsop.io becomes Beto’s daily control room instead of a manually refreshed presentation. Start with usage/session telemetry because the pipeline is bounded and already valuable, then reuse the same pattern for travel expenses and business dashboards.",
-          "impact": 10,
-          "effort": 6,
-          "votes": {
-            "strategist": 10,
-            "engineer": 9,
-            "analyst": 10,
-            "critic": 7,
-            "synthesizer": 10
-          },
-          "status": "priority-candidate"
-        },
-        {
-          "id": "idea-strategist-rdb-ops-core",
-          "title": "Build the RDB ops core around Waitry instead of replacing the whole POS",
-          "proposedBy": "strategist",
-          "summary": "Keep the working QR experience in Waitry, stop trying to replace the entire front-of-house stack, and build the proprietary moat around reconciliations, deduplication, inventory, requisitions, receiving, warehouse control, and cash-cut workflows. This matches Beto’s strength: system architecture around real operations, not commodity POS hardware.",
-          "impact": 9,
-          "effort": 5,
-          "votes": {
-            "strategist": 10,
-            "engineer": 9,
-            "analyst": 8,
-            "critic": 8,
-            "synthesizer": 9
-          },
-          "status": "priority-candidate"
-        },
-        {
-          "id": "idea-strategist-dilesa-program",
-          "title": "Treat DILESA as the flagship modernization program",
-          "proposedBy": "strategist",
-          "summary": "DILESA has the largest Coda surface area, the highest schema complexity, and the clearest long-term payoff if external data syncs eventually become real. Formalize it as a multi-wave modernization program: governance, god-table reduction, high-volume table strategy, and clearer portfolio stage control across land, anteproyectos, proyectos, and construction.",
-          "impact": 9,
-          "effort": 8,
-          "votes": {
-            "strategist": 9,
-            "engineer": 9,
-            "analyst": 8,
-            "critic": 7,
-            "synthesizer": 9
-          },
-          "status": "promising"
-        },
-        {
-          "id": "idea-strategist-shared-travel",
-          "title": "Use shared trip links as the first external-facing BSOP product",
-          "proposedBy": "strategist",
-          "summary": "The trip sharing + expense tracker already has a natural product shape: no-login links, itinerary visibility, maps, and settlement. It can become the first polished “other people touch BSOP” experience without exposing the rest of the operating system, and it fits Beto’s real travel behavior.",
-          "impact": 7,
-          "effort": 4,
-          "votes": {
-            "strategist": 8,
-            "engineer": 7,
-            "analyst": 7,
-            "critic": 6,
-            "synthesizer": 8
-          },
-          "status": "backlog"
-        },
-        {
-          "id": "idea-engineer-usage-pipeline",
-          "title": "Ship a normalized telemetry pipeline for OpenClaw → BSOP",
-          "proposedBy": "engineer",
-          "summary": "Normalize session JSONL, manifests, and derived metrics into one stable schema, then drive the AI dashboard from that schema instead of hand-regenerated files. This creates a reusable ingestion architecture for every future BSOP module that starts life as files and later graduates into Supabase.",
-          "impact": 10,
-          "effort": 6,
-          "votes": {
-            "strategist": 10,
-            "engineer": 10,
-            "analyst": 10,
-            "critic": 8,
-            "synthesizer": 10
-          },
-          "status": "priority-candidate"
-        },
-        {
-          "id": "idea-engineer-rdb-dedupe",
-          "title": "Install a deterministic dedupe and archiving layer for RDB orders",
-          "proposedBy": "engineer",
-          "summary": "Use the March evidence (1,127 orders, 95 suspicious duplicate pairs, 33 strong pairs) to build deterministic duplicate scoring and archival rules. Store canonical orders, flag probable duplicates, and archive old inbound rows so the large Coda table stops degrading performance.",
-          "impact": 9,
-          "effort": 5,
-          "votes": {
-            "strategist": 9,
-            "engineer": 10,
-            "analyst": 9,
-            "critic": 8,
-            "synthesizer": 9
-          },
-          "status": "priority-candidate"
-        },
-        {
-          "id": "idea-engineer-coda-tiering",
-          "title": "Create a table-tiering policy for Coda-heavy systems",
-          "proposedBy": "engineer",
-          "summary": "Define which tables stay in Coda as workflow UI, which get archived periodically, and which should eventually sync with external storage. This is especially urgent for DILESA and RDB where table growth and dependency webs are starting to drag performance and maintainability.",
-          "impact": 8,
-          "effort": 7,
-          "votes": {
-            "strategist": 8,
-            "engineer": 9,
-            "analyst": 8,
-            "critic": 8,
-            "synthesizer": 9
-          },
-          "status": "promising"
-        },
-        {
-          "id": "idea-engineer-agent-jobs",
-          "title": "Turn manual BSOP data refreshes into scheduled jobs with health checks",
-          "proposedBy": "engineer",
-          "summary": "The team already identified that static JSON erodes trust because it requires manual regeneration. Add scheduled collectors plus freshness markers, success/failure logging, and a visible “data updated at” contract so every dashboard states its own recency honestly.",
-          "impact": 8,
-          "effort": 5,
-          "votes": {
-            "strategist": 8,
-            "engineer": 9,
-            "analyst": 9,
-            "critic": 7,
-            "synthesizer": 8
-          },
-          "status": "promising"
-        },
-        {
-          "id": "idea-analyst-exec-scoreboard",
-          "title": "Create an executive scoreboard across ANSA, DILESA, COAGAN, and RDB",
-          "proposedBy": "analyst",
-          "summary": "Build one weekly scoreboard with only the few KPIs that matter to Beto: cash/collections, project stage movement, inventory exceptions, duplicate-order incidents, open operational blockers, and upcoming commitments. The point is cross-business comparability, not exhaustive reporting.",
-          "impact": 9,
-          "effort": 6,
-          "votes": {
-            "strategist": 9,
-            "engineer": 8,
-            "analyst": 10,
-            "critic": 8,
-            "synthesizer": 9
-          },
-          "status": "priority-candidate"
-        },
-        {
-          "id": "idea-analyst-reminders-ar",
-          "title": "Use passive overdue reminders as an accounts-follow-up queue",
-          "proposedBy": "analyst",
-          "summary": "Beto explicitly uses overdue reminders as passive follow-up, especially for pending income near month-end. Instead of treating them as clutter, operationalize them: monthly collection queue, owner, amount, age, expected close date, and unresolved reasons.",
-          "impact": 7,
-          "effort": 3,
-          "votes": {
-            "strategist": 8,
-            "engineer": 6,
-            "analyst": 9,
-            "critic": 8,
-            "synthesizer": 8
-          },
-          "status": "backlog"
-        },
-        {
-          "id": "idea-analyst-travel-costs",
-          "title": "Use travel expense data as the first shared settlement analytics module",
-          "proposedBy": "analyst",
-          "summary": "The Baja import and shared-link flow already provide real expense data. Add per-person balance views, category splits, FX handling, and trip cost benchmarks so travel becomes the cleanest proof that BSOP can coordinate data among multiple humans without heavy auth.",
-          "impact": 7,
-          "effort": 4,
-          "votes": {
-            "strategist": 8,
-            "engineer": 7,
-            "analyst": 8,
-            "critic": 6,
-            "synthesizer": 8
-          },
-          "status": "backlog"
-        },
-        {
-          "id": "idea-analyst-rdb-loss-meter",
-          "title": "Quantify the cost of operational friction before replacing systems",
-          "proposedBy": "analyst",
-          "summary": "Before any bigger rebuild, measure what RDB duplicate orders, Coda slowdown, and manual refresh work are actually costing in pesos, hours, and trust. This prevents prestige projects and helps sequence work by measurable pain, not by technical curiosity.",
-          "impact": 8,
-          "effort": 4,
-          "votes": {
-            "strategist": 9,
-            "engineer": 8,
-            "analyst": 10,
-            "critic": 9,
-            "synthesizer": 9
-          },
-          "status": "promising"
-        },
-        {
-          "id": "idea-critic-scope-discipline",
-          "title": "Do not launch three migrations at once",
-          "proposedBy": "critic",
-          "summary": "BSOP live data, DILESA modernization, and RDB back-office hardening are all good ideas, but running them simultaneously would dilute attention and create half-built systems. Force a sequence: one proving ground, one adjacent build, one monitored backlog.",
-          "impact": 9,
-          "effort": 2,
-          "votes": {
-            "strategist": 9,
-            "engineer": 8,
-            "analyst": 9,
-            "critic": 10,
-            "synthesizer": 10
-          },
-          "status": "priority-candidate"
-        },
-        {
-          "id": "idea-critic-front-desk",
-          "title": "Avoid custom front-desk tools for non-technical staff until back-office is stable",
-          "proposedBy": "critic",
-          "summary": "RDB has few employees and low technical tolerance. Any custom point-of-sale or front-desk workflow introduced too early will create support burden and resistance. Build invisible controls first, where the system protects the business without forcing new behavior changes on staff.",
-          "impact": 8,
-          "effort": 3,
-          "votes": {
-            "strategist": 8,
-            "engineer": 8,
-            "analyst": 7,
-            "critic": 10,
-            "synthesizer": 9
-          },
-          "status": "priority-candidate"
-        },
-        {
-          "id": "idea-critic-supabase-creep",
-          "title": "Use Supabase surgically, not as an excuse to rebuild everything",
-          "proposedBy": "critic",
-          "summary": "Supabase is useful for shared travel and live metrics, but it can easily become a gravity well that turns every problem into a schema project. The council should treat Supabase as a selective substrate for high-friction workflows, not a religion.",
-          "impact": 8,
-          "effort": 3,
-          "votes": {
-            "strategist": 8,
-            "engineer": 7,
-            "analyst": 8,
-            "critic": 10,
-            "synthesizer": 9
-          },
-          "status": "promising"
-        },
-        {
-          "id": "idea-critic-deal-focus",
-          "title": "Protect founder bandwidth during PED and Taos windows",
-          "proposedBy": "critic",
-          "summary": "There is an active PED land negotiation and an imminent Taos family trip. The risk is loading Beto with platform design work exactly when live business and family commitments need attention. Recommendations should create leverage with low daily management overhead.",
-          "impact": 8,
-          "effort": 2,
-          "votes": {
-            "strategist": 8,
-            "engineer": 7,
-            "analyst": 8,
-            "critic": 10,
-            "synthesizer": 9
-          },
-          "status": "priority-candidate"
-        },
-        {
-          "id": "idea-synth-unified-ops",
-          "title": "Make BSOP the wrapper, Coda the workflow UI, and Supabase the selective data spine",
-          "proposedBy": "synthesizer",
-          "summary": "The emerging architecture is already visible: Coda remains the highly adaptable operator interface, BSOP becomes the portfolio dashboard and shared surface, and Supabase is used only where live data, scale, or external sharing justify it. Naming this clearly reduces random architectural drift.",
-          "impact": 10,
-          "effort": 5,
-          "votes": {
-            "strategist": 10,
-            "engineer": 9,
-            "analyst": 9,
-            "critic": 8,
-            "synthesizer": 10
-          },
-          "status": "priority-candidate"
-        },
-        {
-          "id": "idea-synth-review-cadence",
-          "title": "Institute a weekly council-driven operating review",
-          "proposedBy": "synthesizer",
-          "summary": "Tie the Sunday-night R&D Council to a Monday operating review artifact: top risks, top experiments, dashboards freshness, and what changed in each business. This converts the council from an inspiration engine into a real management rhythm.",
-          "impact": 8,
-          "effort": 3,
-          "votes": {
-            "strategist": 9,
-            "engineer": 7,
-            "analyst": 8,
-            "critic": 8,
-            "synthesizer": 10
-          },
-          "status": "promising"
-        },
-        {
-          "id": "idea-synth-land-pipeline",
-          "title": "Extend the DILESA land pipeline from offered parcels to owned inventory",
-          "proposedBy": "synthesizer",
-          "summary": "This honors Beto’s explicit preference that Terrenos cover both evaluated parcels and land already owned. It enables a single system of record for deal sourcing, evaluation history, ownership status, and future project conversion.",
-          "impact": 8,
-          "effort": 5,
-          "votes": {
-            "strategist": 8,
-            "engineer": 8,
-            "analyst": 8,
-            "critic": 7,
-            "synthesizer": 10
-          },
-          "status": "promising"
-        },
-        {
-          "id": "idea-synth-trust-contract",
-          "title": "Adopt a data trust contract across all dashboards",
-          "proposedBy": "synthesizer",
-          "summary": "Every dashboard should declare source, freshness, owner, and whether the metric is live, scheduled, or manual. This small discipline protects credibility as BSOP expands from static pages into operational dashboards.",
-          "impact": 8,
-          "effort": 2,
-          "votes": {
-            "strategist": 8,
-            "engineer": 9,
-            "analyst": 9,
-            "critic": 9,
-            "synthesizer": 10
-          },
-          "status": "priority-candidate"
-        }
-      ],
-      "debate": [
-        {
-          "round": 1,
-          "topic": "Opening positions — where is the highest leverage right now?",
-          "highlights": [
-            {
-              "speaker": "strategist",
-              "message": "BSOP already looks credible. The gap is not design anymore; it is trust. If the data is stale, the platform stays a showroom instead of becoming Beto’s cockpit."
-            },
-            {
-              "speaker": "engineer",
-              "message": "AI Operations is the cleanest first live pipeline because the raw data already exists in OpenClaw artifacts. It is the least ambiguous place to prove ingestion, normalization, freshness, and dashboard contracts."
-            },
-            {
-              "speaker": "analyst",
-              "message": "RDB has the strongest quantified pain today: suspicious duplicates, known table bloat, and direct operational friction. That is a better near-term target than an abstract full-stack rebuild."
-            },
-            {
-              "speaker": "critic",
-              "message": "The temptation here is obvious: BSOP live data, DILESA architecture cleanup, RDB systems work, travel product polish — all true, all too much at once. Sequencing is the real strategy."
-            },
-            {
-              "speaker": "synthesizer",
-              "message": "A coherent stack is emerging: BSOP as wrapper, Coda as workflow UI, Supabase only where live sync or outside sharing requires it. The council should explicitly anchor decisions to that architecture."
-            }
-          ]
-        },
-        {
-          "round": 2,
-          "topic": "Cross-critiques — what could fail or distract execution?",
-          "highlights": [
-            {
-              "speaker": "strategist",
-              "message": "To the Engineer: a telemetry spine is valuable only if it produces operating decisions, not another analytics toy. Tie it immediately to cost control, delegation quality, and freshness confidence."
-            },
-            {
-              "speaker": "engineer",
-              "message": "To the Strategist: DILESA is the right flagship, but not if we frame it as a giant migration. It needs wave-based architecture work with explicit boundaries, or it becomes an endless refactor."
-            },
-            {
-              "speaker": "analyst",
-              "message": "To the Strategist and Synthesizer: travel is promising, but it is still a sidecar business case. RDB and AI Operations have better measurable urgency this week."
-            },
-            {
-              "speaker": "critic",
-              "message": "To everyone: non-technical staff at RDB are a hard constraint. Any solution that asks them to behave differently before back-office controls are invisible and stable is likely to fail socially, not technically."
-            },
-            {
-              "speaker": "synthesizer",
-              "message": "The common pattern behind every good idea is not “more software”; it is tighter trust loops: canonical records, freshness labels, smaller surfaces, and one owner per metric or queue."
-            }
-          ]
-        },
-        {
-          "round": 3,
-          "topic": "Resolution — what the council actually recommends now",
-          "highlights": [
-            {
-              "speaker": "synthesizer",
-              "message": "Consensus: the first P0 is the live telemetry spine because it is the lowest-risk architectural proving ground. The second P0 is RDB data integrity because the pain is real and current."
-            },
-            {
-              "speaker": "critic",
-              "message": "Consensus with warning: DILESA should begin as a formal program, but only after the first P0 work is moving and only with explicit scope discipline."
-            },
-            {
-              "speaker": "analyst",
-              "message": "Consensus: a weekly executive scoreboard is the mechanism that turns these recommendations into management rhythm across ANSA, DILESA, COAGAN, and RDB."
-            },
-            {
-              "speaker": "strategist",
-              "message": "Consensus: travel remains strategically useful as BSOP’s first shared external surface, but it is P2 because it should follow the more urgent operating leverage plays."
-            }
-          ]
-        }
-      ],
-      "recommendations": [
-        {
-          "id": "rec-2026-03-23-1",
-          "priority": "P0",
-          "title": "Build the OpenClaw → BSOP live telemetry spine first",
-          "owner": "The Engineer",
-          "rationale": "This is the cleanest proving ground: bounded scope, immediate value, and directly aligned with Beto’s need for trustworthy AI cost and activity visibility. It also establishes the ingestion pattern BSOP will reuse for future live modules.",
-          "implementationStatus": "next-up",
-          "actionItems": [
-            "Define a normalized schema for sessions, messages, model usage, and freshness metadata",
-            "Build a scheduled sync that ingests JSONL/manifests and writes a stable dataset for BSOP",
-            "Add visible freshness badges and source labels to AI dashboard, usage, and models pages"
-          ]
-        },
-        {
-          "id": "rec-2026-03-23-2",
-          "priority": "P0",
-          "title": "Harden RDB with duplicate detection, canonical orders, and archive policy",
-          "owner": "The Analyst",
-          "rationale": "RDB has a quantified pain signal right now: duplicate behavior in Waitry POS, a known Coda bottleneck, and clear evidence that the issue is operationally real. Fixing integrity and performance around existing workflows beats building a new POS.",
-          "implementationStatus": "next-up",
-          "actionItems": [
-            "Formalize duplicate scoring rules using table, amount, item set, and time-window signals",
-            "Create a canonical-order layer plus a reviewed-duplicates queue for ops follow-up",
-            "Archive old inbound/raw rows on a schedule so the heaviest Coda tables stop slowing the system"
-          ]
-        },
-        {
-          "id": "rec-2026-03-23-3",
-          "priority": "P1",
-          "title": "Launch DILESA as the first formal modernization program",
-          "owner": "The Strategist",
-          "rationale": "DILESA is the most complex and highest-leverage Coda environment. A formal modernization wave there will clarify where Coda remains the right UI and where external data structures should eventually carry load.",
-          "implementationStatus": "planning",
-          "actionItems": [
-            "List the top god tables and high-friction workflows by business criticality, not by technical curiosity",
-            "Draft a tiering policy: stay in Coda, archive in Coda, or sync externally later",
-            "Start with the land/anteproyectos/proyectos pipeline so development stages are governed coherently"
-          ]
-        },
-        {
-          "id": "rec-2026-03-23-4",
-          "priority": "P1",
-          "title": "Create a weekly executive scoreboard across the four businesses",
-          "owner": "The Synthesizer",
-          "rationale": "Beto runs multiple operating contexts. A single weekly scoreboard forces cross-business visibility and makes the council’s output useful in Monday decision-making, not just Sunday reflection.",
-          "implementationStatus": "planning",
-          "actionItems": [
-            "Choose 5–8 executive KPIs total across ANSA, DILESA, COAGAN, and RDB",
-            "Define owner and source for each metric, including whether it is manual, scheduled, or live",
-            "Publish the first scoreboard even if some metrics are manual placeholders, then tighten automation later"
-          ]
-        },
-        {
-          "id": "rec-2026-03-23-5",
-          "priority": "P2",
-          "title": "Use shared trip links and expense settlement as BSOP’s first outside-user surface",
-          "owner": "The Strategist",
-          "rationale": "Travel is already real, emotionally sticky, and naturally collaborative. It is the safest domain to let other people touch BSOP, proving shareable UX and selective Supabase use without risking core business operations.",
-          "implementationStatus": "monitoring",
-          "actionItems": [
-            "Finish tabs/export polish on trip detail and validate the shared-link flow on actual phones",
-            "Add per-person balances, category summaries, and FX transparency to the expense tracker",
-            "Use Taos as a live test for itinerary visibility and shared planning behavior"
-          ]
-        }
-      ],
-      "scores": {
-        "strategicClarity": 9.3,
-        "technicalReadiness": 8.1,
-        "expectedImpact": 9.0,
-        "executionRisk": 6.8
-      }
+      "name": "Strategist",
+      "model": "anthropic/claude-sonnet-4-6",
+      "status": "completed"
+    },
+    {
+      "name": "Engineer",
+      "model": "openai/gpt-5.4 (fallback)",
+      "status": "completed"
+    },
+    {
+      "name": "Analyst",
+      "model": "openai/gpt-5.4 (fallback, gemini failed)",
+      "status": "completed"
+    },
+    {
+      "name": "Critic",
+      "model": "moonshot/kimi-k2.5",
+      "status": "completed"
+    },
+    {
+      "name": "Synthesizer",
+      "model": "openai/gpt-5.4 (fallback)",
+      "status": "completed"
     }
   ],
-  "stats": {
-    "totalSessions": 1,
-    "totalIdeas": 20,
-    "implementedIdeas": 0,
-    "avgScore": 8.4
-  }
+  "failures": [
+    {
+      "member": "Analyst",
+      "model": "google/gemini-3.1-pro-preview",
+      "error": "LiveSessionModelSwitchError",
+      "resolution": "Retried with default model"
+    },
+    {
+      "member": "Engineer",
+      "model": "openai/gpt-5.4",
+      "error": "model not allowed",
+      "resolution": "Retried with default model"
+    },
+    {
+      "member": "Synthesizer",
+      "model": "openrouter/minimax/minimax-m2.5",
+      "error": "model not allowed",
+      "resolution": "Retried with default model"
+    }
+  ],
+  "round1": {
+    "crossCritique": [
+      {
+        "member": "Strategist",
+        "idea": "RDB padel membership engine",
+        "stance": "Supported as a plausible commercial win, but challenged on sequencing.",
+        "reasoning": "It has tangible revenue potential and retention logic, yet it is narrower than the platform-level ideas and competes for scarce operator attention.",
+        "modifications": [
+          "Treat as a contained business experiment, not a council-level top priority.",
+          "Instrument utilization, churn, and sponsorship demand before full rollout.",
+          "Feed it from KPI layer rather than building bespoke systems first."
+        ],
+        "crossReferences": [
+          "Analyst: Cross-Business Executive KPI Layer",
+          "Synthesizer: Operating Pulse"
+        ],
+        "strength": "medium",
+        "notes": "Good local monetization idea, but weaker than cross-business infrastructure work."
+      },
+      {
+        "member": "Strategist",
+        "idea": "Finish DILESA 3-layer ERP refactor",
+        "stance": "Supported on strategic importance, challenged on execution framing.",
+        "reasoning": "The moat thesis is credible, but the council rejected a heroic 'finish it all' framing for a solo operator. The work must be staged, rollback-friendly, and scoped around the Clientes bottleneck.",
+        "modifications": [
+          "Focus on highest-risk/highest-value entities first.",
+          "Incorporate the Critic's vertical split logic to reduce migration burden.",
+          "Use scorecards and audit checkpoints after each phase."
+        ],
+        "crossReferences": [
+          "Critic: Kill the God Table Migration",
+          "Analyst: DILESA Operational Cleanup Scorecard",
+          "Engineer: Canonical Data Access Layer"
+        ],
+        "strength": "high",
+        "notes": "Remains one of the strongest business-specific bets, but only with disciplined sequencing."
+      },
+      {
+        "member": "Strategist",
+        "idea": "ANSA AI upsell co-pilot",
+        "stance": "Conditionally supported.",
+        "reasoning": "It is concrete and commercially adjacent, but depends on trustworthy service history, clean prompts, and advisor workflow fit.",
+        "modifications": [
+          "Pilot on one advisor team and one upsell category.",
+          "Measure attach rate, advisor adoption, and false-positive rate.",
+          "Delay until canonical source declarations exist for service data."
+        ],
+        "crossReferences": [
+          "Engineer: Canonical Data Access Layer",
+          "Analyst: KPI Layer"
+        ],
+        "strength": "medium",
+        "notes": "Useful later; not strong enough to beat current foundation priorities."
+      },
+      {
+        "member": "Strategist",
+        "idea": "COAGAN forward sales contracts",
+        "stance": "Supported but partially displaced.",
+        "reasoning": "Financially sensible hedge logic, but the council felt COAGAN's more urgent problem is asset-loss visibility and recovery planning.",
+        "modifications": [
+          "Sequence after recovery dashboard establishes reliable production scenarios.",
+          "Track exposure assumptions in BSOP before committing structure."
+        ],
+        "crossReferences": [
+          "Analyst: COAGAN Asset Loss and Recovery Dashboard"
+        ],
+        "strength": "medium",
+        "notes": "Good finance move, but not the first COAGAN priority."
+      },
+      {
+        "member": "Strategist",
+        "idea": "Productize BSOP as Family Office OS",
+        "stance": "Supported as option value, challenged as active priority.",
+        "reasoning": "The market thesis is attractive, but the product is not yet stable enough to commercialize. The council liked preserving the option via multi-tenant-safe decisions, not pursuing packaging now.",
+        "modifications": [
+          "Keep architecture productizable, but do not launch go-to-market work yet.",
+          "Use Business Packs later once internal use is mature."
+        ],
+        "crossReferences": [
+          "Synthesizer: Business Packs",
+          "Engineer: Release Guardrail Pipeline",
+          "Critic: OpenClaw Fallback"
+        ],
+        "strength": "medium",
+        "notes": "Important strategic option, not immediate execution priority."
+      },
+      {
+        "member": "Engineer",
+        "idea": "Canonical Data Access Layer and Source of Truth Map",
+        "stance": "Strongly supported.",
+        "reasoning": "This proposal addressed the deepest common pain: ambiguity about where truth lives. It also overlapped with the Critic and Synthesizer, making it the council's clearest consensus cluster.",
+        "modifications": [
+          "Merge with a human-readable treaty and an app-visible registry.",
+          "Start with top routes/entities instead of full-system perfection.",
+          "Add reconciliation logs for dual-source transitions."
+        ],
+        "crossReferences": [
+          "Critic: Single Source of Truth Treaty",
+          "Synthesizer: Canonical Source Map"
+        ],
+        "strength": "very high",
+        "notes": "One of the strongest ideas in the whole council."
+      },
+      {
+        "member": "Engineer",
+        "idea": "Solo-Developer Release Guardrail Pipeline",
+        "stance": "Supported.",
+        "reasoning": "Low glamour, high survivability. Multiple members agreed BSOP needs reliability and deploy safety before more ambitious expansion.",
+        "modifications": [
+          "Bundle with operator scripts and degraded-mode runbooks.",
+          "Keep the pipeline lean enough to use every time."
+        ],
+        "crossReferences": [
+          "Engineer: Operator Scripts and Local Dev Commands",
+          "Critic: OpenClaw Fallback",
+          "Synthesizer: Cognitive Load Mode"
+        ],
+        "strength": "high",
+        "notes": "Indirect revenue, but strong force-multiplier for a solo operator."
+      },
+      {
+        "member": "Engineer",
+        "idea": "AI-Assisted Codebase Audit + Tech Debt Radar",
+        "stance": "Supported as enabling work, but not as top-five final outcome.",
+        "reasoning": "Useful for scoping risk and informing other decisions, but the council preferred interventions that directly change runtime behavior and operating clarity.",
+        "modifications": [
+          "Use it as a short diagnostic phase feeding guardrails and canonical-source cleanup.",
+          "Time-box it tightly."
+        ],
+        "crossReferences": [
+          "Engineer: Release Guardrails",
+          "Synthesizer: Council-to-Roadmap Loop"
+        ],
+        "strength": "medium",
+        "notes": "Helpful, but subordinate to more operational recommendations."
+      },
+      {
+        "member": "Engineer",
+        "idea": "Internal Operations Event Bus",
+        "stance": "Challenged on timing.",
+        "reasoning": "Architecturally powerful, but the council felt it risks overbuilding before source ownership and critical workflows are stabilized.",
+        "modifications": [
+          "Start with event logging conventions and idempotency keys before full bus infrastructure.",
+          "Revisit after canonical map and reliability layer are in place."
+        ],
+        "crossReferences": [
+          "Critic: Cost Per Outcome logging",
+          "Synthesizer: Operating Pulse"
+        ],
+        "strength": "medium-low",
+        "notes": "A likely future layer, but premature today."
+      },
+      {
+        "member": "Engineer",
+        "idea": "Operator Scripts and Local Dev Commands",
+        "stance": "Strongly supported.",
+        "reasoning": "This is practical glue that helps both human and agent operators. It reduces setup friction, improves repeatability, and complements release guardrails.",
+        "modifications": [
+          "Design scripts to emit machine-readable JSON.",
+          "Tie each script to a short runbook."
+        ],
+        "crossReferences": [
+          "Engineer: Release Guardrails",
+          "Critic: OpenClaw Fallback"
+        ],
+        "strength": "high",
+        "notes": "Merged naturally into the final reliability recommendation."
+      },
+      {
+        "member": "Analyst",
+        "idea": "Cross-Business Executive KPI Layer",
+        "stance": "Supported, with reframing.",
+        "reasoning": "The council agreed on the value of trusted metrics, but pushed back against dashboard sprawl. KPIs should drive weekly review, escalation, and pulse generation rather than exist as passive summaries.",
+        "modifications": [
+          "Limit to 5-7 owned KPIs per business.",
+          "Show trend, threshold, and next action only.",
+          "Pipe exceptions into the Operating Pulse."
+        ],
+        "crossReferences": [
+          "Synthesizer: Operating Pulse",
+          "Strategist: Revenue initiatives"
+        ],
+        "strength": "high",
+        "notes": "Important, especially when paired with judgment-oriented synthesis."
+      },
+      {
+        "member": "Analyst",
+        "idea": "DILESA Operational Cleanup Scorecard",
+        "stance": "Supported.",
+        "reasoning": "This gives the DILESA migration an operational scoreboard rather than a vague feeling of progress.",
+        "modifications": [
+          "Use it as governance around the migration, not as a separate dashboard product.",
+          "Tie score changes to business risk reduction."
+        ],
+        "crossReferences": [
+          "Strategist: Finish DILESA ERP Refactor",
+          "Critic: Kill the God Table Migration"
+        ],
+        "strength": "medium-high",
+        "notes": "Strong supporting mechanism for the DILESA program."
+      },
+      {
+        "member": "Analyst",
+        "idea": "COAGAN Asset Loss and Recovery Dashboard",
+        "stance": "Strongly supported.",
+        "reasoning": "This was the clearest business metric proposal tied directly to capital preservation and forward planning. It beat broader COAGAN commercial ideas on urgency and decision value.",
+        "modifications": [
+          "Model 1/3/5-year recovery scenarios.",
+          "Tie irrigation coverage and replant backlog to expected yield recovery."
+        ],
+        "crossReferences": [
+          "Strategist: Forward Sales Contracts",
+          "Synthesizer: Operating Pulse"
+        ],
+        "strength": "very high",
+        "notes": "Best pure business-analytics idea in the set."
+      },
+      {
+        "member": "Analyst",
+        "idea": "AI ROI and Governance Panel",
+        "stance": "Supported but narrowed.",
+        "reasoning": "The council agreed cost governance matters, but the Critic improved the framing by focusing on cost per successful outcome rather than cost per token.",
+        "modifications": [
+          "Measure outcome success, retries, and correction load.",
+          "Keep initial scope small and operational."
+        ],
+        "crossReferences": [
+          "Critic: Audit AI Cost Per Outcome"
+        ],
+        "strength": "medium",
+        "notes": "Good second-order optimization, not top-tier priority."
+      },
+      {
+        "member": "Analyst",
+        "idea": "Weekly Competitive and Market Pulse",
+        "stance": "Challenged.",
+        "reasoning": "The council felt internal truth and operating discipline are bigger current constraints than outside-in scanning.",
+        "modifications": [
+          "Defer until internal metrics are trusted and weekly review cadence is functioning.",
+          "Maybe pilot only for one business later."
+        ],
+        "crossReferences": [
+          "Analyst: Executive KPI Layer"
+        ],
+        "strength": "low",
+        "notes": "One of the weaker ideas after debate."
+      },
+      {
+        "member": "Critic",
+        "idea": "Kill the God Table Migration",
+        "stance": "Strongly supported.",
+        "reasoning": "The critique was sharp and practical: optimize for access patterns and risk, not just schema neatness. This materially improved the DILESA recommendation.",
+        "modifications": [
+          "Use vertical split where it cuts migration time and state-machine risk.",
+          "Separate hot operational columns from colder long-tail data where appropriate."
+        ],
+        "crossReferences": [
+          "Strategist: Finish DILESA ERP Refactor",
+          "Analyst: Cleanup Scorecard"
+        ],
+        "strength": "high",
+        "notes": "A decisive refinement to the DILESA path."
+      },
+      {
+        "member": "Critic",
+        "idea": "Single Source of Truth Treaty",
+        "stance": "Strongly supported.",
+        "reasoning": "Low effort, high leverage. It gave language and enforcement posture to the Engineer's more code-heavy proposal.",
+        "modifications": [
+          "Keep the treaty short and executable.",
+          "Make unresolved dual-source cases visible instead of implicit."
+        ],
+        "crossReferences": [
+          "Engineer: Canonical Data Access Layer",
+          "Synthesizer: Canonical Source Map"
+        ],
+        "strength": "very high",
+        "notes": "Merged into the top-ranked recommendation."
+      },
+      {
+        "member": "Critic",
+        "idea": "Health Circuit Breaker",
+        "stance": "Supported in concept, moderated in execution.",
+        "reasoning": "The council liked protecting operator cognition, but automatic HRV-driven system behavior felt too early without trust in signals and policies.",
+        "modifications": [
+          "Start with manual stress mode.",
+          "Automate only after rules are socially and operationally validated."
+        ],
+        "crossReferences": [
+          "Synthesizer: Cognitive Load Mode"
+        ],
+        "strength": "medium-high",
+        "notes": "Influential, but folded into reliability rather than standing alone."
+      },
+      {
+        "member": "Critic",
+        "idea": "Audit AI Cost Per Outcome",
+        "stance": "Supported.",
+        "reasoning": "The council found the framing strong because retry loops and correctness failures can dominate true AI cost.",
+        "modifications": [
+          "Add task type, success state, and retry count.",
+          "Keep it lightweight at first."
+        ],
+        "crossReferences": [
+          "Analyst: AI ROI and Governance Panel"
+        ],
+        "strength": "medium",
+        "notes": "Useful, but secondary to more foundational work."
+      },
+      {
+        "member": "Critic",
+        "idea": "OpenClaw Fallback Mode",
+        "stance": "Strongly supported.",
+        "reasoning": "This proposal gained credibility because it directly addresses continuity risk in an early-stage platform layer.",
+        "modifications": [
+          "Document only the most critical fallback paths first.",
+          "Tie it to operator scripts and runbooks."
+        ],
+        "crossReferences": [
+          "Engineer: Release Guardrails",
+          "Engineer: Operator Scripts"
+        ],
+        "strength": "high",
+        "notes": "Core ingredient of the final reliability recommendation."
+      },
+      {
+        "member": "Synthesizer",
+        "idea": "Operating Pulse",
+        "stance": "Strongly supported.",
+        "reasoning": "This became the council's clearest product-level expression of what BSOP should become: fewer dashboards, more decision reduction.",
+        "modifications": [
+          "Keep it exception-driven.",
+          "Constrain to a small number of ranked actions.",
+          "Expose confidence and source."
+        ],
+        "crossReferences": [
+          "Analyst: Executive KPI Layer",
+          "Critic: Health Circuit Breaker"
+        ],
+        "strength": "very high",
+        "notes": "One of the final top two recommendations."
+      },
+      {
+        "member": "Synthesizer",
+        "idea": "Canonical Source Map",
+        "stance": "Strongly supported.",
+        "reasoning": "It overlapped heavily with the Engineer and Critic proposals and helped unify documentation with runtime use.",
+        "modifications": [
+          "Make it app-visible, not just a document.",
+          "Tie ownership and refresh cadence to each entity."
+        ],
+        "crossReferences": [
+          "Engineer: Canonical Data Access Layer",
+          "Critic: Source of Truth Treaty"
+        ],
+        "strength": "very high",
+        "notes": "Merged into the top-ranked recommendation."
+      },
+      {
+        "member": "Synthesizer",
+        "idea": "Business Packs",
+        "stance": "Supported as future packaging, challenged on timing.",
+        "reasoning": "Compelling once internal patterns are stable, but premature while data and operating layers are still settling.",
+        "modifications": [
+          "Preserve as later-stage packaging of proven internal patterns.",
+          "Do not prioritize over current reliability and source-of-truth work."
+        ],
+        "crossReferences": [
+          "Strategist: Family Office OS"
+        ],
+        "strength": "medium",
+        "notes": "Good downstream consequence, not near-term priority."
+      },
+      {
+        "member": "Synthesizer",
+        "idea": "Cognitive Load Mode",
+        "stance": "Supported, with sequencing caution.",
+        "reasoning": "The philosophy resonated strongly, but council members preferred simple policies and manual toggles before deep adaptive behavior.",
+        "modifications": [
+          "Start with manual mode switches.",
+          "Reduce briefing width, cron load, and migration tasks first."
+        ],
+        "crossReferences": [
+          "Critic: Health Circuit Breaker"
+        ],
+        "strength": "medium-high",
+        "notes": "Merged into the reliability/survivability recommendation."
+      },
+      {
+        "member": "Synthesizer",
+        "idea": "Council-to-Roadmap Loop",
+        "stance": "Supported as process hygiene.",
+        "reasoning": "Useful for preventing good ideas from evaporating, but weaker than the core structural and operating recommendations.",
+        "modifications": [
+          "Add decision status, owner, next experiment, and follow-up date.",
+          "Keep lightweight."
+        ],
+        "crossReferences": [
+          "Engineer: Tech Debt Radar"
+        ],
+        "strength": "medium",
+        "notes": "Helpful governance layer, but not a top-five standalone recommendation."
+      }
+    ],
+    "emergingClusters": [
+      {
+        "name": "Canonical truth and data ownership",
+        "ideas": [
+          "Engineer: Canonical Data Access Layer",
+          "Critic: Single Source of Truth Treaty",
+          "Synthesizer: Canonical Source Map"
+        ],
+        "assessment": "Strongest cluster in the debate; broad agreement and high leverage."
+      },
+      {
+        "name": "Solo-operator survivability and load management",
+        "ideas": [
+          "Engineer: Release Guardrails",
+          "Engineer: Operator Scripts",
+          "Critic: OpenClaw Fallback",
+          "Critic: Health Circuit Breaker",
+          "Synthesizer: Cognitive Load Mode"
+        ],
+        "assessment": "Second-strongest cluster; high consensus that BSOP must become more resilient to operator overload and platform instability."
+      },
+      {
+        "name": "Decision reduction over dashboards",
+        "ideas": [
+          "Synthesizer: Operating Pulse",
+          "Analyst: Executive KPI Layer",
+          "Analyst: COAGAN Recovery Dashboard"
+        ],
+        "assessment": "Strong cluster; metrics should flow into action and prioritization, not dashboard sprawl."
+      },
+      {
+        "name": "DILESA as moat, but only via staged migration",
+        "ideas": [
+          "Strategist: Finish DILESA ERP Refactor",
+          "Critic: Kill the God Table Migration",
+          "Analyst: Cleanup Scorecard"
+        ],
+        "assessment": "High-value cluster with real disagreement about implementation style; resolved into a staged, risk-managed path."
+      },
+      {
+        "name": "Future packaging and commercialization",
+        "ideas": [
+          "Strategist: Family Office OS",
+          "Synthesizer: Business Packs",
+          "Strategist: Padel Membership Engine",
+          "Strategist: ANSA Upsell Copilot"
+        ],
+        "assessment": "Valuable option set, but mostly deferred behind foundation work."
+      }
+    ],
+    "strongestIdeas": [
+      "Engineer: Canonical Data Access Layer and Source of Truth Map",
+      "Critic: Single Source of Truth Treaty",
+      "Synthesizer: Operating Pulse",
+      "Analyst: COAGAN Asset Loss and Recovery Dashboard",
+      "Engineer: Solo-Developer Release Guardrail Pipeline"
+    ],
+    "weakestIdeas": [
+      "Analyst: Weekly Competitive and Market Pulse",
+      "Engineer: Internal Operations Event Bus (premature relative to prerequisites)",
+      "Strategist: RDB Padel Membership Engine (good, but narrow versus current constraints)"
+    ]
+  },
+  "round2": {
+    "resolution": [
+      {
+        "issue": "How to handle source-of-truth ambiguity",
+        "decision": "Merge the Engineer's adapter layer, the Critic's treaty, and the Synthesizer's canonical map into one unified initiative.",
+        "result": "This became the top recommendation because it reduces ambiguity in both code and operations."
+      },
+      {
+        "issue": "Whether BSOP should invest in dashboards or synthesis",
+        "decision": "Metrics survive only when tied to escalation and action. The Operating Pulse becomes the main product expression; KPI layers and recovery models become feeder systems.",
+        "result": "Operating Pulse rises; generic dashboard work is narrowed."
+      },
+      {
+        "issue": "Whether DILESA should be pushed hard now",
+        "decision": "Yes, but only through phased execution centered on the Clientes split, rollback safety, and scorecard-driven progress.",
+        "result": "DILESA stays high, but the broad 'finish it' framing is replaced with a staged migration program."
+      },
+      {
+        "issue": "How much reliability work is enough",
+        "decision": "Bundle release guardrails, scripts, fallback mode, and load-management into one survivability layer sized for a solo operator.",
+        "result": "Reliability rises into the final top five."
+      },
+      {
+        "issue": "Which business metric initiative should rise first",
+        "decision": "COAGAN recovery dashboard rises above broader market pulse and ahead of a full executive KPI build because it has the clearest capital-protection value.",
+        "result": "COAGAN recovery becomes the lead business-metrics entry point."
+      }
+    ],
+    "dropsOrDeferrals": [
+      {
+        "idea": "Weekly Competitive and Market Pulse",
+        "status": "dropped from top priorities",
+        "why": "Internal truth and operating discipline matter more right now."
+      },
+      {
+        "idea": "Internal Operations Event Bus",
+        "status": "deferred",
+        "why": "Too much infrastructure relative to current readiness; revisit later."
+      },
+      {
+        "idea": "Family Office OS commercialization",
+        "status": "deferred",
+        "why": "Keep option alive architecturally, but do not commercialize yet."
+      },
+      {
+        "idea": "Padel Membership Engine",
+        "status": "deferred",
+        "why": "Attractive local win, but weaker cross-system leverage."
+      }
+    ],
+    "dissentThatRemains": [
+      {
+        "topic": "Health-aware automation",
+        "viewA": "Automate load shedding using health signals early.",
+        "viewB": "Use manual stress mode first until rules are trusted.",
+        "status": "Unresolved; compromise favors manual mode first."
+      },
+      {
+        "topic": "DILESA migration philosophy",
+        "viewA": "Complete the normalized 3-layer refactor as strategic moat.",
+        "viewB": "Optimize around access patterns and practical cuts, even if less architecturally pure.",
+        "status": "Resolved partially in favor of pragmatic staged split, but tension remains."
+      },
+      {
+        "topic": "Revenue now vs foundation now",
+        "viewA": "Push faster commercial wins in individual businesses.",
+        "viewB": "Fix trust and survivability first because everything else compounds on top.",
+        "status": "Resolved in favor of foundation-first, with monetization preserved as option value."
+      }
+    ]
+  },
+  "recommendations": [
+    {
+      "rank": 1,
+      "priority": "P0",
+      "title": "Canonical Source Treaty + Data Access Layer",
+      "champion": [
+        "Engineer",
+        "Critic",
+        "Synthesizer"
+      ],
+      "description": "Establish a unified source-of-truth program: typed adapters, app-visible source registry, explicit ownership and sync rules, and reconciliation logs for dual-source entities. This creates the trust layer required for both product and operating decisions.",
+      "impact_score": 10,
+      "effort_score": 5,
+      "revenue_potential": "medium",
+      "status": "rise-and-merge",
+      "mergedFrom": [
+        "Engineer: Canonical Data Access Layer and Source of Truth Map",
+        "Critic: Single Source of Truth Treaty",
+        "Synthesizer: Canonical Source Map"
+      ],
+      "risks": [
+        "May turn into abstract architecture work if not tied to live routes first",
+        "Documentation without enforcement could create false confidence"
+      ],
+      "first_steps": [
+        "Define registry fields for top entities and routes",
+        "Route selected risky pages through adapters only",
+        "Add undeclared-source logging",
+        "Publish concise DATA_TREATY.md tied to code"
+      ]
+    },
+    {
+      "rank": 2,
+      "priority": "P0",
+      "title": "Operating Pulse — What Needs Beto Today?",
+      "champion": [
+        "Synthesizer",
+        "Analyst"
+      ],
+      "description": "Create a cross-business operating layer that ranks the 3-7 actions or decisions that deserve attention today, using KPI exceptions, infra health, calendar/travel context, DILESA risk, COAGAN recovery, and AI operations. It should reduce cognitive load rather than expand dashboards.",
+      "impact_score": 10,
+      "effort_score": 6,
+      "revenue_potential": "medium",
+      "status": "rise",
+      "mergedFrom": [
+        "Synthesizer: Operating Pulse",
+        "Analyst: Cross-Business Executive KPI Layer"
+      ],
+      "risks": [
+        "Bad upstream data could make the pulse confidently wrong",
+        "Scope creep could collapse it back into dashboard sprawl"
+      ],
+      "first_steps": [
+        "Define a small set of exception-driven signal types",
+        "Limit output to ranked actions with source and confidence",
+        "Start from current known pain points rather than aiming for completeness"
+      ]
+    },
+    {
+      "rank": 3,
+      "priority": "P1",
+      "title": "DILESA Clientes Split + 3-Layer ERP Completion",
+      "champion": [
+        "Strategist",
+        "Critic"
+      ],
+      "description": "Continue DILESA's ERP transformation, but through a staged, rollback-heavy migration centered on the Clientes split, Expediente extraction, and eventual 3-layer completion. Use practical access-pattern cuts rather than pursuing schema purity for its own sake.",
+      "impact_score": 9,
+      "effort_score": 8,
+      "revenue_potential": "high",
+      "status": "refined",
+      "mergedFrom": [
+        "Strategist: Finish DILESA's 3-Layer ERP Refactor",
+        "Critic: Kill the God Table Migration",
+        "Analyst: DILESA Operational Cleanup Scorecard"
+      ],
+      "risks": [
+        "High migration complexity and hidden dependencies",
+        "Solo-operator bandwidth",
+        "State-machine and button regressions"
+      ],
+      "first_steps": [
+        "Execute migration preparation plan",
+        "Start with Expediente as first low-risk cut",
+        "Stage Operaciones de Venta cutover with backups and audits",
+        "Delay deletion of legacy fields until all views and dependencies validate"
+      ]
+    },
+    {
+      "rank": 4,
+      "priority": "P1",
+      "title": "Solo-Operator Reliability Layer",
+      "champion": [
+        "Engineer",
+        "Critic",
+        "Synthesizer"
+      ],
+      "description": "Build the survivability stack for BSOP: release guardrails, operator scripts, degraded-mode runbooks, and a stress/load-management policy. The goal is not elegant infrastructure but dependable operation for a single human with AI support.",
+      "impact_score": 9,
+      "effort_score": 5,
+      "revenue_potential": "low",
+      "status": "rise-and-merge",
+      "mergedFrom": [
+        "Engineer: Solo-Developer Release Guardrail Pipeline",
+        "Engineer: Operator Scripts and Local Dev Commands",
+        "Critic: OpenClaw Fallback — BSOP Without OpenClaw",
+        "Critic: Health Circuit Breaker",
+        "Synthesizer: Cognitive Load Mode"
+      ],
+      "risks": [
+        "Can be postponed because revenue impact is indirect",
+        "Could become maintenance theater if overbuilt"
+      ],
+      "first_steps": [
+        "Create scripts/ops for key health and deploy checks",
+        "Document one critical degraded-mode fallback path",
+        "Add manual stress mode and define first load-shedding rules"
+      ]
+    },
+    {
+      "rank": 5,
+      "priority": "P1",
+      "title": "Trustworthy Metrics Layer for COAGAN and Cross-Business Review",
+      "champion": [
+        "Analyst",
+        "Synthesizer"
+      ],
+      "description": "Start with a COAGAN tree-loss and recovery model, then build a narrow KPI layer across businesses that supports weekly review, funding, and escalation decisions. Metrics should be trusted, sparse, and action-linked.",
+      "impact_score": 9,
+      "effort_score": 5,
+      "revenue_potential": "high",
+      "status": "rise-and-refine",
+      "mergedFrom": [
+        "Analyst: COAGAN Asset Loss and Recovery Dashboard",
+        "Analyst: Cross-Business Executive KPI Layer"
+      ],
+      "risks": [
+        "Can drift into passive reporting",
+        "Metric trust will collapse if definitions are inconsistent"
+      ],
+      "first_steps": [
+        "Model COAGAN losses and recovery scenarios by zone/block",
+        "Define 5-7 KPIs per business with owners and thresholds",
+        "Show trend plus exception plus next action only"
+      ]
+    }
+  ],
+  "debateHighlights": [
+    "Three separate ideas converged into one dominant thesis: canonical data truth must be explicit in both documentation and code before BSOP scales safely.",
+    "The council rejected a false choice between metrics and judgment: dashboards only survive if they feed an operating pulse that changes what Beto reviews or funds this week.",
+    "DILESA stayed strategically important, but the Critic successfully shifted the migration logic from 'finish the big refactor' to 'de-risk the god table through staged, access-pattern-aware cuts.'",
+    "Reliability work gained rank because several members independently identified the same bottleneck: the system is useful, but too dependent on a single operator and too exposed to platform fragility.",
+    "COAGAN's recovery model beat broader market-intelligence work because it directly informs asset protection, replanting, and future cash-flow expectations.",
+    "The Family Office OS idea survived as option value only; the council wants productizable architecture choices now, but no active commercialization until internal trust and continuity improve."
+  ],
+  "dissent": [
+    "Padel memberships and ANSA service upsell are still attractive commercial ideas, but the council judged them lower leverage than system foundations in the current moment.",
+    "Some members wanted health data to automatically throttle workstreams now; others argued that manual stress mode should come first to avoid brittle automation and false positives.",
+    "There remains real tension between architecturally pure DILESA normalization and pragmatic migration cuts optimized for access patterns and button safety.",
+    "A fuller internal event bus may become important later, but the council did not believe BSOP is ready to justify that complexity today."
+  ],
+  "actionItems": [
+    "Approve a unified canonical source initiative combining registry, treaty, adapters, and reconciliation logging.",
+    "Choose the first 3 BSOP routes and 10-20 entities that must declare canonical source explicitly.",
+    "Begin DILESA Clientes migration with the documented preparation phase and make Expediente extraction the first live cut.",
+    "Design the first Operating Pulse around exception signals only; cap output at a small ranked action list.",
+    "Build the COAGAN recovery dashboard before the broader executive KPI layer.",
+    "Create a minimum viable solo-operator reliability stack: scripts, pre/post deploy checks, one degraded-mode runbook, and manual stress mode.",
+    "Keep Family Office OS / Business Packs as an architectural option, but explicitly defer go-to-market execution.",
+    "Add a lightweight council-to-roadmap tracking loop so chosen ideas get status, owner, next experiment, and follow-up date."
+  ]
 }
