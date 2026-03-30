@@ -1,6 +1,7 @@
 import { Activity, BedDouble, Footprints, HeartPulse, MoonStar, Sparkles, Timer, Waves, Weight } from 'lucide-react';
+import { HealthRangeSelector } from '@/components/health-range-selector';
 import { SectionHeading, Shell, Surface } from '@/components/ui';
-import { formatDurationHours, formatMetricValue, getHealthDashboardData, type HealthMetricRow } from '@/lib/health';
+import { formatDurationHours, formatMetricValue, getHealthDashboardData, type HealthMetricRow, type HealthRangePreset } from '@/lib/health';
 
 const VITAL_CONFIG: Record<string, { label: string; unit?: string; digits?: number; icon: typeof HeartPulse }> = {
   'Resting Heart Rate': { label: 'Resting HR', unit: 'bpm', digits: 0, icon: HeartPulse },
@@ -28,13 +29,13 @@ function groupDailyAverage(rows: HealthMetricRow[]) {
   }));
 }
 
-function summarizeWindow(rows: HealthMetricRow[], endOffsetDays: number) {
+function summarizeWindow(rows: HealthMetricRow[], days: number, endOffsetDays: number) {
   const end = new Date();
   end.setHours(23, 59, 59, 999);
   end.setDate(end.getDate() - endOffsetDays);
 
   const start = new Date(end);
-  start.setDate(start.getDate() - 6);
+  start.setDate(start.getDate() - (days - 1));
   start.setHours(0, 0, 0, 0);
 
   const filtered = rows.filter((row) => {
@@ -47,7 +48,7 @@ function summarizeWindow(rows: HealthMetricRow[], endOffsetDays: number) {
   return total / filtered.length;
 }
 
-function DeltaPill({ current, previous }: { current: number | null; previous: number | null }) {
+function DeltaPill({ current, previous, comparisonLabel }: { current: number | null; previous: number | null; comparisonLabel: string }) {
   if (current == null || previous == null) {
     return <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/45">No comparison yet</span>;
   }
@@ -58,7 +59,7 @@ function DeltaPill({ current, previous }: { current: number | null; previous: nu
 
   return (
     <span className={`rounded-full border px-3 py-1 text-xs font-medium ${tone}`}>
-      {up ? '↑' : '↓'} {Math.abs(delta).toFixed(1)} vs prior week
+      {up ? '↑' : '↓'} {Math.abs(delta).toFixed(1)} vs {comparisonLabel}
     </span>
   );
 }
@@ -72,20 +73,44 @@ function EmptyState({ title, copy }: { title: string; copy: string }) {
   );
 }
 
-export default async function HealthPage() {
-  const { vitals, summaryMetrics, hrvDaily, restingHrDaily, weightDaily, workouts, errors } = await getHealthDashboardData();
+function resolveRangeParams(searchParams?: Record<string, string | string[] | undefined>) {
+  const rawRange = typeof searchParams?.range === 'string' ? searchParams.range : undefined;
+  const from = typeof searchParams?.from === 'string' ? searchParams.from : undefined;
+  const to = typeof searchParams?.to === 'string' ? searchParams.to : undefined;
+
+  if (from && to) {
+    return { preset: 'custom' as const, from, to };
+  }
+
+  const allowedPresets: HealthRangePreset[] = ['today', '7d', '30d', '90d'];
+  if (rawRange && allowedPresets.includes(rawRange as HealthRangePreset)) {
+    return { preset: rawRange as HealthRangePreset };
+  }
+
+  return { preset: '7d' as const };
+}
+
+export default async function HealthPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const requestedRange = resolveRangeParams(resolvedSearchParams);
+  const { vitals, summaryMetrics, restingHrDaily, weightDaily, workouts, errors, range } = await getHealthDashboardData(requestedRange);
   const latestVitals = new Map<string, HealthMetricRow>();
 
   vitals.forEach((row) => {
     if (!latestVitals.has(row.metric_name)) latestVitals.set(row.metric_name, row);
   });
 
-  const heartTrend = groupDailyAverage(restingHrDaily).slice(-7);
+  const heartTrend = groupDailyAverage(restingHrDaily).slice(-Math.min(range.trendDays, 30));
   const heartTrendMax = Math.max(...heartTrend.map((item) => item.value), 1);
-  const weightTrend = groupDailyAverage(weightDaily).slice(-30);
+  const weightTrend = groupDailyAverage(weightDaily).slice(-Math.min(Math.max(range.trendDays, 30), 90));
   const weightMin = Math.min(...weightTrend.map((item) => item.value), Number.POSITIVE_INFINITY);
   const weightMax = Math.max(...weightTrend.map((item) => item.value), 0);
   const weightRange = Number.isFinite(weightMin) && weightMax > weightMin ? weightMax - weightMin : 1;
+  const comparisonLabel = range.trendDays > 1 ? `prior ${range.trendDays}-day window` : 'previous day';
 
   const weeklySummary = [
     'Resting Heart Rate',
@@ -96,8 +121,8 @@ export default async function HealthPage() {
     const rows = summaryMetrics.filter((row) => row.metric_name === metric);
     return {
       metric,
-      current: summarizeWindow(rows, 0),
-      previous: summarizeWindow(rows, 7),
+      current: summarizeWindow(rows, range.trendDays, 0),
+      previous: range.trendDays > 1 ? summarizeWindow(rows, range.trendDays, range.trendDays) : null,
       unit: VITAL_CONFIG[metric]?.unit,
       digits: VITAL_CONFIG[metric]?.digits ?? 0,
       label: VITAL_CONFIG[metric]?.label ?? metric,
@@ -106,6 +131,10 @@ export default async function HealthPage() {
 
   return (
     <Shell>
+      <div className="mb-6">
+        <HealthRangeSelector initialPreset={range.preset} initialFrom={range.requestedFrom} initialTo={range.requestedTo} />
+      </div>
+
       <section className="relative overflow-hidden rounded-[2rem] border border-amber-300/15 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(255,255,255,0.02))] p-6 sm:p-8">
         <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.14),transparent_55%)]" />
         <div className="relative grid gap-8 xl:grid-cols-[1.15fr_0.85fr]">
@@ -119,7 +148,7 @@ export default async function HealthPage() {
               ['Live source', 'Supabase health tables'],
               ['Today status', vitals.length ? 'Data received' : 'No data yet'],
               ['Recent workouts', `${workouts.length} loaded`],
-              ['Trend windows', '7- and 30-day views'],
+              ['Trend window', range.trendLabel],
             ].map(([label, value]) => (
               <Surface key={String(label)} className="border-amber-300/15 bg-black/20 p-5">
                 <div className="text-xs uppercase tracking-[0.24em] text-white/35">{label}</div>
@@ -140,9 +169,9 @@ export default async function HealthPage() {
         <div className="mb-4 flex items-center justify-between gap-4">
           <div>
             <h2 className="text-xl font-semibold text-white">Today&apos;s vitals</h2>
-            <p className="mt-2 text-sm text-white/55">Latest readings for the six signals you&apos;ll probably care about first.</p>
+            <p className="mt-2 text-sm text-white/55">Latest readings for the six signals you&apos;ll probably care about first. Sleep stays empty for now because Health Auto Export does not send Sleep Analysis data.</p>
           </div>
-          <div className="rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-medium text-amber-200">Amber means attention, not panic</div>
+          <div className="rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-medium text-amber-200">Showing vitals from {range.vitalsLabel}</div>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {Object.entries(VITAL_CONFIG).map(([metricName, config]) => {
@@ -163,7 +192,7 @@ export default async function HealthPage() {
                   </div>
                   {config.unit ? <div className="pb-1 text-sm text-white/45">{config.unit}</div> : null}
                 </div>
-                <div className="mt-3 text-sm text-white/50">{row ? new Date(row.date).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Waiting for the first sync.'}</div>
+                <div className="mt-3 text-sm text-white/50">{row ? new Date(row.date).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : isSleep ? 'No Sleep Analysis arrives from the export app yet.' : 'Waiting for the first sync.'}</div>
               </Surface>
             );
           })}
@@ -185,22 +214,22 @@ export default async function HealthPage() {
                     <div key={item.date} className="flex h-full flex-col justify-end gap-3">
                       <div className="text-center text-xs text-white/45">{Math.round(item.value)}</div>
                       <div className="rounded-t-[1.5rem] bg-gradient-to-t from-amber-500 to-amber-300/90" style={{ height: `${height}%` }} />
-                      <div className="text-center text-xs text-white/35">{new Date(`${item.date}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                      <div className="text-center text-xs text-white/35">{new Date(`${item.date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
                     </div>
                   );
                 })}
               </div>
-              <p className="mt-4 text-sm text-white/55">Daily resting heart rate averages over the last 7 days.</p>
+              <p className="mt-4 text-sm text-white/55">Daily resting heart rate averages across {range.trendLabel.toLowerCase()}.</p>
             </div>
           ) : (
-            <EmptyState title="No heart trend yet" copy="As soon as resting heart rate data is ingested, the 7-day trend will render here." />
+            <EmptyState title="No heart trend yet" copy="As soon as resting heart rate data is ingested, the selected trend window will render here." />
           )}
         </Surface>
 
         <Surface className="p-6">
           <div className="mb-4 flex items-center gap-3 text-white">
             <Sparkles className="h-5 w-5 text-amber-300" />
-            <h2 className="text-lg font-semibold">Weekly summary</h2>
+            <h2 className="text-lg font-semibold">Summary window</h2>
           </div>
           <div className="space-y-4">
             {weeklySummary.map((item) => (
@@ -208,9 +237,9 @@ export default async function HealthPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div className="text-sm font-semibold text-white">{item.label}</div>
-                    <div className="mt-1 text-xs text-white/40">7-day average</div>
+                    <div className="mt-1 text-xs text-white/40">{range.trendDays}-day average</div>
                   </div>
-                  <DeltaPill current={item.current} previous={item.previous} />
+                  <DeltaPill current={item.current} previous={item.previous} comparisonLabel={comparisonLabel} />
                 </div>
                 <div className="mt-4 flex items-end gap-2">
                   <div className="text-2xl font-semibold text-white">{item.current == null ? '—' : formatMetricValue(item.current, item.digits)}</div>
@@ -297,7 +326,7 @@ export default async function HealthPage() {
               </div>
             </div>
           ) : (
-            <EmptyState title="No weight data yet" copy="If Body Mass is exported, a 30-day line trend will appear here automatically." />
+            <EmptyState title="No weight data yet" copy="If Body Mass is exported, a line trend will appear here automatically for the selected window." />
           )}
         </Surface>
       </section>

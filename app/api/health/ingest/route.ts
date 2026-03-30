@@ -1,8 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 
+const METRIC_NAME_NORMALIZE: Record<string, string> = {
+  resting_heart_rate: 'Resting Heart Rate',
+  heart_rate_variability: 'Heart Rate Variability',
+  blood_oxygen_saturation: 'Oxygen Saturation',
+  step_count: 'Step Count',
+  apple_exercise_time: 'Apple Exercise Time',
+  weight_body_mass: 'Body Mass',
+  heart_rate: 'Heart Rate',
+  active_energy: 'Active Energy',
+  basal_energy_burned: 'Basal Energy Burned',
+  walking_heart_rate_average: 'Walking Heart Rate Average',
+  respiratory_rate: 'Respiratory Rate',
+  vo2_max: 'VO2 Max',
+  body_fat_percentage: 'Body Fat Percentage',
+  body_mass_index: 'Body Mass Index',
+  flights_climbed: 'Flights Climbed',
+  walking_running_distance: 'Walking Running Distance',
+  walking_speed: 'Walking Speed',
+  walking_step_length: 'Walking Step Length',
+  walking_asymmetry_percentage: 'Walking Asymmetry Percentage',
+  walking_double_support_percentage: 'Walking Double Support Percentage',
+  stair_speed_up: 'Stair Speed Up',
+  stair_speed_down: 'Stair Speed Down',
+  cycling_distance: 'Cycling Distance',
+  environmental_audio_exposure: 'Environmental Audio Exposure',
+  headphone_audio_exposure: 'Headphone Audio Exposure',
+  apple_stand_hour: 'Apple Stand Hour',
+  apple_stand_time: 'Apple Stand Time',
+  apple_sleeping_wrist_temperature: 'Apple Sleeping Wrist Temperature',
+  time_in_daylight: 'Time In Daylight',
+  physical_effort: 'Physical Effort',
+  dietary_water: 'Dietary Water',
+  mindful_minutes: 'Mindful Minutes',
+  six_minute_walking_test_distance: 'Six Minute Walking Test Distance',
+  breathing_disturbances: 'Breathing Disturbances',
+  height: 'Height',
+  test: 'test',
+};
+
 const METRIC_FIELD_MAP: Record<string, string[]> = {
-  'Heart Rate': ['Avg'],
+  'Heart Rate': ['Avg', 'qty'],
   'Resting Heart Rate': ['qty'],
   'Heart Rate Variability': ['qty'],
   'Oxygen Saturation': ['qty'],
@@ -10,6 +49,35 @@ const METRIC_FIELD_MAP: Record<string, string[]> = {
   'Apple Exercise Time': ['qty'],
   'Body Mass': ['qty'],
   'Sleep Analysis': ['totalSleep', 'asleep', 'qty'],
+  'Active Energy': ['qty'],
+  'Basal Energy Burned': ['qty'],
+  'Walking Heart Rate Average': ['qty'],
+  'Respiratory Rate': ['qty'],
+  'VO2 Max': ['qty'],
+  'Body Fat Percentage': ['qty'],
+  'Body Mass Index': ['qty'],
+  'Flights Climbed': ['qty'],
+  'Walking Running Distance': ['qty'],
+  'Walking Speed': ['qty'],
+  'Walking Step Length': ['qty'],
+  'Walking Asymmetry Percentage': ['qty'],
+  'Walking Double Support Percentage': ['qty'],
+  'Stair Speed Up': ['qty'],
+  'Stair Speed Down': ['qty'],
+  'Cycling Distance': ['qty'],
+  'Environmental Audio Exposure': ['qty'],
+  'Headphone Audio Exposure': ['qty'],
+  'Apple Stand Hour': ['qty'],
+  'Apple Stand Time': ['qty'],
+  'Apple Sleeping Wrist Temperature': ['qty'],
+  'Time In Daylight': ['qty'],
+  'Physical Effort': ['qty'],
+  'Dietary Water': ['qty'],
+  'Mindful Minutes': ['qty'],
+  'Six Minute Walking Test Distance': ['qty'],
+  'Breathing Disturbances': ['qty'],
+  'Height': ['qty'],
+  test: ['qty'],
 };
 
 function unauthorized() {
@@ -48,12 +116,13 @@ function normalizeMetricRecords(metrics: unknown[]) {
 
     const entry = metricEntry as Record<string, unknown>;
     const metricName = typeof entry.name === 'string' ? entry.name : null;
+    const normalizedName = metricName ? (METRIC_NAME_NORMALIZE[metricName] ?? metricName) : null;
     const unit = typeof entry.units === 'string' ? entry.units : null;
     const source = typeof entry.source === 'string' ? entry.source : 'Health Auto Export';
     const data = Array.isArray(entry.data) ? entry.data : [];
-    const fields = metricName ? (METRIC_FIELD_MAP[metricName] ?? ['qty']) : ['qty'];
+    const fields = normalizedName ? (METRIC_FIELD_MAP[normalizedName] ?? (metricName ? METRIC_FIELD_MAP[metricName] : undefined) ?? ['qty']) : ['qty'];
 
-    if (!metricName) return;
+    if (!normalizedName) return;
 
     data.forEach((sample) => {
       if (!sample || typeof sample !== 'object') return;
@@ -66,7 +135,7 @@ function normalizeMetricRecords(metrics: unknown[]) {
       if (value == null) return;
 
       records.push({
-        metric_name: metricName,
+        metric_name: normalizedName,
         date,
         value,
         unit,
