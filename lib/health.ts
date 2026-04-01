@@ -39,8 +39,10 @@ export type HealthDateRange = {
 
 export type HealthDashboardRange = {
   vitalsFromIso: string;
+  vitalsToIso: string;
   vitalsLabel: string;
   trendFromIso: string;
+  trendToIso: string;
   trendLabel: string;
   trendDays: number;
   requestedFrom?: string;
@@ -55,8 +57,8 @@ const SUMMARY_METRIC_NAMES = [
   'Step Count',
   'Blood Pressure Systolic',
   'Blood Pressure Diastolic',
-  'Apple Exercise Time',
   'Sleep Analysis',
+  'Body Mass',
 ];
 
 export function formatMetricValue(value: number | null | undefined, digits = 0) {
@@ -94,13 +96,16 @@ function startOfDateIso(dateInput: string) {
 
 export function resolveHealthDashboardRange(input?: Partial<HealthDateRange>): HealthDashboardRange {
   const preset = input?.preset ?? '7d';
+  const nowIso = new Date().toISOString();
 
   if (preset === 'today') {
     return {
       preset,
       vitalsFromIso: startOfDayIso(0),
+      vitalsToIso: nowIso,
       vitalsLabel: 'Today',
       trendFromIso: startOfDayIso(0),
+      trendToIso: nowIso,
       trendLabel: 'Today',
       trendDays: 1,
     };
@@ -110,8 +115,10 @@ export function resolveHealthDashboardRange(input?: Partial<HealthDateRange>): H
     return {
       preset,
       vitalsFromIso: startOfDayIso(0),
+      vitalsToIso: nowIso,
       vitalsLabel: 'Today',
       trendFromIso: startOfDayIso(29),
+      trendToIso: nowIso,
       trendLabel: 'Last 30 Days',
       trendDays: 30,
     };
@@ -121,8 +128,10 @@ export function resolveHealthDashboardRange(input?: Partial<HealthDateRange>): H
     return {
       preset,
       vitalsFromIso: startOfDayIso(0),
+      vitalsToIso: nowIso,
       vitalsLabel: 'Today',
       trendFromIso: startOfDayIso(89),
+      trendToIso: nowIso,
       trendLabel: 'Last 90 Days',
       trendDays: 90,
     };
@@ -140,8 +149,10 @@ export function resolveHealthDashboardRange(input?: Partial<HealthDateRange>): H
       return {
         preset,
         vitalsFromIso: from,
+        vitalsToIso: to,
         vitalsLabel: label,
         trendFromIso: from,
+        trendToIso: to,
         trendLabel: label,
         trendDays,
         requestedFrom: input?.from,
@@ -153,8 +164,10 @@ export function resolveHealthDashboardRange(input?: Partial<HealthDateRange>): H
   return {
     preset: '7d',
     vitalsFromIso: startOfDayIso(0),
+    vitalsToIso: nowIso,
     vitalsLabel: 'Today',
     trendFromIso: startOfDayIso(6),
+    trendToIso: nowIso,
     trendLabel: 'Last 7 Days',
     trendDays: 7,
   };
@@ -174,13 +187,14 @@ export async function getHealthDashboardData(rangeInput?: Partial<HealthDateRang
       bpDiastolic: [] as HealthMetricRow[],
       restingHrDaily: [] as HealthMetricRow[],
       weightDaily: [] as HealthMetricRow[],
+      sleepDaily: [] as HealthMetricRow[],
       workouts: [] as HealthWorkoutRow[],
       errors: ['Supabase service role key is not configured.'],
       range,
     };
   }
 
-  const weightFromIso = range.preset === 'custom' ? range.trendFromIso : startOfDayIso(Math.min(Math.max(range.trendDays - 1, 29), 89));
+  const workoutsToIso = range.trendToIso;
 
   const [
     vitalsResult,
@@ -192,6 +206,7 @@ export async function getHealthDashboardData(rangeInput?: Partial<HealthDateRang
     bpDiastolicResult,
     restingHrResult,
     weightResult,
+    sleepResult,
     workoutsResult,
   ] = await Promise.all([
     supabase
@@ -199,6 +214,7 @@ export async function getHealthDashboardData(rangeInput?: Partial<HealthDateRang
       .select('id, metric_name, date, value, unit, source')
       .in('metric_name', SUMMARY_METRIC_NAMES)
       .gte('date', range.vitalsFromIso)
+      .lte('date', range.vitalsToIso)
       .order('date', { ascending: false })
       .returns<HealthMetricRow[]>(),
     supabase
@@ -206,6 +222,7 @@ export async function getHealthDashboardData(rangeInput?: Partial<HealthDateRang
       .select('id, metric_name, date, value, unit, source')
       .in('metric_name', SUMMARY_METRIC_NAMES)
       .gte('date', range.trendFromIso)
+      .lte('date', range.trendToIso)
       .order('date', { ascending: false })
       .returns<HealthMetricRow[]>(),
     supabase
@@ -213,6 +230,7 @@ export async function getHealthDashboardData(rangeInput?: Partial<HealthDateRang
       .select('id, metric_name, date, value, unit, source')
       .eq('metric_name', 'Heart Rate Variability')
       .gte('date', range.trendFromIso)
+      .lte('date', range.trendToIso)
       .order('date', { ascending: true })
       .returns<HealthMetricRow[]>(),
     supabase
@@ -220,6 +238,7 @@ export async function getHealthDashboardData(rangeInput?: Partial<HealthDateRang
       .select('id, metric_name, date, value, unit, source')
       .eq('metric_name', 'Oxygen Saturation')
       .gte('date', range.trendFromIso)
+      .lte('date', range.trendToIso)
       .order('date', { ascending: true })
       .returns<HealthMetricRow[]>(),
     supabase
@@ -227,6 +246,7 @@ export async function getHealthDashboardData(rangeInput?: Partial<HealthDateRang
       .select('id, metric_name, date, value, unit, source')
       .eq('metric_name', 'Step Count')
       .gte('date', range.trendFromIso)
+      .lte('date', range.trendToIso)
       .order('date', { ascending: true })
       .returns<HealthMetricRow[]>(),
     supabase
@@ -234,6 +254,7 @@ export async function getHealthDashboardData(rangeInput?: Partial<HealthDateRang
       .select('id, metric_name, date, value, unit, source')
       .eq('metric_name', 'Blood Pressure Systolic')
       .gte('date', range.trendFromIso)
+      .lte('date', range.trendToIso)
       .order('date', { ascending: true })
       .returns<HealthMetricRow[]>(),
     supabase
@@ -241,6 +262,7 @@ export async function getHealthDashboardData(rangeInput?: Partial<HealthDateRang
       .select('id, metric_name, date, value, unit, source')
       .eq('metric_name', 'Blood Pressure Diastolic')
       .gte('date', range.trendFromIso)
+      .lte('date', range.trendToIso)
       .order('date', { ascending: true })
       .returns<HealthMetricRow[]>(),
     supabase
@@ -248,25 +270,47 @@ export async function getHealthDashboardData(rangeInput?: Partial<HealthDateRang
       .select('id, metric_name, date, value, unit, source')
       .eq('metric_name', 'Resting Heart Rate')
       .gte('date', range.trendFromIso)
+      .lte('date', range.trendToIso)
       .order('date', { ascending: true })
       .returns<HealthMetricRow[]>(),
     supabase
       .from('health_metrics')
       .select('id, metric_name, date, value, unit, source')
       .eq('metric_name', 'Body Mass')
-      .gte('date', weightFromIso)
+      .gte('date', range.trendFromIso)
+      .lte('date', range.trendToIso)
+      .order('date', { ascending: true })
+      .returns<HealthMetricRow[]>(),
+    supabase
+      .from('health_metrics')
+      .select('id, metric_name, date, value, unit, source')
+      .eq('metric_name', 'Sleep Analysis')
+      .gte('date', range.trendFromIso)
+      .lte('date', range.trendToIso)
       .order('date', { ascending: true })
       .returns<HealthMetricRow[]>(),
     supabase
       .from('health_workouts')
       .select('id, name, start_time, end_time, duration_minutes, distance_km, energy_kcal, heart_rate_avg, heart_rate_max, source')
+      .gte('start_time', range.trendFromIso)
+      .lte('start_time', workoutsToIso)
       .order('start_time', { ascending: false })
-      .limit(5)
       .returns<HealthWorkoutRow[]>(),
   ]);
 
-  const errors = [vitalsResult, summaryResult, hrvResult, spo2Result, stepsResult, bpSystolicResult, bpDiastolicResult, restingHrResult, weightResult, workoutsResult]
-    .flatMap((result) => (result.error ? [result.error.message] : []));
+  const errors = [
+    vitalsResult,
+    summaryResult,
+    hrvResult,
+    spo2Result,
+    stepsResult,
+    bpSystolicResult,
+    bpDiastolicResult,
+    restingHrResult,
+    weightResult,
+    sleepResult,
+    workoutsResult,
+  ].flatMap((result) => (result.error ? [result.error.message] : []));
 
   return {
     vitals: vitalsResult.data ?? [],
@@ -278,6 +322,7 @@ export async function getHealthDashboardData(rangeInput?: Partial<HealthDateRang
     bpDiastolic: bpDiastolicResult.data ?? [],
     restingHrDaily: restingHrResult.data ?? [],
     weightDaily: weightResult.data ?? [],
+    sleepDaily: sleepResult.data ?? [],
     workouts: workoutsResult.data ?? [],
     errors,
     range,
