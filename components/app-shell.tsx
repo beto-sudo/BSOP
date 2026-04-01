@@ -11,9 +11,13 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   LogOut,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useTheme } from 'next-themes';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { useLocale, type Locale } from '@/lib/i18n';
 
 type NavChild = {
   label: string;
@@ -22,7 +26,7 @@ type NavChild = {
 
 type NavItem = {
   href: string;
-  label: string;
+  labelKey: string;
   icon: string;
   matchPaths?: string[];
   children?: NavChild[];
@@ -35,10 +39,10 @@ type AuthUser = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { href: '/', label: 'Overview', icon: '🏠' },
+  { href: '/', labelKey: 'nav.overview', icon: '🏠' },
   {
     href: '/businesses',
-    label: 'Businesses',
+    labelKey: 'nav.businesses',
     icon: '🏢',
     children: [
       { label: 'ANSA', href: '/businesses/ansa' },
@@ -49,7 +53,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     href: '/finance',
-    label: 'Finance',
+    labelKey: 'nav.finance',
     icon: '💰',
     children: [
       { label: 'Inversiones', href: '/finance/inversiones' },
@@ -60,7 +64,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     href: '/coda',
-    label: 'Coda Architect',
+    labelKey: 'nav.coda',
     icon: '📊',
     children: [
       { label: 'DILESA', href: '/coda/dilesa' },
@@ -72,7 +76,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     href: '/travel',
-    label: 'Travel',
+    labelKey: 'nav.travel',
     icon: '✈️',
     children: [
       { label: 'Viajes activos', href: '/travel/viajes-activos' },
@@ -82,7 +86,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     href: '/health',
-    label: 'Health',
+    labelKey: 'nav.health',
     icon: '❤️',
     children: [
       { label: 'Medicamentos', href: '/health/medicamentos' },
@@ -92,7 +96,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     href: '/ai/dashboard',
-    label: 'AI Operations',
+    labelKey: 'nav.ai_operations',
     icon: '🤖',
     matchPaths: ['/ai', '/usage', '/agents', '/rnd'],
     children: [
@@ -105,7 +109,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     href: '/documents',
-    label: 'Documents',
+    labelKey: 'nav.documents',
     icon: '📄',
     children: [
       { label: 'Legales', href: '/documents/legales' },
@@ -115,7 +119,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     href: '/family',
-    label: 'Family / SR Group',
+    labelKey: 'nav.family',
     icon: '👨‍👩‍👧',
     children: [
       { label: 'Patrimonio', href: '/family/patrimonio' },
@@ -125,7 +129,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     href: '/settings',
-    label: 'Settings',
+    labelKey: 'nav.settings',
     icon: '⚙️',
     children: [
       { label: 'Acceso', href: '/settings/acceso' },
@@ -148,8 +152,8 @@ function getActiveSection(pathname: string) {
   return NAV_ITEMS.find((item) => item.children && isItemActive(pathname, item))?.href ?? null;
 }
 
-function getSectionName(pathname: string) {
-  return NAV_ITEMS.find((item) => isItemActive(pathname, item))?.label ?? 'Overview';
+function getSectionLabelKey(pathname: string) {
+  return NAV_ITEMS.find((item) => isItemActive(pathname, item))?.labelKey ?? 'nav.overview';
 }
 
 const money = (value: number) =>
@@ -159,13 +163,6 @@ const money = (value: number) =>
     minimumFractionDigits: value < 1 ? 4 : 2,
     maximumFractionDigits: value < 1 ? 4 : 2,
   });
-
-function getGreeting(date: Date) {
-  const hour = date.getHours();
-  if (hour < 12) return 'Buenos días';
-  if (hour < 19) return 'Buenas tardes';
-  return 'Buenas noches';
-}
 
 function getInitials(name: string, email: string) {
   const source = name.trim() || email.trim();
@@ -177,6 +174,8 @@ function getInitials(name: string, email: string) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { t, locale, setLocale } = useLocale();
+  const { theme, setTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
@@ -277,16 +276,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setMenuOpen(false);
   }, [pathname]);
 
-  const sectionName = useMemo(() => getSectionName(pathname), [pathname]);
+  const sectionLabelKey = useMemo(() => getSectionLabelKey(pathname), [pathname]);
+  const sectionName = t(sectionLabelKey);
+
+  function getGreeting(date: Date) {
+    const hour = date.getHours();
+    if (hour < 12) return t('greeting.morning');
+    if (hour < 19) return t('greeting.afternoon');
+    return t('greeting.evening');
+  }
+
   const formattedDate = now
-    ? now.toLocaleString('en-US', {
+    ? now.toLocaleString(locale === 'es' ? 'es-MX' : 'en-US', {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
         hour: 'numeric',
         minute: '2-digit',
       })
-    : 'Loading time...';
+    : '…';
 
   const displayName = user?.name ?? 'Beto Santos';
   const displayEmail = user?.email ?? 'beto@anorte.com';
@@ -314,8 +322,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <button
         type="button"
         onClick={() => setMobileOpen((value) => !value)}
-        className="fixed left-4 top-4 z-50 inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel)] text-white shadow-lg transition hover:border-[var(--accent)] md:hidden"
-        aria-label="Toggle navigation"
+        className="fixed left-4 top-4 z-50 inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel)] dark:text-white text-[var(--text)] shadow-lg transition hover:border-[var(--accent)] md:hidden"
+        aria-label={t('header.toggle_nav')}
       >
         <Menu className="h-5 w-5" />
       </button>
@@ -323,7 +331,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {mobileOpen ? (
         <button
           type="button"
-          aria-label="Close navigation"
+          aria-label={t('header.close_nav')}
           className="fixed inset-0 z-30 bg-black/60 md:hidden"
           onClick={() => setMobileOpen(false)}
         />
@@ -340,7 +348,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link
             href="/"
             className={[
-              'flex min-w-0 items-center overflow-hidden rounded-2xl border border-white/10 bg-white/95 p-2 shadow-sm transition hover:border-white/20',
+              'flex min-w-0 items-center overflow-hidden rounded-2xl border border-[var(--border)] bg-white/95 p-2 shadow-sm transition hover:border-[var(--accent)]/40',
               collapsed ? 'justify-center' : 'w-full max-w-[148px]',
             ].join(' ')}
             aria-label="BSOP home"
@@ -360,8 +368,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             onClick={() => setCollapsed((value) => !value)}
-            className="hidden h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-white/5 text-white/70 transition hover:border-[var(--accent)] hover:text-white md:inline-flex"
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className="hidden h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--card)] dark:text-white/70 text-[var(--text)]/70 transition hover:border-[var(--accent)] dark:hover:text-white hover:text-[var(--text)] md:inline-flex"
+            aria-label={collapsed ? t('header.expand_sidebar') : t('header.collapse_sidebar')}
           >
             {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
           </button>
@@ -372,6 +380,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             const active = isItemActive(pathname, item);
             const hasChildren = Boolean(item.children?.length);
             const expanded = !collapsed && expandedSection === item.href;
+            const label = t(item.labelKey);
 
             return (
               <div key={item.href} className="group/item relative">
@@ -381,19 +390,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   className={[
                     'group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition',
                     active
-                      ? 'border border-[var(--accent)]/40 bg-[var(--accent)]/15 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
-                      : 'border border-transparent text-white/68 hover:border-[var(--border)] hover:bg-white/5 hover:text-white',
+                      ? 'border border-[var(--accent)]/40 bg-[var(--accent)]/15 dark:text-white text-[var(--text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
+                      : 'border border-transparent dark:text-white/68 text-[var(--text)]/68 hover:border-[var(--border)] hover:bg-[var(--card)] dark:hover:text-white hover:text-[var(--text)]',
                     collapsed ? 'justify-center px-2' : '',
                   ].join(' ')}
-                  title={collapsed ? item.label : undefined}
+                  title={collapsed ? label : undefined}
                 >
                   <span className="text-lg leading-none">{item.icon}</span>
-                  {!collapsed ? <span className="min-w-0 flex-1 truncate">{item.label}</span> : null}
+                  {!collapsed ? <span className="min-w-0 flex-1 truncate">{label}</span> : null}
                   {!collapsed && hasChildren ? (
                     expanded ? (
-                      <ChevronDown className="h-4 w-4 shrink-0 text-white/45 transition-transform duration-200" />
+                      <ChevronDown className="h-4 w-4 shrink-0 dark:text-white/45 text-[var(--text)]/45 transition-transform duration-200" />
                     ) : (
-                      <ChevronRight className="h-4 w-4 shrink-0 text-white/45 transition-transform duration-200" />
+                      <ChevronRight className="h-4 w-4 shrink-0 dark:text-white/45 text-[var(--text)]/45 transition-transform duration-200" />
                     )
                   ) : null}
                 </Link>
@@ -405,7 +414,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       expanded ? 'max-h-80 opacity-100' : 'max-h-0 opacity-0',
                     ].join(' ')}
                   >
-                    <div className="ml-7 mt-1 space-y-1 border-l border-white/8 pl-4 pb-1">
+                    <div className="ml-7 mt-1 space-y-1 border-l border-[var(--border)] pl-4 pb-1">
                       {item.children?.map((child) => {
                         const childActive = matchesPath(pathname, child.href);
                         return (
@@ -416,7 +425,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                               'block rounded-xl border-l-2 px-3 py-2 text-xs transition',
                               childActive
                                 ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
-                                : 'border-transparent text-white/48 hover:bg-white/5 hover:text-white/80',
+                                : 'border-transparent dark:text-white/48 text-[var(--text)]/55 hover:bg-[var(--card)] dark:hover:text-white/80 hover:text-[var(--text)]',
                             ].join(' ')}
                           >
                             {child.label}
@@ -429,8 +438,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
                 {collapsed && hasChildren ? (
                   <div className="pointer-events-none absolute left-full top-0 z-50 ml-2 hidden min-w-48 rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-2 opacity-0 shadow-2xl transition duration-200 group-hover/item:pointer-events-auto group-hover/item:block group-hover/item:opacity-100 md:block">
-                    <div className="px-2 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/40">
-                      {item.label}
+                    <div className="px-2 pb-2 text-xs font-semibold uppercase tracking-[0.16em] dark:text-white/40 text-[var(--text)]/40">
+                      {label}
                     </div>
                     <div className="space-y-1">
                       {item.children?.map((child) => {
@@ -443,7 +452,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                               'pointer-events-auto block rounded-xl border-l-2 px-3 py-2 text-xs transition',
                               childActive
                                 ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
-                                : 'border-transparent text-white/60 hover:bg-white/5 hover:text-white',
+                                : 'border-transparent dark:text-white/60 text-[var(--text)]/60 hover:bg-[var(--card)] dark:hover:text-white hover:text-[var(--text)]',
                             ].join(' ')}
                           >
                             {child.label}
@@ -458,8 +467,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="border-t border-[var(--border)] px-3 py-4 text-xs text-white/38">
-          {!collapsed ? 'Built with 🦞 by Claw & Beto' : '🦞'}
+        <div className="border-t border-[var(--border)] px-3 py-4 text-xs dark:text-white/38 text-[var(--text)]/50">
+          {!collapsed ? t('footer.built_by') : '🦞'}
         </div>
       </aside>
 
@@ -469,32 +478,57 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           collapsed ? 'md:pl-16' : 'md:pl-60',
         ].join(' ')}
       >
-        <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[rgba(15,17,23,0.88)] backdrop-blur-xl">
+        <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--panel)] backdrop-blur-xl">
           <div className="flex min-h-20 flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8 xl:flex-row xl:items-center xl:justify-between">
             <div className="pl-12 md:pl-0">
-              <div className="text-xs uppercase tracking-[0.24em] text-white/35">BSOP / {sectionName}</div>
-              <div className="mt-1 text-2xl font-semibold text-white">{sectionName}</div>
-              <div className="mt-1 text-sm text-white/48">{getGreeting(now ?? new Date())}, {displayName.split(' ')[0] ?? 'Beto'}</div>
+              <div className="text-xs uppercase tracking-[0.24em] dark:text-white/35 text-[var(--text)]/45">BSOP / {sectionName}</div>
+              <div className="mt-1 text-2xl font-semibold dark:text-white text-[var(--text)]">{sectionName}</div>
+              <div className="mt-1 text-sm dark:text-white/48 text-[var(--text)]/60">{getGreeting(now ?? new Date())}, {displayName.split(' ')[0] ?? 'Beto'}</div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 text-sm text-white/70">
+            <div className="flex flex-wrap items-center gap-3 text-sm dark:text-white/70 text-[var(--text)]/70">
               <InfoPill label="🕐" value={formattedDate} />
-              <InfoPill label="💰" value={costToday !== null ? `Today ${money(costToday)}` : 'Today …'} />
-              <InfoPill label="📅" value="No upcoming events" />
-              <div className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2">
+              <InfoPill label="💰" value={costToday !== null ? `${t('header.today')} ${money(costToday)}` : `${t('header.today')} …`} />
+              <InfoPill label="📅" value={t('header.no_events')} />
+              <div className="flex items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2">
+                {/* Theme toggle */}
+                <button
+                  type="button"
+                  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                  className="flex h-7 w-7 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--card)] dark:text-white/70 text-[var(--text)]/70 transition hover:border-[var(--accent)] dark:hover:text-white hover:text-[var(--text)]"
+                  aria-label={t('header.toggle_theme')}
+                >
+                  {theme === 'dark' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+                </button>
+
+                {/* Language toggle */}
+                <button
+                  type="button"
+                  onClick={() => setLocale(locale === 'es' ? 'en' : 'es')}
+                  className="flex h-7 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--card)] px-2 text-[10px] font-semibold dark:text-white/70 text-[var(--text)]/70 transition hover:border-[var(--accent)] dark:hover:text-white hover:text-[var(--text)]"
+                  aria-label={t('header.toggle_locale')}
+                >
+                  {locale === 'es' ? 'ES' : 'EN'}
+                  <span className="mx-1 dark:text-white/25 text-[var(--text)]/25">|</span>
+                  {locale === 'es' ? 'EN' : 'ES'}
+                </button>
+
+                {/* Notifications bell */}
                 <div className="relative">
-                  <Bell className="h-4 w-4 text-white/70" />
+                  <Bell className="h-4 w-4 dark:text-white/70 text-[var(--text)]/70" />
                   <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-semibold text-white">
                     0
                   </span>
                 </div>
+
+                {/* Account menu */}
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => setMenuOpen((value) => !value)}
-                    className="flex items-center gap-2 rounded-full bg-white/5 pl-1 pr-2 py-1 text-left transition hover:bg-white/10"
+                    className="flex items-center gap-2 rounded-full bg-[var(--card)] pl-1 pr-2 py-1 text-left transition dark:hover:bg-white/10 hover:bg-[var(--border)]"
                     aria-expanded={menuOpen}
-                    aria-label="Open account menu"
+                    aria-label={t('header.open_account')}
                   >
                     {user?.avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -506,31 +540,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         className="h-8 w-8 rounded-full object-cover"
                       />
                     ) : (
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)]/20 text-xs font-semibold text-white">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)]/20 text-xs font-semibold dark:text-white text-[var(--text)]">
                         {initials}
                       </div>
                     )}
                     <div className="hidden min-w-0 sm:block">
-                      <div className="max-w-40 truncate text-sm text-white/90">{displayName}</div>
-                      <div className="max-w-40 truncate text-xs text-white/45">{displayEmail}</div>
+                      <div className="max-w-40 truncate text-sm dark:text-white/90 text-[var(--text)]/90">{displayName}</div>
+                      <div className="max-w-40 truncate text-xs dark:text-white/45 text-[var(--text)]/55">{displayEmail}</div>
                     </div>
-                    <ChevronDown className="h-4 w-4 text-white/45" />
+                    <ChevronDown className="h-4 w-4 dark:text-white/45 text-[var(--text)]/45" />
                   </button>
 
                   {menuOpen ? (
-                    <div className="absolute right-0 top-[calc(100%+0.75rem)] z-30 min-w-56 overflow-hidden rounded-2xl border border-[var(--border)] bg-[#151925] p-2 shadow-2xl">
-                      <div className="border-b border-white/6 px-3 py-2">
-                        <div className="text-sm font-medium text-white">{displayName}</div>
-                        <div className="mt-1 text-xs text-white/45">{displayEmail}</div>
+                    <div className="absolute right-0 top-[calc(100%+0.75rem)] z-30 min-w-56 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] p-2 shadow-2xl">
+                      <div className="border-b border-[var(--border)] px-3 py-2">
+                        <div className="text-sm font-medium dark:text-white text-[var(--text)]">{displayName}</div>
+                        <div className="mt-1 text-xs dark:text-white/45 text-[var(--text)]/55">{displayEmail}</div>
                       </div>
                       <button
                         type="button"
                         onClick={handleSignOut}
                         disabled={signingOut}
-                        className="mt-2 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-white/78 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                        className="mt-2 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm dark:text-white/78 text-[var(--text)]/78 transition dark:hover:bg-white/5 hover:bg-[var(--border)] dark:hover:text-white hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <LogOut className="h-4 w-4" />
-                        {signingOut ? 'Signing out…' : 'Sign out'}
+                        {signingOut ? t('header.signing_out') : t('header.sign_out')}
                       </button>
                     </div>
                   ) : null}
@@ -550,7 +584,7 @@ function InfoPill({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2">
       <span>{label}</span>
-      <span className="text-white/85">{value}</span>
+      <span className="dark:text-white/85 text-[var(--text)]/85">{value}</span>
     </div>
   );
 }
