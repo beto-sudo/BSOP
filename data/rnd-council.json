@@ -276,12 +276,295 @@
         "recommendationConfidence": 8.4,
         "debateIntensity": 7.8
       }
+    },
+    {
+      "id": "rnd-2026-03-23",
+      "date": "2026-03-23",
+      "title": "R&D Council Session",
+      "status": "complete",
+      "runStarted": "2026-03-23T20:00:00Z",
+      "summary": "The first council session landed on a disciplined operating thesis: BSOP should become a live operating spine, not just a polished static hub, but only through staged execution. The highest-confidence first move is a live telemetry pipeline for AI Operations because it is bounded, already useful, and reusable across future modules. In parallel, the most urgent business integrity issue is RDB order deduplication and Coda table hygiene, while DILESA should be treated as the first formal modernization program rather than an ad hoc cleanup effort.",
+      "ideas": [
+        {
+          "id": "idea-1",
+          "title": "Convert BSOP from showcase to live operating spine",
+          "summary": "Move BSOP from static credibility to operational trust by making the AI layer live first, then reusing that pattern elsewhere.",
+          "proposedBy": "strategist",
+          "impact": 10,
+          "effort": 6,
+          "votes": {
+            "strategist": 10,
+            "engineer": 9,
+            "analyst": 9,
+            "critic": 8,
+            "synthesizer": 9
+          }
+        },
+        {
+          "id": "idea-2",
+          "title": "Build the RDB ops core around Waitry instead of replacing the whole POS",
+          "summary": "Preserve what already works and build defensible control around it.",
+          "proposedBy": "strategist",
+          "impact": 9,
+          "effort": 5,
+          "votes": {
+            "strategist": 9,
+            "engineer": 10,
+            "analyst": 10,
+            "critic": 9,
+            "synthesizer": 9
+          }
+        },
+        {
+          "id": "idea-3",
+          "title": "Treat DILESA as the flagship modernization program",
+          "summary": "Sequence a serious modernization effort where the payoff is biggest.",
+          "proposedBy": "strategist",
+          "impact": 9,
+          "effort": 8,
+          "votes": {
+            "strategist": 10,
+            "engineer": 7,
+            "analyst": 9,
+            "critic": 7,
+            "synthesizer": 8
+          }
+        },
+        {
+          "id": "idea-4",
+          "title": "Ship a normalized telemetry pipeline for OpenClaw → BSOP",
+          "summary": "Build the live telemetry pipeline for AI Operations because it is bounded, already useful, and reusable across future modules.",
+          "proposedBy": "engineer",
+          "impact": 10,
+          "effort": 6,
+          "votes": {
+            "strategist": 9,
+            "engineer": 10,
+            "analyst": 9,
+            "critic": 8,
+            "synthesizer": 9
+          }
+        },
+        {
+          "id": "idea-5",
+          "title": "Install a deterministic dedupe and archiving layer for RDB orders",
+          "summary": "Create the deduplication layer for the 95 suspicious duplicate pairs found across 1,127 orders.",
+          "proposedBy": "engineer",
+          "impact": 9,
+          "effort": 5,
+          "votes": {
+            "strategist": 8,
+            "engineer": 10,
+            "analyst": 10,
+            "critic": 9,
+            "synthesizer": 9
+          }
+        },
+        {
+          "id": "idea-6",
+          "title": "Create an executive scoreboard across ANSA, DILESA, COAGAN, and RDB",
+          "summary": "Build a unified executive view across all four businesses with the metrics that matter most.",
+          "proposedBy": "analyst",
+          "impact": 9,
+          "effort": 6,
+          "votes": {
+            "strategist": 10,
+            "engineer": 8,
+            "analyst": 10,
+            "critic": 8,
+            "synthesizer": 9
+          }
+        },
+        {
+          "id": "idea-7",
+          "title": "Do not launch three migrations at once",
+          "summary": "Protect execution capacity by sequencing big moves instead of parallelizing them.",
+          "proposedBy": "critic",
+          "impact": 9,
+          "effort": 2,
+          "votes": {
+            "strategist": 8,
+            "engineer": 9,
+            "analyst": 9,
+            "critic": 10,
+            "synthesizer": 9
+          }
+        },
+        {
+          "id": "idea-8",
+          "title": "Use Supabase surgically, not as an excuse to rebuild everything",
+          "summary": "Treat Supabase as a selective substrate, not a default answer to every problem.",
+          "proposedBy": "critic",
+          "impact": 8,
+          "effort": 3,
+          "votes": {
+            "strategist": 8,
+            "engineer": 9,
+            "analyst": 8,
+            "critic": 10,
+            "synthesizer": 9
+          }
+        },
+        {
+          "id": "idea-9",
+          "title": "Make BSOP the wrapper, Coda the workflow UI, and Supabase the selective data spine",
+          "summary": "Define the architectural contract: BSOP wraps, Coda orchestrates workflows, Supabase holds selective data.",
+          "proposedBy": "synthesizer",
+          "impact": 10,
+          "effort": 5,
+          "votes": {
+            "strategist": 10,
+            "engineer": 9,
+            "analyst": 9,
+            "critic": 9,
+            "synthesizer": 10
+          }
+        },
+        {
+          "id": "idea-10",
+          "title": "Institute a weekly council-driven operating review",
+          "summary": "Convert council output into a recurring management rhythm and cross-business visibility practice.",
+          "proposedBy": "synthesizer",
+          "impact": 8,
+          "effort": 3,
+          "votes": {
+            "strategist": 9,
+            "engineer": 8,
+            "analyst": 9,
+            "critic": 7,
+            "synthesizer": 9
+          }
+        }
+      ],
+      "debate": [
+        {
+          "round": 1,
+          "topic": "BSOP as live spine vs static hub",
+          "highlights": [
+            {
+              "speaker": "strategist",
+              "message": "BSOP needs to move from static credibility to operational trust. The AI layer should be live first, then that pattern replicates elsewhere."
+            },
+            {
+              "speaker": "engineer",
+              "message": "AI Operations telemetry is the best first proving ground: raw data exists, scope is bounded, and it's reusable across future modules."
+            },
+            {
+              "speaker": "critic",
+              "message": "The Strategist pushed for a big transformation; I pushed back on multi-front migration and founder overload during an active PED deal window."
+            },
+            {
+              "speaker": "analyst",
+              "message": "RDB is already measurable and painful: 95 suspicious duplicate pairs across 1,127 orders. That should get attention now."
+            },
+            {
+              "speaker": "synthesizer",
+              "message": "Architecture crystallized: BSOP = wrapper, Coda = workflow UI, Supabase = selective data spine."
+            }
+          ]
+        },
+        {
+          "round": 2,
+          "topic": "Sequencing and resource protection",
+          "highlights": [
+            {
+              "speaker": "critic",
+              "message": "Travel sharing is strategically interesting but not urgent. Do not let it distract from operating leverage plays."
+            },
+            {
+              "speaker": "engineer",
+              "message": "DILESA architecture work should accelerate; the Critic argued for slowing it into a formal P1 program instead."
+            },
+            {
+              "speaker": "analyst",
+              "message": "Hard quantification of pain points before bigger bets. But the Strategist is right that some architectural moves are justified even before perfect measurement."
+            },
+            {
+              "speaker": "strategist",
+              "message": "Shared trip links as first external-facing BSOP product is promising, but follows more urgent operating leverage plays."
+            }
+          ]
+        }
+      ],
+      "recommendations": [
+        {
+          "id": "rec-1",
+          "title": "Build the OpenClaw → BSOP live telemetry spine first",
+          "priority": "P0",
+          "implementationStatus": "next-up",
+          "owner": "Engineer",
+          "rationale": "Lowest-risk live-data proving ground; immediate trust upgrade for BSOP AI Operations. Impact 10, effort 6, council support 9.6.",
+          "actionItems": [
+            "Define normalized schema",
+            "Build scheduled sync",
+            "Add freshness/source labels to BSOP pages"
+          ]
+        },
+        {
+          "id": "rec-2",
+          "title": "Harden RDB with duplicate detection, canonical orders, and archive policy",
+          "priority": "P0",
+          "implementationStatus": "planning",
+          "owner": "Analyst",
+          "rationale": "Real quantified issue affecting daily operations; avoids premature POS rebuild. Impact 9, effort 5, council support 9.0.",
+          "actionItems": [
+            "Formalize duplicate rules",
+            "Create canonical-order layer",
+            "Archive heavy raw tables on a schedule"
+          ]
+        },
+        {
+          "id": "rec-3",
+          "title": "Launch DILESA as the first formal modernization program",
+          "priority": "P1",
+          "implementationStatus": "planning",
+          "owner": "Strategist",
+          "rationale": "Highest long-term leverage across Coda-heavy systems. Impact 9, effort 8, council support 8.4.",
+          "actionItems": [
+            "Rank god tables/workflows by business criticality",
+            "Define stay/archive/sync tiers",
+            "Begin with land → anteproyectos → proyectos flow"
+          ]
+        },
+        {
+          "id": "rec-4",
+          "title": "Create a weekly executive scoreboard across the four businesses",
+          "priority": "P1",
+          "implementationStatus": "monitoring",
+          "owner": "Synthesizer",
+          "rationale": "Converts council output into management rhythm and cross-business visibility. Impact 9, effort 6, council support 8.8.",
+          "actionItems": [
+            "Pick 5–8 KPIs total",
+            "Assign source + owner + freshness mode",
+            "Publish v1 even if partially manual"
+          ]
+        },
+        {
+          "id": "rec-5",
+          "title": "Use shared trip links and expense settlement as BSOP's first outside-user surface",
+          "priority": "P2",
+          "implementationStatus": "monitoring",
+          "owner": "Strategist",
+          "rationale": "Best low-risk collaborative use case, but not the most urgent operational leverage. Impact 7, effort 4, council support 7.2.",
+          "actionItems": [
+            "Finish trip detail polish and mobile validation",
+            "Add balances/category/FX transparency",
+            "Use Taos as the real-world test case"
+          ]
+        }
+      ],
+      "scores": {
+        "averageImpact": 9.0,
+        "averageEffort": 4.9,
+        "recommendationConfidence": 8.7,
+        "debateIntensity": 7.5
+      }
     }
   ],
   "stats": {
-    "totalSessions": 1,
-    "totalIdeas": 5,
+    "totalSessions": 2,
+    "totalIdeas": 15,
     "implementedIdeas": 0,
-    "avgScore": 9.4
+    "avgScore": 9.2
   }
 }
