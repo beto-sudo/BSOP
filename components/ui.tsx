@@ -18,8 +18,8 @@ export function SectionHeading({
   return (
     <div className="mb-8 max-w-3xl">
       <div className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-[var(--accent-soft)]">{eyebrow}</div>
-      <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">{title}</h1>
-      <p className="mt-3 text-sm leading-7 text-white/60 sm:text-base">{copy}</p>
+      <h1 className="text-3xl font-semibold tracking-tight text-[var(--text)] sm:text-4xl">{title}</h1>
+      <p className="mt-3 text-sm leading-7 text-[var(--muted)] sm:text-base">{copy}</p>
     </div>
   );
 }
@@ -54,12 +54,12 @@ export function PlaceholderSection({
           Under Construction
         </div>
         <div className="mt-6 flex items-start gap-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-3xl border border-[var(--border)] bg-white/5 text-3xl">
+          <div className="flex h-16 w-16 items-center justify-center rounded-3xl border border-[var(--border)] bg-[var(--card)] text-3xl">
             {icon}
           </div>
           <div>
-            <h1 className="text-3xl font-semibold text-white sm:text-4xl">{title}</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-white/60 sm:text-base">{description}</p>
+            <h1 className="text-3xl font-semibold text-[var(--text)] sm:text-4xl">{title}</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted)] sm:text-base">{description}</p>
           </div>
         </div>
       </Surface>
