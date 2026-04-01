@@ -48,6 +48,363 @@
   },
   "memos": [
     {
+      "id": "rnd-2026-04-01",
+      "date": "2026-04-01",
+      "generatedAt": "2026-04-01T23:08:12Z",
+      "title": "R&D Council Session",
+      "status": "complete-with-failure",
+      "runStarted": "2026-04-01T23:08:12Z",
+      "summary": "Session #3 concluded that the main bottleneck is now execution, not ideation. Since Session #2, BSOP gained meaningful new infrastructure — live health telemetry, the R&D dashboard, and Coda MCP — but the prior P0s still did not start. The council therefore narrowed toward shippable operating layers: a minimum Operating Pulse, a compressed metric registry as the Canonical Source Treaty, an MCP-assisted DILESA Clientes pilot, a COAGAN recovery scorecard, and immediate reliability fixes around offline RDB cameras and permissive Supabase RLS.",
+      "context": {
+        "sessionNumber": 3,
+        "priorSessionDate": "2026-03-29",
+        "executionGap": "Session #2 identified Canonical Source Treaty and Operating Pulse as P0s, but neither was started before Session #3.",
+        "updatedContext": [
+          "BSOP health dashboard v2 deployed",
+          "R&D Council dashboard deployed",
+          "Live usage telemetry available",
+          "Coda MCP connected with 27 tools",
+          "Health pipeline fully operational with 50,516 metrics",
+          "DILESA migration still not started",
+          "COAGAN recovery metrics still absent",
+          "RDB has 16 offline cameras",
+          "ANSA still lacks comparable live data pipeline",
+          "Beto is on family trip in Breckenridge with reduced bandwidth"
+        ]
+      },
+      "members": [
+        {
+          "id": "strategist",
+          "name": "The Strategist",
+          "status": "complete",
+          "mainPoints": [
+            "Operating Pulse is the P0 of P0s",
+            "Start DILESA Clientes migration in Q2",
+            "COAGAN recovery dashboard is urgent",
+            "Fix RDB's 16 offline cameras",
+            "Map ANSA data flows before ANSA intelligence"
+          ]
+        },
+        {
+          "id": "engineer",
+          "name": "The Engineer",
+          "status": "complete",
+          "mainPoints": [
+            "Canonical data access layer plus source registry remains top technical drag",
+            "Operating Pulse should include system health and drift",
+            "Supabase RLS hardening is now a real liability",
+            "Use Coda MCP for migration factory artifacts",
+            "Solo-operator reliability needs explicit guardrails"
+          ]
+        },
+        {
+          "id": "analyst",
+          "name": "The Analyst",
+          "status": "complete",
+          "mainPoints": [
+            "Weekly Operating Pulse with tightly bounded KPIs",
+            "Canonical Source Treaty as metric map",
+            "DILESA burn-down with throughput math",
+            "COAGAN recovery scorecard",
+            "Reliability Cost Index"
+          ]
+        },
+        {
+          "id": "critic",
+          "name": "The Critic",
+          "status": "failed",
+          "failureReason": "timeout",
+          "mainPoints": []
+        },
+        {
+          "id": "synthesizer",
+          "name": "The Synthesizer",
+          "status": "complete",
+          "mainPoints": [
+            "Turn Coda MCP into DILESA migration factory pilot",
+            "Minimum Operating Pulse around 5 signals",
+            "Health-aware workload routing",
+            "R&D Council dashboard as execution ledger",
+            "Start Source Treaty with top 20 metric registry"
+          ]
+        }
+      ],
+      "failures": [
+        {
+          "member": "critic",
+          "type": "timeout",
+          "impact": "downside testing and edge-case pressure were reduced; scope was kept conservative to compensate"
+        }
+      ],
+      "round1": {
+        "name": "Cross-critique",
+        "summary": "Round 1 found strong convergence around three themes: Operating Pulse, source-of-truth compression, and DILESA migration readiness. The main critique was that Session #2 already surfaced the right strategic shape, so repeating broad priorities would miss the actual issue: nothing converted into live execution. The strongest ideas were those that narrowed scope and attached themselves to already-shipped infrastructure; the weakest were the ones that still depended on broad architecture programs or absent data sources.",
+        "clusters": [
+          {
+            "theme": "Operating layer and decision compression",
+            "members": [
+              "strategist",
+              "analyst",
+              "synthesizer",
+              "engineer"
+            ],
+            "notes": "All four members supported some version of Operating Pulse; differences were about breadth, cadence, and data prerequisites."
+          },
+          {
+            "theme": "Trust layer / canonical source",
+            "members": [
+              "engineer",
+              "analyst",
+              "synthesizer"
+            ],
+            "notes": "Consensus that trust is prerequisite, but challenge that a full canonical layer risks stalling again unless compressed into a metric registry."
+          },
+          {
+            "theme": "DILESA execution",
+            "members": [
+              "strategist",
+              "engineer",
+              "synthesizer",
+              "analyst"
+            ],
+            "notes": "Support for moving DILESA forward, but modification toward one MCP-assisted pilot instead of a broad Q2 migration push."
+          },
+          {
+            "theme": "Reliability and visible liabilities",
+            "members": [
+              "engineer",
+              "strategist",
+              "analyst"
+            ],
+            "notes": "RDB cameras, stale data, failed automations, and permissive RLS were seen as real risk, though the full reliability layer was judged too broad for immediate focus."
+          }
+        ],
+        "strongestIdeas": [
+          "Minimum Operating Pulse using already-live signals",
+          "Metric registry as practical Canonical Source Treaty",
+          "MCP-assisted DILESA Clientes pilot"
+        ],
+        "weakestIdeas": [
+          "Broad ANSA intelligence before data-flow mapping",
+          "Fully automated health-based workload routing right now",
+          "Large all-at-once reliability program this week"
+        ]
+      },
+      "round2": {
+        "name": "Resolution",
+        "summary": "Round 2 resolved the main disagreements by collapsing parallel ideas into smaller execution packages. The Operating Pulse rose to the top, but only as a minimum version. Canonical architecture work survived by shrinking into a top-20 KPI registry tied directly to Pulse cards. DILESA stayed high priority, but the council merged migration urgency with bandwidth caution by recommending a single MCP-assisted Clientes pilot. Reliability was split into immediate fixes now and a broader survivability layer later.",
+        "rises": [
+          "Operating Pulse v1",
+          "Metric Registry / Canonical Source Treaty",
+          "COAGAN Recovery Scorecard"
+        ],
+        "merges": [
+          {
+            "into": "Minimum Operating Pulse v1",
+            "from": [
+              "Strategist Operating Pulse",
+              "Analyst weekly 12 metrics",
+              "Synthesizer 5-signal pulse",
+              "Engineer system health console"
+            ]
+          },
+          {
+            "into": "Metric Registry / Canonical Source Treaty",
+            "from": [
+              "Engineer source registry",
+              "Analyst metric map",
+              "Synthesizer top-20 metric registry"
+            ]
+          },
+          {
+            "into": "DILESA Clientes Migration Factory Pilot",
+            "from": [
+              "Strategist Q2 migration push",
+              "Engineer migration factory",
+              "Synthesizer MCP-assisted pilot"
+            ]
+          }
+        ],
+        "drops": [
+          "ANSA build priority before instrumentation exists",
+          "Automatic health-aware workload routing as a top-5 item",
+          "Large generic reliability layer as this week's main deliverable"
+        ],
+        "dissentToKeep": [
+          "Analyst's broader 12-metric Pulse may be more useful later once the minimum version earns trust.",
+          "Strategist's ANSA urgency remains valid and should resurface once data flows are mapped.",
+          "Engineer's broader reliability layer still matters after the immediate liabilities are closed."
+        ]
+      },
+      "recommendations": [
+        {
+          "id": "rec-1",
+          "rank": 1,
+          "title": "Launch the Minimum Operating Pulse v1",
+          "priority": "P0",
+          "champion": "Strategist + Analyst + Synthesizer",
+          "description": "Ship a narrow decision layer with 5-12 signals and 3-7 ranked actions, using already-live telemetry and known operating exceptions instead of waiting for complete coverage.",
+          "impact_score": 10,
+          "effort_score": 4,
+          "revenue_potential": "medium",
+          "implementationStatus": "next-up",
+          "risks": [
+            "Scope creep back into dashboard sprawl",
+            "Trust loss if source metadata is weak"
+          ],
+          "firstSteps": [
+            "Define 5 signal cards",
+            "Cap output at ranked actions only",
+            "Attach source/confidence badges",
+            "Run weekly before daily"
+          ],
+          "sourceIdeas": [
+            "Operating Pulse is the P0 of P0s",
+            "Weekly Operating Pulse with 12 metrics only",
+            "Minimum Operating Pulse around 5 signals",
+            "Operating Pulse as unified system health console"
+          ]
+        },
+        {
+          "id": "rec-2",
+          "rank": 2,
+          "title": "Start the Metric Registry / Canonical Source Treaty on 20 KPIs",
+          "priority": "P0",
+          "champion": "Engineer + Analyst + Synthesizer",
+          "description": "Compress source-of-truth work into a practical registry for the top 20 KPIs and first live entities so the Operating Pulse has an explicit trust layer.",
+          "impact_score": 10,
+          "effort_score": 5,
+          "revenue_potential": "medium",
+          "implementationStatus": "next-up",
+          "risks": [
+            "Documentation theater",
+            "Too many entities too early"
+          ],
+          "firstSteps": [
+            "Define first 20 KPIs",
+            "Create registry fields for source, owner, cadence, confidence",
+            "Start with Health, Usage, and DILESA Clientes",
+            "Link Pulse cards back to registry entries"
+          ],
+          "sourceIdeas": [
+            "Canonical Data Access Layer + Source Registry",
+            "Canonical Source Treaty as metric map",
+            "Start Source Treaty with Metric Registry"
+          ]
+        },
+        {
+          "id": "rec-3",
+          "rank": 3,
+          "title": "Turn Coda MCP into a DILESA Clientes Migration Factory Pilot",
+          "priority": "P1",
+          "champion": "Synthesizer + Engineer",
+          "description": "Use the newly connected Coda MCP to auto-generate migration artifacts for one bounded Clientes slice, turning DILESA progress into a visible pilot instead of a broad migration promise.",
+          "impact_score": 9,
+          "effort_score": 6,
+          "revenue_potential": "high",
+          "implementationStatus": "planning",
+          "risks": [
+            "Pilot artifacts disconnected from real cutover",
+            "Permission/protection issues slowing edits",
+            "Over-scoping into whole-ERP migration"
+          ],
+          "firstSteps": [
+            "Choose one bounded Clientes slice",
+            "Generate source-target mapping with MCP",
+            "Score parity and blockers",
+            "Delay first cut until readiness is visible"
+          ],
+          "sourceIdeas": [
+            "Start DILESA Clientes migration in Q2",
+            "Coda Migration Factory with MCP-Assisted Schema/Mapping",
+            "Turn Coda MCP into DILESA Migration Factory"
+          ]
+        },
+        {
+          "id": "rec-4",
+          "rank": 4,
+          "title": "Build the COAGAN Recovery Scorecard",
+          "priority": "P1",
+          "champion": "Strategist + Analyst",
+          "description": "Create the first live recovery model for the 5K lost walnut trees so recovery pace, irrigation coverage, cost, and yield impact become visible and reviewable weekly.",
+          "impact_score": 9,
+          "effort_score": 4,
+          "revenue_potential": "high",
+          "implementationStatus": "planning",
+          "risks": [
+            "Manual data collection drift",
+            "Dashboard without field update discipline"
+          ],
+          "firstSteps": [
+            "Define zone/lote baseline",
+            "Track lost, recovered, and planned trees",
+            "Add irrigation, cost, and yield impact",
+            "Feed one exception into Pulse"
+          ],
+          "sourceIdeas": [
+            "COAGAN recovery dashboard",
+            "COAGAN recovery scorecard"
+          ]
+        },
+        {
+          "id": "rec-5",
+          "rank": 5,
+          "title": "Close Immediate Reliability Gaps: RDB Cameras + Supabase RLS",
+          "priority": "P1",
+          "champion": "Engineer + Strategist",
+          "description": "Treat the 16 offline RDB cameras and permissive Supabase RLS policies as immediate reliability liabilities that should be fixed before a broader survivability layer is designed.",
+          "impact_score": 8,
+          "effort_score": 3,
+          "revenue_potential": "low",
+          "implementationStatus": "next-up",
+          "risks": [
+            "Deferred as maintenance noise",
+            "RLS changes may break existing assumptions"
+          ],
+          "firstSteps": [
+            "Inventory offline cameras with owner and ETA",
+            "Audit public-read tables",
+            "Patch highest-risk exposure first"
+          ],
+          "sourceIdeas": [
+            "Fix RDB's 16 offline cameras",
+            "Supabase RLS Hardening Sprint",
+            "Solo-Operator Reliability Layer"
+          ]
+        }
+      ],
+      "debateHighlights": [
+        "Execution gap from Session #2 to Session #3 became the central finding.",
+        "Operating Pulse remained the top idea, but only in a narrower shippable form.",
+        "Canonical work survived by compressing into a metric registry tied to live signals.",
+        "DILESA priority stayed high because MCP creates a new execution path, but scope was reduced to one pilot.",
+        "COAGAN outranked ANSA for immediate build priority because it has a bounded, asset-protection use case.",
+        "Reliability split into immediate liabilities now versus systemic layer later.",
+        "Critic timeout reduced adversarial pressure, so scoping was intentionally conservative."
+      ],
+      "dissent": [
+        "The Pulse may eventually need Analyst's 12-metric format, not just the Synthesizer's 5-signal minimum.",
+        "ANSA remains strategically under-instrumented and should likely rise once data mapping exists.",
+        "Health-aware workload routing is promising, but not yet trusted enough for automation.",
+        "The missing Critic means untested downside cases may still exist around security and migration scope."
+      ],
+      "actionItems": [
+        "Approve Minimum Operating Pulse v1 with strict scope limits.",
+        "Approve the top-20 KPI metric registry as the practical Canonical Source Treaty.",
+        "Select one DILESA Clientes pilot slice for MCP-assisted migration artifacts.",
+        "Request COAGAN recovery baseline by zone/lote.",
+        "Request RDB camera incident list with owner and ETA.",
+        "Run targeted Supabase RLS hardening on exposed public-read tables.",
+        "Use health/operator energy as a prioritization input before any automatic throttling."
+      ],
+      "scores": {
+        "averageImpact": 9.2,
+        "averageEffort": 4.4,
+        "recommendationConfidence": 8.5,
+        "debateIntensity": 7.3
+      }
+    },
+    {
       "id": "rnd-2026-03-29",
       "date": "2026-03-29",
       "title": "R&D Council Session",
@@ -562,7 +919,7 @@
     }
   ],
   "stats": {
-    "totalSessions": 2,
+    "totalSessions": 3,
     "totalIdeas": 15,
     "implementedIdeas": 0,
     "avgScore": 9.2
