@@ -34,6 +34,9 @@ export default function RndCouncilPage() {
 
   const selectedMemo = councilData.memos.find((m) => m.id === selectedMemoId) ?? councilData.memos[0];
   const isLatest = selectedMemoId === councilData.memos[0].id;
+  const selectedIdeas = selectedMemo.ideas ?? [];
+  const selectedDebate = selectedMemo.debate ?? [];
+  const selectedRecommendations = selectedMemo.recommendations ?? [];
 
   const lastRun = new Date(selectedMemo.runStarted).toLocaleString(locale === 'es' ? 'es-MX' : 'en-US', {
     month: 'short',
@@ -126,11 +129,11 @@ export default function RndCouncilPage() {
                   <div className="mt-5 grid gap-3 sm:grid-cols-2">
                     <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg)]/10 px-4 py-3">
                       <div className="text-xs uppercase tracking-[0.2em] text-[var(--text)]/35">{t('rnd.archive.ideas')}</div>
-                      <div className="mt-2 text-sm font-medium text-[var(--text)]/80">{t('rnd.archive.proposals', { count: memo.ideas.length })}</div>
+                      <div className="mt-2 text-sm font-medium text-[var(--text)]/80">{t('rnd.archive.proposals', { count: memo.ideas?.length ?? 0 })}</div>
                     </div>
                     <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg)]/10 px-4 py-3">
                       <div className="text-xs uppercase tracking-[0.2em] text-[var(--text)]/35">{t('rnd.archive.recommendations')}</div>
-                      <div className="mt-2 text-sm font-medium text-[var(--text)]/80">{t('rnd.archive.ranked', { count: memo.recommendations.length })}</div>
+                      <div className="mt-2 text-sm font-medium text-[var(--text)]/80">{t('rnd.archive.ranked', { count: memo.recommendations?.length ?? 0 })}</div>
                     </div>
                   </div>
                 </Surface>
@@ -188,7 +191,7 @@ export default function RndCouncilPage() {
             <section className="mt-8">
               <h4 className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--text)]/45">{t('rnd.memo.ideas_section')}</h4>
               <div className="mt-4 space-y-4">
-                {selectedMemo.ideas.map((idea) => {
+                {selectedIdeas.map((idea) => {
                   const proposer = councilById[idea.proposedBy];
                   return (
                     <div key={idea.id} className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-5">
@@ -221,7 +224,7 @@ export default function RndCouncilPage() {
             <section className="mt-8">
               <h4 className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--text)]/45">{t('rnd.memo.debate_section')}</h4>
               <div className="mt-4 space-y-4">
-                {selectedMemo.debate.map((round) => (
+                {selectedDebate.map((round) => (
                   <div key={round.round} className="rounded-3xl border border-[var(--border)] bg-[var(--bg)]/10 p-5">
                     <div className="text-xs uppercase tracking-[0.2em] text-[var(--text)]/35">{t('rnd.memo.round', { n: round.round, topic: round.topic })}</div>
                     <div className="mt-4 space-y-3">
@@ -240,27 +243,33 @@ export default function RndCouncilPage() {
             <section className="mt-8">
               <h4 className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--text)]/45">{t('rnd.memo.recs_section')}</h4>
               <div className="mt-4 space-y-4">
-                {selectedMemo.recommendations.map((recommendation, index) => (
-                  <div key={recommendation.id} className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-5">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <div className="text-sm text-[var(--text)]/45">{t('rnd.memo.rec_n', { n: index + 1 })}</div>
-                        <h5 className="mt-2 text-lg font-semibold text-[var(--text)]">{recommendation.title}</h5>
+                {selectedRecommendations.map((recommendation, index) => {
+                  const recommendationSummary = 'rationale' in recommendation ? recommendation.rationale : recommendation.description;
+                  const recommendationOwner = 'owner' in recommendation ? recommendation.owner : recommendation.champion;
+                  const recommendationActions = 'actionItems' in recommendation ? recommendation.actionItems : recommendation.firstSteps;
+
+                  return (
+                    <div key={recommendation.id} className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-5">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm text-[var(--text)]/45">{t('rnd.memo.rec_n', { n: index + 1 })}</div>
+                          <h5 className="mt-2 text-lg font-semibold text-[var(--text)]">{recommendation.title}</h5>
+                        </div>
+                        <span className={`rounded-full border px-3 py-1 text-xs font-medium ${priorityTone[recommendation.priority] ?? priorityTone.P2}`}>{recommendation.priority}</span>
                       </div>
-                      <span className={`rounded-full border px-3 py-1 text-xs font-medium ${priorityTone[recommendation.priority] ?? priorityTone.P2}`}>{recommendation.priority}</span>
+                      <p className="mt-3 text-sm leading-7 text-[var(--muted)]">{recommendationSummary}</p>
+                      <div className="mt-4 text-sm text-[var(--text)]/75">{t('rnd.memo.owner')} <span className="text-[var(--text)]">{recommendationOwner}</span></div>
+                      <ul className="mt-4 space-y-2 text-sm text-[var(--muted)]">
+                        {recommendationActions.map((item) => (
+                          <li key={item} className="flex gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg)]/10 px-4 py-3">
+                            <span className="text-amber-300">•</span>
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
-                    <p className="mt-3 text-sm leading-7 text-[var(--muted)]">{recommendation.rationale}</p>
-                    <div className="mt-4 text-sm text-[var(--text)]/75">{t('rnd.memo.owner')} <span className="text-[var(--text)]">{recommendation.owner}</span></div>
-                    <ul className="mt-4 space-y-2 text-sm text-[var(--muted)]">
-                      {recommendation.actionItems.map((item) => (
-                        <li key={item} className="flex gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg)]/10 px-4 py-3">
-                          <span className="text-amber-300">•</span>
-                          <span>{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
           </Surface>

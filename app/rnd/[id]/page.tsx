@@ -50,6 +50,10 @@ export default function RndMemoDetailPage() {
     hour: 'numeric',
     minute: '2-digit',
   });
+  const ideas = memo.ideas ?? [];
+  const recommendations = memo.recommendations ?? [];
+  const debate = memo.debate ?? [];
+  const scores = memo.scores ?? {};
 
   return (
     <Shell>
@@ -73,8 +77,8 @@ export default function RndMemoDetailPage() {
           {([
             [t('rnd.detail.stat.last_run'), lastRun],
             [t('rnd.detail.stat.next_run'), councilData.config.schedule],
-            [t('rnd.detail.stat.ideas'), t('rnd.detail.stat.ideas_val', { count: memo.ideas.length })],
-            [t('rnd.detail.stat.recs'), t('rnd.detail.stat.recs_val', { count: memo.recommendations.length })],
+            [t('rnd.detail.stat.ideas'), t('rnd.detail.stat.ideas_val', { count: ideas.length })],
+            [t('rnd.detail.stat.recs'), t('rnd.detail.stat.recs_val', { count: recommendations.length })],
           ] as [string, string][]).map(([label, value]) => (
             <Surface key={label} className="p-5">
               <div className="text-xs uppercase tracking-[0.22em] text-[var(--text)]/35">{label}</div>
@@ -89,7 +93,7 @@ export default function RndMemoDetailPage() {
           <h2 className="text-xl font-semibold text-[var(--text)]">{t('rnd.detail.ideas_title')}</h2>
           <p className="mt-2 text-sm text-[var(--muted)]">{t('rnd.detail.ideas_desc')}</p>
           <div className="mt-6 space-y-4">
-            {memo.ideas.map((idea) => {
+            {ideas.map((idea) => {
               const proposer = councilById[idea.proposedBy];
               return (
                 <div key={idea.id} className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-5">
@@ -136,7 +140,7 @@ export default function RndMemoDetailPage() {
                   <div key={`y-${impact}`} className="flex items-center text-[var(--text)]/35">{t('rnd.detail.impact_label', { n: impact })}</div>
                   {Array.from({ length: 10 }, (_, colIndex) => {
                     const effort = colIndex + 1;
-                    const match = memo.ideas.find((idea) => idea.impact === impact && idea.effort === effort);
+                    const match = ideas.find((idea) => idea.impact === impact && idea.effort === effort);
                     return (
                       <div key={`${impact}-${effort}`} className="flex aspect-square items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--bg)]/10 p-1 text-center">
                         {match ? (
@@ -154,7 +158,7 @@ export default function RndMemoDetailPage() {
           <div className="mt-4 text-right text-xs uppercase tracking-[0.2em] text-[var(--text)]/35">{t('rnd.detail.effort_arrow')}</div>
 
           <div className="mt-8 grid gap-3 sm:grid-cols-2">
-            {Object.entries(memo.scores).map(([label, value]) => (
+            {Object.entries(scores).map(([label, value]) => (
               <div key={label} className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-4">
                 <div className="text-xs uppercase tracking-[0.2em] text-[var(--text)]/35">{label.replace(/([A-Z])/g, ' $1').trim()}</div>
                 <div className="mt-2 text-2xl font-semibold text-[var(--text)]">{Number(value).toFixed(1)}</div>
@@ -169,7 +173,7 @@ export default function RndMemoDetailPage() {
           <h2 className="text-xl font-semibold text-[var(--text)]">{t('rnd.detail.debate_title')}</h2>
           <p className="mt-2 text-sm text-[var(--muted)]">{t('rnd.detail.debate_desc')}</p>
           <div className="mt-6 space-y-4">
-            {memo.debate.map((round, index) => (
+            {debate.map((round, index) => (
               <details key={round.round} className="group rounded-3xl border border-[var(--border)] bg-[var(--card)] p-5" open={index === 0}>
                 <summary className="cursor-pointer list-none">
                   <div className="flex items-center justify-between gap-4">
@@ -197,30 +201,36 @@ export default function RndMemoDetailPage() {
           <h2 className="text-xl font-semibold text-[var(--text)]">{t('rnd.detail.recs_title')}</h2>
           <p className="mt-2 text-sm text-[var(--muted)]">{t('rnd.detail.recs_desc')}</p>
           <div className="mt-6 space-y-4">
-            {memo.recommendations.map((recommendation, index) => (
-              <div key={recommendation.id} className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="text-sm text-[var(--text)]/45">{t('rnd.detail.rec_n', { n: index + 1 })}</div>
-                    <h3 className="mt-2 text-lg font-semibold text-[var(--text)]">{recommendation.title}</h3>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <span className={`rounded-full border px-3 py-1 text-xs font-medium ${priorityTone[recommendation.priority] ?? priorityTone.P2}`}>{recommendation.priority}</span>
-                    <span className={`rounded-full border px-3 py-1 text-xs font-medium ${statusTone[recommendation.implementationStatus] ?? statusTone.monitoring}`}>{recommendation.implementationStatus}</span>
-                  </div>
-                </div>
-                <p className="mt-3 text-sm leading-7 text-[var(--muted)]">{recommendation.rationale}</p>
-                <div className="mt-4 text-sm text-[var(--text)]/75">{t('rnd.detail.owner')} <span className="text-[var(--text)]">{recommendation.owner}</span></div>
-                <div className="mt-5 space-y-2">
-                  {recommendation.actionItems.map((item, itemIndex) => (
-                    <div key={item} className="flex items-start gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg)]/10 px-4 py-3 text-sm text-[var(--muted)]">
-                      <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full border border-amber-300/20 bg-amber-300/10 text-[11px] font-medium text-amber-200">{itemIndex + 1}</span>
-                      <span>{item}</span>
+            {recommendations.map((recommendation, index) => {
+              const recommendationSummary = 'rationale' in recommendation ? recommendation.rationale : recommendation.description;
+              const recommendationOwner = 'owner' in recommendation ? recommendation.owner : recommendation.champion;
+              const recommendationActions = 'actionItems' in recommendation ? recommendation.actionItems : recommendation.firstSteps;
+
+              return (
+                <div key={recommendation.id} className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm text-[var(--text)]/45">{t('rnd.detail.rec_n', { n: index + 1 })}</div>
+                      <h3 className="mt-2 text-lg font-semibold text-[var(--text)]">{recommendation.title}</h3>
                     </div>
-                  ))}
+                    <div className="flex flex-wrap gap-2">
+                      <span className={`rounded-full border px-3 py-1 text-xs font-medium ${priorityTone[recommendation.priority] ?? priorityTone.P2}`}>{recommendation.priority}</span>
+                      <span className={`rounded-full border px-3 py-1 text-xs font-medium ${statusTone[recommendation.implementationStatus] ?? statusTone.monitoring}`}>{recommendation.implementationStatus}</span>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-sm leading-7 text-[var(--muted)]">{recommendationSummary}</p>
+                  <div className="mt-4 text-sm text-[var(--text)]/75">{t('rnd.detail.owner')} <span className="text-[var(--text)]">{recommendationOwner}</span></div>
+                  <div className="mt-5 space-y-2">
+                    {recommendationActions.map((item, itemIndex) => (
+                      <div key={item} className="flex items-start gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg)]/10 px-4 py-3 text-sm text-[var(--muted)]">
+                        <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full border border-amber-300/20 bg-amber-300/10 text-[11px] font-medium text-amber-200">{itemIndex + 1}</span>
+                        <span>{item}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </Surface>
       </section>
