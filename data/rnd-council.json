@@ -48,6 +48,323 @@
   },
   "memos": [
     {
+      "id": "rnd-2026-04-05",
+      "date": "2026-04-05",
+      "generatedAt": "2026-04-06T04:12:58Z",
+      "title": "R&D Council Session",
+      "status": "complete",
+      "runStarted": "2026-04-06T04:12:58Z",
+      "summary": "Session #4 concluded that RDB is now the highest-leverage live systems priority because the Supabase-vs-Coda audit moved the issue from theory to proof: Coda is both computationally brittle and financially lossy. The council converged on five perspectives and two debate rounds around a common thesis: cross the RDB trust threshold first, use it as the canonical backend pilot for the broader architecture, and treat workspace discipline as execution infrastructure rather than housekeeping. The week should therefore focus on Caja V2, duplicate-policy resolution, bounded Coda bridge design, and lightweight enforcement of workspace rules, while deferring broader BSOP breadth.",
+      "context": {
+        "sessionNumber": 4,
+        "priorSessionDate": "2026-04-01",
+        "keyShift": "RDB moved from suspected pain point to proven source-of-truth break, with Supabase established as the reliable ingestion layer and Coda demoted to frontend role.",
+        "updatedContext": [
+          "RDB Supabase schema and mathematical views created and executed successfully",
+          "Critical Waitry inbound trigger bug fixed; missed payments recovered",
+          "Coda full-table Filter formulas identified as freeze root cause in Cortes de Caja",
+          "Comparative audit across Cortes 350-395 confirms material data loss in Coda",
+          "Caja V2 page created in Coda but V2 tables must be created manually due to platform limits",
+          "Workspace discipline rules hardened in AGENTS, cron payloads, and HEARTBEAT",
+          "Derived daily files were still generated, proving enforcement gap remains",
+          "19 loose root artifacts moved into project folder, improving workspace hygiene",
+          "BSOP remains active, but breadth work should pause until RDB trust threshold is crossed"
+        ]
+      },
+      "members": [
+        {
+          "id": "architecture",
+          "name": "OpenClaw / Architecture",
+          "status": "complete",
+          "mainPoints": [
+            "RDB should become the canonical backend pilot for the full operating stack",
+            "Workspace rules need enforcement, not more prose",
+            "Source registry should begin with live exception zones",
+            "Shadow-mode comparators should become a reusable migration pattern"
+          ]
+        },
+        {
+          "id": "business-ops",
+          "name": "Business / Ops",
+          "status": "complete",
+          "mainPoints": [
+            "Caja V2 should dominate the week",
+            "RDB discrepancy should be framed as trust and leakage recovery",
+            "Broader BSOP breadth should be deferred",
+            "The council output should become a weekly execution scoreboard"
+          ]
+        },
+        {
+          "id": "personal-health",
+          "name": "Personal / Health",
+          "status": "complete",
+          "mainPoints": [
+            "Narrow the week to three critical moves only",
+            "Use health/workload as a throttle input rather than decoration",
+            "Reduce cognitive friction in the workspace",
+            "Maintain an explicit do-not-start list"
+          ]
+        },
+        {
+          "id": "data-intelligence",
+          "name": "Data / Intelligence",
+          "status": "complete",
+          "mainPoints": [
+            "Publish the RDB trust delta explicitly",
+            "Resolve duplicate policy before declaring parity",
+            "Start the source registry with high-trust conflict zones only",
+            "Define migration readiness metrics"
+          ]
+        },
+        {
+          "id": "travel-rdb",
+          "name": "Travel / RDB",
+          "status": "complete",
+          "mainPoints": [
+            "Keep Coda as cockpit but not as backend",
+            "Use aggregated views plus 30-day windows as the practical bridge",
+            "RDB should become the template for remote-friendly supervision",
+            "Travel-feature breadth should wait until the RDB crossing is complete"
+          ]
+        }
+      ],
+      "failures": [],
+      "round1": {
+        "name": "Cross-critique",
+        "summary": "Round 1 produced strong convergence around four themes: RDB as the first canonical backend pilot, duplicate-policy resolution as the gating trust milestone, bounded Coda bridge design via aggregated views and 30-day windows, and workspace-discipline enforcement as execution infrastructure. The strongest critiques rejected broad BSOP expansion, premature parity claims, and any attempt to push full heavy history back into Coda.",
+        "clusters": [
+          {
+            "theme": "RDB trust crossing",
+            "members": [
+              "architecture",
+              "business-ops",
+              "data-intelligence",
+              "travel-rdb"
+            ],
+            "notes": "All four treated RDB as the week's dominant systems priority."
+          },
+          {
+            "theme": "Execution concentration",
+            "members": [
+              "business-ops",
+              "personal-health",
+              "architecture"
+            ],
+            "notes": "The week should be narrowed deliberately to avoid diffusion."
+          },
+          {
+            "theme": "Hybrid frontend/backend operating model",
+            "members": [
+              "architecture",
+              "travel-rdb",
+              "data-intelligence"
+            ],
+            "notes": "Consensus that Coda should remain the cockpit while Supabase owns truth and computation."
+          },
+          {
+            "theme": "Workspace discipline as leverage",
+            "members": [
+              "architecture",
+              "business-ops",
+              "personal-health"
+            ],
+            "notes": "Process reliability now directly affects technical delivery quality."
+          }
+        ],
+        "strongestIdeas": [
+          "Cross the RDB trust threshold with Caja V2",
+          "Resolve duplicate policy and rerun parity",
+          "Turn workspace discipline into enforceable guardrails",
+          "Use bounded sync windows and aggregated views for the Coda bridge"
+        ],
+        "weakestIdeas": [
+          "Broad BSOP breadth work this week",
+          "Health-aware workload logic as a major standalone project right now",
+          "Full historical sync into Coda as the near-term answer"
+        ]
+      },
+      "round2": {
+        "name": "Resolution",
+        "summary": "Round 2 resolved the remaining disagreement by sequencing rather than flattening. RDB stayed P0, but the council narrowed the required crossing point to a usable Supabase-backed Caja V2 rather than a perfect total migration. Workspace guardrails survived because they directly protect execution on the live migration, while broader registry and dashboard ideas were retained only insofar as they support the RDB trust transition and weekly review rhythm.",
+        "rises": [
+          "Caja V2 trust crossing",
+          "Duplicate-policy resolution and rerun of parity",
+          "Workspace enforcement guardrails",
+          "Weekly migration-control ledger"
+        ],
+        "merges": [
+          {
+            "into": "RDB migration-control stream",
+            "from": [
+              "Trust delta reporting",
+              "Parity and duplicate review",
+              "Migration readiness metrics",
+              "Weekly execution scoreboard"
+            ]
+          },
+          {
+            "into": "Hybrid RDB bridge",
+            "from": [
+              "Coda as cockpit only",
+              "Aggregated cortes views",
+              "30-day sync windows",
+              "Manual V2 table creation in Coda"
+            ]
+          }
+        ],
+        "drops": [
+          "Broad BSOP feature expansion this week",
+          "Large health automation work",
+          "Full-history Coda sync ambition"
+        ],
+        "dissentToKeep": [
+          "Some Coda>manual discrepancies may reflect manual adjustments and should remain explicitly classified as uncertain until explained.",
+          "DILESA is strategically important and should rise again once RDB stabilizes.",
+          "Workspace enforcement must stay lightweight or it will become its own distraction."
+        ]
+      },
+      "recommendations": [
+        {
+          "id": "rec-1",
+          "rank": 1,
+          "title": "Cross the RDB trust threshold with Caja V2",
+          "priority": "P0",
+          "champion": "Business / Ops",
+          "description": "Finish the minimum path that lets Beto review a Supabase-backed caja result through a practical Coda V2 frontend. The goal is trustworthy daily use, not perfect migration completeness.",
+          "impact_score": 10,
+          "effort_score": 5,
+          "revenue_potential": "high",
+          "implementationStatus": "next-up",
+          "risks": [
+            "Over-scoping into historical completeness",
+            "UI bridge blocked by Coda constraints",
+            "Trust loss if parity is claimed early"
+          ],
+          "firstSteps": [
+            "Create the four V2 tables manually in Coda",
+            "Build Supabase views for aggregated cortes and 30-day windows",
+            "Connect the bounded Pack/sync bridge",
+            "Validate one full daily cut through the new path"
+          ]
+        },
+        {
+          "id": "rec-2",
+          "rank": 2,
+          "title": "Resolve duplicate policy and rerun parity on the RDB comparatives",
+          "priority": "P0",
+          "champion": "Data / Intelligence",
+          "description": "Classify pending duplicate candidates and rerun the Corte 395 and 350-395 comparison with an explained discrepancy model before declaring trust.",
+          "impact_score": 10,
+          "effort_score": 4,
+          "revenue_potential": "medium",
+          "implementationStatus": "next-up",
+          "risks": [
+            "Premature confidence",
+            "Residual ambiguous orders",
+            "Manual adjustments being misread as bugs"
+          ],
+          "firstSteps": [
+            "Review duplicate candidates for Corte 395 and worst-delta days",
+            "Tag each delta as duplicate, Coda omission, or unexplained/manual",
+            "Regenerate the discrepancy report",
+            "Freeze the working duplicate policy"
+          ]
+        },
+        {
+          "id": "rec-3",
+          "rank": 3,
+          "title": "Turn workspace discipline into enforceable guardrails",
+          "priority": "P0",
+          "champion": "OpenClaw / Architecture",
+          "description": "Add lightweight enforcement so daily-note hygiene, root cleanliness, and cron/subagent behavior become reliable defaults rather than best-effort compliance.",
+          "impact_score": 9,
+          "effort_score": 4,
+          "revenue_potential": "none",
+          "implementationStatus": "planning",
+          "risks": [
+            "Meta-work delaying real delivery",
+            "Overengineering the guardrails"
+          ],
+          "firstSteps": [
+            "Detect same-day derived daily files",
+            "Add root-artifact linting/reporting",
+            "Surface violations in heartbeat/cron summaries",
+            "Keep the first version lightweight"
+          ]
+        },
+        {
+          "id": "rec-4",
+          "rank": 4,
+          "title": "Create a weekly migration-control ledger in BSOP/R&D outputs",
+          "priority": "P1",
+          "champion": "Business / Ops + Data / Intelligence",
+          "description": "Make the council output double as an execution ledger tracking each active migration or system bet by milestone, trust status, blocker, and next action.",
+          "impact_score": 8,
+          "effort_score": 3,
+          "revenue_potential": "medium",
+          "implementationStatus": "planning",
+          "risks": [
+            "Becoming another passive dashboard",
+            "Weak review cadence"
+          ],
+          "firstSteps": [
+            "Track RDB, workspace discipline, DILESA prep, and one reliability item",
+            "Add status, blocker, next milestone, and owner fields",
+            "Review weekly from the council artifact itself"
+          ]
+        },
+        {
+          "id": "rec-5",
+          "rank": 5,
+          "title": "Freeze broad BSOP feature expansion until the RDB crossing is complete",
+          "priority": "P1",
+          "champion": "Personal / Health + Travel / RDB",
+          "description": "Put a temporary brake on attractive breadth work in Travel and placeholder BSOP sections so the week's real leverage is not diluted.",
+          "impact_score": 8,
+          "effort_score": 1,
+          "revenue_potential": "low",
+          "implementationStatus": "next-up",
+          "risks": [
+            "Short-term frustration from deferring interesting work",
+            "May feel conservative"
+          ],
+          "firstSteps": [
+            "Define a one-week do-not-start list",
+            "Explicitly defer non-critical Travel and placeholder-section work",
+            "Reopen breadth only after the Caja V2 trust milestone is reached"
+          ]
+        }
+      ],
+      "debateHighlights": [
+        "RDB is no longer just a migration candidate; it is the first system with enough forensic evidence to justify a decisive backend shift.",
+        "Supabase is already the truth layer; Coda has simply not been demoted yet.",
+        "Workspace discipline matters strategically because process drift degrades high-stakes technical execution.",
+        "Aggregated views plus 30-day windows beat full-history sync as the practical Coda bridge.",
+        "The council rejected broad BSOP breadth, health automation, and side-feature expansion until the RDB crossing point is complete."
+      ],
+      "dissent": [
+        "Some days where Coda exceeds Supabase may reflect real manual adjustments and should remain classified as uncertain until explained.",
+        "DILESA should return quickly after RDB stabilizes; current deferral is sequencing, not demotion.",
+        "Health-aware workload control should remain advisory rather than autonomous for now.",
+        "Workspace enforcement must stay lightweight or it will become its own distraction."
+      ],
+      "actionItems": [
+        "Approve RDB as the dominant systems priority for the week.",
+        "Resolve duplicate-policy cases for Corte 395 and worst-delta days.",
+        "Create the Caja V2 tables manually in Coda so the bridge can proceed.",
+        "Approve the bounded bridge design: aggregated cortes plus 30-day windows only.",
+        "Treat workspace-discipline enforcement as delivery quality, not housekeeping.",
+        "Maintain a short do-not-start list until the RDB trust threshold is crossed.",
+        "Use the next council session as an execution review rather than a wide ideation pass."
+      ],
+      "scores": {
+        "averageImpact": 9.0,
+        "averageEffort": 3.4,
+        "recommendationConfidence": 9.0,
+        "debateIntensity": 8.0
+      }
+    },
+    {
       "id": "rnd-2026-04-01",
       "date": "2026-04-01",
       "generatedAt": "2026-04-01T23:08:12Z",
@@ -919,8 +1236,8 @@
     }
   ],
   "stats": {
-    "totalSessions": 3,
-    "totalIdeas": 15,
+    "totalSessions": 4,
+    "totalIdeas": 20,
     "implementedIdeas": 0,
     "avgScore": 9.2
   }
