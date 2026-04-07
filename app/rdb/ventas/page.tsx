@@ -322,7 +322,7 @@ export default function VentasPage() {
       const [itemsRes, pagosRes] = await Promise.all([
         supabase
           .schema('waitry')
-          .from('productos_pedido')
+          .from('productos')
           .select('*')
           .eq('pedido_id', pedido.id)
           .limit(50),
