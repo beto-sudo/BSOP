@@ -58,9 +58,9 @@ function SidebarLogo() {
   return (
     <div className="flex h-16 items-center border-b px-4">
       <Link href="/" className="flex items-center gap-2">
-        <Image src="/logo-bs.png" alt="BSOP" width={32} height={32} className="h-8 w-8 object-contain" />
+        <Image src="/logos/rdb.jpg" alt="RDB" width={32} height={32} className="h-8 w-8 object-contain rounded-md" />
         <div>
-          <div className="text-sm font-semibold leading-none">BSOP</div>
+          <div className="text-sm font-semibold leading-none">Rincón del Bosque</div>
           <div className="text-xs text-muted-foreground">RDB Operations</div>
         </div>
       </Link>
