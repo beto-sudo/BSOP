@@ -70,7 +70,8 @@ const TZ = 'America/Matamoros';
 
 function formatDate(ts: string | null) {
   if (!ts) return '—';
-  return new Date(ts).toLocaleString('es-MX', {
+  const dateObj = new Date(ts.endsWith("Z") || ts.includes("+") ? ts : ts + "Z");
+  return dateObj.toLocaleString('es-MX', {
     timeZone: TZ,
     dateStyle: 'short',
     timeStyle: 'short',
@@ -324,13 +325,13 @@ export default function VentasPage() {
           .schema('waitry')
           .from('productos')
           .select('*')
-          .eq('order_id', pedido.id)
+          .eq('order_id', pedido.order_id)
           .limit(50),
         supabase
           .schema('waitry')
           .from('pagos')
           .select('*')
-          .eq('order_id', pedido.id)
+          .eq('order_id', pedido.order_id)
           .limit(20),
       ]);
 
