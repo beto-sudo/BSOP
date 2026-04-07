@@ -413,7 +413,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 >
                   <span className="text-lg leading-none">
                     {item.icon === 'RDB_LOGO' ? (
-                      <img src="/logo-rdb.jpg" alt="RDB" className="h-5 w-5 object-contain rounded-sm" />
+                      <img src="/logos/rdb.jpg" alt="RDB" className="h-5 w-5 object-contain rounded-sm" />
                     ) : (
                       item.icon
                     )}
