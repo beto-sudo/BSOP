@@ -31,10 +31,8 @@ export default async function AccesoPage() {
     },
   );
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const currentEmail = session?.user.email?.toLowerCase() ?? '';
+  const { data: { user } } = await supabase.auth.getUser();
+  const currentEmail = user?.email?.toLowerCase() ?? '';
 
   const admin = getSupabaseAdminClient();
   if (!admin) {
