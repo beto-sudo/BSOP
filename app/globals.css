@@ -188,3 +188,33 @@ textarea {
     @apply font-sans;
   }
 }
+
+
+@media print {
+  /* Ocultar el layout principal cuando se imprime el drawer */
+  body > * {
+    visibility: hidden;
+  }
+  
+  /* Hacer visible el contenido del drawer y quitarle estilos de popover */
+  [data-slot="sheet-content"], [data-slot="sheet-content"] * {
+    visibility: visible;
+  }
+  
+  [data-slot="sheet-content"] {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: white !important;
+    transform: none !important;
+  }
+
+  /* Ocultar elementos de UI que no tienen sentido en papel */
+  button, [data-slot="sheet-close"], [data-slot="sheet-overlay"] {
+    display: none !important;
+  }
+}
