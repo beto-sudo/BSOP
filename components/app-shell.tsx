@@ -247,7 +247,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       })
     : '…';
 
-  const displayName = user?.name ?? 'Beto Santos';
+  const displayName = user?.name ?? 'Adalberto Santos de los Santos';
   const displayEmail = user?.email ?? 'beto@anorte.com';
   const initials = getInitials(displayName, displayEmail);
 
@@ -438,7 +438,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         ].join(' ')}
       >
         <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--panel)] backdrop-blur-xl">
-          <div className="flex min-h-20 flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex min-h-16 flex-col gap-3 px-4 py-3 sm:px-6 lg:px-8 xl:flex-row xl:items-center xl:justify-between">
             <div className="pl-12 md:pl-0">
               <div className="text-xs uppercase tracking-[0.24em] dark:text-white/35 text-[var(--text)]/45">BSOP / {sectionName}</div>
               <div className="mt-1 text-2xl font-semibold dark:text-white text-[var(--text)]">{sectionName}</div>
@@ -447,7 +447,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
             <div className="flex flex-wrap items-center gap-3 text-sm dark:text-white/70 text-[var(--text)]/70">
               <InfoPill label="🕐" value={formattedDate} />
-              <InfoPill label="💰" value={costToday !== null ? `${t('header.today')} ${money(costToday)}` : `${t('header.today')} …`} />
               <InfoPill label="📅" value={t('header.no_events')} />
               <div className="flex items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2">
                 {/* Theme toggle */}
@@ -504,8 +503,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       </div>
                     )}
                     <div className="hidden min-w-0 sm:block">
-                      <div className="max-w-40 truncate text-sm dark:text-white/90 text-[var(--text)]/90">{displayName}</div>
-                      <div className="max-w-40 truncate text-xs dark:text-white/45 text-[var(--text)]/55">{displayEmail}</div>
+                      <div className="max-w-56 truncate text-xs dark:text-white/90 text-[var(--text)]/90">{displayName}</div>
+                      <div className="max-w-56 truncate text-[10px] dark:text-white/45 text-[var(--text)]/55">{displayEmail}</div>
                     </div>
                     <ChevronDown className="h-4 w-4 dark:text-white/45 text-[var(--text)]/45" />
                   </button>
@@ -513,7 +512,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   {menuOpen ? (
                     <div className="absolute right-0 top-[calc(100%+0.75rem)] z-30 min-w-56 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] p-2 shadow-2xl">
                       <div className="border-b border-[var(--border)] px-3 py-2">
-                        <div className="text-sm font-medium dark:text-white text-[var(--text)]">{displayName}</div>
+                        <div className="truncate text-xs font-medium dark:text-white text-[var(--text)]">{displayName}</div>
                         <div className="mt-1 text-xs dark:text-white/45 text-[var(--text)]/55">{displayEmail}</div>
                       </div>
                       <button
