@@ -57,10 +57,13 @@ type PedidoItem = {
   id: number | string;
   nombre?: string | null;
   name?: string | null;
+  product_name?: string | null;
   cantidad?: number | null;
   quantity?: number | null;
   precio?: number | null;
   price?: number | null;
+  unit_price?: number | null;
+  total_price?: number | null;
   subtotal?: number | null;
 };
 
