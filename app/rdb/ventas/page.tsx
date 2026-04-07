@@ -225,13 +225,22 @@ function OrderDetail({
                 </div>
               )}
             </div>
-            {((pedido.total_discount ?? 0) > 0 || (pedido.service_charge ?? 0) > 0 || (pedido.tax ?? 0) > 0) && (
-              <div className="bg-muted/30 rounded-lg p-3 mt-4 space-y-1 text-sm">
-                {(pedido.total_discount ?? 0) > 0 && <div className="flex justify-between text-destructive"><span>Descuento</span><span>-{formatCurrency(pedido.total_discount)}</span></div>}
-                {(pedido.service_charge ?? 0) > 0 && <div className="flex justify-between"><span>Servicio</span><span>{formatCurrency(pedido.service_charge)}</span></div>}
-                {(pedido.tax ?? 0) > 0 && <div className="flex justify-between text-muted-foreground"><span>Impuestos</span><span>{formatCurrency(pedido.tax)}</span></div>}
-              </div>
-            )}
+            {(() => {
+              const realDiscount = (pedido.total_amount ?? 0) - (pedido.total_discount ?? (pedido.total_amount ?? 0));
+              const hasDiscount = realDiscount > 0.01;
+              const hasService = (pedido.service_charge ?? 0) > 0;
+              const hasTax = (pedido.tax ?? 0) > 0;
+              
+              if (!hasDiscount && !hasService && !hasTax) return null;
+              
+              return (
+                <div className="bg-muted/30 rounded-lg p-3 mt-4 space-y-1 text-sm">
+                  {hasDiscount && <div className="flex justify-between text-destructive"><span>Descuento</span><span>-{formatCurrency(realDiscount)}</span></div>}
+                  {hasService && <div className="flex justify-between"><span>Servicio</span><span>{formatCurrency(pedido.service_charge)}</span></div>}
+                  {hasTax && <div className="flex justify-between text-muted-foreground"><span>Impuestos</span><span>{formatCurrency(pedido.tax)}</span></div>}
+                </div>
+              );
+            })()}
             {pedido.notes && (
               <div className="mt-4 bg-yellow-500/10 border border-yellow-500/20 text-yellow-600 dark:text-yellow-400 p-3 rounded-lg text-sm">
                 <span className="font-semibold block mb-1">Notas del Pedido</span>
