@@ -17,12 +17,20 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
-import { Search, RefreshCw, CalendarDays } from 'lucide-react';
+import { Search, RefreshCw, CalendarDays, ShoppingBag, Receipt } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,7 +40,7 @@ type Pedido = {
   timestamp: string | null;
   total_amount: number | null;
   status: string | null;
-  // joined
+  // lazy-loaded
   pagos?: Pago[];
   items?: PedidoItem[];
 };
@@ -41,7 +49,6 @@ type Pago = {
   id: number | string;
   metodo?: string | null;
   monto?: number | null;
-  // fallback field names
   payment_method?: string | null;
   amount?: number | null;
 };
@@ -70,21 +77,21 @@ function formatDate(ts: string | null) {
   });
 }
 
-function formatCurrency(amount: number | null) {
+function formatCurrency(amount: number | null | undefined) {
   if (amount == null) return '—';
   return amount.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
 }
 
 function todayRange(): { from: string; to: string } {
   const now = new Date();
-  // midnight in Matamoros timezone ≈ UTC-6 / UTC-5 DST
-  // Use ISO date string as lower bound, tomorrow as upper
   const formatter = new Intl.DateTimeFormat('sv-SE', { timeZone: TZ });
   const today = formatter.format(now);
-  return { from: `${today}T00:00:00`, to: `${today}T23:59:59` };
+  return { from: today, to: today };
 }
 
-function statusVariant(status: string | null): 'default' | 'secondary' | 'destructive' | 'outline' {
+function statusVariant(
+  status: string | null,
+): 'default' | 'secondary' | 'destructive' | 'outline' {
   switch (status?.toLowerCase()) {
     case 'completed':
     case 'completado':
@@ -102,9 +109,56 @@ function statusVariant(status: string | null): 'default' | 'secondary' | 'destru
   }
 }
 
-// ─── Order Detail Drawer ───────────────────────────────────────────────────────
+// ─── Summary Stats ─────────────────────────────────────────────────────────────
 
-function OrderDetail({ pedido, open, onClose }: { pedido: Pedido | null; open: boolean; onClose: () => void }) {
+function SummaryBar({ pedidos }: { pedidos: Pedido[] }) {
+  const total = pedidos.reduce((acc, p) => acc + (p.total_amount ?? 0), 0);
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-2">
+      <div className="rounded-xl border bg-card px-4 py-3">
+        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          <ShoppingBag className="h-3.5 w-3.5" />
+          Pedidos
+        </div>
+        <div className="mt-1 text-2xl font-semibold tabular-nums">{pedidos.length}</div>
+      </div>
+      <div className="rounded-xl border bg-card px-4 py-3">
+        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          <Receipt className="h-3.5 w-3.5" />
+          Total
+        </div>
+        <div className="mt-1 text-2xl font-semibold tabular-nums">{formatCurrency(total)}</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Order Detail Drawer ────────────────────────────────────────────────────────
+
+function DetailSkeleton() {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="flex justify-between gap-4">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-4 w-24" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function OrderDetail({
+  pedido,
+  loadingDetail,
+  open,
+  onClose,
+}: {
+  pedido: Pedido | null;
+  loadingDetail: boolean;
+  open: boolean;
+  onClose: () => void;
+}) {
   if (!pedido) return null;
 
   const items = pedido.items ?? [];
@@ -112,75 +166,91 @@ function OrderDetail({ pedido, open, onClose }: { pedido: Pedido | null; open: b
 
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-md">
+      <SheetContent className="flex w-full flex-col sm:max-w-md">
         <SheetHeader>
           <SheetTitle>Pedido #{pedido.order_id ?? pedido.id}</SheetTitle>
           <SheetDescription>{formatDate(pedido.timestamp)}</SheetDescription>
         </SheetHeader>
 
-        <div className="mt-6 space-y-6">
-          {/* Status + total */}
-          <div className="flex items-center justify-between">
-            <Badge variant={statusVariant(pedido.status)}>
-              {pedido.status ?? 'Sin estado'}
-            </Badge>
-            <span className="text-lg font-semibold">{formatCurrency(pedido.total_amount)}</span>
-          </div>
-
-          <Separator />
-
-          {/* Items */}
-          <div>
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Productos
+        <ScrollArea className="flex-1 pr-1">
+          <div className="mt-6 space-y-6 pb-6">
+            {/* Status + total */}
+            <div className="flex items-center justify-between">
+              <Badge variant={statusVariant(pedido.status)}>
+                {pedido.status ?? 'Sin estado'}
+              </Badge>
+              <span className="text-lg font-semibold">{formatCurrency(pedido.total_amount)}</span>
             </div>
-            {items.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Sin detalle de productos</p>
-            ) : (
-              <div className="space-y-2">
-                {items.map((item) => {
-                  const nombre = item.nombre ?? item.name ?? 'Producto';
-                  const qty = item.cantidad ?? item.quantity ?? 1;
-                  const price = item.precio ?? item.price;
-                  const sub = item.subtotal ?? (price != null ? price * qty : null);
-                  return (
-                    <div key={String(item.id)} className="flex items-start justify-between gap-4 text-sm">
-                      <span className="text-foreground">{nombre}</span>
-                      <span className="shrink-0 text-muted-foreground">
-                        {qty} × {price != null ? formatCurrency(price) : '—'} = {sub != null ? formatCurrency(sub) : '—'}
-                      </span>
-                    </div>
-                  );
-                })}
+
+            <Separator />
+
+            {/* Items */}
+            <div>
+              <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Productos
               </div>
-            )}
-          </div>
-
-          <Separator />
-
-          {/* Payments */}
-          <div>
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Pagos
+              {loadingDetail ? (
+                <DetailSkeleton />
+              ) : items.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sin detalle de productos</p>
+              ) : (
+                <div className="space-y-2.5">
+                  {items.map((item) => {
+                    const nombre = item.nombre ?? item.name ?? 'Producto';
+                    const qty = item.cantidad ?? item.quantity ?? 1;
+                    const price = item.precio ?? item.price;
+                    const sub = item.subtotal ?? (price != null ? price * qty : null);
+                    return (
+                      <div
+                        key={String(item.id)}
+                        className="flex items-start justify-between gap-4 text-sm"
+                      >
+                        <span className="text-foreground">{nombre}</span>
+                        <span className="shrink-0 text-right text-muted-foreground">
+                          {qty} × {price != null ? formatCurrency(price) : '—'}
+                          <br />
+                          <span className="font-medium text-foreground">
+                            {sub != null ? formatCurrency(sub) : '—'}
+                          </span>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-            {pagos.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Sin registros de pago</p>
-            ) : (
-              <div className="space-y-1">
-                {pagos.map((pago) => {
-                  const metodo = pago.metodo ?? pago.payment_method ?? 'Desconocido';
-                  const monto = pago.monto ?? pago.amount;
-                  return (
-                    <div key={String(pago.id)} className="flex items-center justify-between text-sm">
-                      <span className="capitalize text-foreground">{metodo}</span>
-                      <span className="font-medium">{formatCurrency(monto ?? null)}</span>
-                    </div>
-                  );
-                })}
+
+            <Separator />
+
+            {/* Payments */}
+            <div>
+              <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Pagos
               </div>
-            )}
+              {loadingDetail ? (
+                <DetailSkeleton />
+              ) : pagos.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sin registros de pago</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {pagos.map((pago) => {
+                    const metodo = pago.metodo ?? pago.payment_method ?? 'Desconocido';
+                    const monto = pago.monto ?? pago.amount;
+                    return (
+                      <div
+                        key={String(pago.id)}
+                        className="flex items-center justify-between text-sm"
+                      >
+                        <span className="capitalize text-foreground">{metodo}</span>
+                        <span className="font-medium">{formatCurrency(monto)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        </ScrollArea>
       </SheetContent>
     </Sheet>
   );
@@ -188,13 +258,22 @@ function OrderDetail({ pedido, open, onClose }: { pedido: Pedido | null; open: b
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+const STATUS_OPTIONS = [
+  { value: 'all', label: 'Todos los estados' },
+  { value: 'completed', label: 'Completado' },
+  { value: 'pending', label: 'Pendiente' },
+  { value: 'cancelled', label: 'Cancelado' },
+];
+
 export default function VentasPage() {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [dateFrom, setDateFrom] = useState(() => todayRange().from.slice(0, 10));
-  const [dateTo, setDateTo] = useState(() => todayRange().to.slice(0, 10));
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState(() => todayRange().from);
+  const [dateTo, setDateTo] = useState(() => todayRange().to);
   const [selected, setSelected] = useState<Pedido | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -214,18 +293,16 @@ export default function VentasPage() {
         .from('pedidos')
         .select('*')
         .order('timestamp', { ascending: false })
-        .limit(200);
+        .limit(500);
 
-      if (dateFrom) query = query.gte('timestamp', `${dateFrom}T00:00:00+00:00`);
-      if (dateTo) query = query.lte('timestamp', `${dateTo}T23:59:59+00:00`);
+      if (dateFrom) query = query.gte('timestamp', `${dateFrom}T00:00:00`);
+      if (dateTo) query = query.lte('timestamp', `${dateTo}T23:59:59`);
 
       const { data, error: err } = await query;
-
       if (err) throw err;
       setPedidos(data ?? []);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Error al cargar pedidos';
-      setError(msg);
+      setError(e instanceof Error ? e.message : 'Error al cargar pedidos');
     } finally {
       setLoading(false);
     }
@@ -238,27 +315,39 @@ export default function VentasPage() {
   const openDetail = async (pedido: Pedido) => {
     setSelected(pedido);
     setDrawerOpen(true);
+    setLoadingDetail(true);
 
-    // Lazy-load items + pagos when drawer opens
     try {
       const supabase = createSupabaseBrowserClient();
-
       const [itemsRes, pagosRes] = await Promise.all([
-        supabase.schema('waitry').from('productos_pedido').select('*').eq('pedido_id', pedido.id).limit(50),
-        supabase.schema('waitry').from('pagos').select('*').eq('pedido_id', pedido.id).limit(20),
+        supabase
+          .schema('waitry')
+          .from('productos_pedido')
+          .select('*')
+          .eq('pedido_id', pedido.id)
+          .limit(50),
+        supabase
+          .schema('waitry')
+          .from('pagos')
+          .select('*')
+          .eq('pedido_id', pedido.id)
+          .limit(20),
       ]);
 
       setSelected((prev) =>
         prev?.id === pedido.id
           ? { ...prev, items: itemsRes.data ?? [], pagos: pagosRes.data ?? [] }
-          : prev
+          : prev,
       );
     } catch {
-      // detail load failure is non-fatal
+      // non-fatal
+    } finally {
+      setLoadingDetail(false);
     }
   };
 
   const filtered = pedidos.filter((p) => {
+    if (statusFilter !== 'all' && p.status?.toLowerCase() !== statusFilter) return false;
     if (!search) return true;
     const q = search.toLowerCase();
     return (
@@ -270,15 +359,18 @@ export default function VentasPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page title */}
+      {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Ventas</h1>
         <p className="text-sm text-muted-foreground">Pedidos registrados en Waitry</p>
       </div>
 
+      {/* Summary stats */}
+      {!loading && !error && <SummaryBar pedidos={filtered} />}
+
       {/* Filters */}
       <div className="flex flex-wrap items-end gap-3">
-        <div className="relative min-w-48">
+        <div className="relative min-w-52">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Buscar por folio o estado…"
@@ -288,8 +380,21 @@ export default function VentasPage() {
           />
         </div>
 
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? 'all')}>
+          <SelectTrigger className="w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {STATUS_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         <div className="flex items-center gap-2">
-          <CalendarDays className="h-4 w-4 text-muted-foreground" />
+          <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
           <Input
             type="date"
             value={dateFrom}
@@ -307,12 +412,19 @@ export default function VentasPage() {
           />
         </div>
 
-        <Button variant="outline" size="icon" onClick={() => void fetchPedidos()} aria-label="Actualizar">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => void fetchPedidos()}
+          aria-label="Actualizar"
+        >
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
         </Button>
 
         <span className="text-sm text-muted-foreground">
-          {loading ? 'Cargando…' : `${filtered.length} pedido${filtered.length !== 1 ? 's' : ''}`}
+          {loading
+            ? 'Cargando…'
+            : `${filtered.length} pedido${filtered.length !== 1 ? 's' : ''}`}
         </span>
       </div>
 
@@ -330,16 +442,15 @@ export default function VentasPage() {
             <TableRow>
               <TableHead>Folio</TableHead>
               <TableHead>Fecha/Hora</TableHead>
-              <TableHead>Total</TableHead>
+              <TableHead className="text-right">Total</TableHead>
               <TableHead>Estado</TableHead>
-              <TableHead className="hidden sm:table-cell">Método de Pago</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               Array.from({ length: 8 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 5 }).map((__, j) => (
+                  {Array.from({ length: 4 }).map((__, j) => (
                     <TableCell key={j}>
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
@@ -348,7 +459,10 @@ export default function VentasPage() {
               ))
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-12 text-center text-muted-foreground">
+                <TableCell
+                  colSpan={4}
+                  className="py-12 text-center text-muted-foreground"
+                >
                   No se encontraron pedidos para el rango seleccionado.
                 </TableCell>
               </TableRow>
@@ -362,15 +476,16 @@ export default function VentasPage() {
                   <TableCell className="font-mono text-xs font-medium">
                     #{pedido.order_id ?? pedido.id}
                   </TableCell>
-                  <TableCell className="text-sm">{formatDate(pedido.timestamp)}</TableCell>
-                  <TableCell className="font-medium">{formatCurrency(pedido.total_amount)}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {formatDate(pedido.timestamp)}
+                  </TableCell>
+                  <TableCell className="text-right font-medium tabular-nums">
+                    {formatCurrency(pedido.total_amount)}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={statusVariant(pedido.status)}>
                       {pedido.status ?? '—'}
                     </Badge>
-                  </TableCell>
-                  <TableCell className="hidden text-sm text-muted-foreground sm:table-cell">
-                    {pedido.pagos?.map((p) => p.metodo ?? p.payment_method).filter(Boolean).join(', ') ?? '—'}
                   </TableCell>
                 </TableRow>
               ))
@@ -382,6 +497,7 @@ export default function VentasPage() {
       {/* Order detail drawer */}
       <OrderDetail
         pedido={selected}
+        loadingDetail={loadingDetail}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
       />
