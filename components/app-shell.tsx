@@ -43,7 +43,7 @@ const NAV_ITEMS: NavItem[] = [
   {
     href: '/rdb',
     labelKey: 'Rincón del Bosque',
-    icon: '🌳',
+    icon: 'RDB_LOGO',
     children: [
       { label: 'Ventas', href: '/rdb/ventas' },
       { label: 'Cortes', href: '/rdb/cortes' },
@@ -411,7 +411,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   ].join(' ')}
                   title={collapsed ? label : undefined}
                 >
-                  <span className="text-lg leading-none">{item.icon}</span>
+                  <span className="text-lg leading-none">
+                    {item.icon === 'RDB_LOGO' ? (
+                      <img src="/logo-rdb.jpg" alt="RDB" className="h-5 w-5 object-contain rounded-sm" />
+                    ) : (
+                      item.icon
+                    )}
+                  </span>
                   {!collapsed ? <span className="min-w-0 flex-1 truncate">{label}</span> : null}
                   {!collapsed && hasChildren ? (
                     expanded ? (
