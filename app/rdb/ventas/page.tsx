@@ -358,7 +358,7 @@ export default function VentasPage() {
         .schema('waitry')
         .from('pedidos')
         .select('*')
-        .order('timestamp', { ascending: false })
+        .order('timestamp', { ascending: false }).limit(10000)
         ;
 
       if (dateFrom) query = query.gte('timestamp', `${dateFrom}T00:00:00-06:00`);
