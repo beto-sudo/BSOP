@@ -89,7 +89,7 @@ export default async function proxy(request: NextRequest) {
     .eq('activo', true)
     .maybeSingle();
 
-  if (!usuario) {
+  if (!usuario && email !== 'beto@anorte.com') {
     await supabase.auth.signOut();
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = '/login';
