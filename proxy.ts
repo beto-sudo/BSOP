@@ -54,18 +54,17 @@ export default async function proxy(request: NextRequest) {
     },
   );
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = '/login';
     loginUrl.search = '';
     return NextResponse.redirect(loginUrl);
   }
 
-  const email = session.user.email?.toLowerCase();
+  const email = user.email?.toLowerCase();
   if (!email) {
     await supabase.auth.signOut();
     const loginUrl = request.nextUrl.clone();
