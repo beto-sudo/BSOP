@@ -372,6 +372,7 @@ export default function CortesPage() {
   const [selected, setSelected] = useState<Corte | null>(null);
   const [selectedTotales, setSelectedTotales] = useState<CorteTotales | null>(null);
   const [selectedMovimientos, setSelectedMovimientos] = useState<Movimiento[]>([]);
+  const [selectedProductos, setSelectedProductos] = useState<any[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -421,7 +422,7 @@ export default function CortesPage() {
 
     try {
       const supabase = createSupabaseBrowserClient();
-      const [totalesRes, movimientosRes] = await Promise.all([
+      const [totalesRes, movimientosRes, productosRes] = await Promise.all([
         supabase
           .schema('caja')
           .from('v_cortes_totales')
@@ -435,10 +436,18 @@ export default function CortesPage() {
           .eq('corte_id', corte.id)
           .order('fecha_hora', { ascending: true })
           .limit(100),
+        supabase
+          .schema('caja')
+          .from('v_cortes_productos')
+          .select('*')
+          .eq('corte_id', corte.id)
+          .order('importe_total', { ascending: false })
+          .limit(100),
       ]);
 
       setSelectedTotales((totalesRes.data as CorteTotales | null) ?? null);
       setSelectedMovimientos((movimientosRes.data ?? []) as Movimiento[]);
+      setSelectedProductos((productosRes?.data ?? []) as any[]);
     } catch {
       // non-fatal — drawer still shows corte base info
     } finally {
