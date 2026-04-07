@@ -509,8 +509,8 @@ export default function VentasPage() {
               <TableHead>Folio</TableHead>
               <TableHead>Fecha/Hora</TableHead>
               <TableHead>Área</TableHead>
-                  <TableHead>Mesa</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
+              <TableHead>Mesa</TableHead>
+              <TableHead className="text-right">Total</TableHead>
               <TableHead>Estado</TableHead>
             </TableRow>
           </TableHeader>
@@ -546,6 +546,12 @@ export default function VentasPage() {
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {formatDate(pedido.timestamp)}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {pedido.layout_name || "-"}
+                  </TableCell>
+                  <TableCell className="text-sm font-medium">
+                    {pedido.table_name || "-"}
                   </TableCell>
                   <TableCell className="text-right font-medium tabular-nums">
                     {formatCurrency(pedido.total_amount)}
