@@ -81,12 +81,12 @@ const TZ = 'America/Matamoros';
 
 function formatDate(ts: string | null) {
   if (!ts) return '—';
-  const dateObj = new Date(ts.endsWith("Z") || ts.includes("+") ? ts : ts + "Z");
-  return dateObj.toLocaleString('es-MX', {
-    timeZone: TZ,
-    dateStyle: 'short',
-    timeStyle: 'short',
-  });
+  const cleanTs = ts.replace(/\+[0-9]+(:[0-9]+)?$/, "").replace("Z", "").replace("T", " ");
+  const parts = cleanTs.split(" ");
+  if (parts.length < 2) return cleanTs;
+  const [yyyy, mm, dd] = parts[0].split("-");
+  const [hh, min] = parts[1].split(":");
+  return `${dd}/${mm}/${yyyy.slice(2)}, ${hh}:${min}`;
 }
 
 function formatCurrency(amount: number | null | undefined) {
@@ -178,10 +178,15 @@ function OrderDetail({
 
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <SheetContent className="flex w-full flex-col sm:max-w-xl md:max-w-2xl">
+      <SheetContent className="flex w-full flex-col data-[side=right]:sm:max-w-xl data-[side=right]:md:max-w-2xl">
         <SheetHeader>
           <SheetTitle>Pedido #{pedido.order_id ?? pedido.id}</SheetTitle>
           <SheetDescription>{formatDate(pedido.timestamp)}</SheetDescription>
+          <div className="absolute right-12 top-4 hidden sm:flex">
+            <Button variant="outline" size="sm" onClick={() => window.print()}>
+              Imprimir
+            </Button>
+          </div>
         </SheetHeader>
 
         <ScrollArea className="flex-1 pr-1">
