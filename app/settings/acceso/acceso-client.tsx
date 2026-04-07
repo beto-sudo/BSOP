@@ -1,7 +1,7 @@
 'use client';
 
-import { type ReactNode, useState } from 'react';
-import { Building2, ShieldCheck, Users, Plus, X, ChevronRight } from 'lucide-react';
+import { type ReactNode, useState, useTransition } from 'react';
+import { Building2, ShieldCheck, Users, Plus, X, ChevronRight, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -19,12 +19,20 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import type {
@@ -35,6 +43,19 @@ import type {
   RolRecord,
   UsuarioCore,
   UsuarioEmpresa,
+} from './actions';
+import {
+  createEmpresa,
+  updateEmpresa,
+  createRolRecord,
+  updateRolRecord,
+  deleteRolRecord,
+  upsertPermisoRol,
+  createUsuarioCore,
+  setUsuarioEmpresaAcceso,
+  updateUsuarioEmpresaRol,
+  upsertExcepcionUsuario,
+  deleteExcepcionUsuario,
 } from './actions';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -65,6 +86,15 @@ const TABS: TabDef[] = [
   { id: 'usuarios', label: 'Usuarios', icon: <Users className="h-4 w-4" /> },
 ];
 
+function slugify(str: string): string {
+  return str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
 // ── Component ──────────────────────────────────────────────────────────────
 
 export function AccesoClient({
@@ -76,6 +106,8 @@ export function AccesoClient({
   usuariosEmpresas,
   excepciones,
 }: Props) {
+  const [isPending, startTransition] = useTransition();
+
   // Tab navigation
   const [tab, setTab] = useState<Tab>('usuarios');
 
@@ -93,6 +125,47 @@ export function AccesoClient({
   const [newExcModuloId, setNewExcModuloId] = useState<string>('');
   const [newExcLectura, setNewExcLectura] = useState(false);
   const [newExcEscritura, setNewExcEscritura] = useState(false);
+
+  // ── Empresa dialog ──
+  const [empresaDialog, setEmpresaDialog] = useState<{ open: boolean; editing: Empresa | null }>({
+    open: false,
+    editing: null,
+  });
+  const [empresaNombre, setEmpresaNombre] = useState('');
+  const [empresaSlug, setEmpresaSlug] = useState('');
+  const [empresaSlugManual, setEmpresaSlugManual] = useState(false);
+
+  // ── Rol dialog ──
+  const [rolDialog, setRolDialog] = useState<{ open: boolean; editing: RolRecord | null }>({
+    open: false,
+    editing: null,
+  });
+  const [rolNombre, setRolNombre] = useState('');
+
+  // ── Usuario dialog ──
+  const [usuarioDialogOpen, setUsuarioDialogOpen] = useState(false);
+  const [usuarioEmail, setUsuarioEmail] = useState('');
+  const [usuarioFirstName, setUsuarioFirstName] = useState('');
+
+  // ── Error state ──
+  const [dialogError, setDialogError] = useState<string | null>(null);
+
+  // ── Action helper ──
+
+  function run(
+    action: () => Promise<void>,
+    onSuccess?: () => void,
+  ) {
+    setDialogError(null);
+    startTransition(async () => {
+      try {
+        await action();
+        onSuccess?.();
+      } catch (err) {
+        setDialogError(err instanceof Error ? err.message : 'Error desconocido');
+      }
+    });
+  }
 
   // ── Helpers ──
 
@@ -124,6 +197,27 @@ export function AccesoClient({
     setNewExcModuloId('');
     setNewExcLectura(false);
     setNewExcEscritura(false);
+  }
+
+  function openEmpresaDialog(editing: Empresa | null) {
+    setEmpresaDialog({ open: true, editing });
+    setEmpresaNombre(editing?.nombre ?? '');
+    setEmpresaSlug(editing?.slug ?? '');
+    setEmpresaSlugManual(!!editing);
+    setDialogError(null);
+  }
+
+  function openRolDialog(editing: RolRecord | null) {
+    setRolDialog({ open: true, editing });
+    setRolNombre(editing?.nombre ?? '');
+    setDialogError(null);
+  }
+
+  function openUsuarioDialog() {
+    setUsuarioEmail('');
+    setUsuarioFirstName('');
+    setDialogError(null);
+    setUsuarioDialogOpen(true);
   }
 
   const rolesDeEmpresa = roles.filter((r) => r.empresa_id === filterEmpresaId);
@@ -165,54 +259,80 @@ export function AccesoClient({
 
       {/* ── Tab: Empresas ─────────────────────────────────────────────────── */}
       {tab === 'empresas' && (
-        <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)]">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-[var(--border)] dark:hover:bg-transparent hover:bg-transparent">
-                <TableHead className="dark:text-white/50 text-[var(--text)]/50">Nombre</TableHead>
-                <TableHead className="dark:text-white/50 text-[var(--text)]/50">Slug</TableHead>
-                <TableHead className="dark:text-white/50 text-[var(--text)]/50">
-                  Roles configurados
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {empresas.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={3}
-                    className="py-16 text-center text-sm dark:text-white/30 text-[var(--text)]/35"
-                  >
-                    No hay empresas registradas.
-                  </TableCell>
+        <>
+          <div className="flex items-center justify-between">
+            <p className="text-sm dark:text-white/40 text-[var(--text)]/40">
+              {empresas.length} empresa{empresas.length !== 1 ? 's' : ''} registrada{empresas.length !== 1 ? 's' : ''}
+            </p>
+            <Button
+              size="sm"
+              onClick={() => openEmpresaDialog(null)}
+              className="gap-1.5"
+            >
+              <Plus className="h-4 w-4" />
+              Nueva empresa
+            </Button>
+          </div>
+          <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)]">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-[var(--border)] dark:hover:bg-transparent hover:bg-transparent">
+                  <TableHead className="dark:text-white/50 text-[var(--text)]/50">Nombre</TableHead>
+                  <TableHead className="dark:text-white/50 text-[var(--text)]/50">Slug</TableHead>
+                  <TableHead className="dark:text-white/50 text-[var(--text)]/50">
+                    Roles configurados
+                  </TableHead>
+                  <TableHead className="w-10" />
                 </TableRow>
-              ) : (
-                empresas.map((emp) => (
-                  <TableRow
-                    key={emp.id}
-                    className="border-[var(--border)] dark:hover:bg-white/3 hover:bg-black/2"
-                  >
-                    <TableCell className="font-medium dark:text-white/85 text-[var(--text)]/85">
-                      {emp.nombre}
-                    </TableCell>
-                    <TableCell className="font-mono text-sm dark:text-white/50 text-[var(--text)]/50">
-                      {emp.slug}
-                    </TableCell>
-                    <TableCell className="text-sm dark:text-white/50 text-[var(--text)]/50">
-                      {roles.filter((r) => r.empresa_id === emp.id).length} roles
+              </TableHeader>
+              <TableBody>
+                {empresas.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={4}
+                      className="py-16 text-center text-sm dark:text-white/30 text-[var(--text)]/35"
+                    >
+                      No hay empresas registradas.
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                ) : (
+                  empresas.map((emp) => (
+                    <TableRow
+                      key={emp.id}
+                      className="border-[var(--border)] dark:hover:bg-white/3 hover:bg-black/2"
+                    >
+                      <TableCell className="font-medium dark:text-white/85 text-[var(--text)]/85">
+                        {emp.nombre}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm dark:text-white/50 text-[var(--text)]/50">
+                        {emp.slug}
+                      </TableCell>
+                      <TableCell className="text-sm dark:text-white/50 text-[var(--text)]/50">
+                        {roles.filter((r) => r.empresa_id === emp.id).length} roles
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => openEmpresaDialog(emp)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </>
       )}
 
       {/* ── Tab: Roles y Permisos ─────────────────────────────────────────── */}
       {tab === 'roles' && (
         <div className="space-y-4">
-          {/* Company selector */}
+          {/* Company selector + new rol button */}
           <div className="flex items-center gap-3">
             <span className="text-sm dark:text-white/55 text-[var(--text)]/55">Empresa:</span>
             <Select
@@ -233,6 +353,17 @@ export function AccesoClient({
                 ))}
               </SelectContent>
             </Select>
+            {filterEmpresaId && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => openRolDialog(null)}
+                className="ml-auto gap-1.5"
+              >
+                <Plus className="h-4 w-4" />
+                Nuevo rol
+              </Button>
+            )}
           </div>
 
           <div className="grid grid-cols-[220px_1fr] gap-4">
@@ -251,18 +382,42 @@ export function AccesoClient({
                 <ul>
                   {rolesDeEmpresa.map((rol) => (
                     <li key={rol.id}>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedRolId(rol.id)}
+                      <div
                         className={cn(
-                          'w-full px-4 py-2.5 text-left text-sm transition-colors',
+                          'group flex items-center gap-1 px-3 py-2 text-sm transition-colors cursor-pointer',
                           selectedRolId === rol.id
                             ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium'
                             : 'dark:text-white/70 text-[var(--text)]/70 dark:hover:bg-white/5 hover:bg-black/3',
                         )}
+                        onClick={() => setSelectedRolId(rol.id)}
                       >
-                        {rol.nombre}
-                      </button>
+                        <span className="flex-1 truncate">{rol.nombre}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100 shrink-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openRolDialog(rol);
+                          }}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100 shrink-0 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!confirm(`¿Eliminar el rol "${rol.nombre}"?`)) return;
+                            run(() => deleteRolRecord(rol.id), () => {
+                              if (selectedRolId === rol.id) setSelectedRolId(null);
+                            });
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -284,7 +439,7 @@ export function AccesoClient({
                       {selectedRol.nombre}
                     </p>
                     <p className="mt-0.5 text-xs dark:text-white/40 text-[var(--text)]/40">
-                      Permisos por módulo
+                      Permisos por módulo — haz clic para cambiar
                     </p>
                   </div>
                   <Table>
@@ -325,17 +480,37 @@ export function AccesoClient({
                               <TableCell className="text-center">
                                 <input
                                   type="checkbox"
-                                  readOnly
+                                  disabled={isPending}
                                   checked={perm?.acceso_lectura ?? false}
-                                  className="h-4 w-4 cursor-default rounded accent-[var(--accent)]"
+                                  onChange={(e) => {
+                                    run(() =>
+                                      upsertPermisoRol(
+                                        selectedRol.id,
+                                        mod.id,
+                                        e.target.checked,
+                                        perm?.acceso_escritura ?? false,
+                                      ),
+                                    );
+                                  }}
+                                  className="h-4 w-4 cursor-pointer rounded accent-[var(--accent)]"
                                 />
                               </TableCell>
                               <TableCell className="text-center">
                                 <input
                                   type="checkbox"
-                                  readOnly
+                                  disabled={isPending}
                                   checked={perm?.acceso_escritura ?? false}
-                                  className="h-4 w-4 cursor-default rounded accent-[var(--accent)]"
+                                  onChange={(e) => {
+                                    run(() =>
+                                      upsertPermisoRol(
+                                        selectedRol.id,
+                                        mod.id,
+                                        perm?.acceso_lectura ?? false,
+                                        e.target.checked,
+                                      ),
+                                    );
+                                  }}
+                                  className="h-4 w-4 cursor-pointer rounded accent-[var(--accent)]"
                                 />
                               </TableCell>
                             </TableRow>
@@ -353,71 +528,82 @@ export function AccesoClient({
 
       {/* ── Tab: Usuarios ─────────────────────────────────────────────────── */}
       {tab === 'usuarios' && (
-        <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)]">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-[var(--border)] dark:hover:bg-transparent hover:bg-transparent">
-                <TableHead className="dark:text-white/50 text-[var(--text)]/50">Correo</TableHead>
-                <TableHead className="dark:text-white/50 text-[var(--text)]/50">Nombre</TableHead>
-                <TableHead className="dark:text-white/50 text-[var(--text)]/50">
-                  Empresas con acceso
-                </TableHead>
-                <TableHead className="w-8" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {usuarios.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={4}
-                    className="py-16 text-center text-sm dark:text-white/30 text-[var(--text)]/35"
-                  >
-                    No hay usuarios registrados.
-                  </TableCell>
+        <>
+          <div className="flex items-center justify-between">
+            <p className="text-sm dark:text-white/40 text-[var(--text)]/40">
+              {usuarios.length} usuario{usuarios.length !== 1 ? 's' : ''} registrado{usuarios.length !== 1 ? 's' : ''}
+            </p>
+            <Button size="sm" onClick={openUsuarioDialog} className="gap-1.5">
+              <Plus className="h-4 w-4" />
+              Nuevo usuario
+            </Button>
+          </div>
+          <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)]">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-[var(--border)] dark:hover:bg-transparent hover:bg-transparent">
+                  <TableHead className="dark:text-white/50 text-[var(--text)]/50">Correo</TableHead>
+                  <TableHead className="dark:text-white/50 text-[var(--text)]/50">Nombre</TableHead>
+                  <TableHead className="dark:text-white/50 text-[var(--text)]/50">
+                    Empresas con acceso
+                  </TableHead>
+                  <TableHead className="w-8" />
                 </TableRow>
-              ) : (
-                usuarios.map((u) => {
-                  const userEmpresas = getUserEmpresas(u.id);
-                  return (
-                    <TableRow
-                      key={u.id}
-                      className="cursor-pointer border-[var(--border)] transition-colors dark:hover:bg-white/3 hover:bg-black/2"
-                      onClick={() => openUserSheet(u)}
+              </TableHeader>
+              <TableBody>
+                {usuarios.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={4}
+                      className="py-16 text-center text-sm dark:text-white/30 text-[var(--text)]/35"
                     >
-                      <TableCell className="font-mono text-sm dark:text-white/85 text-[var(--text)]/85">
-                        {u.email}
-                      </TableCell>
-                      <TableCell className="text-sm dark:text-white/60 text-[var(--text)]/60">
-                        {u.first_name ?? '—'}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {userEmpresas.length === 0 ? (
-                            <span className="text-xs dark:text-white/28 text-[var(--text)]/30">
-                              Sin acceso
-                            </span>
-                          ) : (
-                            userEmpresas.map((ue) => (
-                              <span
-                                key={ue.empresa_id}
-                                className="inline-flex items-center rounded-full bg-[var(--accent)]/10 px-2 py-0.5 text-xs text-[var(--accent)]"
-                              >
-                                {getEmpresaNombre(ue.empresa_id)}
+                      No hay usuarios registrados.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  usuarios.map((u) => {
+                    const userEmpresas = getUserEmpresas(u.id);
+                    return (
+                      <TableRow
+                        key={u.id}
+                        className="cursor-pointer border-[var(--border)] transition-colors dark:hover:bg-white/3 hover:bg-black/2"
+                        onClick={() => openUserSheet(u)}
+                      >
+                        <TableCell className="font-mono text-sm dark:text-white/85 text-[var(--text)]/85">
+                          {u.email}
+                        </TableCell>
+                        <TableCell className="text-sm dark:text-white/60 text-[var(--text)]/60">
+                          {u.first_name ?? '—'}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {userEmpresas.length === 0 ? (
+                              <span className="text-xs dark:text-white/28 text-[var(--text)]/30">
+                                Sin acceso
                               </span>
-                            ))
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <ChevronRight className="ml-auto h-4 w-4 dark:text-white/25 text-[var(--text)]/25" />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                            ) : (
+                              userEmpresas.map((ue) => (
+                                <span
+                                  key={ue.empresa_id}
+                                  className="inline-flex items-center rounded-full bg-[var(--accent)]/10 px-2 py-0.5 text-xs text-[var(--accent)]"
+                                >
+                                  {getEmpresaNombre(ue.empresa_id)}
+                                </span>
+                              ))
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <ChevronRight className="ml-auto h-4 w-4 dark:text-white/25 text-[var(--text)]/25" />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </>
       )}
 
       {/* ── User Detail Sheet ─────────────────────────────────────────────── */}
@@ -462,9 +648,18 @@ export function AccesoClient({
                               <label className="flex cursor-pointer items-center gap-3">
                                 <input
                                   type="checkbox"
-                                  readOnly
+                                  disabled={isPending}
                                   checked={!!ue}
-                                  className="h-4 w-4 cursor-default rounded accent-[var(--accent)]"
+                                  onChange={(e) => {
+                                    run(() =>
+                                      setUsuarioEmpresaAcceso(
+                                        selectedUsuario.id,
+                                        emp.id,
+                                        e.target.checked,
+                                      ),
+                                    );
+                                  }}
+                                  className="h-4 w-4 cursor-pointer rounded accent-[var(--accent)]"
                                 />
                                 <span className="text-sm font-medium dark:text-white/85 text-[var(--text)]/85">
                                   Tiene acceso a {emp.nombre}
@@ -476,24 +671,31 @@ export function AccesoClient({
                                   <span className="text-xs dark:text-white/50 text-[var(--text)]/50">
                                     Rol base:
                                   </span>
-                                  {ue.rol_id ? (
-                                    <Select value={ue.rol_id} disabled>
-                                      <SelectTrigger className="h-7 w-48 text-xs">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {empRoles.map((rol) => (
-                                          <SelectItem key={rol.id} value={rol.id}>
-                                            {rol.nombre}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  ) : (
-                                    <span className="text-xs dark:text-white/35 text-[var(--text)]/40">
-                                      Sin rol asignado
-                                    </span>
-                                  )}
+                                  <Select
+                                    value={ue.rol_id ?? '__none__'}
+                                    disabled={isPending}
+                                    onValueChange={(v) => {
+                                      run(() =>
+                                        updateUsuarioEmpresaRol(
+                                          selectedUsuario.id,
+                                          emp.id,
+                                          v === '__none__' ? null : v,
+                                        ),
+                                      );
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-7 w-48 text-xs">
+                                      <SelectValue placeholder="Sin rol" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="__none__">Sin rol</SelectItem>
+                                      {empRoles.map((rol) => (
+                                        <SelectItem key={rol.id} value={rol.id}>
+                                          {rol.nombre}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
                                 </div>
                               )}
                             </div>
@@ -598,7 +800,26 @@ export function AccesoClient({
                         <Button
                           size="sm"
                           className="w-full rounded-lg text-xs"
-                          disabled={!newExcEmpresaId || !newExcModuloId}
+                          disabled={!newExcEmpresaId || !newExcModuloId || isPending}
+                          onClick={() => {
+                            run(
+                              () =>
+                                upsertExcepcionUsuario({
+                                  usuario_id: selectedUsuario.id,
+                                  empresa_id: newExcEmpresaId,
+                                  modulo_id: newExcModuloId,
+                                  acceso_lectura: newExcLectura,
+                                  acceso_escritura: newExcEscritura,
+                                }),
+                              () => {
+                                setAddingExcepcion(false);
+                                setNewExcEmpresaId('');
+                                setNewExcModuloId('');
+                                setNewExcLectura(false);
+                                setNewExcEscritura(false);
+                              },
+                            );
+                          }}
                         >
                           Guardar excepción
                         </Button>
@@ -630,7 +851,7 @@ export function AccesoClient({
                                   en {getEmpresaNombre(ex.empresa_id)}
                                 </span>
                               </div>
-                              <div className="flex gap-1.5">
+                              <div className="flex items-center gap-1.5">
                                 {ex.acceso_lectura && (
                                   <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-emerald-600 dark:text-emerald-400">
                                     Lectura
@@ -646,6 +867,23 @@ export function AccesoClient({
                                     Denegado
                                   </span>
                                 )}
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  disabled={isPending}
+                                  className="h-6 w-6 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                                  onClick={() => {
+                                    run(() =>
+                                      deleteExcepcionUsuario(
+                                        ex.usuario_id,
+                                        ex.empresa_id,
+                                        ex.modulo_id,
+                                      ),
+                                    );
+                                  }}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
                               </div>
                             </div>
                           ))}
@@ -659,6 +897,200 @@ export function AccesoClient({
           )}
         </SheetContent>
       </Sheet>
+
+      {/* ── Empresa Dialog ────────────────────────────────────────────────── */}
+      <Dialog
+        open={empresaDialog.open}
+        onOpenChange={(open) => {
+          if (!open) setEmpresaDialog({ open: false, editing: null });
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {empresaDialog.editing ? 'Editar empresa' : 'Nueva empresa'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <p className="text-sm dark:text-white/60 text-[var(--text)]/60">Nombre</p>
+              <Input
+                value={empresaNombre}
+                onChange={(e) => {
+                  setEmpresaNombre(e.target.value);
+                  if (!empresaSlugManual) setEmpresaSlug(slugify(e.target.value));
+                }}
+                placeholder="Ej. Distribuidora Norte"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-sm dark:text-white/60 text-[var(--text)]/60">Slug</p>
+              <Input
+                value={empresaSlug}
+                onChange={(e) => {
+                  setEmpresaSlug(e.target.value);
+                  setEmpresaSlugManual(true);
+                }}
+                placeholder="ej. distribuidora-norte"
+                className="font-mono"
+              />
+              <p className="text-xs dark:text-white/35 text-[var(--text)]/35">
+                Identificador único, solo letras minúsculas, números y guiones.
+              </p>
+            </div>
+            {dialogError && (
+              <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-400">
+                {dialogError}
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEmpresaDialog({ open: false, editing: null })}
+              disabled={isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={!empresaNombre.trim() || !empresaSlug.trim() || isPending}
+              onClick={() => {
+                const editing = empresaDialog.editing;
+                run(
+                  () =>
+                    editing
+                      ? updateEmpresa(editing.id, empresaNombre, empresaSlug)
+                      : createEmpresa(empresaNombre, empresaSlug),
+                  () => setEmpresaDialog({ open: false, editing: null }),
+                );
+              }}
+            >
+              {isPending ? 'Guardando…' : empresaDialog.editing ? 'Guardar cambios' : 'Crear empresa'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Rol Dialog ────────────────────────────────────────────────────── */}
+      <Dialog
+        open={rolDialog.open}
+        onOpenChange={(open) => {
+          if (!open) setRolDialog({ open: false, editing: null });
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {rolDialog.editing ? 'Editar rol' : 'Nuevo rol'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {!rolDialog.editing && (
+              <div className="space-y-1.5">
+                <p className="text-sm dark:text-white/60 text-[var(--text)]/60">Empresa</p>
+                <p className="text-sm font-medium dark:text-white/85 text-[var(--text)]/85">
+                  {getEmpresaNombre(filterEmpresaId)}
+                </p>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <p className="text-sm dark:text-white/60 text-[var(--text)]/60">Nombre del rol</p>
+              <Input
+                value={rolNombre}
+                onChange={(e) => setRolNombre(e.target.value)}
+                placeholder="Ej. Vendedor, Supervisor"
+                autoFocus
+              />
+            </div>
+            {dialogError && (
+              <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-400">
+                {dialogError}
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRolDialog({ open: false, editing: null })}
+              disabled={isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={!rolNombre.trim() || isPending}
+              onClick={() => {
+                const editing = rolDialog.editing;
+                run(
+                  () =>
+                    editing
+                      ? updateRolRecord(editing.id, rolNombre)
+                      : createRolRecord(rolNombre, filterEmpresaId),
+                  () => setRolDialog({ open: false, editing: null }),
+                );
+              }}
+            >
+              {isPending ? 'Guardando…' : rolDialog.editing ? 'Guardar cambios' : 'Crear rol'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Usuario Dialog ────────────────────────────────────────────────── */}
+      <Dialog open={usuarioDialogOpen} onOpenChange={setUsuarioDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Nuevo usuario</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <p className="text-sm dark:text-white/60 text-[var(--text)]/60">Correo electrónico</p>
+              <Input
+                type="email"
+                value={usuarioEmail}
+                onChange={(e) => setUsuarioEmail(e.target.value)}
+                placeholder="usuario@ejemplo.com"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-sm dark:text-white/60 text-[var(--text)]/60">
+                Nombre <span className="dark:text-white/35 text-[var(--text)]/35">(opcional)</span>
+              </p>
+              <Input
+                value={usuarioFirstName}
+                onChange={(e) => setUsuarioFirstName(e.target.value)}
+                placeholder="Ej. Juan"
+              />
+            </div>
+            {dialogError && (
+              <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-400">
+                {dialogError}
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setUsuarioDialogOpen(false)}
+              disabled={isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={!usuarioEmail.trim() || isPending}
+              onClick={() => {
+                run(
+                  () => createUsuarioCore(usuarioEmail, usuarioFirstName),
+                  () => setUsuarioDialogOpen(false),
+                );
+              }}
+            >
+              {isPending ? 'Guardando…' : 'Crear usuario'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
