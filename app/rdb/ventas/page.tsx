@@ -40,6 +40,14 @@ type Pedido = {
   timestamp: string | null;
   total_amount: number | null;
   status: string | null;
+  place_name?: string | null;
+  layout_name?: string | null;
+  table_name?: string | null;
+  external_delivery_id?: string | null;
+  total_discount?: number | null;
+  service_charge?: number | null;
+  tax?: number | null;
+  notes?: string | null;
   // lazy-loaded
   pagos?: Pago[];
   items?: PedidoItem[];
@@ -185,6 +193,46 @@ function OrderDetail({
               </Badge>
               <span className="text-lg font-semibold">{formatCurrency(pedido.total_amount)}</span>
             </div>
+
+            <div className="grid grid-cols-2 gap-4 text-sm mt-4">
+              {pedido.place_name && (
+                <div>
+                  <span className="text-muted-foreground block text-xs">Ubicación</span>
+                  <span className="font-medium">{pedido.place_name}</span>
+                </div>
+              )}
+              {pedido.layout_name && (
+                <div>
+                  <span className="text-muted-foreground block text-xs">Área</span>
+                  <span className="font-medium">{pedido.layout_name}</span>
+                </div>
+              )}
+              {pedido.table_name && (
+                <div>
+                  <span className="text-muted-foreground block text-xs">Mesa</span>
+                  <span className="font-medium">{pedido.table_name}</span>
+                </div>
+              )}
+              {pedido.external_delivery_id && (
+                <div>
+                  <span className="text-muted-foreground block text-xs">Delivery ID</span>
+                  <span className="font-medium">{pedido.external_delivery_id}</span>
+                </div>
+              )}
+            </div>
+            {((pedido.total_discount ?? 0) > 0 || (pedido.service_charge ?? 0) > 0 || (pedido.tax ?? 0) > 0) && (
+              <div className="bg-muted/30 rounded-lg p-3 mt-4 space-y-1 text-sm">
+                {(pedido.total_discount ?? 0) > 0 && <div className="flex justify-between text-destructive"><span>Descuento</span><span>-{formatCurrency(pedido.total_discount)}</span></div>}
+                {(pedido.service_charge ?? 0) > 0 && <div className="flex justify-between"><span>Servicio</span><span>{formatCurrency(pedido.service_charge)}</span></div>}
+                {(pedido.tax ?? 0) > 0 && <div className="flex justify-between text-muted-foreground"><span>Impuestos</span><span>{formatCurrency(pedido.tax)}</span></div>}
+              </div>
+            )}
+            {pedido.notes && (
+              <div className="mt-4 bg-yellow-500/10 border border-yellow-500/20 text-yellow-600 dark:text-yellow-400 p-3 rounded-lg text-sm">
+                <span className="font-semibold block mb-1">Notas del Pedido</span>
+                {pedido.notes}
+              </div>
+            )}
 
             <Separator />
 
