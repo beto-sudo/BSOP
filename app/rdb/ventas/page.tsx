@@ -167,7 +167,7 @@ function OrderDetail({
 
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <SheetContent className="flex w-full flex-col sm:max-w-md">
+      <SheetContent className="flex w-full flex-col sm:max-w-xl md:max-w-2xl">
         <SheetHeader>
           <SheetTitle>Pedido #{pedido.order_id ?? pedido.id}</SheetTitle>
           <SheetDescription>{formatDate(pedido.timestamp)}</SheetDescription>
@@ -197,10 +197,10 @@ function OrderDetail({
               ) : (
                 <div className="space-y-2.5">
                   {items.map((item) => {
-                    const nombre = item.nombre ?? item.name ?? 'Producto';
+                    const nombre = item.product_name ?? item.nombre ?? item.name ?? 'Producto';
                     const qty = item.cantidad ?? item.quantity ?? 1;
-                    const price = item.precio ?? item.price;
-                    const sub = item.subtotal ?? (price != null ? price * qty : null);
+                    const price = item.unit_price ?? item.precio ?? item.price;
+                    const sub = item.total_price ?? item.subtotal ?? (price != null ? price * qty : null);
                     return (
                       <div
                         key={String(item.id)}
