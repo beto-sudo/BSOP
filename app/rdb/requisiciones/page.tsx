@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import {
   Table,
@@ -13,9 +13,9 @@ import {
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetDescription,
 } from '@/components/ui/sheet';
 import {
   Select,
@@ -30,91 +30,209 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
-import { CalendarDays, ClipboardList, RefreshCw, Search } from 'lucide-react';
+import {
+  CalendarDays,
+  CheckCircle2,
+  ClipboardList,
+  FilePlus2,
+  Package2,
+  RefreshCw,
+  Search,
+  ShoppingBasket,
+  User2,
+  XCircle,
+} from 'lucide-react';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+type RequisicionStatus =
+  | 'borrador'
+  | 'pendiente'
+  | 'autorizada'
+  | 'convertida_oc'
+  | 'cancelada';
 
-type Requisicion = {
-  id: string;
-  folio: string;
-  estatus: 'borrador' | 'enviada' | 'aprobada' | 'rechazada' | 'convertida';
-  solicitado_por: string | null;
-  aprobado_por: string | null;
-  fecha_solicitud: string | null;
-  fecha_necesidad: string | null;
-  notas: string | null;
-  created_at: string | null;
-  // lazy-loaded
-  items?: RequisicionItem[];
-};
+type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline';
 
 type RequisicionItem = {
   id: string;
+  requisicion_id?: string | null;
   producto_id: string | null;
-  descripcion: string;
-  cantidad: number;
+  descripcion: string | null;
+  cantidad: number | null;
   unidad: string | null;
-  notas: string | null;
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+type Requisicion = {
+  id: string;
+  folio: string | null;
+  estatus: string | null;
+  solicitado_por: string | null;
+  aprobado_por: string | null;
+  fecha_solicitud: string | null;
+  items?: RequisicionItem[];
+};
+
+type DraftItem = {
+  id: string;
+  producto: string;
+  cantidad: string;
+  unidad: string;
+  descripcion: string;
+};
 
 const TZ = 'America/Matamoros';
 
-function formatDate(ts: string | null | undefined) {
-  if (!ts) return '—';
-  return new Date(ts).toLocaleString('es-MX', {
-    timeZone: TZ,
-    dateStyle: 'short',
-    timeStyle: 'short',
-  });
-}
-
-function formatDateShort(date: string | null | undefined) {
-  if (!date) return '—';
-  return new Date(date).toLocaleDateString('es-MX', {
-    timeZone: TZ,
-    dateStyle: 'short',
-  });
-}
-
-type EstatusVariant = 'default' | 'secondary' | 'destructive' | 'outline';
-
-const ESTATUS_VARIANT: Record<Requisicion['estatus'], EstatusVariant> = {
-  borrador: 'outline',
-  enviada: 'secondary',
-  aprobada: 'default',
-  rechazada: 'destructive',
-  convertida: 'default',
+const STATUS_LABELS: Record<RequisicionStatus, string> = {
+  borrador: 'Borrador',
+  pendiente: 'Pendiente',
+  autorizada: 'Autorizada',
+  convertida_oc: 'Convertida a OC',
+  cancelada: 'Cancelada',
 };
 
-const ESTATUS_LABELS: Record<Requisicion['estatus'], string> = {
-  borrador: 'Borrador',
-  enviada: 'Enviada',
-  aprobada: 'Aprobada',
-  rechazada: 'Rechazada',
-  convertida: 'Convertida a OC',
+const STATUS_VARIANTS: Record<RequisicionStatus, BadgeVariant> = {
+  borrador: 'outline',
+  pendiente: 'secondary',
+  autorizada: 'default',
+  convertida_oc: 'default',
+  cancelada: 'destructive',
+};
+
+const STATUS_CLASSNAMES: Record<RequisicionStatus, string> = {
+  borrador: 'border-slate-300 text-slate-700',
+  pendiente: 'border-amber-200 bg-amber-50 text-amber-700',
+  autorizada: 'bg-emerald-600 text-white hover:bg-emerald-600',
+  convertida_oc: 'bg-blue-600 text-white hover:bg-blue-600',
+  cancelada: 'bg-red-600 text-white hover:bg-red-600',
 };
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'Todos los estados' },
   { value: 'borrador', label: 'Borrador' },
-  { value: 'enviada', label: 'Enviada' },
-  { value: 'aprobada', label: 'Aprobada' },
-  { value: 'rechazada', label: 'Rechazada' },
-  { value: 'convertida', label: 'Convertida a OC' },
+  { value: 'pendiente', label: 'Pendiente' },
+  { value: 'autorizada', label: 'Autorizada' },
+  { value: 'convertida_oc', label: 'Convertida a OC' },
+  { value: 'cancelada', label: 'Cancelada' },
+] as const;
+
+const MOCK_DRAFT_ITEMS: DraftItem[] = [
+  {
+    id: '1',
+    producto: 'Hielo en cubo',
+    cantidad: '8',
+    unidad: 'bolsas',
+    descripcion: 'Para barra principal y terraza',
+  },
+  {
+    id: '2',
+    producto: 'Refresco mineral',
+    cantidad: '3',
+    unidad: 'cajas',
+    descripcion: 'Reposición de fin de semana',
+  },
+  {
+    id: '3',
+    producto: 'Limón',
+    cantidad: '15',
+    unidad: 'kg',
+    descripcion: 'Consumo de barra',
+  },
 ];
 
-// ─── Summary Bar ──────────────────────────────────────────────────────────────
+function normalizeStatus(status: string | null | undefined): RequisicionStatus {
+  const value = String(status ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, '_');
+
+  switch (value) {
+    case 'borrador':
+    case 'draft':
+      return 'borrador';
+    case 'pendiente':
+    case 'pending':
+    case 'enviada':
+      return 'pendiente';
+    case 'autorizada':
+    case 'aprobada':
+    case 'approved':
+      return 'autorizada';
+    case 'convertida_a_oc':
+    case 'convertida_oc':
+    case 'convertida':
+    case 'oc':
+      return 'convertida_oc';
+    case 'cancelada':
+    case 'rechazada':
+    case 'cancelled':
+      return 'cancelada';
+    default:
+      return 'borrador';
+  }
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return '—';
+  return new Date(value).toLocaleDateString('es-MX', {
+    timeZone: TZ,
+    dateStyle: 'medium',
+  });
+}
+
+function safeCountLabel(count: number) {
+  return `${count} ítem${count === 1 ? '' : 's'}`;
+}
+
+function summarizeItems(items: RequisicionItem[] | undefined) {
+  if (!items || items.length === 0) return 'Sin artículos';
+  const names = items
+    .map((item) => item.descripcion?.trim())
+    .filter((value): value is string => Boolean(value));
+
+  if (names.length === 0) return safeCountLabel(items.length);
+  const preview = names.slice(0, 2).join(', ');
+  return names.length > 2 ? `${preview} +${names.length - 2}` : preview;
+}
+
+function requesterName(value: string | null | undefined) {
+  return value?.trim() || 'Barra Principal';
+}
+
+function DetailSkeleton() {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="flex justify-between gap-4">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-4 w-24" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: RequisicionStatus }) {
+  return (
+    <Badge variant={STATUS_VARIANTS[status]} className={STATUS_CLASSNAMES[status]}>
+      {STATUS_LABELS[status]}
+    </Badge>
+  );
+}
 
 function SummaryBar({ requisiciones }: { requisiciones: Requisicion[] }) {
-  const pendientes = requisiciones.filter((r) =>
-    ['borrador', 'enviada'].includes(r.estatus),
+  const pendientes = requisiciones.filter(
+    (req) => normalizeStatus(req.estatus) === 'pendiente',
   ).length;
-  const aprobadas = requisiciones.filter((r) => r.estatus === 'aprobada').length;
+  const autorizadas = requisiciones.filter(
+    (req) => normalizeStatus(req.estatus) === 'autorizada',
+  ).length;
+  const borradores = requisiciones.filter(
+    (req) => normalizeStatus(req.estatus) === 'borrador',
+  ).length;
 
   return (
-    <div className="grid grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
       <div className="rounded-xl border bg-card px-4 py-3">
         <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
           <ClipboardList className="h-3.5 w-3.5" />
@@ -123,31 +241,25 @@ function SummaryBar({ requisiciones }: { requisiciones: Requisicion[] }) {
         <div className="mt-1 text-2xl font-semibold tabular-nums">{requisiciones.length}</div>
       </div>
       <div className="rounded-xl border bg-card px-4 py-3">
-        <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          <Package2 className="h-3.5 w-3.5" />
           Pendientes
         </div>
-        <div
-          className={[
-            'mt-1 text-2xl font-semibold tabular-nums',
-            pendientes > 0 ? 'text-amber-500' : '',
-          ].join(' ')}
-        >
-          {pendientes}
-        </div>
+        <div className="mt-1 text-2xl font-semibold tabular-nums text-amber-600">{pendientes}</div>
       </div>
       <div className="rounded-xl border bg-card px-4 py-3">
-        <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Aprobadas
+        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          Autorizadas
         </div>
-        <div className="mt-1 text-2xl font-semibold tabular-nums">{aprobadas}</div>
+        <div className="mt-1 text-2xl font-semibold tabular-nums">{autorizadas}</div>
+        <div className="text-xs text-muted-foreground">{borradores} en borrador</div>
       </div>
     </div>
   );
 }
 
-// ─── Requisicion Detail Drawer ────────────────────────────────────────────────
-
-function RequisionDetail({
+function ExistingRequestSheet({
   requisicion,
   loadingItems,
   open,
@@ -159,66 +271,97 @@ function RequisionDetail({
   onClose: () => void;
 }) {
   if (!requisicion) return null;
+
+  const status = normalizeStatus(requisicion.estatus);
   const items = requisicion.items ?? [];
 
   return (
-    <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <SheetContent className="flex w-full flex-col sm:max-w-md">
+    <Sheet open={open} onOpenChange={(value) => !value && onClose()}>
+      <SheetContent className="flex w-full flex-col data-[side=right]:sm:max-w-xl data-[side=right]:md:max-w-2xl">
         <SheetHeader>
-          <SheetTitle>{requisicion.folio}</SheetTitle>
+          <SheetTitle>{requisicion.folio || 'Sin folio'}</SheetTitle>
           <SheetDescription>{formatDate(requisicion.fecha_solicitud)}</SheetDescription>
         </SheetHeader>
 
         <ScrollArea className="flex-1 pr-1">
           <div className="mt-6 space-y-6 pb-6">
-            <div className="flex items-center gap-3">
-              <Badge variant={ESTATUS_VARIANT[requisicion.estatus]}>
-                {ESTATUS_LABELS[requisicion.estatus]}
-              </Badge>
-              {requisicion.fecha_necesidad && (
-                <span className="text-sm text-muted-foreground">
-                  Necesario: {formatDateShort(requisicion.fecha_necesidad)}
-                </span>
-              )}
+            <div className="flex items-center justify-between gap-4">
+              <StatusBadge status={status} />
+              <span className="text-sm text-muted-foreground">
+                {safeCountLabel(items.length)}
+              </span>
             </div>
 
-            {requisicion.notas && (
-              <div className="rounded-lg border bg-muted/40 px-3 py-2.5 text-sm text-muted-foreground">
-                {requisicion.notas}
+            <div className="grid gap-4 rounded-xl border bg-muted/20 p-4 text-sm sm:grid-cols-2">
+              <div>
+                <span className="block text-xs uppercase tracking-wider text-muted-foreground">
+                  Solicitado por
+                </span>
+                <span className="font-medium text-foreground">
+                  {requesterName(requisicion.solicitado_por)}
+                </span>
               </div>
-            )}
+              <div>
+                <span className="block text-xs uppercase tracking-wider text-muted-foreground">
+                  Aprobado por
+                </span>
+                <span className="font-medium text-foreground">
+                  {requisicion.aprobado_por?.trim() || 'Pendiente'}
+                </span>
+              </div>
+            </div>
 
             <Separator />
 
-            {/* Items */}
-            <div>
-              <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Artículos solicitados
-              </div>
-              {loadingItems ? (
-                <div className="space-y-3">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="flex justify-between gap-4">
-                      <Skeleton className="h-4 w-40" />
-                      <Skeleton className="h-4 w-20" />
-                    </div>
-                  ))}
+            <div className="space-y-3">
+              <div>
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Artículos solicitados
                 </div>
+                <p className="text-sm text-muted-foreground">
+                  Detalle de lo que pidió el área para surtir o convertir a orden de compra.
+                </p>
+              </div>
+
+              {loadingItems ? (
+                <DetailSkeleton />
               ) : items.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Sin artículos registrados</p>
+                <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                  Esta requisición no tiene artículos cargados todavía.
+                </div>
               ) : (
-                <div className="space-y-2.5">
-                  {items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-start justify-between gap-4 text-sm"
-                    >
-                      <span className="text-foreground">{item.descripcion}</span>
-                      <span className="shrink-0 tabular-nums font-medium text-muted-foreground">
-                        {item.cantidad} {item.unidad ?? 'pzs'}
-                      </span>
-                    </div>
-                  ))}
+                <div className="overflow-hidden rounded-xl border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Artículo</TableHead>
+                        <TableHead className="w-32 text-right">Cantidad</TableHead>
+                        <TableHead className="w-28">Unidad</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {items.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell>
+                            <div className="font-medium text-foreground">
+                              {item.descripcion?.trim() || 'Artículo sin descripción'}
+                            </div>
+                            {item.producto_id ? (
+                              <div className="text-xs text-muted-foreground">
+                                Producto ID: {item.producto_id}
+                              </div>
+                            ) : null}
+                          </TableCell>
+                          <TableCell className="text-right font-medium tabular-nums">
+                            {item.cantidad ?? '—'}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {item.unidad || 'pza'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               )}
             </div>
@@ -229,7 +372,184 @@ function RequisionDetail({
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+function NewRequestSheet({
+  open,
+  onClose,
+  draftItems,
+  onDraftItemChange,
+  onAddDraftItem,
+  onRemoveDraftItem,
+}: {
+  open: boolean;
+  onClose: () => void;
+  draftItems: DraftItem[];
+  onDraftItemChange: (id: string, field: keyof DraftItem, value: string) => void;
+  onAddDraftItem: () => void;
+  onRemoveDraftItem: (id: string) => void;
+}) {
+  return (
+    <Sheet open={open} onOpenChange={(value) => !value && onClose()}>
+      <SheetContent className="flex w-full flex-col data-[side=right]:sm:max-w-xl data-[side=right]:md:max-w-2xl">
+        <SheetHeader>
+          <SheetTitle>Nueva Requisición</SheetTitle>
+          <SheetDescription>
+            Cascarón visual para capturar productos antes de enviarlos a autorización.
+          </SheetDescription>
+        </SheetHeader>
+
+        <ScrollArea className="flex-1 pr-1">
+          <div className="mt-6 space-y-6 pb-6">
+            <div className="rounded-2xl border bg-gradient-to-br from-muted/40 to-background p-4">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Vista previa
+                  </div>
+                  <div className="mt-1 text-lg font-semibold">REQ-BORRADOR</div>
+                  <p className="text-sm text-muted-foreground">
+                    Así se ve una requisición nueva antes de guardarse en DB.
+                  </p>
+                </div>
+                <StatusBadge status="borrador" />
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border bg-background p-3">
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
+                    <User2 className="h-3.5 w-3.5" />
+                    Solicitante
+                  </div>
+                  <div className="mt-1 font-medium">Barra Principal</div>
+                </div>
+                <div className="rounded-xl border bg-background p-3">
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    Fecha solicitud
+                  </div>
+                  <div className="mt-1 font-medium">{formatDate(new Date().toISOString())}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-semibold">Artículos solicitados</div>
+                  <p className="text-sm text-muted-foreground">
+                    El flujo de búsqueda/guardado puede conectarse después, pero la experiencia ya queda definida.
+                  </p>
+                </div>
+                <Button variant="outline" onClick={onAddDraftItem}>
+                  <FilePlus2 className="mr-2 h-4 w-4" />
+                  Agregar producto
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                {draftItems.map((item, index) => (
+                  <div key={item.id} className="rounded-xl border p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <div className="text-sm font-medium">Artículo {index + 1}</div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground"
+                        onClick={() => onRemoveDraftItem(item.id)}
+                        disabled={draftItems.length === 1}
+                      >
+                        Quitar
+                      </Button>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="sm:col-span-2">
+                        <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          Producto
+                        </label>
+                        <Input
+                          value={item.producto}
+                          onChange={(event) =>
+                            onDraftItemChange(item.id, 'producto', event.target.value)
+                          }
+                          placeholder="Buscar o escribir producto"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          Cantidad
+                        </label>
+                        <Input
+                          value={item.cantidad}
+                          onChange={(event) =>
+                            onDraftItemChange(item.id, 'cantidad', event.target.value)
+                          }
+                          placeholder="0"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          Unidad
+                        </label>
+                        <Input
+                          value={item.unidad}
+                          onChange={(event) =>
+                            onDraftItemChange(item.id, 'unidad', event.target.value)
+                          }
+                          placeholder="pza, caja, kg..."
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          Descripción / notas
+                        </label>
+                        <Input
+                          value={item.descripcion}
+                          onChange={(event) =>
+                            onDraftItemChange(item.id, 'descripcion', event.target.value)
+                          }
+                          placeholder="Ej. consumo fin de semana"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="rounded-xl border border-dashed bg-muted/20 p-4">
+              <div className="flex items-start gap-3">
+                <ShoppingBasket className="mt-0.5 h-5 w-5 text-muted-foreground" />
+                <div>
+                  <div className="font-medium">Siguiente paso sugerido</div>
+                  <p className="text-sm text-muted-foreground">
+                    Conectar este formulario a catálogo de productos, validación de stock y guardado en
+                    <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">rdb.requisiciones</code>
+                    y
+                    <code className="ml-1 rounded bg-muted px-1 py-0.5 text-xs">rdb.requisiciones_items</code>.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-3">
+              <Button variant="outline" onClick={onClose}>
+                Cancelar
+              </Button>
+              <Button disabled>
+                Guardar requisición próximamente
+              </Button>
+            </div>
+          </div>
+        </ScrollArea>
+      </SheetContent>
+    </Sheet>
+  );
+}
 
 export default function RequisicionesPage() {
   const [requisiciones, setRequisiciones] = useState<Requisicion[]>([]);
@@ -241,28 +561,36 @@ export default function RequisicionesPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [selected, setSelected] = useState<Requisicion | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [newOpen, setNewOpen] = useState(false);
+  const [draftItems, setDraftItems] = useState<DraftItem[]>(MOCK_DRAFT_ITEMS);
 
   const fetchRequisiciones = useCallback(async () => {
     setLoading(true);
     setError(null);
+
     try {
       const supabase = createSupabaseBrowserClient();
       let query = supabase
         .schema('rdb')
         .from('requisiciones')
         .select('*')
-        .order('created_at', { ascending: false })
+        .order('fecha_solicitud', { ascending: false })
         .limit(200);
 
-      if (dateFrom) query = query.gte('fecha_solicitud', `${dateFrom}T00:00:00`);
-      if (dateTo) query = query.lte('fecha_solicitud', `${dateTo}T23:59:59`);
+      if (dateFrom) {
+        query = query.gte('fecha_solicitud', `${dateFrom}T00:00:00`);
+      }
+      if (dateTo) {
+        query = query.lte('fecha_solicitud', `${dateTo}T23:59:59`);
+      }
 
-      const { data, error: err } = await query;
-      if (err) throw err;
-      setRequisiciones(data ?? []);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Error al cargar requisiciones');
+      const { data, error: fetchError } = await query;
+      if (fetchError) throw fetchError;
+
+      setRequisiciones((data ?? []) as Requisicion[]);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error al cargar requisiciones');
     } finally {
       setLoading(false);
     }
@@ -272,65 +600,121 @@ export default function RequisicionesPage() {
     void fetchRequisiciones();
   }, [fetchRequisiciones]);
 
-  const openDetail = async (req: Requisicion) => {
-    setSelected(req);
-    setDrawerOpen(true);
+  const openDetail = async (requisicion: Requisicion) => {
+    setSelected(requisicion);
+    setDetailOpen(true);
     setLoadingItems(true);
+
     try {
       const supabase = createSupabaseBrowserClient();
-      const { data } = await supabase
+      const { data, error: itemsError } = await supabase
         .schema('rdb')
         .from('requisiciones_items')
         .select('*')
-        .eq('requisicion_id', req.id);
+        .eq('requisicion_id', requisicion.id)
+        .limit(100);
+
+      if (itemsError) throw itemsError;
+
       setSelected((prev) =>
-        prev?.id === req.id ? { ...prev, items: data ?? [] } : prev,
+        prev?.id === requisicion.id ? { ...prev, items: (data ?? []) as RequisicionItem[] } : prev,
       );
     } catch {
-      // non-fatal
+      setSelected((prev) => (prev?.id === requisicion.id ? { ...prev, items: [] } : prev));
     } finally {
       setLoadingItems(false);
     }
   };
 
-  const filtered = requisiciones.filter((r) => {
-    if (statusFilter !== 'all' && r.estatus !== statusFilter) return false;
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return r.folio.toLowerCase().includes(q) || (r.notas ?? '').toLowerCase().includes(q);
-  });
+  const filtered = useMemo(() => {
+    return requisiciones.filter((req) => {
+      const normalizedStatus = normalizeStatus(req.estatus);
+      if (statusFilter !== 'all' && normalizedStatus !== statusFilter) return false;
+
+      if (!search.trim()) return true;
+      const q = search.toLowerCase();
+      return (
+        (req.folio ?? '').toLowerCase().includes(q) ||
+        requesterName(req.solicitado_por).toLowerCase().includes(q) ||
+        STATUS_LABELS[normalizedStatus].toLowerCase().includes(q)
+      );
+    });
+  }, [requisiciones, search, statusFilter]);
+
+  const handleDraftItemChange = (id: string, field: keyof DraftItem, value: string) => {
+    setDraftItems((current) =>
+      current.map((item) => (item.id === id ? { ...item, [field]: value } : item)),
+    );
+  };
+
+  const handleAddDraftItem = () => {
+    setDraftItems((current) => [
+      ...current,
+      {
+        id: String(Date.now()),
+        producto: '',
+        cantidad: '',
+        unidad: '',
+        descripcion: '',
+      },
+    ]);
+  };
+
+  const handleRemoveDraftItem = (id: string) => {
+    setDraftItems((current) =>
+      current.length === 1 ? current : current.filter((item) => item.id !== id),
+    );
+  };
+
+  const emptyState = (
+    <TableRow>
+      <TableCell colSpan={5} className="py-12 text-center text-muted-foreground">
+        No se encontraron requisiciones para los filtros seleccionados.
+      </TableCell>
+    </TableRow>
+  );
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Requisiciones</h1>
-        <p className="text-sm text-muted-foreground">Solicitudes de compra internas</p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Requisiciones</h1>
+          <p className="text-sm text-muted-foreground">
+            Solicitudes de compra internas para abastecer áreas operativas.
+          </p>
+        </div>
+        <Button
+          onClick={() => {
+            setNewOpen(true);
+            setDetailOpen(false);
+          }}
+        >
+          <FilePlus2 className="mr-2 h-4 w-4" />
+          Nueva Requisición
+        </Button>
       </div>
 
-      {/* Summary */}
-      {!loading && !error && <SummaryBar requisiciones={filtered} />}
+      {!loading && !error ? <SummaryBar requisiciones={filtered} /> : null}
 
-      {/* Filters */}
       <div className="flex flex-wrap items-end gap-3">
-        <div className="relative min-w-44">
+        <div className="relative min-w-52">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Buscar folio…"
+            placeholder="Buscar folio, solicitante o estado..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(event) => setSearch(event.target.value)}
             className="pl-9"
           />
         </div>
 
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? 'all')}>
-          <SelectTrigger className="w-44">
+        <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value ?? 'all')}>
+          <SelectTrigger className="w-48">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {STATUS_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
+            {STATUS_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -341,7 +725,7 @@ export default function RequisicionesPage() {
           <Input
             type="date"
             value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
+            onChange={(event) => setDateFrom(event.target.value)}
             className="w-36"
             aria-label="Fecha desde"
           />
@@ -349,99 +733,96 @@ export default function RequisicionesPage() {
           <Input
             type="date"
             value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
+            onChange={(event) => setDateTo(event.target.value)}
             className="w-36"
             aria-label="Fecha hasta"
           />
         </div>
 
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => void fetchRequisiciones()}
-          aria-label="Actualizar"
-        >
+        <Button variant="outline" size="icon" onClick={() => void fetchRequisiciones()} aria-label="Actualizar">
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
         </Button>
 
         <span className="text-sm text-muted-foreground">
           {loading
             ? 'Cargando…'
-            : `${filtered.length} requisición${filtered.length !== 1 ? 'es' : ''}`}
+            : `${filtered.length} requisición${filtered.length === 1 ? '' : 'es'}`}
         </span>
       </div>
 
-      {/* Error */}
-      {error && (
+      {error ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {error}
         </div>
-      )}
+      ) : null}
 
-      {/* Table */}
       <div className="rounded-xl border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Folio</TableHead>
               <TableHead>Fecha Solicitud</TableHead>
-              <TableHead>Fecha Necesidad</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Notas</TableHead>
+              <TableHead>Solicitante</TableHead>
+              <TableHead>Estatus</TableHead>
+              <TableHead>Ítems</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading ? (
-              Array.from({ length: 6 }).map((_, i) => (
-                <TableRow key={i}>
-                  {Array.from({ length: 5 }).map((__, j) => (
-                    <TableCell key={j}>
-                      <Skeleton className="h-4 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : filtered.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="py-12 text-center text-muted-foreground">
-                  No se encontraron requisiciones.
-                </TableCell>
-              </TableRow>
-            ) : (
-              filtered.map((req) => (
-                <TableRow
-                  key={req.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => void openDetail(req)}
-                >
-                  <TableCell className="font-mono text-xs font-medium">{req.folio}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {formatDate(req.fecha_solicitud)}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {formatDateShort(req.fecha_necesidad)}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={ESTATUS_VARIANT[req.estatus]}>
-                      {ESTATUS_LABELS[req.estatus]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="max-w-48 truncate text-sm text-muted-foreground">
-                    {req.notas ?? '—'}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
+            {loading
+              ? Array.from({ length: 6 }).map((_, rowIndex) => (
+                  <TableRow key={rowIndex}>
+                    {Array.from({ length: 5 }).map((__, cellIndex) => (
+                      <TableCell key={cellIndex}>
+                        <Skeleton className="h-4 w-full" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              : filtered.length === 0
+                ? emptyState
+                : filtered.map((req) => {
+                    const normalizedStatus = normalizeStatus(req.estatus);
+                    const items = req.items ?? [];
+                    return (
+                      <TableRow
+                        key={req.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => void openDetail(req)}
+                      >
+                        <TableCell className="font-mono text-xs font-medium">
+                          {req.folio || '—'}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {formatDate(req.fecha_solicitud)}
+                        </TableCell>
+                        <TableCell className="text-sm">{requesterName(req.solicitado_por)}</TableCell>
+                        <TableCell>
+                          <StatusBadge status={normalizedStatus} />
+                        </TableCell>
+                        <TableCell className="max-w-64 text-sm text-muted-foreground">
+                          {items.length > 0 ? summarizeItems(items) : safeCountLabel(items.length)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
           </TableBody>
         </Table>
       </div>
 
-      {/* Detail drawer */}
-      <RequisionDetail
+      <ExistingRequestSheet
         requisicion={selected}
         loadingItems={loadingItems}
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+      />
+
+      <NewRequestSheet
+        open={newOpen}
+        onClose={() => setNewOpen(false)}
+        draftItems={draftItems}
+        onDraftItemChange={handleDraftItemChange}
+        onAddDraftItem={handleAddDraftItem}
+        onRemoveDraftItem={handleRemoveDraftItem}
       />
     </div>
   );

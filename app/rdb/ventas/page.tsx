@@ -359,7 +359,7 @@ export default function VentasPage() {
         .from('pedidos')
         .select('*')
         .order('timestamp', { ascending: false })
-        .limit(500);
+        ;
 
       if (dateFrom) query = query.gte('timestamp', `${dateFrom}T00:00:00-06:00`);
       if (dateTo) query = query.lte('timestamp', `${dateTo}T23:59:59-06:00`);
@@ -508,7 +508,9 @@ export default function VentasPage() {
             <TableRow>
               <TableHead>Folio</TableHead>
               <TableHead>Fecha/Hora</TableHead>
-              <TableHead className="text-right">Total</TableHead>
+              <TableHead>Área</TableHead>
+                  <TableHead>Mesa</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
               <TableHead>Estado</TableHead>
             </TableRow>
           </TableHeader>

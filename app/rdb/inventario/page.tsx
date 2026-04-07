@@ -17,13 +17,36 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Separator } from '@/components/ui/separator';
-import { Boxes, RefreshCw, Search, AlertTriangle, TrendingDown, TrendingUp } from 'lucide-react';
+import {
+  AlertTriangle,
+  Boxes,
+  ClipboardList,
+  Plus,
+  RefreshCw,
+  Search,
+  TrendingDown,
+  TrendingUp,
+} from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,17 +62,47 @@ type StockItem = {
   bajo_minimo: boolean;
 };
 
-type Movimiento = {
+type MovimientoRow = {
   id: string;
+  producto_id: string;
   tipo: 'entrada' | 'salida' | 'ajuste';
   cantidad: number;
   costo_unitario: number | null;
   referencia_tipo: string | null;
   notas: string | null;
   created_at: string | null;
+  productos: { nombre: string } | null;
 };
 
+type TipoUI = 'ajuste_positivo' | 'ajuste_negativo' | 'merma' | 'consumo_interno';
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const TIPO_OPTIONS: { value: TipoUI; label: string; desc: string }[] = [
+  { value: 'ajuste_positivo', label: 'Ajuste Positivo', desc: 'Encontré algo perdido' },
+  { value: 'ajuste_negativo', label: 'Ajuste Negativo', desc: 'Me faltan' },
+  { value: 'merma', label: 'Merma', desc: 'Se rompió / echó a perder' },
+  { value: 'consumo_interno', label: 'Consumo Interno', desc: 'Regalía, cortesía, evento interno' },
+];
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function mapTipoToDb(
+  tipo: TipoUI,
+  cantidad: number,
+): { tipoDB: string; cantidadSigned: number } {
+  const abs = Math.abs(cantidad);
+  switch (tipo) {
+    case 'ajuste_positivo':
+      return { tipoDB: 'ajuste', cantidadSigned: abs };
+    case 'ajuste_negativo':
+      return { tipoDB: 'ajuste', cantidadSigned: -abs };
+    case 'merma':
+      return { tipoDB: 'salida', cantidadSigned: -abs };
+    case 'consumo_interno':
+      return { tipoDB: 'salida', cantidadSigned: -abs };
+  }
+}
 
 function formatDate(ts: string | null | undefined) {
   if (!ts) return '—';
@@ -60,9 +113,18 @@ function formatDate(ts: string | null | undefined) {
   });
 }
 
-function formatCurrency(amount: number | null | undefined) {
-  if (amount == null) return '—';
-  return amount.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
+function tipoLabel(tipo: string, cantidad: number): string {
+  if (tipo === 'entrada') return 'Entrada';
+  if (tipo === 'salida') return 'Salida';
+  if (tipo === 'ajuste') return cantidad >= 0 ? 'Ajuste +' : 'Ajuste −';
+  return tipo;
+}
+
+function tipoColorClass(tipo: string, cantidad: number): string {
+  const isPositive = tipo === 'entrada' || (tipo === 'ajuste' && cantidad >= 0);
+  return isPositive
+    ? 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400'
+    : 'border-red-500/40 text-red-600 dark:text-red-400';
 }
 
 // ─── Summary Bar ──────────────────────────────────────────────────────────────
@@ -70,7 +132,6 @@ function formatCurrency(amount: number | null | undefined) {
 function SummaryBar({ items }: { items: StockItem[] }) {
   const bajosMinimo = items.filter((i) => i.bajo_minimo).length;
   const sinStock = items.filter((i) => i.stock_actual <= 0).length;
-
   return (
     <div className="grid grid-cols-3 gap-3">
       <div className="rounded-xl border bg-card px-4 py-3">
@@ -86,10 +147,7 @@ function SummaryBar({ items }: { items: StockItem[] }) {
           Bajo mínimo
         </div>
         <div
-          className={[
-            'mt-1 text-2xl font-semibold tabular-nums',
-            bajosMinimo > 0 ? 'text-amber-500' : '',
-          ].join(' ')}
+          className={`mt-1 text-2xl font-semibold tabular-nums${bajosMinimo > 0 ? ' text-amber-500' : ''}`}
         >
           {bajosMinimo}
         </div>
@@ -100,10 +158,7 @@ function SummaryBar({ items }: { items: StockItem[] }) {
           Sin stock
         </div>
         <div
-          className={[
-            'mt-1 text-2xl font-semibold tabular-nums',
-            sinStock > 0 ? 'text-destructive' : '',
-          ].join(' ')}
+          className={`mt-1 text-2xl font-semibold tabular-nums${sinStock > 0 ? ' text-destructive' : ''}`}
         >
           {sinStock}
         </div>
@@ -112,36 +167,18 @@ function SummaryBar({ items }: { items: StockItem[] }) {
   );
 }
 
-// ─── Movement History Drawer ──────────────────────────────────────────────────
+// ─── Stock Detail Drawer ──────────────────────────────────────────────────────
 
-function MovimientosSkeleton() {
-  return (
-    <div className="space-y-3">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="flex justify-between gap-4">
-          <Skeleton className="h-4 w-40" />
-          <Skeleton className="h-4 w-20" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function InventarioDetail({
+function StockDetailDrawer({
   item,
-  movimientos,
-  loadingMovimientos,
   open,
   onClose,
 }: {
   item: StockItem | null;
-  movimientos: Movimiento[];
-  loadingMovimientos: boolean;
   open: boolean;
   onClose: () => void;
 }) {
   if (!item) return null;
-
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <SheetContent className="flex w-full flex-col sm:max-w-md">
@@ -151,18 +188,13 @@ function InventarioDetail({
             {item.categoria ?? 'Sin categoría'} · {item.unidad ?? 'pieza'}
           </SheetDescription>
         </SheetHeader>
-
         <ScrollArea className="flex-1 pr-1">
-          <div className="mt-6 space-y-6 pb-6">
-            {/* Stock summary */}
+          <div className="mt-6 space-y-4 pb-6">
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-lg border bg-muted/40 px-3 py-2.5">
                 <div className="text-xs text-muted-foreground">Stock actual</div>
                 <div
-                  className={[
-                    'mt-1 text-xl font-semibold tabular-nums',
-                    item.bajo_minimo ? 'text-amber-500' : '',
-                  ].join(' ')}
+                  className={`mt-1 text-xl font-semibold tabular-nums${item.bajo_minimo ? ' text-amber-500' : ''}`}
                 >
                   {item.stock_actual} {item.unidad ?? 'pzs'}
                 </div>
@@ -174,78 +206,12 @@ function InventarioDetail({
                 </div>
               </div>
             </div>
-
             {item.bajo_minimo && (
               <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-600 dark:text-amber-400">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
                 Stock por debajo del mínimo
               </div>
             )}
-
-            <Separator />
-
-            {/* Movement history */}
-            <div>
-              <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Movimientos recientes
-              </div>
-              {loadingMovimientos ? (
-                <MovimientosSkeleton />
-              ) : movimientos.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Sin movimientos registrados</p>
-              ) : (
-                <div className="space-y-2">
-                  {movimientos.map((mov) => (
-                    <div
-                      key={mov.id}
-                      className="flex items-start justify-between gap-4 text-sm"
-                    >
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          {mov.tipo === 'entrada' ? (
-                            <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
-                          ) : mov.tipo === 'salida' ? (
-                            <TrendingDown className="h-3.5 w-3.5 text-destructive" />
-                          ) : (
-                            <span className="h-3.5 w-3.5 text-muted-foreground">~</span>
-                          )}
-                          <span className="capitalize font-medium">{mov.tipo}</span>
-                          {mov.referencia_tipo && (
-                            <Badge variant="outline" className="text-[10px] px-1 py-0">
-                              {mov.referencia_tipo.replace('_', ' ')}
-                            </Badge>
-                          )}
-                        </div>
-                        {mov.notas && (
-                          <p className="mt-0.5 text-xs text-muted-foreground">{mov.notas}</p>
-                        )}
-                        <p className="text-xs text-muted-foreground">{formatDate(mov.created_at)}</p>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <span
-                          className={[
-                            'font-medium tabular-nums',
-                            mov.tipo === 'entrada'
-                              ? 'text-emerald-500'
-                              : mov.tipo === 'salida'
-                              ? 'text-destructive'
-                              : '',
-                          ].join(' ')}
-                        >
-                          {mov.tipo === 'salida' ? '-' : '+'}
-                          {Math.abs(mov.cantidad)}
-                        </span>
-                        {mov.costo_unitario != null && (
-                          <p className="text-xs text-muted-foreground">
-                            {formatCurrency(mov.costo_unitario)} / u
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
         </ScrollArea>
       </SheetContent>
@@ -253,65 +219,271 @@ function InventarioDetail({
   );
 }
 
+// ─── Registrar Movimiento Dialog ──────────────────────────────────────────────
+
+function RegistrarMovimientoDialog({
+  open,
+  onClose,
+  productos,
+  onSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  productos: StockItem[];
+  onSuccess: () => void;
+}) {
+  const [productoId, setProductoId] = useState('');
+  const [tipo, setTipo] = useState<TipoUI>('ajuste_positivo');
+  const [cantidad, setCantidad] = useState('');
+  const [notas, setNotas] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setProductoId('');
+      setTipo('ajuste_positivo');
+      setCantidad('');
+      setNotas('');
+      setFormError(null);
+    }
+  }, [open]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!productoId) {
+      setFormError('Selecciona un producto.');
+      return;
+    }
+    const cantNum = parseFloat(cantidad);
+    if (!cantidad || isNaN(cantNum) || cantNum <= 0) {
+      setFormError('Ingresa una cantidad positiva mayor a cero.');
+      return;
+    }
+    setSaving(true);
+    setFormError(null);
+    try {
+      const { tipoDB, cantidadSigned } = mapTipoToDb(tipo, cantNum);
+      const supabase = createSupabaseBrowserClient();
+      const { error } = await supabase
+        .schema('rdb')
+        .from('inventario_movimientos')
+        .insert({
+          producto_id: productoId,
+          tipo: tipoDB,
+          cantidad: cantidadSigned,
+          referencia_tipo: 'ajuste_manual',
+          notas: notas.trim() || null,
+        });
+      if (error) throw error;
+      onSuccess();
+      onClose();
+    } catch (e: unknown) {
+      setFormError(
+        e instanceof Error ? e.message : 'Error al registrar movimiento',
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const tipoSeleccionado = TIPO_OPTIONS.find((t) => t.value === tipo);
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Registrar Movimiento</DialogTitle>
+          <DialogDescription>Ajusta el inventario manualmente.</DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+          {/* Producto */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Producto</label>
+            <Select value={productoId} onValueChange={(v) => setProductoId(v ?? '')}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Seleccionar producto…" />
+              </SelectTrigger>
+              <SelectContent>
+                {productos.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.nombre}
+                    {p.bajo_minimo ? ' ⚠' : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Tipo */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Tipo de movimiento</label>
+            <Select value={tipo} onValueChange={(v) => setTipo(v as TipoUI)}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TIPO_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {tipoSeleccionado && (
+              <p className="text-xs text-muted-foreground">{tipoSeleccionado.desc}</p>
+            )}
+          </div>
+
+          {/* Cantidad */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Cantidad</label>
+            <Input
+              type="number"
+              min="0.01"
+              step="any"
+              placeholder="Ej. 3"
+              value={cantidad}
+              onChange={(e) => setCantidad(e.target.value)}
+            />
+          </div>
+
+          {/* Notas */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">
+              Notas / Motivo{' '}
+              <span className="font-normal text-muted-foreground">(opcional)</span>
+            </label>
+            <textarea
+              className="w-full min-h-[80px] resize-none rounded-lg border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              placeholder="Ej. Se rompió vaso en evento"
+              value={notas}
+              onChange={(e) => setNotas(e.target.value)}
+            />
+          </div>
+
+          {formError && (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {formError}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={saving}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Guardando…' : 'Guardar'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+type Tab = 'stock' | 'movimientos';
+
 export default function InventarioPage() {
+  // Stock state
   const [items, setItems] = useState<StockItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadingStock, setLoadingStock] = useState(true);
+  const [errorStock, setErrorStock] = useState<string | null>(null);
+
+  // Movimientos (kardex) state
+  const [movimientos, setMovimientos] = useState<MovimientoRow[]>([]);
+  const [loadingMovimientos, setLoadingMovimientos] = useState(false);
+  const [errorMovimientos, setErrorMovimientos] = useState<string | null>(null);
+  const [kardexLoaded, setKardexLoaded] = useState(false);
+
+  // UI state
+  const [tab, setTab] = useState<Tab>('stock');
   const [search, setSearch] = useState('');
   const [showBajoMinimo, setShowBajoMinimo] = useState(false);
-  const [selected, setSelected] = useState<StockItem | null>(null);
-  const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
-  const [loadingMovimientos, setLoadingMovimientos] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
-  const fetchInventario = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const fetchStock = useCallback(async () => {
+    setLoadingStock(true);
+    setErrorStock(null);
     try {
       const supabase = createSupabaseBrowserClient();
-      const { data, error: err } = await supabase
+      const { data, error } = await supabase
         .schema('rdb')
         .from('v_stock_actual')
         .select('*')
         .order('nombre');
-      if (err) throw err;
-      setItems(data ?? []);
+      if (error) throw error;
+      setItems((data ?? []) as StockItem[]);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Error al cargar inventario');
+      setErrorStock(e instanceof Error ? e.message : 'Error al cargar inventario');
     } finally {
-      setLoading(false);
+      setLoadingStock(false);
+    }
+  }, []);
+
+  const fetchMovimientos = useCallback(async () => {
+    setLoadingMovimientos(true);
+    setErrorMovimientos(null);
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { data, error } = await supabase
+        .schema('rdb')
+        .from('inventario_movimientos')
+        .select('*, productos(nombre)')
+        .order('created_at', { ascending: false })
+        .limit(300);
+      if (error) throw error;
+      setMovimientos((data ?? []) as MovimientoRow[]);
+      setKardexLoaded(true);
+    } catch (e: unknown) {
+      setErrorMovimientos(
+        e instanceof Error ? e.message : 'Error al cargar movimientos',
+      );
+    } finally {
+      setLoadingMovimientos(false);
     }
   }, []);
 
   useEffect(() => {
-    void fetchInventario();
-  }, [fetchInventario]);
+    void fetchStock();
+  }, [fetchStock]);
 
-  const openDetail = async (item: StockItem) => {
-    setSelected(item);
-    setDrawerOpen(true);
-    setLoadingMovimientos(true);
-    setMovimientos([]);
-    try {
-      const supabase = createSupabaseBrowserClient();
-      const { data } = await supabase
-        .schema('rdb')
-        .from('inventario_movimientos')
-        .select('*')
-        .eq('producto_id', item.id)
-        .order('created_at', { ascending: false })
-        .limit(50);
-      setMovimientos(data ?? []);
-    } catch {
-      // non-fatal
-    } finally {
-      setLoadingMovimientos(false);
+  // Lazy-load kardex on first switch to movimientos tab
+  useEffect(() => {
+    if (tab === 'movimientos' && !kardexLoaded) {
+      void fetchMovimientos();
+    }
+  }, [tab, kardexLoaded, fetchMovimientos]);
+
+  const handleTabChange = (newTab: Tab) => {
+    setTab(newTab);
+    setSearch('');
+  };
+
+  const handleRefresh = () => {
+    if (tab === 'stock') {
+      void fetchStock();
+    } else {
+      void fetchMovimientos();
     }
   };
 
-  const filtered = items.filter((i) => {
+  const handleSuccess = () => {
+    void fetchStock();
+    if (kardexLoaded) void fetchMovimientos();
+  };
+
+  const filteredStock = items.filter((i) => {
     if (showBajoMinimo && !i.bajo_minimo) return false;
     if (!search) return true;
     const q = search.toLowerCase();
@@ -321,142 +493,297 @@ export default function InventarioPage() {
     );
   });
 
+  const filteredMovimientos = movimientos.filter((m) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      (m.productos?.nombre ?? '').toLowerCase().includes(q) ||
+      (m.notas ?? '').toLowerCase().includes(q)
+    );
+  });
+
+  const isLoading = tab === 'stock' ? loadingStock : loadingMovimientos;
+  const currentError = tab === 'stock' ? errorStock : errorMovimientos;
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Inventario</h1>
-        <p className="text-sm text-muted-foreground">Stock actual por producto</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Inventario</h1>
+          <p className="text-sm text-muted-foreground">Control de stock y movimientos</p>
+        </div>
+        <Button className="shrink-0 gap-2" onClick={() => setDialogOpen(true)}>
+          <Plus className="h-4 w-4" />
+          Registrar Movimiento
+        </Button>
       </div>
 
-      {/* Summary */}
-      {!loading && !error && <SummaryBar items={filtered} />}
+      {/* Summary (stock tab only) */}
+      {tab === 'stock' && !loadingStock && !errorStock && (
+        <SummaryBar items={filteredStock} />
+      )}
+
+      {/* Tab toggle */}
+      <div className="flex w-fit gap-1 rounded-lg border bg-muted/30 p-1">
+        <button
+          type="button"
+          onClick={() => handleTabChange('stock')}
+          className={[
+            'flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+            tab === 'stock'
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground',
+          ].join(' ')}
+        >
+          <Boxes className="h-4 w-4" />
+          Stock Actual
+        </button>
+        <button
+          type="button"
+          onClick={() => handleTabChange('movimientos')}
+          className={[
+            'flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+            tab === 'movimientos'
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground',
+          ].join(' ')}
+        >
+          <ClipboardList className="h-4 w-4" />
+          Movimientos
+        </button>
+      </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="relative min-w-52">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Buscar producto…"
+            placeholder={
+              tab === 'stock' ? 'Buscar producto…' : 'Buscar producto o nota…'
+            }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
           />
         </div>
 
-        <Button
-          variant={showBajoMinimo ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setShowBajoMinimo((v) => !v)}
-          className="gap-2"
-        >
-          <AlertTriangle className="h-3.5 w-3.5" />
-          Solo bajo mínimo
-        </Button>
+        {tab === 'stock' && (
+          <Button
+            variant={showBajoMinimo ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setShowBajoMinimo((v) => !v)}
+            className="gap-2"
+          >
+            <AlertTriangle className="h-3.5 w-3.5" />
+            Solo bajo mínimo
+          </Button>
+        )}
 
         <Button
           variant="outline"
           size="icon"
-          onClick={() => void fetchInventario()}
+          onClick={handleRefresh}
           aria-label="Actualizar"
         >
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
         </Button>
 
         <span className="text-sm text-muted-foreground">
-          {loading ? 'Cargando…' : `${filtered.length} producto${filtered.length !== 1 ? 's' : ''}`}
+          {isLoading
+            ? 'Cargando…'
+            : tab === 'stock'
+            ? `${filteredStock.length} producto${filteredStock.length !== 1 ? 's' : ''}`
+            : `${filteredMovimientos.length} movimiento${filteredMovimientos.length !== 1 ? 's' : ''}`}
         </span>
       </div>
 
       {/* Error */}
-      {error && (
+      {currentError && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {error}
+          {currentError}
         </div>
       )}
 
-      {/* Table */}
-      <div className="rounded-xl border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Producto</TableHead>
-              <TableHead>Categoría</TableHead>
-              <TableHead className="text-right">Stock Actual</TableHead>
-              <TableHead className="text-right">Mínimo</TableHead>
-              <TableHead>Estado</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              Array.from({ length: 8 }).map((_, i) => (
-                <TableRow key={i}>
-                  {Array.from({ length: 5 }).map((__, j) => (
-                    <TableCell key={j}>
-                      <Skeleton className="h-4 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : filtered.length === 0 ? (
+      {/* ── Stock Table ────────────────────────────────────────────────────── */}
+      {tab === 'stock' && (
+        <div className="rounded-xl border bg-card">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={5} className="py-12 text-center text-muted-foreground">
-                  No se encontraron productos.
-                </TableCell>
+                <TableHead>Producto</TableHead>
+                <TableHead>Categoría</TableHead>
+                <TableHead className="text-right">Stock Actual</TableHead>
+                <TableHead className="text-right">Mínimo</TableHead>
+                <TableHead>Estado</TableHead>
               </TableRow>
-            ) : (
-              filtered.map((item) => (
-                <TableRow
-                  key={item.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => void openDetail(item)}
-                >
-                  <TableCell>
-                    <span className="font-medium">{item.nombre}</span>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {item.categoria ?? '—'}
-                  </TableCell>
+            </TableHeader>
+            <TableBody>
+              {loadingStock ? (
+                Array.from({ length: 8 }).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array.from({ length: 5 }).map((__, j) => (
+                      <TableCell key={j}>
+                        <Skeleton className="h-4 w-full" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : filteredStock.length === 0 ? (
+                <TableRow>
                   <TableCell
-                    className={[
-                      'text-right font-semibold tabular-nums',
-                      item.bajo_minimo
-                        ? item.stock_actual <= 0
-                          ? 'text-destructive'
-                          : 'text-amber-500'
-                        : '',
-                    ].join(' ')}
+                    colSpan={5}
+                    className="py-12 text-center text-muted-foreground"
                   >
-                    {item.stock_actual} {item.unidad ?? 'pzs'}
-                  </TableCell>
-                  <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
-                    {item.stock_minimo ?? '—'} {item.unidad ?? 'pzs'}
-                  </TableCell>
-                  <TableCell>
-                    {item.stock_actual <= 0 ? (
-                      <Badge variant="destructive">Sin stock</Badge>
-                    ) : item.bajo_minimo ? (
-                      <Badge variant="outline" className="border-amber-500/50 text-amber-500">
-                        Bajo mínimo
-                      </Badge>
-                    ) : (
-                      <Badge variant="default">OK</Badge>
-                    )}
+                    No se encontraron productos.
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              ) : (
+                filteredStock.map((item) => (
+                  <TableRow
+                    key={item.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => {
+                      setSelectedItem(item);
+                      setDrawerOpen(true);
+                    }}
+                  >
+                    <TableCell>
+                      <span className="font-medium">{item.nombre}</span>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {item.categoria ?? '—'}
+                    </TableCell>
+                    <TableCell
+                      className={[
+                        'text-right font-semibold tabular-nums',
+                        item.stock_actual <= 0
+                          ? 'text-destructive'
+                          : item.bajo_minimo
+                          ? 'text-amber-500'
+                          : '',
+                      ].join(' ')}
+                    >
+                      {item.stock_actual} {item.unidad ?? 'pzs'}
+                    </TableCell>
+                    <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
+                      {item.stock_minimo ?? '—'} {item.unidad ?? 'pzs'}
+                    </TableCell>
+                    <TableCell>
+                      {item.stock_actual <= 0 ? (
+                        <Badge variant="destructive">Sin stock</Badge>
+                      ) : item.bajo_minimo ? (
+                        <Badge
+                          variant="outline"
+                          className="border-amber-500/50 text-amber-500"
+                        >
+                          Bajo mínimo
+                        </Badge>
+                      ) : (
+                        <Badge variant="default">OK</Badge>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
-      {/* Detail drawer */}
-      <InventarioDetail
-        item={selected}
-        movimientos={movimientos}
-        loadingMovimientos={loadingMovimientos}
+      {/* ── Movimientos Table (Kardex) ─────────────────────────────────────── */}
+      {tab === 'movimientos' && (
+        <div className="rounded-xl border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Fecha</TableHead>
+                <TableHead>Producto</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead className="text-right">Cantidad</TableHead>
+                <TableHead>Notas</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loadingMovimientos ? (
+                Array.from({ length: 8 }).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array.from({ length: 5 }).map((__, j) => (
+                      <TableCell key={j}>
+                        <Skeleton className="h-4 w-full" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : filteredMovimientos.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={5}
+                    className="py-12 text-center text-muted-foreground"
+                  >
+                    No se encontraron movimientos.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredMovimientos.map((mov) => (
+                  <TableRow key={mov.id}>
+                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                      {formatDate(mov.created_at)}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {mov.productos?.nombre ?? '—'}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        {mov.tipo === 'entrada' ||
+                        (mov.tipo === 'ajuste' && mov.cantidad >= 0) ? (
+                          <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                        ) : (
+                          <TrendingDown className="h-3.5 w-3.5 text-destructive" />
+                        )}
+                        <Badge
+                          variant="outline"
+                          className={tipoColorClass(mov.tipo, mov.cantidad)}
+                        >
+                          {tipoLabel(mov.tipo, mov.cantidad)}
+                        </Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell
+                      className={[
+                        'text-right font-semibold tabular-nums',
+                        mov.cantidad > 0
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-destructive',
+                      ].join(' ')}
+                    >
+                      {mov.cantidad > 0 ? '+' : ''}
+                      {mov.cantidad}
+                    </TableCell>
+                    <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">
+                      {mov.notas ?? '—'}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* Stock detail drawer */}
+      <StockDetailDrawer
+        item={selectedItem}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
+      />
+
+      {/* Registrar movimiento dialog */}
+      <RegistrarMovimientoDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        productos={items}
+        onSuccess={handleSuccess}
       />
     </div>
   );

@@ -17,37 +17,71 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
-import { CalendarDays, RefreshCw, Scissors, TrendingUp, DollarSign } from 'lucide-react';
+import { CalendarDays, RefreshCw, Scissors, TrendingUp, Wallet, PlusCircle } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+// rdb.cortes columns
 type Corte = {
-  id: number | string;
-  // flexible column names — Waitry schema may differ
-  fecha?: string | null;
-  fecha_inicio?: string | null;
-  fecha_fin?: string | null;
-  created_at?: string | null;
-  turno?: string | number | null;
-  cajero?: string | null;
-  cajero_nombre?: string | null;
-  nombre_cajero?: string | null;
-  total_ventas?: number | null;
-  ventas_total?: number | null;
-  total?: number | null;
-  efectivo_esperado?: number | null;
-  efectivo_contado?: number | null;
-  diferencia?: number | null;
-  estado?: string | null;
-  status?: string | null;
-  // raw for unknown columns
-  [key: string]: unknown;
+  id: string;
+  corte_nombre: string | null;
+  caja_nombre: string | null;
+  caja_id: string | null;
+  fecha_operativa: string | null;
+  hora_inicio: string | null;
+  hora_fin: string | null;
+  estado: string | null;
+  efectivo_inicial: number | null;
+  efectivo_contado: number | null;
+  responsable_apertura: string | null;
+  responsable_cierre: string | null;
+  turno: string | null;
+  tipo: string | null;
+  observaciones: string | null;
+};
+
+// rdb.v_cortes_totales columns (lazy-loaded per corte)
+type CorteTotales = {
+  corte_id: string;
+  caja_id: string | null;
+  caja_nombre: string | null;
+  estado: string | null;
+  hora_inicio: string | null;
+  hora_fin: string | null;
+  efectivo_inicial: number | null;
+  ingresos_efectivo: number | null;
+  ingresos_tarjeta: number | null;
+  ingresos_stripe: number | null;
+  ingresos_transferencias: number | null;
+  total_ingresos: number | null;
+  depositos: number | null;
+  retiros: number | null;
+  efectivo_esperado: number | null;
+};
+
+// rdb.movimientos columns
+type Movimiento = {
+  id: string;
+  corte_id: string;
+  fecha_hora: string | null;
+  tipo: string | null;
+  monto: number | null;
+  nota: string | null;
+  registrado_por: string | null;
+  c_corte_desc: string | null;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -56,11 +90,18 @@ const TZ = 'America/Matamoros';
 
 function formatDate(ts: string | null | undefined) {
   if (!ts) return '—';
-  return new Date(ts).toLocaleString('es-MX', {
-    timeZone: TZ,
-    dateStyle: 'short',
-    timeStyle: 'short',
-  });
+  // date-only (YYYY-MM-DD) — parse without time to avoid TZ shift
+  if (/^\d{4}-\d{2}-\d{2}$/.test(ts)) {
+    const [yyyy, mm, dd] = ts.split('-');
+    return `${dd}/${mm}/${yyyy}`;
+  }
+  // timestamp — strip offset suffix, parse as local wall-clock
+  const clean = ts.replace(/\+\d{2}(:\d{2})?$/, '').replace('Z', '').replace('T', ' ');
+  const parts = clean.split(' ');
+  if (parts.length < 2) return clean;
+  const [yyyy, mm, dd] = parts[0].split('-');
+  const [hh, min] = parts[1].split(':');
+  return `${dd}/${mm}/${yyyy.slice(2)}, ${hh}:${min}`;
 }
 
 function formatCurrency(amount: number | null | undefined) {
@@ -75,35 +116,16 @@ function todayRange() {
   return { from: today, to: today };
 }
 
-function getCorteDate(c: Corte): string | null {
-  return c.fecha ?? c.fecha_inicio ?? c.created_at ?? null;
-}
-
-function getTotal(c: Corte): number | null {
-  return c.total_ventas ?? c.ventas_total ?? c.total ?? null;
-}
-
-function getCajero(c: Corte): string {
-  return String(c.cajero ?? c.cajero_nombre ?? c.nombre_cajero ?? '—');
-}
-
-function getEstado(c: Corte): string | null {
-  return c.estado ?? c.status ?? null;
-}
-
-function statusVariant(
-  status: string | null,
+function estadoVariant(
+  estado: string | null,
 ): 'default' | 'secondary' | 'destructive' | 'outline' {
-  switch (status?.toLowerCase()) {
+  switch (estado?.toLowerCase()) {
     case 'cerrado':
     case 'closed':
-    case 'completado':
       return 'default';
     case 'abierto':
     case 'open':
       return 'secondary';
-    case 'cancelado':
-      return 'destructive';
     default:
       return 'outline';
   }
@@ -112,8 +134,8 @@ function statusVariant(
 // ─── Summary Bar ──────────────────────────────────────────────────────────────
 
 function SummaryBar({ cortes }: { cortes: Corte[] }) {
-  const totalVentas = cortes.reduce((acc, c) => acc + (getTotal(c) ?? 0), 0);
-  const diferenciaNeta = cortes.reduce((acc, c) => acc + (c.diferencia ?? 0), 0);
+  const totalInicial = cortes.reduce((s, c) => s + (c.efectivo_inicial ?? 0), 0);
+  const totalContado = cortes.reduce((s, c) => s + (c.efectivo_contado ?? 0), 0);
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -126,24 +148,17 @@ function SummaryBar({ cortes }: { cortes: Corte[] }) {
       </div>
       <div className="rounded-xl border bg-card px-4 py-3">
         <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          <TrendingUp className="h-3.5 w-3.5" />
-          Total Ventas
+          <Wallet className="h-3.5 w-3.5" />
+          Fondo Inicial
         </div>
-        <div className="mt-1 text-2xl font-semibold tabular-nums">{formatCurrency(totalVentas)}</div>
+        <div className="mt-1 text-2xl font-semibold tabular-nums">{formatCurrency(totalInicial)}</div>
       </div>
-      <div className="rounded-xl border bg-card px-4 py-3 sm:col-span-1 col-span-2">
+      <div className="rounded-xl border bg-card px-4 py-3 col-span-2 sm:col-span-1">
         <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          <DollarSign className="h-3.5 w-3.5" />
-          Diferencia Neta
+          <TrendingUp className="h-3.5 w-3.5" />
+          Efectivo Contado
         </div>
-        <div
-          className={[
-            'mt-1 text-2xl font-semibold tabular-nums',
-            diferenciaNeta < 0 ? 'text-destructive' : diferenciaNeta > 0 ? 'text-emerald-500' : '',
-          ].join(' ')}
-        >
-          {formatCurrency(diferenciaNeta)}
-        </div>
+        <div className="mt-1 text-2xl font-semibold tabular-nums">{formatCurrency(totalContado)}</div>
       </div>
     </div>
   );
@@ -151,68 +166,184 @@ function SummaryBar({ cortes }: { cortes: Corte[] }) {
 
 // ─── Corte Detail Drawer ──────────────────────────────────────────────────────
 
+function DetailSkeleton() {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="flex justify-between gap-4">
+          <Skeleton className="h-4 w-36" />
+          <Skeleton className="h-4 w-24" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function CorteDetail({
   corte,
+  totales,
+  movimientos,
+  loadingDetail,
   open,
   onClose,
 }: {
   corte: Corte | null;
+  totales: CorteTotales | null;
+  movimientos: Movimiento[];
+  loadingDetail: boolean;
   open: boolean;
   onClose: () => void;
 }) {
   if (!corte) return null;
 
-  const rows: { label: string; value: string }[] = [
-    { label: 'Cajero', value: getCajero(corte) },
-    { label: 'Turno', value: corte.turno != null ? String(corte.turno) : '—' },
-    { label: 'Apertura', value: formatDate(corte.fecha_inicio ?? corte.fecha ?? corte.created_at) },
-    { label: 'Cierre', value: formatDate(corte.fecha_fin) },
-    { label: 'Total ventas', value: formatCurrency(getTotal(corte)) },
-    { label: 'Efectivo esperado', value: formatCurrency(corte.efectivo_esperado) },
-    { label: 'Efectivo contado', value: formatCurrency(corte.efectivo_contado) },
-    { label: 'Diferencia', value: formatCurrency(corte.diferencia) },
-  ].filter((r) => r.value !== '—' || ['Total ventas', 'Cajero'].includes(r.label));
-
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <SheetContent className="flex w-full flex-col sm:max-w-md">
+      <SheetContent className="flex w-full flex-col data-[side=right]:sm:max-w-xl data-[side=right]:md:max-w-2xl">
         <SheetHeader>
-          <SheetTitle>Corte #{String(corte.id)}</SheetTitle>
-          <SheetDescription>{formatDate(getCorteDate(corte))}</SheetDescription>
+          <SheetTitle>{corte.corte_nombre ?? `Corte ${corte.id}`}</SheetTitle>
+          <SheetDescription>
+            {corte.caja_nombre ?? '—'} · {formatDate(corte.fecha_operativa)}
+          </SheetDescription>
         </SheetHeader>
 
         <ScrollArea className="flex-1 pr-1">
           <div className="mt-6 space-y-6 pb-6">
+
+            {/* Estado + responsable */}
             <div className="flex items-center justify-between">
-              <Badge variant={statusVariant(getEstado(corte))}>
-                {getEstado(corte) ?? 'Sin estado'}
+              <Badge variant={estadoVariant(corte.estado)}>
+                {corte.estado ?? 'Sin estado'}
               </Badge>
-              <span className="text-lg font-semibold">{formatCurrency(getTotal(corte))}</span>
+              <span className="text-sm text-muted-foreground">
+                {corte.responsable_apertura ?? corte.responsable_cierre ?? ''}
+              </span>
+            </div>
+
+            {/* Horario */}
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="block text-xs text-muted-foreground">Apertura</span>
+                <span className="font-medium">{formatDate(corte.hora_inicio)}</span>
+              </div>
+              <div>
+                <span className="block text-xs text-muted-foreground">Cierre</span>
+                <span className="font-medium">{formatDate(corte.hora_fin)}</span>
+              </div>
+              {corte.turno && (
+                <div>
+                  <span className="block text-xs text-muted-foreground">Turno</span>
+                  <span className="font-medium">{corte.turno}</span>
+                </div>
+              )}
+              {corte.tipo && (
+                <div>
+                  <span className="block text-xs text-muted-foreground">Tipo</span>
+                  <span className="font-medium">{corte.tipo}</span>
+                </div>
+              )}
+            </div>
+
+            {corte.observaciones && (
+              <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-yellow-600 dark:text-yellow-400">
+                <span className="mb-1 block font-semibold">Observaciones</span>
+                {corte.observaciones}
+              </div>
+            )}
+
+            <Separator />
+
+            {/* Resumen Financiero */}
+            <div>
+              <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Resumen Financiero
+              </div>
+              {loadingDetail ? (
+                <DetailSkeleton />
+              ) : totales ? (
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Efectivo inicial</span>
+                    <span className="font-medium tabular-nums">{formatCurrency(totales.efectivo_inicial)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Ingresos efectivo</span>
+                    <span className="font-medium tabular-nums">{formatCurrency(totales.ingresos_efectivo)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Ingresos tarjeta</span>
+                    <span className="font-medium tabular-nums">{formatCurrency(totales.ingresos_tarjeta)}</span>
+                  </div>
+                  {(totales.ingresos_stripe ?? 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Ingresos Stripe</span>
+                      <span className="font-medium tabular-nums">{formatCurrency(totales.ingresos_stripe)}</span>
+                    </div>
+                  )}
+                  {(totales.ingresos_transferencias ?? 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Transferencias</span>
+                      <span className="font-medium tabular-nums">{formatCurrency(totales.ingresos_transferencias)}</span>
+                    </div>
+                  )}
+                  {(totales.depositos ?? 0) !== 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Depósitos</span>
+                      <span className="font-medium tabular-nums text-emerald-500">{formatCurrency(totales.depositos)}</span>
+                    </div>
+                  )}
+                  {(totales.retiros ?? 0) !== 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Retiros</span>
+                      <span className="font-medium tabular-nums text-destructive">{formatCurrency(totales.retiros)}</span>
+                    </div>
+                  )}
+                  <Separator className="my-1" />
+                  <div className="flex justify-between font-semibold">
+                    <span>Total ingresos</span>
+                    <span className="tabular-nums">{formatCurrency(totales.total_ingresos)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Efectivo esperado</span>
+                    <span className="font-semibold tabular-nums">{formatCurrency(totales.efectivo_esperado)}</span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Sin datos de totales.</p>
+              )}
             </div>
 
             <Separator />
 
-            <div className="space-y-3">
-              {rows.map((row) => (
-                <div key={row.label} className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{row.label}</span>
-                  <span
-                    className={[
-                      'font-medium',
-                      row.label === 'Diferencia' && corte.diferencia != null
-                        ? corte.diferencia < 0
-                          ? 'text-destructive'
-                          : corte.diferencia > 0
-                          ? 'text-emerald-500'
-                          : ''
-                        : '',
-                    ].join(' ')}
-                  >
-                    {row.value}
-                  </span>
+            {/* Movimientos — placeholder */}
+            <div>
+              <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Movimientos
+              </div>
+              {loadingDetail ? (
+                <DetailSkeleton />
+              ) : movimientos.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sin movimientos registrados.</p>
+              ) : (
+                <div className="space-y-2 text-sm">
+                  {movimientos.map((m) => (
+                    <div key={m.id} className="flex items-start justify-between gap-4">
+                      <div>
+                        <span className="font-medium capitalize">{m.tipo ?? 'Movimiento'}</span>
+                        {m.nota && (
+                          <span className="block text-xs text-muted-foreground">{m.nota}</span>
+                        )}
+                        <span className="block text-xs text-muted-foreground">
+                          {formatDate(m.fecha_hora)}
+                          {m.registrado_por ? ` · ${m.registrado_por}` : ''}
+                        </span>
+                      </div>
+                      <span className="shrink-0 font-medium tabular-nums">{formatCurrency(m.monto)}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
+
           </div>
         </ScrollArea>
       </SheetContent>
@@ -220,15 +351,27 @@ function CorteDetail({
   );
 }
 
+// ─── Filters ──────────────────────────────────────────────────────────────────
+
+const ESTADO_OPTIONS = [
+  { value: 'all', label: 'Todos los estados' },
+  { value: 'abierto', label: 'Abierto' },
+  { value: 'cerrado', label: 'Cerrado' },
+];
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function CortesPage() {
   const [cortes, setCortes] = useState<Corte[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [estadoFilter, setEstadoFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState(() => todayRange().from);
   const [dateTo, setDateTo] = useState(() => todayRange().to);
   const [selected, setSelected] = useState<Corte | null>(null);
+  const [selectedTotales, setSelectedTotales] = useState<CorteTotales | null>(null);
+  const [selectedMovimientos, setSelectedMovimientos] = useState<Movimiento[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -242,25 +385,22 @@ export default function CortesPage() {
     try {
       const supabase = createSupabaseBrowserClient();
 
-      // Try waitry.cortes first; fall back to waitry.cortes_caja if needed.
       let query = supabase
-        .schema('waitry')
+        .schema('rdb')
         .from('cortes')
-        .select('*')
-        .order('id', { ascending: false })
-        .limit(200);
+        .select(
+          'id, corte_nombre, caja_nombre, caja_id, fecha_operativa, hora_inicio, hora_fin, estado, efectivo_inicial, efectivo_contado, responsable_apertura, responsable_cierre, turno, tipo, observaciones',
+        )
+        .order('fecha_operativa', { ascending: false })
+        .order('hora_inicio', { ascending: false })
+        .limit(300);
 
-      // Date filter — try multiple column names via OR
-      if (dateFrom) {
-        query = query.gte('fecha', `${dateFrom}T00:00:00`);
-      }
-      if (dateTo) {
-        query = query.lte('fecha', `${dateTo}T23:59:59`);
-      }
+      if (dateFrom) query = query.gte('fecha_operativa', dateFrom);
+      if (dateTo) query = query.lte('fecha_operativa', dateTo);
 
       const { data, error: err } = await query;
       if (err) throw err;
-      setCortes(data ?? []);
+      setCortes((data ?? []) as Corte[]);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error al cargar cortes');
     } finally {
@@ -272,24 +412,80 @@ export default function CortesPage() {
     void fetchCortes();
   }, [fetchCortes]);
 
-  const openDetail = (corte: Corte) => {
+  const openDetail = async (corte: Corte) => {
     setSelected(corte);
+    setSelectedTotales(null);
+    setSelectedMovimientos([]);
     setDrawerOpen(true);
+    setLoadingDetail(true);
+
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const [totalesRes, movimientosRes] = await Promise.all([
+        supabase
+          .schema('rdb')
+          .from('v_cortes_totales')
+          .select('*')
+          .eq('corte_id', corte.id)
+          .maybeSingle(),
+        supabase
+          .schema('rdb')
+          .from('movimientos')
+          .select('*')
+          .eq('corte_id', corte.id)
+          .order('fecha_hora', { ascending: true })
+          .limit(100),
+      ]);
+
+      setSelectedTotales((totalesRes.data as CorteTotales | null) ?? null);
+      setSelectedMovimientos((movimientosRes.data ?? []) as Movimiento[]);
+    } catch {
+      // non-fatal — drawer still shows corte base info
+    } finally {
+      setLoadingDetail(false);
+    }
   };
+
+  const filtered = cortes.filter((c) => {
+    if (estadoFilter !== 'all' && c.estado?.toLowerCase() !== estadoFilter) return false;
+    return true;
+  });
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Cortes de Caja</h1>
-        <p className="text-sm text-muted-foreground">Resumen de turnos registrados en Waitry</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Cortes de Caja</h1>
+          <p className="text-sm text-muted-foreground">Turnos registrados en RDB</p>
+        </div>
+        <Button
+          onClick={() => alert('Función "Abrir Caja" próximamente disponible.')}
+          className="shrink-0"
+        >
+          <PlusCircle className="mr-2 h-4 w-4" />
+          Abrir Caja
+        </Button>
       </div>
 
       {/* Summary */}
-      {!loading && !error && <SummaryBar cortes={cortes} />}
+      {!loading && !error && <SummaryBar cortes={filtered} />}
 
       {/* Filters */}
       <div className="flex flex-wrap items-end gap-3">
+        <Select value={estadoFilter} onValueChange={(v) => setEstadoFilter(v ?? 'all')}>
+          <SelectTrigger className="w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {ESTADO_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         <div className="flex items-center gap-2">
           <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
           <Input
@@ -319,7 +515,9 @@ export default function CortesPage() {
         </Button>
 
         <span className="text-sm text-muted-foreground">
-          {loading ? 'Cargando…' : `${cortes.length} corte${cortes.length !== 1 ? 's' : ''}`}
+          {loading
+            ? 'Cargando…'
+            : `${filtered.length} corte${filtered.length !== 1 ? 's' : ''}`}
         </span>
       </div>
 
@@ -335,72 +533,52 @@ export default function CortesPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>#</TableHead>
-              <TableHead>Fecha / Apertura</TableHead>
-              <TableHead>Cajero</TableHead>
-              <TableHead className="text-right">Total Ventas</TableHead>
-              <TableHead className="text-right">Diferencia</TableHead>
+              <TableHead>Caja</TableHead>
+              <TableHead>Corte</TableHead>
+              <TableHead>Fecha Operativa</TableHead>
               <TableHead>Estado</TableHead>
+              <TableHead className="text-right">Efectivo Contado</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               Array.from({ length: 6 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 6 }).map((__, j) => (
+                  {Array.from({ length: 5 }).map((__, j) => (
                     <TableCell key={j}>
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
                   ))}
                 </TableRow>
               ))
-            ) : cortes.length === 0 ? (
+            ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">
+                <TableCell colSpan={5} className="py-12 text-center text-muted-foreground">
                   No se encontraron cortes para el rango seleccionado.
                 </TableCell>
               </TableRow>
             ) : (
-              cortes.map((corte) => {
-                const diff = corte.diferencia ?? null;
-                return (
-                  <TableRow
-                    key={String(corte.id)}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => openDetail(corte)}
-                  >
-                    <TableCell className="font-mono text-xs font-medium">
-                      #{String(corte.id)}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {formatDate(getCorteDate(corte))}
-                    </TableCell>
-                    <TableCell className="text-sm">{getCajero(corte)}</TableCell>
-                    <TableCell className="text-right font-medium tabular-nums">
-                      {formatCurrency(getTotal(corte))}
-                    </TableCell>
-                    <TableCell
-                      className={[
-                        'text-right font-medium tabular-nums',
-                        diff != null
-                          ? diff < 0
-                            ? 'text-destructive'
-                            : diff > 0
-                            ? 'text-emerald-500'
-                            : ''
-                          : '',
-                      ].join(' ')}
-                    >
-                      {formatCurrency(diff)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={statusVariant(getEstado(corte))}>
-                        {getEstado(corte) ?? '—'}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
+              filtered.map((corte) => (
+                <TableRow
+                  key={corte.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => void openDetail(corte)}
+                >
+                  <TableCell className="font-medium">{corte.caja_nombre ?? '—'}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {corte.corte_nombre ?? '—'}
+                  </TableCell>
+                  <TableCell className="text-sm">{formatDate(corte.fecha_operativa)}</TableCell>
+                  <TableCell>
+                    <Badge variant={estadoVariant(corte.estado)}>
+                      {corte.estado ?? '—'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right font-medium tabular-nums">
+                    {formatCurrency(corte.efectivo_contado)}
+                  </TableCell>
+                </TableRow>
+              ))
             )}
           </TableBody>
         </Table>
@@ -409,6 +587,9 @@ export default function CortesPage() {
       {/* Detail drawer */}
       <CorteDetail
         corte={selected}
+        totales={selectedTotales}
+        movimientos={selectedMovimientos}
+        loadingDetail={loadingDetail}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
       />
