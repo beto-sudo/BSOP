@@ -324,13 +324,13 @@ export default function VentasPage() {
           .schema('waitry')
           .from('productos')
           .select('*')
-          .eq('pedido_id', pedido.id)
+          .eq('order_id', pedido.id)
           .limit(50),
         supabase
           .schema('waitry')
           .from('pagos')
           .select('*')
-          .eq('pedido_id', pedido.id)
+          .eq('order_id', pedido.id)
           .limit(20),
       ]);
 
