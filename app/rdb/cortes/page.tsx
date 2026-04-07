@@ -423,13 +423,13 @@ export default function CortesPage() {
       const supabase = createSupabaseBrowserClient();
       const [totalesRes, movimientosRes] = await Promise.all([
         supabase
-          .schema('rdb')
+          .schema('caja')
           .from('v_cortes_totales')
           .select('*')
           .eq('corte_id', corte.id)
           .maybeSingle(),
         supabase
-          .schema('rdb')
+          .schema('caja')
           .from('movimientos')
           .select('*')
           .eq('corte_id', corte.id)
