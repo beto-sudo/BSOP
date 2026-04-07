@@ -200,7 +200,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [signingOut, setSigningOut] = useState(false);
   const isStandaloneSharePage = pathname.startsWith('/compartir/');
   const isAuthPage = pathname === '/login';
-  const isRdbPage = pathname.startsWith('/rdb');
+  const isRdbPage = pathname.startsWith('/rdb') && !pathname.startsWith('/rdb/ventas') && !pathname.startsWith('/rdb/cortes') && !pathname.startsWith('/rdb/productos') && !pathname.startsWith('/rdb/inventario') && !pathname.startsWith('/rdb/proveedores') && !pathname.startsWith('/rdb/requisiciones') && !pathname.startsWith('/rdb/ordenes-compra');
 
   useEffect(() => {
     setNow(new Date());
