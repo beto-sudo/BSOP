@@ -295,8 +295,7 @@ export default function VentasPage() {
         .order('timestamp', { ascending: false })
         .limit(500);
 
-      if (dateFrom) query = query.gte('timestamp', `${dateFrom}T00:00:00-06:00`);
-      if (dateTo) query = query.lte('timestamp', `${dateTo}T23:59:59-06:00`);
+      if (dateFrom) query = query.gte('timestamp', `${dateFrom}T00:00:00-06:00`).lte('timestamp', `${dateTo}T23:59:59-06:00`);
 
       const { data, error: err } = await query;
       if (err) throw err;
