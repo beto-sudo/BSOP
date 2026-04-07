@@ -72,11 +72,9 @@ const NAV_ITEMS: NavItem[] = [
     icon: 'SR_LOGO',
     matchPaths: ['/family', '/travel', '/health'],
     children: [
-      { label: 'Viajes', href: '/travel/viajes-activos' },
-      { label: 'Salud', href: '/health/vitales' },
-      { label: 'Patrimonio', href: '/family/patrimonio' },
-      { label: 'Calendario', href: '/family/calendario' },
-      { label: 'Activos', href: '/family/activos' },
+      { label: 'Viajes', href: '/travel' },
+      { label: 'Salud', href: '/health' },
+      { label: 'Familia', href: '/family' },
     ],
   },
   {
