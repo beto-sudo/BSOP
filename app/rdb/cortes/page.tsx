@@ -386,7 +386,7 @@ export default function CortesPage() {
       const supabase = createSupabaseBrowserClient();
 
       let query = supabase
-        .schema('rdb')
+        .schema('caja')
         .from('cortes')
         .select(
           'id, corte_nombre, caja_nombre, caja_id, fecha_operativa, hora_inicio, hora_fin, estado, efectivo_inicial, efectivo_contado, responsable_apertura, responsable_cierre, turno, tipo, observaciones',
