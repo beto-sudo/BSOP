@@ -55,28 +55,6 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
-    href: '/businesses',
-    labelKey: 'nav.businesses',
-    icon: '🏢',
-    children: [
-      { label: 'ANSA', href: '/businesses/ansa' },
-      { label: 'DILESA', href: '/businesses/dilesa' },
-      { label: 'COAGAN', href: '/businesses/coagan' },
-      { label: 'RDB', href: '/businesses/rdb' },
-    ],
-  },
-  {
-    href: '/finance',
-    labelKey: 'nav.finance',
-    icon: '💰',
-    children: [
-      { label: 'Inversiones', href: '/finance/inversiones' },
-      { label: 'Cuentas', href: '/finance/cuentas' },
-      { label: 'Ingresos', href: '/finance/ingresos' },
-      { label: 'Gastos', href: '/finance/gastos' },
-    ],
-  },
-  {
     href: '/coda',
     labelKey: 'nav.coda',
     icon: '📊',
@@ -89,53 +67,13 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
-    href: '/travel',
-    labelKey: 'nav.travel',
-    icon: '✈️',
-    children: [
-      { label: 'Viajes activos', href: '/travel/viajes-activos' },
-      { label: 'Planeación', href: '/travel/planeacion' },
-      { label: 'Historial', href: '/travel/historial' },
-    ],
-  },
-  {
-    href: '/health',
-    labelKey: 'nav.health',
-    icon: '❤️',
-    children: [
-      { label: 'Medicamentos', href: '/health/medicamentos' },
-      { label: 'Citas', href: '/health/citas' },
-      { label: 'Vitales', href: '/health/vitales' },
-    ],
-  },
-  {
-    href: '/ai/dashboard',
-    labelKey: 'nav.ai_operations',
-    icon: '🤖',
-    matchPaths: ['/ai', '/usage', '/agents', '/rnd'],
-    children: [
-      { label: 'Dashboard', href: '/ai/dashboard' },
-      { label: 'Usage & Costs', href: '/ai/usage' },
-      { label: 'Agents', href: '/agents' },
-      { label: 'Models', href: '/ai/models' },
-      { label: 'R&D Council', href: '/rnd' },
-    ],
-  },
-  {
-    href: '/documents',
-    labelKey: 'nav.documents',
-    icon: '📄',
-    children: [
-      { label: 'Legales', href: '/documents/legales' },
-      { label: 'Contratos', href: '/documents/contratos' },
-      { label: 'Branding', href: '/documents/branding' },
-    ],
-  },
-  {
     href: '/family',
-    labelKey: 'nav.family',
-    icon: '👨‍👩‍👧',
+    labelKey: 'Familia / Grupo SR',
+    icon: 'SR_LOGO',
+    matchPaths: ['/family', '/travel', '/health'],
     children: [
+      { label: 'Viajes', href: '/travel/viajes-activos' },
+      { label: 'Salud', href: '/health/vitales' },
       { label: 'Patrimonio', href: '/family/patrimonio' },
       { label: 'Calendario', href: '/family/calendario' },
       { label: 'Activos', href: '/family/activos' },
@@ -414,6 +352,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <span className="text-lg leading-none">
                     {item.icon === 'RDB_LOGO' ? (
                       <img src="/logos/rdb.jpg" alt="RDB" className="h-5 w-5 object-contain rounded-sm" />
+                    ) : item.icon === 'SR_LOGO' ? (
+                      <img src="/logo-familia-sr.jpg" alt="SR" className="h-5 w-5 object-contain rounded-sm" />
                     ) : (
                       item.icon
                     )}

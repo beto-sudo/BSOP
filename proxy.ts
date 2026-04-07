@@ -14,7 +14,8 @@ function isPublicPath(pathname: string) {
     pathname === '/favicon.ico' ||
     pathname === '/logo-bs.png' ||
     pathname === '/logo-bs.jpg' ||
-    pathname === '/logo-bsop.jpg'
+    pathname === '/logo-bsop.jpg' ||
+    pathname === '/logo-familia-sr.jpg'
   );
 }
 
