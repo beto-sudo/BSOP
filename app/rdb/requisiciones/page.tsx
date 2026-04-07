@@ -79,7 +79,6 @@ type DraftItem = {
   descripcion: string;
 };
 
-const TZ = 'America/Matamoros';
 
 const STATUS_LABELS: Record<RequisicionStatus, string> = {
   borrador: 'Borrador',
@@ -551,6 +550,14 @@ function NewRequestSheet({
   );
 }
 
+const TZ = 'America/Matamoros';
+function todayRange(): { from: string; to: string } {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('sv-SE', { timeZone: TZ });
+  const today = formatter.format(now);
+  return { from: today, to: today };
+}
+
 export default function RequisicionesPage() {
   const [requisiciones, setRequisiciones] = useState<Requisicion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -558,8 +565,8 @@ export default function RequisicionesPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [dateFrom, setDateFrom] = useState(() => todayRange().from);
+  const [dateTo, setDateTo] = useState(() => todayRange().to);
   const [selected, setSelected] = useState<Requisicion | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
