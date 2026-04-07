@@ -41,6 +41,20 @@ type AuthUser = {
 const NAV_ITEMS: NavItem[] = [
   { href: '/', labelKey: 'nav.overview', icon: '🏠' },
   {
+    href: '/rdb',
+    labelKey: 'Rincón del Bosque',
+    icon: '🌳',
+    children: [
+      { label: 'Ventas', href: '/rdb/ventas' },
+      { label: 'Cortes', href: '/rdb/cortes' },
+      { label: 'Productos', href: '/rdb/productos' },
+      { label: 'Inventario', href: '/rdb/inventario' },
+      { label: 'Proveedores', href: '/rdb/proveedores' },
+      { label: 'Requisiciones', href: '/rdb/requisiciones' },
+      { label: 'Órdenes de Compra', href: '/rdb/ordenes-compra' },
+    ],
+  },
+  {
     href: '/businesses',
     labelKey: 'nav.businesses',
     icon: '🏢',
