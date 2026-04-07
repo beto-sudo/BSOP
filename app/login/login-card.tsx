@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { Chrome } from 'lucide-react';
+import { Globe } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 
 export function LoginCard({ unauthorized }: { unauthorized: boolean }) {
@@ -45,7 +45,7 @@ export function LoginCard({ unauthorized }: { unauthorized: boolean }) {
             onClick={handleSignIn}
             className="mt-8 inline-flex w-full items-center justify-center gap-3 rounded-2xl border border-[var(--border)] bg-[#111522] px-5 py-4 text-sm font-medium text-white transition hover:border-[var(--accent)] hover:bg-[var(--accent)]/12 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40"
           >
-            <Chrome className="h-5 w-5" />
+            <Globe className="h-5 w-5" />
             Sign in with Google
           </button>
 

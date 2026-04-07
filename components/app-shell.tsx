@@ -186,6 +186,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [signingOut, setSigningOut] = useState(false);
   const isStandaloneSharePage = pathname.startsWith('/compartir/');
   const isAuthPage = pathname === '/login';
+  const isRdbPage = pathname.startsWith('/rdb');
 
   useEffect(() => {
     setNow(new Date());
@@ -313,7 +314,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   };
 
-  if (isStandaloneSharePage || isAuthPage) {
+  if (isStandaloneSharePage || isAuthPage || isRdbPage) {
     return <>{children}</>;
   }
 
