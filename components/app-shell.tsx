@@ -440,18 +440,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--panel)] backdrop-blur-xl">
           <div className="flex min-h-16 flex-col gap-3 px-4 py-3 sm:px-6 lg:px-8 xl:flex-row xl:items-center xl:justify-between">
-            <div className="pl-12 md:pl-0">
-              <div className="text-xs uppercase tracking-[0.24em] dark:text-white/35 text-[var(--text)]/45">BSOP / {sectionName}</div>
-              <div className="mt-1 flex items-center gap-3">
-                {sectionName === 'Rincón del Bosque' && (
-                  <img src="/logos/rdb.jpg" alt="RDB" className="h-8 w-8 rounded object-contain" />
-                )}
-                {sectionName === 'Familia / Grupo SR' && (
-                  <img src="/logo-familia-sr.jpg" alt="SR" className="h-8 w-8 rounded object-contain" />
-                )}
-                <div className="text-2xl font-semibold dark:text-white text-[var(--text)]">{sectionName}</div>
+            <div className="pl-12 md:pl-0 flex items-center gap-4">
+              {sectionName === 'Rincón del Bosque' && (
+                <div className="flex h-[3.25rem] w-[3.25rem] shrink-0 items-center justify-center rounded-xl bg-white p-1 shadow-sm ring-1 ring-inset ring-[var(--border)]">
+                  <img src="/logos/rdb.jpg" alt="RDB" className="h-full w-full rounded-lg object-contain" />
+                </div>
+              )}
+              {sectionName === 'Familia / Grupo SR' && (
+                <div className="flex h-[3.25rem] w-[3.25rem] shrink-0 items-center justify-center rounded-xl bg-white p-1 shadow-sm ring-1 ring-inset ring-[var(--border)]">
+                  <img src="/logo-familia-sr.jpg" alt="SR" className="h-full w-full rounded-lg object-contain" />
+                </div>
+              )}
+              <div className="flex flex-col justify-center">
+                <div className="text-[10px] uppercase tracking-[0.24em] font-medium dark:text-white/40 text-[var(--text)]/50 mb-0.5">BSOP / {sectionName}</div>
+                <div className="text-[22px] font-bold tracking-tight dark:text-white text-[var(--text)] leading-none">{sectionName}</div>
+                <div className="text-[13px] font-medium dark:text-white/50 text-[var(--text)]/60 mt-1.5">{getGreeting(now ?? new Date())}, {displayName.split(' ')[0] ?? 'Beto'}</div>
               </div>
-              <div className="mt-1 text-sm dark:text-white/48 text-[var(--text)]/60">{getGreeting(now ?? new Date())}, {displayName.split(' ')[0] ?? 'Beto'}</div>
             </div>
 
             <div className="flex flex-wrap items-center gap-3 text-sm dark:text-white/70 text-[var(--text)]/70">
