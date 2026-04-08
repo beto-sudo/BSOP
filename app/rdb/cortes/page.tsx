@@ -284,18 +284,14 @@ function CorteDetail({
                     <span className="text-muted-foreground">Ingresos tarjeta</span>
                     <span className="font-medium tabular-nums">{formatCurrency(totales.ingresos_tarjeta)}</span>
                   </div>
-                  {(totales.ingresos_stripe ?? 0) > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Ingresos Stripe</span>
-                      <span className="font-medium tabular-nums">{formatCurrency(totales.ingresos_stripe)}</span>
-                    </div>
-                  )}
-                  {(totales.ingresos_transferencias ?? 0) > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Transferencias</span>
-                      <span className="font-medium tabular-nums">{formatCurrency(totales.ingresos_transferencias)}</span>
-                    </div>
-                  )}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Ingresos Stripe</span>
+                    <span className="font-medium tabular-nums">{formatCurrency(totales.ingresos_stripe)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Transferencias</span>
+                    <span className="font-medium tabular-nums">{formatCurrency(totales.ingresos_transferencias)}</span>
+                  </div>
                   {(totales.depositos ?? 0) !== 0 && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Depósitos</span>
