@@ -438,6 +438,7 @@ export default function CortesPage() {
     responsable_apertura: '',
     efectivo_inicial: '',
     fecha_operativa: todayRange().from,
+    auto_matched: false,
   });
   const [abrirError, setAbrirError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -546,13 +547,14 @@ export default function CortesPage() {
       const cajasList = (data ?? []) as Caja[];
       setCajas(cajasList);
 
-      const matchedCaja = cajasList.find(c => c.nombre.toLowerCase().includes(firstName.toLowerCase())) || cajasList[0];
+      const matchedCaja = cajasList.find(c => c.nombre.toLowerCase().includes(firstName.toLowerCase()));
 
       setAbrirForm(f => ({
         ...f,
         responsable_apertura: userName,
         caja_id: matchedCaja?.id ?? '',
         fecha_operativa: todayRange().from,
+        auto_matched: !!matchedCaja,
       }));
     } catch {
       // non-fatal
@@ -773,7 +775,25 @@ export default function CortesPage() {
               </div>
               <div className="space-y-1 col-span-2">
                 <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Caja Asignada</div>
-                <div className="font-medium text-foreground">{cajas.find(c => c.id === abrirForm.caja_id)?.nombre || '—'}</div>
+                {abrirForm.auto_matched ? (
+                  <div className="font-medium text-foreground">{cajas.find(c => c.id === abrirForm.caja_id)?.nombre || '—'}</div>
+                ) : (
+                  <Select
+                    value={abrirForm.caja_id}
+                    onValueChange={(v) => setAbrirForm((f) => ({ ...f, caja_id: v ?? '' }))}
+                  >
+                    <SelectTrigger className="h-8 mt-1 border-muted-foreground/30 bg-background">
+                      <SelectValue placeholder="Selecciona tu caja…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cajas.map((caja) => (
+                        <SelectItem key={caja.id} value={caja.id}>
+                          {caja.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             </div>
 
