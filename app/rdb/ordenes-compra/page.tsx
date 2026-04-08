@@ -294,8 +294,12 @@ export default function OrdenesCompraPage() {
   const [search, setSearch] = useState('');
   const [dateFrom, setDateFrom] = useState(() => todayRange().from);
   const [dateTo, setDateTo] = useState(() => todayRange().to);
+  const [presetKey, setPresetKey] = useState<string>('hoy');
 
   const handlePreset = (preset: string | null) => {
+    if (!preset) return;
+    setPresetKey(preset);
+    localStorage.setItem('rdb_preset_ordenes_compra', preset);
     if (!preset) return;
     const today = new Date();
     const formatter = new Intl.DateTimeFormat('sv-SE', { timeZone: TZ });
@@ -334,6 +338,13 @@ export default function OrdenesCompraPage() {
   const [selected, setSelected] = useState<OrdenCompra | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editedReceipts, setEditedReceipts] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const saved = localStorage.getItem('rdb_preset_ordenes_compra');
+    if (saved && saved !== 'hoy') {
+      handlePreset(saved);
+    }
+  }, []);
 
   const fetchOrdenes = useCallback(async () => {
     setLoading(true);
@@ -514,12 +525,12 @@ export default function OrdenesCompraPage() {
 
         <div className="flex items-center gap-2">
           <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="w-36" />
+          <Input type="date" value={dateFrom} onChange={(event) => { setDateFrom(event.target.value); setPresetKey('custom'); }} className="w-36" />
           <span className="text-muted-foreground">—</span>
-          <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="w-36" />
+          <Input type="date" value={dateTo} onChange={(event) => { setDateTo(event.target.value); setPresetKey('custom'); }} className="w-36" />
         </div>
 
-        <Select onValueChange={handlePreset}>
+        <Select value={presetKey} onValueChange={handlePreset}>
           <SelectTrigger className="w-[140px]">
             <SelectValue placeholder="Rango..." />
           </SelectTrigger>
@@ -531,6 +542,7 @@ export default function OrdenesCompraPage() {
             <SelectItem value="mes">Este mes</SelectItem>
             <SelectItem value="30dias">Últimos 30 días</SelectItem>
             <SelectItem value="ano">Este año</SelectItem>
+            <SelectItem value="custom" className="hidden">Personalizado</SelectItem>
           </SelectContent>
         </Select>
 

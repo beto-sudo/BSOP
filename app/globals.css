@@ -208,6 +208,7 @@ textarea {
     width: 100% !important;
     max-width: 100% !important;
     border: none !important;
+    border-width: 0 !important;
     box-shadow: none !important;
     background: white !important;
     transform: none !important;

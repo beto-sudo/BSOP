@@ -401,8 +401,12 @@ export default function CortesPage() {
   const [estadoFilter, setEstadoFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState(() => todayRange().from);
   const [dateTo, setDateTo] = useState(() => todayRange().to);
+  const [presetKey, setPresetKey] = useState<string>('hoy');
 
   const handlePreset = (preset: string | null) => {
+    if (!preset) return;
+    setPresetKey(preset);
+    localStorage.setItem('rdb_preset_cortes', preset);
     if (!preset) return;
     const today = new Date();
     const formatter = new Intl.DateTimeFormat('sv-SE', { timeZone: TZ });
@@ -458,6 +462,13 @@ export default function CortesPage() {
   });
   const [abrirError, setAbrirError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    const saved = localStorage.getItem('rdb_preset_cortes');
+    if (saved && saved !== 'hoy') {
+      handlePreset(saved);
+    }
+  }, []);
 
   const fetchCortes = useCallback(async () => {
     if (abortRef.current) abortRef.current.abort();
@@ -650,7 +661,7 @@ export default function CortesPage() {
           <Input
             type="date"
             value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
+            onChange={(e) => { setDateFrom(e.target.value); setPresetKey('custom'); }}
             className="w-36"
             aria-label="Fecha desde"
           />
@@ -658,12 +669,12 @@ export default function CortesPage() {
           <Input
             type="date"
             value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
+            onChange={(e) => { setDateTo(e.target.value); setPresetKey('custom'); }}
             className="w-36"
             aria-label="Fecha hasta"
           />
         </div>
-        <Select onValueChange={handlePreset}>
+        <Select value={presetKey} onValueChange={handlePreset}>
           <SelectTrigger className="w-[140px]">
             <SelectValue placeholder="Rango..." />
           </SelectTrigger>
@@ -675,6 +686,7 @@ export default function CortesPage() {
             <SelectItem value="mes">Este mes</SelectItem>
             <SelectItem value="30dias">Últimos 30 días</SelectItem>
             <SelectItem value="ano">Este año</SelectItem>
+            <SelectItem value="custom" className="hidden">Personalizado</SelectItem>
           </SelectContent>
         </Select>
 
