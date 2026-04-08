@@ -60,17 +60,15 @@ type Corte = {
   turno: string | null;
   tipo: string | null;
   observaciones: string | null;
-  // Joined from v_cortes_totales (Supabase returns as array)
-  v_cortes_totales?: {
-    ingresos_efectivo: number | null;
-    ingresos_tarjeta: number | null;
-    ingresos_stripe: number | null;
-    ingresos_transferencias: number | null;
-    total_ingresos: number | null;
-    depositos: number | null;
-    retiros: number | null;
-    efectivo_esperado: number | null;
-  }[];
+  // From v_cortes_totales via v_cortes_completo
+  ingresos_efectivo?: number | null;
+  ingresos_tarjeta?: number | null;
+  ingresos_stripe?: number | null;
+  ingresos_transferencias?: number | null;
+  total_ingresos?: number | null;
+  depositos?: number | null;
+  retiros?: number | null;
+  efectivo_esperado?: number | null;
 };
 
 // rdb.v_cortes_totales columns (lazy-loaded per corte)
@@ -466,15 +464,8 @@ export default function CortesPage() {
 
       let query = supabase
         .schema('caja')
-        .from('cortes')
-        .select(`
-          id, corte_nombre, caja_nombre, caja_id, fecha_operativa, hora_inicio, hora_fin, estado, 
-          efectivo_inicial, efectivo_contado, responsable_apertura, responsable_cierre, turno, tipo, observaciones,
-          v_cortes_totales (
-            ingresos_efectivo, ingresos_tarjeta, ingresos_stripe, ingresos_transferencias, 
-            total_ingresos, depositos, retiros, efectivo_esperado
-          )
-        `)
+        .from('v_cortes_completo')
+        .select('*')
         .order('fecha_operativa', { ascending: false })
         .order('hora_inicio', { ascending: false })
         .limit(300);
@@ -740,8 +731,7 @@ export default function CortesPage() {
               </TableRow>
             ) : (
               filtered.map((corte) => {
-                const totales = corte.v_cortes_totales?.[0];
-                const diferencia = (corte.efectivo_contado ?? 0) - (totales?.efectivo_esperado ?? 0);
+                const diferencia = (corte.efectivo_contado ?? 0) - (corte.efectivo_esperado ?? 0);
                 return (
                   <TableRow
                     key={corte.id}
@@ -759,16 +749,16 @@ export default function CortesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right font-medium tabular-nums whitespace-nowrap">
-                      {formatCurrency(totales?.ingresos_efectivo)}
+                      {formatCurrency(corte.ingresos_efectivo)}
                     </TableCell>
                     <TableCell className="text-right font-medium tabular-nums whitespace-nowrap">
-                      {formatCurrency(totales?.ingresos_tarjeta)}
+                      {formatCurrency(corte.ingresos_tarjeta)}
                     </TableCell>
                     <TableCell className="text-right font-medium tabular-nums whitespace-nowrap">
-                      {formatCurrency(totales?.ingresos_transferencias)}
+                      {formatCurrency(corte.ingresos_transferencias)}
                     </TableCell>
                     <TableCell className="text-right font-semibold tabular-nums whitespace-nowrap">
-                      {formatCurrency(totales?.total_ingresos)}
+                      {formatCurrency(corte.total_ingresos)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums whitespace-nowrap">
                       {formatCurrency(corte.efectivo_contado)}
