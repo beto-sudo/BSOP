@@ -529,19 +529,33 @@ export default function CortesPage() {
   async function openAbrirDialog() {
     setAbrirOpen(true);
     setAbrirError(null);
-    if (cajas.length > 0) return;
     setLoadingCajas(true);
     try {
       const supabase = createSupabaseBrowserClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      const userName = user?.user_metadata?.full_name || user?.email || '';
+      const firstName = userName.split(' ')[0] || '';
+
       const { data, error: err } = await supabase
         .schema('caja')
         .from('cajas')
         .select('id, nombre')
         .order('nombre');
       if (err) throw err;
-      setCajas((data ?? []) as Caja[]);
+      
+      const cajasList = (data ?? []) as Caja[];
+      setCajas(cajasList);
+
+      const matchedCaja = cajasList.find(c => c.nombre.toLowerCase().includes(firstName.toLowerCase())) || cajasList[0];
+
+      setAbrirForm(f => ({
+        ...f,
+        responsable_apertura: userName,
+        caja_id: matchedCaja?.id ?? '',
+        fecha_operativa: todayRange().from,
+      }));
     } catch {
-      // non-fatal — user can still type caja_id manually
+      // non-fatal
     } finally {
       setLoadingCajas(false);
     }
@@ -747,45 +761,28 @@ export default function CortesPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Caja
-              </label>
-              <Select
-                value={abrirForm.caja_id}
-                onValueChange={(v) => setAbrirForm((f) => ({ ...f, caja_id: v ?? '' }))}
-                disabled={loadingCajas}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={loadingCajas ? 'Cargando…' : 'Selecciona una caja'} />
-                </SelectTrigger>
-                <SelectContent>
-                  {cajas.map((caja) => (
-                    <SelectItem key={caja.id} value={caja.id}>
-                      {caja.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="space-y-5 py-4">
+            <div className="grid grid-cols-2 gap-4 text-sm border bg-muted/30 p-3 rounded-lg">
+              <div className="space-y-1">
+                <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Responsable</div>
+                <div className="font-medium text-foreground">{abrirForm.responsable_apertura || '—'}</div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Fecha Operativa</div>
+                <div className="font-medium text-foreground">{abrirForm.fecha_operativa}</div>
+              </div>
+              <div className="space-y-1 col-span-2">
+                <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Caja Asignada</div>
+                <div className="font-medium text-foreground">{cajas.find(c => c.id === abrirForm.caja_id)?.nombre || '—'}</div>
+              </div>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 pt-2">
               <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Responsable de apertura
+                Efectivo inicial
               </label>
-              <Input
-                value={abrirForm.responsable_apertura}
-                onChange={(e) => setAbrirForm((f) => ({ ...f, responsable_apertura: e.target.value }))}
-                placeholder="Nombre del cajero"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Efectivo inicial
-                </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
                 <Input
                   type="number"
                   min="0"
@@ -793,16 +790,8 @@ export default function CortesPage() {
                   value={abrirForm.efectivo_inicial}
                   onChange={(e) => setAbrirForm((f) => ({ ...f, efectivo_inicial: e.target.value }))}
                   placeholder="0.00"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Fecha operativa
-                </label>
-                <Input
-                  type="date"
-                  value={abrirForm.fecha_operativa}
-                  onChange={(e) => setAbrirForm((f) => ({ ...f, fecha_operativa: e.target.value }))}
+                  className="pl-7 text-lg font-medium"
+                  autoFocus
                 />
               </div>
             </div>
