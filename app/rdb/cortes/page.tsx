@@ -706,6 +706,7 @@ export default function CortesPage() {
               <TableHead className="whitespace-nowrap">Estado</TableHead>
               <TableHead className="text-right whitespace-nowrap">Efectivo</TableHead>
               <TableHead className="text-right whitespace-nowrap">Tarjeta</TableHead>
+              <TableHead className="text-right whitespace-nowrap">Stripe</TableHead>
               <TableHead className="text-right whitespace-nowrap">Transf.</TableHead>
               <TableHead className="text-right whitespace-nowrap">Total</TableHead>
               <TableHead className="text-right whitespace-nowrap">Efectivo Contado</TableHead>
@@ -716,7 +717,7 @@ export default function CortesPage() {
             {loading ? (
               Array.from({ length: 6 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 10 }).map((__, j) => (
+                  {Array.from({ length: 11 }).map((__, j) => (
                     <TableCell key={j}>
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
@@ -725,7 +726,7 @@ export default function CortesPage() {
               ))
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="py-12 text-center text-muted-foreground">
+                <TableCell colSpan={11} className="py-12 text-center text-muted-foreground">
                   No se encontraron cortes para el rango seleccionado.
                 </TableCell>
               </TableRow>
@@ -753,6 +754,9 @@ export default function CortesPage() {
                     </TableCell>
                     <TableCell className="text-right font-medium tabular-nums whitespace-nowrap">
                       {formatCurrency(corte.ingresos_tarjeta)}
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums whitespace-nowrap">
+                      {formatCurrency(corte.ingresos_stripe)}
                     </TableCell>
                     <TableCell className="text-right font-medium tabular-nums whitespace-nowrap">
                       {formatCurrency(corte.ingresos_transferencias)}
