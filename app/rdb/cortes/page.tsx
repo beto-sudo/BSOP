@@ -69,6 +69,7 @@ type Corte = {
   depositos?: number | null;
   retiros?: number | null;
   efectivo_esperado?: number | null;
+  pedidos_count?: number | null;
 };
 
 // rdb.v_cortes_totales columns (lazy-loaded per corte)
@@ -105,6 +106,30 @@ type Movimiento = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const TZ = 'America/Matamoros';
+
+function formatDateTime(ts: string | null | undefined) {
+  if (!ts) return '—';
+  
+  if (/^\d{4}-\d{2}-\d{2}$/.test(ts)) {
+    const [yyyy, mm, dd] = ts.split('-');
+    return `${dd}/${mm}/${yyyy}`;
+  }
+  
+  const cleanTs = ts.replace(' ', 'T');
+  const d = new Date(cleanTs);
+  
+  if (isNaN(d.getTime())) return ts;
+  
+  return d.toLocaleString('es-MX', {
+    timeZone: 'America/Matamoros',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).replace(',', ' -');
+}
 
 function formatDate(ts: string | null | undefined) {
   if (!ts) return '—';
@@ -230,7 +255,7 @@ function CorteDetail({
         <SheetHeader>
           <SheetTitle>{corte.corte_nombre ?? `Corte ${corte.id}`}</SheetTitle>
           <SheetDescription>
-            {corte.caja_nombre ?? '—'} · {formatDate(corte.fecha_operativa)}
+            {corte.caja_nombre ?? '—'} · {formatDateTime(corte.hora_inicio)} a {formatDateTime(corte.hora_fin)}
           </SheetDescription>
           <div className="absolute right-12 top-4 hidden sm:flex print:hidden">
             <Button variant="outline" size="sm" onClick={() => window.print()}>
@@ -720,7 +745,9 @@ export default function CortesPage() {
             <TableRow>
               <TableHead className="whitespace-nowrap">Caja</TableHead>
               <TableHead className="whitespace-nowrap">Corte</TableHead>
-              <TableHead className="whitespace-nowrap">Fecha</TableHead>
+              <TableHead className="whitespace-nowrap">Inicio</TableHead>
+              <TableHead className="whitespace-nowrap">Fin</TableHead>
+              <TableHead className="whitespace-nowrap">Pedidos</TableHead>
               <TableHead className="whitespace-nowrap">Estado</TableHead>
               <TableHead className="text-right whitespace-nowrap">Efectivo</TableHead>
               <TableHead className="text-right whitespace-nowrap">Tarjeta</TableHead>
@@ -761,7 +788,9 @@ export default function CortesPage() {
                     <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                       {corte.corte_nombre || `Corte-${corte.id.slice(0, 8)}`}
                     </TableCell>
-                    <TableCell className="text-sm whitespace-nowrap">{formatDate(corte.fecha_operativa)}</TableCell>
+                    <TableCell className="text-sm whitespace-nowrap">{formatDateTime(corte.hora_inicio)}</TableCell>
+                    <TableCell className="text-sm whitespace-nowrap">{formatDateTime(corte.hora_fin)}</TableCell>
+                    <TableCell className="text-sm text-center">{corte.pedidos_count ?? 0}</TableCell>
                     <TableCell>
                       <Badge variant={estadoVariant(corte.estado)}>
                         {corte.estado ?? '—'}
