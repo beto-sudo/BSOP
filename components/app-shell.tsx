@@ -300,7 +300,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link
             href="/"
             className={[
-              'flex h-[3.25rem] min-w-0 items-center justify-center overflow-hidden rounded-xl bg-white p-1.5 shadow-sm ring-1 ring-inset ring-[var(--border)] transition hover:ring-[var(--accent)]/40',
+              'flex min-w-0 items-center justify-center overflow-hidden rounded-lg bg-white px-3 py-1.5 shadow-sm ring-1 ring-inset ring-[var(--border)] transition hover:ring-[var(--accent)]/40',
               collapsed ? 'justify-center' : 'w-full max-w-[148px]',
             ].join(' ')}
             aria-label="BSOP home"
