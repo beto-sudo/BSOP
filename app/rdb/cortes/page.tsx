@@ -590,6 +590,7 @@ export default function CortesPage() {
           responsable_apertura: '',
           efectivo_inicial: '',
           fecha_operativa: todayRange().from,
+          auto_matched: false,
         });
         void fetchCortes();
       } catch (err) {
