@@ -1,7 +1,16 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { abrirCaja } from './actions';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -30,7 +39,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
-import { CalendarDays, RefreshCw, Scissors, TrendingUp, Wallet, PlusCircle } from 'lucide-react';
+import { CalendarDays, RefreshCw, Scissors, TrendingUp, Wallet, PlusCircle, Loader2 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -90,18 +99,20 @@ const TZ = 'America/Matamoros';
 
 function formatDate(ts: string | null | undefined) {
   if (!ts) return '—';
-  // date-only (YYYY-MM-DD) — parse without time to avoid TZ shift
   if (/^\d{4}-\d{2}-\d{2}$/.test(ts)) {
     const [yyyy, mm, dd] = ts.split('-');
     return `${dd}/${mm}/${yyyy}`;
   }
-  // timestamp — strip offset suffix, parse as local wall-clock
   const clean = ts.replace(/\+\d{2}(:\d{2})?$/, '').replace('Z', '').replace('T', ' ');
   const parts = clean.split(' ');
   if (parts.length < 2) return clean;
   const [yyyy, mm, dd] = parts[0].split('-');
-  const [hh, min] = parts[1].split(':');
-  return `${dd}/${mm}/${yyyy.slice(2)}, ${hh}:${min}`;
+  const [hhStr, min] = parts[1].split(':');
+  let hh = parseInt(hhStr, 10);
+  const ampm = hh >= 12 ? 'PM' : 'AM';
+  hh = hh % 12;
+  if (hh === 0) hh = 12;
+  return `${dd}/${mm}/${yyyy.slice(2)}, ${hh}:${min} ${ampm}`;
 }
 
 function formatCurrency(amount: number | null | undefined) {
@@ -361,6 +372,8 @@ const ESTADO_OPTIONS = [
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+type Caja = { id: string; nombre: string };
+
 export default function CortesPage() {
   const [cortes, setCortes] = useState<Corte[]>([]);
   const [loading, setLoading] = useState(true);
@@ -375,6 +388,19 @@ export default function CortesPage() {
   const [selectedProductos, setSelectedProductos] = useState<any[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+
+  // ── Abrir Caja dialog state ──────────────────────────────────────────────
+  const [abrirOpen, setAbrirOpen] = useState(false);
+  const [cajas, setCajas] = useState<Caja[]>([]);
+  const [loadingCajas, setLoadingCajas] = useState(false);
+  const [abrirForm, setAbrirForm] = useState({
+    caja_id: '',
+    responsable_apertura: '',
+    efectivo_inicial: '',
+    fecha_operativa: todayRange().from,
+  });
+  const [abrirError, setAbrirError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   const fetchCortes = useCallback(async () => {
     if (abortRef.current) abortRef.current.abort();
@@ -460,6 +486,62 @@ export default function CortesPage() {
     return true;
   });
 
+  async function openAbrirDialog() {
+    setAbrirOpen(true);
+    setAbrirError(null);
+    if (cajas.length > 0) return;
+    setLoadingCajas(true);
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { data, error: err } = await supabase
+        .schema('caja')
+        .from('cajas')
+        .select('id, nombre')
+        .order('nombre');
+      if (err) throw err;
+      setCajas((data ?? []) as Caja[]);
+    } catch {
+      // non-fatal — user can still type caja_id manually
+    } finally {
+      setLoadingCajas(false);
+    }
+  }
+
+  function handleAbrirSubmit() {
+    setAbrirError(null);
+    const selectedCaja = cajas.find((c) => c.id === abrirForm.caja_id);
+    if (!abrirForm.caja_id) {
+      setAbrirError('Selecciona una caja.');
+      return;
+    }
+    if (!abrirForm.responsable_apertura.trim()) {
+      setAbrirError('Ingresa el nombre del responsable de apertura.');
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        await abrirCaja({
+          caja_id: abrirForm.caja_id,
+          caja_nombre: selectedCaja?.nombre ?? abrirForm.caja_id,
+          responsable_apertura: abrirForm.responsable_apertura.trim(),
+          efectivo_inicial: parseFloat(abrirForm.efectivo_inicial) || 0,
+          fecha_operativa: abrirForm.fecha_operativa || todayRange().from,
+        });
+        setAbrirOpen(false);
+        setAbrirForm({
+          caja_id: '',
+          responsable_apertura: '',
+          efectivo_inicial: '',
+          fecha_operativa: todayRange().from,
+        });
+        void fetchCortes();
+      } catch (err) {
+        setAbrirError(err instanceof Error ? err.message : 'Error al abrir la caja');
+      }
+    });
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -468,10 +550,7 @@ export default function CortesPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Cortes de Caja</h1>
           <p className="text-sm text-muted-foreground">Turnos registrados en RDB</p>
         </div>
-        <Button
-          onClick={() => alert('Función "Abrir Caja" próximamente disponible.')}
-          className="shrink-0"
-        >
+        <Button onClick={() => void openAbrirDialog()} className="shrink-0">
           <PlusCircle className="mr-2 h-4 w-4" />
           Abrir Caja
         </Button>
@@ -602,6 +681,104 @@ export default function CortesPage() {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
       />
+
+      {/* Abrir Caja dialog */}
+      <Dialog open={abrirOpen} onOpenChange={(v) => { if (!v) setAbrirOpen(false); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Abrir Caja</DialogTitle>
+            <DialogDescription>
+              Registra la apertura de un nuevo turno de caja. Se verificará que no haya un turno abierto para la caja seleccionada.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Caja
+              </label>
+              <Select
+                value={abrirForm.caja_id}
+                onValueChange={(v) => setAbrirForm((f) => ({ ...f, caja_id: v ?? '' }))}
+                disabled={loadingCajas}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={loadingCajas ? 'Cargando…' : 'Selecciona una caja'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {cajas.map((caja) => (
+                    <SelectItem key={caja.id} value={caja.id}>
+                      {caja.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Responsable de apertura
+              </label>
+              <Input
+                value={abrirForm.responsable_apertura}
+                onChange={(e) => setAbrirForm((f) => ({ ...f, responsable_apertura: e.target.value }))}
+                placeholder="Nombre del cajero"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Efectivo inicial
+                </label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={abrirForm.efectivo_inicial}
+                  onChange={(e) => setAbrirForm((f) => ({ ...f, efectivo_inicial: e.target.value }))}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Fecha operativa
+                </label>
+                <Input
+                  type="date"
+                  value={abrirForm.fecha_operativa}
+                  onChange={(e) => setAbrirForm((f) => ({ ...f, fecha_operativa: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            {abrirError && (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                {abrirError}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAbrirOpen(false)} disabled={isPending}>
+              Cancelar
+            </Button>
+            <Button onClick={handleAbrirSubmit} disabled={isPending}>
+              {isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Abriendo…
+                </>
+              ) : (
+                <>
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Abrir turno
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

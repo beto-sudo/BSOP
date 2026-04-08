@@ -1,7 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import {
+  guardarRequisicion,
+  aprobarRequisicion,
+  generarOrdenCompra,
+  type DraftItemInput,
+} from './actions';
 import {
   Table,
   TableBody,
@@ -263,16 +269,47 @@ function ExistingRequestSheet({
   loadingItems,
   open,
   onClose,
+  onAction,
 }: {
   requisicion: Requisicion | null;
   loadingItems: boolean;
   open: boolean;
   onClose: () => void;
+  onAction: () => void;
 }) {
+  const [isPending, startTransition] = useTransition();
+  const [actionError, setActionError] = useState<string | null>(null);
+
   if (!requisicion) return null;
 
   const status = normalizeStatus(requisicion.estatus);
   const items = requisicion.items ?? [];
+
+  function handleAprobar() {
+    setActionError(null);
+    startTransition(async () => {
+      try {
+        await aprobarRequisicion(requisicion!.id);
+        onAction();
+        onClose();
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : 'Error al aprobar');
+      }
+    });
+  }
+
+  function handleGenerarOC() {
+    setActionError(null);
+    startTransition(async () => {
+      try {
+        await generarOrdenCompra(requisicion!.id);
+        onAction();
+        onClose();
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : 'Error al generar OC');
+      }
+    });
+  }
 
   return (
     <Sheet open={open} onOpenChange={(value) => !value && onClose()}>
@@ -364,6 +401,29 @@ function ExistingRequestSheet({
                 </div>
               )}
             </div>
+
+            {actionError && (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                {actionError}
+              </div>
+            )}
+
+            {(status === 'pendiente' || status === 'autorizada') && (
+              <div className="flex flex-wrap justify-end gap-3">
+                {status === 'pendiente' && (
+                  <Button onClick={handleAprobar} disabled={isPending}>
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    {isPending ? 'Aprobando…' : 'Aprobar'}
+                  </Button>
+                )}
+                {status === 'autorizada' && (
+                  <Button onClick={handleGenerarOC} disabled={isPending}>
+                    <ShoppingBasket className="mr-2 h-4 w-4" />
+                    {isPending ? 'Generando OC…' : 'Generar OC'}
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
         </ScrollArea>
       </SheetContent>
@@ -378,6 +438,7 @@ function NewRequestSheet({
   onDraftItemChange,
   onAddDraftItem,
   onRemoveDraftItem,
+  onSaved,
 }: {
   open: boolean;
   onClose: () => void;
@@ -385,14 +446,45 @@ function NewRequestSheet({
   onDraftItemChange: (id: string, field: keyof DraftItem, value: string) => void;
   onAddDraftItem: () => void;
   onRemoveDraftItem: (id: string) => void;
+  onSaved: () => void;
 }) {
+  const [isPending, startTransition] = useTransition();
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  function handleGuardar() {
+    setSaveError(null);
+    const items: DraftItemInput[] = draftItems
+      .filter((item) => (item.producto || item.descripcion).trim())
+      .map((item) => ({
+        descripcion: (item.producto || item.descripcion).trim(),
+        cantidad: Math.max(parseFloat(item.cantidad) || 1, 0),
+        unidad: item.unidad.trim() || 'pza',
+        notas: item.descripcion.trim() || null,
+      }));
+
+    if (items.length === 0) {
+      setSaveError('Agrega al menos un artículo antes de guardar.');
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        await guardarRequisicion(items);
+        onSaved();
+        onClose();
+      } catch (err) {
+        setSaveError(err instanceof Error ? err.message : 'Error al guardar la requisición');
+      }
+    });
+  }
+
   return (
     <Sheet open={open} onOpenChange={(value) => !value && onClose()}>
       <SheetContent className="flex w-full flex-col data-[side=right]:sm:max-w-xl data-[side=right]:md:max-w-2xl">
         <SheetHeader>
           <SheetTitle>Nueva Requisición</SheetTitle>
           <SheetDescription>
-            Cascarón visual para capturar productos antes de enviarlos a autorización.
+            Captura los artículos que necesitas y envía la requisición a autorización.
           </SheetDescription>
         </SheetHeader>
 
@@ -520,27 +612,19 @@ function NewRequestSheet({
 
             <Separator />
 
-            <div className="rounded-xl border border-dashed bg-muted/20 p-4">
-              <div className="flex items-start gap-3">
-                <ShoppingBasket className="mt-0.5 h-5 w-5 text-muted-foreground" />
-                <div>
-                  <div className="font-medium">Siguiente paso sugerido</div>
-                  <p className="text-sm text-muted-foreground">
-                    Conectar este formulario a catálogo de productos, validación de stock y guardado en
-                    <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">rdb.requisiciones</code>
-                    y
-                    <code className="ml-1 rounded bg-muted px-1 py-0.5 text-xs">rdb.requisiciones_items</code>.
-                  </p>
-                </div>
+            {saveError && (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                {saveError}
               </div>
-            </div>
+            )}
 
             <div className="flex flex-wrap justify-end gap-3">
-              <Button variant="outline" onClick={onClose}>
+              <Button variant="outline" onClick={onClose} disabled={isPending}>
                 Cancelar
               </Button>
-              <Button disabled>
-                Guardar requisición próximamente
+              <Button onClick={handleGuardar} disabled={isPending}>
+                <FilePlus2 className="mr-2 h-4 w-4" />
+                {isPending ? 'Guardando…' : 'Guardar requisición'}
               </Button>
             </div>
           </div>
@@ -821,6 +905,7 @@ export default function RequisicionesPage() {
         loadingItems={loadingItems}
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
+        onAction={() => void fetchRequisiciones()}
       />
 
       <NewRequestSheet
@@ -830,6 +915,10 @@ export default function RequisicionesPage() {
         onDraftItemChange={handleDraftItemChange}
         onAddDraftItem={handleAddDraftItem}
         onRemoveDraftItem={handleRemoveDraftItem}
+        onSaved={() => {
+          void fetchRequisiciones();
+          setDraftItems(MOCK_DRAFT_ITEMS);
+        }}
       />
     </div>
   );
