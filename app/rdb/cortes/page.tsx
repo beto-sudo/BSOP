@@ -60,15 +60,17 @@ type Corte = {
   turno: string | null;
   tipo: string | null;
   observaciones: string | null;
-  // Totales de Waitry (joined from v_cortes_totales)
-  ingresos_efectivo?: number | null;
-  ingresos_tarjeta?: number | null;
-  ingresos_stripe?: number | null;
-  ingresos_transferencias?: number | null;
-  total_ingresos?: number | null;
-  depositos?: number | null;
-  retiros?: number | null;
-  efectivo_esperado?: number | null;
+  // Joined from v_cortes_totales (Supabase returns as array)
+  v_cortes_totales?: {
+    ingresos_efectivo: number | null;
+    ingresos_tarjeta: number | null;
+    ingresos_stripe: number | null;
+    ingresos_transferencias: number | null;
+    total_ingresos: number | null;
+    depositos: number | null;
+    retiros: number | null;
+    efectivo_esperado: number | null;
+  }[];
 };
 
 // rdb.v_cortes_totales columns (lazy-loaded per corte)
@@ -738,8 +740,8 @@ export default function CortesPage() {
               </TableRow>
             ) : (
               filtered.map((corte) => {
-                const totales = corte.v_cortes_totales?.[0] || {};
-                const diferencia = (corte.efectivo_contado ?? 0) - (totales.efectivo_esperado ?? 0);
+                const totales = corte.v_cortes_totales?.[0];
+                const diferencia = (corte.efectivo_contado ?? 0) - (totales?.efectivo_esperado ?? 0);
                 return (
                   <TableRow
                     key={corte.id}
@@ -757,16 +759,16 @@ export default function CortesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right font-medium tabular-nums whitespace-nowrap">
-                      {formatCurrency(totales.ingresos_efectivo)}
+                      {formatCurrency(totales?.ingresos_efectivo)}
                     </TableCell>
                     <TableCell className="text-right font-medium tabular-nums whitespace-nowrap">
-                      {formatCurrency(totales.ingresos_tarjeta)}
+                      {formatCurrency(totales?.ingresos_tarjeta)}
                     </TableCell>
                     <TableCell className="text-right font-medium tabular-nums whitespace-nowrap">
-                      {formatCurrency(totales.ingresos_transferencias)}
+                      {formatCurrency(totales?.ingresos_transferencias)}
                     </TableCell>
                     <TableCell className="text-right font-semibold tabular-nums whitespace-nowrap">
-                      {formatCurrency(totales.total_ingresos)}
+                      {formatCurrency(totales?.total_ingresos)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums whitespace-nowrap">
                       {formatCurrency(corte.efectivo_contado)}
