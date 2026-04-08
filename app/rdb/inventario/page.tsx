@@ -212,7 +212,7 @@ function StockDetailDrawer({
         .select('*')
         .eq('producto_id', item.id)
         .order('created_at', { ascending: false })
-        .limit(50)
+        .limit(500)
         .then(({ data, error }) => {
           if (!error && data) {
             setKardex(data as MovimientoRow[]);
