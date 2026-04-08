@@ -163,7 +163,7 @@ function OrdenDetail({
 
   return (
     <Sheet open={open} onOpenChange={(value) => !value && onClose()}>
-      <SheetContent className="flex w-full flex-col data-[side=right]:md:max-w-2xl">
+      <SheetContent className="flex w-full flex-col sm:max-w-[400px] md:max-w-[500px]">
         <SheetHeader>
           <SheetTitle>{orden?.folio ?? 'Orden de compra'}</SheetTitle>
           <SheetDescription>

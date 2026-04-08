@@ -193,7 +193,7 @@ function OrderDetail({
 
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <SheetContent className="flex w-full flex-col data-[side=right]:sm:max-w-xl data-[side=right]:md:max-w-2xl">
+      <SheetContent className="flex w-full flex-col sm:max-w-[400px] md:max-w-[500px]">
         <SheetHeader>
           <SheetTitle>Pedido #{pedido.order_id ?? pedido.id}</SheetTitle>
           <SheetDescription>{formatDate(pedido.timestamp)}</SheetDescription>

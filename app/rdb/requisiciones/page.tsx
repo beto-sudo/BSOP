@@ -315,7 +315,7 @@ function ExistingRequestSheet({
 
   return (
     <Sheet open={open} onOpenChange={(value) => !value && onClose()}>
-      <SheetContent className="flex w-full flex-col data-[side=right]:sm:max-w-xl data-[side=right]:md:max-w-2xl">
+      <SheetContent className="flex w-full flex-col sm:max-w-[400px] md:max-w-[500px]">
         <SheetHeader>
           <SheetTitle>{requisicion.folio || 'Sin folio'}</SheetTitle>
           <SheetDescription>{formatDate(requisicion.fecha_solicitud)}</SheetDescription>
@@ -482,7 +482,7 @@ function NewRequestSheet({
 
   return (
     <Sheet open={open} onOpenChange={(value) => !value && onClose()}>
-      <SheetContent className="flex w-full flex-col data-[side=right]:sm:max-w-xl data-[side=right]:md:max-w-2xl">
+      <SheetContent className="flex w-full flex-col sm:max-w-[400px] md:max-w-[500px]">
         <SheetHeader>
           <SheetTitle>Nueva Requisición</SheetTitle>
           <SheetDescription>
