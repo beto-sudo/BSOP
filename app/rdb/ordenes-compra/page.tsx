@@ -23,6 +23,13 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { CalendarDays, PackagePlus, RefreshCw, Search, Truck } from 'lucide-react';
 
 type EstatusOc = 'Enviada' | 'Parcial' | 'Recibida' | 'Cancelada' | string;
@@ -504,6 +511,21 @@ export default function OrdenesCompraPage() {
           <span className="text-muted-foreground">—</span>
           <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="w-36" />
         </div>
+
+        <Select onValueChange={handlePreset}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="Rango..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="hoy">Hoy</SelectItem>
+            <SelectItem value="ayer">Ayer</SelectItem>
+            <SelectItem value="semana">Esta semana</SelectItem>
+            <SelectItem value="7dias">Últimos 7 días</SelectItem>
+            <SelectItem value="mes">Este mes</SelectItem>
+            <SelectItem value="30dias">Últimos 30 días</SelectItem>
+            <SelectItem value="ano">Este año</SelectItem>
+          </SelectContent>
+        </Select>
 
         <Button variant="outline" size="icon" onClick={() => void fetchOrdenes()} aria-label="Actualizar">
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
