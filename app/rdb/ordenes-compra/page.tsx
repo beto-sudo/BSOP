@@ -280,6 +280,43 @@ export default function OrdenesCompraPage() {
   const [search, setSearch] = useState('');
   const [dateFrom, setDateFrom] = useState(() => todayRange().from);
   const [dateTo, setDateTo] = useState(() => todayRange().to);
+
+  const handlePreset = (preset: string | null) => {
+    if (!preset) return;
+    const today = new Date();
+    const formatter = new Intl.DateTimeFormat('sv-SE', { timeZone: TZ });
+    if (preset === 'hoy') {
+      const t = formatter.format(today);
+      setDateFrom(t); setDateTo(t);
+    } else if (preset === 'ayer') {
+      const ayer = new Date(today.toLocaleString('en-US', { timeZone: TZ }));
+      ayer.setDate(ayer.getDate() - 1);
+      const t = formatter.format(ayer);
+      setDateFrom(t); setDateTo(t);
+    } else if (preset === 'semana') {
+      const d = new Date(today.toLocaleString('en-US', { timeZone: TZ }));
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(d.setDate(diff));
+      setDateFrom(formatter.format(monday)); setDateTo(formatter.format(today));
+    } else if (preset === '7dias') {
+      const d = new Date(today.toLocaleString('en-US', { timeZone: TZ }));
+      d.setDate(d.getDate() - 7);
+      setDateFrom(formatter.format(d)); setDateTo(formatter.format(today));
+    } else if (preset === 'mes') {
+      const d = new Date(today.toLocaleString('en-US', { timeZone: TZ }));
+      const first = new Date(d.getFullYear(), d.getMonth(), 1);
+      setDateFrom(formatter.format(first)); setDateTo(formatter.format(today));
+    } else if (preset === '30dias') {
+      const d = new Date(today.toLocaleString('en-US', { timeZone: TZ }));
+      d.setDate(d.getDate() - 30);
+      setDateFrom(formatter.format(d)); setDateTo(formatter.format(today));
+    } else if (preset === 'ano') {
+      const d = new Date(today.toLocaleString('en-US', { timeZone: TZ }));
+      const first = new Date(d.getFullYear(), 0, 1);
+      setDateFrom(formatter.format(first)); setDateTo(formatter.format(today));
+    }
+  };
   const [selected, setSelected] = useState<OrdenCompra | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editedReceipts, setEditedReceipts] = useState<Record<string, string>>({});
