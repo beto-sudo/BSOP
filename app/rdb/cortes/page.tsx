@@ -99,20 +99,27 @@ const TZ = 'America/Matamoros';
 
 function formatDate(ts: string | null | undefined) {
   if (!ts) return '—';
+  
   if (/^\d{4}-\d{2}-\d{2}$/.test(ts)) {
     const [yyyy, mm, dd] = ts.split('-');
     return `${dd}/${mm}/${yyyy}`;
   }
-  const clean = ts.replace(/\+\d{2}(:\d{2})?$/, '').replace('Z', '').replace('T', ' ');
-  const parts = clean.split(' ');
-  if (parts.length < 2) return clean;
-  const [yyyy, mm, dd] = parts[0].split('-');
-  const [hhStr, min] = parts[1].split(':');
-  let hh = parseInt(hhStr, 10);
-  const ampm = hh >= 12 ? 'PM' : 'AM';
-  hh = hh % 12;
-  if (hh === 0) hh = 12;
-  return `${dd}/${mm}/${yyyy.slice(2)}, ${hh}:${min} ${ampm}`;
+  
+  const cleanTs = ts.replace(/\+[0-9]+(:[0-9]+)?$/, '').replace('Z', '').replace('T', ' ');
+  const isoWithOffset = cleanTs.replace(' ', 'T') + '-06:00';
+  const d = new Date(isoWithOffset);
+  
+  if (isNaN(d.getTime())) return ts;
+  
+  return d.toLocaleString('es-MX', {
+    timeZone: 'America/Matamoros',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
 }
 
 function formatCurrency(amount: number | null | undefined) {
