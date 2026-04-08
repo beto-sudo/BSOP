@@ -114,9 +114,8 @@ function formatDate(ts: string | null | undefined) {
     return `${dd}/${mm}/${yyyy}`;
   }
   
-  const cleanTs = ts.replace(/\+[0-9]+(:[0-9]+)?$/, '').replace('Z', '').replace('T', ' ');
-  const isoWithOffset = cleanTs.replace(' ', 'T') + '-06:00';
-  const d = new Date(isoWithOffset);
+  const cleanTs = ts.replace(' ', 'T');
+  const d = new Date(cleanTs);
   
   if (isNaN(d.getTime())) return ts;
   
