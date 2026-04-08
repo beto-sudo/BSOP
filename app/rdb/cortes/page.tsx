@@ -518,8 +518,9 @@ export default function CortesPage() {
       const { data, error: err } = await query;
       if (err) throw err;
       setCortes((data ?? []) as Corte[]);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Error al cargar cortes');
+    } catch (e: any) {
+      console.error(e);
+      setError(e?.message || 'Error al cargar cortes');
     } finally {
       setLoading(false);
     }
