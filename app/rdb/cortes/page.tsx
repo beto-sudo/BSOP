@@ -60,6 +60,15 @@ type Corte = {
   turno: string | null;
   tipo: string | null;
   observaciones: string | null;
+  // Totales de Waitry (joined from v_cortes_totales)
+  ingresos_efectivo?: number | null;
+  ingresos_tarjeta?: number | null;
+  ingresos_stripe?: number | null;
+  ingresos_transferencias?: number | null;
+  total_ingresos?: number | null;
+  depositos?: number | null;
+  retiros?: number | null;
+  efectivo_esperado?: number | null;
 };
 
 // rdb.v_cortes_totales columns (lazy-loaded per corte)
@@ -456,9 +465,14 @@ export default function CortesPage() {
       let query = supabase
         .schema('caja')
         .from('cortes')
-        .select(
-          'id, corte_nombre, caja_nombre, caja_id, fecha_operativa, hora_inicio, hora_fin, estado, efectivo_inicial, efectivo_contado, responsable_apertura, responsable_cierre, turno, tipo, observaciones',
-        )
+        .select(`
+          id, corte_nombre, caja_nombre, caja_id, fecha_operativa, hora_inicio, hora_fin, estado, 
+          efectivo_inicial, efectivo_contado, responsable_apertura, responsable_cierre, turno, tipo, observaciones,
+          v_cortes_totales (
+            ingresos_efectivo, ingresos_tarjeta, ingresos_stripe, ingresos_transferencias, 
+            total_ingresos, depositos, retiros, efectivo_esperado
+          )
+        `)
         .order('fecha_operativa', { ascending: false })
         .order('hora_inicio', { ascending: false })
         .limit(300);
@@ -689,22 +703,27 @@ export default function CortesPage() {
       )}
 
       {/* Table */}
-      <div className="rounded-xl border bg-card">
+      <div className="rounded-xl border bg-card overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Caja</TableHead>
-              <TableHead>Corte</TableHead>
-              <TableHead>Fecha Operativa</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="text-right">Efectivo Contado</TableHead>
+              <TableHead className="whitespace-nowrap">Caja</TableHead>
+              <TableHead className="whitespace-nowrap">Corte</TableHead>
+              <TableHead className="whitespace-nowrap">Fecha</TableHead>
+              <TableHead className="whitespace-nowrap">Estado</TableHead>
+              <TableHead className="text-right whitespace-nowrap">Efectivo</TableHead>
+              <TableHead className="text-right whitespace-nowrap">Tarjeta</TableHead>
+              <TableHead className="text-right whitespace-nowrap">Transf.</TableHead>
+              <TableHead className="text-right whitespace-nowrap">Total</TableHead>
+              <TableHead className="text-right whitespace-nowrap">Efectivo Contado</TableHead>
+              <TableHead className="text-right whitespace-nowrap">Diferencia</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               Array.from({ length: 6 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 5 }).map((__, j) => (
+                  {Array.from({ length: 10 }).map((__, j) => (
                     <TableCell key={j}>
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
@@ -713,32 +732,51 @@ export default function CortesPage() {
               ))
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-12 text-center text-muted-foreground">
+                <TableCell colSpan={10} className="py-12 text-center text-muted-foreground">
                   No se encontraron cortes para el rango seleccionado.
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((corte) => (
-                <TableRow
-                  key={corte.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => void openDetail(corte)}
-                >
-                  <TableCell className="font-medium">{corte.caja_nombre ?? '—'}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {corte.corte_nombre ?? '—'}
-                  </TableCell>
-                  <TableCell className="text-sm">{formatDate(corte.fecha_operativa)}</TableCell>
-                  <TableCell>
-                    <Badge variant={estadoVariant(corte.estado)}>
-                      {corte.estado ?? '—'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">
-                    {formatCurrency(corte.efectivo_contado)}
-                  </TableCell>
-                </TableRow>
-              ))
+              filtered.map((corte) => {
+                const totales = corte.v_cortes_totales?.[0] || {};
+                const diferencia = (corte.efectivo_contado ?? 0) - (totales.efectivo_esperado ?? 0);
+                return (
+                  <TableRow
+                    key={corte.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => void openDetail(corte)}
+                  >
+                    <TableCell className="font-medium whitespace-nowrap">{corte.caja_nombre ?? '—'}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                      {corte.corte_nombre || `Corte-${corte.id.slice(0, 8)}`}
+                    </TableCell>
+                    <TableCell className="text-sm whitespace-nowrap">{formatDate(corte.fecha_operativa)}</TableCell>
+                    <TableCell>
+                      <Badge variant={estadoVariant(corte.estado)}>
+                        {corte.estado ?? '—'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums whitespace-nowrap">
+                      {formatCurrency(totales.ingresos_efectivo)}
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums whitespace-nowrap">
+                      {formatCurrency(totales.ingresos_tarjeta)}
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums whitespace-nowrap">
+                      {formatCurrency(totales.ingresos_transferencias)}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums whitespace-nowrap">
+                      {formatCurrency(totales.total_ingresos)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums whitespace-nowrap">
+                      {formatCurrency(corte.efectivo_contado)}
+                    </TableCell>
+                    <TableCell className={`text-right tabular-nums whitespace-nowrap ${diferencia !== 0 ? (diferencia > 0 ? 'text-emerald-600' : 'text-destructive') : ''}`}>
+                      {diferencia !== 0 ? formatCurrency(diferencia) : '—'}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
