@@ -351,13 +351,21 @@ export default function ProductosPage() {
 
                  {/* Categoria */}
                  <div className="space-y-2">
-                    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="cat">Categoría</label>
-                    <Input
-                       id="cat"
-                       placeholder="Ej. Cervezas, Snacks, Servicios..."
-                       value={formCategoria}
-                       onChange={(e) => setFormCategoria(e.target.value)}
-                    />
+                    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Categoría</label>
+                    <Select value={formCategoria || 'none'} onValueChange={(v) => setFormCategoria(v === 'none' ? '' : v)}>
+                       <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar categoría..." />
+                       </SelectTrigger>
+                       <SelectContent>
+                          <SelectItem value="none" className="italic text-muted-foreground">Sin Categoría</SelectItem>
+                          <SelectItem value="Alimentos">Alimentos</SelectItem>
+                          <SelectItem value="Bebidas">Bebidas</SelectItem>
+                          <SelectItem value="Licores">Licores</SelectItem>
+                          <SelectItem value="Articulos">Articulos</SelectItem>
+                          <SelectItem value="Deportes">Deportes</SelectItem>
+                          <SelectItem value="Consumibles">Consumibles</SelectItem>
+                       </SelectContent>
+                    </Select>
                  </div>
 
                  {/* Producto Padre (Anidar) */}
