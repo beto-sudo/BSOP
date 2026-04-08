@@ -196,8 +196,8 @@ textarea {
     display: none !important;
   }
   
-  /* Aseguramos que los portales de Radix sigan vivos */
-  body > [data-radix-portal] {
+  /* Aseguramos que los portales de Radix sigan vivos (NextJS genera varios tipos) */
+  body > [data-radix-portal], body > [data-slot="sheet-portal"], body > .radix-portal {
     display: block !important;
     position: relative !important;
     height: auto !important;
