@@ -21,7 +21,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Package, RefreshCw, Search, Tag, Box } from 'lucide-react';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet';
+import { Package, RefreshCw, Search, Tag, Box, Settings2, Save } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,6 +44,8 @@ type Producto = {
   stock_minimo: number | null;
   created_at: string | null;
   updated_at: string | null;
+  inventariable: boolean;
+  parent_id: string | null;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -46,48 +55,26 @@ function formatCurrency(amount: number | null | undefined) {
   return amount.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
 }
 
-// ─── Summary Bar ──────────────────────────────────────────────────────────────
-
-function SummaryBar({ productos }: { productos: Producto[] }) {
-  const activos = productos.filter((p) => p.activo).length;
-  const categorias = new Set(productos.map((p) => p.categoria).filter(Boolean)).size;
-
-  return (
-    <div className="grid grid-cols-3 gap-3">
-      <div className="rounded-xl border bg-card px-4 py-3">
-        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          <Package className="h-3.5 w-3.5" />
-          Total
-        </div>
-        <div className="mt-1 text-2xl font-semibold tabular-nums">{productos.length}</div>
-      </div>
-      <div className="rounded-xl border bg-card px-4 py-3">
-        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          <Box className="h-3.5 w-3.5" />
-          Activos
-        </div>
-        <div className="mt-1 text-2xl font-semibold tabular-nums">{activos}</div>
-      </div>
-      <div className="rounded-xl border bg-card px-4 py-3">
-        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          <Tag className="h-3.5 w-3.5" />
-          Categorías
-        </div>
-        <div className="mt-1 text-2xl font-semibold tabular-nums">{categorias}</div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ProductosPage() {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
   const [search, setSearch] = useState('');
   const [categoriaFilter, setCategoriaFilter] = useState('all');
   const [activoFilter, setActivoFilter] = useState('all');
+  const [inventariableFilter, setInventariableFilter] = useState('all');
+
+  const [selectedProducto, setSelectedProducto] = useState<Producto | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Form State
+  const [formCategoria, setFormCategoria] = useState('');
+  const [formInventariable, setFormInventariable] = useState(false);
+  const [formParentId, setFormParentId] = useState<string>('none');
 
   const fetchProductos = useCallback(async () => {
     setLoading(true);
@@ -112,6 +99,42 @@ export default function ProductosPage() {
     void fetchProductos();
   }, [fetchProductos]);
 
+  const openDrawer = (p: Producto) => {
+    setSelectedProducto(p);
+    setFormCategoria(p.categoria || '');
+    setFormInventariable(p.inventariable ?? true);
+    setFormParentId(p.parent_id || 'none');
+    setDrawerOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!selectedProducto) return;
+    setSaving(true);
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { error: err } = await supabase
+        .schema('rdb')
+        .from('productos')
+        .update({
+          categoria: formCategoria.trim() || null,
+          inventariable: formInventariable,
+          parent_id: formParentId === 'none' ? null : formParentId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', selectedProducto.id);
+
+      if (err) throw err;
+      
+      setDrawerOpen(false);
+      void fetchProductos();
+    } catch (e) {
+      console.error(e);
+      alert('Error al guardar el producto');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const categorias = Array.from(
     new Set(productos.map((p) => p.categoria).filter((c): c is string => !!c)),
   ).sort();
@@ -119,6 +142,7 @@ export default function ProductosPage() {
   const filtered = productos.filter((p) => {
     if (activoFilter !== 'all' && String(p.activo) !== activoFilter) return false;
     if (categoriaFilter !== 'all' && p.categoria !== categoriaFilter) return false;
+    if (inventariableFilter !== 'all' && String(p.inventariable ?? true) !== inventariableFilter) return false;
     if (!search) return true;
     const q = search.toLowerCase();
     return (
@@ -131,13 +155,17 @@ export default function ProductosPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Productos</h1>
-        <p className="text-sm text-muted-foreground">Catálogo de productos del restaurante</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Productos</h1>
+          <p className="text-sm text-muted-foreground">Catálogo de productos y servicios</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="text-sm text-muted-foreground">
+             Total: <span className="font-semibold text-foreground">{filtered.length}</span>
+          </div>
+        </div>
       </div>
-
-      {/* Summary */}
-      {!loading && !error && <SummaryBar productos={filtered} />}
 
       {/* Filters */}
       <div className="flex flex-wrap items-end gap-3">
@@ -165,14 +193,25 @@ export default function ProductosPage() {
           </SelectContent>
         </Select>
 
+        <Select value={inventariableFilter} onValueChange={(v) => setInventariableFilter(v ?? 'all')}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="Tipo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los tipos</SelectItem>
+            <SelectItem value="true">Inventariable</SelectItem>
+            <SelectItem value="false">Servicio / Varios</SelectItem>
+          </SelectContent>
+        </Select>
+
         <Select value={activoFilter} onValueChange={(v) => setActivoFilter(v ?? 'all')}>
           <SelectTrigger className="w-36">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="true">Activos</SelectItem>
-            <SelectItem value="false">Inactivos</SelectItem>
+            <SelectItem value="all">Todos (Activos)</SelectItem>
+            <SelectItem value="true">Solo Activos</SelectItem>
+            <SelectItem value="false">Solo Inactivos</SelectItem>
           </SelectContent>
         </Select>
 
@@ -184,10 +223,6 @@ export default function ProductosPage() {
         >
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
         </Button>
-
-        <span className="text-sm text-muted-foreground">
-          {loading ? 'Cargando…' : `${filtered.length} producto${filtered.length !== 1 ? 's' : ''}`}
-        </span>
       </div>
 
       {/* Error */}
@@ -203,18 +238,19 @@ export default function ProductosPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Nombre</TableHead>
+              <TableHead>Tipo</TableHead>
               <TableHead>Categoría</TableHead>
-              <TableHead>Unidad</TableHead>
               <TableHead className="text-right">Precio</TableHead>
-              <TableHead className="text-right">Stock Mín.</TableHead>
+              <TableHead>Padre</TableHead>
               <TableHead>Estado</TableHead>
+              <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               Array.from({ length: 8 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 6 }).map((__, j) => (
+                  {Array.from({ length: 7 }).map((__, j) => (
                     <TableCell key={j}>
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
@@ -223,42 +259,144 @@ export default function ProductosPage() {
               ))
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
                   No se encontraron productos.
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((p) => (
-                <TableRow key={p.id}>
+              filtered.map((p) => {
+                const parent = p.parent_id ? productos.find(x => x.id === p.parent_id) : null;
+                return (
+                <TableRow key={p.id} className="cursor-pointer hover:bg-muted/50" onClick={() => openDrawer(p)}>
                   <TableCell>
                     <div className="font-medium">{p.nombre}</div>
                     {p.descripcion && (
                       <div className="text-xs text-muted-foreground">{p.descripcion}</div>
                     )}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {p.categoria ?? '—'}
+                  <TableCell>
+                     {p.inventariable ?? true ? (
+                        <Badge variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50">Producto</Badge>
+                     ) : (
+                        <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">Servicio</Badge>
+                     )}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {p.unidad ?? 'pieza'}
+                    {p.categoria ?? '—'}
                   </TableCell>
                   <TableCell className="text-right font-medium tabular-nums">
                     {formatCurrency(p.precio)}
                   </TableCell>
-                  <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
-                    {p.stock_minimo ?? '—'}
+                  <TableCell className="text-sm text-muted-foreground">
+                    {parent ? parent.nombre : '—'}
                   </TableCell>
                   <TableCell>
                     <Badge variant={p.activo ? 'default' : 'secondary'}>
                       {p.activo ? 'Activo' : 'Inactivo'}
                     </Badge>
                   </TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={(e) => { e.stopPropagation(); openDrawer(p); }}>
+                       <Settings2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
-              ))
+              );})
             )}
           </TableBody>
         </Table>
       </div>
+
+      {/* Detail/Config Drawer */}
+      <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+        <SheetContent className="sm:max-w-[600px]">
+          <SheetHeader>
+            <SheetTitle>Configurar Producto</SheetTitle>
+            <SheetDescription>
+              Ajusta las reglas de inventario, agrupaciones y categorías.
+            </SheetDescription>
+          </SheetHeader>
+          
+          {selectedProducto && (
+            <div className="mt-8 space-y-6">
+              
+              <div className="rounded-lg border bg-muted/30 p-4">
+                 <div className="font-semibold text-lg">{selectedProducto.nombre}</div>
+                 <div className="text-sm text-muted-foreground mt-1">
+                    Precio: {formatCurrency(selectedProducto.precio)} • {selectedProducto.unidad || 'pieza'}
+                 </div>
+              </div>
+
+              <div className="space-y-4">
+                 
+                 {/* Inventariable Toggle */}
+                 <div className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
+                    <div className="space-y-0.5">
+                       <label className="text-base font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Es inventariable</label>
+                       <p className="text-sm text-muted-foreground">
+                          Actívalo para llevar control de stock y kardex en RDB.
+                          Apágalo para servicios, rentas, cortesías.
+                       </p>
+                    </div>
+                    <div className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="sr-only peer" 
+                        checked={formInventariable}
+                        onChange={(e) => setFormInventariable(e.target.checked)} 
+                      />
+                      <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ring rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </div>
+                 </div>
+
+                 {/* Categoria */}
+                 <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="cat">Categoría</label>
+                    <Input
+                       id="cat"
+                       placeholder="Ej. Cervezas, Snacks, Servicios..."
+                       value={formCategoria}
+                       onChange={(e) => setFormCategoria(e.target.value)}
+                    />
+                 </div>
+
+                 {/* Producto Padre (Anidar) */}
+                 <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Producto Padre (Agrupador)</label>
+                    <p className="text-sm text-muted-foreground mb-2">
+                       Si este producto es una variante o sabor, selecciona su producto principal.
+                    </p>
+                    <Select value={formParentId} onValueChange={(v) => setFormParentId(v ?? 'none')}>
+                       <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar producto padre..." />
+                       </SelectTrigger>
+                       <SelectContent>
+                          <SelectItem value="none" className="italic text-muted-foreground">Ninguno (Es producto raíz)</SelectItem>
+                          {productos
+                             .filter(p => p.id !== selectedProducto.id) // Cannot be parent of itself
+                             .map(p => (
+                             <SelectItem key={p.id} value={p.id}>
+                                {p.nombre}
+                             </SelectItem>
+                          ))}
+                       </SelectContent>
+                    </Select>
+                 </div>
+
+              </div>
+
+              <div className="flex justify-end pt-6 border-t">
+                 <Button onClick={handleSave} disabled={saving} className="gap-2">
+                    {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Guardar Configuración
+                 </Button>
+              </div>
+
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
     </div>
   );
 }
