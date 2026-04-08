@@ -191,56 +191,57 @@ textarea {
 
 
 @media print {
-  /* En vez de esconder el body > *, escondemos específicamente el contenedor principal de la app */
-  body > :first-child {
-    display: none !important;
-  }
-  
-  /* Aseguramos que los portales de Radix sigan vivos (NextJS genera varios tipos) */
-  body > [data-radix-portal], body > [data-slot="sheet-portal"], body > .radix-portal {
-    display: block !important;
-    position: relative !important;
-    height: auto !important;
-    overflow: visible !important;
+  html,
+  body {
+    background: white !important;
   }
 
-  /* Hacer que el Sheet lateral ocupe el 100% de la hoja sin posición fija */
-  [data-slot="sheet-content"] {
-    position: relative !important;
+  body[data-print-sheet-open="true"] [data-app-shell-root="true"] {
+    display: none !important;
+  }
+
+  body[data-print-sheet-open="true"] > [data-radix-portal],
+  body[data-print-sheet-open="true"] > [data-slot="sheet-portal"],
+  body[data-print-sheet-open="true"] > .radix-portal {
     display: block !important;
+    position: static !important;
+    height: auto !important;
+    overflow: visible !important;
+    inset: auto !important;
+  }
+
+  body[data-print-sheet-open="true"] [data-slot="sheet-content"] {
+    position: static !important;
+    display: block !important;
+    inset: auto !important;
     width: 100% !important;
     max-width: 100% !important;
+    min-height: auto !important;
+    height: auto !important;
+    overflow: visible !important;
     border: none !important;
     box-shadow: none !important;
     background: white !important;
     transform: none !important;
-    height: auto !important;
-    overflow: visible !important;
     padding: 0 !important;
   }
 
-  /* Destruir explícitamente cualquier rastro de la raya gris o botones */
-  button, [data-slot="sheet-close"], [data-slot="sheet-overlay"] {
+  body[data-print-sheet-open="true"] button,
+  body[data-print-sheet-open="true"] [data-slot="sheet-close"],
+  body[data-print-sheet-open="true"] [data-slot="sheet-overlay"] {
     display: none !important;
   }
 
-  /* El ScrollArea es un monstruo para la impresión, hay que obligarlo a soltar su altura */
-  [data-slot="scroll-area"] {
+  body[data-print-sheet-open="true"] [data-slot="scroll-area"],
+  body[data-print-sheet-open="true"] [data-slot="scroll-area-viewport"] {
     overflow: visible !important;
     height: auto !important;
     max-height: none !important;
-    position: relative !important;
+    position: static !important;
     border: none !important;
   }
-  
-  [data-slot="scroll-area-viewport"] {
-    overflow: visible !important;
-    height: auto !important;
-    max-height: none !important;
-    border: none !important;
-  }
-  
-  [data-slot="scroll-area-scrollbar"] {
+
+  body[data-print-sheet-open="true"] [data-slot="scroll-area-scrollbar"] {
     display: none !important;
   }
 }

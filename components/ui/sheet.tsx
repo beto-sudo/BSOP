@@ -7,6 +7,9 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
 
+const PRINT_SHEET_OPEN_ATTR = "data-print-sheet-open"
+const PRINT_SHEET_COUNT_ATTR = "data-print-sheet-open-count"
+
 function Sheet({ ...props }: SheetPrimitive.Root.Props) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />
 }
@@ -46,11 +49,34 @@ function SheetContent({
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
 }) {
+  React.useEffect(() => {
+    const { body } = document
+    const currentCount = Number(body.getAttribute(PRINT_SHEET_COUNT_ATTR) ?? "0")
+    const nextCount = currentCount + 1
+
+    body.setAttribute(PRINT_SHEET_COUNT_ATTR, String(nextCount))
+    body.setAttribute(PRINT_SHEET_OPEN_ATTR, "true")
+
+    return () => {
+      const latestCount = Number(body.getAttribute(PRINT_SHEET_COUNT_ATTR) ?? "1")
+      const remainingCount = Math.max(0, latestCount - 1)
+
+      if (remainingCount === 0) {
+        body.removeAttribute(PRINT_SHEET_COUNT_ATTR)
+        body.removeAttribute(PRINT_SHEET_OPEN_ATTR)
+        return
+      }
+
+      body.setAttribute(PRINT_SHEET_COUNT_ATTR, String(remainingCount))
+    }
+  }, [])
+
   return (
     <SheetPortal>
       <SheetOverlay />
       <SheetPrimitive.Popup
         data-slot="sheet-content"
+        data-print-sheet-content="true"
         data-side={side}
         className={cn(
           "fixed z-50 flex flex-col gap-4 bg-popover bg-clip-padding text-sm text-popover-foreground shadow-lg transition duration-200 ease-in-out data-ending-style:opacity-0 data-starting-style:opacity-0 data-[side=bottom]:inset-x-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-auto data-[side=bottom]:border-t data-[side=bottom]:data-ending-style:translate-y-[2.5rem] data-[side=bottom]:data-starting-style:translate-y-[2.5rem] data-[side=left]:inset-y-0 data-[side=left]:left-0 data-[side=left]:h-full data-[side=left]:w-3/4 data-[side=left]:border-r data-[side=left]:data-ending-style:translate-x-[-2.5rem] data-[side=left]:data-starting-style:translate-x-[-2.5rem] data-[side=right]:inset-y-0 data-[side=right]:right-0 data-[side=right]:h-full data-[side=right]:w-3/4 data-[side=right]:border-l data-[side=right]:data-ending-style:translate-x-[2.5rem] data-[side=right]:data-starting-style:translate-x-[2.5rem] data-[side=top]:inset-x-0 data-[side=top]:top-0 data-[side=top]:h-auto data-[side=top]:border-b data-[side=top]:data-ending-style:translate-y-[-2.5rem] data-[side=top]:data-starting-style:translate-y-[-2.5rem] print:border-none print:shadow-none print:transform-none print:w-full",

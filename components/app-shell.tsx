@@ -270,7 +270,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
+    <div data-app-shell-root="true" className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
       <button
         type="button"
         onClick={() => { setMobileOpen((value) => !value); setCollapsed(false); }}
