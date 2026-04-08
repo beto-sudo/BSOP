@@ -191,22 +191,19 @@ textarea {
 
 
 @media print {
-  /* Ocultar TODO lo que NO sea el panel de Radix para matar las hojas en blanco */
-  body > :not([data-radix-portal]) {
+  /* Ocultar el layout principal cuando se imprime el drawer para matar las hojas en blanco */
+  body > * {
     display: none !important;
   }
-
-  /* Resetear el body y el portal para que fluyan como una hoja normal */
-  body {
+  
+  /* Hacer visible únicamente el body general y el contenedor flotante donde vive el modal */
+  body, body > [data-radix-portal], body > [data-radix-popper-content-wrapper], body > .fixed {
+    display: block !important;
+    position: relative !important;
     background: white !important;
     overflow: visible !important;
     height: auto !important;
-  }
-
-  [data-radix-portal] {
-    position: relative !important;
-    display: block !important;
-    height: auto !important;
+    width: 100% !important;
   }
 
   /* Hacer que el Sheet lateral ocupe el 100% de la hoja sin posición fija */
