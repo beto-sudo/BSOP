@@ -179,9 +179,11 @@ function normalizeStatus(status: string | null | undefined): RequisicionStatus {
 
 function formatDate(value: string | null | undefined) {
   if (!value) return '—';
-  return new Date(value).toLocaleDateString('es-MX', {
+  return new Date(value).toLocaleString('es-MX', {
     timeZone: TZ,
     dateStyle: 'medium',
+    timeStyle: 'short',
+    hour12: true,
   });
 }
 

@@ -296,7 +296,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
         ].join(' ')}
       >
-        <div className="flex items-center justify-between border-b border-[var(--border)] px-3 py-4">
+        <div className="flex h-16 items-center justify-between border-b border-[var(--border)] px-6">
           <Link
             href="/"
             className={[
@@ -312,7 +312,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               height={collapsed ? 28 : 34}
               className={[
                 'h-auto w-auto object-contain opacity-80',
-                collapsed ? 'max-h-7 max-w-7' : 'max-h-9 max-w-[100px]',
+                collapsed ? 'max-h-7 max-w-7' : 'max-h-6 max-w-[84px]',
               ].join(' ')}
               priority
             />
@@ -439,8 +439,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         ].join(' ')}
       >
         <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--panel)] backdrop-blur-xl">
-          <div className="flex min-h-16 flex-col gap-3 px-4 py-3 sm:px-6 lg:px-8 xl:flex-row xl:items-center xl:justify-between">
-            <div className="pl-12 md:pl-0 flex items-center gap-4">
+          <div className="flex min-h-16 flex-col gap-3 px-6 py-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="pl-10 md:pl-0 flex items-center gap-4">
               {sectionName === 'Rincón del Bosque' && (
                 <div className="flex h-[3.25rem] w-[3.25rem] shrink-0 items-center justify-center rounded-xl bg-white p-1 shadow-sm ring-1 ring-inset ring-[var(--border)]">
                   <img src="/logos/rdb.jpg" alt="RDB" className="h-full w-full rounded-lg object-contain" />
@@ -452,9 +452,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </div>
               )}
               <div className="flex flex-col justify-center">
-                <div className="text-[10px] uppercase tracking-[0.24em] font-medium dark:text-white/40 text-[var(--text)]/50 mb-0.5">BSOP / {sectionName}</div>
+                <div className="text-[10px] uppercase tracking-widest font-semibold dark:text-white/40 text-[var(--text)]/50 mb-0.5 leading-tight">BSOP / {sectionName}</div>
                 <div className="text-[22px] font-bold tracking-tight dark:text-white text-[var(--text)] leading-none">{sectionName}</div>
-                <div className="text-[13px] font-medium dark:text-white/50 text-[var(--text)]/60 mt-1.5">{getGreeting(now ?? new Date())}, {displayName.split(' ')[0] ?? 'Beto'}</div>
+                <div className="text-[13px] font-medium dark:text-white/50 text-[var(--text)]/60 mt-1 leading-tight">{getGreeting(now ?? new Date())}, {displayName.split(" ")[0] ?? "Beto"}</div>
               </div>
             </div>
 

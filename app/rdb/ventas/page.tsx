@@ -85,8 +85,12 @@ function formatDate(ts: string | null) {
   const parts = cleanTs.split(" ");
   if (parts.length < 2) return cleanTs;
   const [yyyy, mm, dd] = parts[0].split("-");
-  const [hh, min] = parts[1].split(":");
-  return `${dd}/${mm}/${yyyy.slice(2)}, ${hh}:${min}`;
+  const [hhStr, min] = parts[1].split(":");
+  let hh = parseInt(hhStr, 10);
+  const ampm = hh >= 12 ? 'PM' : 'AM';
+  hh = hh % 12;
+  if (hh === 0) hh = 12;
+  return `${dd}/${mm}/${yyyy.slice(2)}, ${hh}:${min} ${ampm}`;
 }
 
 function formatCurrency(amount: number | null | undefined) {
