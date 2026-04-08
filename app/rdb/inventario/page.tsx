@@ -60,6 +60,8 @@ type StockItem = {
   precio: number | null;
   ultimo_costo: number | null;
   inventariable: boolean;
+  entradas: number;
+  salidas: number;
   stock_actual: number;
   valor_inventario: number | null;
   bajo_minimo: boolean;
@@ -227,7 +229,7 @@ function StockDetailDrawer({
   if (!item) return null;
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <SheetContent className="flex w-full flex-col sm:max-w-2xl">
+      <SheetContent className="flex w-full flex-col sm:max-w-[800px] !max-w-[90vw]">
         <SheetHeader>
           <SheetTitle>{item.nombre}</SheetTitle>
           <SheetDescription>
@@ -236,19 +238,41 @@ function StockDetailDrawer({
         </SheetHeader>
         <ScrollArea className="h-[calc(100vh-8rem)] pr-4">
           <div className="mt-6 space-y-4 pb-6">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div className="rounded-lg border bg-muted/40 px-3 py-2.5">
-                <div className="text-xs text-muted-foreground">Stock actual</div>
-                <div
-                  className={`mt-1 text-xl font-semibold tabular-nums${item.bajo_minimo ? ' text-amber-500' : ''}`}
-                >
-                  {item.stock_actual} {item.unidad ?? 'pzs'}
+                <div className="text-xs text-muted-foreground">Entradas</div>
+                <div className="mt-1 text-lg font-semibold tabular-nums text-emerald-600">
+                  {item.entradas}
                 </div>
               </div>
               <div className="rounded-lg border bg-muted/40 px-3 py-2.5">
-                <div className="text-xs text-muted-foreground">Stock mínimo</div>
-                <div className="mt-1 text-xl font-semibold tabular-nums">
-                  {item.stock_minimo ?? '—'} {item.unidad ?? 'pzs'}
+                <div className="text-xs text-muted-foreground">Salidas</div>
+                <div className="mt-1 text-lg font-semibold tabular-nums text-destructive">
+                  {item.salidas}
+                </div>
+              </div>
+              <div className="rounded-lg border bg-muted/40 px-3 py-2.5">
+                <div className="text-xs text-muted-foreground">Stock Actual</div>
+                <div className={`mt-1 text-lg font-semibold tabular-nums${item.bajo_minimo ? ' text-amber-500' : ''}`}>
+                  {item.stock_actual}
+                </div>
+              </div>
+              <div className="rounded-lg border bg-muted/40 px-3 py-2.5">
+                <div className="text-xs text-muted-foreground">Stock Mínimo</div>
+                <div className="mt-1 text-lg font-semibold tabular-nums">
+                  {item.stock_minimo ?? '—'}
+                </div>
+              </div>
+              <div className="rounded-lg border bg-muted/40 px-3 py-2.5">
+                <div className="text-xs text-muted-foreground">Último Costo</div>
+                <div className="mt-1 text-lg font-semibold tabular-nums text-muted-foreground">
+                  {formatCurrency(item.ultimo_costo)}
+                </div>
+              </div>
+              <div className="rounded-lg border bg-muted/40 px-3 py-2.5">
+                <div className="text-xs text-muted-foreground">Valor del Stock</div>
+                <div className="mt-1 text-lg font-semibold tabular-nums text-blue-600 dark:text-blue-400">
+                  {formatCurrency(item.valor_inventario)}
                 </div>
               </div>
             </div>
