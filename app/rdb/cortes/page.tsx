@@ -225,7 +225,7 @@ function CorteDetail({
 
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <SheetContent className="flex w-full flex-col sm:max-w-[600px]">
+      <SheetContent className="sm:max-w-[600px]">
         <SheetHeader>
           <SheetTitle>{corte.corte_nombre ?? `Corte ${corte.id}`}</SheetTitle>
           <SheetDescription>

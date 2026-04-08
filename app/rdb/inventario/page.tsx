@@ -229,7 +229,7 @@ function StockDetailDrawer({
   if (!item) return null;
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <SheetContent className="flex w-full flex-col sm:max-w-[600px]">
+      <SheetContent className="sm:max-w-[600px]">
         <SheetHeader>
           <SheetTitle>{item.nombre}</SheetTitle>
           <SheetDescription>
