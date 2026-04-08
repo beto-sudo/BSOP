@@ -211,7 +211,7 @@ function OrderDetail({
           </div>
         </SheetHeader>
 
-        <ScrollArea className="flex-1 pr-1">
+        <ScrollArea className="flex-1 pr-1 print:h-auto">
           <div className="mt-6 space-y-6 pb-6">
             {/* Status + total */}
             <div className="flex items-center justify-between">
@@ -259,7 +259,7 @@ function OrderDetail({
                 <div className="bg-muted/30 rounded-lg p-3 mt-4 space-y-1 text-sm">
                   {hasDiscount && <div className="flex justify-between text-destructive"><span>Descuento</span><span>-{formatCurrency(realDiscount)}</span></div>}
                   {hasService && <div className="flex justify-between"><span>Servicio</span><span>{formatCurrency(pedido.service_charge)}</span></div>}
-                  {hasTax && <div className="flex justify-between text-muted-foreground"><span>Impuestos</span><span>{formatCurrency(pedido.tax)}</span></div>}
+                  {hasTax && <div className="flex justify-between text-muted-foreground"><span>Impuestos</span><span>{pedido.tax}%</span></div>}
                 </div>
               );
             })()}

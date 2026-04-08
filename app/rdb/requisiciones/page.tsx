@@ -328,7 +328,7 @@ function ExistingRequestSheet({
           </div>
         </SheetHeader>
 
-        <ScrollArea className="flex-1 pr-1">
+        <ScrollArea className="flex-1 pr-1 print:h-auto">
           <div className="mt-6 space-y-6 pb-6">
             <div className="flex items-center justify-between gap-4">
               <StatusBadge status={status} />
@@ -502,7 +502,7 @@ function NewRequestSheet({
           </div>
         </SheetHeader>
 
-        <ScrollArea className="flex-1 pr-1">
+        <ScrollArea className="flex-1 pr-1 print:h-auto">
           <div className="mt-6 space-y-6 pb-6">
             <div className="rounded-2xl border bg-gradient-to-br from-muted/40 to-background p-4">
               <div className="flex flex-wrap items-start justify-between gap-4">

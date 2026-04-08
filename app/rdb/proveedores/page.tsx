@@ -75,7 +75,7 @@ function ProveedorDetail({
           </div>
         </SheetHeader>
 
-        <ScrollArea className="flex-1 pr-1">
+        <ScrollArea className="flex-1 pr-1 print:h-auto">
           <div className="mt-6 space-y-6 pb-6">
             <Badge variant={proveedor.activo ? 'default' : 'secondary'}>
               {proveedor.activo ? 'Activo' : 'Inactivo'}

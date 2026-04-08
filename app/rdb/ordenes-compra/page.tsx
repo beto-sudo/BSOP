@@ -178,7 +178,7 @@ function OrdenDetail({
           </div>
         </SheetHeader>
 
-        <ScrollArea className="flex-1 pr-1">
+        <ScrollArea className="flex-1 pr-1 print:h-auto">
           <div className="space-y-6 pb-6 pt-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="space-y-1 text-sm">
