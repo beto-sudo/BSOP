@@ -243,7 +243,7 @@ function StockDetailDrawer({
             </Button>
           </div>
         </SheetHeader>
-        <ScrollArea className="h-[calc(100vh-8rem)] print:h-auto" pr-4">
+        <ScrollArea className="h-[calc(100vh-8rem)] print:h-auto" pr-4>
           <div className="mt-6 space-y-4 pb-6">
             <div className="grid grid-cols-3 gap-3">
               <div className="rounded-lg border bg-muted/40 px-3 py-2.5">

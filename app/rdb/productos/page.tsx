@@ -352,7 +352,7 @@ export default function ProductosPage() {
                  {/* Categoria */}
                  <div className="space-y-2">
                     <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Categoría</label>
-                    <Select value={formCategoria || 'none'} onValueChange={(v) => setFormCategoria(v === 'none' ? '' : v)}>
+                    <Select value={formCategoria || 'none'} onValueChange={(v) => setFormCategoria(v === 'none' || v === null ? '' : v)}>
                        <SelectTrigger>
                           <SelectValue placeholder="Seleccionar categoría..." />
                        </SelectTrigger>
