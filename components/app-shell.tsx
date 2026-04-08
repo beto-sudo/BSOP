@@ -552,7 +552,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+        <main className="px-4 py-6 sm:px-6 lg:px-8 print:p-0 print:m-0 print:absolute print:inset-0 print:w-full print:h-auto">{children}</main>
       </div>
     </div>
   );
