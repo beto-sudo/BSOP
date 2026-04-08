@@ -301,7 +301,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             href="/"
             className={[
               'flex min-w-0 items-center justify-center overflow-hidden rounded-lg bg-white px-3 py-1.5 shadow-sm ring-1 ring-inset ring-[var(--border)] transition hover:ring-[var(--accent)]/40',
-              collapsed ? 'justify-center' : 'w-full max-w-[148px]',
+              collapsed ? 'justify-center' : 'w-auto',
             ].join(' ')}
             aria-label="BSOP home"
           >
@@ -312,7 +312,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               height={collapsed ? 28 : 34}
               className={[
                 'h-auto w-auto object-contain opacity-80',
-                collapsed ? 'max-h-6 max-w-6' : 'max-h-[1.125rem] max-w-[70px]',
+                collapsed ? 'max-h-6 max-w-6' : 'max-h-[1.25rem] max-w-[80px]',
               ].join(' ')}
               priority
             />
