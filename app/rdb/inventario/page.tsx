@@ -58,7 +58,9 @@ type StockItem = {
   unidad: string | null;
   stock_minimo: number | null;
   precio: number | null;
+  ultimo_costo: number | null;
   stock_actual: number;
+  valor_inventario: number | null;
   bajo_minimo: boolean;
 };
 
@@ -104,6 +106,14 @@ function mapTipoToDb(
   }
 }
 
+function formatCurrency(amount: number | null | undefined): string {
+  if (amount == null) return '—';
+  return new Intl.NumberFormat('es-MX', {
+    style: 'currency',
+    currency: 'MXN',
+  }).format(amount);
+}
+
 function formatDate(ts: string | null | undefined) {
   if (!ts) return '—';
   return new Date(ts).toLocaleString('es-MX', {
@@ -132,8 +142,9 @@ function tipoColorClass(tipo: string, cantidad: number): string {
 function SummaryBar({ items }: { items: StockItem[] }) {
   const bajosMinimo = items.filter((i) => i.bajo_minimo).length;
   const sinStock = items.filter((i) => i.stock_actual <= 0).length;
+  const totalValue = items.reduce((acc, curr) => acc + (curr.valor_inventario || 0), 0);
   return (
-    <div className="grid grid-cols-3 gap-3">
+    <div className="grid grid-cols-4 gap-3">
       <div className="rounded-xl border bg-card px-4 py-3">
         <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
           <Boxes className="h-3.5 w-3.5" />
@@ -163,6 +174,15 @@ function SummaryBar({ items }: { items: StockItem[] }) {
           {sinStock}
         </div>
       </div>
+      <div className="rounded-xl border bg-card px-4 py-3">
+        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          <TrendingUp className="h-3.5 w-3.5" />
+          Valor Inventario
+        </div>
+        <div className="mt-1 text-2xl font-semibold tabular-nums">
+          {formatCurrency(totalValue)}
+        </div>
+      </div>
     </div>
   );
 }
@@ -178,6 +198,31 @@ function StockDetailDrawer({
   open: boolean;
   onClose: () => void;
 }) {
+  const [kardex, setKardex] = useState<MovimientoRow[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (open && item) {
+      setLoading(true);
+      const supabase = createSupabaseBrowserClient();
+      supabase
+        .schema('rdb')
+        .from('inventario_movimientos')
+        .select('*')
+        .eq('producto_id', item.id)
+        .order('created_at', { ascending: false })
+        .limit(50)
+        .then(({ data, error }) => {
+          if (!error && data) {
+            setKardex(data as MovimientoRow[]);
+          }
+          setLoading(false);
+        });
+    } else {
+      setKardex([]);
+    }
+  }, [open, item]);
+
   if (!item) return null;
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -212,6 +257,48 @@ function StockDetailDrawer({
                 Stock por debajo del mínimo
               </div>
             )}
+            <div className="mt-8">
+              <h3 className="mb-4 text-sm font-medium">Historial de movimientos</h3>
+              {loading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              ) : kardex.length === 0 ? (
+                <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  No hay movimientos registrados.
+                </div>
+              ) : (
+                <div className="rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[90px]">Fecha</TableHead>
+                        <TableHead>Movimiento</TableHead>
+                        <TableHead className="text-right">Cant</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {kardex.map((mov) => (
+                        <TableRow key={mov.id}>
+                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                            {formatDate(mov.created_at).split(',')[0]}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            <div className="font-medium">{tipoLabel(mov.tipo, mov.cantidad)}</div>
+                            {mov.notas && <div className="text-xs text-muted-foreground truncate max-w-[120px]">{mov.notas}</div>}
+                          </TableCell>
+                          <TableCell className={["text-right font-medium tabular-nums", mov.cantidad > 0 ? "text-emerald-600" : "text-destructive"].join(" ")}>
+                            {mov.cantidad > 0 ? '+' : ''}{mov.cantidad}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
           </div>
         </ScrollArea>
       </SheetContent>
@@ -615,6 +702,8 @@ export default function InventarioPage() {
                 <TableHead>Categoría</TableHead>
                 <TableHead className="text-right">Stock Actual</TableHead>
                 <TableHead className="text-right">Mínimo</TableHead>
+                <TableHead className="text-right">Último Costo</TableHead>
+                <TableHead className="text-right">Valor Total</TableHead>
                 <TableHead>Estado</TableHead>
               </TableRow>
             </TableHeader>
@@ -622,7 +711,7 @@ export default function InventarioPage() {
               {loadingStock ? (
                 Array.from({ length: 8 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 5 }).map((__, j) => (
+                    {Array.from({ length: 7 }).map((__, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-4 w-full" />
                       </TableCell>
@@ -632,7 +721,7 @@ export default function InventarioPage() {
               ) : filteredStock.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={5}
+                    colSpan={7}
                     className="py-12 text-center text-muted-foreground"
                   >
                     No se encontraron productos.
@@ -669,6 +758,12 @@ export default function InventarioPage() {
                     <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
                       {item.stock_minimo ?? '—'} {item.unidad ?? 'pzs'}
                     </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatCurrency(item.ultimo_costo)}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums">
+                      {formatCurrency(item.valor_inventario)}
+                    </TableCell>
                     <TableCell>
                       {item.stock_actual <= 0 ? (
                         <Badge variant="destructive">Sin stock</Badge>
@@ -701,14 +796,15 @@ export default function InventarioPage() {
                 <TableHead>Producto</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead className="text-right">Cantidad</TableHead>
-                <TableHead>Notas</TableHead>
+                <TableHead className="text-right">Costo Unit.</TableHead>
+                <TableHead>Detalle / Referencia</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loadingMovimientos ? (
                 Array.from({ length: 8 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 5 }).map((__, j) => (
+                    {Array.from({ length: 6 }).map((__, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-4 w-full" />
                       </TableCell>
@@ -718,7 +814,7 @@ export default function InventarioPage() {
               ) : filteredMovimientos.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={5}
+                    colSpan={6}
                     className="py-12 text-center text-muted-foreground"
                   >
                     No se encontraron movimientos.
@@ -760,8 +856,12 @@ export default function InventarioPage() {
                       {mov.cantidad > 0 ? '+' : ''}
                       {mov.cantidad}
                     </TableCell>
+                    <TableCell className="text-right tabular-nums text-sm">
+                      {formatCurrency(mov.costo_unitario)}
+                    </TableCell>
                     <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">
-                      {mov.notas ?? '—'}
+                      <div className="font-medium text-foreground">{mov.referencia_tipo === 'orden_compra' ? 'OC' : 'Manual'}</div>
+                      <div className="truncate">{mov.notas ?? '—'}</div>
                     </TableCell>
                   </TableRow>
                 ))
