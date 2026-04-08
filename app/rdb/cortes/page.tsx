@@ -771,7 +771,7 @@ export default function CortesPage() {
               ))
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="py-12 text-center text-muted-foreground">
+                <TableCell colSpan={13} className="py-12 text-center text-muted-foreground">
                   No se encontraron cortes para el rango seleccionado.
                 </TableCell>
               </TableRow>
