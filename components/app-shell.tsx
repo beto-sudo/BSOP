@@ -145,7 +145,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (stored !== null) {
       setCollapsed(stored === 'true');
     } else if (mobile) {
-      setCollapsed(true);
+      setCollapsed(false);
     }
   }, []);
 
@@ -273,7 +273,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
       <button
         type="button"
-        onClick={() => setMobileOpen((value) => !value)}
+        onClick={() => { setMobileOpen((value) => !value); setCollapsed(false); }}
         className="fixed left-4 top-4 z-50 inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel)] dark:text-white text-[var(--text)] shadow-lg transition hover:border-[var(--accent)] md:hidden"
         aria-label={t('header.toggle_nav')}
       >
@@ -296,11 +296,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
         ].join(' ')}
       >
-        <div className="flex h-16 items-center justify-between border-b border-[var(--border)] px-6">
+        <div className="flex h-[76px] items-center justify-between border-b border-[var(--border)] px-6">
           <Link
             href="/"
             className={[
-              'flex min-w-0 items-center overflow-hidden rounded-2xl border border-[var(--border)] bg-white/95 p-2 shadow-sm transition hover:border-[var(--accent)]/40',
+              'flex h-[3.25rem] min-w-0 items-center justify-center overflow-hidden rounded-xl bg-white p-1.5 shadow-sm ring-1 ring-inset ring-[var(--border)] transition hover:ring-[var(--accent)]/40',
               collapsed ? 'justify-center' : 'w-full max-w-[148px]',
             ].join(' ')}
             aria-label="BSOP home"
@@ -312,7 +312,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               height={collapsed ? 28 : 34}
               className={[
                 'h-auto w-auto object-contain opacity-80',
-                collapsed ? 'max-h-7 max-w-7' : 'max-h-6 max-w-[84px]',
+                collapsed ? 'max-h-6 max-w-6' : 'max-h-[1.125rem] max-w-[70px]',
               ].join(' ')}
               priority
             />
@@ -338,7 +338,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <div key={item.href} className="group/item relative">
                 <Link
                   href={item.href}
-                  onClick={() => setExpandedSection(hasChildren ? item.href : null)}
+                  onClick={() => {
+                    if (collapsed) setCollapsed(false);
+                    if (hasChildren) {
+                      setExpandedSection(expanded && !collapsed ? null : item.href);
+                    } else {
+                      setExpandedSection(null);
+                    }
+                  }}
                   className={[
                     'group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition',
                     active
@@ -439,7 +446,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         ].join(' ')}
       >
         <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--panel)] backdrop-blur-xl">
-          <div className="flex min-h-16 flex-col gap-3 px-6 py-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex min-h-[76px] flex-col gap-3 px-6 py-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="pl-10 md:pl-0 flex items-center gap-4">
               {sectionName === 'Rincón del Bosque' && (
                 <div className="flex h-[3.25rem] w-[3.25rem] shrink-0 items-center justify-center rounded-xl bg-white p-1 shadow-sm ring-1 ring-inset ring-[var(--border)]">
