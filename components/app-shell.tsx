@@ -244,6 +244,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         day: 'numeric',
         hour: 'numeric',
         minute: '2-digit',
+        hour12: true,
       })
     : '…';
 
@@ -307,11 +308,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Image
               src={collapsed ? '/logo-bs.png' : '/logo-bsop.jpg'}
               alt="BSOP"
-              width={collapsed ? 36 : 136}
-              height={collapsed ? 36 : 46}
+              width={collapsed ? 28 : 100}
+              height={collapsed ? 28 : 34}
               className={[
-                'h-auto w-auto object-contain',
-                collapsed ? 'max-h-9 max-w-9' : 'max-h-12 max-w-[136px]',
+                'h-auto w-auto object-contain opacity-80',
+                collapsed ? 'max-h-7 max-w-7' : 'max-h-9 max-w-[100px]',
               ].join(' ')}
               priority
             />
@@ -441,7 +442,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex min-h-16 flex-col gap-3 px-4 py-3 sm:px-6 lg:px-8 xl:flex-row xl:items-center xl:justify-between">
             <div className="pl-12 md:pl-0">
               <div className="text-xs uppercase tracking-[0.24em] dark:text-white/35 text-[var(--text)]/45">BSOP / {sectionName}</div>
-              <div className="mt-1 text-2xl font-semibold dark:text-white text-[var(--text)]">{sectionName}</div>
+              <div className="mt-1 flex items-center gap-3">
+                {sectionName === 'Rincón del Bosque' && (
+                  <img src="/logos/rdb.jpg" alt="RDB" className="h-8 w-8 rounded object-contain" />
+                )}
+                {sectionName === 'Familia / Grupo SR' && (
+                  <img src="/logo-familia-sr.jpg" alt="SR" className="h-8 w-8 rounded object-contain" />
+                )}
+                <div className="text-2xl font-semibold dark:text-white text-[var(--text)]">{sectionName}</div>
+              </div>
               <div className="mt-1 text-sm dark:text-white/48 text-[var(--text)]/60">{getGreeting(now ?? new Date())}, {displayName.split(' ')[0] ?? 'Beto'}</div>
             </div>
 
