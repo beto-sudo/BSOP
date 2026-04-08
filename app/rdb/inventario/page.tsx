@@ -234,7 +234,7 @@ function StockDetailDrawer({
             {item.categoria ?? 'Sin categoría'} · {item.unidad ?? 'pieza'}
           </SheetDescription>
         </SheetHeader>
-        <ScrollArea className="flex-1 pr-1">
+        <ScrollArea className="h-[calc(100vh-8rem)] pr-4">
           <div className="mt-6 space-y-4 pb-6">
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-lg border bg-muted/40 px-3 py-2.5">
