@@ -59,6 +59,7 @@ type StockItem = {
   stock_minimo: number | null;
   precio: number | null;
   ultimo_costo: number | null;
+  inventariable: boolean;
   stock_actual: number;
   valor_inventario: number | null;
   bajo_minimo: boolean;
@@ -494,6 +495,7 @@ export default function InventarioPage() {
   // UI state
   const [tab, setTab] = useState<Tab>('stock');
   const [search, setSearch] = useState('');
+  const [showServicios, setShowServicios] = useState(false);
   const [showBajoMinimo, setShowBajoMinimo] = useState(false);
   const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -571,6 +573,11 @@ export default function InventarioPage() {
   };
 
   const filteredStock = items.filter((i) => {
+    if (i.inventariable === showServicios) return false; // i.inventariable is true for real products. We hide them if showServicios is true? No wait.
+    // If showServicios is false, we want inventariable === true.
+    // If showServicios is true, we want inventariable === false.
+    if (showServicios && i.inventariable) return false;
+    if (!showServicios && !i.inventariable) return false;
     if (showBajoMinimo && !i.bajo_minimo) return false;
     if (!search) return true;
     const q = search.toLowerCase();
@@ -655,6 +662,18 @@ export default function InventarioPage() {
           />
         </div>
 
+        {tab === 'stock' && (
+          <Button
+            variant={showServicios ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setShowServicios((v) => !v)}
+            className="gap-2"
+          >
+            <Boxes className="h-3.5 w-3.5" />
+            Ver no inventariables
+          </Button>
+        )}
+        
         {tab === 'stock' && (
           <Button
             variant={showBajoMinimo ? 'default' : 'outline'}
