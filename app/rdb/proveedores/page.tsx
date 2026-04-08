@@ -63,7 +63,7 @@ function ProveedorDetail({
 
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <SheetContent className="flex w-full flex-col sm:max-w-[400px] md:max-w-[500px]">
+      <SheetContent className="flex w-full flex-col sm:max-w-[600px]">
         <SheetHeader>
           <SheetTitle>{proveedor.nombre}</SheetTitle>
         </SheetHeader>
