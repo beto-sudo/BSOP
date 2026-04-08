@@ -230,11 +230,18 @@ function StockDetailDrawer({
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <SheetContent className="sm:max-w-[600px]">
+        {/* Membrete solo para impresión */}
+        <img src="/membrete-rdb.jpg" alt="Membrete Rincón del Bosque" className="hidden print:block w-full object-contain mb-6" />
         <SheetHeader>
           <SheetTitle>{item.nombre}</SheetTitle>
           <SheetDescription>
             {item.categoria ?? 'Sin categoría'} · {item.unidad ?? 'pieza'}
           </SheetDescription>
+          <div className="absolute right-12 top-4 hidden sm:flex print:hidden">
+            <Button variant="outline" size="sm" onClick={() => window.print()}>
+              Imprimir
+            </Button>
+          </div>
         </SheetHeader>
         <ScrollArea className="h-[calc(100vh-8rem)] pr-4">
           <div className="mt-6 space-y-4 pb-6">

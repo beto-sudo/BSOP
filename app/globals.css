@@ -217,4 +217,14 @@ textarea {
   button, [data-slot="sheet-close"], [data-slot="sheet-overlay"] {
     display: none !important;
   }
+
+  /* Arreglar scrollbars y permitir que el ScrollArea imprima completo hacia abajo */
+  [data-slot="scroll-area-viewport"] {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+  [data-slot="scroll-area-scrollbar"] {
+    display: none !important;
+  }
 }

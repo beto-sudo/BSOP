@@ -64,8 +64,15 @@ function ProveedorDetail({
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <SheetContent className="sm:max-w-[600px]">
+        {/* Membrete solo para impresión */}
+        <img src="/membrete-rdb.jpg" alt="Membrete Rincón del Bosque" className="hidden print:block w-full object-contain mb-6" />
         <SheetHeader>
           <SheetTitle>{proveedor.nombre}</SheetTitle>
+          <div className="absolute right-12 top-4 hidden sm:flex print:hidden">
+            <Button variant="outline" size="sm" onClick={() => window.print()}>
+              Imprimir
+            </Button>
+          </div>
         </SheetHeader>
 
         <ScrollArea className="flex-1 pr-1">

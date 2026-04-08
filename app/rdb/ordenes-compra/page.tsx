@@ -164,11 +164,18 @@ function OrdenDetail({
   return (
     <Sheet open={open} onOpenChange={(value) => !value && onClose()}>
       <SheetContent className="sm:max-w-[600px]">
+        {/* Membrete solo para impresión */}
+        <img src="/membrete-rdb.jpg" alt="Membrete Rincón del Bosque" className="hidden print:block w-full object-contain mb-6" />
         <SheetHeader>
           <SheetTitle>{orden?.folio ?? 'Orden de compra'}</SheetTitle>
           <SheetDescription>
             {getProveedorNombre(orden?.proveedor ?? null)} · {formatDate(orden?.fecha_emision)}
           </SheetDescription>
+          <div className="absolute right-12 top-4 hidden sm:flex print:hidden">
+            <Button variant="outline" size="sm" onClick={() => window.print()}>
+              Imprimir
+            </Button>
+          </div>
         </SheetHeader>
 
         <ScrollArea className="flex-1 pr-1">

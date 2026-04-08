@@ -316,9 +316,16 @@ function ExistingRequestSheet({
   return (
     <Sheet open={open} onOpenChange={(value) => !value && onClose()}>
       <SheetContent className="sm:max-w-[600px]">
+        {/* Membrete solo para impresión */}
+        <img src="/membrete-rdb.jpg" alt="Membrete Rincón del Bosque" className="hidden print:block w-full object-contain mb-6" />
         <SheetHeader>
           <SheetTitle>{requisicion.folio || 'Sin folio'}</SheetTitle>
           <SheetDescription>{formatDate(requisicion.fecha_solicitud)}</SheetDescription>
+          <div className="absolute right-12 top-4 hidden sm:flex print:hidden">
+            <Button variant="outline" size="sm" onClick={() => window.print()}>
+              Imprimir
+            </Button>
+          </div>
         </SheetHeader>
 
         <ScrollArea className="flex-1 pr-1">
@@ -488,6 +495,11 @@ function NewRequestSheet({
           <SheetDescription>
             Captura los artículos que necesitas y envía la requisición a autorización.
           </SheetDescription>
+          <div className="absolute right-12 top-4 hidden sm:flex print:hidden">
+            <Button variant="outline" size="sm" onClick={() => window.print()}>
+              Imprimir
+            </Button>
+          </div>
         </SheetHeader>
 
         <ScrollArea className="flex-1 pr-1">
