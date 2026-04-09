@@ -323,7 +323,7 @@ function ExistingRequestSheet({
 
   return (
     <Sheet open={open} onOpenChange={(value) => !value && onClose()}>
-      <SheetContent className="sm:max-w-[600px]">
+      <SheetContent className="sm:max-w-[600px] flex flex-col">
         {/* Membrete solo para impresión */}
         <img src="/membrete-rdb.jpg" alt="Membrete Rincón del Bosque" className="hidden print:block w-full object-contain mb-6" />
         <SheetHeader>
@@ -500,7 +500,7 @@ function NewRequestSheet({
 
   return (
     <Sheet open={open} onOpenChange={(value) => !value && onClose()}>
-      <SheetContent className="sm:max-w-[600px]">
+      <SheetContent className="sm:max-w-[600px] flex flex-col">
         <SheetHeader>
           <SheetTitle>Nueva Requisición</SheetTitle>
           <SheetDescription>
