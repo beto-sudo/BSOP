@@ -569,6 +569,7 @@ export default function InventarioPage() {
   const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [fechaCorte, setFechaCorte] = useState<Date | null>(null);
 
   const fetchStock = useCallback(async () => {
     setLoadingStock(true);
@@ -584,6 +585,25 @@ export default function InventarioPage() {
       setItems((data ?? []) as StockItem[]);
     } catch (e: unknown) {
       setErrorStock(e instanceof Error ? e.message : 'Error al cargar inventario');
+    } finally {
+      setLoadingStock(false);
+    }
+  }, []);
+
+  const fetchStockHistorico = useCallback(async (fecha: Date) => {
+    setLoadingStock(true);
+    setErrorStock(null);
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const fechaFin = new Date(fecha);
+      fechaFin.setHours(23, 59, 59, 999);
+      const { data, error } = await supabase
+        .schema('rdb')
+        .rpc('fn_inventario_al_corte', { p_fecha: fechaFin.toISOString() });
+      if (error) throw error;
+      setItems((data ?? []) as StockItem[]);
+    } catch (e: unknown) {
+      setErrorStock(e instanceof Error ? e.message : 'Error al cargar inventario histórico');
     } finally {
       setLoadingStock(false);
     }
@@ -630,7 +650,8 @@ export default function InventarioPage() {
 
   const handleRefresh = () => {
     if (tab === 'stock') {
-      void fetchStock();
+      if (fechaCorte) void fetchStockHistorico(fechaCorte);
+      else void fetchStock();
     } else {
       void fetchMovimientos();
     }
@@ -638,7 +659,9 @@ export default function InventarioPage() {
 
   const handlePrintLista = (stock: StockItem[]) => {
     const totalValor = stock.reduce((s, i) => s + (Number(i.valor_inventario) || 0), 0);
-    const fecha = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
+    const fecha = fechaCorte
+      ? fechaCorte.toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })
+      : new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
     const rows = stock.map((item) => `
       <tr>
         <td>${item.nombre}</td>
@@ -680,7 +703,7 @@ export default function InventarioPage() {
   <div class="header">
     <div class="header-left">
       <h1>Rincón del Bosque</h1>
-      <p>Inventario de Stock — ${fecha}</p>
+      <p>${fechaCorte ? `Inventario al Corte: ${fecha}` : `Inventario de Stock — ${fecha}`}</p>
     </div>
     <div class="header-right">
       <div>${stock.length} productos</div>
@@ -837,6 +860,38 @@ export default function InventarioPage() {
           </Button>
         )}
 
+        {tab === 'stock' && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Al corte:</span>
+            <input
+              type="date"
+              max={new Date().toISOString().split('T')[0]}
+              value={fechaCorte ? fechaCorte.toISOString().split('T')[0] : ''}
+              onChange={(e) => {
+                if (!e.target.value) {
+                  setFechaCorte(null);
+                  void fetchStock();
+                } else {
+                  const d = new Date(e.target.value + 'T12:00:00');
+                  setFechaCorte(d);
+                  void fetchStockHistorico(d);
+                }
+              }}
+              className="rounded-md border border-input bg-transparent px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+            {fechaCorte && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setFechaCorte(null); void fetchStock(); }}
+                className="text-xs h-7 px-2"
+              >
+                × Hoy
+              </Button>
+            )}
+          </div>
+        )}
+
         <Button
           variant="outline"
           size="icon"
@@ -871,6 +926,14 @@ export default function InventarioPage() {
       {currentError && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {currentError}
+        </div>
+      )}
+
+      {/* Historical date banner */}
+      {fechaCorte && tab === 'stock' && (
+        <div className="flex items-center gap-2 rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-2 text-sm text-blue-600 dark:text-blue-400">
+          <span>📅</span>
+          <span>Inventario al cierre del {fechaCorte.toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })} — solo movimientos hasta esa fecha</span>
         </div>
       )}
 
