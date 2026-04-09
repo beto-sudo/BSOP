@@ -88,7 +88,7 @@ export async function guardarRequisicion(
       .from('requisiciones')
       .insert({
         folio,
-        estatus: 'pendiente',
+        estatus: 'enviada',
         solicitado_por: user.id,
         fecha_solicitud: new Date().toISOString(),
         notas: notas ?? null,
@@ -130,7 +130,7 @@ export async function aprobarRequisicion(id: string): Promise<void> {
   const { error } = await supabase
     .schema('rdb')
     .from('requisiciones')
-    .update({ estatus: 'autorizada', aprobado_por: user.id })
+    .update({ estatus: 'aprobada', aprobado_por: user.id })
     .eq('id', id);
 
   if (error) throw new Error(error.message);
@@ -195,7 +195,7 @@ export async function generarOrdenCompra(
   const { error: updateErr } = await supabase
     .schema('rdb')
     .from('requisiciones')
-    .update({ estatus: 'convertida_oc' })
+    .update({ estatus: 'convertida' })
     .eq('id', requisicionId);
 
   if (updateErr) throw new Error(updateErr.message);
