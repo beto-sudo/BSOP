@@ -716,16 +716,9 @@ export default function InventarioPage() {
     body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif; font-size: 11px; color: #111; padding: 24px; }
 
     /* ── Membrete ──────────────────────────────────────────────── */
-    .membrete { display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 10px; margin-bottom: 6px; border-bottom: 3px solid #1a1a2e; }
-    .membrete-logo { display: flex; align-items: center; gap: 10px; }
-    .membrete-icon { width: 42px; height: 42px; background: #1a1a2e; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 22px; flex-shrink: 0; }
-    .membrete-nombre { font-size: 18px; font-weight: 800; color: #1a1a2e; letter-spacing: -0.3px; line-height: 1.1; }
-    .membrete-sub { font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
-    .membrete-info { text-align: right; font-size: 9px; color: #666; line-height: 1.7; }
-    .membrete-info strong { font-size: 11px; color: #111; }
-
-    .doc-titulo { margin: 10px 0 4px; font-size: 13px; font-weight: 700; color: #1a1a2e; }
-    .doc-meta { font-size: 10px; color: #555; margin-bottom: 14px; }
+    .membrete { margin-bottom: 0; }
+    .membrete img { width: 100%; height: auto; display: block; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .doc-meta { font-size: 10px; color: #555; margin: 6px 0 14px; display: flex; justify-content: space-between; border-bottom: 1px solid #ddd; padding-bottom: 6px; }
 
     /* ── Tabla principal ───────────────────────────────────────── */
     table { width: 100%; border-collapse: collapse; }
@@ -765,18 +758,11 @@ export default function InventarioPage() {
 <body>
   <!-- Membrete empresa -->
   <div class="membrete">
-    <div class="membrete-logo">
-      <div class="membrete-icon">🏟</div>
-      <div>
-        <div class="membrete-nombre">Rincón del Bosque</div>
-        <div class="membrete-sub">Club Deportivo &amp; Restaurante</div>
-      </div>
-    </div>
-    <div class="membrete-info">
-      <div>Piedras Negras, Coahuila</div>
-      <div><strong>Inventario al Corte: ${fecha}</strong></div>
-      <div>${stock.length} productos registrados</div>
-    </div>
+    <img src="/membrete-rdb.jpg" alt="Rincón del Bosque" />
+  </div>
+  <div class="doc-meta">
+    <span>${fechaCorte ? `Inventario al Corte: <strong>${fecha}</strong>` : `Inventario de Stock &mdash; <strong>${fecha}</strong>`}</span>
+    <span>${stock.length} productos registrados</span>
   </div>
 
   <!-- Tabla de inventario -->
