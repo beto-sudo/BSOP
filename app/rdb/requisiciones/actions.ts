@@ -20,10 +20,16 @@ function generarFolio(prefix: string): string {
 async function requireAuth() {
   const supabase = await createSupabaseServerClient();
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session?.user) throw new Error('No autenticado');
-  return { supabase, user: session.user, userId: session.user.id };
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error) {
+    throw new Error(`Auth error: ${error.message}`);
+  }
+
+  if (!user) throw new Error('No autenticado');
+  return { supabase, user, userId: user.id };
 }
 
 async function resolveUserDisplayName(
@@ -58,58 +64,73 @@ export async function guardarRequisicion(
   items: DraftItemInput[],
   notas?: string | null,
 ): Promise<{ id: string; folio: string }> {
-  const { supabase, user } = await requireAuth();
-  const solicitadoPor = await resolveUserDisplayName(supabase, user);
+  try {
+    const { supabase, user } = await requireAuth();
 
-  const folio = generarFolio('REQ');
+    const folio = generarFolio('REQ');
 
-  const { data: req, error: reqError } = await supabase
-    .schema('rdb')
-    .from('requisiciones')
-    .insert({
-      folio,
-      estatus: 'pendiente',
-      solicitado_por: solicitadoPor,
-      fecha_solicitud: new Date().toISOString(),
-      notas: notas ?? null,
-    })
-    .select('id, folio')
-    .single();
+    const sanitizedItems = items
+      .map((item) => ({
+        producto_id: item.producto_id ?? null,
+        descripcion: item.descripcion?.trim() || '',
+        cantidad: Number(item.cantidad ?? 0),
+        unidad: item.unidad?.trim() || 'pza',
+        notas: item.notas?.trim() || null,
+      }))
+      .filter((item) => item.descripcion.length > 0);
 
-  if (reqError) throw new Error(reqError.message);
-  if (!req) throw new Error('Error al crear la requisición');
+    if (sanitizedItems.length === 0) {
+      throw new Error('No hay artículos válidos para guardar');
+    }
 
-  if (items.length > 0) {
+    const { data: req, error: reqError } = await supabase
+      .schema('rdb')
+      .from('requisiciones')
+      .insert({
+        folio,
+        estatus: 'pendiente',
+        solicitado_por: user.id,
+        fecha_solicitud: new Date().toISOString(),
+        notas: notas ?? null,
+      })
+      .select('id, folio')
+      .single();
+
+    if (reqError) throw new Error(`Error creando requisición: ${reqError.message}`);
+    if (!req) throw new Error('Error al crear la requisición');
+
     const { error: itemsError } = await supabase
       .schema('rdb')
       .from('requisiciones_items')
       .insert(
-        items.map((item) => ({
+        sanitizedItems.map((item) => ({
           requisicion_id: req.id,
-          producto_id: item.producto_id ?? null,
+          producto_id: item.producto_id,
           descripcion: item.descripcion,
           cantidad: item.cantidad,
-          unidad: item.unidad || 'pza',
-          notas: item.notas ?? null,
+          unidad: item.unidad,
+          notas: item.notas,
         })),
       );
 
-    if (itemsError) throw new Error(itemsError.message);
-  }
+    if (itemsError) throw new Error(`Error creando items: ${itemsError.message}`);
 
-  return req as { id: string; folio: string };
+    return req as { id: string; folio: string };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Error desconocido al guardar requisición';
+    throw new Error(message);
+  }
 }
 
 // ── Aprobar ───────────────────────────────────────────────────────────────────
 
 export async function aprobarRequisicion(id: string): Promise<void> {
   const { supabase, user } = await requireAuth();
-  const aprobadoPor = await resolveUserDisplayName(supabase, user);
 
   const { error } = await supabase
     .schema('rdb')
     .from('requisiciones')
-    .update({ estatus: 'autorizada', aprobado_por: aprobadoPor })
+    .update({ estatus: 'autorizada', aprobado_por: user.id })
     .eq('id', id);
 
   if (error) throw new Error(error.message);
