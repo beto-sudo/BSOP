@@ -128,26 +128,10 @@ const MOCK_DRAFT_ITEMS: DraftItem[] = [
   {
     id: '1',
     producto_id: null,
-    producto: 'Hielo en cubo',
-    cantidad: '8',
-    unidad: 'bolsas',
-    descripcion: 'Para barra principal y terraza',
-  },
-  {
-    id: '2',
-    producto_id: null,
-    producto: 'Refresco mineral',
-    cantidad: '3',
-    unidad: 'cajas',
-    descripcion: 'Reposición de fin de semana',
-  },
-  {
-    id: '3',
-    producto_id: null,
-    producto: 'Limón',
-    cantidad: '15',
-    unidad: 'kg',
-    descripcion: 'Consumo de barra',
+    producto: '',
+    cantidad: '',
+    unidad: '',
+    descripcion: '',
   },
 ];
 
@@ -211,7 +195,7 @@ function summarizeItems(items: RequisicionItem[] | undefined) {
 }
 
 function requesterName(value: string | null | undefined) {
-  return value?.trim() || 'Barra Principal';
+  return value?.trim() || 'Sistema';
 }
 
 function DetailSkeleton() {
@@ -453,6 +437,7 @@ function NewRequestSheet({
   onClose,
   draftItems,
   catalogoProductos,
+  userName,
   onDraftItemChange,
   onAddDraftItem,
   onRemoveDraftItem,
@@ -462,6 +447,7 @@ function NewRequestSheet({
   onClose: () => void;
   draftItems: DraftItem[];
   catalogoProductos: { id: string; nombre: string; unidad: string | null; categoria: string | null }[];
+  userName: string;
   onDraftItemChange: (id: string, field: keyof DraftItem, value: string) => void;
   onAddDraftItem: () => void;
   onRemoveDraftItem: (id: string) => void;
@@ -535,7 +521,7 @@ function NewRequestSheet({
                     <User2 className="h-3.5 w-3.5" />
                     Solicitante
                   </div>
-                  <div className="mt-1 font-medium">Barra Principal</div>
+                  <div className="mt-1 font-medium">{userName || 'Sistema'}</div>
                 </div>
                 <div className="rounded-xl border bg-background p-3">
                   <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
@@ -711,6 +697,7 @@ function todayRange(): { from: string; to: string } {
 export default function RequisicionesPage() {
   const [requisiciones, setRequisiciones] = useState<Requisicion[]>([]);
   const [catalogoProductos, setCatalogoProductos] = useState<{ id: string; nombre: string; unidad: string | null; categoria: string | null }[]>([]);
+  const [currentUserData, setCurrentUserData] = useState<{ id: string; name: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingItems, setLoadingItems] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -805,6 +792,29 @@ export default function RequisicionesPage() {
       
       if (prodData) {
         setCatalogoProductos(prodData);
+      }
+
+      // Obtener usuario actual para el creador
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData?.user?.id) {
+         const { data: userRecord } = await supabase
+           .schema('core')
+           .from('usuarios')
+           .select('nombre, apellido')
+           .eq('auth_user_id', userData.user.id)
+           .single();
+           
+         if (userRecord) {
+            setCurrentUserData({
+               id: userData.user.id,
+               name: `${userRecord.nombre} ${userRecord.apellido || ''}`.trim()
+            });
+         } else {
+            setCurrentUserData({
+               id: userData.user.id,
+               name: userData.user.email?.split('@')[0] || 'Sistema'
+            });
+         }
       }
 
     } catch (err: unknown) {
@@ -1057,6 +1067,7 @@ export default function RequisicionesPage() {
         onClose={() => setNewOpen(false)}
         draftItems={draftItems}
         catalogoProductos={catalogoProductos}
+        userName={currentUserData?.name || ''}
         onDraftItemChange={handleDraftItemChange}
         onAddDraftItem={handleAddDraftItem}
         onRemoveDraftItem={handleRemoveDraftItem}
