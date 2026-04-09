@@ -636,6 +636,88 @@ export default function InventarioPage() {
     }
   };
 
+  const handlePrintLista = (stock: StockItem[]) => {
+    const totalValor = stock.reduce((s, i) => s + (Number(i.valor_inventario) || 0), 0);
+    const fecha = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
+    const rows = stock.map((item) => `
+      <tr>
+        <td>${item.nombre}</td>
+        <td>${item.categoria ?? '—'}</td>
+        <td class="num ${item.stock_actual <= 0 ? 'rojo' : item.bajo_minimo ? 'naranja' : ''}">${item.stock_actual} ${item.unidad ?? 'pzs'}</td>
+        <td class="num gris">${item.stock_minimo ?? '—'}</td>
+        <td class="num">${item.costo_unitario != null ? '$' + Number(item.costo_unitario).toLocaleString('es-MX', { minimumFractionDigits: 2 }) : '—'}</td>
+        <td class="num">${item.valor_inventario != null ? '$' + Number(item.valor_inventario).toLocaleString('es-MX', { minimumFractionDigits: 2 }) : '—'}</td>
+        <td class="center">${item.stock_actual <= 0 ? '❌ Sin stock' : item.bajo_minimo ? '⚠️ Bajo mínimo' : '✓'}</td>
+      </tr>
+    `).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Inventario RDB — ${fecha}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif; font-size: 11px; color: #111; padding: 24px; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 16px; }
+    .header-left h1 { font-size: 20px; font-weight: 700; }
+    .header-left p { font-size: 11px; color: #555; margin-top: 2px; }
+    .header-right { text-align: right; font-size: 11px; color: #555; }
+    table { width: 100%; border-collapse: collapse; }
+    th { font-weight: 600; text-align: left; padding: 5px 6px; border-bottom: 1px solid #ccc; font-size: 10px; text-transform: uppercase; letter-spacing: 0.03em; color: #444; }
+    td { padding: 4px 6px; border-bottom: 1px solid #eee; }
+    tr:last-child td { border-bottom: none; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .center { text-align: center; }
+    .gris { color: #888; }
+    .rojo { color: #dc2626; font-weight: 600; }
+    .naranja { color: #d97706; font-weight: 600; }
+    tfoot td { font-weight: 700; border-top: 2px solid #111; padding-top: 6px; }
+    @media print { body { padding: 0; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <h1>Rincón del Bosque</h1>
+      <p>Inventario de Stock — ${fecha}</p>
+    </div>
+    <div class="header-right">
+      <div>${stock.length} productos</div>
+    </div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Producto</th>
+        <th>Categoría</th>
+        <th class="num">Stock</th>
+        <th class="num">Mínimo</th>
+        <th class="num">Costo Unit.</th>
+        <th class="num">Valor Total</th>
+        <th class="center">Estado</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+    <tfoot>
+      <tr>
+        <td colspan="5">Total valor inventario</td>
+        <td class="num">$${totalValor.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank', 'width=900,height=700');
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); }, 400);
+  };
+
   const handleSuccess = () => {
     void fetchStock();
     if (kardexLoaded) void fetchMovimientos();
@@ -768,8 +850,8 @@ export default function InventarioPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => window.print()}
-            className="gap-2 print:hidden"
+            onClick={() => handlePrintLista(filteredStock)}
+            className="gap-2"
           >
             <Printer className="h-3.5 w-3.5" />
             Imprimir lista
@@ -791,54 +873,6 @@ export default function InventarioPage() {
           {currentError}
         </div>
       )}
-
-      {/* ── PRINT HEADER (solo impresión) ──────────────────────────────── */}
-      <div className="hidden print:block text-sm mb-4">
-        <div className="flex items-start justify-between border-b pb-3 mb-4">
-          <div>
-            <div className="text-lg font-bold">Rincón del Bosque</div>
-            <div className="text-xs text-gray-500">Inventario de Stock — {new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
-          </div>
-          <div className="text-right text-xs text-gray-500">
-            {filteredStock.length} productos
-          </div>
-        </div>
-        <table className="w-full border-collapse text-xs">
-          <thead>
-            <tr className="border-b">
-              <th className="text-left py-1 font-semibold">Producto</th>
-              <th className="text-left py-1 font-semibold">Categoría</th>
-              <th className="text-right py-1 font-semibold">Stock</th>
-              <th className="text-right py-1 font-semibold">Mínimo</th>
-              <th className="text-right py-1 font-semibold">Costo Unit.</th>
-              <th className="text-right py-1 font-semibold">Valor Total</th>
-              <th className="text-center py-1 font-semibold">Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredStock.map((item) => (
-              <tr key={item.id} className="border-t">
-                <td className="py-0.5 font-medium">{item.nombre}</td>
-                <td className="py-0.5 text-gray-500">{item.categoria ?? '—'}</td>
-                <td className="py-0.5 text-right tabular-nums">{item.stock_actual ?? 0}</td>
-                <td className="py-0.5 text-right tabular-nums text-gray-500">{item.stock_minimo ?? '—'}</td>
-                <td className="py-0.5 text-right tabular-nums">{item.costo_unitario != null ? `$${Number(item.costo_unitario).toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '—'}</td>
-                <td className="py-0.5 text-right tabular-nums">{item.valor_inventario != null ? `$${Number(item.valor_inventario).toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '—'}</td>
-                <td className="py-0.5 text-center">{item.bajo_minimo ? '⚠️' : '✓'}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr className="border-t font-semibold">
-              <td colSpan={5} className="py-1">Total valor inventario</td>
-              <td className="text-right tabular-nums">
-                ${filteredStock.reduce((s, i) => s + (Number(i.valor_inventario) || 0), 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-              </td>
-              <td />
-            </tr>
-          </tfoot>
-        </table>
-      </div>
 
       {/* ── Stock Table ────────────────────────────────────────────────────── */}
       {tab === 'stock' && (
