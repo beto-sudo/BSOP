@@ -33,6 +33,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -40,6 +42,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   AlertTriangle,
   Boxes,
+  Check,
+  ChevronsUpDown,
   ClipboardList,
   Plus,
   RefreshCw,
@@ -52,16 +56,17 @@ import {
 
 type StockItem = {
   id: string;
-  waitry_item_id: number | null;
   nombre: string;
   categoria: string | null;
   unidad: string | null;
   stock_minimo: number | null;
-  precio: number | null;
+  costo_unitario: number | null;
   ultimo_costo: number | null;
   inventariable: boolean;
-  entradas: number;
-  salidas: number;
+  factor_consumo: number;
+  total_entradas: number;
+  total_vendido: number;
+  total_mermas: number;
   stock_actual: number;
   valor_inventario: number | null;
   bajo_minimo: boolean;
@@ -249,13 +254,19 @@ function StockDetailDrawer({
               <div className="rounded-lg border bg-muted/40 px-3 py-2.5">
                 <div className="text-xs text-muted-foreground">Entradas</div>
                 <div className="mt-1 text-lg font-semibold tabular-nums text-emerald-600">
-                  {item.entradas}
+                  {Number(item.total_entradas).toFixed(2)}
                 </div>
               </div>
               <div className="rounded-lg border bg-muted/40 px-3 py-2.5">
-                <div className="text-xs text-muted-foreground">Salidas</div>
+                <div className="text-xs text-muted-foreground">Vendido</div>
                 <div className="mt-1 text-lg font-semibold tabular-nums text-destructive">
-                  {item.salidas}
+                  {Number(item.total_vendido).toFixed(2)}
+                </div>
+              </div>
+              <div className="rounded-lg border bg-muted/40 px-3 py-2.5">
+                <div className="text-xs text-muted-foreground">Mermas</div>
+                <div className="mt-1 text-lg font-semibold tabular-nums text-amber-500">
+                  {Number(item.total_mermas).toFixed(2)}
                 </div>
               </div>
               <div className="rounded-lg border bg-muted/40 px-3 py-2.5">
@@ -271,9 +282,9 @@ function StockDetailDrawer({
                 </div>
               </div>
               <div className="rounded-lg border bg-muted/40 px-3 py-2.5">
-                <div className="text-xs text-muted-foreground">Último Costo</div>
+                <div className="text-xs text-muted-foreground">Costo Unitario</div>
                 <div className="mt-1 text-lg font-semibold tabular-nums text-muted-foreground">
-                  {formatCurrency(item.ultimo_costo)}
+                  {formatCurrency(item.costo_unitario ?? item.ultimo_costo)}
                 </div>
               </div>
               <div className="rounded-lg border bg-muted/40 px-3 py-2.5">
@@ -352,6 +363,7 @@ function RegistrarMovimientoDialog({
   onSuccess: () => void;
 }) {
   const [productoId, setProductoId] = useState('');
+  const [productoPopoverOpen, setProductoPopoverOpen] = useState(false);
   const [tipo, setTipo] = useState<TipoUI>('ajuste_positivo');
   const [cantidad, setCantidad] = useState('');
   const [notas, setNotas] = useState('');
@@ -420,19 +432,44 @@ function RegistrarMovimientoDialog({
           {/* Producto */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Producto</label>
-            <Select value={productoId} onValueChange={(v) => setProductoId(v ?? '')}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Seleccionar producto…" />
-              </SelectTrigger>
-              <SelectContent>
-                {productos.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.nombre}
-                    {p.bajo_minimo ? ' ⚠' : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={productoPopoverOpen} onOpenChange={setProductoPopoverOpen}>
+              <PopoverTrigger
+                render={
+                  <Button variant="outline" role="combobox"
+                    aria-expanded={productoPopoverOpen}
+                    className="w-full justify-between font-normal" />
+                }
+              >
+                <span className="truncate">
+                  {productoId
+                    ? productos.find(p => p.id === productoId)?.nombre ?? 'Seleccionar…'
+                    : <span className="text-muted-foreground">Seleccionar producto…</span>}
+                </span>
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </PopoverTrigger>
+              <PopoverContent className="w-[420px] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar producto…" />
+                  <CommandList className="max-h-60">
+                    <CommandEmpty>No se encontraron productos.</CommandEmpty>
+                    <CommandGroup>
+                      {productos
+                        .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+                        .map(p => (
+                          <CommandItem key={p.id} value={p.nombre}
+                            onSelect={() => { setProductoId(p.id); setProductoPopoverOpen(false); }}
+                          >
+                            <Check className={`mr-2 h-4 w-4 shrink-0 ${productoId === p.id ? 'opacity-100' : 'opacity-0'}`} />
+                            <span className="truncate">{p.nombre}</span>
+                            {p.bajo_minimo && <span className="ml-auto text-xs text-amber-500 shrink-0">⚠ bajo mínimo</span>}
+                            {p.categoria && !p.bajo_minimo && <span className="ml-auto text-xs text-muted-foreground shrink-0">{p.categoria}</span>}
+                          </CommandItem>
+                        ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
           {/* Tipo */}
@@ -539,7 +576,7 @@ export default function InventarioPage() {
       const supabase = createSupabaseBrowserClient();
       const { data, error } = await supabase
         .schema('rdb')
-        .from('v_stock_actual')
+        .from('v_inventario_stock')
         .select('*')
         .order('nombre');
       if (error) throw error;
@@ -809,7 +846,7 @@ export default function InventarioPage() {
                       {item.stock_minimo ?? '—'} {item.unidad ?? 'pzs'}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {formatCurrency(item.ultimo_costo)}
+                      {formatCurrency(item.costo_unitario ?? item.ultimo_costo)}
                     </TableCell>
                     <TableCell className="text-right font-semibold tabular-nums">
                       {formatCurrency(item.valor_inventario)}
