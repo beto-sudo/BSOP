@@ -307,10 +307,17 @@ function ExistingRequestSheet({
 
   return (
     <Sheet open={open} onOpenChange={(value) => !value && onClose()}>
-      <SheetContent className="sm:max-w-[600px] flex flex-col">
-        {/* Membrete solo para impresión */}
-        <img src="/membrete-rdb.jpg" alt="Membrete Rincón del Bosque" className="hidden print:block w-full object-contain mb-6" />
-        <SheetHeader>
+      <SheetContent className="sm:max-w-[700px] flex flex-col p-6 print:p-0">
+        {/* Membrete y encabezado solo para impresión */}
+        <div className="hidden print:block mb-8">
+          <img src="/membrete-rdb.jpg" alt="Membrete Rincón del Bosque" className="w-full object-contain mb-6 max-h-32" />
+          <div className="text-center mb-4">
+             <h2 className="text-xl font-bold uppercase tracking-widest">Requisición Interna</h2>
+             <p className="text-lg font-semibold mt-1">Folio: {requisicion.folio || 'S/N'}</p>
+          </div>
+        </div>
+
+        <SheetHeader className="print:hidden">
           <SheetTitle>{requisicion.folio || 'Sin folio'}</SheetTitle>
           <SheetDescription>{formatDate(requisicion.fecha_solicitud)}</SheetDescription>
           <div className="absolute right-12 top-4 hidden sm:flex print:hidden">
@@ -320,38 +327,46 @@ function ExistingRequestSheet({
           </div>
         </SheetHeader>
 
-        <ScrollArea className="flex-1 pr-1 print:h-auto">
-          <div className="mt-6 space-y-6 pb-6">
-            <div className="flex items-center justify-between gap-4">
+        <ScrollArea className="flex-1 pr-1 print:h-auto print:overflow-visible">
+          <div className="mt-6 space-y-6 pb-6 print:space-y-4 print:mt-0 print:pb-0">
+            <div className="flex items-center justify-between gap-4 print:hidden">
               <StatusBadge status={status} />
               <span className="text-sm text-muted-foreground">
                 {safeCountLabel(items.length)}
               </span>
             </div>
 
-            <div className="grid gap-4 rounded-xl border bg-muted/20 p-4 text-sm sm:grid-cols-2">
+            <div className="grid gap-4 rounded-xl border bg-muted/20 p-4 text-sm sm:grid-cols-2 print:border-none print:bg-transparent print:p-0 print:grid-cols-2 print:text-xs print:mb-4">
               <div>
-                <span className="block text-xs uppercase tracking-wider text-muted-foreground">
+                <span className="block text-xs uppercase tracking-wider text-muted-foreground print:text-black">
                   Solicitado por
                 </span>
-                <span className="font-medium text-foreground">
+                <span className="font-medium text-foreground print:text-black">
                   {requesterName(requisicion.solicitado_por)}
                 </span>
               </div>
               <div>
-                <span className="block text-xs uppercase tracking-wider text-muted-foreground">
+                <span className="block text-xs uppercase tracking-wider text-muted-foreground print:text-black">
+                  Fecha
+                </span>
+                <span className="font-medium text-foreground print:text-black">
+                  {formatDate(requisicion.fecha_solicitud)}
+                </span>
+              </div>
+              <div className="print:col-span-2 print:mt-2">
+                <span className="block text-xs uppercase tracking-wider text-muted-foreground print:text-black">
                   Aprobado por
                 </span>
-                <span className="font-medium text-foreground">
+                <span className="font-medium text-foreground print:text-black">
                   {requisicion.aprobado_por?.trim() || 'Pendiente'}
                 </span>
               </div>
             </div>
 
-            <Separator />
+            <Separator className="print:hidden" />
 
-            <div className="space-y-3">
-              <div>
+            <div className="space-y-3 print:space-y-1">
+              <div className="print:hidden">
                 <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Artículos solicitados
                 </div>
@@ -363,36 +378,31 @@ function ExistingRequestSheet({
               {loadingItems ? (
                 <DetailSkeleton />
               ) : items.length === 0 ? (
-                <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground print:border-none">
                   Esta requisición no tiene artículos cargados todavía.
                 </div>
               ) : (
-                <div className="overflow-hidden rounded-xl border">
-                  <Table>
+                <div className="overflow-hidden rounded-xl border print:rounded-none print:border-black">
+                  <Table className="print:text-xs">
                     <TableHeader>
-                      <TableRow>
-                        <TableHead>Artículo</TableHead>
-                        <TableHead className="w-32 text-right">Cantidad</TableHead>
-                        <TableHead className="w-28">Unidad</TableHead>
+                      <TableRow className="print:border-b-black print:bg-gray-100">
+                        <TableHead className="print:text-black print:font-bold">Artículo</TableHead>
+                        <TableHead className="w-32 text-right print:text-black print:font-bold">Cantidad</TableHead>
+                        <TableHead className="w-28 print:text-black print:font-bold">Unidad</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {items.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell>
-                            <div className="font-medium text-foreground">
+                        <TableRow key={item.id} className="print:border-b-gray-300">
+                          <TableCell className="print:py-1">
+                            <div className="font-medium text-foreground print:text-black">
                               {item.descripcion?.trim() || 'Artículo sin descripción'}
                             </div>
-                            {item.producto_id ? (
-                              <div className="text-xs text-muted-foreground">
-                                Producto ID: {item.producto_id}
-                              </div>
-                            ) : null}
                           </TableCell>
-                          <TableCell className="text-right font-medium tabular-nums">
+                          <TableCell className="text-right font-medium tabular-nums print:text-black print:py-1">
                             {item.cantidad ?? '—'}
                           </TableCell>
-                          <TableCell className="text-muted-foreground">
+                          <TableCell className="text-muted-foreground print:text-black print:py-1">
                             {item.unidad || 'pza'}
                           </TableCell>
                         </TableRow>
@@ -403,8 +413,18 @@ function ExistingRequestSheet({
               )}
             </div>
 
+            {/* Espacio para firmas en impresión */}
+            <div className="hidden print:grid grid-cols-2 gap-8 mt-16 pt-8 text-center text-sm">
+               <div>
+                  <div className="w-48 mx-auto border-t border-black pt-2">Firma Solicitante</div>
+               </div>
+               <div>
+                  <div className="w-48 mx-auto border-t border-black pt-2">Firma Autorización</div>
+               </div>
+            </div>
+
             {actionError && (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive print:hidden">
                 {actionError}
               </div>
             )}
