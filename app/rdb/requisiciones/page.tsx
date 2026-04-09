@@ -36,6 +36,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import {
   CalendarDays,
   CheckCircle2,
@@ -47,6 +49,8 @@ import {
   ShoppingBasket,
   User2,
   XCircle,
+  ChevronsUpDown,
+  Check,
 } from 'lucide-react';
 
 type RequisicionStatus =
@@ -79,6 +83,7 @@ type Requisicion = {
 
 type DraftItem = {
   id: string;
+  producto_id: string | null;
   producto: string;
   cantidad: string;
   unidad: string;
@@ -122,6 +127,7 @@ const STATUS_OPTIONS = [
 const MOCK_DRAFT_ITEMS: DraftItem[] = [
   {
     id: '1',
+    producto_id: null,
     producto: 'Hielo en cubo',
     cantidad: '8',
     unidad: 'bolsas',
@@ -129,6 +135,7 @@ const MOCK_DRAFT_ITEMS: DraftItem[] = [
   },
   {
     id: '2',
+    producto_id: null,
     producto: 'Refresco mineral',
     cantidad: '3',
     unidad: 'cajas',
@@ -136,6 +143,7 @@ const MOCK_DRAFT_ITEMS: DraftItem[] = [
   },
   {
     id: '3',
+    producto_id: null,
     producto: 'Limón',
     cantidad: '15',
     unidad: 'kg',
@@ -444,6 +452,7 @@ function NewRequestSheet({
   open,
   onClose,
   draftItems,
+  catalogoProductos,
   onDraftItemChange,
   onAddDraftItem,
   onRemoveDraftItem,
@@ -452,6 +461,7 @@ function NewRequestSheet({
   open: boolean;
   onClose: () => void;
   draftItems: DraftItem[];
+  catalogoProductos: { id: string; nombre: string; unidad: string | null; categoria: string | null }[];
   onDraftItemChange: (id: string, field: keyof DraftItem, value: string) => void;
   onAddDraftItem: () => void;
   onRemoveDraftItem: (id: string) => void;
@@ -460,11 +470,12 @@ function NewRequestSheet({
   const [isPending, startTransition] = useTransition();
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  function handleGuardar() {
+  const handleGuardar = () => {
     setSaveError(null);
     const items: DraftItemInput[] = draftItems
       .filter((item) => (item.producto || item.descripcion).trim())
       .map((item) => ({
+        producto_id: item.producto_id,
         descripcion: (item.producto || item.descripcion).trim(),
         cantidad: Math.max(parseFloat(item.cantidad) || 1, 0),
         unidad: item.unidad.trim() || 'pza',
@@ -571,13 +582,54 @@ function NewRequestSheet({
                         <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
                           Producto
                         </label>
-                        <Input
-                          value={item.producto}
-                          onChange={(event) =>
-                            onDraftItemChange(item.id, 'producto', event.target.value)
-                          }
-                          placeholder="Buscar o escribir producto"
-                        />
+                        <Popover>
+                           <PopoverTrigger
+                              render={
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  className="w-full justify-between font-normal"
+                                />
+                              }
+                           >
+                              <span className="truncate">{item.producto || "Buscar o escribir producto..."}</span>
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                           </PopoverTrigger>
+                           <PopoverContent className="w-[420px] p-0" align="start">
+                              <Command>
+                                <CommandInput 
+                                   placeholder="Buscar producto..." 
+                                   onValueChange={(val) => {
+                                      // Allow free text if it doesn't match
+                                      onDraftItemChange(item.id, 'producto', val);
+                                      onDraftItemChange(item.id, 'producto_id', '');
+                                   }}
+                                />
+                                <CommandList className="max-h-64">
+                                  <CommandEmpty>No hay resultados. Escribe para usar como texto libre.</CommandEmpty>
+                                  <CommandGroup>
+                                    {catalogoProductos.map((p) => (
+                                      <CommandItem
+                                        key={p.id}
+                                        value={p.nombre}
+                                        onSelect={() => {
+                                          onDraftItemChange(item.id, 'producto_id', p.id);
+                                          onDraftItemChange(item.id, 'producto', p.nombre);
+                                          if (p.unidad) onDraftItemChange(item.id, 'unidad', p.unidad);
+                                        }}
+                                      >
+                                        <Check className={`mr-2 h-4 w-4 shrink-0 ${item.producto_id === p.id ? 'opacity-100' : 'opacity-0'}`} />
+                                        <span className="truncate">{p.nombre}</span>
+                                        {p.categoria && (
+                                          <span className="ml-auto text-xs text-muted-foreground shrink-0">{p.categoria}</span>
+                                        )}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                           </PopoverContent>
+                        </Popover>
                       </div>
 
                       <div>
@@ -658,6 +710,7 @@ function todayRange(): { from: string; to: string } {
 
 export default function RequisicionesPage() {
   const [requisiciones, setRequisiciones] = useState<Requisicion[]>([]);
+  const [catalogoProductos, setCatalogoProductos] = useState<{ id: string; nombre: string; unidad: string | null; categoria: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingItems, setLoadingItems] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -742,6 +795,18 @@ export default function RequisicionesPage() {
       if (fetchError) throw fetchError;
 
       setRequisiciones((data ?? []) as Requisicion[]);
+
+      const { data: prodData } = await supabase
+        .schema('rdb')
+        .from('productos')
+        .select('id, nombre, unidad, categoria')
+        .eq('activo', true)
+        .order('nombre');
+      
+      if (prodData) {
+        setCatalogoProductos(prodData);
+      }
+
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error al cargar requisiciones');
     } finally {
@@ -805,6 +870,7 @@ export default function RequisicionesPage() {
       ...current,
       {
         id: String(Date.now()),
+        producto_id: null,
         producto: '',
         cantidad: '',
         unidad: '',
@@ -990,6 +1056,7 @@ export default function RequisicionesPage() {
         open={newOpen}
         onClose={() => setNewOpen(false)}
         draftItems={draftItems}
+        catalogoProductos={catalogoProductos}
         onDraftItemChange={handleDraftItemChange}
         onAddDraftItem={handleAddDraftItem}
         onRemoveDraftItem={handleRemoveDraftItem}

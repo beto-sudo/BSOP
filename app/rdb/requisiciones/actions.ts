@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 
 export type DraftItemInput = {
+  producto_id?: string | null;
   descripcion: string;
   cantidad: number;
   unidad: string;
@@ -59,7 +60,7 @@ export async function guardarRequisicion(
       .insert(
         items.map((item) => ({
           requisicion_id: req.id,
-          producto_id: null,
+          producto_id: item.producto_id ?? null,
           descripcion: item.descripcion,
           cantidad: item.cantidad,
           unidad: item.unidad || 'pza',
