@@ -22,7 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
-import { Truck, RefreshCw, Search, Phone, Mail, FileText } from 'lucide-react';
+import { Truck, RefreshCw, Search, Phone, Mail, FileText, Save } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -131,6 +131,58 @@ export default function ProveedoresPage() {
   const [selected, setSelected] = useState<Proveedor | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  // Form State
+  const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newNombre, setNewNombre] = useState('');
+  const [newContacto, setNewContacto] = useState('');
+  const [newTelefono, setNewTelefono] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newRFC, setNewRFC] = useState('');
+  const [newDireccion, setNewDireccion] = useState('');
+  const [newNotas, setNewNotas] = useState('');
+
+  const handleCreate = async () => {
+    if (!newNombre.trim()) {
+      alert('El nombre es obligatorio');
+      return;
+    }
+    setCreating(true);
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { error: err } = await supabase
+        .schema('rdb')
+        .from('proveedores')
+        .insert({
+          nombre: newNombre.trim(),
+          contacto: newContacto.trim() || null,
+          telefono: newTelefono.trim() || null,
+          email: newEmail.trim() || null,
+          rfc: newRFC.trim() || null,
+          direccion: newDireccion.trim() || null,
+          notas: newNotas.trim() || null,
+          activo: true,
+        });
+
+      if (err) throw err;
+      
+      setCreateDrawerOpen(false);
+      setNewNombre('');
+      setNewContacto('');
+      setNewTelefono('');
+      setNewEmail('');
+      setNewRFC('');
+      setNewDireccion('');
+      setNewNotas('');
+      void fetchProveedores();
+    } catch (e) {
+      console.error(e);
+      alert('Error al crear el proveedor');
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const fetchProveedores = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -171,12 +223,17 @@ export default function ProveedoresPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Proveedores</h1>
-        <p className="text-sm text-muted-foreground">
-          Directorio de proveedores ·{' '}
-          <span className="text-foreground font-medium">{activos}</span> activos
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Proveedores</h1>
+          <p className="text-sm text-muted-foreground">
+            Directorio de proveedores ·{' '}
+            <span className="text-foreground font-medium">{activos}</span> activos
+          </p>
+        </div>
+        <div>
+          <Button onClick={() => setCreateDrawerOpen(true)}>+ Nuevo Proveedor</Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -291,6 +348,95 @@ export default function ProveedoresPage() {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
       />
+
+      {/* Create Proveedor Drawer */}
+      <Sheet open={createDrawerOpen} onOpenChange={setCreateDrawerOpen}>
+        <SheetContent className="sm:max-w-[600px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Nuevo Proveedor</SheetTitle>
+          </SheetHeader>
+          
+          <div className="mt-8 space-y-6">
+            <div className="space-y-4">
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">Razón Social / Nombre Comercial <span className="text-destructive">*</span></label>
+                <Input 
+                  value={newNombre} 
+                  onChange={(e) => setNewNombre(e.target.value)} 
+                  placeholder="Ej. Comercializadora La Estrella" 
+                />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                 <div className="space-y-2">
+                   <label className="text-sm font-medium leading-none">Contacto</label>
+                   <Input 
+                     value={newContacto} 
+                     onChange={(e) => setNewContacto(e.target.value)} 
+                     placeholder="Ej. Juan Pérez" 
+                   />
+                 </div>
+                 <div className="space-y-2">
+                   <label className="text-sm font-medium leading-none">Teléfono</label>
+                   <Input 
+                     value={newTelefono} 
+                     onChange={(e) => setNewTelefono(e.target.value)} 
+                     placeholder="Ej. 878 123 4567" 
+                   />
+                 </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                 <div className="space-y-2">
+                   <label className="text-sm font-medium leading-none">Email</label>
+                   <Input 
+                     value={newEmail} 
+                     onChange={(e) => setNewEmail(e.target.value)} 
+                     placeholder="Ej. ventas@empresa.com" 
+                   />
+                 </div>
+                 <div className="space-y-2">
+                   <label className="text-sm font-medium leading-none">RFC</label>
+                   <Input 
+                     value={newRFC} 
+                     onChange={(e) => setNewRFC(e.target.value)} 
+                     placeholder="Ej. XAXX010101000" 
+                     className="uppercase"
+                   />
+                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">Dirección</label>
+                <Input 
+                  value={newDireccion} 
+                  onChange={(e) => setNewDireccion(e.target.value)} 
+                  placeholder="Calle, Número, Colonia, Ciudad..." 
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">Notas / Detalles adicionales</label>
+                <Input 
+                  value={newNotas} 
+                  onChange={(e) => setNewNotas(e.target.value)} 
+                  placeholder="Ej. Días de entrega, condiciones de crédito..." 
+                />
+              </div>
+
+            </div>
+
+            <div className="flex justify-end pt-6 border-t">
+               <Button onClick={handleCreate} disabled={creating} className="gap-2">
+                  {creating ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Crear Proveedor
+               </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
     </div>
   );
 }
