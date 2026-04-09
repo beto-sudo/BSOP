@@ -667,8 +667,8 @@ export default function InventarioPage() {
     const totalValor = stock.reduce((s, i) => s + Math.max(0, Number(i.valor_inventario) || 0), 0);
     const fecha = fechaLabel ?? new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
 
-    // Solo productos con stock >= 0 (excluir negativos del impreso)
-    const stockPositivo = stock.filter(i => Number(i.stock_actual) >= 0);
+    // Solo productos con stock > 0 (excluir ceros y negativos del impreso — para contabilidad)
+    const stockPositivo = stock.filter(i => Number(i.stock_actual) > 0);
 
     // Agrupar por categoría para el resumen final
     const catOrder = ['Licores','Bebidas','Alimentos','Consumibles','Artículos','Deportes','Propinas'];
