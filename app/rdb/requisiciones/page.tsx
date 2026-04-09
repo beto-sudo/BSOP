@@ -475,6 +475,11 @@ function NewRequestSheet({
 }) {
   const [isPending, startTransition] = useTransition();
   const [saveError, setSaveError] = useState<string | null>(null);
+  const printableItems = draftItems.filter((item) =>
+    [item.producto, item.descripcion, item.cantidad, item.unidad].some(
+      (value) => Boolean(value?.trim()),
+    ),
+  );
 
   const handleGuardar = () => {
     setSaveError(null);
@@ -506,8 +511,16 @@ function NewRequestSheet({
 
   return (
     <Sheet open={open} onOpenChange={(value) => !value && onClose()}>
-      <SheetContent className="sm:max-w-[600px] flex flex-col">
-        <SheetHeader>
+      <SheetContent className="sm:max-w-[700px] flex flex-col p-6 print:p-0">
+        <div className="hidden print:block mb-8">
+          <img src="/membrete-rdb.jpg" alt="Membrete Rincón del Bosque" className="w-full object-contain mb-6 max-h-32" />
+          <div className="text-center mb-4">
+            <h2 className="text-xl font-bold uppercase tracking-widest">Requisición Interna</h2>
+            <p className="text-lg font-semibold mt-1">Folio: REQ-BORRADOR</p>
+          </div>
+        </div>
+
+        <SheetHeader className="print:hidden">
           <SheetTitle>Nueva Requisición</SheetTitle>
           <SheetDescription>
             Captura los artículos que necesitas y envía la requisición a autorización.
@@ -519,9 +532,9 @@ function NewRequestSheet({
           </div>
         </SheetHeader>
 
-        <ScrollArea className="flex-1 pr-1 print:h-auto">
-          <div className="mt-6 space-y-6 pb-6">
-            <div className="rounded-2xl border bg-gradient-to-br from-muted/40 to-background p-4">
+        <ScrollArea className="flex-1 pr-1 print:h-auto print:overflow-visible">
+          <div className="mt-6 space-y-6 pb-6 print:space-y-4 print:mt-0 print:pb-0">
+            <div className="rounded-2xl border bg-gradient-to-br from-muted/40 to-background p-4 print:hidden">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -553,7 +566,56 @@ function NewRequestSheet({
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="hidden print:block space-y-3">
+              <div className="grid gap-4 text-sm grid-cols-2 mb-4">
+                <div>
+                  <span className="block text-xs uppercase tracking-wider text-black/70">Solicitante</span>
+                  <span className="font-medium text-black">{userName || 'Sistema'}</span>
+                </div>
+                <div>
+                  <span className="block text-xs uppercase tracking-wider text-black/70">Fecha</span>
+                  <span className="font-medium text-black">{formatDate(new Date().toISOString())}</span>
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-xl border border-black print:rounded-none">
+                <Table className="text-xs">
+                  <TableHeader>
+                    <TableRow className="border-b-black bg-gray-100">
+                      <TableHead className="text-black font-bold">Artículo</TableHead>
+                      <TableHead className="w-32 text-right text-black font-bold">Cantidad</TableHead>
+                      <TableHead className="w-28 text-black font-bold">Unidad</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(printableItems.length > 0 ? printableItems : draftItems).map((item) => (
+                      <TableRow key={`print-${item.id}`} className="border-b-gray-300">
+                        <TableCell className="py-1 text-black">
+                          {(item.producto || item.descripcion).trim() || 'Artículo pendiente'}
+                        </TableCell>
+                        <TableCell className="py-1 text-right text-black tabular-nums">
+                          {item.cantidad?.trim() || '1'}
+                        </TableCell>
+                        <TableCell className="py-1 text-black">
+                          {item.unidad?.trim() || 'pza'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="grid grid-cols-2 gap-8 mt-16 pt-8 text-center text-sm">
+                <div>
+                  <div className="w-48 mx-auto border-t border-black pt-2">Firma Solicitante</div>
+                </div>
+                <div>
+                  <div className="w-48 mx-auto border-t border-black pt-2">Firma Autorización</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4 print:hidden">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm font-semibold">Artículos solicitados</div>
@@ -682,15 +744,15 @@ function NewRequestSheet({
               </div>
             </div>
 
-            <Separator />
+            <Separator className="print:hidden" />
 
             {saveError && (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive print:hidden">
                 {saveError}
               </div>
             )}
 
-            <div className="flex flex-wrap justify-end gap-3">
+            <div className="flex flex-wrap justify-end gap-3 print:hidden">
               <Button variant="outline" onClick={onClose} disabled={isPending}>
                 Cancelar
               </Button>
