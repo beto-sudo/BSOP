@@ -124,6 +124,73 @@ export async function guardarRequisicion(
 
 // ── Aprobar ───────────────────────────────────────────────────────────────────
 
+export async function actualizarRequisicion(
+  id: string,
+  items: DraftItemInput[],
+  notas?: string | null,
+): Promise<void> {
+  const { supabase } = await requireAuth();
+
+  const sanitizedItems = items
+    .map((item) => ({
+      producto_id: item.producto_id ?? null,
+      descripcion: item.descripcion?.trim() || '',
+      cantidad: Number(item.cantidad ?? 0),
+      unidad: item.unidad?.trim() || 'pza',
+      notas: item.notas?.trim() || null,
+    }))
+    .filter((item) => item.descripcion.length > 0);
+
+  if (sanitizedItems.length === 0) {
+    throw new Error('No hay artículos válidos para guardar');
+  }
+
+  const { data: requisicion, error: requisicionError } = await supabase
+    .schema('rdb')
+    .from('requisiciones')
+    .select('estatus')
+    .eq('id', id)
+    .single();
+
+  if (requisicionError) throw new Error(requisicionError.message);
+
+  if (['aprobada', 'autorizada', 'convertida', 'convertida_oc', 'cancelada', 'rechazada'].includes(String(requisicion?.estatus ?? '').toLowerCase())) {
+    throw new Error('La requisición ya no se puede editar');
+  }
+
+  const { error: updateReqError } = await supabase
+    .schema('rdb')
+    .from('requisiciones')
+    .update({ notas: notas ?? null })
+    .eq('id', id);
+
+  if (updateReqError) throw new Error(updateReqError.message);
+
+  const { error: deleteItemsError } = await supabase
+    .schema('rdb')
+    .from('requisiciones_items')
+    .delete()
+    .eq('requisicion_id', id);
+
+  if (deleteItemsError) throw new Error(deleteItemsError.message);
+
+  const { error: insertItemsError } = await supabase
+    .schema('rdb')
+    .from('requisiciones_items')
+    .insert(
+      sanitizedItems.map((item) => ({
+        requisicion_id: id,
+        producto_id: item.producto_id,
+        descripcion: item.descripcion,
+        cantidad: item.cantidad,
+        unidad: item.unidad,
+        notas: item.notas,
+      })),
+    );
+
+  if (insertItemsError) throw new Error(insertItemsError.message);
+}
+
 export async function aprobarRequisicion(id: string): Promise<void> {
   const { supabase, user } = await requireAuth();
 

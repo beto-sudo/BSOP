@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import {
   guardarRequisicion,
+  actualizarRequisicion,
   aprobarRequisicion,
   generarOrdenCompra,
   type DraftItemInput,
@@ -267,12 +268,14 @@ function ExistingRequestSheet({
   open,
   onClose,
   onAction,
+  onEdit,
 }: {
   requisicion: Requisicion | null;
   loadingItems: boolean;
   open: boolean;
   onClose: () => void;
   onAction: () => void;
+  onEdit: (requisicion: Requisicion) => void;
 }) {
   const [isPending, startTransition] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
@@ -435,10 +438,15 @@ function ExistingRequestSheet({
             {(status === 'pendiente' || status === 'autorizada') && (
               <div className="flex flex-wrap justify-end gap-3">
                 {status === 'pendiente' && (
-                  <Button onClick={handleAprobar} disabled={isPending}>
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                    {isPending ? 'Aprobando…' : 'Aprobar'}
-                  </Button>
+                  <>
+                    <Button variant="outline" onClick={() => onEdit(requisicion)} disabled={isPending || loadingItems}>
+                      Editar
+                    </Button>
+                    <Button onClick={handleAprobar} disabled={isPending}>
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      {isPending ? 'Aprobando…' : 'Aprobar'}
+                    </Button>
+                  </>
                 )}
                 {status === 'autorizada' && (
                   <Button onClick={handleGenerarOC} disabled={isPending}>
@@ -461,6 +469,7 @@ function NewRequestSheet({
   draftItems,
   catalogoProductos,
   userName,
+  editingRequisicion,
   onDraftItemChange,
   onAddDraftItem,
   onRemoveDraftItem,
@@ -471,6 +480,7 @@ function NewRequestSheet({
   draftItems: DraftItem[];
   catalogoProductos: { id: string; nombre: string; unidad: string | null; categoria: string | null }[];
   userName: string;
+  editingRequisicion: Requisicion | null;
   onDraftItemChange: (id: string, field: keyof DraftItem, value: string) => void;
   onAddDraftItem: () => void;
   onRemoveDraftItem: (id: string) => void;
@@ -478,6 +488,7 @@ function NewRequestSheet({
 }) {
   const [isPending, startTransition] = useTransition();
   const [saveError, setSaveError] = useState<string | null>(null);
+  const isEditing = Boolean(editingRequisicion?.id);
   const printableItems = draftItems.filter((item) =>
     [item.producto, item.descripcion, item.cantidad, item.unidad].some(
       (value) => Boolean(value?.trim()),
@@ -503,7 +514,11 @@ function NewRequestSheet({
 
     startTransition(async () => {
       try {
-        await guardarRequisicion(items);
+        if (editingRequisicion?.id) {
+          await actualizarRequisicion(editingRequisicion.id, items);
+        } else {
+          await guardarRequisicion(items);
+        }
         onSaved();
         onClose();
       } catch (err) {
@@ -519,14 +534,16 @@ function NewRequestSheet({
           <img src="/membrete-rdb.jpg" alt="Membrete Rincón del Bosque" className="w-full object-contain mb-6 max-h-32" />
           <div className="text-center mb-4">
             <h2 className="text-xl font-bold uppercase tracking-widest">Requisición Interna</h2>
-            <p className="text-lg font-semibold mt-1">Folio: REQ-BORRADOR</p>
+            <p className="text-lg font-semibold mt-1">Folio: {editingRequisicion?.folio || 'REQ-BORRADOR'}</p>
           </div>
         </div>
 
         <SheetHeader className="print:hidden">
-          <SheetTitle>Nueva Requisición</SheetTitle>
+          <SheetTitle>{isEditing ? `Editar ${editingRequisicion?.folio || 'requisición'}` : 'Nueva Requisición'}</SheetTitle>
           <SheetDescription>
-            Captura los artículos que necesitas y envía la requisición a autorización.
+            {isEditing
+              ? 'Ajusta productos o cantidades antes de autorizar la requisición.'
+              : 'Captura los artículos que necesitas y envía la requisición a autorización.'}
           </SheetDescription>
           <div className="absolute right-12 top-4 hidden sm:flex print:hidden">
             <Button variant="outline" size="sm" onClick={() => window.print()}>
@@ -543,9 +560,11 @@ function NewRequestSheet({
                   <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Vista previa
                   </div>
-                  <div className="mt-1 text-lg font-semibold">REQ-BORRADOR</div>
+                  <div className="mt-1 text-lg font-semibold">{editingRequisicion?.folio || 'REQ-BORRADOR'}</div>
                   <p className="text-sm text-muted-foreground">
-                    Así se ve una requisición nueva antes de guardarse en DB.
+                    {isEditing
+                      ? 'Ajusta la requisición antes de autorizarla.'
+                      : 'Así se ve una requisición nueva antes de guardarse en DB.'}
                   </p>
                 </div>
                 <StatusBadge status="borrador" />
@@ -761,7 +780,7 @@ function NewRequestSheet({
               </Button>
               <Button onClick={handleGuardar} disabled={isPending}>
                 <FilePlus2 className="mr-2 h-4 w-4" />
-                {isPending ? 'Guardando…' : 'Guardar requisición'}
+                {isPending ? 'Guardando…' : isEditing ? 'Guardar cambios' : 'Guardar requisición'}
               </Button>
             </div>
           </div>
@@ -834,6 +853,7 @@ export default function RequisicionesPage() {
   const [selected, setSelected] = useState<Requisicion | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
+  const [editingRequisicion, setEditingRequisicion] = useState<Requisicion | null>(null);
   const [draftItems, setDraftItems] = useState<DraftItem[]>(MOCK_DRAFT_ITEMS);
 
   useEffect(() => {
@@ -1043,6 +1063,30 @@ export default function RequisicionesPage() {
     ]);
   };
 
+  const resetDraft = () => {
+    setDraftItems(MOCK_DRAFT_ITEMS);
+    setEditingRequisicion(null);
+  };
+
+  const openEditDraft = (requisicion: Requisicion) => {
+    const sourceItems = requisicion.items ?? [];
+    setEditingRequisicion(requisicion);
+    setDraftItems(
+      sourceItems.length > 0
+        ? sourceItems.map((item, index) => ({
+            id: item.id || `${requisicion.id}-${index}`,
+            producto_id: item.producto_id,
+            producto: item.descripcion?.trim() || '',
+            cantidad: item.cantidad != null ? String(item.cantidad) : '',
+            unidad: item.unidad?.trim() || '',
+            descripcion: item.descripcion?.trim() || '',
+          }))
+        : MOCK_DRAFT_ITEMS,
+    );
+    setDetailOpen(false);
+    setNewOpen(true);
+  };
+
   const handleRemoveDraftItem = (id: string) => {
     setDraftItems((current) =>
       current.length === 1 ? current : current.filter((item) => item.id !== id),
@@ -1068,6 +1112,7 @@ export default function RequisicionesPage() {
         </div>
         <Button
           onClick={() => {
+            resetDraft();
             setNewOpen(true);
             setDetailOpen(false);
           }}
@@ -1218,20 +1263,25 @@ export default function RequisicionesPage() {
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
         onAction={() => void fetchRequisiciones()}
+        onEdit={openEditDraft}
       />
 
       <NewRequestSheet
         open={newOpen}
-        onClose={() => setNewOpen(false)}
+        onClose={() => {
+          setNewOpen(false);
+          resetDraft();
+        }}
         draftItems={draftItems}
         catalogoProductos={catalogoProductos}
         userName={currentUserData?.name || ''}
+        editingRequisicion={editingRequisicion}
         onDraftItemChange={handleDraftItemChange}
         onAddDraftItem={handleAddDraftItem}
         onRemoveDraftItem={handleRemoveDraftItem}
         onSaved={() => {
           void fetchRequisiciones();
-          setDraftItems(MOCK_DRAFT_ITEMS);
+          resetDraft();
         }}
       />
     </div>
