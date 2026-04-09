@@ -904,7 +904,7 @@ export default function InventarioPage() {
         )}
 
         {tab === 'stock' && (
-          <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
+          <Select value={categoriaFiltro} onValueChange={(v) => setCategoriaFiltro(v ?? '')}>
             <SelectTrigger className="w-40 h-8 text-sm">
               <SelectValue placeholder="Categoría" />
             </SelectTrigger>
