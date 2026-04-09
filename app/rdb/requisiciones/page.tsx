@@ -307,7 +307,7 @@ function ExistingRequestSheet({
 
   return (
     <Sheet open={open} onOpenChange={(value) => !value && onClose()}>
-      <SheetContent className="sm:max-w-[700px] flex flex-col p-6 print:p-0">
+      <SheetContent className="sm:max-w-[700px] flex min-h-0 flex-col overflow-hidden p-6 print:p-0">
         {/* Membrete y encabezado solo para impresión */}
         <div className="hidden print:block mb-8">
           <img src="/membrete-rdb.jpg" alt="Membrete Rincón del Bosque" className="w-full object-contain mb-6 max-h-32" />
@@ -327,7 +327,7 @@ function ExistingRequestSheet({
           </div>
         </SheetHeader>
 
-        <ScrollArea className="flex-1 pr-1 print:h-auto print:overflow-visible">
+        <ScrollArea className="min-h-0 flex-1 pr-1 print:h-auto print:overflow-visible">
           <div className="mt-6 space-y-6 pb-6 print:space-y-4 print:mt-0 print:pb-0">
             <div className="flex items-center justify-between gap-4 print:hidden">
               <StatusBadge status={status} />
@@ -511,7 +511,7 @@ function NewRequestSheet({
 
   return (
     <Sheet open={open} onOpenChange={(value) => !value && onClose()}>
-      <SheetContent className="sm:max-w-[700px] flex flex-col p-6 print:p-0">
+      <SheetContent className="sm:max-w-[700px] flex min-h-0 flex-col overflow-hidden p-6 print:p-0">
         <div className="hidden print:block mb-8">
           <img src="/membrete-rdb.jpg" alt="Membrete Rincón del Bosque" className="w-full object-contain mb-6 max-h-32" />
           <div className="text-center mb-4">
@@ -532,7 +532,7 @@ function NewRequestSheet({
           </div>
         </SheetHeader>
 
-        <ScrollArea className="flex-1 pr-1 print:h-auto print:overflow-visible">
+        <ScrollArea className="min-h-0 flex-1 pr-1 print:h-auto print:overflow-visible">
           <div className="mt-6 space-y-6 pb-6 print:space-y-4 print:mt-0 print:pb-0">
             <div className="rounded-2xl border bg-gradient-to-br from-muted/40 to-background p-4 print:hidden">
               <div className="flex flex-wrap items-start justify-between gap-4">
