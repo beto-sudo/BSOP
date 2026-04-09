@@ -229,7 +229,7 @@ export async function generarOrdenCompra(
       folio,
       requisicion_id: requisicionId,
       proveedor_id: null,
-      estatus: 'pendiente',
+      estatus: 'abierta',
       fecha_emision: new Date().toISOString(),
     })
     .select('id, folio')
