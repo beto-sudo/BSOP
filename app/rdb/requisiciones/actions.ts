@@ -1,6 +1,5 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 
 export type DraftItemInput = {
@@ -98,7 +97,6 @@ export async function guardarRequisicion(
     if (itemsError) throw new Error(itemsError.message);
   }
 
-  revalidatePath('/rdb/requisiciones');
   return req as { id: string; folio: string };
 }
 
@@ -115,7 +113,6 @@ export async function aprobarRequisicion(id: string): Promise<void> {
     .eq('id', id);
 
   if (error) throw new Error(error.message);
-  revalidatePath('/rdb/requisiciones');
 }
 
 // ── Generar Orden de Compra ────────────────────────────────────────────────────
@@ -182,6 +179,5 @@ export async function generarOrdenCompra(
 
   if (updateErr) throw new Error(updateErr.message);
 
-  revalidatePath('/rdb/requisiciones');
   return oc as { id: string; folio: string };
 }
