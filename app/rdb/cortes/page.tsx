@@ -506,7 +506,7 @@ export default function CortesPage() {
 
       let query = supabase
         .schema('rdb')
-        .from('cortes')
+        .from('v_cortes_lista')
         .select('*')
         .order('fecha_operativa', { ascending: false })
         .order('hora_inicio', { ascending: false })
