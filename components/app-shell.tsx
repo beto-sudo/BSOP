@@ -296,23 +296,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
         ].join(' ')}
       >
-        <div className="flex h-[76px] items-center justify-between border-b border-[var(--border)] px-6">
+        <div className="relative flex h-[76px] items-center justify-center border-b border-[var(--border)] px-6">
           <Link
             href="/"
             className={[
-              'flex min-w-0 items-center justify-center overflow-hidden rounded-lg bg-white px-3 py-1.5 shadow-sm ring-1 ring-inset ring-[var(--border)] transition hover:ring-[var(--accent)]/40',
-              collapsed ? 'justify-center' : 'w-auto',
+              'flex min-w-0 items-center justify-center overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-inset ring-[var(--border)] transition hover:ring-[var(--accent)]/40',
+              collapsed ? 'h-10 w-10 px-0 py-0' : 'px-3.5 py-1.5',
             ].join(' ')}
             aria-label="BSOP home"
           >
             <Image
               src={collapsed ? '/logo-bs.png' : '/logo-bsop.jpg'}
               alt="BSOP"
-              width={collapsed ? 28 : 100}
-              height={collapsed ? 28 : 34}
+              width={collapsed ? 28 : 115}
+              height={collapsed ? 28 : 39}
               className={[
                 'h-auto w-auto object-contain opacity-80',
-                collapsed ? 'max-h-6 max-w-6' : 'max-h-[1.375rem] max-w-[88px]',
+                collapsed ? 'max-h-6 max-w-6' : 'max-h-[1.6rem] max-w-[101px]',
               ].join(' ')}
               priority
             />
@@ -320,7 +320,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             onClick={() => setCollapsed((value) => !value)}
-            className="hidden h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--card)] dark:text-white/70 text-[var(--text)]/70 transition hover:border-[var(--accent)] dark:hover:text-white hover:text-[var(--text)] md:inline-flex"
+            className="absolute right-6 hidden h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--card)] dark:text-white/70 text-[var(--text)]/70 transition hover:border-[var(--accent)] dark:hover:text-white hover:text-[var(--text)] md:inline-flex"
             aria-label={collapsed ? t('header.expand_sidebar') : t('header.collapse_sidebar')}
           >
             {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
