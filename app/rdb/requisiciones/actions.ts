@@ -24,7 +24,33 @@ async function requireAuth() {
     data: { session },
   } = await supabase.auth.getSession();
   if (!session?.user) throw new Error('No autenticado');
-  return { supabase, userId: session.user.id };
+  return { supabase, user: session.user, userId: session.user.id };
+}
+
+async function resolveUserDisplayName(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> | null },
+) {
+  const metadata = user.user_metadata ?? {};
+  const fullName = typeof metadata.full_name === 'string' ? metadata.full_name.trim() : '';
+  const name = typeof metadata.name === 'string' ? metadata.name.trim() : '';
+  const firstName = typeof metadata.first_name === 'string' ? metadata.first_name.trim() : '';
+
+  if (fullName) return fullName;
+  if (name) return name;
+  if (firstName) return firstName;
+
+  const { data: profile } = await supabase
+    .schema('core')
+    .from('usuarios')
+    .select('first_name, email')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  const profileFirstName = profile?.first_name?.trim() || '';
+  if (profileFirstName) return profileFirstName;
+
+  return user.email?.split('@')[0] || profile?.email?.split('@')[0] || 'Sistema';
 }
 
 // ── Guardar (create as pendiente) ─────────────────────────────────────────────
@@ -33,7 +59,8 @@ export async function guardarRequisicion(
   items: DraftItemInput[],
   notas?: string | null,
 ): Promise<{ id: string; folio: string }> {
-  const { supabase, userId } = await requireAuth();
+  const { supabase, user } = await requireAuth();
+  const solicitadoPor = await resolveUserDisplayName(supabase, user);
 
   const folio = generarFolio('REQ');
 
@@ -43,7 +70,7 @@ export async function guardarRequisicion(
     .insert({
       folio,
       estatus: 'pendiente',
-      solicitado_por: userId,
+      solicitado_por: solicitadoPor,
       fecha_solicitud: new Date().toISOString(),
       notas: notas ?? null,
     })
@@ -78,12 +105,13 @@ export async function guardarRequisicion(
 // ── Aprobar ───────────────────────────────────────────────────────────────────
 
 export async function aprobarRequisicion(id: string): Promise<void> {
-  const { supabase, userId } = await requireAuth();
+  const { supabase, user } = await requireAuth();
+  const aprobadoPor = await resolveUserDisplayName(supabase, user);
 
   const { error } = await supabase
     .schema('rdb')
     .from('requisiciones')
-    .update({ estatus: 'autorizada', aprobado_por: userId })
+    .update({ estatus: 'autorizada', aprobado_por: aprobadoPor })
     .eq('id', id);
 
   if (error) throw new Error(error.message);

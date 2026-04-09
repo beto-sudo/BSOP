@@ -817,24 +817,33 @@ export default function RequisicionesPage() {
       // Obtener usuario actual para el creador
       const { data: userData } = await supabase.auth.getUser();
       if (userData?.user?.id) {
-         const { data: userRecord } = await supabase
-           .schema('core')
-           .from('usuarios')
-           .select('nombre, apellido')
-           .eq('auth_user_id', userData.user.id)
-           .single();
-           
-         if (userRecord) {
-            setCurrentUserData({
-               id: userData.user.id,
-               name: `${userRecord.nombre} ${userRecord.apellido || ''}`.trim()
-            });
-         } else {
-            setCurrentUserData({
-               id: userData.user.id,
-               name: userData.user.email?.split('@')[0] || 'Sistema'
-            });
-         }
+        const metadata = userData.user.user_metadata ?? {};
+        const metadataName = [metadata.full_name, metadata.name, metadata.first_name]
+          .find((value): value is string => typeof value === 'string' && value.trim().length > 0)
+          ?.trim();
+
+        if (metadataName) {
+          setCurrentUserData({
+            id: userData.user.id,
+            name: metadataName,
+          });
+        } else {
+          const { data: userRecord } = await supabase
+            .schema('core')
+            .from('usuarios')
+            .select('first_name, email')
+            .eq('id', userData.user.id)
+            .maybeSingle();
+
+          setCurrentUserData({
+            id: userData.user.id,
+            name:
+              userRecord?.first_name?.trim() ||
+              userData.user.email?.split('@')[0] ||
+              userRecord?.email?.split('@')[0] ||
+              'Sistema',
+          });
+        }
       }
 
     } catch (err: unknown) {
