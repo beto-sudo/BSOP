@@ -505,8 +505,8 @@ export default function CortesPage() {
       const supabase = createSupabaseBrowserClient();
 
       let query = supabase
-        .schema('caja')
-        .from('v_cortes_completo')
+        .schema('rdb')
+        .from('cortes')
         .select('*')
         .order('fecha_operativa', { ascending: false })
         .order('hora_inicio', { ascending: false })
@@ -541,20 +541,20 @@ export default function CortesPage() {
       const supabase = createSupabaseBrowserClient();
       const [totalesRes, movimientosRes, productosRes] = await Promise.all([
         supabase
-          .schema('caja')
+          .schema('rdb')
           .from('v_cortes_totales')
           .select('*')
           .eq('corte_id', corte.id)
           .maybeSingle(),
         supabase
-          .schema('caja')
+          .schema('rdb')
           .from('movimientos')
           .select('*')
           .eq('corte_id', corte.id)
           .order('fecha_hora', { ascending: true })
           .limit(100),
         supabase
-          .schema('caja')
+          .schema('rdb')
           .from('v_cortes_productos')
           .select('*')
           .eq('corte_id', corte.id)
@@ -588,7 +588,7 @@ export default function CortesPage() {
       const firstName = userName.split(' ')[0] || '';
 
       const { data, error: err } = await supabase
-        .schema('caja')
+        .schema('rdb')
         .from('cajas')
         .select('id, nombre')
         .order('nombre');

@@ -424,8 +424,8 @@ export default function VentasPage() {
       const supabase = createSupabaseBrowserClient();
 
       let query = supabase
-        .schema('waitry')
-        .from('pedidos')
+        .schema('rdb')
+        .from('waitry_pedidos')
         .select('*')
         .order('timestamp', { ascending: false }).limit(10000)
         ;
@@ -456,14 +456,14 @@ export default function VentasPage() {
       const supabase = createSupabaseBrowserClient();
       const [itemsRes, pagosRes] = await Promise.all([
         supabase
-          .schema('waitry')
-          .from('productos')
+          .schema('rdb')
+          .from('waitry_productos')
           .select('*')
           .eq('order_id', pedido.order_id)
           .limit(50),
         supabase
-          .schema('waitry')
-          .from('pagos')
+          .schema('rdb')
+          .from('waitry_pagos')
           .select('*')
           .eq('order_id', pedido.order_id)
           .limit(20),

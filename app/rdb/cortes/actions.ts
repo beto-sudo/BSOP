@@ -21,7 +21,7 @@ export async function abrirCaja(input: AbrirCajaInput): Promise<{ id: string }> 
 
   // Check for an existing open turn on this caja (case-insensitive)
   const { data: existing, error: checkErr } = await supabase
-    .schema('caja')
+    .schema('rdb')
     .from('cortes')
     .select('id')
     .eq('caja_id', input.caja_id)
@@ -37,15 +37,13 @@ export async function abrirCaja(input: AbrirCajaInput): Promise<{ id: string }> 
   }
 
   const now = new Date().toISOString();
-  const corteNombre = `${input.caja_nombre} — ${input.fecha_operativa}`;
 
   const { data: corte, error: insertErr } = await supabase
-    .schema('caja')
+    .schema('rdb')
     .from('cortes')
     .insert({
       caja_id: input.caja_id,
       caja_nombre: input.caja_nombre,
-      corte_nombre: corteNombre,
       estado: 'Abierto',
       responsable_apertura: input.responsable_apertura,
       efectivo_inicial: input.efectivo_inicial,
