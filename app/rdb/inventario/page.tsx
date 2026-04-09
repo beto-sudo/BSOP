@@ -46,6 +46,7 @@ import {
   ChevronsUpDown,
   ClipboardList,
   Plus,
+  Printer,
   RefreshCw,
   Search,
   TrendingDown,
@@ -763,6 +764,18 @@ export default function InventarioPage() {
           <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
         </Button>
 
+        {tab === 'stock' && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.print()}
+            className="gap-2 print:hidden"
+          >
+            <Printer className="h-3.5 w-3.5" />
+            Imprimir lista
+          </Button>
+        )}
+
         <span className="text-sm text-muted-foreground">
           {isLoading
             ? 'Cargando…'
@@ -778,6 +791,54 @@ export default function InventarioPage() {
           {currentError}
         </div>
       )}
+
+      {/* ── PRINT HEADER (solo impresión) ──────────────────────────────── */}
+      <div className="hidden print:block text-sm mb-4">
+        <div className="flex items-start justify-between border-b pb-3 mb-4">
+          <div>
+            <div className="text-lg font-bold">Rincón del Bosque</div>
+            <div className="text-xs text-gray-500">Inventario de Stock — {new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
+          </div>
+          <div className="text-right text-xs text-gray-500">
+            {filteredStock.length} productos
+          </div>
+        </div>
+        <table className="w-full border-collapse text-xs">
+          <thead>
+            <tr className="border-b">
+              <th className="text-left py-1 font-semibold">Producto</th>
+              <th className="text-left py-1 font-semibold">Categoría</th>
+              <th className="text-right py-1 font-semibold">Stock</th>
+              <th className="text-right py-1 font-semibold">Mínimo</th>
+              <th className="text-right py-1 font-semibold">Costo Unit.</th>
+              <th className="text-right py-1 font-semibold">Valor Total</th>
+              <th className="text-center py-1 font-semibold">Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredStock.map((item) => (
+              <tr key={item.id} className="border-t">
+                <td className="py-0.5 font-medium">{item.nombre}</td>
+                <td className="py-0.5 text-gray-500">{item.categoria ?? '—'}</td>
+                <td className="py-0.5 text-right tabular-nums">{item.stock_actual ?? 0}</td>
+                <td className="py-0.5 text-right tabular-nums text-gray-500">{item.stock_minimo ?? '—'}</td>
+                <td className="py-0.5 text-right tabular-nums">{item.costo_unitario != null ? `$${Number(item.costo_unitario).toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '—'}</td>
+                <td className="py-0.5 text-right tabular-nums">{item.valor_inventario != null ? `$${Number(item.valor_inventario).toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '—'}</td>
+                <td className="py-0.5 text-center">{item.bajo_minimo ? '⚠️' : '✓'}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t font-semibold">
+              <td colSpan={5} className="py-1">Total valor inventario</td>
+              <td className="text-right tabular-nums">
+                ${filteredStock.reduce((s, i) => s + (Number(i.valor_inventario) || 0), 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              </td>
+              <td />
+            </tr>
+          </tfoot>
+        </table>
+      </div>
 
       {/* ── Stock Table ────────────────────────────────────────────────────── */}
       {tab === 'stock' && (
