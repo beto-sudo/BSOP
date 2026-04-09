@@ -864,7 +864,9 @@ export default function CortesPage() {
               <TableHead className="text-right whitespace-nowrap">Stripe</TableHead>
               <TableHead className="text-right whitespace-nowrap">Transf.</TableHead>
               <TableHead className="text-right whitespace-nowrap">Total</TableHead>
-              <TableHead className="text-right whitespace-nowrap">Efectivo Contado</TableHead>
+              <TableHead className="text-right whitespace-nowrap">Ef. Esperado</TableHead>
+              <TableHead className="text-right whitespace-nowrap">Movimientos</TableHead>
+              <TableHead className="text-right whitespace-nowrap">Ef. Contado</TableHead>
               <TableHead className="text-right whitespace-nowrap">Diferencia</TableHead>
             </TableRow>
           </TableHeader>
@@ -872,7 +874,7 @@ export default function CortesPage() {
             {loading ? (
               Array.from({ length: 6 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 11 }).map((__, j) => (
+                  {Array.from({ length: 13 }).map((__, j) => (
                     <TableCell key={j}>
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
@@ -881,13 +883,16 @@ export default function CortesPage() {
               ))
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={13} className="py-12 text-center text-muted-foreground">
+                <TableCell colSpan={15} className="py-12 text-center text-muted-foreground">
                   No se encontraron cortes para el rango seleccionado.
                 </TableCell>
               </TableRow>
             ) : (
               filtered.map((corte) => {
-                const diferencia = (corte.efectivo_contado ?? 0) - (corte.efectivo_esperado ?? 0);
+                const movimientosNeto = (corte.depositos ?? 0) - (corte.retiros ?? 0);
+                const diferencia = corte.efectivo_contado != null
+                  ? (corte.efectivo_contado) - (corte.efectivo_esperado ?? 0)
+                  : null;
                 return (
                   <TableRow
                     key={corte.id}
@@ -922,10 +927,20 @@ export default function CortesPage() {
                       {formatCurrency(corte.total_ingresos)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums whitespace-nowrap">
-                      {formatCurrency(corte.efectivo_contado)}
+                      {(corte.efectivo_esperado ?? 0) !== 0 ? formatCurrency(corte.efectivo_esperado) : '—'}
                     </TableCell>
-                    <TableCell className={`text-right tabular-nums whitespace-nowrap ${diferencia !== 0 ? (diferencia > 0 ? 'text-emerald-600' : 'text-destructive') : ''}`}>
-                      {diferencia !== 0 ? formatCurrency(diferencia) : '—'}
+                    <TableCell className={`text-right tabular-nums whitespace-nowrap ${
+                      movimientosNeto > 0 ? 'text-emerald-600' : movimientosNeto < 0 ? 'text-destructive' : 'text-muted-foreground'
+                    }`}>
+                      {movimientosNeto !== 0 ? formatCurrency(movimientosNeto) : '—'}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums whitespace-nowrap">
+                      {corte.efectivo_contado != null ? formatCurrency(corte.efectivo_contado) : '—'}
+                    </TableCell>
+                    <TableCell className={`text-right tabular-nums whitespace-nowrap ${
+                      diferencia == null ? '' : diferencia > 0 ? 'text-emerald-600' : diferencia < 0 ? 'text-destructive' : ''
+                    }`}>
+                      {diferencia == null || diferencia === 0 ? '—' : formatCurrency(diferencia)}
                     </TableCell>
                   </TableRow>
                 );
