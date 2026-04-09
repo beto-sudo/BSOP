@@ -11,9 +11,12 @@ export const metadata: Metadata = {
   title: 'BSOP',
   description: 'Beto Santos Operations Platform',
   icons: {
-    icon: '/favicon.ico',
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/favicon.png', type: 'image/png' },
+    ],
     shortcut: '/favicon.ico',
-    apple: '/logo-bs.png',
+    apple: '/apple-touch-icon.png',
   },
 };
 
