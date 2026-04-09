@@ -79,6 +79,14 @@ export default function ProductosPage() {
   const [formParentId, setFormParentId] = useState<string>('none');
   const [parentPopoverOpen, setParentPopoverOpen] = useState(false);
 
+  // Create Form State
+  const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
+  const [newNombre, setNewNombre] = useState('');
+  const [newPrecio, setNewPrecio] = useState('0');
+  const [newCategoria, setNewCategoria] = useState('');
+  const [newInventariable, setNewInventariable] = useState(true);
+  const [creating, setCreating] = useState(false);
+
   const fetchProductos = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -138,6 +146,41 @@ export default function ProductosPage() {
     }
   };
 
+  const handleCreate = async () => {
+    if (!newNombre.trim()) {
+      alert('El nombre es obligatorio');
+      return;
+    }
+    setCreating(true);
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { error: err } = await supabase
+        .schema('rdb')
+        .from('productos')
+        .insert({
+          nombre: newNombre.trim(),
+          precio: parseFloat(newPrecio) || 0,
+          categoria: newCategoria.trim() || null,
+          inventariable: newInventariable,
+          activo: true,
+        });
+
+      if (err) throw err;
+      
+      setCreateDrawerOpen(false);
+      setNewNombre('');
+      setNewPrecio('0');
+      setNewCategoria('');
+      setNewInventariable(true);
+      void fetchProductos();
+    } catch (e) {
+      console.error(e);
+      alert('Error al crear el producto');
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const categorias = Array.from(
     new Set(productos.map((p) => p.categoria).filter((c): c is string => !!c)),
   ).sort();
@@ -163,10 +206,11 @@ export default function ProductosPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Productos</h1>
           <p className="text-sm text-muted-foreground">Catálogo de productos y servicios</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
           <div className="text-sm text-muted-foreground">
              Total: <span className="font-semibold text-foreground">{filtered.length}</span>
           </div>
+          <Button onClick={() => setCreateDrawerOpen(true)}>+ Nuevo Producto</Button>
         </div>
       </div>
 
@@ -312,7 +356,7 @@ export default function ProductosPage() {
 
       {/* Detail/Config Drawer */}
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
-        <SheetContent className="sm:max-w-[600px]">
+        <SheetContent className="sm:max-w-[600px] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Configurar Producto</SheetTitle>
             <SheetDescription>
@@ -442,6 +486,87 @@ export default function ProductosPage() {
 
             </div>
           )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Create Producto Drawer */}
+      <Sheet open={createDrawerOpen} onOpenChange={setCreateDrawerOpen}>
+        <SheetContent className="sm:max-w-[600px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Nuevo Producto</SheetTitle>
+            <SheetDescription>
+              Da de alta un producto o insumo manualmente (ej. para Órdenes de Compra o almacén interno).
+            </SheetDescription>
+          </SheetHeader>
+          
+          <div className="mt-8 space-y-6">
+            <div className="space-y-4">
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">Nombre</label>
+                <Input 
+                  value={newNombre} 
+                  onChange={(e) => setNewNombre(e.target.value)} 
+                  placeholder="Ej. Servilletas de barra" 
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">Precio (Opcional)</label>
+                <Input 
+                  type="number"
+                  value={newPrecio} 
+                  onChange={(e) => setNewPrecio(e.target.value)} 
+                  placeholder="0" 
+                />
+              </div>
+
+              <div className="space-y-2">
+                 <label className="text-sm font-medium leading-none">Categoría</label>
+                 <Select value={newCategoria || 'none'} onValueChange={(v) => setNewCategoria(v === 'none' || v === null ? '' : v)}>
+                    <SelectTrigger>
+                       <SelectValue placeholder="Seleccionar categoría..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                       <SelectItem value="none" className="italic text-muted-foreground">Sin Categoría</SelectItem>
+                       <SelectItem value="Alimentos">Alimentos</SelectItem>
+                       <SelectItem value="Bebidas">Bebidas</SelectItem>
+                       <SelectItem value="Licores">Licores</SelectItem>
+                       <SelectItem value="Articulos">Articulos</SelectItem>
+                       <SelectItem value="Deportes">Deportes</SelectItem>
+                       <SelectItem value="Consumibles">Consumibles</SelectItem>
+                    </SelectContent>
+                 </Select>
+              </div>
+
+              {/* Inventariable Toggle */}
+              <div className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
+                 <div className="space-y-0.5">
+                    <label className="text-base font-medium leading-none">Es inventariable</label>
+                    <p className="text-sm text-muted-foreground">
+                       Actívalo si lo contarás en stock.
+                    </p>
+                 </div>
+                 <label className="relative inline-flex items-center cursor-pointer">
+                   <input 
+                     type="checkbox" 
+                     className="sr-only peer" 
+                     checked={newInventariable}
+                     onChange={(e) => setNewInventariable(e.target.checked)} 
+                   />
+                   <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ring rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                 </label>
+              </div>
+
+            </div>
+
+            <div className="flex justify-end pt-6 border-t">
+               <Button onClick={handleCreate} disabled={creating} className="gap-2">
+                  {creating ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Crear Producto
+               </Button>
+            </div>
+          </div>
         </SheetContent>
       </Sheet>
 
