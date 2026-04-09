@@ -569,7 +569,8 @@ export default function InventarioPage() {
   const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [fechaCorte, setFechaCorte] = useState<Date | null>(null);
+  const [fechaCorte, setFechaCorte] = useState<string | null>(null);
+  const [categoriaFiltro, setCategoriaFiltro] = useState<string>('');
 
   const fetchStock = useCallback(async () => {
     setLoadingStock(true);
@@ -590,16 +591,16 @@ export default function InventarioPage() {
     }
   }, []);
 
-  const fetchStockHistorico = useCallback(async (fecha: Date) => {
+  const fetchStockHistorico = useCallback(async (dateStr: string) => {
     setLoadingStock(true);
     setErrorStock(null);
     try {
       const supabase = createSupabaseBrowserClient();
-      const fechaFin = new Date(fecha);
-      fechaFin.setHours(23, 59, 59, 999);
+      // Fin del día en UTC para la fecha seleccionada (sin conversión timezone)
+      const p_fecha = `${dateStr}T23:59:59.999Z`;
       const { data, error } = await supabase
         .schema('rdb')
-        .rpc('fn_inventario_al_corte', { p_fecha: fechaFin.toISOString() });
+        .rpc('fn_inventario_al_corte', { p_fecha });
       if (error) throw error;
       setItems((data ?? []) as StockItem[]);
     } catch (e: unknown) {
@@ -646,6 +647,7 @@ export default function InventarioPage() {
   const handleTabChange = (newTab: Tab) => {
     setTab(newTab);
     setSearch('');
+    setCategoriaFiltro('');
   };
 
   const handleRefresh = () => {
@@ -657,11 +659,13 @@ export default function InventarioPage() {
     }
   };
 
+  const fechaLabel = fechaCorte
+    ? new Date(fechaCorte + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })
+    : null;
+
   const handlePrintLista = (stock: StockItem[]) => {
     const totalValor = stock.reduce((s, i) => s + (Number(i.valor_inventario) || 0), 0);
-    const fecha = fechaCorte
-      ? fechaCorte.toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })
-      : new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
+    const fecha = fechaLabel ?? new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
     const rows = stock.map((item) => `
       <tr>
         <td>${item.nombre}</td>
@@ -747,12 +751,10 @@ export default function InventarioPage() {
   };
 
   const filteredStock = items.filter((i) => {
-    if (i.inventariable === showServicios) return false; // i.inventariable is true for real products. We hide them if showServicios is true? No wait.
-    // If showServicios is false, we want inventariable === true.
-    // If showServicios is true, we want inventariable === false.
     if (showServicios && i.inventariable) return false;
     if (!showServicios && !i.inventariable) return false;
     if (showBajoMinimo && !i.bajo_minimo) return false;
+    if (categoriaFiltro && i.categoria !== categoriaFiltro) return false;
     if (!search) return true;
     const q = search.toLowerCase();
     return (
@@ -791,6 +793,47 @@ export default function InventarioPage() {
       {tab === 'stock' && !loadingStock && !errorStock && (
         <SummaryBar items={filteredStock} />
       )}
+
+      {/* KPI cards por categoría */}
+      {tab === 'stock' && !loadingStock && !errorStock && (() => {
+        const cats = ['Alimentos','Bebidas','Licores','Artículos','Deportes','Consumibles','Propinas'];
+        type CatStat = { count: number; valor: number };
+        const stats = cats.reduce<Record<string,CatStat>>((acc, c) => {
+          acc[c] = { count: 0, valor: 0 };
+          return acc;
+        }, {});
+        for (const item of filteredStock) {
+          const c = item.categoria ?? 'Otros';
+          if (!stats[c]) stats[c] = { count: 0, valor: 0 };
+          stats[c].count++;
+          stats[c].valor += Number(item.valor_inventario) || 0;
+        }
+        const sorted = Object.entries(stats)
+          .filter(([, s]) => s.count > 0)
+          .sort((a, b) => b[1].valor - a[1].valor);
+        if (sorted.length === 0) return null;
+        return (
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+            {sorted.map(([cat, s]) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setCategoriaFiltro(categoriaFiltro === cat ? '' : cat)}
+                className={[
+                  'rounded-lg border px-3 py-2 text-left transition-colors hover:bg-muted/60',
+                  categoriaFiltro === cat ? 'border-primary bg-primary/10' : 'bg-card',
+                ].join(' ')}
+              >
+                <div className="text-xs font-medium text-muted-foreground truncate">{cat}</div>
+                <div className="mt-0.5 text-sm font-semibold tabular-nums">
+                  {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }).format(s.valor)}
+                </div>
+                <div className="text-xs text-muted-foreground">{s.count} prod.</div>
+              </button>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Tab toggle */}
       <div className="flex w-fit gap-1 rounded-lg border bg-muted/30 p-1">
@@ -861,20 +904,33 @@ export default function InventarioPage() {
         )}
 
         {tab === 'stock' && (
+          <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
+            <SelectTrigger className="w-40 h-8 text-sm">
+              <SelectValue placeholder="Categoría" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Todas</SelectItem>
+              {['Alimentos','Bebidas','Licores','Artículos','Deportes','Consumibles','Propinas'].map(c => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {tab === 'stock' && (
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Al corte:</span>
             <input
               type="date"
               max={new Date().toISOString().split('T')[0]}
-              value={fechaCorte ? fechaCorte.toISOString().split('T')[0] : ''}
+              value={fechaCorte ?? ''}
               onChange={(e) => {
                 if (!e.target.value) {
                   setFechaCorte(null);
                   void fetchStock();
                 } else {
-                  const d = new Date(e.target.value + 'T12:00:00');
-                  setFechaCorte(d);
-                  void fetchStockHistorico(d);
+                  setFechaCorte(e.target.value);
+                  void fetchStockHistorico(e.target.value);
                 }
               }}
               className="rounded-md border border-input bg-transparent px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -933,7 +989,7 @@ export default function InventarioPage() {
       {fechaCorte && tab === 'stock' && (
         <div className="flex items-center gap-2 rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-2 text-sm text-blue-600 dark:text-blue-400">
           <span>📅</span>
-          <span>Inventario al cierre del {fechaCorte.toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })} — solo movimientos hasta esa fecha</span>
+          <span>Inventario al cierre del {fechaLabel} — solo movimientos hasta esa fecha</span>
         </div>
       )}
 
