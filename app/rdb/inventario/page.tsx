@@ -666,17 +666,45 @@ export default function InventarioPage() {
   const handlePrintLista = (stock: StockItem[]) => {
     const totalValor = stock.reduce((s, i) => s + (Number(i.valor_inventario) || 0), 0);
     const fecha = fechaLabel ?? new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
-    const rows = stock.map((item) => `
+
+    // Agrupar por categoría para el resumen final
+    const catOrder = ['Licores','Bebidas','Alimentos','Consumibles','Artículos','Deportes','Propinas'];
+    const catMap: Record<string, { count: number; valor: number }> = {};
+    for (const item of stock) {
+      const cat = item.categoria ?? 'Sin categoría';
+      if (!catMap[cat]) catMap[cat] = { count: 0, valor: 0 };
+      catMap[cat].count++;
+      catMap[cat].valor += Number(item.valor_inventario) || 0;
+    }
+    const catEntries = [
+      ...catOrder.filter(c => catMap[c]).map(c => [c, catMap[c]] as [string, {count:number;valor:number}]),
+      ...Object.entries(catMap).filter(([c]) => !catOrder.includes(c)),
+    ];
+
+    const catRows = catEntries.map(([cat, s]) => `
+      <tr>
+        <td>${cat}</td>
+        <td class="num">${s.count}</td>
+        <td class="num">$${s.valor.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
+      </tr>
+    `).join('');
+
+    const rows = stock.map((item) => {
+      const sinStock = item.stock_actual <= 0;
+      const bajoMin = item.bajo_minimo;
+      const estadoText = sinStock ? 'Sin stock' : bajoMin ? 'Bajo mínimo' : '✓';
+      const estadoClass = sinStock ? 'estado-sin-stock' : bajoMin ? 'estado-bajo' : 'estado-ok';
+      return `
       <tr>
         <td>${item.nombre}</td>
         <td>${item.categoria ?? '—'}</td>
-        <td class="num ${item.stock_actual <= 0 ? 'rojo' : item.bajo_minimo ? 'naranja' : ''}">${item.stock_actual} ${item.unidad ?? 'pzs'}</td>
+        <td class="num ${sinStock ? 'rojo' : bajoMin ? 'naranja' : ''}">${item.stock_actual} ${item.unidad ?? 'pzs'}</td>
         <td class="num gris">${item.stock_minimo ?? '—'}</td>
         <td class="num">${item.costo_unitario != null ? '$' + Number(item.costo_unitario).toLocaleString('es-MX', { minimumFractionDigits: 2 }) : '—'}</td>
         <td class="num">${item.valor_inventario != null ? '$' + Number(item.valor_inventario).toLocaleString('es-MX', { minimumFractionDigits: 2 }) : '—'}</td>
-        <td class="center">${item.stock_actual <= 0 ? '❌ Sin stock' : item.bajo_minimo ? '⚠️ Bajo mínimo' : '✓'}</td>
+        <td class="nowrap ${estadoClass}">${estadoText}</td>
       </tr>
-    `).join('');
+    `}).join('');
 
     const html = `<!DOCTYPE html>
 <html lang="es">
@@ -686,33 +714,72 @@ export default function InventarioPage() {
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif; font-size: 11px; color: #111; padding: 24px; }
-    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 16px; }
-    .header-left h1 { font-size: 20px; font-weight: 700; }
-    .header-left p { font-size: 11px; color: #555; margin-top: 2px; }
-    .header-right { text-align: right; font-size: 11px; color: #555; }
+
+    /* ── Membrete ──────────────────────────────────────────────── */
+    .membrete { display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 10px; margin-bottom: 6px; border-bottom: 3px solid #1a1a2e; }
+    .membrete-logo { display: flex; align-items: center; gap: 10px; }
+    .membrete-icon { width: 42px; height: 42px; background: #1a1a2e; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 22px; flex-shrink: 0; }
+    .membrete-nombre { font-size: 18px; font-weight: 800; color: #1a1a2e; letter-spacing: -0.3px; line-height: 1.1; }
+    .membrete-sub { font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
+    .membrete-info { text-align: right; font-size: 9px; color: #666; line-height: 1.7; }
+    .membrete-info strong { font-size: 11px; color: #111; }
+
+    .doc-titulo { margin: 10px 0 4px; font-size: 13px; font-weight: 700; color: #1a1a2e; }
+    .doc-meta { font-size: 10px; color: #555; margin-bottom: 14px; }
+
+    /* ── Tabla principal ───────────────────────────────────────── */
     table { width: 100%; border-collapse: collapse; }
-    th { font-weight: 600; text-align: left; padding: 5px 6px; border-bottom: 1px solid #ccc; font-size: 10px; text-transform: uppercase; letter-spacing: 0.03em; color: #444; }
-    td { padding: 4px 6px; border-bottom: 1px solid #eee; }
+    th { font-weight: 700; text-align: left; padding: 5px 6px; border-bottom: 2px solid #1a1a2e; font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.04em; color: #1a1a2e; background: #f5f5f8; }
+    td { padding: 3.5px 6px; border-bottom: 1px solid #eee; vertical-align: middle; }
     tr:last-child td { border-bottom: none; }
-    .num { text-align: right; font-variant-numeric: tabular-nums; }
-    .center { text-align: center; }
-    .gris { color: #888; }
+    tr:nth-child(even) td { background: #fafafa; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .nowrap { white-space: nowrap; }
+    .gris { color: #999; }
     .rojo { color: #dc2626; font-weight: 600; }
     .naranja { color: #d97706; font-weight: 600; }
-    tfoot td { font-weight: 700; border-top: 2px solid #111; padding-top: 6px; }
-    @media print { body { padding: 0; } }
+    .estado-sin-stock { color: #dc2626; font-weight: 600; }
+    .estado-bajo { color: #d97706; font-weight: 600; }
+    .estado-ok { color: #16a34a; }
+
+    /* ── Resumen por categoría (solo al final) ─────────────────── */
+    .resumen-section { margin-top: 28px; page-break-inside: avoid; }
+    .resumen-section h2 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #1a1a2e; border-bottom: 2px solid #1a1a2e; padding-bottom: 4px; margin-bottom: 8px; }
+    .resumen-table { width: 340px; border-collapse: collapse; }
+    .resumen-table th { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #444; padding: 3px 8px; border-bottom: 1px solid #ccc; background: #f5f5f8; }
+    .resumen-table td { padding: 3px 8px; border-bottom: 1px solid #eee; font-size: 10.5px; }
+    .resumen-table tr:last-child td { border-bottom: none; }
+    .resumen-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .resumen-total { margin-top: 6px; width: 340px; border-collapse: collapse; }
+    .resumen-total td { padding: 5px 8px; font-size: 12px; font-weight: 800; color: #1a1a2e; border-top: 2px solid #1a1a2e; }
+    .resumen-total .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+    @media print {
+      body { padding: 12px 16px; }
+      .membrete { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      tr:nth-child(even) td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div class="header-left">
-      <h1>Rincón del Bosque</h1>
-      <p>${fechaCorte ? `Inventario al Corte: ${fecha}` : `Inventario de Stock — ${fecha}`}</p>
+  <!-- Membrete empresa -->
+  <div class="membrete">
+    <div class="membrete-logo">
+      <div class="membrete-icon">🏟</div>
+      <div>
+        <div class="membrete-nombre">Rincón del Bosque</div>
+        <div class="membrete-sub">Club Deportivo &amp; Restaurante</div>
+      </div>
     </div>
-    <div class="header-right">
-      <div>${stock.length} productos</div>
+    <div class="membrete-info">
+      <div>Piedras Negras, Coahuila</div>
+      <div><strong>Inventario al Corte: ${fecha}</strong></div>
+      <div>${stock.length} productos registrados</div>
     </div>
   </div>
+
+  <!-- Tabla de inventario -->
   <table>
     <thead>
       <tr>
@@ -722,18 +789,32 @@ export default function InventarioPage() {
         <th class="num">Mínimo</th>
         <th class="num">Costo Unit.</th>
         <th class="num">Valor Total</th>
-        <th class="center">Estado</th>
+        <th class="nowrap">Estado</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
-    <tfoot>
-      <tr>
-        <td colspan="5">Total valor inventario</td>
-        <td class="num">$${totalValor.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
-        <td></td>
-      </tr>
-    </tfoot>
   </table>
+
+  <!-- Resumen por categoría — solo al final del documento -->
+  <div class="resumen-section">
+    <h2>Resumen por Categoría</h2>
+    <table class="resumen-table">
+      <thead>
+        <tr>
+          <th>Categoría</th>
+          <th class="num">Productos</th>
+          <th class="num">Valor</th>
+        </tr>
+      </thead>
+      <tbody>${catRows}</tbody>
+    </table>
+    <table class="resumen-total">
+      <tr>
+        <td>TOTAL INVENTARIO</td>
+        <td class="num">$${totalValor.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
+      </tr>
+    </table>
+  </div>
 </body>
 </html>`;
 
