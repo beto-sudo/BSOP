@@ -251,7 +251,6 @@ export async function generarOrdenCompra(
           cantidad: item.cantidad,
           cantidad_recibida: 0,
           precio_unitario: 0,
-          subtotal: 0,
         })),
       );
 
