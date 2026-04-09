@@ -28,7 +28,9 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import { Package, RefreshCw, Search, Tag, Box, Settings2, Save } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Package, RefreshCw, Search, Tag, Box, Settings2, Save, ChevronsUpDown, Check } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -75,6 +77,7 @@ export default function ProductosPage() {
   const [formCategoria, setFormCategoria] = useState('');
   const [formInventariable, setFormInventariable] = useState(false);
   const [formParentId, setFormParentId] = useState<string>('none');
+  const [parentPopoverOpen, setParentPopoverOpen] = useState(false);
 
   const fetchProductos = useCallback(async () => {
     setLoading(true);
@@ -370,25 +373,62 @@ export default function ProductosPage() {
 
                  {/* Producto Padre (Anidar) */}
                  <div className="space-y-2">
-                    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Producto Padre (Agrupador)</label>
-                    <p className="text-sm text-muted-foreground mb-2">
+                    <label className="text-sm font-medium leading-none">Producto Padre (Agrupador)</label>
+                    <p className="text-sm text-muted-foreground">
                        Si este producto es una variante o sabor, selecciona su producto principal.
                     </p>
-                    <Select value={formParentId} onValueChange={(v) => setFormParentId(v ?? 'none')}>
-                       <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar producto padre..." />
-                       </SelectTrigger>
-                       <SelectContent>
-                          <SelectItem value="none" className="italic text-muted-foreground">Ninguno (Es producto raíz)</SelectItem>
-                          {productos
-                             .filter(p => p.id !== selectedProducto.id) // Cannot be parent of itself
-                             .map(p => (
-                             <SelectItem key={p.id} value={p.id}>
-                                {p.nombre}
-                             </SelectItem>
-                          ))}
-                       </SelectContent>
-                    </Select>
+                    <Popover open={parentPopoverOpen} onOpenChange={setParentPopoverOpen}>
+                       <PopoverTrigger
+                          render={
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={parentPopoverOpen}
+                              className="w-full justify-between font-normal"
+                            />
+                          }
+                       >
+                          <span className="truncate">
+                            {formParentId === 'none'
+                              ? <span className="italic text-muted-foreground">Ninguno (Es producto raíz)</span>
+                              : productos.find(p => p.id === formParentId)?.nombre ?? 'Seleccionar...'}
+                          </span>
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                       </PopoverTrigger>
+                       <PopoverContent className="w-[420px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Buscar producto..." />
+                            <CommandList className="max-h-64">
+                              <CommandEmpty>No se encontraron productos.</CommandEmpty>
+                              <CommandGroup>
+                                <CommandItem
+                                  value="none"
+                                  onSelect={() => { setFormParentId('none'); setParentPopoverOpen(false); }}
+                                >
+                                  <Check className={`mr-2 h-4 w-4 ${formParentId === 'none' ? 'opacity-100' : 'opacity-0'}`} />
+                                  <span className="italic text-muted-foreground">Ninguno (Es producto raíz)</span>
+                                </CommandItem>
+                                {productos
+                                  .filter(p => p.id !== selectedProducto.id)
+                                  .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+                                  .map(p => (
+                                    <CommandItem
+                                      key={p.id}
+                                      value={p.nombre}
+                                      onSelect={() => { setFormParentId(p.id); setParentPopoverOpen(false); }}
+                                    >
+                                      <Check className={`mr-2 h-4 w-4 shrink-0 ${formParentId === p.id ? 'opacity-100' : 'opacity-0'}`} />
+                                      <span className="truncate">{p.nombre}</span>
+                                      {p.categoria && (
+                                        <span className="ml-auto text-xs text-muted-foreground shrink-0">{p.categoria}</span>
+                                      )}
+                                    </CommandItem>
+                                  ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                       </PopoverContent>
+                    </Popover>
                  </div>
 
               </div>
