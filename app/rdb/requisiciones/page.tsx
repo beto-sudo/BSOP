@@ -76,8 +76,11 @@ type Requisicion = {
   folio: string | null;
   estatus: string | null;
   solicitado_por: string | null;
+  solicitado_por_nombre?: string | null;
   aprobado_por: string | null;
+  aprobado_por_nombre?: string | null;
   fecha_solicitud: string | null;
+  item_count?: number;
   items?: RequisicionItem[];
 };
 
@@ -342,7 +345,7 @@ function ExistingRequestSheet({
                   Solicitado por
                 </span>
                 <span className="font-medium text-foreground print:text-black">
-                  {requesterName(requisicion.solicitado_por)}
+                  {requesterName(requisicion.solicitado_por_nombre ?? requisicion.solicitado_por)}
                 </span>
               </div>
               <div>
@@ -358,7 +361,7 @@ function ExistingRequestSheet({
                   Aprobado por
                 </span>
                 <span className="font-medium text-foreground print:text-black">
-                  {requisicion.aprobado_por?.trim() || 'Pendiente'}
+                  {requisicion.aprobado_por_nombre?.trim() || requisicion.aprobado_por?.trim() || 'Pendiente'}
                 </span>
               </div>
             </div>
@@ -863,7 +866,7 @@ export default function RequisicionesPage() {
       const { data, error: fetchError } = await query;
       if (fetchError) throw fetchError;
 
-      setRequisiciones((data ?? []) as Requisicion[]);
+      const requisicionesData = (data ?? []) as Requisicion[];
 
       const { data: prodData } = await supabase
         .schema('rdb')
@@ -871,24 +874,24 @@ export default function RequisicionesPage() {
         .select('id, nombre, unidad, categoria')
         .eq('activo', true)
         .order('nombre');
-      
+
       if (prodData) {
         setCatalogoProductos(prodData);
       }
 
-      // Obtener usuario actual para el creador
       const { data: userData } = await supabase.auth.getUser();
+      let currentUserId: string | null = null;
+      let currentUserName = 'Sistema';
+
       if (userData?.user?.id) {
+        currentUserId = userData.user.id;
         const metadata = userData.user.user_metadata ?? {};
         const metadataName = [metadata.full_name, metadata.name, metadata.first_name]
           .find((value): value is string => typeof value === 'string' && value.trim().length > 0)
           ?.trim();
 
         if (metadataName) {
-          setCurrentUserData({
-            id: userData.user.id,
-            name: metadataName,
-          });
+          currentUserName = metadataName;
         } else {
           const { data: userRecord } = await supabase
             .schema('core')
@@ -897,16 +900,76 @@ export default function RequisicionesPage() {
             .eq('id', userData.user.id)
             .maybeSingle();
 
-          setCurrentUserData({
-            id: userData.user.id,
-            name:
-              userRecord?.first_name?.trim() ||
-              userData.user.email?.split('@')[0] ||
-              userRecord?.email?.split('@')[0] ||
-              'Sistema',
-          });
+          currentUserName =
+            userRecord?.first_name?.trim() ||
+            userData.user.email?.split('@')[0] ||
+            userRecord?.email?.split('@')[0] ||
+            'Sistema';
         }
+
+        setCurrentUserData({
+          id: currentUserId,
+          name: currentUserName,
+        });
       }
+
+      const userIds = Array.from(
+        new Set(
+          requisicionesData
+            .flatMap((req) => [req.solicitado_por, req.aprobado_por])
+            .filter((value): value is string => Boolean(value)),
+        ),
+      );
+
+      const userNameMap = new Map<string, string>();
+      if (userIds.length > 0) {
+        const { data: userRows } = await supabase
+          .schema('core')
+          .from('usuarios')
+          .select('id, first_name, email')
+          .in('id', userIds);
+
+        (userRows ?? []).forEach((row: { id: string; first_name: string | null; email: string | null }) => {
+          userNameMap.set(
+            row.id,
+            row.first_name?.trim() || row.email?.split('@')[0] || row.id,
+          );
+        });
+      }
+
+      if (currentUserId) {
+        userNameMap.set(currentUserId, currentUserName);
+      }
+
+      const requisicionIds = requisicionesData.map((req) => req.id);
+      const itemCountMap = new Map<string, number>();
+      if (requisicionIds.length > 0) {
+        const { data: itemRows } = await supabase
+          .schema('rdb')
+          .from('requisiciones_items')
+          .select('requisicion_id')
+          .in('requisicion_id', requisicionIds);
+
+        (itemRows ?? []).forEach((row: { requisicion_id: string }) => {
+          itemCountMap.set(
+            row.requisicion_id,
+            (itemCountMap.get(row.requisicion_id) ?? 0) + 1,
+          );
+        });
+      }
+
+      setRequisiciones(
+        requisicionesData.map((req) => ({
+          ...req,
+          solicitado_por_nombre: req.solicitado_por
+            ? userNameMap.get(req.solicitado_por) ?? req.solicitado_por
+            : null,
+          aprobado_por_nombre: req.aprobado_por
+            ? userNameMap.get(req.aprobado_por) ?? req.aprobado_por
+            : null,
+          item_count: itemCountMap.get(req.id) ?? 0,
+        })),
+      );
 
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error al cargar requisiciones');
@@ -954,7 +1017,7 @@ export default function RequisicionesPage() {
       const q = search.toLowerCase();
       return (
         (req.folio ?? '').toLowerCase().includes(q) ||
-        requesterName(req.solicitado_por).toLowerCase().includes(q) ||
+        requesterName(req.solicitado_por_nombre ?? req.solicitado_por).toLowerCase().includes(q) ||
         STATUS_LABELS[normalizedStatus].toLowerCase().includes(q)
       );
     });
@@ -1131,12 +1194,16 @@ export default function RequisicionesPage() {
                         <TableCell className="text-sm text-muted-foreground">
                           {formatDate(req.fecha_solicitud)}
                         </TableCell>
-                        <TableCell className="text-sm">{requesterName(req.solicitado_por)}</TableCell>
+                        <TableCell className="text-sm">{requesterName(req.solicitado_por_nombre ?? req.solicitado_por)}</TableCell>
                         <TableCell>
                           <StatusBadge status={normalizedStatus} />
                         </TableCell>
                         <TableCell className="max-w-64 text-sm text-muted-foreground">
-                          {items.length > 0 ? summarizeItems(items) : safeCountLabel(items.length)}
+                          {items.length > 0
+                            ? summarizeItems(items)
+                            : (req.item_count ?? 0) > 0
+                              ? safeCountLabel(req.item_count ?? 0)
+                              : 'Sin artículos'}
                         </TableCell>
                       </TableRow>
                     );
