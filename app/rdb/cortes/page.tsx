@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import { abrirCaja, cerrarCaja } from './actions';
+import { abrirCaja, cerrarCaja, type Denominacion } from './actions';
 import {
   Dialog,
   DialogContent,
@@ -532,9 +532,24 @@ export default function CortesPage() {
 
   // ── Abrir Caja dialog state ──────────────────────────────────────────────
   const [abrirOpen, setAbrirOpen] = useState(false);
+  const DENOMINACIONES_DEFAULT: Denominacion[] = [
+    { denominacion: 1000, tipo: 'billete', cantidad: 0 },
+    { denominacion: 500,  tipo: 'billete', cantidad: 0 },
+    { denominacion: 200,  tipo: 'billete', cantidad: 0 },
+    { denominacion: 100,  tipo: 'billete', cantidad: 0 },
+    { denominacion: 50,   tipo: 'billete', cantidad: 0 },
+    { denominacion: 20,   tipo: 'billete', cantidad: 0 },
+    { denominacion: 10,   tipo: 'moneda',  cantidad: 0 },
+    { denominacion: 5,    tipo: 'moneda',  cantidad: 0 },
+    { denominacion: 2,    tipo: 'moneda',  cantidad: 0 },
+    { denominacion: 1,    tipo: 'moneda',  cantidad: 0 },
+    { denominacion: 0.50, tipo: 'moneda',  cantidad: 0 },
+  ];
+
   const [cerrarOpen, setCerrarOpen] = useState(false);
   const [cerrarCorte, setCerrarCorte] = useState<Corte | null>(null);
-  const [cerrarForm, setCerrarForm] = useState({ efectivo_contado: '', observaciones: '' });
+  const [cerrarDenom, setCerrarDenom] = useState<Denominacion[]>(DENOMINACIONES_DEFAULT);
+  const [cerrarObs, setCerrarObs] = useState('');
   const [cerrarError, setCerrarError] = useState<string | null>(null);
   const [cajas, setCajas] = useState<Caja[]>([]);
   const [loadingCajas, setLoadingCajas] = useState(false);
@@ -712,26 +727,27 @@ export default function CortesPage() {
 
   function openCerrarDialog(corte: Corte) {
     setCerrarCorte(corte);
-    setCerrarForm({ efectivo_contado: '', observaciones: '' });
+    setCerrarDenom(DENOMINACIONES_DEFAULT.map(d => ({ ...d, cantidad: 0 })));
+    setCerrarObs('');
     setCerrarError(null);
     setCerrarOpen(true);
     setDrawerOpen(false);
   }
 
+  function updateCantidad(idx: number, val: string) {
+    const n = parseInt(val) || 0;
+    setCerrarDenom(prev => prev.map((d, i) => i === idx ? { ...d, cantidad: Math.max(0, n) } : d));
+  }
+
   function handleCerrarSubmit() {
     if (!cerrarCorte) return;
     setCerrarError(null);
-    const efectivo = parseFloat(cerrarForm.efectivo_contado);
-    if (isNaN(efectivo) || efectivo < 0) {
-      setCerrarError('Ingresa un monto de efectivo contado válido.');
-      return;
-    }
     startTransition(async () => {
       try {
         await cerrarCaja({
           corte_id: cerrarCorte.id,
-          efectivo_contado: efectivo,
-          observaciones: cerrarForm.observaciones.trim() || undefined,
+          denominaciones: cerrarDenom,
+          observaciones: cerrarObs.trim() || undefined,
         });
         setCerrarOpen(false);
         setCerrarCorte(null);
@@ -932,78 +948,142 @@ export default function CortesPage() {
 
       {/* Cerrar Corte dialog */}
       <Dialog open={cerrarOpen} onOpenChange={(v) => { if (!v) setCerrarOpen(false); }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Cerrar Corte</DialogTitle>
+            <DialogTitle>Cerrar Corte — Conteo de Efectivo</DialogTitle>
             <DialogDescription>
-              {cerrarCorte?.corte_nombre ?? 'Corte'} — {cerrarCorte?.caja_nombre}
+              {cerrarCorte?.corte_nombre} · {cerrarCorte?.caja_nombre}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-5 py-4">
-            {/* Totales de referencia */}
-            <div className="grid grid-cols-2 gap-3 text-sm border bg-muted/30 p-3 rounded-lg">
-              <div>
-                <div className="text-xs text-muted-foreground">Efectivo esperado</div>
-                <div className="font-semibold">{formatCurrency(cerrarCorte?.efectivo_esperado)}</div>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground">Total ingresos</div>
-                <div className="font-semibold">{formatCurrency(cerrarCorte?.total_ingresos)}</div>
-              </div>
-            </div>
+          <ScrollArea className="flex-1 pr-2">
+            <div className="space-y-4 py-2">
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Efectivo contado al cierre *
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+              {/* Referencia */}
+              <div className="grid grid-cols-2 gap-3 text-sm border bg-muted/30 p-3 rounded-lg">
+                <div>
+                  <div className="text-xs text-muted-foreground">Efectivo esperado</div>
+                  <div className="font-semibold tabular-nums">{formatCurrency(cerrarCorte?.efectivo_esperado)}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Total sistema</div>
+                  <div className="font-semibold tabular-nums">{formatCurrency(cerrarCorte?.total_ingresos)}</div>
+                </div>
+              </div>
+
+              {/* Billetes */}
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Billetes</div>
+                <div className="space-y-1.5">
+                  {cerrarDenom.filter(d => d.tipo === 'billete').map((d, i) => {
+                    const idx = cerrarDenom.findIndex(x => x.denominacion === d.denominacion);
+                    return (
+                      <div key={d.denominacion} className="flex items-center gap-3">
+                        <div className="w-20 text-sm font-medium tabular-nums text-right">
+                          {formatCurrency(d.denominacion)}
+                        </div>
+                        <span className="text-muted-foreground text-sm">×</span>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={d.cantidad || ''}
+                          onChange={(e) => updateCantidad(idx, e.target.value)}
+                          placeholder="0"
+                          className="w-20 text-center tabular-nums"
+                        />
+                        <span className="text-muted-foreground text-sm">=</span>
+                        <div className="w-24 text-sm tabular-nums text-right font-medium">
+                          {d.cantidad > 0 ? formatCurrency(d.denominacion * d.cantidad) : '—'}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Monedas */}
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Monedas</div>
+                <div className="space-y-1.5">
+                  {cerrarDenom.filter(d => d.tipo === 'moneda').map((d) => {
+                    const idx = cerrarDenom.findIndex(x => x.denominacion === d.denominacion);
+                    return (
+                      <div key={d.denominacion} className="flex items-center gap-3">
+                        <div className="w-20 text-sm font-medium tabular-nums text-right">
+                          {formatCurrency(d.denominacion)}
+                        </div>
+                        <span className="text-muted-foreground text-sm">×</span>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={d.cantidad || ''}
+                          onChange={(e) => updateCantidad(idx, e.target.value)}
+                          placeholder="0"
+                          className="w-20 text-center tabular-nums"
+                        />
+                        <span className="text-muted-foreground text-sm">=</span>
+                        <div className="w-24 text-sm tabular-nums text-right font-medium">
+                          {d.cantidad > 0 ? formatCurrency(d.denominacion * d.cantidad) : '—'}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Total contado */}
+              {(() => {
+                const total = cerrarDenom.reduce((s, d) => s + d.denominacion * d.cantidad, 0);
+                const esperado = cerrarCorte?.efectivo_esperado ?? 0;
+                const diff = total - esperado;
+                return (
+                  <div className="rounded-lg border bg-card p-3 space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="font-medium">Total contado</span>
+                      <span className="font-bold tabular-nums text-base">{formatCurrency(total)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Diferencia vs. esperado</span>
+                      <span className={`font-semibold tabular-nums ${
+                        diff === 0 ? 'text-muted-foreground' :
+                        diff > 0 ? 'text-emerald-600' : 'text-destructive'
+                      }`}>
+                        {diff === 0 ? '—' : formatCurrency(diff)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Observaciones */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Observaciones (opcional)
+                </label>
                 <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={cerrarForm.efectivo_contado}
-                  onChange={(e) => setCerrarForm(f => ({ ...f, efectivo_contado: e.target.value }))}
-                  placeholder="0.00"
-                  className="pl-7 text-lg font-medium"
-                  autoFocus
+                  value={cerrarObs}
+                  onChange={(e) => setCerrarObs(e.target.value)}
+                  placeholder="Ej: Faltante por rollo de monedas..."
                 />
               </div>
-              {cerrarForm.efectivo_contado && !isNaN(parseFloat(cerrarForm.efectivo_contado)) && (
-                <div className="text-xs">
-                  Diferencia: <span className={(
-                    parseFloat(cerrarForm.efectivo_contado) - (cerrarCorte?.efectivo_esperado ?? 0)
-                  ) >= 0 ? 'text-emerald-600 font-medium' : 'text-destructive font-medium'}>
-                    {formatCurrency(parseFloat(cerrarForm.efectivo_contado) - (cerrarCorte?.efectivo_esperado ?? 0))}
-                  </span>
+
+              {cerrarError && (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                  {cerrarError}
                 </div>
               )}
             </div>
+          </ScrollArea>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Observaciones (opcional)
-              </label>
-              <Input
-                value={cerrarForm.observaciones}
-                onChange={(e) => setCerrarForm(f => ({ ...f, observaciones: e.target.value }))}
-                placeholder="Ej: Faltante por rollo de monedas..."
-              />
-            </div>
-
-            {cerrarError && (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                {cerrarError}
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
+          <DialogFooter className="pt-2">
             <Button variant="outline" onClick={() => setCerrarOpen(false)} disabled={isPending}>
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={handleCerrarSubmit} disabled={isPending || !cerrarForm.efectivo_contado}>
+            <Button variant="destructive" onClick={handleCerrarSubmit} disabled={isPending}>
               {isPending ? (
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Cerrando…</>
               ) : (

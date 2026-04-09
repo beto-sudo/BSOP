@@ -60,10 +60,15 @@ export async function abrirCaja(input: AbrirCajaInput): Promise<{ id: string }> 
   return corte as { id: string };
 }
 
+export type Denominacion = {
+  denominacion: number;
+  tipo: 'billete' | 'moneda';
+  cantidad: number;
+};
+
 export type CerrarCajaInput = {
   corte_id: string;
-  efectivo_contado: number;
-  responsable_cierre?: string;
+  denominaciones: Denominacion[];
   observaciones?: string;
 };
 
@@ -75,20 +80,45 @@ export async function cerrarCaja(input: CerrarCajaInput): Promise<void> {
   } = await supabase.auth.getSession();
   if (!session?.user) throw new Error('No autenticado');
 
+  // Calcular total desde denominaciones
+  const efectivo_contado = input.denominaciones.reduce(
+    (sum, d) => sum + d.denominacion * d.cantidad,
+    0
+  );
+
   const now = new Date().toISOString();
 
+  // Actualizar corte
   const { error } = await supabase
     .schema('rdb')
     .from('cortes')
     .update({
       estado: 'cerrado',
       hora_fin: now,
-      efectivo_contado: input.efectivo_contado,
-      responsable_cierre: input.responsable_cierre ?? null,
+      efectivo_contado,
       observaciones: input.observaciones ?? null,
     })
     .eq('id', input.corte_id);
 
   if (error) throw new Error(error.message);
+
+  // Guardar denominaciones (solo las que tienen cantidad > 0)
+  const rows = input.denominaciones
+    .filter((d) => d.cantidad > 0)
+    .map((d) => ({
+      corte_id: input.corte_id,
+      denominacion: d.denominacion,
+      tipo: d.tipo,
+      cantidad: d.cantidad,
+    }));
+
+  if (rows.length > 0) {
+    const { error: denomErr } = await supabase
+      .schema('rdb')
+      .from('corte_conteo_denominaciones')
+      .upsert(rows, { onConflict: 'corte_id,denominacion' });
+    if (denomErr) throw new Error(denomErr.message);
+  }
+
   revalidatePath('/rdb/cortes');
 }
