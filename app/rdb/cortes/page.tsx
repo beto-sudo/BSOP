@@ -277,18 +277,51 @@ function CorteDetail({
             <div><span className="text-gray-500">Responsable:</span> {corte.responsable_apertura ?? '—'}</div>
             <div><span className="text-gray-500">Pedidos:</span> {corte.pedidos_count ?? '—'}</div>
           </div>
-          <table className="w-full border-collapse text-xs mb-4">
+          {/* INGRESOS */}
+          <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1 mt-2">Ingresos</div>
+          <table className="w-full border-collapse text-xs mb-1">
             <tbody>
               <tr className="border-t"><td className="py-0.5 text-gray-500">Efectivo inicial</td><td className="text-right font-medium">{formatCurrency(corte.efectivo_inicial)}</td></tr>
               <tr className="border-t"><td className="py-0.5 text-gray-500">Ingresos efectivo</td><td className="text-right font-medium">{formatCurrency(totales?.ingresos_efectivo)}</td></tr>
-              <tr className="border-t"><td className="py-0.5 text-gray-500">Ingresos tarjeta</td><td className="text-right font-medium">{formatCurrency(totales?.ingresos_tarjeta)}</td></tr>
-              <tr className="border-t"><td className="py-0.5 text-gray-500">Ingresos Stripe</td><td className="text-right font-medium">{formatCurrency(totales?.ingresos_stripe)}</td></tr>
+              {(totales?.ingresos_tarjeta ?? 0) !== 0 && <tr className="border-t"><td className="py-0.5 text-gray-500">Ingresos tarjeta</td><td className="text-right font-medium">{formatCurrency(totales?.ingresos_tarjeta)}</td></tr>}
+              {(totales?.ingresos_stripe ?? 0) !== 0 && <tr className="border-t"><td className="py-0.5 text-gray-500">Ingresos Stripe</td><td className="text-right font-medium">{formatCurrency(totales?.ingresos_stripe)}</td></tr>}
+              {(totales?.ingresos_transferencias ?? 0) !== 0 && <tr className="border-t"><td className="py-0.5 text-gray-500">Transferencias</td><td className="text-right font-medium">{formatCurrency(totales?.ingresos_transferencias)}</td></tr>}
               {(totales?.depositos ?? 0) !== 0 && <tr className="border-t"><td className="py-0.5 text-gray-500">Depósitos</td><td className="text-right font-medium">{formatCurrency(totales?.depositos)}</td></tr>}
-              {(totales?.retiros ?? 0) !== 0 && <tr className="border-t"><td className="py-0.5 text-gray-500">Retiros</td><td className="text-right font-medium">{formatCurrency(totales?.retiros)}</td></tr>}
-              <tr className="border-t font-semibold"><td className="py-0.5">Total ingresos</td><td className="text-right">{formatCurrency(totales?.total_ingresos)}</td></tr>
+              <tr className="border-t border-gray-400 font-semibold"><td className="py-1">Total ingresos</td><td className="text-right">{formatCurrency(totales?.total_ingresos)}</td></tr>
+            </tbody>
+          </table>
+
+          {/* EGRESOS / MOVIMIENTOS DE CAJA */}
+          {movimientos.length > 0 && (
+            <>
+              <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1 mt-3">Egresos / Movimientos de caja</div>
+              <table className="w-full border-collapse text-xs mb-1">
+                <tbody>
+                  {movimientos.map((m) => (
+                    <tr key={m.id} className="border-t">
+                      <td className="py-0.5">
+                        <span className="text-gray-700 capitalize">{m.nota || m.tipo}</span>
+                        <span className="block text-gray-400 text-[10px]">{formatDate(m.fecha_hora)}</span>
+                      </td>
+                      <td className="text-right font-medium text-red-700">{formatCurrency(m.monto)}</td>
+                    </tr>
+                  ))}
+                  <tr className="border-t border-gray-400 font-semibold">
+                    <td className="py-1">Total egresos</td>
+                    <td className="text-right text-red-700">{formatCurrency(movimientos.reduce((s, m) => s + (m.monto ?? 0), 0))}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </>
+          )}
+
+          {/* CIERRE */}
+          <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1 mt-3">Cierre</div>
+          <table className="w-full border-collapse text-xs mb-4">
+            <tbody>
               <tr className="border-t"><td className="py-0.5 text-gray-500">Efectivo esperado</td><td className="text-right font-medium">{formatCurrency(efectivoEsperado)}</td></tr>
               <tr className="border-t"><td className="py-0.5 text-gray-500">Efectivo contado</td><td className="text-right font-medium">{formatCurrency(corte.efectivo_contado)}</td></tr>
-              <tr className="border-t font-semibold"><td className="py-0.5">Diferencia</td><td className={`text-right ${diferencia > 0 ? 'text-green-700' : diferencia < 0 ? 'text-red-700' : ''}`}>{diferencia !== 0 ? formatCurrency(diferencia) : '—'}</td></tr>
+              <tr className="border-t border-gray-400 font-semibold"><td className="py-1">Diferencia</td><td className={`text-right ${diferencia > 0 ? 'text-green-700' : diferencia < 0 ? 'text-red-700' : ''}`}>{diferencia !== 0 ? formatCurrency(diferencia) : '—'}</td></tr>
             </tbody>
           </table>
           <div className="mt-6 pt-4 border-t grid grid-cols-2 gap-8 text-xs">
