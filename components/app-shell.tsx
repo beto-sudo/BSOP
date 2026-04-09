@@ -311,7 +311,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               width={collapsed ? 28 : 115}
               height={collapsed ? 28 : 39}
               className={[
-                'h-auto w-auto object-contain opacity-80',
+                'h-auto w-auto object-contain',
                 collapsed ? 'max-h-6 max-w-6' : 'max-h-[1.6rem] max-w-[101px]',
               ].join(' ')}
               priority
