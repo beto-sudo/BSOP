@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import { abrirCaja } from './actions';
+import { abrirCaja, cerrarCaja } from './actions';
 import {
   Dialog,
   DialogContent,
@@ -39,7 +39,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
-import { CalendarDays, RefreshCw, Scissors, TrendingUp, Wallet, PlusCircle, Loader2 } from 'lucide-react';
+import { CalendarDays, RefreshCw, Scissors, TrendingUp, Wallet, PlusCircle, Loader2, Printer, XCircle } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -237,6 +237,7 @@ function CorteDetail({
   loadingDetail,
   open,
   onClose,
+  onCerrar,
 }: {
   corte: Corte | null;
   totales: CorteTotales | null;
@@ -244,22 +245,78 @@ function CorteDetail({
   loadingDetail: boolean;
   open: boolean;
   onClose: () => void;
+  onCerrar: (corte: Corte) => void;
 }) {
   if (!corte) return null;
+  const estaAbierto = corte.estado?.toLowerCase() === 'abierto';
+  const efectivoEsperado = totales?.efectivo_esperado ?? corte.efectivo_esperado ?? 0;
+  const efectivoContado = corte.efectivo_contado ?? 0;
+  const diferencia = efectivoContado - efectivoEsperado;
 
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <SheetContent className="sm:max-w-[600px]">
-        {/* Membrete solo para impresión */}
-        <img src="/membrete-rdb.jpg" alt="Membrete Rincón del Bosque" className="hidden print:block w-full object-contain mb-6" />
-        <SheetHeader>
+
+        {/* ── MARBETE DE IMPRESIÓN ──────────────────────────── */}
+        <div className="hidden print:block mb-6 text-sm">
+          <div className="flex items-start justify-between border-b pb-3 mb-4">
+            <div>
+              <div className="text-lg font-bold">Rincón del Bosque</div>
+              <div className="text-xs text-gray-500">Corte de Caja</div>
+            </div>
+            <div className="text-right">
+              <div className="text-base font-semibold">{corte.corte_nombre ?? corte.id}</div>
+              <div className="text-xs text-gray-500">{formatDateTime(corte.hora_inicio)}</div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1 mb-4">
+            <div><span className="text-gray-500">Caja:</span> <strong>{corte.caja_nombre}</strong></div>
+            <div><span className="text-gray-500">Estado:</span> <strong>{corte.estado}</strong></div>
+            <div><span className="text-gray-500">Apertura:</span> {formatDateTime(corte.hora_inicio)}</div>
+            <div><span className="text-gray-500">Cierre:</span> {formatDateTime(corte.hora_fin)}</div>
+            <div><span className="text-gray-500">Responsable:</span> {corte.responsable_apertura ?? '—'}</div>
+            <div><span className="text-gray-500">Pedidos:</span> {corte.pedidos_count ?? '—'}</div>
+          </div>
+          <table className="w-full border-collapse text-xs mb-4">
+            <tbody>
+              <tr className="border-t"><td className="py-0.5 text-gray-500">Efectivo inicial</td><td className="text-right font-medium">{formatCurrency(corte.efectivo_inicial)}</td></tr>
+              <tr className="border-t"><td className="py-0.5 text-gray-500">Ingresos efectivo</td><td className="text-right font-medium">{formatCurrency(totales?.ingresos_efectivo)}</td></tr>
+              <tr className="border-t"><td className="py-0.5 text-gray-500">Ingresos tarjeta</td><td className="text-right font-medium">{formatCurrency(totales?.ingresos_tarjeta)}</td></tr>
+              <tr className="border-t"><td className="py-0.5 text-gray-500">Ingresos Stripe</td><td className="text-right font-medium">{formatCurrency(totales?.ingresos_stripe)}</td></tr>
+              {(totales?.depositos ?? 0) !== 0 && <tr className="border-t"><td className="py-0.5 text-gray-500">Depósitos</td><td className="text-right font-medium">{formatCurrency(totales?.depositos)}</td></tr>}
+              {(totales?.retiros ?? 0) !== 0 && <tr className="border-t"><td className="py-0.5 text-gray-500">Retiros</td><td className="text-right font-medium">{formatCurrency(totales?.retiros)}</td></tr>}
+              <tr className="border-t font-semibold"><td className="py-0.5">Total ingresos</td><td className="text-right">{formatCurrency(totales?.total_ingresos)}</td></tr>
+              <tr className="border-t"><td className="py-0.5 text-gray-500">Efectivo esperado</td><td className="text-right font-medium">{formatCurrency(efectivoEsperado)}</td></tr>
+              <tr className="border-t"><td className="py-0.5 text-gray-500">Efectivo contado</td><td className="text-right font-medium">{formatCurrency(corte.efectivo_contado)}</td></tr>
+              <tr className="border-t font-semibold"><td className="py-0.5">Diferencia</td><td className={`text-right ${diferencia > 0 ? 'text-green-700' : diferencia < 0 ? 'text-red-700' : ''}`}>{diferencia !== 0 ? formatCurrency(diferencia) : '—'}</td></tr>
+            </tbody>
+          </table>
+          <div className="mt-6 pt-4 border-t grid grid-cols-2 gap-8 text-xs">
+            <div><div className="border-t border-gray-400 mt-8 pt-1 text-center text-gray-500">Responsable de apertura</div></div>
+            <div><div className="border-t border-gray-400 mt-8 pt-1 text-center text-gray-500">Responsable de cierre</div></div>
+          </div>
+        </div>
+
+        {/* ── HEADER (pantalla) ──────────────────────────────── */}
+        <SheetHeader className="print:hidden">
           <SheetTitle>{corte.corte_nombre ?? `Corte ${corte.id}`}</SheetTitle>
           <SheetDescription>
             {corte.caja_nombre ?? '—'} · {formatDateTime(corte.hora_inicio)} a {formatDateTime(corte.hora_fin)}
           </SheetDescription>
-          <div className="absolute right-12 top-4 hidden sm:flex print:hidden">
+          <div className="absolute right-12 top-4 flex gap-2 print:hidden">
+            {estaAbierto && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => onCerrar(corte)}
+              >
+                <XCircle className="mr-1.5 h-3.5 w-3.5" />
+                Cerrar Corte
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => window.print()}>
-              Imprimir
+              <Printer className="mr-1.5 h-3.5 w-3.5" />
+              Marbete
             </Button>
           </div>
         </SheetHeader>
@@ -475,6 +532,10 @@ export default function CortesPage() {
 
   // ── Abrir Caja dialog state ──────────────────────────────────────────────
   const [abrirOpen, setAbrirOpen] = useState(false);
+  const [cerrarOpen, setCerrarOpen] = useState(false);
+  const [cerrarCorte, setCerrarCorte] = useState<Corte | null>(null);
+  const [cerrarForm, setCerrarForm] = useState({ efectivo_contado: '', observaciones: '' });
+  const [cerrarError, setCerrarError] = useState<string | null>(null);
   const [cajas, setCajas] = useState<Caja[]>([]);
   const [loadingCajas, setLoadingCajas] = useState(false);
   const [abrirForm, setAbrirForm] = useState({
@@ -645,6 +706,38 @@ export default function CortesPage() {
         void fetchCortes();
       } catch (err) {
         setAbrirError(err instanceof Error ? err.message : 'Error al abrir la caja');
+      }
+    });
+  }
+
+  function openCerrarDialog(corte: Corte) {
+    setCerrarCorte(corte);
+    setCerrarForm({ efectivo_contado: '', observaciones: '' });
+    setCerrarError(null);
+    setCerrarOpen(true);
+    setDrawerOpen(false);
+  }
+
+  function handleCerrarSubmit() {
+    if (!cerrarCorte) return;
+    setCerrarError(null);
+    const efectivo = parseFloat(cerrarForm.efectivo_contado);
+    if (isNaN(efectivo) || efectivo < 0) {
+      setCerrarError('Ingresa un monto de efectivo contado válido.');
+      return;
+    }
+    startTransition(async () => {
+      try {
+        await cerrarCaja({
+          corte_id: cerrarCorte.id,
+          efectivo_contado: efectivo,
+          observaciones: cerrarForm.observaciones.trim() || undefined,
+        });
+        setCerrarOpen(false);
+        setCerrarCorte(null);
+        void fetchCortes();
+      } catch (err) {
+        setCerrarError(err instanceof Error ? err.message : 'Error al cerrar el corte');
       }
     });
   }
@@ -834,7 +927,92 @@ export default function CortesPage() {
         loadingDetail={loadingDetail}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
+        onCerrar={openCerrarDialog}
       />
+
+      {/* Cerrar Corte dialog */}
+      <Dialog open={cerrarOpen} onOpenChange={(v) => { if (!v) setCerrarOpen(false); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cerrar Corte</DialogTitle>
+            <DialogDescription>
+              {cerrarCorte?.corte_nombre ?? 'Corte'} — {cerrarCorte?.caja_nombre}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 py-4">
+            {/* Totales de referencia */}
+            <div className="grid grid-cols-2 gap-3 text-sm border bg-muted/30 p-3 rounded-lg">
+              <div>
+                <div className="text-xs text-muted-foreground">Efectivo esperado</div>
+                <div className="font-semibold">{formatCurrency(cerrarCorte?.efectivo_esperado)}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Total ingresos</div>
+                <div className="font-semibold">{formatCurrency(cerrarCorte?.total_ingresos)}</div>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Efectivo contado al cierre *
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={cerrarForm.efectivo_contado}
+                  onChange={(e) => setCerrarForm(f => ({ ...f, efectivo_contado: e.target.value }))}
+                  placeholder="0.00"
+                  className="pl-7 text-lg font-medium"
+                  autoFocus
+                />
+              </div>
+              {cerrarForm.efectivo_contado && !isNaN(parseFloat(cerrarForm.efectivo_contado)) && (
+                <div className="text-xs">
+                  Diferencia: <span className={(
+                    parseFloat(cerrarForm.efectivo_contado) - (cerrarCorte?.efectivo_esperado ?? 0)
+                  ) >= 0 ? 'text-emerald-600 font-medium' : 'text-destructive font-medium'}>
+                    {formatCurrency(parseFloat(cerrarForm.efectivo_contado) - (cerrarCorte?.efectivo_esperado ?? 0))}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Observaciones (opcional)
+              </label>
+              <Input
+                value={cerrarForm.observaciones}
+                onChange={(e) => setCerrarForm(f => ({ ...f, observaciones: e.target.value }))}
+                placeholder="Ej: Faltante por rollo de monedas..."
+              />
+            </div>
+
+            {cerrarError && (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                {cerrarError}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCerrarOpen(false)} disabled={isPending}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleCerrarSubmit} disabled={isPending || !cerrarForm.efectivo_contado}>
+              {isPending ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Cerrando…</>
+              ) : (
+                <><XCircle className="mr-2 h-4 w-4" />Confirmar cierre</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Abrir Caja dialog */}
       <Dialog open={abrirOpen} onOpenChange={(v) => { if (!v) setAbrirOpen(false); }}>

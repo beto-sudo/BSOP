@@ -59,3 +59,36 @@ export async function abrirCaja(input: AbrirCajaInput): Promise<{ id: string }> 
   revalidatePath('/rdb/cortes');
   return corte as { id: string };
 }
+
+export type CerrarCajaInput = {
+  corte_id: string;
+  efectivo_contado: number;
+  responsable_cierre?: string;
+  observaciones?: string;
+};
+
+export async function cerrarCaja(input: CerrarCajaInput): Promise<void> {
+  const supabase = await createSupabaseServerClient();
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error('No autenticado');
+
+  const now = new Date().toISOString();
+
+  const { error } = await supabase
+    .schema('rdb')
+    .from('cortes')
+    .update({
+      estado: 'cerrado',
+      hora_fin: now,
+      efectivo_contado: input.efectivo_contado,
+      responsable_cierre: input.responsable_cierre ?? null,
+      observaciones: input.observaciones ?? null,
+    })
+    .eq('id', input.corte_id);
+
+  if (error) throw new Error(error.message);
+  revalidatePath('/rdb/cortes');
+}
