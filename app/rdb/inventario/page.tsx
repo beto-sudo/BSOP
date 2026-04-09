@@ -664,13 +664,16 @@ export default function InventarioPage() {
     : null;
 
   const handlePrintLista = (stock: StockItem[]) => {
-    const totalValor = stock.reduce((s, i) => s + (Number(i.valor_inventario) || 0), 0);
+    const totalValor = stock.reduce((s, i) => s + Math.max(0, Number(i.valor_inventario) || 0), 0);
     const fecha = fechaLabel ?? new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
+
+    // Solo productos con stock >= 0 (excluir negativos del impreso)
+    const stockPositivo = stock.filter(i => Number(i.stock_actual) >= 0);
 
     // Agrupar por categoría para el resumen final
     const catOrder = ['Licores','Bebidas','Alimentos','Consumibles','Artículos','Deportes','Propinas'];
     const catMap: Record<string, { count: number; valor: number }> = {};
-    for (const item of stock) {
+    for (const item of stockPositivo) {
       const cat = item.categoria ?? 'Sin categoría';
       if (!catMap[cat]) catMap[cat] = { count: 0, valor: 0 };
       catMap[cat].count++;
@@ -689,7 +692,7 @@ export default function InventarioPage() {
       </tr>
     `).join('');
 
-    const rows = stock.map((item) => {
+    const rows = stockPositivo.map((item) => {
       const sinStock = item.stock_actual <= 0;
       const bajoMin = item.bajo_minimo;
       const estadoText = sinStock ? 'Sin stock' : bajoMin ? 'Bajo mínimo' : '✓';
@@ -762,7 +765,7 @@ export default function InventarioPage() {
   </div>
   <div class="doc-meta">
     <span>${fechaCorte ? `Inventario al Corte: <strong>${fecha}</strong>` : `Inventario de Stock &mdash; <strong>${fecha}</strong>`}</span>
-    <span>${stock.length} productos registrados</span>
+    <span>${stockPositivo.length} productos registrados</span>
   </div>
 
   <!-- Tabla de inventario -->
