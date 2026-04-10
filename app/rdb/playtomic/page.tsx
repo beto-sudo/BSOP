@@ -91,16 +91,6 @@ type SyncRow = {
   error_message: string | null;
 };
 
-type RevenueDay = {
-  fecha: string;
-  label: string;
-  padel: number;
-  tennis: number;
-  total: number;
-  reservas: number;
-  cancelaciones: number;
-};
-
 type DashboardData = {
   bookings: Booking[];
   participants: BookingParticipant[];
@@ -196,13 +186,6 @@ function formatDateTime(value: string | null | undefined) {
   return DATE_TIME_FMT.format(date);
 }
 
-function formatDateOnly(value: string | null | undefined) {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return DATE_FMT.format(date);
-}
-
 function normalizeSport(value: string | number | null | undefined) {
   if (value == null) return 'OTRO';
   const raw = String(value).trim().toUpperCase();
@@ -227,6 +210,105 @@ function buildDateLabels(from: Date, to: Date) {
     cursor.setDate(cursor.getDate() + 1);
   }
   return labels;
+}
+
+type ChartBucket = {
+  key: string;
+  label: string;
+  padel: number;
+  tennis: number;
+  total: number;
+  reservas: number;
+  cancelaciones: number;
+};
+
+const WEEK_FMT = new Intl.DateTimeFormat('es-MX', { timeZone: TZ, day: '2-digit', month: 'short' });
+const MONTH_FMT = new Intl.DateTimeFormat('es-MX', { timeZone: TZ, month: 'short', year: '2-digit' });
+
+function isoWeekKey(dateStr: string) {
+  const d = new Date(`${dateStr}T12:00:00`);
+  const day = d.getDay();
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - ((day + 6) % 7));
+  return isoDateLocal(monday);
+}
+
+function bucketRevenue(revenueRows: RevenueRow[], from: Date, to: Date, mode: 'day' | 'week' | 'month'): ChartBucket[] {
+  if (mode === 'day') {
+    const dateLabels = buildDateLabels(from, to);
+    const map = new Map<string, ChartBucket>();
+    dateLabels.forEach((date) => {
+      map.set(date, {
+        key: date,
+        label: DAY_FMT.format(new Date(`${date}T12:00:00`)),
+        padel: 0, tennis: 0, total: 0, reservas: 0, cancelaciones: 0,
+      });
+    });
+    revenueRows.forEach((row) => {
+      const bucket = map.get(row.fecha);
+      if (!bucket) return;
+      const sport = normalizeSport(row.sport_id);
+      const revenue = row.revenue ?? 0;
+      if (sport === 'PADEL') bucket.padel += revenue;
+      else if (sport === 'TENNIS') bucket.tennis += revenue;
+      bucket.total += revenue;
+      bucket.reservas += row.reservas ?? 0;
+      bucket.cancelaciones += row.cancelaciones ?? 0;
+    });
+    return Array.from(map.values());
+  }
+
+  if (mode === 'week') {
+    const map = new Map<string, ChartBucket>();
+    revenueRows.forEach((row) => {
+      const wk = isoWeekKey(row.fecha);
+      if (!map.has(wk)) {
+        map.set(wk, {
+          key: wk,
+          label: WEEK_FMT.format(new Date(`${wk}T12:00:00`)),
+          padel: 0, tennis: 0, total: 0, reservas: 0, cancelaciones: 0,
+        });
+      }
+      const bucket = map.get(wk)!;
+      const sport = normalizeSport(row.sport_id);
+      const revenue = row.revenue ?? 0;
+      if (sport === 'PADEL') bucket.padel += revenue;
+      else if (sport === 'TENNIS') bucket.tennis += revenue;
+      bucket.total += revenue;
+      bucket.reservas += row.reservas ?? 0;
+      bucket.cancelaciones += row.cancelaciones ?? 0;
+    });
+    return Array.from(map.values()).sort((a, b) => a.key.localeCompare(b.key));
+  }
+
+  // month
+  const map = new Map<string, ChartBucket>();
+  revenueRows.forEach((row) => {
+    const mk = row.fecha.substring(0, 7); // YYYY-MM
+    if (!map.has(mk)) {
+      map.set(mk, {
+        key: mk,
+        label: MONTH_FMT.format(new Date(`${mk}-15T12:00:00`)),
+        padel: 0, tennis: 0, total: 0, reservas: 0, cancelaciones: 0,
+      });
+    }
+    const bucket = map.get(mk)!;
+    const sport = normalizeSport(row.sport_id);
+    const revenue = row.revenue ?? 0;
+    if (sport === 'PADEL') bucket.padel += revenue;
+    else if (sport === 'TENNIS') bucket.tennis += revenue;
+    bucket.total += revenue;
+    bucket.reservas += row.reservas ?? 0;
+    bucket.cancelaciones += row.cancelaciones ?? 0;
+  });
+  return Array.from(map.values()).sort((a, b) => a.key.localeCompare(b.key));
+}
+
+function pickBucketMode(range: RangeKey): 'day' | 'week' | 'month' {
+  if (range === '7d' || range === 'month') return 'day';
+  if (range === '30d') return 'day';
+  if (range === 'year') return 'week';
+  return 'month'; // 'all'
 }
 
 function chunkArray<T>(items: T[], chunkSize: number) {
@@ -260,7 +342,7 @@ function KpiCard({ label, value, hint, icon }: { label: string; value: string; h
   );
 }
 
-function RevenueChart({ data }: { data: RevenueDay[] }) {
+function RevenueChart({ data }: { data: ChartBucket[] }) {
   const width = 920;
   const chartHeight = 280;
   const barWidth = Math.max(8, Math.min(28, width / Math.max(data.length, 1) - 4));
@@ -286,7 +368,7 @@ function RevenueChart({ data }: { data: RevenueDay[] }) {
             const totalHeight = padelHeight + tennisHeight;
             const yTop = chartHeight - totalHeight;
             return (
-              <g key={item.fecha}>
+              <g key={item.key}>
                 <rect x={x} y={chartHeight - padelHeight} width={barWidth} height={padelHeight} rx={Math.min(6, barWidth / 2)} fill="#10b981" />
                 <rect x={x} y={yTop} width={barWidth} height={tennisHeight} rx={Math.min(6, barWidth / 2)} fill="#0ea5e9" />
                 {(index === 0 || index === data.length - 1 || index % Math.ceil(data.length / 6) === 0) ? (
@@ -521,40 +603,16 @@ export default function PlaytomicPage() {
     void fetchData();
   }, [fetchData]);
 
-  const revenueSeries = useMemo<RevenueDay[]>(() => {
-    const dateLabels = buildDateLabels(meta.from, meta.to);
-    const map = new Map<string, RevenueDay>();
-
-    dateLabels.forEach((date) => {
-      map.set(date, {
-        fecha: date,
-        label: DAY_FMT.format(new Date(`${date}T12:00:00`)),
-        padel: 0,
-        tennis: 0,
-        total: 0,
-        reservas: 0,
-        cancelaciones: 0,
-      });
-    });
-
-    data.revenue.forEach((row) => {
-      const day = map.get(row.fecha);
-      if (!day) return;
-      const sport = normalizeSport(row.sport_id);
-      const revenue = row.revenue ?? 0;
-      if (sport === 'PADEL') day.padel += revenue;
-      else if (sport === 'TENNIS') day.tennis += revenue;
-      day.total += revenue;
-      day.reservas += row.reservas ?? 0;
-      day.cancelaciones += row.cancelaciones ?? 0;
-    });
-
-    return Array.from(map.values());
-  }, [data.revenue, meta.from, meta.to]);
+  const revenueSeries = useMemo<ChartBucket[]>(() => {
+    const mode = pickBucketMode(range);
+    return bucketRevenue(data.revenue, meta.from, meta.to, mode);
+  }, [data.revenue, meta.from, meta.to, range]);
 
   const kpis = useMemo(() => {
     const totalBookings = data.bookings.length;
-    const revenueTotal = data.bookings.reduce((acc, booking) => acc + (booking.price_amount ?? 0), 0);
+    const revenueTotal = data.bookings
+      .filter((booking) => !booking.is_canceled && !(booking.status ?? '').toLowerCase().includes('cancel'))
+      .reduce((acc, booking) => acc + (booking.price_amount ?? 0), 0);
     const canceledCount = data.bookings.filter((booking) => booking.is_canceled || (booking.status ?? '').toLowerCase().includes('cancel')).length;
     const cancellationRate = totalBookings ? (canceledCount / totalBookings) * 100 : 0;
     const avgBookingValue = totalBookings ? revenueTotal / totalBookings : 0;
@@ -877,44 +935,7 @@ export default function PlaytomicPage() {
             </div>
           </section>
 
-          <section className="space-y-4 rounded-3xl border border-[var(--border)] bg-[var(--card)] p-4 sm:p-5">
-            <div>
-              <h2 className="text-lg font-semibold text-[var(--text)]">Canchas</h2>
-              <p className="text-sm text-[var(--text)]/55">Inventario actual de recursos detectados por Playtomic.</p>
-            </div>
-            <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Cancha</TableHead>
-                    <TableHead>Deporte</TableHead>
-                    <TableHead>Estatus</TableHead>
-                    <TableHead>Primera vez vista</TableHead>
-                    <TableHead>Última vez vista</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.resources.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="py-10 text-center text-[var(--text)]/50">No hay recursos disponibles.</TableCell>
-                    </TableRow>
-                  ) : (
-                    data.resources.map((resource) => (
-                      <TableRow key={resource.resource_id}>
-                        <TableCell className="font-medium text-[var(--text)]">{resource.resource_name ?? 'Sin nombre'}</TableCell>
-                        <TableCell>{normalizeSport(resource.sport_id)}</TableCell>
-                        <TableCell>
-                          <Badge variant={resource.active ? 'default' : 'outline'}>{resource.active ? 'Activa' : 'Inactiva'}</Badge>
-                        </TableCell>
-                        <TableCell>{formatDateOnly(resource.first_seen_at)}</TableCell>
-                        <TableCell>{formatDateOnly(resource.last_seen_at)}</TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </section>
+
         </>
       )}
     </div>
