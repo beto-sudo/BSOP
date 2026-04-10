@@ -338,10 +338,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <div key={item.href} className="group/item relative">
                 <Link
                   href={item.href}
-                  onClick={() => {
+                  onClick={(e) => {
                     if (collapsed) setCollapsed(false);
                     if (hasChildren) {
+                      e.preventDefault();
                       setExpandedSection(expanded && !collapsed ? null : item.href);
+                      router.push(item.href);
                     } else {
                       setExpandedSection(null);
                     }
