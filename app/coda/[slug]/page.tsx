@@ -28,15 +28,15 @@ export default async function CodaDocumentPage({ params }: { params: Promise<{ s
 
       <div className="mb-8 flex flex-col gap-4 rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <div className="text-xs uppercase tracking-[0.24em] text-white/40">Latest audit</div>
-          <div className="mt-2 text-lg font-semibold text-white">{formatAuditTimestamp(document.lastAudit)}</div>
-          <div className="mt-2 text-sm text-white/55">Doc ID {document.docId}</div>
+          <div className="text-xs uppercase tracking-[0.24em] text-[var(--text)]/40">Latest audit</div>
+          <div className="mt-2 text-lg font-semibold text-[var(--text)]">{formatAuditTimestamp(document.lastAudit)}</div>
+          <div className="mt-2 text-sm text-[var(--muted-foreground)]">Doc ID {document.docId}</div>
         </div>
         <Link
           href={`https://coda.io/d/_d${document.docId}`}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-2 rounded-2xl border border-[var(--accent)]/35 bg-[var(--accent)]/12 px-4 py-3 text-sm font-medium text-[var(--accent-soft)] transition hover:border-[var(--accent)] hover:text-white"
+          className="inline-flex items-center gap-2 rounded-2xl border border-[var(--accent)]/35 bg-[var(--accent)]/12 px-4 py-3 text-sm font-medium text-[var(--accent-soft)] transition hover:border-[var(--accent)] hover:text-[var(--text)]"
         >
           Open in Coda
           <ArrowUpRight className="h-4 w-4" />
@@ -54,11 +54,11 @@ export default async function CodaDocumentPage({ params }: { params: Promise<{ s
         ].map((item) => (
           <Surface key={item.label} className="p-5">
             <item.icon className="h-5 w-5 text-amber-300" />
-            <div className="mt-4 text-xs uppercase tracking-[0.24em] text-white/40">{item.label}</div>
-            <div className="mt-2 text-3xl font-semibold" style={item.color ? { color: item.color } : undefined}>
+            <div className="mt-4 text-xs uppercase tracking-[0.24em] text-[var(--text)]/40">{item.label}</div>
+            <div className="mt-2 text-3xl font-semibold" style={item.color ? { color: item.color } : { color: 'var(--text)' }}>
               {item.value}
             </div>
-            <div className="mt-2 text-sm text-white/55">{item.sub}</div>
+            <div className="mt-2 text-sm text-[var(--muted-foreground)]">{item.sub}</div>
           </Surface>
         ))}
       </section>
@@ -67,14 +67,14 @@ export default async function CodaDocumentPage({ params }: { params: Promise<{ s
         <Surface className="overflow-hidden p-6">
           <div className="mb-4 flex items-center justify-between gap-4">
             <div>
-              <h2 className="text-xl font-semibold text-white">Top risk tables</h2>
-              <p className="mt-1 text-sm text-white/55">Highest-scoring health risks in the latest audit snapshot.</p>
+              <h2 className="text-xl font-semibold text-[var(--text)]">Top risk tables</h2>
+              <p className="mt-1 text-sm text-[var(--muted-foreground)]">Highest-scoring health risks in the latest audit snapshot.</p>
             </div>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
-              <thead className="text-white/45">
-                <tr className="border-b border-white/8">
+              <thead className="text-[var(--text)]/45">
+                <tr className="border-b border-[var(--border)]">
                   <th className="pb-3 pr-4 font-medium">Table</th>
                   <th className="pb-3 pr-4 font-medium">Columns</th>
                   <th className="pb-3 pr-4 font-medium">Health</th>
@@ -83,9 +83,9 @@ export default async function CodaDocumentPage({ params }: { params: Promise<{ s
               </thead>
               <tbody>
                 {document.topRiskTables.map((table) => (
-                  <tr key={table.name} className="border-b border-white/6 align-top text-white/78 last:border-0">
-                    <td className="py-4 pr-4 font-medium text-white">{table.name}</td>
-                    <td className="py-4 pr-4 text-white/65">{formatInt(table.columnCount)}</td>
+                  <tr key={table.name} className="border-b border-[var(--border)] align-top text-[var(--text)]/78 last:border-0">
+                    <td className="py-4 pr-4 font-medium text-[var(--text)]">{table.name}</td>
+                    <td className="py-4 pr-4 text-[var(--text)]/65">{formatInt(table.columnCount)}</td>
                     <td className="py-4 pr-4 font-semibold" style={{ color: getHealthColor(table.healthScore) }}>
                       {table.healthScore}
                     </td>
@@ -93,12 +93,12 @@ export default async function CodaDocumentPage({ params }: { params: Promise<{ s
                       <div className="flex flex-wrap gap-2">
                         {table.findings.length ? (
                           table.findings.map((finding) => (
-                            <span key={finding} className="rounded-full border border-white/8 bg-white/4 px-3 py-1 text-xs text-white/72">
+                            <span key={finding} className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-1 text-xs text-[var(--text)]/72">
                               {finding}
                             </span>
                           ))
                         ) : (
-                          <span className="text-white/40">No flagged findings</span>
+                          <span className="text-[var(--text)]/40">No flagged findings</span>
                         )}
                       </div>
                     </td>
@@ -110,18 +110,18 @@ export default async function CodaDocumentPage({ params }: { params: Promise<{ s
         </Surface>
 
         <Surface className="p-6">
-          <h2 className="text-xl font-semibold text-white">God tables</h2>
-          <p className="mt-1 text-sm text-white/55">Top 10 oversized tables by column count.</p>
+          <h2 className="text-xl font-semibold text-[var(--text)]">God tables</h2>
+          <p className="mt-1 text-sm text-[var(--muted-foreground)]">Top 10 oversized tables by column count.</p>
           <div className="mt-5 space-y-3">
             {document.godTablesList.map((table, index) => (
-              <div key={table.name} className="flex items-center justify-between rounded-2xl border border-white/8 bg-white/4 px-4 py-3">
+              <div key={table.name} className="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3">
                 <div>
-                  <div className="text-xs uppercase tracking-[0.18em] text-white/35">#{index + 1}</div>
-                  <div className="mt-1 text-sm font-medium text-white">{table.name}</div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-[var(--text)]/35">#{index + 1}</div>
+                  <div className="mt-1 text-sm font-medium text-[var(--text)]">{table.name}</div>
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-semibold text-amber-300">{formatInt(table.columnCount)}</div>
-                  <div className="text-xs uppercase tracking-[0.18em] text-white/35">Columns</div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-[var(--text)]/35">Columns</div>
                 </div>
               </div>
             ))}
@@ -131,16 +131,16 @@ export default async function CodaDocumentPage({ params }: { params: Promise<{ s
 
       <section className="mt-10">
         <div className="mb-5">
-          <h2 className="text-2xl font-semibold text-white">Modules</h2>
-          <p className="mt-2 text-sm text-white/55">Functional clusters inferred from the audit’s structure analysis.</p>
+          <h2 className="text-2xl font-semibold text-[var(--text)]">Modules</h2>
+          <p className="mt-2 text-sm text-[var(--muted-foreground)]">Functional clusters inferred from the audit’s structure analysis.</p>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {document.modules.map((module) => (
             <Surface key={module.name} className="p-5">
-              <div className="text-xs uppercase tracking-[0.22em] text-white/35">Module</div>
-              <div className="mt-2 text-lg font-semibold text-white">{module.name}</div>
+              <div className="text-xs uppercase tracking-[0.22em] text-[var(--text)]/35">Module</div>
+              <div className="mt-2 text-lg font-semibold text-[var(--text)]">{module.name}</div>
               <div className="mt-4 text-3xl font-semibold text-amber-300">{formatInt(module.tableCount)}</div>
-              <div className="mt-1 text-sm text-white/55">tables classified</div>
+              <div className="mt-1 text-sm text-[var(--muted-foreground)]">tables classified</div>
             </Surface>
           ))}
         </div>

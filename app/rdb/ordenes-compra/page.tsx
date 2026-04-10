@@ -30,12 +30,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { CalendarDays, PackagePlus, RefreshCw, Search, Truck } from 'lucide-react';
+import { AlertTriangle, CalendarDays, RefreshCw, Search, Send, Truck } from 'lucide-react';
 
-type EstatusOc = 'Enviada' | 'Parcial' | 'Recibida' | 'Cancelada' | string;
+// ── Types ────────────────────────────────────────────────────────────────────
 
 type Proveedor = {
+  id: string;
   nombre: string | null;
+  contacto?: string | null;
+  email?: string | null;
+  telefono?: string | null;
+  rfc?: string | null;
+  direccion?: string | null;
 };
 
 type OrdenCompraItem = {
@@ -50,23 +56,30 @@ type OrdenCompraItem = {
 type OrdenCompra = {
   id: string;
   folio: string | null;
+  requisicion_id: string | null;
   proveedor_id: string | null;
-  estatus: EstatusOc | null;
+  estatus: string | null;
   total_estimado: number | null;
   total_real: number | null;
   fecha_emision: string | null;
+  notas: string | null;
   proveedor?: Proveedor | Proveedor[] | null;
+  requisicion?: { folio: string | null } | { folio: string | null }[] | null;
   items?: OrdenCompraItem[];
 };
 
 const TZ = 'America/Matamoros';
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function formatDate(ts: string | null | undefined) {
   if (!ts) return '—';
-  return new Intl.DateTimeFormat('es-MX', {
-    timeZone: TZ,
-    dateStyle: 'short',
-  }).format(new Date(ts));
+  return new Intl.DateTimeFormat('es-MX', { timeZone: TZ, dateStyle: 'medium' }).format(new Date(ts));
+}
+
+function formatDateLong(ts: string | null | undefined) {
+  if (!ts) return '—';
+  return new Intl.DateTimeFormat('es-MX', { timeZone: TZ, dateStyle: 'long' }).format(new Date(ts));
 }
 
 function formatCurrency(amount: number | null | undefined) {
@@ -74,39 +87,66 @@ function formatCurrency(amount: number | null | undefined) {
   return amount.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
 }
 
-function todayRange() {
-  const now = new Date();
+function monthRange() {
+  const today = new Date();
   const formatter = new Intl.DateTimeFormat('sv-SE', { timeZone: TZ });
-  const today = formatter.format(now);
-  return { from: today, to: today };
+  const d = new Date(today.toLocaleString('en-US', { timeZone: TZ }));
+  const first = new Date(d.getFullYear(), d.getMonth(), 1);
+  return { from: formatter.format(first), to: formatter.format(today) };
+}
+
+function getProveedorObj(proveedor: OrdenCompra['proveedor']): Proveedor | null {
+  if (Array.isArray(proveedor)) return proveedor[0] ?? null;
+  return proveedor ?? null;
 }
 
 function getProveedorNombre(proveedor: OrdenCompra['proveedor']) {
-  if (Array.isArray(proveedor)) return proveedor[0]?.nombre ?? 'Proveedor no asignado';
-  return proveedor?.nombre ?? 'Proveedor no asignado';
+  return getProveedorObj(proveedor)?.nombre ?? null;
 }
 
-function getBadgeVariant(estatus: EstatusOc | null): 'default' | 'secondary' | 'destructive' | 'outline' {
-  switch ((estatus ?? '').toLowerCase()) {
-    case 'recibida':
-      return 'default';
-    case 'enviada':
-      return 'secondary';
-    case 'cancelada':
-      return 'destructive';
-    case 'parcial':
-    default:
-      return 'outline';
-  }
+function getRequisicionFolio(req: OrdenCompra['requisicion']) {
+  if (Array.isArray(req)) return req[0]?.folio ?? null;
+  return (req as { folio: string | null } | null)?.folio ?? null;
 }
+
+function getEstatusLabel(estatus: string | null, proveedorId: string | null) {
+  const s = (estatus ?? '').toLowerCase();
+  if (s === 'abierta') return proveedorId ? 'Lista' : 'Sin proveedor';
+  if (s === 'enviada') return 'Enviada';
+  if (s === 'parcial') return 'Recepción parcial';
+  if (s === 'recibida') return 'Recibida';
+  if (s === 'cancelada') return 'Cancelada';
+  return estatus ?? 'Sin estatus';
+}
+
+function getBadgeVariant(
+  estatus: string | null,
+  proveedorId: string | null,
+): 'default' | 'secondary' | 'destructive' | 'outline' {
+  const s = (estatus ?? '').toLowerCase();
+  if (s === 'recibida') return 'default';
+  if (s === 'enviada') return 'secondary';
+  if (s === 'cancelada') return 'destructive';
+  if (s === 'abierta') return proveedorId ? 'secondary' : 'outline';
+  return 'outline';
+}
+
+// ── Summary Bar ───────────────────────────────────────────────────────────────
 
 function SummaryBar({ ordenes }: { ordenes: OrdenCompra[] }) {
-  const activas = ordenes.filter((orden) => {
-    const status = (orden.estatus ?? '').toLowerCase();
-    return status === 'enviada' || status === 'parcial';
+  const sinProveedor = ordenes.filter(
+    (o) => (o.estatus ?? '').toLowerCase() === 'abierta' && !o.proveedor_id,
+  ).length;
+
+  const activas = ordenes.filter((o) => {
+    const s = (o.estatus ?? '').toLowerCase();
+    return ['enviada', 'parcial', 'abierta'].includes(s);
   }).length;
 
-  const total = ordenes.reduce((acc, orden) => acc + (orden.total_real ?? orden.total_estimado ?? 0), 0);
+  const total = ordenes.reduce(
+    (acc, o) => acc + (o.total_real ?? o.total_estimado ?? 0),
+    0,
+  );
 
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -118,40 +158,78 @@ function SummaryBar({ ordenes }: { ordenes: OrdenCompra[] }) {
       </div>
       <div className="rounded-xl border bg-card px-4 py-3">
         <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Abiertas / parciales
+          Pendientes / activas
         </div>
         <div className="mt-1 text-2xl font-semibold tabular-nums text-amber-600">{activas}</div>
+        {sinProveedor > 0 && (
+          <div className="mt-0.5 flex items-center gap-1 text-xs text-destructive">
+            <AlertTriangle className="h-3 w-3" />
+            {sinProveedor} sin proveedor asignado
+          </div>
+        )}
       </div>
       <div className="rounded-xl border bg-card px-4 py-3">
         <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Total
+          Total valorizado
         </div>
-        <div className="mt-1 text-2xl font-semibold tabular-nums">{formatCurrency(total)}</div>
+        <div className="mt-1 text-2xl font-semibold tabular-nums">
+          {total > 0 ? formatCurrency(total) : '—'}
+        </div>
+        {total === 0 && (
+          <div className="mt-0.5 text-xs text-muted-foreground">
+            Captura precios en las OC abiertas
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
+// ── OrdenDetail ───────────────────────────────────────────────────────────────
+
 function OrdenDetail({
   orden,
+  proveedores,
   loadingItems,
   open,
   editedReceipts,
+  editedPrices,
   onClose,
   onReceiveChange,
+  onPriceChange,
   onReceivePartial,
   onReceiveAll,
+  onAsignarProveedor,
+  onMarcarEnviada,
 }: {
   orden: OrdenCompra | null;
+  proveedores: Proveedor[];
   loadingItems: boolean;
   open: boolean;
   editedReceipts: Record<string, string>;
+  editedPrices: Record<string, string>;
   onClose: () => void;
   onReceiveChange: (itemId: string, value: string, max: number) => void;
+  onPriceChange: (itemId: string, value: string) => void;
   onReceivePartial: () => Promise<void>;
   onReceiveAll: () => Promise<void>;
+  onAsignarProveedor: (proveedorId: string) => Promise<void>;
+  onMarcarEnviada: () => Promise<void>;
 }) {
+  const [selectedProveedorId, setSelectedProveedorId] = useState<string>('');
+
+  useEffect(() => {
+    setSelectedProveedorId(orden?.proveedor_id ?? '');
+  }, [orden?.id, orden?.proveedor_id]);
+
   const items = orden?.items ?? [];
+  const isAbierta = (orden?.estatus ?? '').toLowerCase() === 'abierta';
+  const isRecibida = (orden?.estatus ?? '').toLowerCase() === 'recibida';
+  const isCancelada = (orden?.estatus ?? '').toLowerCase() === 'cancelada';
+  const canReceive = !isAbierta && !isRecibida && !isCancelada;
+
+  const proveedorObj = getProveedorObj(orden?.proveedor ?? null);
+  const reqFolio = getRequisicionFolio(orden?.requisicion ?? null);
 
   const hasPendingItems = items.some((item) => {
     const pedida = item.cantidad ?? 0;
@@ -159,103 +237,266 @@ function OrdenDetail({
     return recibida < pedida;
   });
 
-  const canEdit = (orden?.estatus ?? '').toLowerCase() !== 'recibida';
+  const printTotal = items.reduce((acc, item) => {
+    const qty = item.cantidad ?? 0;
+    const price = parseFloat(editedPrices[item.id] ?? String(item.precio_unitario ?? 0));
+    return acc + qty * (isNaN(price) ? 0 : price);
+  }, 0);
+
+  const canPrint = Boolean(orden?.proveedor_id);
 
   return (
     <Sheet open={open} onOpenChange={(value) => !value && onClose()}>
-      <SheetContent className="sm:max-w-[600px]">
-        {/* Membrete solo para impresión */}
-        <img src="/membrete-rdb.jpg" alt="Membrete Rincón del Bosque" className="hidden print:block w-full object-contain mb-6" />
-        <SheetHeader>
+      <SheetContent className="flex min-h-0 flex-col overflow-hidden p-6 print:p-0 sm:max-w-[700px]">
+
+        {/* ═══ PRINT: Header block ═══ */}
+        <div className="hidden print:block">
+          <img
+            src="/membrete-rdb.jpg"
+            alt="Membrete Rincón del Bosque"
+            className="mb-4 max-h-28 w-full object-contain"
+          />
+          <div className="mb-6 flex items-start justify-between">
+            <div>
+              <h2 className="text-2xl font-bold uppercase tracking-widest">Orden de Compra</h2>
+              <p className="mt-1 text-base font-semibold">{orden?.folio ?? 'OC-BORRADOR'}</p>
+              <p className="mt-0.5 text-sm text-gray-600">Fecha: {formatDateLong(orden?.fecha_emision)}</p>
+              {reqFolio && (
+                <p className="mt-0.5 text-sm text-gray-600">Ref. Requisición: {reqFolio}</p>
+              )}
+            </div>
+            <div className="max-w-52 text-right text-sm">
+              <div className="mb-1 text-xs font-bold uppercase tracking-wider">Proveedor</div>
+              <div className="font-semibold">{proveedorObj?.nombre ?? '—'}</div>
+              {proveedorObj?.rfc && (
+                <div className="text-gray-600">RFC: {proveedorObj.rfc}</div>
+              )}
+              {proveedorObj?.contacto && (
+                <div className="text-gray-600">{proveedorObj.contacto}</div>
+              )}
+              {proveedorObj?.telefono && (
+                <div className="text-gray-600">Tel: {proveedorObj.telefono}</div>
+              )}
+              {proveedorObj?.email && (
+                <div className="text-gray-600">{proveedorObj.email}</div>
+              )}
+            </div>
+          </div>
+          <hr className="mb-4 border-black" />
+        </div>
+
+        {/* ═══ SCREEN: Header ═══ */}
+        <SheetHeader className="print:hidden">
           <SheetTitle>{orden?.folio ?? 'Orden de compra'}</SheetTitle>
           <SheetDescription>
-            {getProveedorNombre(orden?.proveedor ?? null)} · {formatDate(orden?.fecha_emision)}
+            {proveedorObj?.nombre ?? 'Sin proveedor'} · {formatDate(orden?.fecha_emision)}
+            {reqFolio && ` · Req: ${reqFolio}`}
           </SheetDescription>
-          <div className="absolute right-12 top-4 hidden sm:flex print:hidden">
-            <Button variant="outline" size="sm" onClick={() => window.print()}>
-              Imprimir
+          <div className="absolute right-12 top-4 hidden items-center gap-2 sm:flex print:hidden">
+            {!canPrint && (
+              <span className="flex items-center gap-1 text-xs text-amber-600">
+                <AlertTriangle className="h-3 w-3" />
+                Asigna proveedor primero
+              </span>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.print()}
+              disabled={!canPrint}
+            >
+              Imprimir OC
             </Button>
           </div>
         </SheetHeader>
 
-        <ScrollArea className="flex-1 pr-1 print:h-auto">
-          <div className="space-y-6 pb-6 pt-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <ScrollArea className="flex-1 pr-1 print:h-auto print:overflow-visible">
+          <div className="space-y-6 pb-6 pt-6 print:space-y-4 print:pt-0">
+
+            {/* ── Screen: Status + meta ── */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between print:hidden">
               <div className="space-y-1 text-sm">
+                {reqFolio && (
+                  <div>
+                    <span className="text-muted-foreground">Requisición: </span>
+                    <span className="font-mono font-medium">{reqFolio}</span>
+                  </div>
+                )}
                 <div>
-                  <span className="text-muted-foreground">Proveedor: </span>
-                  <span className="font-medium">{getProveedorNombre(orden?.proveedor ?? null)}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Fecha: </span>
+                  <span className="text-muted-foreground">Fecha emisión: </span>
                   <span className="font-medium">{formatDate(orden?.fecha_emision)}</span>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <Badge variant={getBadgeVariant(orden?.estatus ?? null)}>{orden?.estatus ?? 'Sin estatus'}</Badge>
+                <Badge variant={getBadgeVariant(orden?.estatus ?? null, orden?.proveedor_id ?? null)}>
+                  {getEstatusLabel(orden?.estatus ?? null, orden?.proveedor_id ?? null)}
+                </Badge>
                 <div className="text-right text-sm">
-                  <div className="text-muted-foreground">Estimado: <span className="font-medium text-foreground">{formatCurrency(orden?.total_estimado)}</span></div>
-                  <div className="text-muted-foreground">Real: <span className="font-medium text-foreground">{formatCurrency(orden?.total_real)}</span></div>
+                  <div className="text-muted-foreground">
+                    Total:{' '}
+                    <span className="font-medium text-foreground">
+                      {(() => {
+                        const t = orden?.total_real ?? orden?.total_estimado;
+                        return t != null && t > 0 ? formatCurrency(t) : '—';
+                      })()}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <Separator />
+            {/* ── Provider assignment (abierta only) ── */}
+            {isAbierta && (
+              <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/40 p-4 print:hidden">
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <Truck className="h-4 w-4 text-amber-600" />
+                  Asignación de proveedor
+                </div>
+                <div className="flex gap-2">
+                  <Select value={selectedProveedorId} onValueChange={(v) => setSelectedProveedorId(v ?? '')}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Seleccionar proveedor…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {proveedores.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    size="sm"
+                    disabled={
+                      !selectedProveedorId || selectedProveedorId === orden?.proveedor_id
+                    }
+                    onClick={() => void onAsignarProveedor(selectedProveedorId)}
+                  >
+                    Asignar
+                  </Button>
+                </div>
+                {!orden?.proveedor_id && (
+                  <p className="text-xs text-amber-700">
+                    Asigna un proveedor para poder imprimir o marcar esta OC como enviada.
+                  </p>
+                )}
+              </div>
+            )}
 
+            <Separator className="print:hidden" />
+
+            {/* ═══ Items (both screen and print) ═══ */}
             <div className="space-y-3">
-              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground print:hidden">
                 Partidas
               </div>
 
               {loadingItems ? (
                 <div className="space-y-3">
-                  {Array.from({ length: 5 }).map((_, index) => (
-                    <Skeleton key={index} className="h-12 w-full" />
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
                   ))}
                 </div>
               ) : items.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Sin artículos registrados.</p>
               ) : (
-                <div className="rounded-xl border">
-                  <Table>
+                <div className="overflow-hidden rounded-xl border print:rounded-none print:border-black">
+                  <Table className="print:text-xs">
                     <TableHeader>
-                      <TableRow>
-                        <TableHead>Artículo</TableHead>
-                        <TableHead className="text-right">Pedida</TableHead>
-                        <TableHead className="text-right">Recibida</TableHead>
-                        <TableHead className="text-right">P. Unitario</TableHead>
-                        <TableHead className="text-right">Subtotal</TableHead>
+                      <TableRow className="print:bg-gray-100">
+                        <TableHead className="print:font-bold print:text-black">Artículo</TableHead>
+                        <TableHead className="text-right print:font-bold print:text-black">
+                          Cant.
+                        </TableHead>
+                        {isAbierta ? (
+                          <TableHead className="text-right print:font-bold print:text-black">
+                            P. Unitario
+                          </TableHead>
+                        ) : (
+                          <>
+                            <TableHead className="text-right print:font-bold print:text-black">
+                              Recibida
+                            </TableHead>
+                            <TableHead className="text-right print:font-bold print:text-black">
+                              P. Unitario
+                            </TableHead>
+                          </>
+                        )}
+                        <TableHead className="text-right print:font-bold print:text-black">
+                          Subtotal
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {items.map((item) => {
                         const max = item.cantidad ?? 0;
-                        const value = editedReceipts[item.id] ?? String(item.cantidad_recibida ?? 0);
+                        const recValue =
+                          editedReceipts[item.id] ?? String(item.cantidad_recibida ?? 0);
+                        const priceValue =
+                          editedPrices[item.id] ?? String(item.precio_unitario ?? '');
+                        const priceNum = parseFloat(priceValue) || 0;
+                        const displaySubtotal = isAbierta
+                          ? max * priceNum
+                          : (item.subtotal ?? 0);
                         return (
-                          <TableRow key={item.id}>
-                            <TableCell>
-                              <div className="font-medium">{item.descripcion ?? 'Sin descripción'}</div>
-                            </TableCell>
-                            <TableCell className="text-right tabular-nums">{max}</TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end">
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  max={String(max)}
-                                  step="1"
-                                  value={value}
-                                  disabled={!canEdit}
-                                  onChange={(event) => onReceiveChange(item.id, event.target.value, max)}
-                                  className="w-24 text-right tabular-nums"
-                                />
+                          <TableRow key={item.id} className="print:border-b-gray-300">
+                            <TableCell className="print:py-1">
+                              <div className="font-medium print:text-black">
+                                {item.descripcion ?? 'Sin descripción'}
                               </div>
                             </TableCell>
-                            <TableCell className="text-right tabular-nums text-muted-foreground">
-                              {formatCurrency(item.precio_unitario)}
+                            <TableCell className="text-right tabular-nums print:py-1 print:text-black">
+                              {max}
                             </TableCell>
-                            <TableCell className="text-right tabular-nums font-medium">
-                              {formatCurrency(item.subtotal)}
+
+                            {isAbierta ? (
+                              <TableCell className="text-right print:py-1">
+                                {/* Screen: editable price input */}
+                                <div className="flex justify-end print:hidden">
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={priceValue}
+                                    onChange={(e) => onPriceChange(item.id, e.target.value)}
+                                    className="w-28 text-right tabular-nums"
+                                    placeholder="0.00"
+                                  />
+                                </div>
+                                {/* Print: price */}
+                                <span className="hidden print:inline print:text-black">
+                                  {priceNum > 0 ? formatCurrency(priceNum) : '—'}
+                                </span>
+                              </TableCell>
+                            ) : (
+                              <>
+                                <TableCell className="text-right print:py-1">
+                                  <div className="flex justify-end print:hidden">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      max={String(max)}
+                                      step="1"
+                                      value={recValue}
+                                      disabled={isRecibida}
+                                      onChange={(e) =>
+                                        onReceiveChange(item.id, e.target.value, max)
+                                      }
+                                      className="w-24 text-right tabular-nums"
+                                    />
+                                  </div>
+                                  <span className="hidden print:inline print:text-black">
+                                    {recValue}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-right tabular-nums text-muted-foreground print:py-1 print:text-black">
+                                  {formatCurrency(item.precio_unitario)}
+                                </TableCell>
+                              </>
+                            )}
+
+                            <TableCell className="text-right tabular-nums font-medium print:py-1 print:text-black">
+                              {displaySubtotal > 0 ? formatCurrency(displaySubtotal) : '—'}
                             </TableCell>
                           </TableRow>
                         );
@@ -264,98 +505,161 @@ function OrdenDetail({
                   </Table>
                 </div>
               )}
+
+              {/* Print: total row */}
+              {items.length > 0 && (
+                <div className="hidden justify-end pt-1 print:flex">
+                  <div className="text-sm">
+                    <span className="font-bold">Total estimado: </span>
+                    <span className="tabular-nums">
+                      {formatCurrency(
+                        printTotal > 0 ? printTotal : (orden?.total_estimado ?? 0),
+                      )}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ═══ PRINT: Control / Authorization block ═══ */}
+            <div className="hidden print:block">
+              {orden?.notas && (
+                <div className="mb-6 text-sm">
+                  <div className="mb-1 font-bold">Notas:</div>
+                  <div>{orden.notas}</div>
+                </div>
+              )}
+              <div className="mt-12 grid grid-cols-3 gap-8 text-center text-xs">
+                <div>
+                  <div className="w-full border-t border-black pt-2 font-medium">Elaboró</div>
+                </div>
+                <div>
+                  <div className="w-full border-t border-black pt-2 font-medium">Autorizó</div>
+                </div>
+                <div>
+                  <div className="w-full border-t border-black pt-2 font-medium">
+                    Proveedor / Recibido por
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </ScrollArea>
 
-        {canEdit && items.length > 0 ? (
-          <div className="border-t pt-4">
+        {/* ── Footer actions (screen only) ── */}
+        <div className="space-y-3 border-t pt-4 print:hidden">
+          {isAbierta && orden?.proveedor_id && items.length > 0 && (
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                onClick={() => void onMarcarEnviada()}
+                className="gap-2"
+              >
+                <Send className="h-4 w-4" />
+                Guardar precios y marcar Enviada
+              </Button>
+            </div>
+          )}
+          {canReceive && items.length > 0 && (
             <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-              {hasPendingItems ? (
+              {hasPendingItems && (
                 <Button variant="outline" onClick={() => void onReceivePartial()}>
                   Recibir Parcialmente
                 </Button>
-              ) : null}
+              )}
               <Button onClick={() => void onReceiveAll()}>Recibir Todo</Button>
             </div>
-          </div>
-        ) : null}
+          )}
+        </div>
       </SheetContent>
     </Sheet>
   );
 }
 
+// ── Main Page ─────────────────────────────────────────────────────────────────
+
 export default function OrdenesCompraPage() {
   const [ordenes, setOrdenes] = useState<OrdenCompra[]>([]);
+  const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingItems, setLoadingItems] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [dateFrom, setDateFrom] = useState(() => todayRange().from);
-  const [dateTo, setDateTo] = useState(() => todayRange().to);
-  const [presetKey, setPresetKey] = useState<string>('hoy');
+  const [dateFrom, setDateFrom] = useState(() => monthRange().from);
+  const [dateTo, setDateTo] = useState(() => monthRange().to);
+  const [presetKey, setPresetKey] = useState<string>('mes');
 
   const handlePreset = (preset: string | null) => {
     if (!preset) return;
     setPresetKey(preset);
     localStorage.setItem('rdb_preset_ordenes_compra', preset);
-    if (!preset) return;
     const today = new Date();
     const formatter = new Intl.DateTimeFormat('sv-SE', { timeZone: TZ });
     if (preset === 'hoy') {
       const t = formatter.format(today);
-      setDateFrom(t); setDateTo(t);
+      setDateFrom(t);
+      setDateTo(t);
     } else if (preset === 'ayer') {
       const ayer = new Date(today.toLocaleString('en-US', { timeZone: TZ }));
       ayer.setDate(ayer.getDate() - 1);
       const t = formatter.format(ayer);
-      setDateFrom(t); setDateTo(t);
+      setDateFrom(t);
+      setDateTo(t);
     } else if (preset === 'semana') {
       const d = new Date(today.toLocaleString('en-US', { timeZone: TZ }));
       const day = d.getDay();
       const diff = d.getDate() - day + (day === 0 ? -6 : 1);
       const monday = new Date(d.setDate(diff));
-      setDateFrom(formatter.format(monday)); setDateTo(formatter.format(today));
+      setDateFrom(formatter.format(monday));
+      setDateTo(formatter.format(today));
     } else if (preset === '7dias') {
       const d = new Date(today.toLocaleString('en-US', { timeZone: TZ }));
       d.setDate(d.getDate() - 7);
-      setDateFrom(formatter.format(d)); setDateTo(formatter.format(today));
+      setDateFrom(formatter.format(d));
+      setDateTo(formatter.format(today));
     } else if (preset === 'mes') {
       const d = new Date(today.toLocaleString('en-US', { timeZone: TZ }));
       const first = new Date(d.getFullYear(), d.getMonth(), 1);
-      setDateFrom(formatter.format(first)); setDateTo(formatter.format(today));
+      setDateFrom(formatter.format(first));
+      setDateTo(formatter.format(today));
     } else if (preset === '30dias') {
       const d = new Date(today.toLocaleString('en-US', { timeZone: TZ }));
       d.setDate(d.getDate() - 30);
-      setDateFrom(formatter.format(d)); setDateTo(formatter.format(today));
+      setDateFrom(formatter.format(d));
+      setDateTo(formatter.format(today));
     } else if (preset === 'ano') {
       const d = new Date(today.toLocaleString('en-US', { timeZone: TZ }));
       const first = new Date(d.getFullYear(), 0, 1);
-      setDateFrom(formatter.format(first)); setDateTo(formatter.format(today));
+      setDateFrom(formatter.format(first));
+      setDateTo(formatter.format(today));
     }
   };
+
   const [selected, setSelected] = useState<OrdenCompra | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editedReceipts, setEditedReceipts] = useState<Record<string, string>>({});
+  const [editedPrices, setEditedPrices] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const saved = localStorage.getItem('rdb_preset_ordenes_compra');
-    if (saved && saved !== 'hoy') {
+    if (saved && saved !== 'mes') {
       handlePreset(saved);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchOrdenes = useCallback(async () => {
     setLoading(true);
     setError(null);
-
     try {
       const supabase = createSupabaseBrowserClient();
       let query = supabase
         .schema('rdb')
         .from('ordenes_compra')
-        .select('id, folio, proveedor_id, estatus, total_estimado, total_real, fecha_emision, proveedor:proveedores(nombre)')
+        .select(
+          'id, folio, requisicion_id, proveedor_id, estatus, total_estimado, total_real, fecha_emision, notas, proveedor:proveedores(id, nombre, contacto, email, telefono, rfc, direccion), requisicion:requisiciones(folio)',
+        )
         .order('fecha_emision', { ascending: false });
 
       if (dateFrom) query = query.gte('fecha_emision', `${dateFrom}T00:00:00`);
@@ -365,8 +669,18 @@ export default function OrdenesCompraPage() {
       if (queryError) throw queryError;
 
       setOrdenes((data ?? []) as OrdenCompra[]);
+
+      const { data: provData } = await supabase
+        .schema('rdb')
+        .from('proveedores')
+        .select('id, nombre, contacto, email, telefono, rfc, direccion')
+        .eq('activo', true)
+        .order('nombre');
+      if (provData) setProveedores(provData as Proveedor[]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No pude cargar las órdenes de compra.');
+      setError(
+        err instanceof Error ? err.message : 'No pude cargar las órdenes de compra.',
+      );
     } finally {
       setLoading(false);
     }
@@ -381,7 +695,7 @@ export default function OrdenesCompraPage() {
     setDrawerOpen(true);
     setLoadingItems(true);
     setEditedReceipts({});
-
+    setEditedPrices({});
     try {
       const supabase = createSupabaseBrowserClient();
       const { data, error: itemsError } = await supabase
@@ -398,101 +712,202 @@ export default function OrdenesCompraPage() {
         acc[item.id] = String(item.cantidad_recibida ?? 0);
         return acc;
       }, {});
+      const initialPrices = items.reduce<Record<string, string>>((acc, item) => {
+        acc[item.id] =
+          item.precio_unitario != null && item.precio_unitario > 0
+            ? String(item.precio_unitario)
+            : '';
+        return acc;
+      }, {});
 
       setEditedReceipts(initialReceipts);
+      setEditedPrices(initialPrices);
       setSelected((prev) => (prev?.id === orden.id ? { ...prev, items } : prev));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No pude cargar el detalle de la orden.');
+      setError(err instanceof Error ? err.message : 'No pude cargar el detalle.');
     } finally {
       setLoadingItems(false);
     }
   }, []);
 
   const handleReceiveChange = useCallback((itemId: string, value: string, max: number) => {
-    const normalized = value === '' ? '' : String(Math.min(Math.max(Number(value) || 0, 0), max));
+    const normalized =
+      value === '' ? '' : String(Math.min(Math.max(Number(value) || 0, 0), max));
     setEditedReceipts((prev) => ({ ...prev, [itemId]: normalized }));
   }, []);
 
-  const persistReception = useCallback(async (markAll: boolean) => {
-    if (!selected?.items?.length) return;
+  const handlePriceChange = useCallback((itemId: string, value: string) => {
+    setEditedPrices((prev) => ({ ...prev, [itemId]: value }));
+  }, []);
 
-    setSaving(true);
-    setError(null);
+  const persistReception = useCallback(
+    async (markAll: boolean) => {
+      if (!selected?.items?.length) return;
+      setSaving(true);
+      setError(null);
+      try {
+        const supabase = createSupabaseBrowserClient();
+        const nextItems = selected.items.map((item) => {
+          const cantidadPedida = item.cantidad ?? 0;
+          const cantidadRecibida = markAll
+            ? cantidadPedida
+            : Math.min(
+                Math.max(
+                  Number(editedReceipts[item.id] ?? item.cantidad_recibida ?? 0),
+                  0,
+                ),
+                cantidadPedida,
+              );
+          return { ...item, cantidad_recibida: cantidadRecibida };
+        });
 
-    try {
-      const supabase = createSupabaseBrowserClient();
-      const nextItems = selected.items.map((item) => {
-        const cantidadPedida = item.cantidad ?? 0;
-        const cantidadRecibida = markAll
-          ? cantidadPedida
-          : Math.min(Math.max(Number(editedReceipts[item.id] ?? item.cantidad_recibida ?? 0), 0), cantidadPedida);
+        for (const item of nextItems) {
+          const { error: e } = await supabase
+            .schema('rdb')
+            .from('ordenes_compra_items')
+            .update({ cantidad_recibida: item.cantidad_recibida })
+            .eq('id', item.id);
+          if (e) throw e;
+        }
 
-        return {
-          ...item,
-          cantidad_recibida: cantidadRecibida,
-        };
-      });
+        const fullyReceived = nextItems.every(
+          (item) => (item.cantidad_recibida ?? 0) >= (item.cantidad ?? 0),
+        );
+        const partiallyReceived = nextItems.some((item) => (item.cantidad_recibida ?? 0) > 0);
+        const nextStatus = fullyReceived ? 'Recibida' : partiallyReceived ? 'Parcial' : 'Enviada';
+        const totalReal = nextItems.reduce(
+          (acc, item) => acc + (item.cantidad_recibida ?? 0) * (item.precio_unitario ?? 0),
+          0,
+        );
 
-      for (const item of nextItems) {
-        const { error: updateItemError } = await supabase
+        const { error: e2 } = await supabase
           .schema('rdb')
-          .from('ordenes_compra_items')
-          .update({ cantidad_recibida: item.cantidad_recibida })
-          .eq('id', item.id);
+          .from('ordenes_compra')
+          .update({ estatus: nextStatus, total_real: totalReal })
+          .eq('id', selected.id);
+        if (e2) throw e2;
 
-        if (updateItemError) throw updateItemError;
-      }
-
-      const fullyReceived = nextItems.every((item) => (item.cantidad_recibida ?? 0) >= (item.cantidad ?? 0));
-      const partiallyReceived = nextItems.some((item) => (item.cantidad_recibida ?? 0) > 0);
-      const nextStatus = fullyReceived ? 'Recibida' : partiallyReceived ? 'Parcial' : 'Enviada';
-      const totalReal = nextItems.reduce((acc, item) => {
-        const qty = item.cantidad_recibida ?? 0;
-        const price = item.precio_unitario ?? 0;
-        return acc + qty * price;
-      }, 0);
-
-      const { error: updateOrderError } = await supabase
-        .schema('rdb')
-        .from('ordenes_compra')
-        .update({
+        const updatedOrden: OrdenCompra = {
+          ...selected,
           estatus: nextStatus,
           total_real: totalReal,
-        })
+          items: nextItems,
+        };
+        setSelected(updatedOrden);
+        setOrdenes((prev) =>
+          prev.map((o) =>
+            o.id === updatedOrden.id
+              ? { ...o, estatus: nextStatus, total_real: totalReal }
+              : o,
+          ),
+        );
+        setEditedReceipts(
+          nextItems.reduce<Record<string, string>>((acc, item) => {
+            acc[item.id] = String(item.cantidad_recibida ?? 0);
+            return acc;
+          }, {}),
+        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'No pude guardar la recepción.');
+      } finally {
+        setSaving(false);
+      }
+    },
+    [editedReceipts, selected],
+  );
+
+  const handleAsignarProveedor = useCallback(
+    async (proveedorId: string) => {
+      if (!selected?.id) return;
+      setSaving(true);
+      try {
+        const supabase = createSupabaseBrowserClient();
+        const { error: e } = await supabase
+          .schema('rdb')
+          .from('ordenes_compra')
+          .update({ proveedor_id: proveedorId })
+          .eq('id', selected.id);
+        if (e) throw e;
+
+        const proveedor = proveedores.find((p) => p.id === proveedorId) ?? null;
+        const updatedOrden = { ...selected, proveedor_id: proveedorId, proveedor };
+        setSelected(updatedOrden);
+        setOrdenes((prev) =>
+          prev.map((o) =>
+            o.id === selected.id ? { ...o, proveedor_id: proveedorId, proveedor } : o,
+          ),
+        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'No pude asignar el proveedor.');
+      } finally {
+        setSaving(false);
+      }
+    },
+    [selected, proveedores],
+  );
+
+  const handleSavePricesAndMarkEnviada = useCallback(async () => {
+    if (!selected?.items?.length) return;
+    setSaving(true);
+    try {
+      const supabase = createSupabaseBrowserClient();
+      let totalEstimado = 0;
+
+      for (const item of selected.items) {
+        const price = parseFloat(editedPrices[item.id] ?? '') || 0;
+        const subtotal = (item.cantidad ?? 0) * price;
+        totalEstimado += subtotal;
+        const { error: e } = await supabase
+          .schema('rdb')
+          .from('ordenes_compra_items')
+          .update({ precio_unitario: price, subtotal })
+          .eq('id', item.id);
+        if (e) throw e;
+      }
+
+      const { error: e2 } = await supabase
+        .schema('rdb')
+        .from('ordenes_compra')
+        .update({ estatus: 'Enviada', total_estimado: totalEstimado })
         .eq('id', selected.id);
+      if (e2) throw e2;
 
-      if (updateOrderError) throw updateOrderError;
-
-      const updatedOrden: OrdenCompra = {
+      const updatedItems = (selected.items ?? []).map((item) => ({
+        ...item,
+        precio_unitario: parseFloat(editedPrices[item.id] ?? '') || item.precio_unitario,
+        subtotal: (item.cantidad ?? 0) * (parseFloat(editedPrices[item.id] ?? '') || 0),
+      }));
+      const updatedOrden = {
         ...selected,
-        estatus: nextStatus,
-        total_real: totalReal,
-        items: nextItems,
+        estatus: 'Enviada',
+        total_estimado: totalEstimado,
+        items: updatedItems,
       };
-
       setSelected(updatedOrden);
-      setOrdenes((prev) => prev.map((orden) => (orden.id === updatedOrden.id ? { ...orden, estatus: nextStatus, total_real: totalReal } : orden)));
-      setEditedReceipts(
-        nextItems.reduce<Record<string, string>>((acc, item) => {
-          acc[item.id] = String(item.cantidad_recibida ?? 0);
-          return acc;
-        }, {}),
+      setOrdenes((prev) =>
+        prev.map((o) =>
+          o.id === selected.id
+            ? { ...o, estatus: 'Enviada', total_estimado: totalEstimado }
+            : o,
+        ),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No pude guardar la recepción.');
+      setError(err instanceof Error ? err.message : 'No pude guardar los precios.');
     } finally {
       setSaving(false);
     }
-  }, [editedReceipts, selected]);
+  }, [selected, editedPrices]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
     return ordenes.filter((orden) => {
       if (!query) return true;
+      const reqFolio = getRequisicionFolio(orden.requisicion);
       return (
         (orden.folio ?? '').toLowerCase().includes(query) ||
-        getProveedorNombre(orden.proveedor).toLowerCase().includes(query) ||
-        (orden.estatus ?? '').toLowerCase().includes(query)
+        (getProveedorNombre(orden.proveedor) ?? '').toLowerCase().includes(query) ||
+        (orden.estatus ?? '').toLowerCase().includes(query) ||
+        (reqFolio ?? '').toLowerCase().includes(query)
       );
     });
   }, [ordenes, search]);
@@ -502,12 +917,10 @@ export default function OrdenesCompraPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Órdenes de Compra</h1>
-          <p className="text-sm text-muted-foreground">Control y recepción parcial de compras a proveedores</p>
+          <p className="text-sm text-muted-foreground">
+            Gestión operativa de compras a proveedores
+          </p>
         </div>
-        <Button className="gap-2 self-start">
-          <PackagePlus className="h-4 w-4" />
-          Nueva Orden de Compra
-        </Button>
       </div>
 
       {!loading && !error ? <SummaryBar ordenes={filtered} /> : null}
@@ -516,18 +929,34 @@ export default function OrdenesCompraPage() {
         <div className="relative min-w-52">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Buscar folio o proveedor…"
+            placeholder="Buscar folio, proveedor o requisición…"
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
           />
         </div>
 
         <div className="flex items-center gap-2">
           <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <Input type="date" value={dateFrom} onChange={(event) => { setDateFrom(event.target.value); setPresetKey('custom'); }} className="w-36" />
+          <Input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => {
+              setDateFrom(e.target.value);
+              setPresetKey('custom');
+            }}
+            className="w-36"
+          />
           <span className="text-muted-foreground">—</span>
-          <Input type="date" value={dateTo} onChange={(event) => { setDateTo(event.target.value); setPresetKey('custom'); }} className="w-36" />
+          <Input
+            type="date"
+            value={dateTo}
+            onChange={(e) => {
+              setDateTo(e.target.value);
+              setPresetKey('custom');
+            }}
+            className="w-36"
+          />
         </div>
 
         <Select value={presetKey} onValueChange={handlePreset}>
@@ -542,16 +971,25 @@ export default function OrdenesCompraPage() {
             <SelectItem value="mes">Este mes</SelectItem>
             <SelectItem value="30dias">Últimos 30 días</SelectItem>
             <SelectItem value="ano">Este año</SelectItem>
-            <SelectItem value="custom" className="hidden">Personalizado</SelectItem>
+            <SelectItem value="custom" className="hidden">
+              Personalizado
+            </SelectItem>
           </SelectContent>
         </Select>
 
-        <Button variant="outline" size="icon" onClick={() => void fetchOrdenes()} aria-label="Actualizar">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => void fetchOrdenes()}
+          aria-label="Actualizar"
+        >
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
         </Button>
 
         <span className="text-sm text-muted-foreground">
-          {loading ? 'Cargando…' : `${filtered.length} orden${filtered.length === 1 ? '' : 'es'}`}
+          {loading
+            ? 'Cargando…'
+            : `${filtered.length} orden${filtered.length === 1 ? '' : 'es'}`}
           {saving ? ' · guardando…' : ''}
         </span>
       </div>
@@ -566,19 +1004,20 @@ export default function OrdenesCompraPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Folio</TableHead>
+              <TableHead>OC / Folio</TableHead>
+              <TableHead>Requisición</TableHead>
               <TableHead>Proveedor</TableHead>
               <TableHead>Estatus</TableHead>
-              <TableHead>Fecha Emisión</TableHead>
+              <TableHead>Fecha</TableHead>
               <TableHead className="text-right">Total</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              Array.from({ length: 6 }).map((_, rowIndex) => (
-                <TableRow key={rowIndex}>
-                  {Array.from({ length: 5 }).map((__, cellIndex) => (
-                    <TableCell key={cellIndex}>
+              Array.from({ length: 6 }).map((_, i) => (
+                <TableRow key={i}>
+                  {Array.from({ length: 6 }).map((__, j) => (
+                    <TableCell key={j}>
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
                   ))}
@@ -586,33 +1025,66 @@ export default function OrdenesCompraPage() {
               ))
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-12 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">
                   No se encontraron órdenes de compra.
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((orden) => (
-                <TableRow
-                  key={orden.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => void openDetail(orden)}
-                >
-                  <TableCell className="font-mono text-xs font-medium">{orden.folio ?? '—'}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Truck className="h-3.5 w-3.5 text-muted-foreground" />
-                      {getProveedorNombre(orden.proveedor)}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={getBadgeVariant(orden.estatus)}>{orden.estatus ?? 'Sin estatus'}</Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{formatDate(orden.fecha_emision)}</TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">
-                    {formatCurrency(orden.total_real ?? orden.total_estimado)}
-                  </TableCell>
-                </TableRow>
-              ))
+              filtered.map((orden) => {
+                const reqFolio = getRequisicionFolio(orden.requisicion);
+                const nombre = getProveedorNombre(orden.proveedor);
+                const total = orden.total_real ?? orden.total_estimado;
+                return (
+                  <TableRow
+                    key={orden.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => void openDetail(orden)}
+                  >
+                    <TableCell className="font-mono text-xs font-medium">
+                      {orden.folio ?? '—'}
+                    </TableCell>
+                    <TableCell>
+                      {reqFolio ? (
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {reqFolio}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/40">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {nombre ? (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Truck className="h-3.5 w-3.5 text-muted-foreground" />
+                          {nombre}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-sm text-amber-600">
+                          <AlertTriangle className="h-3.5 w-3.5" />
+                          Sin proveedor
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={getBadgeVariant(orden.estatus, orden.proveedor_id)}
+                      >
+                        {getEstatusLabel(orden.estatus, orden.proveedor_id)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {formatDate(orden.fecha_emision)}
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">
+                      {total != null && total > 0 ? (
+                        formatCurrency(total)
+                      ) : (
+                        <span className="text-xs text-muted-foreground/50">Sin precios</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -620,17 +1092,22 @@ export default function OrdenesCompraPage() {
 
       <OrdenDetail
         orden={selected}
+        proveedores={proveedores}
         loadingItems={loadingItems}
         open={drawerOpen}
         editedReceipts={editedReceipts}
+        editedPrices={editedPrices}
         onClose={() => setDrawerOpen(false)}
         onReceiveChange={handleReceiveChange}
+        onPriceChange={handlePriceChange}
         onReceivePartial={async () => {
           await persistReception(false);
         }}
         onReceiveAll={async () => {
           await persistReception(true);
         }}
+        onAsignarProveedor={handleAsignarProveedor}
+        onMarcarEnviada={handleSavePricesAndMarkEnviada}
       />
     </div>
   );

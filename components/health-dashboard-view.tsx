@@ -53,21 +53,21 @@ type Props = {
 
 const TONES = {
   sleep: {
-    icon: 'border-indigo-400/25 bg-indigo-400/12 text-indigo-200',
+    icon: 'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-400/25 dark:bg-indigo-400/12 dark:text-indigo-200',
     line: '#a78bfa',
     lineSoft: 'rgba(167,139,250,0.35)',
     dot: '#c4b5fd',
     badge: 'border-indigo-400/20 bg-indigo-400/10 text-indigo-200',
   },
   hr: {
-    icon: 'border-rose-400/25 bg-rose-400/12 text-rose-200',
+    icon: 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-400/25 dark:bg-rose-400/12 dark:text-rose-200',
     line: '#fb7185',
     lineSoft: 'rgba(251,113,133,0.35)',
     dot: '#fda4af',
     badge: 'border-rose-400/20 bg-rose-400/10 text-rose-200',
   },
   bp: {
-    icon: 'border-blue-400/25 bg-blue-400/12 text-blue-200',
+    icon: 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-400/25 dark:bg-blue-400/12 dark:text-blue-200',
     line: '#60a5fa',
     lineSoft: 'rgba(96,165,250,0.35)',
     dot: '#93c5fd',
@@ -77,28 +77,28 @@ const TONES = {
     secondaryDot: '#67e8f9',
   },
   spo2: {
-    icon: 'border-cyan-400/25 bg-cyan-400/12 text-cyan-200',
+    icon: 'border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-400/25 dark:bg-cyan-400/12 dark:text-cyan-200',
     line: '#22d3ee',
     lineSoft: 'rgba(34,211,238,0.35)',
     dot: '#67e8f9',
     badge: 'border-cyan-400/20 bg-cyan-400/10 text-cyan-200',
   },
   steps: {
-    icon: 'border-green-400/25 bg-green-400/12 text-green-200',
+    icon: 'border-green-200 bg-green-50 text-green-700 dark:border-green-400/25 dark:bg-green-400/12 dark:text-green-200',
     line: '#4ade80',
     lineSoft: 'rgba(74,222,128,0.35)',
     dot: '#86efac',
     badge: 'border-green-400/20 bg-green-400/10 text-green-200',
   },
   weight: {
-    icon: 'border-orange-400/25 bg-orange-400/12 text-orange-200',
+    icon: 'border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-400/25 dark:bg-orange-400/12 dark:text-orange-200',
     line: '#f59e0b',
     lineSoft: 'rgba(245,158,11,0.35)',
     dot: '#fbbf24',
     badge: 'border-orange-400/20 bg-orange-400/10 text-orange-200',
   },
   hrv: {
-    icon: 'border-emerald-400/25 bg-emerald-400/12 text-emerald-200',
+    icon: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/25 dark:bg-emerald-400/12 dark:text-emerald-200',
     line: '#34d399',
     lineSoft: 'rgba(52,211,153,0.35)',
     dot: '#6ee7b7',
@@ -181,18 +181,18 @@ function getDelta(points: Point[]) {
 
 function EmptyState({ title, copy }: { title: string; copy: string }) {
   return (
-    <div className="rounded-3xl border border-dashed border-white/12 bg-black/10 px-5 py-8 text-center">
-      <div className="text-sm font-medium text-white/78">{title}</div>
-      <div className="mt-2 text-sm leading-6 text-white/45">{copy}</div>
+    <div className="rounded-3xl border border-dashed border-[var(--border)] bg-[var(--panel)] px-5 py-8 text-center dark:border-white/12 dark:bg-black/10">
+      <div className="text-sm font-medium text-[var(--text)] dark:text-white/78">{title}</div>
+      <div className="mt-2 text-sm leading-6 text-[var(--muted-foreground)] dark:text-white/45">{copy}</div>
     </div>
   );
 }
 
 function StatPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-      <div className="text-[11px] uppercase tracking-[0.18em] text-white/35">{label}</div>
-      <div className="mt-2 text-sm font-medium text-white/90">{value}</div>
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 dark:border-white/10 dark:bg-black/20">
+      <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--muted-foreground)] dark:text-white/35">{label}</div>
+      <div className="mt-2 text-sm font-medium text-[var(--text)] dark:text-white/90">{value}</div>
     </div>
   );
 }
@@ -231,7 +231,7 @@ function TrendSvg({ config, expanded = false }: { config: ChartConfig; expanded?
         </defs>
         {[0.25, 0.5, 0.75].map((fraction) => {
           const y = height - 28 - fraction * (height - 52);
-          return <line key={fraction} x1="14" x2={width - 14} y1={y} y2={y} stroke="rgba(255,255,255,0.08)" strokeWidth="1" />;
+          return <line key={fraction} x1="14" x2={width - 14} y1={y} y2={y} stroke="rgba(148,163,184,0.35)" strokeWidth="1" />;
         })}
         <path d={buildLinePath(config.data, min, range, width, height)} fill="none" stroke={`url(#${config.key}-line-${expanded ? 'full' : 'card'})`} strokeWidth={strokeWidth} strokeLinecap="round" />
         {config.secondaryData?.length ? (
@@ -248,12 +248,12 @@ function TrendSvg({ config, expanded = false }: { config: ChartConfig; expanded?
           return <circle key={`${config.key}-secondary-${point.date}`} cx={x} cy={Number.isFinite(y) ? y : height / 2} r={dotRadius} fill={config.key === 'bp' ? TONES.bp.secondaryDot : tone.dot} />;
         })}
       </svg>
-      <div className="mt-4 flex items-center justify-between text-xs text-white/45">
+      <div className="mt-4 flex items-center justify-between text-xs text-[var(--muted-foreground)] dark:text-white/45">
         <span>{formatDateLabel(config.data[0]?.date ?? '')}</span>
         <span>{formatDateLabel(config.data.at(-1)?.date ?? '')}</span>
       </div>
       {config.secondaryData?.length ? (
-        <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-white/60">
+        <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-[var(--muted-foreground)] dark:text-white/60">
           <div className="flex items-center gap-2">
             <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: tone.line }} />
             <span>{config.primaryLabel ?? config.title}</span>
@@ -276,23 +276,23 @@ function TrendCard({ config, onExpand }: { config: ChartConfig; onExpand: () => 
 
   return (
     <button type="button" onClick={onExpand} className="text-left">
-      <Surface className="h-full p-6 transition hover:border-white/15 hover:bg-white/[0.06]">
+      <Surface className="h-full p-6 transition hover:border-[var(--accent)]/20 hover:bg-[var(--panel)] dark:hover:border-white/15 dark:hover:bg-white/[0.06]">
         <div className="mb-4 flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3 text-white">
+          <div className="flex items-center gap-3 text-[var(--text)] dark:text-white">
             <div className={`rounded-2xl border p-3 ${tone.icon}`}>
               <Icon className="h-5 w-5" />
             </div>
             <div>
               <h2 className="text-lg font-semibold">{config.title}</h2>
-              <p className="mt-1 text-xs text-white/45">Click to expand</p>
+              <p className="mt-1 text-xs text-[var(--muted-foreground)] dark:text-white/45">Click to expand</p>
             </div>
           </div>
         </div>
         {config.data.length ? (
           <>
             <div className="mb-4 flex items-end gap-2">
-              <div className="text-2xl font-semibold text-white">{latestLabel}</div>
-              <div className="pb-1 text-sm text-white/45">{config.unit}</div>
+              <div className="text-2xl font-semibold text-[var(--text)] dark:text-white">{latestLabel}</div>
+              <div className="pb-1 text-sm text-[var(--muted-foreground)] dark:text-white/45">{config.unit}</div>
             </div>
             <TrendSvg config={config} />
           </>
@@ -315,17 +315,17 @@ function ChartModal({ config, onClose, rangeLabel }: { config: ChartConfig | nul
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm dark:bg-slate-950/90">
       <div className="flex h-full flex-col overflow-y-auto p-4 sm:p-8">
         <div className="mx-auto w-full max-w-7xl">
           <Surface className="min-h-[calc(100vh-4rem)] p-6 sm:p-8">
             <div className="mb-6 flex items-start justify-between gap-4">
               <div>
-                <div className="text-xs uppercase tracking-[0.24em] text-white/35">Expanded trend</div>
-                <h2 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">{config.title}</h2>
-                <p className="mt-2 text-sm text-white/55">{rangeLabel} • larger view with quick stats</p>
+                <div className="text-xs uppercase tracking-[0.24em] text-[var(--muted-foreground)] dark:text-white/35">Expanded trend</div>
+                <h2 className="mt-2 text-2xl font-semibold text-[var(--text)] sm:text-3xl dark:text-white">{config.title}</h2>
+                <p className="mt-2 text-sm text-[var(--muted-foreground)] dark:text-white/55">{rangeLabel} • larger view with quick stats</p>
               </div>
-              <button type="button" onClick={onClose} className="rounded-2xl border border-white/10 bg-white/5 p-3 text-white/70 transition hover:bg-white/10 hover:text-white">
+              <button type="button" onClick={onClose} className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-3 text-[var(--muted-foreground)] transition hover:bg-[var(--card)] hover:text-[var(--text)] dark:border-white/10 dark:bg-white/5 dark:text-white/70 dark:hover:bg-white/10 dark:hover:text-white">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -338,7 +338,7 @@ function ChartModal({ config, onClose, rangeLabel }: { config: ChartConfig | nul
               <StatPill label="Delta" value={delta == null ? '—' : `${delta >= 0 ? '+' : ''}${formatMetricValue(delta, config.unit === 'hr' ? 1 : 0)} ${config.unit}`} />
             </div>
 
-            <div className="rounded-[2rem] border border-white/8 bg-black/20 p-4 sm:p-6">
+            <div className="rounded-[2rem] border border-[var(--border)] bg-[var(--panel)] p-4 sm:p-6 dark:border-white/8 dark:bg-black/20">
               <TrendSvg config={config} expanded />
             </div>
           </Surface>
@@ -545,8 +545,8 @@ export function HealthDashboardView({
 
   return (
     <>
-      <section className="relative overflow-hidden rounded-[2rem] border border-indigo-300/15 bg-[linear-gradient(180deg,rgba(99,102,241,0.10),rgba(255,255,255,0.02))] p-6 sm:p-8">
-        <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(129,140,248,0.16),transparent_55%)]" />
+      <section className="relative overflow-hidden rounded-[2rem] border border-indigo-200 bg-[linear-gradient(180deg,rgba(99,102,241,0.10),rgba(255,255,255,0.72))] p-6 shadow-sm sm:p-8 dark:border-indigo-300/15 dark:bg-[linear-gradient(180deg,rgba(99,102,241,0.10),rgba(255,255,255,0.02))] dark:shadow-none">
+        <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(129,140,248,0.14),transparent_55%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(129,140,248,0.16),transparent_55%)]" />
         <div className="relative">
           <SectionHeading
             eyebrow="Health"
@@ -557,18 +557,18 @@ export function HealthDashboardView({
             {heroCards.map((card) => {
               const Icon = card.icon;
               return (
-                <Surface key={card.key} className="p-5">
+                <Surface key={card.key} className="p-5 shadow-sm dark:shadow-none">
                   <div className="flex items-center justify-between gap-4">
                     <div className={`rounded-2xl border p-3 ${card.tone}`}>
                       <Icon className="h-5 w-5" />
                     </div>
-                    <div className="text-xs uppercase tracking-[0.22em] text-white/35">{card.label}</div>
+                    <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted-foreground)] dark:text-white/35">{card.label}</div>
                   </div>
                   <div className="mt-6 flex items-end gap-2">
-                    <div className="text-3xl font-semibold text-white">{card.value}</div>
-                    {card.unit ? <div className="pb-1 text-sm text-white/45">{card.unit}</div> : null}
+                    <div className="text-3xl font-semibold text-[var(--text)] dark:text-white">{card.value}</div>
+                    {card.unit ? <div className="pb-1 text-sm text-[var(--muted-foreground)] dark:text-white/45">{card.unit}</div> : null}
                   </div>
-                  <div className="mt-3 text-sm text-white/55">{card.helper}</div>
+                  <div className="mt-3 text-sm text-[var(--muted-foreground)] dark:text-white/55">{card.helper}</div>
                 </Surface>
               );
             })}
@@ -577,7 +577,7 @@ export function HealthDashboardView({
       </section>
 
       {errors.length ? (
-        <Surface className="mt-6 border-amber-300/20 bg-amber-300/8 p-4 text-sm text-amber-100">
+        <Surface className="mt-6 border-amber-300/30 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-300/20 dark:bg-amber-300/8 dark:text-amber-100">
           {errors[0]}
         </Surface>
       ) : null}
@@ -585,10 +585,10 @@ export function HealthDashboardView({
       <section className="mt-10">
         <div className="mb-4 flex items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-semibold text-white">Trends</h2>
-            <p className="mt-2 text-sm text-white/55">{range.trendLabel} across the signals that matter most. All charts open fullscreen on click.</p>
+            <h2 className="text-xl font-semibold text-[var(--text)] dark:text-white">Trends</h2>
+            <p className="mt-2 text-sm text-[var(--muted-foreground)] dark:text-white/55">{range.trendLabel} across the signals that matter most. All charts open fullscreen on click.</p>
           </div>
-          <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-white/70">{range.trendLabel}</div>
+          <div className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-1 text-xs font-medium text-[var(--muted-foreground)] dark:border-white/10 dark:bg-white/5 dark:text-white/70">{range.trendLabel}</div>
         </div>
         <div className="grid gap-6 xl:grid-cols-2">
           {chartConfigs.map((config) => (
@@ -598,14 +598,14 @@ export function HealthDashboardView({
       </section>
 
       <section className="mt-10 grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
-        <Surface className="p-6">
-          <div className="mb-4 flex items-center gap-3 text-white">
+        <Surface className="p-6 shadow-sm dark:shadow-none">
+          <div className="mb-4 flex items-center gap-3 text-[var(--text)] dark:text-white">
             <div className={`rounded-2xl border p-3 ${TONES.sleep.icon}`}>
               <MoonStar className="h-5 w-5" />
             </div>
             <div>
               <h2 className="text-lg font-semibold">Sleep Analysis</h2>
-              <p className="mt-1 text-sm text-white/45">Dedicated view for sleep duration and consistency.</p>
+              <p className="mt-1 text-sm text-[var(--muted-foreground)] dark:text-white/45">Dedicated view for sleep duration and consistency.</p>
             </div>
           </div>
 
@@ -631,18 +631,18 @@ export function HealthDashboardView({
           />
         </Surface>
 
-        <Surface className="p-6">
-          <div className="mb-4 flex items-center gap-3 text-white">
-            <BedDouble className="h-5 w-5 text-indigo-200" />
+        <Surface className="p-6 shadow-sm dark:shadow-none">
+          <div className="mb-4 flex items-center gap-3 text-[var(--text)] dark:text-white">
+            <BedDouble className="h-5 w-5 text-indigo-600 dark:text-indigo-200" />
             <h2 className="text-lg font-semibold">7d average + duration mix</h2>
           </div>
-          <div className="rounded-3xl border border-indigo-400/15 bg-indigo-400/8 p-5">
-            <div className="text-xs uppercase tracking-[0.22em] text-white/35">Average sleep</div>
+          <div className="rounded-3xl border border-indigo-200 bg-indigo-50 p-5 dark:border-indigo-400/15 dark:bg-indigo-400/8">
+            <div className="text-xs uppercase tracking-[0.22em] text-indigo-700/70 dark:text-white/35">Average sleep</div>
             <div className="mt-3 flex items-end gap-2">
-              <div className="text-4xl font-semibold text-white">{sleep7dAverage == null ? '—' : formatDurationHours(sleep7dAverage)}</div>
-              <div className="pb-1 text-sm text-white/45">hr</div>
+              <div className="text-4xl font-semibold text-[var(--text)] dark:text-white">{sleep7dAverage == null ? '—' : formatDurationHours(sleep7dAverage)}</div>
+              <div className="pb-1 text-sm text-[var(--muted-foreground)] dark:text-white/45">hr</div>
             </div>
-            <p className="mt-3 text-sm text-white/55">Useful anchor for the hero card and a quick sense of recovery baseline.</p>
+            <p className="mt-3 text-sm text-[var(--muted-foreground)] dark:text-white/55">Useful anchor for the hero card and a quick sense of recovery baseline.</p>
           </div>
           <div className="mt-5 space-y-3">
             {[
@@ -655,11 +655,11 @@ export function HealthDashboardView({
               const width = `${Math.max((Number(count) / total) * 100, Number(count) ? 8 : 0)}%`;
               return (
                 <div key={String(label)}>
-                  <div className="mb-2 flex items-center justify-between text-sm text-white/70">
+                  <div className="mb-2 flex items-center justify-between text-sm text-[var(--muted-foreground)] dark:text-white/70">
                     <span>{label}</span>
                     <span>{count} nights</span>
                   </div>
-                  <div className="h-2 rounded-full bg-white/8">
+                  <div className="h-2 rounded-full bg-slate-200 dark:bg-white/8">
                     <div className="h-2 rounded-full bg-gradient-to-r from-indigo-400 to-violet-400" style={{ width }} />
                   </div>
                 </div>
@@ -670,12 +670,12 @@ export function HealthDashboardView({
       </section>
 
       <section className="mt-10 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <Surface className="p-6">
-          <div className="mb-4 flex items-center gap-3 text-white">
-            <BedDouble className="h-5 w-5 text-green-200" />
+        <Surface className="p-6 shadow-sm dark:shadow-none">
+          <div className="mb-4 flex items-center gap-3 text-[var(--text)] dark:text-white">
+            <BedDouble className="h-5 w-5 text-green-600 dark:text-green-200" />
             <div>
               <h2 className="text-lg font-semibold">Workouts</h2>
-              <p className="mt-1 text-sm text-white/45">Filtered by the active date range.</p>
+              <p className="mt-1 text-sm text-[var(--muted-foreground)] dark:text-white/45">Filtered by the active date range.</p>
             </div>
           </div>
 
@@ -689,13 +689,13 @@ export function HealthDashboardView({
           {workouts.length ? (
             <div className="space-y-4">
               {workouts.slice(0, 5).map((workout) => (
-                <div key={`${workout.name}-${workout.start_time}`} className="rounded-3xl border border-white/8 bg-white/4 p-5">
+                <div key={`${workout.name}-${workout.start_time}`} className="rounded-3xl border border-[var(--border)] bg-[var(--panel)] p-5 dark:border-white/8 dark:bg-white/4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <div className="text-lg font-semibold text-white">{workout.name}</div>
-                      <div className="mt-2 text-sm text-white/45">{new Date(workout.start_time).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>
+                      <div className="text-lg font-semibold text-[var(--text)] dark:text-white">{workout.name}</div>
+                      <div className="mt-2 text-sm text-[var(--muted-foreground)] dark:text-white/45">{new Date(workout.start_time).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>
                     </div>
-                    <div className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/60">{workout.source ?? 'Unknown source'}</div>
+                    <div className="rounded-full border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-xs text-[var(--muted-foreground)] dark:border-white/10 dark:bg-black/20 dark:text-white/60">{workout.source ?? 'Unknown source'}</div>
                   </div>
                   <div className="mt-4 grid gap-3 sm:grid-cols-4">
                     {[
@@ -704,9 +704,9 @@ export function HealthDashboardView({
                       ['Distance', workout.distance_km == null ? '—' : `${workout.distance_km.toFixed(1)} km`],
                       ['Avg HR', workout.heart_rate_avg == null ? '—' : `${Math.round(workout.heart_rate_avg)} bpm`],
                     ].map(([label, value]) => (
-                      <div key={label} className="rounded-2xl border border-white/6 bg-black/10 px-4 py-3">
-                        <div className="text-xs uppercase tracking-[0.18em] text-white/35">{label}</div>
-                        <div className="mt-2 text-sm font-medium text-white/85">{value}</div>
+                      <div key={label} className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 dark:border-white/6 dark:bg-black/10">
+                        <div className="text-xs uppercase tracking-[0.18em] text-[var(--muted-foreground)] dark:text-white/35">{label}</div>
+                        <div className="mt-2 text-sm font-medium text-[var(--text)] dark:text-white/85">{value}</div>
                       </div>
                     ))}
                   </div>
@@ -718,27 +718,27 @@ export function HealthDashboardView({
           )}
         </Surface>
 
-        <Surface className="p-6">
-          <div className="mb-4 flex items-center gap-3 text-white">
-            <Activity className="h-5 w-5 text-green-200" />
+        <Surface className="p-6 shadow-sm dark:shadow-none">
+          <div className="mb-4 flex items-center gap-3 text-[var(--text)] dark:text-white">
+            <Activity className="h-5 w-5 text-green-600 dark:text-green-200" />
             <h2 className="text-lg font-semibold">Workout mix</h2>
           </div>
           {workoutSummary.mix.length ? (
             <div className="space-y-4">
-              <div className="rounded-3xl border border-white/8 bg-white/4 p-5">
-                <div className="text-xs uppercase tracking-[0.18em] text-white/35">Top type</div>
-                <div className="mt-2 text-2xl font-semibold text-white">{workoutSummary.mix[0]?.[0]}</div>
-                <div className="mt-1 text-sm text-white/50">{workoutSummary.mix[0]?.[1]} sessions in {range.trendLabel.toLowerCase()}</div>
+              <div className="rounded-3xl border border-[var(--border)] bg-[var(--panel)] p-5 dark:border-white/8 dark:bg-white/4">
+                <div className="text-xs uppercase tracking-[0.18em] text-[var(--muted-foreground)] dark:text-white/35">Top type</div>
+                <div className="mt-2 text-2xl font-semibold text-[var(--text)] dark:text-white">{workoutSummary.mix[0]?.[0]}</div>
+                <div className="mt-1 text-sm text-[var(--muted-foreground)] dark:text-white/50">{workoutSummary.mix[0]?.[1]} sessions in {range.trendLabel.toLowerCase()}</div>
               </div>
               {workoutSummary.mix.slice(0, 6).map(([name, count]) => {
                 const width = `${(count / Math.max(workoutSummary.total, 1)) * 100}%`;
                 return (
                   <div key={name}>
-                    <div className="mb-2 flex items-center justify-between text-sm text-white/70">
+                    <div className="mb-2 flex items-center justify-between text-sm text-[var(--muted-foreground)] dark:text-white/70">
                       <span>{name}</span>
                       <span>{count}</span>
                     </div>
-                    <div className="h-2 rounded-full bg-white/8">
+                    <div className="h-2 rounded-full bg-slate-200 dark:bg-white/8">
                       <div className="h-2 rounded-full bg-gradient-to-r from-green-400 to-emerald-400" style={{ width }} />
                     </div>
                   </div>

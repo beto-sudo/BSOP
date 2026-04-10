@@ -28,7 +28,28 @@ type Booking = {
   owner_id: string | null;
   booking_type: string | null;
   origin: string | null;
+  payment_status: string | null;
   synced_at: string | null;
+};
+
+type ReconciliationDay = {
+  fecha: string;
+  label: string;
+  totalReservas: number;
+  canceladas: number;
+  revenueBruto: number;
+  paid: number;
+  partialPaid: number;
+  pending: number;
+  notApplicable: number;
+  paidRevenue: number;
+  partialRevenue: number;
+  pendingRevenue: number;
+  notApplicableRevenue: number;
+  appReservas: number;
+  appRevenue: number;
+  managerReservas: number;
+  managerRevenue: number;
 };
 
 type BookingParticipant = {
@@ -614,7 +635,7 @@ export default function PlaytomicPage() {
 
       const bookingsQuery = schema
         .from('bookings')
-        .select('booking_id,resource_name,sport_id,booking_start,booking_end,duration_min,price_amount,price_currency,status,is_canceled,owner_id,booking_type,origin,synced_at')
+        .select('booking_id,resource_name,sport_id,booking_start,booking_end,duration_min,price_amount,price_currency,status,is_canceled,owner_id,booking_type,origin,payment_status,synced_at')
         .gte('booking_start', `${meta.fromIso}T00:00:00-06:00`)
         .lte('booking_start', `${meta.toIso}T23:59:59-06:00`)
         .order('booking_start', { ascending: true })
@@ -897,6 +918,184 @@ export default function PlaytomicPage() {
       return b.gasto - a.gasto;
     });
   }, [computedPlayers, playerQuery, playerSort]);
+
+  const reconciliation = useMemo(() => {
+    const dayMap = new Map<string, ReconciliationDay>();
+
+    data.bookings.forEach((booking) => {
+      if (!booking.booking_start || isCanceledBooking(booking)) return;
+
+      const bookingDate = new Date(booking.booking_start);
+      if (Number.isNaN(bookingDate.getTime())) return;
+
+      const fecha = bookingDate.toLocaleDateString('en-CA', { timeZone: TZ });
+      const amount = booking.price_amount ?? 0;
+      const paymentStatus = (booking.payment_status ?? 'NOT_APPLICABLE').toUpperCase();
+      const origin = (booking.origin ?? '').toUpperCase();
+
+      const existing = dayMap.get(fecha) ?? {
+        fecha,
+        label: DATE_FMT.format(new Date(`${fecha}T12:00:00`)),
+        totalReservas: 0,
+        canceladas: 0,
+        revenueBruto: 0,
+        paid: 0,
+        partialPaid: 0,
+        pending: 0,
+        notApplicable: 0,
+        paidRevenue: 0,
+        partialRevenue: 0,
+        pendingRevenue: 0,
+        notApplicableRevenue: 0,
+        appReservas: 0,
+        appRevenue: 0,
+        managerReservas: 0,
+        managerRevenue: 0,
+      } satisfies ReconciliationDay;
+
+      existing.totalReservas += 1;
+      existing.revenueBruto += amount;
+
+      if (paymentStatus === 'PAID') {
+        existing.paid += 1;
+        existing.paidRevenue += amount;
+      } else if (paymentStatus === 'PARTIAL_PAID') {
+        existing.partialPaid += 1;
+        existing.partialRevenue += amount;
+      } else if (paymentStatus === 'PENDING') {
+        existing.pending += 1;
+        existing.pendingRevenue += amount;
+      } else {
+        existing.notApplicable += 1;
+        existing.notApplicableRevenue += amount;
+      }
+
+      if (origin === 'APP_IOS' || origin === 'APP_ANDROID') {
+        existing.appReservas += 1;
+        existing.appRevenue += amount;
+      } else if (origin === 'MANAGER' || origin === 'PLAYTOMIC_MANAGER') {
+        existing.managerReservas += 1;
+        existing.managerRevenue += amount;
+      }
+
+      dayMap.set(fecha, existing);
+    });
+
+    const rows = Array.from(dayMap.values())
+      .sort((a, b) => b.fecha.localeCompare(a.fecha))
+      .slice(0, 60);
+
+    const totals = rows.reduce(
+      (acc, day) => ({
+        fecha: 'TOTAL',
+        label: 'Totales',
+        totalReservas: acc.totalReservas + day.totalReservas,
+        canceladas: acc.canceladas + day.canceladas,
+        revenueBruto: acc.revenueBruto + day.revenueBruto,
+        paid: acc.paid + day.paid,
+        partialPaid: acc.partialPaid + day.partialPaid,
+        pending: acc.pending + day.pending,
+        notApplicable: acc.notApplicable + day.notApplicable,
+        paidRevenue: acc.paidRevenue + day.paidRevenue,
+        partialRevenue: acc.partialRevenue + day.partialRevenue,
+        pendingRevenue: acc.pendingRevenue + day.pendingRevenue,
+        notApplicableRevenue: acc.notApplicableRevenue + day.notApplicableRevenue,
+        appReservas: acc.appReservas + day.appReservas,
+        appRevenue: acc.appRevenue + day.appRevenue,
+        managerReservas: acc.managerReservas + day.managerReservas,
+        managerRevenue: acc.managerRevenue + day.managerRevenue,
+      }),
+      {
+        fecha: 'TOTAL',
+        label: 'Totales',
+        totalReservas: 0,
+        canceladas: 0,
+        revenueBruto: 0,
+        paid: 0,
+        partialPaid: 0,
+        pending: 0,
+        notApplicable: 0,
+        paidRevenue: 0,
+        partialRevenue: 0,
+        pendingRevenue: 0,
+        notApplicableRevenue: 0,
+        appReservas: 0,
+        appRevenue: 0,
+        managerReservas: 0,
+        managerRevenue: 0,
+      } satisfies ReconciliationDay,
+    );
+
+    const csvRows = rows.map((day) => ({
+      Fecha: day.fecha,
+      Reservas: day.totalReservas,
+      'Revenue Bruto': day.revenueBruto,
+      Pagado: day.paid,
+      'Pagado Revenue': day.paidRevenue,
+      Parcial: day.partialPaid,
+      'Parcial Revenue': day.partialRevenue,
+      Pendiente: day.pending,
+      'Pendiente Revenue': day.pendingRevenue,
+      'N/A': day.notApplicable,
+      'N/A Revenue': day.notApplicableRevenue,
+      'Vía App': day.appReservas,
+      'Vía App Revenue': day.appRevenue,
+      Directo: day.managerReservas,
+      'Directo Revenue': day.managerRevenue,
+    }));
+
+    return {
+      rows,
+      totals,
+      summary: {
+        revenueBruto: totals.revenueBruto,
+        appRevenue: totals.appRevenue,
+        managerRevenue: totals.managerRevenue,
+        pendingRevenue: totals.pendingRevenue,
+      },
+      csvRows,
+    };
+  }, [data.bookings]);
+
+  const exportReconciliationCsv = useCallback(() => {
+    const headers = [
+      'Fecha',
+      'Reservas',
+      'Revenue Bruto',
+      'Pagado',
+      'Pagado Revenue',
+      'Parcial',
+      'Parcial Revenue',
+      'Pendiente',
+      'Pendiente Revenue',
+      'N/A',
+      'N/A Revenue',
+      'Vía App',
+      'Vía App Revenue',
+      'Directo',
+      'Directo Revenue',
+    ];
+
+    const escapeCsv = (value: string | number) => {
+      const stringValue = String(value ?? '');
+      return /[",\n]/.test(stringValue) ? `"${stringValue.replace(/"/g, '""')}"` : stringValue;
+    };
+
+    const lines = [
+      headers.join(','),
+      ...reconciliation.csvRows.map((row) => headers.map((header) => escapeCsv(row[header as keyof typeof row] ?? '')).join(',')),
+    ];
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `playtomic-conciliacion-${meta.fromIso}-a-${meta.toIso}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  }, [meta.fromIso, meta.toIso, reconciliation.csvRows]);
 
   return (
     <div className="space-y-6 pb-8">
@@ -1223,6 +1422,78 @@ export default function PlaytomicPage() {
             </div>
           </section>
 
+          <section className="space-y-4 rounded-3xl border border-[var(--border)] bg-[var(--card)] p-4 sm:p-5">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--text)]">Conciliación de Ingresos</h2>
+                <p className="text-sm text-[var(--text)]/55">Desglose diario de reservas por estado de pago y origen para cuadrar contra depósitos.</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={exportReconciliationCsv} disabled={reconciliation.rows.length === 0}>
+                Exportar CSV
+              </Button>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <KpiCard label="Revenue bruto total" value={formatMoney(reconciliation.summary.revenueBruto)} hint="Solo reservas no canceladas" icon={<CircleDollarSign className="h-4 w-4" />} />
+              <KpiCard label="Cobrado vía App" value={formatMoney(reconciliation.summary.appRevenue)} hint="APP_IOS + APP_ANDROID" icon={<Activity className="h-4 w-4" />} />
+              <KpiCard label="Cobrado directo" value={formatMoney(reconciliation.summary.managerRevenue)} hint="MANAGER + PLAYTOMIC_MANAGER" icon={<Users className="h-4 w-4" />} />
+              <KpiCard label="Pendiente de cobro" value={formatMoney(reconciliation.summary.pendingRevenue)} hint="payment_status = PENDING" icon={<RefreshCw className="h-4 w-4" />} />
+            </div>
+
+            <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead className="text-right">Reservas</TableHead>
+                    <TableHead className="text-right">Revenue Bruto</TableHead>
+                    <TableHead className="text-right">Pagado</TableHead>
+                    <TableHead className="text-right">Parcial</TableHead>
+                    <TableHead className="text-right">Pendiente</TableHead>
+                    <TableHead className="text-right">N/A</TableHead>
+                    <TableHead className="text-right">Vía App</TableHead>
+                    <TableHead className="text-right">Directo</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {reconciliation.rows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="py-10 text-center text-[var(--text)]/50">
+                        No hay datos de conciliación para este rango.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    <>
+                      {reconciliation.rows.map((day) => (
+                        <TableRow key={day.fecha}>
+                          <TableCell className="font-medium text-[var(--text)]">{day.label}</TableCell>
+                          <TableCell className="text-right">{day.totalReservas}</TableCell>
+                          <TableCell className="text-right font-medium">{formatMoney(day.revenueBruto)}</TableCell>
+                          <TableCell className="text-right">{`${day.paid} · ${formatMoney(day.paidRevenue, true)}`}</TableCell>
+                          <TableCell className="text-right">{`${day.partialPaid} · ${formatMoney(day.partialRevenue, true)}`}</TableCell>
+                          <TableCell className="text-right">{`${day.pending} · ${formatMoney(day.pendingRevenue, true)}`}</TableCell>
+                          <TableCell className="text-right">{`${day.notApplicable} · ${formatMoney(day.notApplicableRevenue, true)}`}</TableCell>
+                          <TableCell className="text-right">{`${day.appReservas} · ${formatMoney(day.appRevenue, true)}`}</TableCell>
+                          <TableCell className="text-right">{`${day.managerReservas} · ${formatMoney(day.managerRevenue, true)}`}</TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow className="bg-[var(--panel)]/80 font-semibold">
+                        <TableCell className="font-semibold text-[var(--text)]">{reconciliation.totals.label}</TableCell>
+                        <TableCell className="text-right font-semibold">{reconciliation.totals.totalReservas}</TableCell>
+                        <TableCell className="text-right font-semibold">{formatMoney(reconciliation.totals.revenueBruto)}</TableCell>
+                        <TableCell className="text-right font-semibold">{`${reconciliation.totals.paid} · ${formatMoney(reconciliation.totals.paidRevenue, true)}`}</TableCell>
+                        <TableCell className="text-right font-semibold">{`${reconciliation.totals.partialPaid} · ${formatMoney(reconciliation.totals.partialRevenue, true)}`}</TableCell>
+                        <TableCell className="text-right font-semibold">{`${reconciliation.totals.pending} · ${formatMoney(reconciliation.totals.pendingRevenue, true)}`}</TableCell>
+                        <TableCell className="text-right font-semibold">{`${reconciliation.totals.notApplicable} · ${formatMoney(reconciliation.totals.notApplicableRevenue, true)}`}</TableCell>
+                        <TableCell className="text-right font-semibold">{`${reconciliation.totals.appReservas} · ${formatMoney(reconciliation.totals.appRevenue, true)}`}</TableCell>
+                        <TableCell className="text-right font-semibold">{`${reconciliation.totals.managerReservas} · ${formatMoney(reconciliation.totals.managerRevenue, true)}`}</TableCell>
+                      </TableRow>
+                    </>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </section>
 
         </>
       )}

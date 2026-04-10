@@ -83,6 +83,7 @@ type Requisicion = {
   fecha_solicitud: string | null;
   item_count?: number;
   items?: RequisicionItem[];
+  oc_folio?: string | null;
 };
 
 type DraftItem = {
@@ -320,6 +321,9 @@ function ExistingRequestSheet({
           <div className="text-center mb-4">
              <h2 className="text-xl font-bold uppercase tracking-widest">Requisición Interna</h2>
              <p className="text-lg font-semibold mt-1">Folio: {requisicion.folio || 'S/N'}</p>
+             {requisicion.oc_folio && (
+               <p className="text-sm mt-1 text-gray-600">Orden de Compra: {requisicion.oc_folio}</p>
+             )}
           </div>
         </div>
 
@@ -367,6 +371,16 @@ function ExistingRequestSheet({
                   {requisicion.aprobado_por_nombre?.trim() || requisicion.aprobado_por?.trim() || 'Pendiente'}
                 </span>
               </div>
+              {requisicion.oc_folio && (
+                <div className="print:col-span-2">
+                  <span className="block text-xs uppercase tracking-wider text-muted-foreground print:text-black">
+                    Orden de Compra generada
+                  </span>
+                  <span className="font-mono font-semibold text-foreground print:text-black">
+                    {requisicion.oc_folio}
+                  </span>
+                </div>
+              )}
             </div>
 
             <Separator className="print:hidden" />
@@ -1009,17 +1023,31 @@ export default function RequisicionesPage() {
 
     try {
       const supabase = createSupabaseBrowserClient();
-      const { data, error: itemsError } = await supabase
-        .schema('rdb')
-        .from('requisiciones_items')
-        .select('*')
-        .eq('requisicion_id', requisicion.id)
-        .limit(100);
+      const [itemsResult, ocResult] = await Promise.all([
+        supabase
+          .schema('rdb')
+          .from('requisiciones_items')
+          .select('*')
+          .eq('requisicion_id', requisicion.id)
+          .limit(100),
+        supabase
+          .schema('rdb')
+          .from('ordenes_compra')
+          .select('folio')
+          .eq('requisicion_id', requisicion.id)
+          .maybeSingle(),
+      ]);
 
-      if (itemsError) throw itemsError;
+      if (itemsResult.error) throw itemsResult.error;
 
       setSelected((prev) =>
-        prev?.id === requisicion.id ? { ...prev, items: (data ?? []) as RequisicionItem[] } : prev,
+        prev?.id === requisicion.id
+          ? {
+              ...prev,
+              items: (itemsResult.data ?? []) as RequisicionItem[],
+              oc_folio: ocResult.data?.folio ?? null,
+            }
+          : prev,
       );
     } catch {
       setSelected((prev) => (prev?.id === requisicion.id ? { ...prev, items: [] } : prev));

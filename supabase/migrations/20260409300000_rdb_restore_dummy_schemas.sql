@@ -1,0 +1,4 @@
+CREATE SCHEMA IF NOT EXISTS waitry;
+CREATE SCHEMA IF NOT EXISTS caja;
+CREATE SCHEMA IF NOT EXISTS inventario;
+NOTIFY pgrst, 'reload schema';

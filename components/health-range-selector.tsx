@@ -78,14 +78,14 @@ export function HealthRangeSelector({
   };
 
   return (
-    <div className="rounded-[2rem] border border-amber-300/15 bg-black/20 p-4 sm:p-5">
+    <div className="rounded-[2rem] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm sm:p-5 dark:border-amber-300/15 dark:bg-black/20 dark:shadow-none">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-amber-200/80">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--accent-soft)] dark:text-amber-200/80">
             <CalendarDays className="h-4 w-4" />
             Date range
           </div>
-          <p className="mt-2 text-sm text-white/55">Vitals stay anchored to today by default. Trends can expand to a wider window or a custom range.</p>
+          <p className="mt-2 text-sm text-[var(--muted-foreground)] dark:text-white/55">Vitals stay anchored to today by default. Trends can expand to a wider window or a custom range.</p>
         </div>
 
         <div className="flex flex-col gap-3 lg:items-end">
@@ -93,16 +93,16 @@ export function HealthRangeSelector({
             <select
               value={preset}
               onChange={(event) => applyPreset(event.target.value as HealthRangePreset)}
-              className="min-w-[220px] appearance-none rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 pr-10 text-sm font-medium text-white outline-none transition focus:border-amber-300/40"
+              className="min-w-[220px] appearance-none rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 pr-10 text-sm font-medium text-[var(--text)] outline-none transition focus:border-[var(--accent-soft)] dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-white dark:focus:border-amber-300/40"
             >
               {PRESET_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value} className="bg-neutral-900 text-white">
+                <option key={option.value} value={option.value} className="bg-white text-[var(--text)] dark:bg-neutral-900 dark:text-white">
                   {option.label}
                 </option>
               ))}
-              <option value="custom" className="bg-neutral-900 text-white">Custom Range</option>
+              <option value="custom" className="bg-white text-[var(--text)] dark:bg-neutral-900 dark:text-white">Custom Range</option>
             </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/55" />
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted-foreground)] dark:text-white/55" />
           </div>
 
           {preset === 'custom' ? (
@@ -112,21 +112,21 @@ export function HealthRangeSelector({
                 value={from}
                 max={to || today}
                 onChange={(event) => setFrom(event.target.value)}
-                className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition focus:border-amber-300/35"
+                className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-sm text-[var(--text)] outline-none transition focus:border-[var(--accent-soft)] dark:border-white/10 dark:bg-black/20 dark:text-white dark:focus:border-amber-300/35"
               />
-              <span className="hidden text-white/35 sm:inline">→</span>
+              <span className="hidden text-[var(--muted-foreground)] sm:inline dark:text-white/35">→</span>
               <input
                 type="date"
                 value={to}
                 min={from || undefined}
                 max={today}
                 onChange={(event) => setTo(event.target.value)}
-                className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition focus:border-amber-300/35"
+                className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-sm text-[var(--text)] outline-none transition focus:border-[var(--accent-soft)] dark:border-white/10 dark:bg-black/20 dark:text-white dark:focus:border-amber-300/35"
               />
               <button
                 type="button"
                 onClick={applyCustom}
-                className="rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm font-medium text-amber-100 transition hover:bg-amber-300/15"
+                className="rounded-2xl border border-[var(--accent)]/20 bg-[var(--accent)]/10 px-4 py-3 text-sm font-medium text-[var(--accent-soft)] transition hover:bg-[var(--accent)]/14 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-100 dark:hover:bg-amber-300/15"
               >
                 Apply
               </button>
