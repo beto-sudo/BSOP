@@ -281,7 +281,7 @@ function OccupancyHeatmap({
   );
 
   const filteredResources = useMemo(() => {
-    const sorted = [...resources].sort((a, b) => (a.resource_name ?? '').localeCompare(b.resource_name ?? '', 'es'));
+    const sorted = [...resources].sort((a, b) => (a.resource_name ?? '').localeCompare(b.resource_name ?? '', 'es', { numeric: true }));
     return sorted.filter((resource) => sportFilter === 'all' || normalizeSport(resource.sport_id) === sportFilter);
   }, [resources, sportFilter]);
 
