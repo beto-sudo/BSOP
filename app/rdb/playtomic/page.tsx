@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Activity, CalendarRange, CircleDollarSign, RefreshCw, Users, XCircle } from 'lucide-react';
 
-type RangeKey = '7d' | '30d' | '90d';
+type RangeKey = '7d' | '30d' | 'month' | 'year' | 'all';
 type SportFilter = 'all' | 'PADEL' | 'TENNIS';
 type PlayerSortKey = 'name' | 'reservas' | 'gasto' | 'sport';
 
@@ -54,13 +54,21 @@ type OccupancyRow = {
   revenue: number | null;
 };
 
-type TopPlayerRow = {
+type PlayerRow = {
+  playtomic_id: string;
   name: string | null;
   email: string | null;
-  reservas_periodo: number | null;
-  gasto_estimado: number | null;
   player_type: string | null;
   favorite_sport: string | null;
+};
+
+type ComputedPlayer = {
+  name: string | null;
+  email: string | null;
+  reservas: number;
+  gasto: number;
+  favorite_sport: string | null;
+  player_type: string | null;
 };
 
 type ResourceRow = {
@@ -98,7 +106,7 @@ type DashboardData = {
   participants: BookingParticipant[];
   revenue: RevenueRow[];
   occupancy: OccupancyRow[];
-  topPlayers: TopPlayerRow[];
+  players: PlayerRow[];
   resources: ResourceRow[];
   syncs: SyncRow[];
 };
@@ -136,14 +144,43 @@ function isoDateLocal(date: Date) {
 
 function getRangeMeta(range: RangeKey) {
   const to = nowInTz();
-  const days = range === '7d' ? 6 : range === '30d' ? 29 : 89;
-  const from = addDays(to, -days);
+  let from: Date;
+  let label: string;
+
+  switch (range) {
+    case '7d':
+      from = addDays(to, -6);
+      label = 'Últimos 7 días';
+      break;
+    case '30d':
+      from = addDays(to, -29);
+      label = 'Últimos 30 días';
+      break;
+    case 'month': {
+      from = new Date(to.getFullYear(), to.getMonth(), 1);
+      const monthName = to.toLocaleString('es-MX', { month: 'long' });
+      label = `${monthName.charAt(0).toUpperCase()}${monthName.slice(1)} ${to.getFullYear()}`;
+      break;
+    }
+    case 'year':
+      from = new Date(to.getFullYear(), 0, 1);
+      label = `Año ${to.getFullYear()}`;
+      break;
+    case 'all':
+      from = new Date(2020, 0, 1);
+      label = 'Todo el historial';
+      break;
+    default:
+      from = addDays(to, -29);
+      label = 'Últimos 30 días';
+  }
+
   return {
     from,
     to,
     fromIso: isoDateLocal(from),
     toIso: isoDateLocal(to),
-    label: range === '7d' ? 'Últimos 7 días' : range === '30d' ? 'Últimos 30 días' : 'Últimos 90 días',
+    label,
   };
 }
 
@@ -368,7 +405,7 @@ export default function PlaytomicPage() {
     participants: [],
     revenue: [],
     occupancy: [],
-    topPlayers: [],
+    players: [],
     resources: [],
     syncs: [],
   });
@@ -393,7 +430,7 @@ export default function PlaytomicPage() {
         .gte('booking_start', `${meta.fromIso}T00:00:00-06:00`)
         .lte('booking_start', `${meta.toIso}T23:59:59-06:00`)
         .order('booking_start', { ascending: true })
-        .limit(range === '90d' ? 12000 : 5000);
+        .limit(range === 'all' || range === 'year' ? 15000 : range === '30d' || range === 'month' ? 5000 : 2000);
 
       const revenueQuery = schema
         .from('v_revenue_diario')
@@ -409,11 +446,10 @@ export default function PlaytomicPage() {
         .lte('fecha', meta.toIso)
         .order('resource_name', { ascending: true });
 
-      const topPlayersQuery = schema
-        .from('v_top_players')
-        .select('name,email,reservas_periodo,gasto_estimado,player_type,favorite_sport')
-        .order('gasto_estimado', { ascending: false })
-        .limit(250);
+      const playersQuery = schema
+        .from('players')
+        .select('playtomic_id,name,email,player_type,favorite_sport')
+        .limit(2000);
 
       const resourcesQuery = schema
         .from('resources')
@@ -427,11 +463,11 @@ export default function PlaytomicPage() {
         .order('started_at', { ascending: false })
         .limit(10);
 
-      const [bookingsRes, revenueRes, occupancyRes, topPlayersRes, resourcesRes, syncsRes] = await Promise.all([
+      const [bookingsRes, revenueRes, occupancyRes, playersRes, resourcesRes, syncsRes] = await Promise.all([
         bookingsQuery,
         revenueQuery,
         occupancyQuery,
-        topPlayersQuery,
+        playersQuery,
         resourcesQuery,
         syncsQuery,
       ]);
@@ -439,7 +475,7 @@ export default function PlaytomicPage() {
       if (bookingsRes.error) throw bookingsRes.error;
       if (revenueRes.error) throw revenueRes.error;
       if (occupancyRes.error) throw occupancyRes.error;
-      if (topPlayersRes.error) throw topPlayersRes.error;
+      if (playersRes.error) throw playersRes.error;
       if (resourcesRes.error) throw resourcesRes.error;
       if (syncsRes.error) throw syncsRes.error;
 
@@ -469,7 +505,7 @@ export default function PlaytomicPage() {
         participants,
         revenue: (revenueRes.data ?? []) as RevenueRow[],
         occupancy: (occupancyRes.data ?? []) as OccupancyRow[],
-        topPlayers: (topPlayersRes.data ?? []) as TopPlayerRow[],
+        players: (playersRes.data ?? []) as PlayerRow[],
         resources: (resourcesRes.data ?? []) as ResourceRow[],
         syncs: (syncsRes.data ?? []) as SyncRow[],
       });
@@ -552,8 +588,64 @@ export default function PlaytomicPage() {
     return data.occupancy.filter((row) => allowed.has(row.resource_name ?? ''));
   }, [data.occupancy, data.resources, sportFilter]);
 
+  const computedPlayers = useMemo<ComputedPlayer[]>(() => {
+    // Build a map of player_id -> { bookings count, total spend } from filtered bookings
+    const playerStats = new Map<string, { reservas: number; gasto: number; sports: Map<string, number> }>();
+
+    // Map booking_id -> booking for quick lookup
+    const bookingMap = new Map(data.bookings.map((b) => [b.booking_id, b]));
+
+    // Count owner bookings
+    data.bookings.forEach((b) => {
+      if (b.owner_id && !b.is_canceled) {
+        const entry = playerStats.get(b.owner_id) ?? { reservas: 0, gasto: 0, sports: new Map() };
+        entry.reservas += 1;
+        entry.gasto += b.price_amount ?? 0;
+        const sport = normalizeSport(b.sport_id);
+        entry.sports.set(sport, (entry.sports.get(sport) ?? 0) + 1);
+        playerStats.set(b.owner_id, entry);
+      }
+    });
+
+    // Count participant bookings (non-owner)
+    data.participants.forEach((p) => {
+      if (p.player_id && !p.is_owner) {
+        const booking = bookingMap.get(p.booking_id);
+        if (booking && !booking.is_canceled) {
+          const entry = playerStats.get(p.player_id) ?? { reservas: 0, gasto: 0, sports: new Map() };
+          entry.reservas += 1;
+          const sport = normalizeSport(booking.sport_id);
+          entry.sports.set(sport, (entry.sports.get(sport) ?? 0) + 1);
+          playerStats.set(p.player_id, entry);
+        }
+      }
+    });
+
+    // Build player lookup
+    const playerMap = new Map(data.players.map((p) => [p.playtomic_id, p]));
+
+    // Merge stats with player info
+    return Array.from(playerStats.entries()).map(([playerId, stats]) => {
+      const player = playerMap.get(playerId);
+      // Determine favorite sport from period data
+      let favSport: string | null = null;
+      let maxCount = 0;
+      stats.sports.forEach((count, sport) => {
+        if (count > maxCount) { maxCount = count; favSport = sport; }
+      });
+      return {
+        name: player?.name ?? null,
+        email: player?.email ?? null,
+        reservas: stats.reservas,
+        gasto: stats.gasto,
+        favorite_sport: favSport,
+        player_type: player?.player_type ?? null,
+      };
+    });
+  }, [data.bookings, data.participants, data.players]);
+
   const topPlayers = useMemo(() => {
-    const searched = data.topPlayers.filter((player) => {
+    const searched = computedPlayers.filter((player) => {
       if (!playerQuery.trim()) return true;
       const query = playerQuery.toLowerCase();
       return (
@@ -565,11 +657,11 @@ export default function PlaytomicPage() {
 
     return [...searched].sort((a, b) => {
       if (playerSort === 'name') return (a.name ?? '').localeCompare(b.name ?? '', 'es');
-      if (playerSort === 'reservas') return (b.reservas_periodo ?? 0) - (a.reservas_periodo ?? 0);
+      if (playerSort === 'reservas') return b.reservas - a.reservas;
       if (playerSort === 'sport') return (a.favorite_sport ?? '').localeCompare(b.favorite_sport ?? '', 'es');
-      return (b.gasto_estimado ?? 0) - (a.gasto_estimado ?? 0);
+      return b.gasto - a.gasto;
     });
-  }, [data.topPlayers, playerQuery, playerSort]);
+  }, [computedPlayers, playerQuery, playerSort]);
 
   return (
     <div className="space-y-6 pb-8">
@@ -581,7 +673,7 @@ export default function PlaytomicPage() {
             <p className="mt-2 max-w-3xl text-sm text-[var(--text)]/60">Reservas, ingresos, ocupación, jugadores y salud de sincronización en una sola vista.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {(['7d', '30d', '90d'] as const).map((value) => (
+            {([['7d', '7 días'], ['30d', '30 días'], ['month', 'Este mes'], ['year', 'Este año'], ['all', 'Todo']] as const).map(([value, label]) => (
               <button
                 key={value}
                 type="button"
@@ -593,7 +685,7 @@ export default function PlaytomicPage() {
                     : 'border-[var(--border)] bg-[var(--card)] text-[var(--text)]/65 hover:text-[var(--text)]',
                 ].join(' ')}
               >
-                {value === '7d' ? '7 días' : value === '30d' ? '30 días' : '90 días'}
+                {label}
               </button>
             ))}
             <Button variant="outline" size="sm" onClick={() => void fetchData(true)} disabled={refreshing}>
@@ -731,8 +823,8 @@ export default function PlaytomicPage() {
                             <div className="font-medium text-[var(--text)]">{player.name ?? 'Sin nombre'}</div>
                             <div className="text-xs text-[var(--text)]/45">{player.email ?? 'Sin correo'}</div>
                           </TableCell>
-                          <TableCell>{player.reservas_periodo ?? 0}</TableCell>
-                          <TableCell className="text-right font-medium">{formatMoney(player.gasto_estimado)}</TableCell>
+                          <TableCell>{player.reservas}</TableCell>
+                          <TableCell className="text-right font-medium">{formatMoney(player.gasto)}</TableCell>
                           <TableCell>
                             <Badge variant="outline">{player.favorite_sport ?? '—'}</Badge>
                           </TableCell>
