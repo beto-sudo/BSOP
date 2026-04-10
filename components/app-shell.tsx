@@ -51,6 +51,7 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'Inventario', href: '/rdb/inventario' },
       { label: 'Proveedores', href: '/rdb/proveedores' },
       { label: 'Requisiciones', href: '/rdb/requisiciones' },
+      { label: 'Playtomic', href: '/rdb/playtomic' },
       { label: 'Órdenes de Compra', href: '/rdb/ordenes-compra' },
     ],
   },
@@ -136,7 +137,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [signingOut, setSigningOut] = useState(false);
   const isStandaloneSharePage = pathname.startsWith('/compartir/');
   const isAuthPage = pathname === '/login';
-  const isRdbPage = pathname === '/rdb'; // Only block the root /rdb if it doesn't exist, let subpages render with shell
 
   useEffect(() => {
     setNow(new Date());
@@ -265,7 +265,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   };
 
-  if (isStandaloneSharePage || isAuthPage || isRdbPage) {
+  if (isStandaloneSharePage || isAuthPage) {
     return <>{children}</>;
   }
 
