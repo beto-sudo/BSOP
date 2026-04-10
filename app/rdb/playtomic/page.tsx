@@ -71,6 +71,15 @@ type ComputedPlayer = {
   player_type: string | null;
 };
 
+type CancelPlayerRow = {
+  ownerId: string;
+  name: string | null;
+  email: string | null;
+  totalBookings: number;
+  canceledBookings: number;
+  cancellationRate: number;
+};
+
 type ResourceRow = {
   resource_id: string;
   resource_name: string | null;
@@ -224,6 +233,14 @@ type ChartBucket = {
 
 const WEEK_FMT = new Intl.DateTimeFormat('es-MX', { timeZone: TZ, day: '2-digit', month: 'short' });
 const MONTH_FMT = new Intl.DateTimeFormat('es-MX', { timeZone: TZ, month: 'short', year: '2-digit' });
+const WEEKDAY_KEY_FMT = new Intl.DateTimeFormat('en-US', { timeZone: TZ, weekday: 'short' });
+const HOUR_FMT = new Intl.DateTimeFormat('en-US', { timeZone: TZ, hour: '2-digit', hour12: false });
+const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] as const;
+const WEEKDAY_INDEX_MAP: Record<string, number> = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+
+function isCanceledBooking(booking: Booking) {
+  return booking.is_canceled === true || (booking.status ?? '').toLowerCase().includes('cancel');
+}
 
 function isoWeekKey(dateStr: string) {
   const d = new Date(`${dateStr}T12:00:00`);
@@ -373,6 +390,95 @@ function RevenueChart({ data }: { data: ChartBucket[] }) {
                 <rect x={x} y={yTop} width={barWidth} height={tennisHeight} rx={Math.min(6, barWidth / 2)} fill="#0ea5e9" />
                 {(index === 0 || index === data.length - 1 || index % Math.ceil(data.length / 6) === 0) ? (
                   <text x={x + barWidth / 2} y={chartHeight + 20} textAnchor="middle" fontSize="11" fill="currentColor" opacity="0.45">
+                    {item.label}
+                  </text>
+                ) : null}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function CancellationWeekdayChart({ data }: { data: { label: string; value: number }[] }) {
+  const width = 520;
+  const height = 220;
+  const chartHeight = 160;
+  const barWidth = 44;
+  const gap = 28;
+  const maxValue = Math.max(...data.map((item) => item.value), 1);
+
+  return (
+    <div className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-4 sm:p-5">
+      <div>
+        <h3 className="text-base font-semibold text-[var(--text)]">Cancelaciones por día</h3>
+        <p className="text-sm text-[var(--text)]/55">Distribución semanal de reservas canceladas.</p>
+      </div>
+      <div className="mt-4 overflow-x-auto">
+        <svg viewBox={`0 0 ${width} ${height}`} className="min-w-[460px] text-[var(--text)]">
+          {[0.25, 0.5, 0.75, 1].map((tick) => {
+            const y = chartHeight - tick * chartHeight;
+            return <line key={tick} x1="0" x2={width} y1={y} y2={y} stroke="currentColor" strokeOpacity="0.08" />;
+          })}
+          {data.map((item, index) => {
+            const x = 20 + index * (barWidth + gap);
+            const barHeight = (item.value / maxValue) * chartHeight;
+            const y = chartHeight - barHeight;
+            return (
+              <g key={item.label}>
+                <rect x={x} y={y} width={barWidth} height={barHeight} rx="12" fill="#f43f5e" />
+                <text x={x + barWidth / 2} y={Math.max(y - 8, 12)} textAnchor="middle" fontSize="11" fill="currentColor" opacity="0.75">
+                  {item.value}
+                </text>
+                <text x={x + barWidth / 2} y={chartHeight + 22} textAnchor="middle" fontSize="11" fill="currentColor" opacity="0.5">
+                  {item.label}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function CancellationHourChart({ data }: { data: { label: string; value: number }[] }) {
+  const width = 960;
+  const height = 220;
+  const chartHeight = 160;
+  const barWidth = Math.max(12, Math.min(24, width / Math.max(data.length, 1) - 4));
+  const gap = Math.max(3, Math.min(10, (width - barWidth * data.length) / Math.max(data.length - 1, 1)));
+  const maxValue = Math.max(...data.map((item) => item.value), 1);
+
+  return (
+    <div className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-4 sm:p-5">
+      <div>
+        <h3 className="text-base font-semibold text-[var(--text)]">Cancelaciones por hora</h3>
+        <p className="text-sm text-[var(--text)]/55">Horas del día con más cancelaciones.</p>
+      </div>
+      <div className="mt-4 overflow-x-auto">
+        <svg viewBox={`0 0 ${width} ${height}`} className="min-w-[760px] text-[var(--text)]">
+          {[0.25, 0.5, 0.75, 1].map((tick) => {
+            const y = chartHeight - tick * chartHeight;
+            return <line key={tick} x1="0" x2={width} y1={y} y2={y} stroke="currentColor" strokeOpacity="0.08" />;
+          })}
+          {data.map((item, index) => {
+            const x = index * (barWidth + gap);
+            const barHeight = (item.value / maxValue) * chartHeight;
+            const y = chartHeight - barHeight;
+            const showLabel = index === 0 || index === data.length - 1 || index % 3 === 0;
+            return (
+              <g key={item.label}>
+                <rect x={x} y={y} width={barWidth} height={barHeight} rx="8" fill="#ef4444" />
+                {item.value > 0 ? (
+                  <text x={x + barWidth / 2} y={Math.max(y - 8, 12)} textAnchor="middle" fontSize="10" fill="currentColor" opacity="0.72">
+                    {item.value}
+                  </text>
+                ) : null}
+                {showLabel ? (
+                  <text x={x + barWidth / 2} y={chartHeight + 22} textAnchor="middle" fontSize="10" fill="currentColor" opacity="0.5">
                     {item.label}
                   </text>
                 ) : null}
@@ -646,6 +752,77 @@ export default function PlaytomicPage() {
     return data.occupancy.filter((row) => allowed.has(row.resource_name ?? ''));
   }, [data.occupancy, data.resources, sportFilter]);
 
+  const cancellationAnalysis = useMemo(() => {
+    const playerMap = new Map(data.players.map((player) => [player.playtomic_id, player]));
+    const canceledBookings = data.bookings.filter((booking) => isCanceledBooking(booking));
+    const sports = {
+      PADEL: { total: 0, canceled: 0 },
+      TENNIS: { total: 0, canceled: 0 },
+    };
+
+    const cancellationsByWeekday = WEEKDAY_LABELS.map((label) => ({ label, value: 0 }));
+    const cancellationsByHour = Array.from({ length: 24 }, (_, hour) => ({ label: `${String(hour).padStart(2, '0')}:00`, value: 0 }));
+    const cancelers = new Map<string, { totalBookings: number; canceledBookings: number }>();
+    let canceledDurationTotal = 0;
+    let canceledDurationCount = 0;
+
+    data.bookings.forEach((booking) => {
+      const canceled = isCanceledBooking(booking);
+      const sport = normalizeSport(booking.sport_id);
+      if (sport === 'PADEL' || sport === 'TENNIS') {
+        sports[sport].total += 1;
+        if (canceled) sports[sport].canceled += 1;
+      }
+
+      if (booking.owner_id) {
+        const entry = cancelers.get(booking.owner_id) ?? { totalBookings: 0, canceledBookings: 0 };
+        entry.totalBookings += 1;
+        if (canceled) entry.canceledBookings += 1;
+        cancelers.set(booking.owner_id, entry);
+      }
+
+      if (!canceled || !booking.booking_start) return;
+
+      if (typeof booking.duration_min === 'number' && Number.isFinite(booking.duration_min)) {
+        canceledDurationTotal += booking.duration_min;
+        canceledDurationCount += 1;
+      }
+
+      const bookingDate = new Date(booking.booking_start);
+      if (Number.isNaN(bookingDate.getTime())) return;
+
+      const weekdayKey = WEEKDAY_KEY_FMT.format(bookingDate);
+      const weekdayIndex = WEEKDAY_INDEX_MAP[weekdayKey];
+      if (weekdayIndex != null) cancellationsByWeekday[weekdayIndex].value += 1;
+
+      const hourValue = Number.parseInt(HOUR_FMT.format(bookingDate), 10);
+      if (!Number.isNaN(hourValue) && cancellationsByHour[hourValue]) cancellationsByHour[hourValue].value += 1;
+    });
+
+    const topCancelers = Array.from(cancelers.entries())
+      .map(([ownerId, stats]) => ({
+        ownerId,
+        name: playerMap.get(ownerId)?.name ?? null,
+        email: playerMap.get(ownerId)?.email ?? null,
+        totalBookings: stats.totalBookings,
+        canceledBookings: stats.canceledBookings,
+        cancellationRate: stats.totalBookings ? (stats.canceledBookings / stats.totalBookings) * 100 : 0,
+      }))
+      .filter((player): player is CancelPlayerRow => player.canceledBookings >= 2)
+      .sort((a, b) => b.canceledBookings - a.canceledBookings || b.cancellationRate - a.cancellationRate || (a.name ?? '').localeCompare(b.name ?? '', 'es'))
+      .slice(0, 20);
+
+    return {
+      canceledCount: canceledBookings.length,
+      cancellationRate: data.bookings.length ? (canceledBookings.length / data.bookings.length) * 100 : 0,
+      avgCanceledDuration: canceledDurationCount ? canceledDurationTotal / canceledDurationCount : 0,
+      sports,
+      cancellationsByWeekday,
+      cancellationsByHour,
+      topCancelers,
+    };
+  }, [data.bookings, data.players]);
+
   const computedPlayers = useMemo<ComputedPlayer[]>(() => {
     // Build a map of player_id -> { bookings count, total spend } from filtered bookings
     const playerStats = new Map<string, { reservas: number; gasto: number; sports: Map<string, number> }>();
@@ -833,6 +1010,117 @@ export default function PlaytomicPage() {
               </div>
             </div>
             <OccupancyHeatmap rows={filteredOccupancy} resources={data.resources} sportFilter={sportFilter} />
+          </section>
+
+          <section className="space-y-6">
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--text)]">Análisis de Cancelaciones</h2>
+              <p className="text-sm text-[var(--text)]/55">Patrones y tendencias en reservas canceladas dentro del periodo seleccionado.</p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-2xl border border-rose-500/20 bg-[var(--card)] p-4">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-500">Total cancelaciones</div>
+                <div className="mt-2 text-3xl font-semibold text-[var(--text)]">{cancellationAnalysis.canceledCount}</div>
+                <div className="mt-1 text-sm text-[var(--text)]/55">Reservas marcadas como canceladas.</div>
+              </div>
+              <div className="rounded-2xl border border-rose-500/20 bg-[var(--card)] p-4">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-500">Tasa de cancelación</div>
+                <div className="mt-2 text-3xl font-semibold text-[var(--text)]">{cancellationAnalysis.cancellationRate.toFixed(1)}%</div>
+                <div className="mt-1 text-sm text-[var(--text)]/55">Sobre {data.bookings.length} reservas del periodo.</div>
+              </div>
+              <div className="rounded-2xl border border-rose-500/20 bg-[var(--card)] p-4">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-500">Padel vs Tennis</div>
+                <div className="mt-2 space-y-1 text-sm text-[var(--text)]">
+                  <div className="flex items-center justify-between gap-3">
+                    <span>Padel</span>
+                    <span className="font-medium">{cancellationAnalysis.sports.PADEL.canceled} ({cancellationAnalysis.sports.PADEL.total ? ((cancellationAnalysis.sports.PADEL.canceled / cancellationAnalysis.sports.PADEL.total) * 100).toFixed(1) : '0.0'}%)</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span>Tennis</span>
+                    <span className="font-medium">{cancellationAnalysis.sports.TENNIS.canceled} ({cancellationAnalysis.sports.TENNIS.total ? ((cancellationAnalysis.sports.TENNIS.canceled / cancellationAnalysis.sports.TENNIS.total) * 100).toFixed(1) : '0.0'}%)</span>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-rose-500/20 bg-[var(--card)] p-4">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-500">Duración cancelada promedio</div>
+                <div className="mt-2 text-3xl font-semibold text-[var(--text)]">{cancellationAnalysis.avgCanceledDuration.toFixed(0)} min</div>
+                <div className="mt-1 text-sm text-[var(--text)]/55">Promedio de minutos en reservas canceladas.</div>
+              </div>
+            </div>
+
+            <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+              <CancellationWeekdayChart data={cancellationAnalysis.cancellationsByWeekday} />
+              <CancellationHourChart data={cancellationAnalysis.cancellationsByHour} />
+            </div>
+
+            <div className="overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--card)]">
+              <div className="border-b border-[var(--border)] px-4 py-4 sm:px-5">
+                <h3 className="text-base font-semibold text-[var(--text)]">Top canceladores</h3>
+                <p className="text-sm text-[var(--text)]/55">Jugadores con al menos 2 cancelaciones dentro del periodo.</p>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Total Reservas</TableHead>
+                    <TableHead>Canceladas</TableHead>
+                    <TableHead className="text-right">Tasa</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {cancellationAnalysis.topCancelers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="py-10 text-center text-[var(--text)]/50">
+                        No hay jugadores con 2 o más cancelaciones en este periodo.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    cancellationAnalysis.topCancelers.map((player) => (
+                      <TableRow key={player.ownerId}>
+                        <TableCell className="font-medium text-[var(--text)]">{player.name ?? 'Sin nombre'}</TableCell>
+                        <TableCell className="text-[var(--text)]/60">{player.email ?? 'Sin correo'}</TableCell>
+                        <TableCell>{player.totalBookings}</TableCell>
+                        <TableCell>{player.canceledBookings}</TableCell>
+                        <TableCell className="text-right font-medium text-rose-600 dark:text-rose-300">{player.cancellationRate.toFixed(1)}%</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              {(['PADEL', 'TENNIS'] as const).map((sport) => {
+                const stats = cancellationAnalysis.sports[sport];
+                const rate = stats.total ? (stats.canceled / stats.total) * 100 : 0;
+                return (
+                  <div key={sport} className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-4 sm:p-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="text-base font-semibold text-[var(--text)]">{sport === 'PADEL' ? 'Padel' : 'Tennis'}</h3>
+                      <Badge variant="outline" className="border-rose-500/30 text-rose-600 dark:text-rose-300">
+                        {rate.toFixed(1)}%
+                      </Badge>
+                    </div>
+                    <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
+                      <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-3 py-3">
+                        <div className="text-xs uppercase tracking-[0.15em] text-[var(--text)]/40">Reservas</div>
+                        <div className="mt-1 text-xl font-semibold text-[var(--text)]">{stats.total}</div>
+                      </div>
+                      <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-3 py-3">
+                        <div className="text-xs uppercase tracking-[0.15em] text-[var(--text)]/40">Canceladas</div>
+                        <div className="mt-1 text-xl font-semibold text-rose-600 dark:text-rose-300">{stats.canceled}</div>
+                      </div>
+                      <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-3 py-3">
+                        <div className="text-xs uppercase tracking-[0.15em] text-[var(--text)]/40">Tasa</div>
+                        <div className="mt-1 text-xl font-semibold text-[var(--text)]">{rate.toFixed(1)}%</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </section>
 
           <section className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
