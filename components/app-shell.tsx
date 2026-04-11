@@ -53,8 +53,8 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'Inventario', href: '/rdb/inventario' },
       { label: 'Proveedores', href: '/rdb/proveedores' },
       { label: 'Requisiciones', href: '/rdb/requisiciones' },
-      { label: 'Playtomic', href: '/rdb/playtomic' },
       { label: 'Órdenes de Compra', href: '/rdb/ordenes-compra' },
+      { label: 'Playtomic', href: '/rdb/playtomic' },
     ],
   },
   {
