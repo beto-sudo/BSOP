@@ -851,7 +851,7 @@ export default function PlaytomicPage() {
       }))
       .filter((player): player is CancelPlayerRow => player.canceledBookings >= 2)
       .sort((a, b) => b.canceledBookings - a.canceledBookings || b.cancellationRate - a.cancellationRate || (a.name ?? '').localeCompare(b.name ?? '', 'es'))
-      .slice(0, 20);
+      .slice(0, 10);
 
     return {
       canceledCount: canceledBookings.length,
@@ -1239,12 +1239,6 @@ export default function PlaytomicPage() {
             <KpiCard label="Cancelación" value={`${kpis.cancellationRate.toFixed(1)}%`} hint="Sobre reservas del periodo" icon={<XCircle className="h-4 w-4" />} />
             <KpiCard label="Jugadores únicos" value={String(kpis.uniquePlayers)} hint="Owners + participantes" icon={<Users className="h-4 w-4" />} />
             <KpiCard label="Valor promedio" value={formatMoney(kpis.avgBookingValue)} hint="Ingreso promedio por reserva" icon={<Activity className="h-4 w-4" />} />
-            <KpiCard
-              label="Última sincronización"
-              value={kpis.lastSync?.status ?? 'Sin datos'}
-              hint={kpis.lastSync ? `${formatDateTime(kpis.lastSync.finished_at ?? kpis.lastSync.started_at)} · ${kpis.lastSync.sync_type ?? 'sync'}` : 'No hay registros'}
-              icon={<RefreshCw className="h-4 w-4" />}
-            />
           </section>
 
           <section className="space-y-4">
@@ -1354,6 +1348,41 @@ export default function PlaytomicPage() {
                 </Table>
               </div>
             </div>
+
+            <div className="overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--card)] self-start">
+              <div className="border-b border-[var(--border)] px-4 py-4 sm:px-5">
+                <h3 className="text-base font-semibold text-[var(--text)]">Top canceladores</h3>
+                <p className="text-sm text-[var(--text)]/55">Jugadores con al menos 2 cancelaciones dentro del periodo.</p>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Total Reservas</TableHead>
+                    <TableHead>Canceladas</TableHead>
+                    <TableHead className="text-right">Tasa</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {cancellationAnalysis.topCancelers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="py-10 text-center text-[var(--text)]/50">
+                        No hay jugadores con 2 o más cancelaciones en este periodo.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    cancellationAnalysis.topCancelers.map((player) => (
+                      <TableRow key={player.ownerId}>
+                        <TableCell className="font-medium text-[var(--text)]">{player.name ?? 'Sin nombre'}</TableCell>
+                        <TableCell>{player.totalBookings}</TableCell>
+                        <TableCell>{player.canceledBookings}</TableCell>
+                        <TableCell className="text-right font-medium text-rose-600 dark:text-rose-300">{player.cancellationRate.toFixed(1)}%</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </section>
 
           <section className="space-y-6">
@@ -1398,42 +1427,6 @@ export default function PlaytomicPage() {
               <CancellationHourChart data={cancellationAnalysis.cancellationsByHour} />
             </div>
 
-            <div className="overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--card)]">
-              <div className="border-b border-[var(--border)] px-4 py-4 sm:px-5">
-                <h3 className="text-base font-semibold text-[var(--text)]">Top canceladores</h3>
-                <p className="text-sm text-[var(--text)]/55">Jugadores con al menos 2 cancelaciones dentro del periodo.</p>
-              </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Total Reservas</TableHead>
-                    <TableHead>Canceladas</TableHead>
-                    <TableHead className="text-right">Tasa</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {cancellationAnalysis.topCancelers.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="py-10 text-center text-[var(--text)]/50">
-                        No hay jugadores con 2 o más cancelaciones en este periodo.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    cancellationAnalysis.topCancelers.map((player) => (
-                      <TableRow key={player.ownerId}>
-                        <TableCell className="font-medium text-[var(--text)]">{player.name ?? 'Sin nombre'}</TableCell>
-                        <TableCell className="text-[var(--text)]/60">{player.email ?? 'Sin correo'}</TableCell>
-                        <TableCell>{player.totalBookings}</TableCell>
-                        <TableCell>{player.canceledBookings}</TableCell>
-                        <TableCell className="text-right font-medium text-rose-600 dark:text-rose-300">{player.cancellationRate.toFixed(1)}%</TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               {(['PADEL', 'TENNIS'] as const).map((sport) => {
