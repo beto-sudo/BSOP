@@ -343,7 +343,9 @@ export function AccesoClient({
               }}
             >
               <SelectTrigger className="w-52">
-                <SelectValue placeholder="Selecciona empresa" />
+                <SelectValue placeholder="Selecciona empresa">
+                  {empresas.find((e) => e.id === filterEmpresaId)?.nombre ?? 'Selecciona empresa'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {empresas.map((emp) => (
