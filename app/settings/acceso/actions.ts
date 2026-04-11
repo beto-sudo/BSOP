@@ -227,16 +227,16 @@ export async function createUsuarioCore(email: string, first_name: string): Prom
     authUserId = existingAuth.id;
   }
 
-  // 3. If not in auth, create them (use generateLink to avoid Supabase email send)
+  // 3. If not in auth, create them (no email sent by Supabase)
   if (!authUserId) {
-    const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
-      type: 'magiclink',
+    const { data: createData, error: createError } = await admin.auth.admin.createUser({
       email: cleanEmail,
+      email_confirm: true,
     });
-    if (linkError) {
-      throw new Error('Error al crear usuario: ' + linkError.message);
+    if (createError) {
+      throw new Error('Error al crear usuario: ' + createError.message);
     }
-    authUserId = linkData?.user?.id ?? null;
+    authUserId = createData?.user?.id ?? null;
   }
   if (!authUserId) throw new Error('No se pudo obtener el ID del usuario de autenticación');
 
@@ -257,8 +257,13 @@ export async function createUsuarioCore(email: string, first_name: string): Prom
   }
 
   // 5. Send welcome email via Resend (pass authUserId to avoid race condition)
-  sendWelcomeEmail(cleanEmail, first_name.trim() || cleanEmail, authUserId).catch((err) => {
-    console.error('[welcome-email] Failed:', err?.message ?? err);
+  sendWelcomeEmail(cleanEmail, first_name.trim() || cleanEmail, authUserId).then(() => {
+    console.log('[welcome-email] Sent successfully to', cleanEmail);
+  }).catch((err) => {
+    console.error('[welcome-email] FAILED for', cleanEmail, ':', JSON.stringify({
+      message: err?.message,
+      stack: err?.stack?.substring(0, 200),
+    }));
   });
 
   revalidatePath('/settings/acceso');
