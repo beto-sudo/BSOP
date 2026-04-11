@@ -35,7 +35,7 @@ export function generateWelcomeHtml(firstName: string, empresas: WelcomeEmpresa[
     <img src="https://bsop.io/logo-bsop.jpg" alt="BSOP" width="160" style="display:block;margin:0 auto"/>
   </div>
   <div style="padding:32px 32px 24px">
-    <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#1a1a1a">¡Bienvenido a BSOP!</h2>
+    <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#1a1a1a">¡Bienvenido a BSOP! 🦞</h2>
     <p style="margin:0 0 24px;font-size:15px;color:#555;line-height:1.5">Hola <strong>${firstName}</strong>, se creó tu cuenta para acceder al sistema operativo de nuestras empresas.</p>
     <div style="background:#f8f8f8;border-radius:8px;padding:20px;margin:0 0 24px">
       <p style="margin:0 0 14px;font-size:13px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.5px">Tu acceso</p>
@@ -57,7 +57,7 @@ export function generateWelcomeHtml(firstName: string, empresas: WelcomeEmpresa[
   </div>
   <div style="background:#f8f8f8;padding:16px 32px;text-align:center;border-top:1px solid #e5e5e5">
     <p style="margin:0 0 4px;font-size:13px;color:#555">¿Dudas? Contacta a tu administrador.</p>
-    <p style="margin:0;font-size:11px;color:#999">BSOP 🦞 · Sistema Operativo</p>
+    <p style="margin:0;font-size:11px;color:#999">BSOP · Sistema Operativo</p>
   </div>
 </div>`;
 }

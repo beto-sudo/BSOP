@@ -273,11 +273,7 @@ export async function setUsuarioEmpresaAcceso(
       .from('usuarios_empresas')
       .upsert({ usuario_id, empresa_id, rol_id: null }, { onConflict: 'usuario_id,empresa_id' });
     if (error) throw new Error(error.message);
-
-    // Send welcome email on first empresa assignment
-    sendWelcomeEmail(usuario_id).catch((err) => {
-      console.error('[welcome-email] Failed:', err?.message ?? err);
-    });
+    // No email here — sent when role is assigned
   } else {
     const { error } = await admin
       .schema('core')
@@ -304,6 +300,14 @@ export async function updateUsuarioEmpresaRol(
     .eq('usuario_id', usuario_id)
     .eq('empresa_id', empresa_id);
   if (error) throw new Error(error.message);
+
+  // Send welcome email when role is assigned (complete setup)
+  if (rol_id) {
+    sendWelcomeEmail(usuario_id).catch((err) => {
+      console.error('[welcome-email] Failed:', err?.message ?? err);
+    });
+  }
+
   revalidatePath('/settings/acceso');
 }
 
