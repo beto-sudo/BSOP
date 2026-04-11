@@ -744,7 +744,9 @@ export function AccesoClient({
                                     }}
                                   >
                                     <SelectTrigger className="h-7 w-48 text-xs">
-                                      <SelectValue placeholder="Sin rol" />
+                                      <SelectValue placeholder="Sin rol">
+                                        {ue.rol_id ? empRoles.find((r) => r.id === ue.rol_id)?.nombre ?? 'Sin rol' : 'Sin rol'}
+                                      </SelectValue>
                                     </SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value="__none__">Sin rol</SelectItem>
