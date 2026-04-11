@@ -83,6 +83,23 @@ type PlayerRow = {
   favorite_sport: string | null;
 };
 
+type PendingBooking = {
+  fecha: string;
+  hora: string;
+  cancha: string;
+  deporte: string;
+  monto: number;
+  jugador: string;
+  email: string;
+};
+
+type PendingSummary = {
+  jugador: string;
+  email: string;
+  reservas: number;
+  total: number;
+};
+
 type ComputedPlayer = {
   name: string | null;
   email: string | null;
@@ -144,6 +161,8 @@ const DATE_TIME_FMT = new Intl.DateTimeFormat('es-MX', {
   minute: '2-digit',
 });
 const DATE_FMT = new Intl.DateTimeFormat('es-MX', { timeZone: TZ, year: 'numeric', month: 'short', day: '2-digit' });
+const PENDING_DATE_FMT = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, day: '2-digit', month: '2-digit', year: 'numeric' });
+const PENDING_TIME_FMT = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false });
 
 function nowInTz() {
   return new Date(new Date().toLocaleString('en-US', { timeZone: TZ }));
@@ -606,6 +625,7 @@ export default function PlaytomicPage() {
   const [sportFilter, setSportFilter] = useState<SportFilter>('all');
   const [playerQuery, setPlayerQuery] = useState('');
   const [playerSort, setPlayerSort] = useState<PlayerSortKey>('gasto');
+  const [showPendingDetails, setShowPendingDetails] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -981,11 +1001,12 @@ export default function PlaytomicPage() {
       dayMap.set(fecha, existing);
     });
 
-    const rows = Array.from(dayMap.values())
-      .sort((a, b) => b.fecha.localeCompare(a.fecha))
-      .slice(0, 60);
+    const allDays = Array.from(dayMap.values());
+    const sortedDays = [...allDays].sort((a, b) => b.fecha.localeCompare(a.fecha));
+    const rows = sortedDays.slice(0, 60);
+    const truncated = allDays.length > 60;
 
-    const totals = rows.reduce(
+    const totals = allDays.reduce(
       (acc, day) => ({
         fecha: 'TOTAL',
         label: 'Totales',
@@ -1026,7 +1047,7 @@ export default function PlaytomicPage() {
       } satisfies ReconciliationDay,
     );
 
-    const csvRows = rows.map((day) => ({
+    const csvRows = sortedDays.map((day) => ({
       Fecha: day.fecha,
       Reservas: day.totalReservas,
       'Revenue Bruto': day.revenueBruto,
@@ -1047,6 +1068,8 @@ export default function PlaytomicPage() {
     return {
       rows,
       totals,
+      truncated,
+      totalDays: allDays.length,
       summary: {
         revenueBruto: totals.revenueBruto,
         appRevenue: totals.appRevenue,
@@ -1056,6 +1079,69 @@ export default function PlaytomicPage() {
       csvRows,
     };
   }, [data.bookings]);
+
+  const pendingPayments = useMemo(() => {
+    const playerMap = new Map(data.players.map((player) => [player.playtomic_id, player]));
+    const ownerParticipantMap = new Map<string, BookingParticipant>();
+
+    data.participants.forEach((participant) => {
+      if (participant.booking_id && participant.is_owner) {
+        ownerParticipantMap.set(participant.booking_id, participant);
+      }
+    });
+
+    const rowsWithSort = data.bookings
+      .filter((booking) => !isCanceledBooking(booking) && (booking.payment_status ?? '').toUpperCase() === 'PENDING')
+      .map((booking) => {
+        const bookingDate = booking.booking_start ? new Date(booking.booking_start) : null;
+        const ownerParticipant = ownerParticipantMap.get(booking.booking_id);
+        const player = ownerParticipant?.player_id ? playerMap.get(ownerParticipant.player_id) : undefined;
+        const jugador = player?.name ?? 'Sin registro';
+        const email = player?.email ?? '-';
+
+        return {
+          sortDate: bookingDate && !Number.isNaN(bookingDate.getTime()) ? bookingDate.getTime() : 0,
+          row: {
+            fecha: bookingDate && !Number.isNaN(bookingDate.getTime()) ? PENDING_DATE_FMT.format(bookingDate) : '—',
+            hora: bookingDate && !Number.isNaN(bookingDate.getTime()) ? PENDING_TIME_FMT.format(bookingDate) : '—',
+            cancha: booking.resource_name ?? '-',
+            deporte: normalizeSport(booking.sport_id) === 'PADEL' ? 'Padel' : normalizeSport(booking.sport_id) === 'TENNIS' ? 'Tennis' : String(booking.sport_id ?? '—'),
+            monto: booking.price_amount ?? 0,
+            jugador,
+            email,
+          } satisfies PendingBooking,
+        };
+      })
+      .sort((a, b) => b.sortDate - a.sortDate);
+
+    const bookings = rowsWithSort.map((entry) => entry.row);
+    const detailRows = bookings.slice(0, 200);
+    const detailTruncated = bookings.length > 200;
+
+    const summaryMap = new Map<string, PendingSummary>();
+    bookings.forEach((booking) => {
+      const key = `${booking.jugador}__${booking.email}`;
+      const existing = summaryMap.get(key) ?? { jugador: booking.jugador, email: booking.email, reservas: 0, total: 0 };
+      existing.reservas += 1;
+      existing.total += booking.monto;
+      summaryMap.set(key, existing);
+    });
+
+    const playerSummary = Array.from(summaryMap.values()).sort(
+      (a, b) => b.total - a.total || b.reservas - a.reservas || a.jugador.localeCompare(b.jugador, 'es'),
+    );
+
+    const totalMonto = bookings.reduce((acc, booking) => acc + booking.monto, 0);
+
+    return {
+      bookings,
+      detailRows,
+      detailTruncated,
+      playerSummary,
+      totalReservas: bookings.length,
+      totalMonto,
+    };
+  }, [data.bookings, data.participants, data.players]);
 
   const exportReconciliationCsv = useCallback(() => {
     const headers = [
@@ -1380,46 +1466,6 @@ export default function PlaytomicPage() {
                 </Table>
               </div>
             </div>
-
-            <div className="space-y-4 rounded-3xl border border-[var(--border)] bg-[var(--card)] p-4 sm:p-5">
-              <div>
-                <h2 className="text-lg font-semibold text-[var(--text)]">Sincronización</h2>
-                <p className="text-sm text-[var(--text)]/55">Últimos 10 eventos del pipeline Playtomic.</p>
-              </div>
-              <div className="space-y-3">
-                {data.syncs.length === 0 ? (
-                  <div className="rounded-2xl border border-[var(--border)] px-4 py-6 text-sm text-[var(--text)]/55">No hay registros de sync.</div>
-                ) : (
-                  data.syncs.map((sync, index) => (
-                    <div key={`${sync.started_at ?? 'sin-fecha'}-${index}`} className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="font-medium text-[var(--text)]">{sync.sync_type ?? 'sync'}</div>
-                          <div className="mt-1 text-xs text-[var(--text)]/45">{formatDateTime(sync.finished_at ?? sync.started_at)}</div>
-                        </div>
-                        <Badge variant={statusTone(sync.status)}>{sync.status ?? '—'}</Badge>
-                      </div>
-                      <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-[var(--text)]/60">
-                        <div>
-                          <div className="uppercase tracking-[0.15em] text-[var(--text)]/40">Fetched</div>
-                          <div className="mt-1 font-medium text-[var(--text)]">{sync.bookings_fetched ?? 0}</div>
-                        </div>
-                        <div>
-                          <div className="uppercase tracking-[0.15em] text-[var(--text)]/40">Upsert reservas</div>
-                          <div className="mt-1 font-medium text-[var(--text)]">{sync.bookings_upserted ?? 0}</div>
-                        </div>
-                        <div>
-                          <div className="uppercase tracking-[0.15em] text-[var(--text)]/40">Upsert jugadores</div>
-                          <div className="mt-1 font-medium text-[var(--text)]">{sync.players_upserted ?? 0}</div>
-                        </div>
-                      </div>
-                      <div className="mt-3 text-xs text-[var(--text)]/50">Duración: {durationLabel(sync.started_at, sync.finished_at)}</div>
-                      {sync.error_message ? <div className="mt-2 text-xs text-red-600 dark:text-red-300">{sync.error_message}</div> : null}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
           </section>
 
           <section className="space-y-4 rounded-3xl border border-[var(--border)] bg-[var(--card)] p-4 sm:p-5">
@@ -1441,57 +1487,219 @@ export default function PlaytomicPage() {
             </div>
 
             <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead className="text-right">Reservas</TableHead>
-                    <TableHead className="text-right">Revenue Bruto</TableHead>
-                    <TableHead className="text-right">Pagado</TableHead>
-                    <TableHead className="text-right">Parcial</TableHead>
-                    <TableHead className="text-right">Pendiente</TableHead>
-                    <TableHead className="text-right">N/A</TableHead>
-                    <TableHead className="text-right">Vía App</TableHead>
-                    <TableHead className="text-right">Directo</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {reconciliation.rows.length === 0 ? (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={9} className="py-10 text-center text-[var(--text)]/50">
-                        No hay datos de conciliación para este rango.
-                      </TableCell>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead className="text-right">Reservas</TableHead>
+                      <TableHead className="text-right">Revenue Bruto</TableHead>
+                      <TableHead className="text-right">Pagado</TableHead>
+                      <TableHead className="text-right">Parcial</TableHead>
+                      <TableHead className="text-right">Pendiente</TableHead>
+                      <TableHead className="text-right">N/A</TableHead>
+                      <TableHead className="text-right">Vía App</TableHead>
+                      <TableHead className="text-right">Directo</TableHead>
                     </TableRow>
-                  ) : (
-                    <>
-                      {reconciliation.rows.map((day) => (
-                        <TableRow key={day.fecha}>
-                          <TableCell className="font-medium text-[var(--text)]">{day.label}</TableCell>
-                          <TableCell className="text-right">{day.totalReservas}</TableCell>
-                          <TableCell className="text-right font-medium">{formatMoney(day.revenueBruto)}</TableCell>
-                          <TableCell className="text-right">{`${day.paid} · ${formatMoney(day.paidRevenue, true)}`}</TableCell>
-                          <TableCell className="text-right">{`${day.partialPaid} · ${formatMoney(day.partialRevenue, true)}`}</TableCell>
-                          <TableCell className="text-right">{`${day.pending} · ${formatMoney(day.pendingRevenue, true)}`}</TableCell>
-                          <TableCell className="text-right">{`${day.notApplicable} · ${formatMoney(day.notApplicableRevenue, true)}`}</TableCell>
-                          <TableCell className="text-right">{`${day.appReservas} · ${formatMoney(day.appRevenue, true)}`}</TableCell>
-                          <TableCell className="text-right">{`${day.managerReservas} · ${formatMoney(day.managerRevenue, true)}`}</TableCell>
-                        </TableRow>
-                      ))}
-                      <TableRow className="bg-[var(--panel)]/80 font-semibold">
-                        <TableCell className="font-semibold text-[var(--text)]">{reconciliation.totals.label}</TableCell>
-                        <TableCell className="text-right font-semibold">{reconciliation.totals.totalReservas}</TableCell>
-                        <TableCell className="text-right font-semibold">{formatMoney(reconciliation.totals.revenueBruto)}</TableCell>
-                        <TableCell className="text-right font-semibold">{`${reconciliation.totals.paid} · ${formatMoney(reconciliation.totals.paidRevenue, true)}`}</TableCell>
-                        <TableCell className="text-right font-semibold">{`${reconciliation.totals.partialPaid} · ${formatMoney(reconciliation.totals.partialRevenue, true)}`}</TableCell>
-                        <TableCell className="text-right font-semibold">{`${reconciliation.totals.pending} · ${formatMoney(reconciliation.totals.pendingRevenue, true)}`}</TableCell>
-                        <TableCell className="text-right font-semibold">{`${reconciliation.totals.notApplicable} · ${formatMoney(reconciliation.totals.notApplicableRevenue, true)}`}</TableCell>
-                        <TableCell className="text-right font-semibold">{`${reconciliation.totals.appReservas} · ${formatMoney(reconciliation.totals.appRevenue, true)}`}</TableCell>
-                        <TableCell className="text-right font-semibold">{`${reconciliation.totals.managerReservas} · ${formatMoney(reconciliation.totals.managerRevenue, true)}`}</TableCell>
+                  </TableHeader>
+                  <TableBody>
+                    {reconciliation.rows.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={9} className="py-10 text-center text-[var(--text)]/50">
+                          No hay datos de conciliación para este rango.
+                        </TableCell>
                       </TableRow>
-                    </>
-                  )}
-                </TableBody>
-              </Table>
+                    ) : (
+                      <>
+                        {reconciliation.rows.map((day) => (
+                          <TableRow key={day.fecha}>
+                            <TableCell className="font-medium text-[var(--text)]">{day.label}</TableCell>
+                            <TableCell className="text-right">{day.totalReservas}</TableCell>
+                            <TableCell className="text-right font-medium">{formatMoney(day.revenueBruto)}</TableCell>
+                            <TableCell className="text-right">{`${day.paid} · ${formatMoney(day.paidRevenue, true)}`}</TableCell>
+                            <TableCell className="text-right">{`${day.partialPaid} · ${formatMoney(day.partialRevenue, true)}`}</TableCell>
+                            <TableCell className="text-right">{`${day.pending} · ${formatMoney(day.pendingRevenue, true)}`}</TableCell>
+                            <TableCell className="text-right">{`${day.notApplicable} · ${formatMoney(day.notApplicableRevenue, true)}`}</TableCell>
+                            <TableCell className="text-right">{`${day.appReservas} · ${formatMoney(day.appRevenue, true)}`}</TableCell>
+                            <TableCell className="text-right">{`${day.managerReservas} · ${formatMoney(day.managerRevenue, true)}`}</TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow className="bg-[var(--panel)]/80 font-semibold">
+                          <TableCell className="font-semibold text-[var(--text)]">{reconciliation.totals.label}</TableCell>
+                          <TableCell className="text-right font-semibold">{reconciliation.totals.totalReservas}</TableCell>
+                          <TableCell className="text-right font-semibold">{formatMoney(reconciliation.totals.revenueBruto)}</TableCell>
+                          <TableCell className="text-right font-semibold">{`${reconciliation.totals.paid} · ${formatMoney(reconciliation.totals.paidRevenue, true)}`}</TableCell>
+                          <TableCell className="text-right font-semibold">{`${reconciliation.totals.partialPaid} · ${formatMoney(reconciliation.totals.partialRevenue, true)}`}</TableCell>
+                          <TableCell className="text-right font-semibold">{`${reconciliation.totals.pending} · ${formatMoney(reconciliation.totals.pendingRevenue, true)}`}</TableCell>
+                          <TableCell className="text-right font-semibold">{`${reconciliation.totals.notApplicable} · ${formatMoney(reconciliation.totals.notApplicableRevenue, true)}`}</TableCell>
+                          <TableCell className="text-right font-semibold">{`${reconciliation.totals.appReservas} · ${formatMoney(reconciliation.totals.appRevenue, true)}`}</TableCell>
+                          <TableCell className="text-right font-semibold">{`${reconciliation.totals.managerReservas} · ${formatMoney(reconciliation.totals.managerRevenue, true)}`}</TableCell>
+                        </TableRow>
+                      </>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+            {reconciliation.truncated ? (
+              <p className="text-sm text-[var(--text)]/55">Mostrando 60 de {reconciliation.totalDays} días. Los totales reflejan el periodo completo.</p>
+            ) : null}
+          </section>
+
+          <section className="space-y-6 rounded-3xl border border-[var(--border)] bg-[var(--card)] p-4 sm:p-5">
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--text)]">Pagos Pendientes</h2>
+              <p className="text-sm text-[var(--text)]/55">Reservas con pago pendiente en el periodo seleccionado.</p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <KpiCard label="Total reservas pendientes" value={String(pendingPayments.totalReservas)} icon={<CalendarRange className="h-4 w-4" />} />
+              <KpiCard label="Monto total pendiente" value={formatMoney(pendingPayments.totalMonto)} icon={<CircleDollarSign className="h-4 w-4" />} />
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <h3 className="text-base font-semibold text-[var(--text)]">Resumen por Jugador</h3>
+                <p className="text-sm text-[var(--text)]/55">Top 20 jugadores con saldo pendiente acumulado.</p>
+              </div>
+              <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
+                <div className="max-h-[28rem] overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Jugador</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead className="text-right">Reservas</TableHead>
+                        <TableHead className="text-right">Total Pendiente</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pendingPayments.playerSummary.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="py-10 text-center text-[var(--text)]/50">
+                            No hay pagos pendientes en este periodo.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        <>
+                          {pendingPayments.playerSummary.slice(0, 20).map((player) => (
+                            <TableRow key={`${player.jugador}-${player.email}`}>
+                              <TableCell className="font-medium text-[var(--text)]">{player.jugador}</TableCell>
+                              <TableCell className="text-[var(--text)]/60">{player.email}</TableCell>
+                              <TableCell className="text-right">{player.reservas}</TableCell>
+                              <TableCell className="text-right font-medium">{formatMoney(player.total)}</TableCell>
+                            </TableRow>
+                          ))}
+                          <TableRow className="bg-[var(--panel)]/80 font-semibold">
+                            <TableCell className="font-semibold text-[var(--text)]">Totales</TableCell>
+                            <TableCell className="text-[var(--text)]/60">—</TableCell>
+                            <TableCell className="text-right font-semibold">{pendingPayments.totalReservas}</TableCell>
+                            <TableCell className="text-right font-semibold">{formatMoney(pendingPayments.totalMonto)}</TableCell>
+                          </TableRow>
+                        </>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--panel)]/35 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="text-base font-semibold text-[var(--text)]">Detalle de Reservas Pendientes</h3>
+                  <p className="text-sm text-[var(--text)]/55">Listado individual de reservas pendientes.</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setShowPendingDetails((value) => !value)}>
+                  {showPendingDetails ? 'Ocultar detalle' : 'Ver detalle'}
+                </Button>
+              </div>
+
+              {showPendingDetails ? (
+                <>
+                  <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)]">
+                    <div className="max-h-[32rem] overflow-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Fecha</TableHead>
+                            <TableHead>Hora</TableHead>
+                            <TableHead>Cancha</TableHead>
+                            <TableHead>Deporte</TableHead>
+                            <TableHead className="text-right">Monto</TableHead>
+                            <TableHead>Jugador</TableHead>
+                            <TableHead>Email</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {pendingPayments.detailRows.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={7} className="py-10 text-center text-[var(--text)]/50">
+                                No hay reservas pendientes para mostrar.
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            pendingPayments.detailRows.map((booking, index) => (
+                              <TableRow key={`${booking.fecha}-${booking.hora}-${booking.email}-${index}`}>
+                                <TableCell className="font-medium text-[var(--text)]">{booking.fecha}</TableCell>
+                                <TableCell>{booking.hora}</TableCell>
+                                <TableCell>{booking.cancha}</TableCell>
+                                <TableCell>{booking.deporte}</TableCell>
+                                <TableCell className="text-right font-medium">{formatMoney(booking.monto)}</TableCell>
+                                <TableCell>{booking.jugador}</TableCell>
+                                <TableCell className="text-[var(--text)]/60">{booking.email}</TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                  {pendingPayments.detailTruncated ? (
+                    <p className="text-sm text-[var(--text)]/55">Mostrando 200 de {pendingPayments.totalReservas} reservas pendientes.</p>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+          </section>
+
+          <section className="space-y-4 rounded-3xl border border-[var(--border)] bg-[var(--card)] p-4 sm:p-5">
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--text)]">Sincronización</h2>
+              <p className="text-sm text-[var(--text)]/55">Últimos 10 eventos del pipeline Playtomic.</p>
+            </div>
+            <div className="space-y-3">
+              {data.syncs.length === 0 ? (
+                <div className="rounded-2xl border border-[var(--border)] px-4 py-6 text-sm text-[var(--text)]/55">No hay registros de sync.</div>
+              ) : (
+                data.syncs.map((sync, index) => (
+                  <div key={`${sync.started_at ?? 'sin-fecha'}-${index}`} className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-medium text-[var(--text)]">{sync.sync_type ?? 'sync'}</div>
+                        <div className="mt-1 text-xs text-[var(--text)]/45">{formatDateTime(sync.finished_at ?? sync.started_at)}</div>
+                      </div>
+                      <Badge variant={statusTone(sync.status)}>{sync.status ?? '—'}</Badge>
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-[var(--text)]/60">
+                      <div>
+                        <div className="uppercase tracking-[0.15em] text-[var(--text)]/40">Fetched</div>
+                        <div className="mt-1 font-medium text-[var(--text)]">{sync.bookings_fetched ?? 0}</div>
+                      </div>
+                      <div>
+                        <div className="uppercase tracking-[0.15em] text-[var(--text)]/40">Upsert reservas</div>
+                        <div className="mt-1 font-medium text-[var(--text)]">{sync.bookings_upserted ?? 0}</div>
+                      </div>
+                      <div>
+                        <div className="uppercase tracking-[0.15em] text-[var(--text)]/40">Upsert jugadores</div>
+                        <div className="mt-1 font-medium text-[var(--text)]">{sync.players_upserted ?? 0}</div>
+                      </div>
+                    </div>
+                    <div className="mt-3 text-xs text-[var(--text)]/50">Duración: {durationLabel(sync.started_at, sync.finished_at)}</div>
+                    {sync.error_message ? <div className="mt-2 text-xs text-red-600 dark:text-red-300">{sync.error_message}</div> : null}
+                  </div>
+                ))
+              )}
             </div>
           </section>
 
