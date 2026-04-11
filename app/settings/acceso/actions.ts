@@ -227,13 +227,16 @@ export async function createUsuarioCore(email: string, first_name: string): Prom
     authUserId = existingAuth.id;
   }
 
-  // 3. If not in auth, invite them
+  // 3. If not in auth, create them (use generateLink to avoid Supabase email send)
   if (!authUserId) {
-    const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(cleanEmail);
-    if (inviteError) {
-      throw new Error('Error al enviar invitación: ' + inviteError.message);
+    const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
+      type: 'magiclink',
+      email: cleanEmail,
+    });
+    if (linkError) {
+      throw new Error('Error al crear usuario: ' + linkError.message);
     }
-    authUserId = inviteData?.user?.id ?? null;
+    authUserId = linkData?.user?.id ?? null;
   }
   if (!authUserId) throw new Error('No se pudo obtener el ID del usuario de autenticación');
 
