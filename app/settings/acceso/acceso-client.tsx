@@ -1,7 +1,7 @@
 'use client';
 
 import { type ReactNode, useState, useTransition } from 'react';
-import { Building2, ShieldCheck, Users, Plus, X, ChevronRight, Pencil, Trash2 } from 'lucide-react';
+import { Building2, Mail, ShieldCheck, Users, Plus, X, ChevronRight, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -641,6 +641,22 @@ export function AccesoClient({
                     </SheetDescription>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isPending}
+                      className="gap-1.5 text-xs text-amber-600 border-amber-500/30 hover:bg-amber-500/10 hover:text-amber-700"
+                      onClick={() => {
+                        if (!confirm(`¿Enviar correo de bienvenida a ${selectedUsuario.email}?`)) return;
+                        run(async () => {
+                          const { sendWelcomeEmailAction } = await import('./actions');
+                          const result = await sendWelcomeEmailAction(selectedUsuario.id);
+                          if (!result.success) throw new Error(result.error);
+                        });
+                      }}
+                    >
+                      <Mail className="h-3 w-3" /> Enviar bienvenida
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"

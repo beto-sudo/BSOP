@@ -301,13 +301,7 @@ export async function updateUsuarioEmpresaRol(
     .eq('empresa_id', empresa_id);
   if (error) throw new Error(error.message);
 
-  // Send welcome email when role is assigned (complete setup)
-  if (rol_id) {
-    sendWelcomeEmail(usuario_id).catch((err) => {
-      console.error('[welcome-email] Failed:', err?.message ?? err);
-    });
-  }
-
+  // Welcome email is sent manually by admin when setup is complete
   revalidatePath('/settings/acceso');
 }
 
@@ -404,8 +398,6 @@ async function sendWelcomeEmail(usuarioId: string): Promise<void> {
 
   const html = generateWelcomeHtml(firstName, empresas);
 
-  console.log('[welcome-email] Sending to', email, 'with', empresas.length, 'empresas');
-
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -423,8 +415,20 @@ async function sendWelcomeEmail(usuarioId: string): Promise<void> {
   const result = await res.json();
   if (!res.ok) {
     console.error('[welcome-email] Resend error:', JSON.stringify(result));
-  } else {
-    console.log('[welcome-email] Sent:', result.id);
+    throw new Error('Error de Resend: ' + (result.message ?? JSON.stringify(result)));
+  }
+  console.log('[welcome-email] Sent:', result.id, 'to', email);
+}
+
+// ── Send welcome email manually ──────────────────────────────────────────────
+
+export async function sendWelcomeEmailAction(usuario_id: string): Promise<{ success: boolean; error?: string }> {
+  await requireAdmin();
+  try {
+    await sendWelcomeEmail(usuario_id);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: (err as Error)?.message ?? 'Error desconocido' };
   }
 }
 
