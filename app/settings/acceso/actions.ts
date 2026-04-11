@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
+import { generateWelcomeHtml, type WelcomeEmpresa } from '@/lib/welcome-email';
 
 // ── Legacy flat-role types (pre-RBAC) ──────────────────────────────────────
 export type Rol = 'admin' | 'viewer' | 'cashier';
@@ -251,6 +252,12 @@ export async function createUsuarioCore(email: string, first_name: string): Prom
     if (error.code === '23505') throw new Error('Este correo ya está registrado');
     throw new Error(error.message);
   }
+
+  // 5. Send welcome email via Resend
+  sendWelcomeEmail(cleanEmail, first_name.trim() || cleanEmail).catch(() => {
+    // Non-blocking: don't fail user creation if email fails
+  });
+
   revalidatePath('/settings/acceso');
 }
 
@@ -298,7 +305,95 @@ export async function updateUsuarioEmpresaRol(
   revalidatePath('/settings/acceso');
 }
 
-// ── Excepciones de módulo ──────────────────────────────────────────────────
+// ── Welcome email via Resend ────────────────────────────────────────────────
+
+const LOGO_MAP: Record<string, string> = {
+  rdb: 'https://bsop.io/logos/rdb.jpg',
+  dilesa: 'https://bsop.io/logos/dilesa.jpg',
+  ansa: 'https://bsop.io/logos/ansa.jpg',
+};
+
+async function sendWelcomeEmail(email: string, firstName: string): Promise<void> {
+  const admin = getSupabaseAdminClient();
+  if (!admin) return;
+
+  // Fetch user's empresa access with role and modules
+  const { data: usuarioEmpresas } = await admin
+    .schema('core')
+    .from('usuarios_empresas')
+    .select('empresa_id, roles:rol_id(nombre), empresas:empresa_id(slug, nombre)')
+    .eq('usuario_id', (
+      await admin.schema('core').from('usuarios').select('id').eq('email', email).maybeSingle()
+    ).data?.id ?? '');
+
+  const empresas: WelcomeEmpresa[] = [];
+
+  if (usuarioEmpresas && usuarioEmpresas.length > 0) {
+    for (const ue of usuarioEmpresas) {
+      const empresaData = ue.empresas as unknown as { slug: string; nombre: string } | null;
+      const rolData = ue.roles as unknown as { nombre: string } | null;
+      if (!empresaData) continue;
+
+      // Fetch modules for this empresa's role
+      let modulos: string[] = [];
+      if (rolData) {
+        const { data: rolRows } = await admin
+          .schema('core')
+          .from('roles')
+          .select('id')
+          .eq('nombre', rolData.nombre)
+          .eq('empresa_id', ue.empresa_id)
+          .maybeSingle();
+
+        if (rolRows) {
+          const { data: perms } = await admin
+            .schema('core')
+            .from('permisos_rol')
+            .select('modulo_id, modulos:modulo_id(nombre)')
+            .eq('rol_id', rolRows.id)
+            .eq('acceso_lectura', true);
+
+          modulos = (perms ?? [])
+            .map((p: Record<string, unknown>) => (p.modulos as unknown as { nombre: string } | null)?.nombre ?? '')
+            .filter(Boolean);
+        }
+      }
+
+      empresas.push({
+        nombre: empresaData.nombre,
+        logoUrl: LOGO_MAP[empresaData.slug] ?? 'https://bsop.io/logo-bsop.jpg',
+        rol: rolData?.nombre ?? 'Sin rol asignado',
+        modulos,
+      });
+    }
+  }
+
+  // If no empresa access yet, show a generic message
+  if (empresas.length === 0) {
+    empresas.push({
+      nombre: 'BSOP',
+      logoUrl: 'https://bsop.io/logo-bsop.jpg',
+      rol: 'Pendiente de asignación',
+      modulos: ['Por asignar'],
+    });
+  }
+
+  const html = generateWelcomeHtml(firstName, empresas);
+
+  await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: 'BSOP <noreply@bsop.io>',
+      to: [email],
+      subject: '¡Bienvenido a BSOP! Tu cuenta está lista',
+      html,
+    }),
+  });
+}
 
 export async function upsertExcepcionUsuario(datos: ExcepcionUsuario): Promise<void> {
   await requireAdmin();
