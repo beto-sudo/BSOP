@@ -212,7 +212,7 @@ export async function createUsuarioCore(email: string, first_name: string): Prom
   // 1. Invite user to Supabase Auth (creates auth.users row)
   const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(cleanEmail);
   // If user already exists in auth, that's fine — proceed to core insert
-  const authUserId = inviteData?.id;
+  const authUserId = inviteData?.user?.id ?? null;
   if (inviteError && !inviteError.message.includes('already been registered') && !inviteError.message.includes('already registered')) {
     throw new Error(inviteError.message);
   }
