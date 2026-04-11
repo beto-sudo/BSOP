@@ -1,3 +1,4 @@
+import { RequireAccess } from '@/components/require-access';
 import { notFound } from 'next/navigation';
 import { getTripBySlug } from '@/data/site';
 import { SectionHeading, Shell } from '@/components/ui';
@@ -10,9 +11,11 @@ export default async function TripDetail({ params }: { params: Promise<{ slug: s
   if (!trip) return notFound();
 
   return (
-    <Shell>
-      <SectionHeading eyebrow="Detalle de viaje" title={trip.name} copy={trip.summary} />
-      <TripDetailView trip={trip} />
-    </Shell>
+    <RequireAccess empresa="familia">
+      <Shell>
+        <SectionHeading eyebrow="Detalle de viaje" title={trip.name} copy={trip.summary} />
+        <TripDetailView trip={trip} />
+      </Shell>
+    </RequireAccess>
   );
 }

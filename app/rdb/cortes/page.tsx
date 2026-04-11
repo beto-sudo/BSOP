@@ -1,5 +1,6 @@
 'use client';
 
+import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { abrirCaja, cerrarCaja, type Denominacion } from './actions';
@@ -792,6 +793,7 @@ export default function CortesPage() {
   }
 
   return (
+    <RequireAccess empresa="rdb" modulo="rdb.cortes">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
@@ -1233,5 +1235,6 @@ export default function CortesPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </RequireAccess>
   );
 }

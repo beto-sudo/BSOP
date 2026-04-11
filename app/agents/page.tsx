@@ -13,6 +13,7 @@ import {
 
 import agents from '@/data/agents.json';
 import { ActionLink, SectionHeading, Shell, Surface } from '@/components/ui';
+import { RequireAccess } from '@/components/require-access';
 
 type UsageSummary = {
   session_count?: number;
@@ -152,6 +153,7 @@ export default function AgentsPage() {
   );
 
   return (
+    <RequireAccess adminOnly>
     <Shell>
       <SectionHeading
         eyebrow="Agents"
@@ -396,5 +398,6 @@ export default function AgentsPage() {
         </Surface>
       </section>
     </Shell>
+    </RequireAccess>
   );
 }

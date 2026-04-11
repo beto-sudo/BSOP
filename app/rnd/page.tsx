@@ -5,6 +5,7 @@ import Link from 'next/link';
 import councilData from '@/data/rnd-council.json';
 import { SectionHeading, Shell, Surface } from '@/components/ui';
 import { useLocale } from '@/lib/i18n';
+import { RequireAccess } from '@/components/require-access';
 
 const memberTone: Record<string, string> = {
   strategist: 'border-amber-300/30 bg-amber-300/8',
@@ -46,6 +47,7 @@ export default function RndCouncilPage() {
   });
 
   return (
+    <RequireAccess adminOnly>
     <Shell>
       <section className="relative overflow-hidden rounded-[2rem] border border-amber-300/15 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(255,255,255,0.02))] p-6 sm:p-8">
         <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.15),transparent_55%)]" />
@@ -276,5 +278,6 @@ export default function RndCouncilPage() {
         </div>
       </section>
     </Shell>
+    </RequireAccess>
   );
 }

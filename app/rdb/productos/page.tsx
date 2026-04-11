@@ -1,5 +1,6 @@
 'use client';
 
+import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import {
@@ -199,6 +200,7 @@ export default function ProductosPage() {
   });
 
   return (
+    <RequireAccess empresa="rdb" modulo="rdb.productos">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -571,5 +573,6 @@ export default function ProductosPage() {
       </Sheet>
 
     </div>
+    </RequireAccess>
   );
 }

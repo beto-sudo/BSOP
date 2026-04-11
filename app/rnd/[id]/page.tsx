@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import councilData from '@/data/rnd-council.json';
 import { Shell, Surface } from '@/components/ui';
 import { useLocale } from '@/lib/i18n';
+import { RequireAccess } from '@/components/require-access';
 
 const memberTone: Record<string, string> = {
   strategist: 'border-amber-300/30 bg-amber-300/8 text-amber-200',
@@ -56,6 +57,7 @@ export default function RndMemoDetailPage() {
   const scores = memo.scores ?? {};
 
   return (
+    <RequireAccess adminOnly>
     <Shell>
       <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <Surface className="overflow-hidden border-amber-300/15 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(255,255,255,0.02))] p-6 sm:p-8">
@@ -235,5 +237,6 @@ export default function RndMemoDetailPage() {
         </Surface>
       </section>
     </Shell>
+    </RequireAccess>
   );
 }

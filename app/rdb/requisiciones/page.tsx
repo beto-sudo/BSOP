@@ -1,5 +1,6 @@
 'use client';
 
+import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import {
@@ -1130,6 +1131,7 @@ export default function RequisicionesPage() {
   );
 
   return (
+    <RequireAccess empresa="rdb" modulo="rdb.requisiciones">
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -1313,5 +1315,6 @@ export default function RequisicionesPage() {
         }}
       />
     </div>
+    </RequireAccess>
   );
 }

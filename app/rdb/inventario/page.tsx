@@ -1,5 +1,6 @@
 'use client';
 
+import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import {
@@ -846,6 +847,7 @@ export default function InventarioPage() {
   const currentError = tab === 'stock' ? errorStock : errorMovimientos;
 
   return (
+    <RequireAccess empresa="rdb" modulo="rdb.inventario">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
@@ -1257,5 +1259,6 @@ export default function InventarioPage() {
         onSuccess={handleSuccess}
       />
     </div>
+    </RequireAccess>
   );
 }

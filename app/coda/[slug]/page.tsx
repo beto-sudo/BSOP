@@ -1,3 +1,4 @@
+import { RequireAccess } from '@/components/require-access';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowUpRight, Blocks, Columns3, Network, ShieldAlert, Sparkles, TableProperties } from 'lucide-react';
@@ -19,6 +20,7 @@ export default async function CodaDocumentPage({ params }: { params: Promise<{ s
   const healthColor = getHealthColor(document.health.avgScore);
 
   return (
+    <RequireAccess empresa="coda">
     <Shell>
       <SectionHeading
         eyebrow="Coda Architect / Document"
@@ -146,5 +148,6 @@ export default async function CodaDocumentPage({ params }: { params: Promise<{ s
         </div>
       </section>
     </Shell>
+    </RequireAccess>
   );
 }

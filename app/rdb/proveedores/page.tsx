@@ -1,5 +1,6 @@
 'use client';
 
+import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import {
@@ -221,6 +222,7 @@ export default function ProveedoresPage() {
   const activos = proveedores.filter((p) => p.activo).length;
 
   return (
+    <RequireAccess empresa="rdb" modulo="rdb.proveedores">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -438,5 +440,6 @@ export default function ProveedoresPage() {
       </Sheet>
 
     </div>
+    </RequireAccess>
   );
 }

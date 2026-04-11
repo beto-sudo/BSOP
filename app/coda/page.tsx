@@ -1,3 +1,4 @@
+import { RequireAccess } from '@/components/require-access';
 import Link from 'next/link';
 import {
   Activity,
@@ -23,6 +24,7 @@ const totalDocuments = codaData.documents.length;
 
 export default function CodaPage() {
   return (
+    <RequireAccess empresa="coda">
     <Shell>
       <SectionHeading
         eyebrow="Coda Architect"
@@ -146,5 +148,6 @@ export default function CodaPage() {
         </div>
       </section>
     </Shell>
+    </RequireAccess>
   );
 }

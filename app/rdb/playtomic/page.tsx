@@ -1,5 +1,6 @@
 'use client';
 
+import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Badge } from '@/components/ui/badge';
@@ -1184,6 +1185,7 @@ export default function PlaytomicPage() {
   }, [meta.fromIso, meta.toIso, reconciliation.csvRows]);
 
   return (
+    <RequireAccess empresa="rdb" modulo="rdb.playtomic">
     <div className="space-y-6 pb-8">
       <section className="rounded-3xl border border-[var(--border)] bg-[var(--panel)] p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -1647,5 +1649,6 @@ export default function PlaytomicPage() {
         </>
       )}
     </div>
+    </RequireAccess>
   );
 }

@@ -18,6 +18,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { useLocale, type Locale } from '@/lib/i18n';
+import { usePermissions } from '@/components/providers';
+import { canAccessEmpresa, canAccessModulo } from '@/lib/permissions';
 
 type NavChild = {
   label: string;
@@ -89,6 +91,28 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
 ];
+
+/** Maps route hrefs to their modulo slug for permission checks */
+const ROUTE_TO_MODULE: Record<string, string> = {
+  '/rdb/ventas': 'rdb.ventas',
+  '/rdb/cortes': 'rdb.cortes',
+  '/rdb/productos': 'rdb.productos',
+  '/rdb/inventario': 'rdb.inventario',
+  '/rdb/proveedores': 'rdb.proveedores',
+  '/rdb/requisiciones': 'rdb.requisiciones',
+  '/rdb/playtomic': 'rdb.playtomic',
+  '/rdb/ordenes-compra': 'rdb.ordenes_compra',
+  '/rdb': 'rdb.home',
+  '/settings/acceso': 'settings.acceso',
+};
+
+/** Maps top-level nav hrefs to their empresa slug */
+const NAV_TO_EMPRESA: Record<string, string> = {
+  '/rdb': 'rdb',
+  '/coda': 'coda',
+  '/family': 'familia',
+  '/settings': 'settings',
+};
 
 function matchesPath(pathname: string, href: string) {
   return href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
@@ -227,6 +251,50 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setMenuOpen(false);
   }, [pathname]);
 
+  const { permissions } = usePermissions();
+
+  // Filter nav items based on permissions. While loading (permissions === null),
+  // show nothing to avoid a flash of unauthorized items.
+  const filteredNavItems = useMemo(() => {
+    if (!permissions) return [];
+
+    return NAV_ITEMS.reduce<NavItem[]>((acc, item) => {
+      // Overview is always visible to authenticated users
+      if (!item.href || item.href === '/') {
+        acc.push(item);
+        return acc;
+      }
+
+      const empresaSlug = NAV_TO_EMPRESA[item.href];
+
+      // Items with no empresa mapping are always visible (e.g., overview)
+      if (!empresaSlug) {
+        acc.push(item);
+        return acc;
+      }
+
+      // Check empresa-level access
+      if (!canAccessEmpresa(permissions, empresaSlug)) return acc;
+
+      // Filter children by modulo access
+      if (item.children?.length) {
+        const visibleChildren = item.children.filter((child) => {
+          const moduloSlug = ROUTE_TO_MODULE[child.href];
+          // If no modulo mapping, show if empresa is accessible
+          if (!moduloSlug) return true;
+          return canAccessModulo(permissions, moduloSlug);
+        });
+
+        // If all children were filtered out, still show the parent (it has empresa access)
+        acc.push({ ...item, children: visibleChildren });
+      } else {
+        acc.push(item);
+      }
+
+      return acc;
+    }, []);
+  }, [permissions]);
+
   const sectionLabelKey = useMemo(() => getSectionLabelKey(pathname), [pathname]);
   const sectionName = t(sectionLabelKey);
 
@@ -328,7 +396,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-4">
-          {NAV_ITEMS.map((item) => {
+          {filteredNavItems.map((item) => {
             const active = isItemActive(pathname, item);
             const hasChildren = Boolean(item.children?.length);
             const expanded = !collapsed && expandedSection === item.href;

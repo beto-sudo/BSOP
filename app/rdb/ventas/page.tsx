@@ -1,5 +1,6 @@
 'use client';
 
+import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import {
@@ -493,6 +494,7 @@ export default function VentasPage() {
   });
 
   return (
+    <RequireAccess empresa="rdb" modulo="rdb.ventas">
     <div className="space-y-6">
       {/* Header */}
       <div>
@@ -661,5 +663,6 @@ export default function VentasPage() {
         onClose={() => setDrawerOpen(false)}
       />
     </div>
+    </RequireAccess>
   );
 }

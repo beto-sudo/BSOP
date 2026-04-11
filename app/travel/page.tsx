@@ -1,9 +1,11 @@
+import { RequireAccess } from '@/components/require-access';
 import { ArrowUpRight, MapPin, Route, Users, Wallet } from 'lucide-react';
 import { travelTrips } from '@/data/site';
 import { ActionLink, SectionHeading, Shell, Surface } from '@/components/ui';
 
 export default function TravelPage() {
   return (
+    <RequireAccess empresa="familia">
     <Shell>
       <SectionHeading
         eyebrow="Viajes"
@@ -75,5 +77,6 @@ export default function TravelPage() {
         ))}
       </div>
     </Shell>
+    </RequireAccess>
   );
 }

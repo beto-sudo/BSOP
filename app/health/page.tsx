@@ -1,3 +1,4 @@
+import { RequireAccess } from '@/components/require-access';
 import { HealthRangeSelector } from '@/components/health-range-selector';
 import { Shell } from '@/components/ui';
 import { HealthDashboardView } from '@/components/health-dashboard-view';
@@ -30,12 +31,14 @@ export default async function HealthPage({
   const data = await getHealthDashboardData(requestedRange);
 
   return (
-    <Shell>
-      <div className="mb-6">
-        <HealthRangeSelector initialPreset={data.range.preset} initialFrom={data.range.requestedFrom} initialTo={data.range.requestedTo} />
-      </div>
+    <RequireAccess empresa="familia">
+      <Shell>
+        <div className="mb-6">
+          <HealthRangeSelector initialPreset={data.range.preset} initialFrom={data.range.requestedFrom} initialTo={data.range.requestedTo} />
+        </div>
 
-      <HealthDashboardView {...data} />
-    </Shell>
+        <HealthDashboardView {...data} />
+      </Shell>
+    </RequireAccess>
   );
 }

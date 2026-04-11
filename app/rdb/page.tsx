@@ -1,5 +1,6 @@
 'use client';
 
+import { RequireAccess } from '@/components/require-access';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
@@ -460,6 +461,7 @@ export default function RdbHomePage() {
   const vsLastYear = pctChange(sales, lastYearTotal);
 
   return (
+    <RequireAccess empresa="rdb" modulo="rdb.home">
     <div className="space-y-6">
       <section className="rounded-3xl border border-[var(--border)] bg-[var(--panel)] p-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -567,5 +569,6 @@ export default function RdbHomePage() {
         </>
       )}
     </div>
+    </RequireAccess>
   );
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import {
@@ -913,6 +914,7 @@ export default function OrdenesCompraPage() {
   }, [ordenes, search]);
 
   return (
+    <RequireAccess empresa="rdb" modulo="rdb.ordenes_compra">
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -1110,5 +1112,6 @@ export default function OrdenesCompraPage() {
         onMarcarEnviada={handleSavePricesAndMarkEnviada}
       />
     </div>
+    </RequireAccess>
   );
 }
