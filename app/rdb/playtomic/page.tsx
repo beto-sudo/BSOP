@@ -1297,6 +1297,65 @@ export default function PlaytomicPage() {
             <OccupancyHeatmap rows={filteredOccupancy} resources={data.resources} sportFilter={sportFilter} />
           </section>
 
+          <section className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
+            <div className="space-y-4 rounded-3xl border border-[var(--border)] bg-[var(--card)] p-4 sm:p-5">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-[var(--text)]">Top jugadores</h2>
+                  <p className="text-sm text-[var(--text)]/55">Ranking operable con búsqueda y orden.</p>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input value={playerQuery} onChange={(event) => setPlayerQuery(event.target.value)} placeholder="Buscar jugador o correo…" className="sm:w-64" />
+                  <Select value={playerSort} onValueChange={(value) => setPlayerSort(value as PlayerSortKey)}>
+                    <SelectTrigger className="sm:w-48">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="gasto">Ordenar por gasto</SelectItem>
+                      <SelectItem value="reservas">Ordenar por reservas</SelectItem>
+                      <SelectItem value="name">Ordenar por nombre</SelectItem>
+                      <SelectItem value="sport">Ordenar por deporte</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Jugador</TableHead>
+                      <TableHead>Reservas</TableHead>
+                      <TableHead className="text-right">Gasto estimado</TableHead>
+                      <TableHead>Deporte favorito</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {topPlayers.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="py-10 text-center text-[var(--text)]/50">
+                          No hay jugadores para el filtro actual.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      topPlayers.slice(0, 10).map((player) => (
+                        <TableRow key={`${player.email ?? 'sin-correo'}-${player.name ?? 'sin-nombre'}`}>
+                          <TableCell>
+                            <div className="font-medium text-[var(--text)]">{player.name ?? 'Sin nombre'}</div>
+                          </TableCell>
+                          <TableCell>{player.reservas}</TableCell>
+                          <TableCell className="text-right font-medium">{formatMoney(player.gasto)}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{player.favorite_sport ?? '—'}</Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </section>
+
           <section className="space-y-6">
             <div>
               <h2 className="text-lg font-semibold text-[var(--text)]">Análisis de Cancelaciones</h2>
@@ -1405,66 +1464,6 @@ export default function PlaytomicPage() {
                   </div>
                 );
               })}
-            </div>
-          </section>
-
-          <section className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
-            <div className="space-y-4 rounded-3xl border border-[var(--border)] bg-[var(--card)] p-4 sm:p-5">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-[var(--text)]">Top jugadores</h2>
-                  <p className="text-sm text-[var(--text)]/55">Ranking operable con búsqueda y orden.</p>
-                </div>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <Input value={playerQuery} onChange={(event) => setPlayerQuery(event.target.value)} placeholder="Buscar jugador o correo…" className="sm:w-64" />
-                  <Select value={playerSort} onValueChange={(value) => setPlayerSort(value as PlayerSortKey)}>
-                    <SelectTrigger className="sm:w-48">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="gasto">Ordenar por gasto</SelectItem>
-                      <SelectItem value="reservas">Ordenar por reservas</SelectItem>
-                      <SelectItem value="name">Ordenar por nombre</SelectItem>
-                      <SelectItem value="sport">Ordenar por deporte</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Jugador</TableHead>
-                      <TableHead>Reservas</TableHead>
-                      <TableHead className="text-right">Gasto estimado</TableHead>
-                      <TableHead>Deporte favorito</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {topPlayers.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="py-10 text-center text-[var(--text)]/50">
-                          No hay jugadores para el filtro actual.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      topPlayers.slice(0, 25).map((player) => (
-                        <TableRow key={`${player.email ?? 'sin-correo'}-${player.name ?? 'sin-nombre'}`}>
-                          <TableCell>
-                            <div className="font-medium text-[var(--text)]">{player.name ?? 'Sin nombre'}</div>
-                            <div className="text-xs text-[var(--text)]/45">{player.email ?? 'Sin correo'}</div>
-                          </TableCell>
-                          <TableCell>{player.reservas}</TableCell>
-                          <TableCell className="text-right font-medium">{formatMoney(player.gasto)}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{player.favorite_sport ?? '—'}</Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
             </div>
           </section>
 
@@ -1663,43 +1662,32 @@ export default function PlaytomicPage() {
             </div>
           </section>
 
-          <section className="space-y-4 rounded-3xl border border-[var(--border)] bg-[var(--card)] p-4 sm:p-5">
-            <div>
+          <section className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-4 sm:p-5">
+            <div className="flex items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-[var(--text)]">Sincronización</h2>
-              <p className="text-sm text-[var(--text)]/55">Últimos 10 eventos del pipeline Playtomic.</p>
-            </div>
-            <div className="space-y-3">
-              {data.syncs.length === 0 ? (
-                <div className="rounded-2xl border border-[var(--border)] px-4 py-6 text-sm text-[var(--text)]/55">No hay registros de sync.</div>
-              ) : (
-                data.syncs.map((sync, index) => (
-                  <div key={`${sync.started_at ?? 'sin-fecha'}-${index}`} className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="font-medium text-[var(--text)]">{sync.sync_type ?? 'sync'}</div>
-                        <div className="mt-1 text-xs text-[var(--text)]/45">{formatDateTime(sync.finished_at ?? sync.started_at)}</div>
-                      </div>
-                      <Badge variant={statusTone(sync.status)}>{sync.status ?? '—'}</Badge>
-                    </div>
-                    <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-[var(--text)]/60">
-                      <div>
-                        <div className="uppercase tracking-[0.15em] text-[var(--text)]/40">Fetched</div>
-                        <div className="mt-1 font-medium text-[var(--text)]">{sync.bookings_fetched ?? 0}</div>
-                      </div>
-                      <div>
-                        <div className="uppercase tracking-[0.15em] text-[var(--text)]/40">Upsert reservas</div>
-                        <div className="mt-1 font-medium text-[var(--text)]">{sync.bookings_upserted ?? 0}</div>
-                      </div>
-                      <div>
-                        <div className="uppercase tracking-[0.15em] text-[var(--text)]/40">Upsert jugadores</div>
-                        <div className="mt-1 font-medium text-[var(--text)]">{sync.players_upserted ?? 0}</div>
-                      </div>
-                    </div>
-                    <div className="mt-3 text-xs text-[var(--text)]/50">Duración: {durationLabel(sync.started_at, sync.finished_at)}</div>
-                    {sync.error_message ? <div className="mt-2 text-xs text-red-600 dark:text-red-300">{sync.error_message}</div> : null}
+              {(() => {
+                const lastSuccess = data.syncs.find((s) => s.status === 'success');
+                const lastError = data.syncs.find((s) => s.status === 'error');
+                if (!lastSuccess && !lastError) {
+                  return <span className="text-sm text-[var(--text)]/50">Sin registros</span>;
+                }
+                return (
+                  <div className="flex flex-col items-end gap-1 text-sm">
+                    {lastSuccess ? (
+                      <span className="text-green-600 dark:text-green-400">
+                        ✓ Último éxito: {formatDateTime(lastSuccess.finished_at ?? lastSuccess.started_at)}
+                        {lastSuccess.bookings_fetched != null ? ` · ${lastSuccess.bookings_fetched} bookings` : ''}
+                      </span>
+                    ) : null}
+                    {lastError ? (
+                      <span className="text-red-500 dark:text-red-400 max-w-md truncate">
+                        ✗ Último error: {formatDateTime(lastError.finished_at ?? lastError.started_at)}
+                        {lastError.error_message ? ` — ${lastError.error_message}` : ''}
+                      </span>
+                    ) : null}
                   </div>
-                ))
-              )}
+                );
+              })()}
             </div>
           </section>
 
