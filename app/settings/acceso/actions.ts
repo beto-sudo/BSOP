@@ -207,11 +207,34 @@ export async function upsertPermisoRol(
 export async function createUsuarioCore(email: string, first_name: string): Promise<void> {
   await requireAdmin();
   const admin = getSupabaseAdminClient()!;
+  const cleanEmail = email.toLowerCase().trim();
+
+  // 1. Invite user to Supabase Auth (creates auth.users row)
+  const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(cleanEmail);
+  // If user already exists in auth, that's fine — proceed to core insert
+  const authUserId = inviteData?.id;
+  if (inviteError && !inviteError.message.includes('already been registered') && !inviteError.message.includes('already registered')) {
+    throw new Error(inviteError.message);
+  }
+
+  // 2. If invite failed because user exists, look up their auth id
+  let userId = authUserId;
+  if (!userId) {
+    const { data: userList } = await admin.auth.admin.listUsers();
+    const existing = userList?.users?.find((u) => u.email?.toLowerCase() === cleanEmail);
+    if (existing) {
+      userId = existing.id;
+    }
+  }
+  if (!userId) throw new Error('No se pudo obtener el ID del usuario de autenticación');
+
+  // 3. Insert into core.usuarios with the auth user id
   const { error } = await admin
     .schema('core')
     .from('usuarios')
     .insert({
-      email: email.toLowerCase().trim(),
+      id: userId,
+      email: cleanEmail,
       first_name: first_name.trim() || null,
       rol: 'viewer',
       activo: true,
