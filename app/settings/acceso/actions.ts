@@ -253,9 +253,9 @@ export async function createUsuarioCore(email: string, first_name: string): Prom
     throw new Error(error.message);
   }
 
-  // 5. Send welcome email via Resend
-  sendWelcomeEmail(cleanEmail, first_name.trim() || cleanEmail).catch(() => {
-    // Non-blocking: don't fail user creation if email fails
+  // 5. Send welcome email via Resend (pass authUserId to avoid race condition)
+  sendWelcomeEmail(cleanEmail, first_name.trim() || cleanEmail, authUserId).catch((err) => {
+    console.error('[welcome-email] Failed:', err?.message ?? err);
   });
 
   revalidatePath('/settings/acceso');
@@ -313,18 +313,24 @@ const LOGO_MAP: Record<string, string> = {
   ansa: 'https://bsop.io/logos/ansa.jpg',
 };
 
-async function sendWelcomeEmail(email: string, firstName: string): Promise<void> {
+async function sendWelcomeEmail(email: string, firstName: string, usuarioId?: string): Promise<void> {
   const admin = getSupabaseAdminClient();
   if (!admin) return;
+
+  // Resolve user ID if not provided
+  let userId = usuarioId;
+  if (!userId) {
+    const { data: u } = await admin.schema('core').from('usuarios').select('id').eq('email', email).maybeSingle();
+    userId = u?.id;
+  }
+  if (!userId) { console.error('[welcome-email] No user ID found for', email); return; }
 
   // Fetch user's empresa access with role and modules
   const { data: usuarioEmpresas } = await admin
     .schema('core')
     .from('usuarios_empresas')
     .select('empresa_id, roles:rol_id(nombre), empresas:empresa_id(slug, nombre)')
-    .eq('usuario_id', (
-      await admin.schema('core').from('usuarios').select('id').eq('email', email).maybeSingle()
-    ).data?.id ?? '');
+    .eq('usuario_id', userId);
 
   const empresas: WelcomeEmpresa[] = [];
 
