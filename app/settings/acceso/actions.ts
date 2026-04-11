@@ -227,16 +227,13 @@ export async function createUsuarioCore(email: string, first_name: string): Prom
     authUserId = existingAuth.id;
   }
 
-  // 3. If not in auth, create them (no email sent by Supabase)
+  // 3. If not in auth, send Supabase invite (magic link for auth)
   if (!authUserId) {
-    const { data: createData, error: createError } = await admin.auth.admin.createUser({
-      email: cleanEmail,
-      email_confirm: true,
-    });
-    if (createError) {
-      throw new Error('Error al crear usuario: ' + createError.message);
+    const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(cleanEmail);
+    if (inviteError) {
+      throw new Error('Error al enviar invitación: ' + inviteError.message);
     }
-    authUserId = createData?.user?.id ?? null;
+    authUserId = inviteData?.user?.id ?? null;
   }
   if (!authUserId) throw new Error('No se pudo obtener el ID del usuario de autenticación');
 
@@ -256,32 +253,7 @@ export async function createUsuarioCore(email: string, first_name: string): Prom
     throw new Error(error.message);
   }
 
-  // 5. Send welcome email via Resend directly
-  const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey) {
-    console.error('[welcome-email] RESEND_API_KEY not found in env');
-  } else {
-    fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${resendKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: 'BSOP <noreply@bsop.io>',
-        to: [cleanEmail],
-        subject: '¡Bienvenido a BSOP! Tu cuenta está lista',
-        html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px"><h1>¡Bienvenido, ${first_name.trim() || cleanEmail}!</h1><p>Tu cuenta en BSOP ha sido creada exitosamente.</p><a href="https://bsop.io" style="display:inline-block;background:#0070f3;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold">Entrar a BSOP</a><p style="color:#999;font-size:12px;margin-top:30px">Si no solicitaste esta cuenta, ignora este correo.</p></div>`,
-      }),
-    }).then(async (r) => {
-      const data = await r.json();
-      if (!r.ok) console.error('[welcome-email] Resend error:', JSON.stringify(data));
-      else console.log('[welcome-email] Sent:', data.id);
-    }).catch((err) => {
-      console.error('[welcome-email] Fetch error:', err?.message);
-    });
-  }
-
+  // 5. NO welcome email here — it's sent when the first empresa is assigned
   revalidatePath('/settings/acceso');
 }
 
@@ -294,12 +266,18 @@ export async function setUsuarioEmpresaAcceso(
 ): Promise<void> {
   await requireAdmin();
   const admin = getSupabaseAdminClient()!;
+
   if (has_access) {
     const { error } = await admin
       .schema('core')
       .from('usuarios_empresas')
       .upsert({ usuario_id, empresa_id, rol_id: null }, { onConflict: 'usuario_id,empresa_id' });
     if (error) throw new Error(error.message);
+
+    // Send welcome email on first empresa assignment
+    sendWelcomeEmail(usuario_id).catch((err) => {
+      console.error('[welcome-email] Failed:', err?.message ?? err);
+    });
   } else {
     const { error } = await admin
       .schema('core')
@@ -337,24 +315,37 @@ const LOGO_MAP: Record<string, string> = {
   ansa: 'https://bsop.io/logos/ansa.jpg',
 };
 
-async function sendWelcomeEmail(email: string, firstName: string, usuarioId?: string): Promise<void> {
+async function sendWelcomeEmail(usuarioId: string): Promise<void> {
   const admin = getSupabaseAdminClient();
   if (!admin) return;
 
-  // Resolve user ID if not provided
-  let userId = usuarioId;
-  if (!userId) {
-    const { data: u } = await admin.schema('core').from('usuarios').select('id').eq('email', email).maybeSingle();
-    userId = u?.id;
+  const resendKey = process.env.RESEND_API_KEY;
+  if (!resendKey) {
+    console.error('[welcome-email] RESEND_API_KEY not found');
+    return;
   }
-  if (!userId) { console.error('[welcome-email] No user ID found for', email); return; }
+
+  // Fetch user info
+  const { data: usuario } = await admin
+    .schema('core')
+    .from('usuarios')
+    .select('email, first_name')
+    .eq('id', usuarioId)
+    .maybeSingle();
+  if (!usuario) {
+    console.error('[welcome-email] User not found:', usuarioId);
+    return;
+  }
+
+  const firstName = usuario.first_name || usuario.email;
+  const email = usuario.email;
 
   // Fetch user's empresa access with role and modules
   const { data: usuarioEmpresas } = await admin
     .schema('core')
     .from('usuarios_empresas')
     .select('empresa_id, roles:rol_id(nombre), empresas:empresa_id(slug, nombre)')
-    .eq('usuario_id', userId);
+    .eq('usuario_id', usuarioId);
 
   const empresas: WelcomeEmpresa[] = [];
 
@@ -398,7 +389,6 @@ async function sendWelcomeEmail(email: string, firstName: string, usuarioId?: st
     }
   }
 
-  // If no empresa access yet, show a generic message
   if (empresas.length === 0) {
     empresas.push({
       nombre: 'BSOP',
@@ -410,10 +400,12 @@ async function sendWelcomeEmail(email: string, firstName: string, usuarioId?: st
 
   const html = generateWelcomeHtml(firstName, empresas);
 
-  await fetch('https://api.resend.com/emails', {
+  console.log('[welcome-email] Sending to', email, 'with', empresas.length, 'empresas');
+
+  const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      Authorization: `Bearer ${resendKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -423,6 +415,13 @@ async function sendWelcomeEmail(email: string, firstName: string, usuarioId?: st
       html,
     }),
   });
+
+  const result = await res.json();
+  if (!res.ok) {
+    console.error('[welcome-email] Resend error:', JSON.stringify(result));
+  } else {
+    console.log('[welcome-email] Sent:', result.id);
+  }
 }
 
 export async function upsertExcepcionUsuario(datos: ExcepcionUsuario): Promise<void> {
