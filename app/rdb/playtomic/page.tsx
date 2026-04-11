@@ -1239,6 +1239,7 @@ export default function PlaytomicPage() {
             <KpiCard label="Cancelación" value={`${kpis.cancellationRate.toFixed(1)}%`} hint="Sobre reservas del periodo" icon={<XCircle className="h-4 w-4" />} />
             <KpiCard label="Jugadores únicos" value={String(kpis.uniquePlayers)} hint="Owners + participantes" icon={<Users className="h-4 w-4" />} />
             <KpiCard label="Valor promedio" value={formatMoney(kpis.avgBookingValue)} hint="Ingreso promedio por reserva" icon={<Activity className="h-4 w-4" />} />
+            <KpiCard label="Pendiente de cobro" value={formatMoney(reconciliation.summary.pendingRevenue)} hint="Reservas con pago pendiente" icon={<RefreshCw className="h-4 w-4" />} />
           </section>
 
           <section className="space-y-4">
@@ -1427,37 +1428,6 @@ export default function PlaytomicPage() {
               <CancellationHourChart data={cancellationAnalysis.cancellationsByHour} />
             </div>
 
-
-            <div className="grid gap-4 md:grid-cols-2">
-              {(['PADEL', 'TENNIS'] as const).map((sport) => {
-                const stats = cancellationAnalysis.sports[sport];
-                const rate = stats.total ? (stats.canceled / stats.total) * 100 : 0;
-                return (
-                  <div key={sport} className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-4 sm:p-5">
-                    <div className="flex items-center justify-between gap-3">
-                      <h3 className="text-base font-semibold text-[var(--text)]">{sport === 'PADEL' ? 'Padel' : 'Tennis'}</h3>
-                      <Badge variant="outline" className="border-rose-500/30 text-rose-600 dark:text-rose-300">
-                        {rate.toFixed(1)}%
-                      </Badge>
-                    </div>
-                    <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
-                      <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-3 py-3">
-                        <div className="text-xs uppercase tracking-[0.15em] text-[var(--text)]/40">Reservas</div>
-                        <div className="mt-1 text-xl font-semibold text-[var(--text)]">{stats.total}</div>
-                      </div>
-                      <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-3 py-3">
-                        <div className="text-xs uppercase tracking-[0.15em] text-[var(--text)]/40">Canceladas</div>
-                        <div className="mt-1 text-xl font-semibold text-rose-600 dark:text-rose-300">{stats.canceled}</div>
-                      </div>
-                      <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-3 py-3">
-                        <div className="text-xs uppercase tracking-[0.15em] text-[var(--text)]/40">Tasa</div>
-                        <div className="mt-1 text-xl font-semibold text-[var(--text)]">{rate.toFixed(1)}%</div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
           </section>
 
           <section className="space-y-4 rounded-3xl border border-[var(--border)] bg-[var(--card)] p-4 sm:p-5">
@@ -1475,7 +1445,7 @@ export default function PlaytomicPage() {
               <KpiCard label="Revenue bruto total" value={formatMoney(reconciliation.summary.revenueBruto)} hint="Solo reservas no canceladas" icon={<CircleDollarSign className="h-4 w-4" />} />
               <KpiCard label="Cobrado vía App" value={formatMoney(reconciliation.summary.appRevenue)} hint="APP_IOS + APP_ANDROID" icon={<Activity className="h-4 w-4" />} />
               <KpiCard label="Cobrado directo" value={formatMoney(reconciliation.summary.managerRevenue)} hint="MANAGER + PLAYTOMIC_MANAGER" icon={<Users className="h-4 w-4" />} />
-              <KpiCard label="Pendiente de cobro" value={formatMoney(reconciliation.summary.pendingRevenue)} hint="payment_status = PENDING" icon={<RefreshCw className="h-4 w-4" />} />
+              <KpiCard label="% Cobrado" value={reconciliation.summary.revenueBruto > 0 ? `${((1 - reconciliation.summary.pendingRevenue / reconciliation.summary.revenueBruto) * 100).toFixed(1)}%` : '—'} hint="Revenue cobrado vs bruto" icon={<Activity className="h-4 w-4" />} />
             </div>
 
             <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
@@ -1536,122 +1506,112 @@ export default function PlaytomicPage() {
             {reconciliation.truncated ? (
               <p className="text-sm text-[var(--text)]/55">Mostrando 60 de {reconciliation.totalDays} días. Los totales reflejan el periodo completo.</p>
             ) : null}
-          </section>
 
-          <section className="space-y-6 rounded-3xl border border-[var(--border)] bg-[var(--card)] p-4 sm:p-5">
-            <div>
-              <h2 className="text-lg font-semibold text-[var(--text)]">Pagos Pendientes</h2>
-              <p className="text-sm text-[var(--text)]/55">Reservas con pago pendiente en el periodo seleccionado.</p>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <KpiCard label="Total reservas pendientes" value={String(pendingPayments.totalReservas)} icon={<CalendarRange className="h-4 w-4" />} />
-              <KpiCard label="Monto total pendiente" value={formatMoney(pendingPayments.totalMonto)} icon={<CircleDollarSign className="h-4 w-4" />} />
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <h3 className="text-base font-semibold text-[var(--text)]">Resumen por Jugador</h3>
-                <p className="text-sm text-[var(--text)]/55">Top 20 jugadores con saldo pendiente acumulado.</p>
-              </div>
-              <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
-                <div className="max-h-[28rem] overflow-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Jugador</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead className="text-right">Reservas</TableHead>
-                        <TableHead className="text-right">Total Pendiente</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {pendingPayments.playerSummary.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={4} className="py-10 text-center text-[var(--text)]/50">
-                            No hay pagos pendientes en este periodo.
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        <>
-                          {pendingPayments.playerSummary.slice(0, 20).map((player) => (
-                            <TableRow key={`${player.jugador}-${player.email}`}>
-                              <TableCell className="font-medium text-[var(--text)]">{player.jugador}</TableCell>
-                              <TableCell className="text-[var(--text)]/60">{player.email}</TableCell>
-                              <TableCell className="text-right">{player.reservas}</TableCell>
-                              <TableCell className="text-right font-medium">{formatMoney(player.total)}</TableCell>
-                            </TableRow>
-                          ))}
-                          <TableRow className="bg-[var(--panel)]/80 font-semibold">
-                            <TableCell className="font-semibold text-[var(--text)]">Totales</TableCell>
-                            <TableCell className="text-[var(--text)]/60">—</TableCell>
-                            <TableCell className="text-right font-semibold">{pendingPayments.totalReservas}</TableCell>
-                            <TableCell className="text-right font-semibold">{formatMoney(pendingPayments.totalMonto)}</TableCell>
-                          </TableRow>
-                        </>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--panel)]/35 p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="border-t border-[var(--border)] pt-6">
+              <div className="space-y-3">
                 <div>
-                  <h3 className="text-base font-semibold text-[var(--text)]">Detalle de Reservas Pendientes</h3>
-                  <p className="text-sm text-[var(--text)]/55">Listado individual de reservas pendientes.</p>
+                  <h3 className="text-base font-semibold text-[var(--text)]">Resumen por Jugador</h3>
+                  <p className="text-sm text-[var(--text)]/55">Top 20 jugadores con saldo pendiente acumulado.</p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => setShowPendingDetails((value) => !value)}>
-                  {showPendingDetails ? 'Ocultar detalle' : 'Ver detalle'}
-                </Button>
+                <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
+                  <div className="max-h-[28rem] overflow-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Jugador</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead className="text-right">Reservas</TableHead>
+                          <TableHead className="text-right">Total Pendiente</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {pendingPayments.playerSummary.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={4} className="py-10 text-center text-[var(--text)]/50">
+                              No hay pagos pendientes en este periodo.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          <>
+                            {pendingPayments.playerSummary.slice(0, 20).map((player) => (
+                              <TableRow key={`${player.jugador}-${player.email}`}>
+                                <TableCell className="font-medium text-[var(--text)]">{player.jugador}</TableCell>
+                                <TableCell className="text-[var(--text)]/60">{player.email}</TableCell>
+                                <TableCell className="text-right">{player.reservas}</TableCell>
+                                <TableCell className="text-right font-medium">{formatMoney(player.total)}</TableCell>
+                              </TableRow>
+                            ))}
+                            <TableRow className="bg-[var(--panel)]/80 font-semibold">
+                              <TableCell className="font-semibold text-[var(--text)]">Totales</TableCell>
+                              <TableCell className="text-[var(--text)]/60">—</TableCell>
+                              <TableCell className="text-right font-semibold">{pendingPayments.totalReservas}</TableCell>
+                              <TableCell className="text-right font-semibold">{formatMoney(pendingPayments.totalMonto)}</TableCell>
+                            </TableRow>
+                          </>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
               </div>
 
-              {showPendingDetails ? (
-                <>
-                  <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)]">
-                    <div className="max-h-[32rem] overflow-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Fecha</TableHead>
-                            <TableHead>Hora</TableHead>
-                            <TableHead>Cancha</TableHead>
-                            <TableHead>Deporte</TableHead>
-                            <TableHead className="text-right">Monto</TableHead>
-                            <TableHead>Jugador</TableHead>
-                            <TableHead>Email</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {pendingPayments.detailRows.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={7} className="py-10 text-center text-[var(--text)]/50">
-                                No hay reservas pendientes para mostrar.
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            pendingPayments.detailRows.map((booking, index) => (
-                              <TableRow key={`${booking.fecha}-${booking.hora}-${booking.email}-${index}`}>
-                                <TableCell className="font-medium text-[var(--text)]">{booking.fecha}</TableCell>
-                                <TableCell>{booking.hora}</TableCell>
-                                <TableCell>{booking.cancha}</TableCell>
-                                <TableCell>{booking.deporte}</TableCell>
-                                <TableCell className="text-right font-medium">{formatMoney(booking.monto)}</TableCell>
-                                <TableCell>{booking.jugador}</TableCell>
-                                <TableCell className="text-[var(--text)]/60">{booking.email}</TableCell>
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
-                    </div>
+              <div className="mt-6 space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--panel)]/35 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="text-base font-semibold text-[var(--text)]">Detalle de Reservas Pendientes</h3>
+                    <p className="text-sm text-[var(--text)]/55">Listado individual de reservas pendientes.</p>
                   </div>
-                  {pendingPayments.detailTruncated ? (
-                    <p className="text-sm text-[var(--text)]/55">Mostrando 200 de {pendingPayments.totalReservas} reservas pendientes.</p>
-                  ) : null}
-                </>
-              ) : null}
+                  <Button variant="outline" size="sm" onClick={() => setShowPendingDetails((value) => !value)}>
+                    {showPendingDetails ? 'Ocultar detalle' : 'Ver detalle'}
+                  </Button>
+                </div>
+
+                {showPendingDetails ? (
+                  <>
+                    <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)]">
+                      <div className="max-h-[32rem] overflow-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Fecha</TableHead>
+                              <TableHead>Hora</TableHead>
+                              <TableHead>Cancha</TableHead>
+                              <TableHead>Deporte</TableHead>
+                              <TableHead className="text-right">Monto</TableHead>
+                              <TableHead>Jugador</TableHead>
+                              <TableHead>Email</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {pendingPayments.detailRows.length === 0 ? (
+                              <TableRow>
+                                <TableCell colSpan={7} className="py-10 text-center text-[var(--text)]/50">
+                                  No hay reservas pendientes para mostrar.
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              pendingPayments.detailRows.map((booking, index) => (
+                                <TableRow key={`${booking.fecha}-${booking.hora}-${booking.email}-${index}`}>
+                                  <TableCell className="font-medium text-[var(--text)]">{booking.fecha}</TableCell>
+                                  <TableCell>{booking.hora}</TableCell>
+                                  <TableCell>{booking.cancha}</TableCell>
+                                  <TableCell>{booking.deporte}</TableCell>
+                                  <TableCell className="text-right font-medium">{formatMoney(booking.monto)}</TableCell>
+                                  <TableCell>{booking.jugador}</TableCell>
+                                  <TableCell className="text-[var(--text)]/60">{booking.email}</TableCell>
+                                </TableRow>
+                              ))
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                    {pendingPayments.detailTruncated ? (
+                      <p className="text-sm text-[var(--text)]/55">Mostrando 200 de {pendingPayments.totalReservas} reservas pendientes.</p>
+                    ) : null}
+                  </>
+                ) : null}
+              </div>
             </div>
           </section>
 
