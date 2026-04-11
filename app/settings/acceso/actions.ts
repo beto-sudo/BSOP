@@ -26,7 +26,7 @@ export type PermisoRol = {
   acceso_lectura: boolean;
   acceso_escritura: boolean;
 };
-export type UsuarioCore = { id: string; email: string; first_name: string | null };
+export type UsuarioCore = { id: string; email: string; first_name: string | null; activo: boolean };
 export type UsuarioEmpresa = { usuario_id: string; empresa_id: string; rol_id: string | null };
 export type ExcepcionUsuario = {
   usuario_id: string;

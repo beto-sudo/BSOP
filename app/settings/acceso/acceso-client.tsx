@@ -56,6 +56,8 @@ import {
   updateUsuarioEmpresaRol,
   upsertExcepcionUsuario,
   deleteExcepcionUsuario,
+  toggleActivo,
+  removeUsuario,
 } from './actions';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -549,6 +551,7 @@ export function AccesoClient({
                   <TableHead className="dark:text-white/50 text-[var(--text)]/50">
                     Empresas con acceso
                   </TableHead>
+                  <TableHead className="dark:text-white/50 text-[var(--text)]/50">Estado</TableHead>
                   <TableHead className="w-8" />
                 </TableRow>
               </TableHeader>
@@ -556,7 +559,7 @@ export function AccesoClient({
                 {usuarios.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={4}
+                      colSpan={5}
                       className="py-16 text-center text-sm dark:text-white/30 text-[var(--text)]/35"
                     >
                       No hay usuarios registrados.
@@ -568,7 +571,10 @@ export function AccesoClient({
                     return (
                       <TableRow
                         key={u.id}
-                        className="cursor-pointer border-[var(--border)] transition-colors dark:hover:bg-white/3 hover:bg-black/2"
+                        className={cn(
+                          'cursor-pointer border-[var(--border)] transition-colors',
+                          !u.activo ? 'opacity-50' : 'dark:hover:bg-white/3 hover:bg-black/2',
+                        )}
                         onClick={() => openUserSheet(u)}
                       >
                         <TableCell className="font-mono text-sm dark:text-white/85 text-[var(--text)]/85">
@@ -596,6 +602,17 @@ export function AccesoClient({
                           </div>
                         </TableCell>
                         <TableCell>
+                          {u.activo ? (
+                            <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-600 dark:text-emerald-400">
+                              Activo
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full bg-red-500/10 px-2 py-0.5 text-xs text-red-500">
+                              Inactivo
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
                           <ChevronRight className="ml-auto h-4 w-4 dark:text-white/25 text-[var(--text)]/25" />
                         </TableCell>
                       </TableRow>
@@ -614,12 +631,52 @@ export function AccesoClient({
           {selectedUsuario && (
             <>
               <SheetHeader className="border-b border-[var(--border)] px-6 py-4">
-                <SheetTitle className="dark:text-white text-[var(--text)]">
-                  {selectedUsuario.first_name ?? selectedUsuario.email}
-                </SheetTitle>
-                <SheetDescription className="font-mono text-xs">
-                  {selectedUsuario.email}
-                </SheetDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <SheetTitle className="dark:text-white text-[var(--text)]">
+                      {selectedUsuario.first_name ?? selectedUsuario.email}
+                    </SheetTitle>
+                    <SheetDescription className="font-mono text-xs">
+                      {selectedUsuario.email}
+                    </SheetDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isPending}
+                      onClick={() => {
+                        const nuevoEstado = !selectedUsuario.activo;
+                        if (!confirm(nuevoEstado ? '¿Reactivar este usuario?' : '¿Desactivar este usuario? Perderá acceso al sistema.')) return;
+                        run(() => toggleActivo(selectedUsuario.id, nuevoEstado));
+                      }}
+                      className={cn(
+                        'gap-1.5 text-xs',
+                        selectedUsuario.activo
+                          ? 'text-red-500 border-red-500/30 hover:bg-red-500/10 hover:text-red-600'
+                          : 'text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-600',
+                      )}
+                    >
+                      {selectedUsuario.activo ? (
+                        <><X className="h-3 w-3" /> Desactivar</>
+                      ) : (
+                        <><ShieldCheck className="h-3 w-3" /> Reactivar</>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isPending}
+                      className="gap-1.5 text-xs text-red-500 border-red-500/30 hover:bg-red-500/10 hover:text-red-600"
+                      onClick={() => {
+                        if (!confirm(`¿Eliminar permanentemente a ${selectedUsuario.email}? Esta acción no se puede deshacer.`)) return;
+                        run(() => removeUsuario(selectedUsuario.id), () => setSheetOpen(false));
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3" /> Eliminar
+                    </Button>
+                  </div>
+                </div>
               </SheetHeader>
 
               <ScrollArea className="flex-1">

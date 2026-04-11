@@ -90,7 +90,7 @@ export default async function AccesoPage() {
       .schema('core')
       .from('permisos_rol')
       .select('rol_id, modulo_id, acceso_lectura, acceso_escritura'),
-    admin.schema('core').from('usuarios').select('id, email, first_name').order('email'),
+    admin.schema('core').from('usuarios').select('id, email, first_name, activo').order('email'),
     admin
       .schema('core')
       .from('usuarios_empresas')
