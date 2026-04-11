@@ -256,14 +256,17 @@ export async function createUsuarioCore(email: string, first_name: string): Prom
     throw new Error(error.message);
   }
 
-  // 5. Send welcome email via Resend (pass authUserId to avoid race condition)
-  sendWelcomeEmail(cleanEmail, first_name.trim() || cleanEmail, authUserId).then(() => {
-    console.log('[welcome-email] Sent successfully to', cleanEmail);
+  // 5. Send welcome email via API route (for proper logging)
+  fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'https://bsop.io'}/api/welcome-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: cleanEmail, firstName: first_name.trim() || cleanEmail, usuarioId: authUserId }),
+  }).then(async (r) => {
+    const data = await r.json();
+    if (!r.ok) console.error('[welcome-email] API failed:', JSON.stringify(data));
+    else console.log('[welcome-email] Sent:', data.emailId);
   }).catch((err) => {
-    console.error('[welcome-email] FAILED for', cleanEmail, ':', JSON.stringify({
-      message: err?.message,
-      stack: err?.stack?.substring(0, 200),
-    }));
+    console.error('[welcome-email] Fetch failed:', err?.message);
   });
 
   revalidatePath('/settings/acceso');
