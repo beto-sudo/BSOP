@@ -256,18 +256,31 @@ export async function createUsuarioCore(email: string, first_name: string): Prom
     throw new Error(error.message);
   }
 
-  // 5. Send welcome email via API route (for proper logging)
-  fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'https://bsop.io'}/api/welcome-email`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: cleanEmail, firstName: first_name.trim() || cleanEmail, usuarioId: authUserId }),
-  }).then(async (r) => {
-    const data = await r.json();
-    if (!r.ok) console.error('[welcome-email] API failed:', JSON.stringify(data));
-    else console.log('[welcome-email] Sent:', data.emailId);
-  }).catch((err) => {
-    console.error('[welcome-email] Fetch failed:', err?.message);
-  });
+  // 5. Send welcome email via Resend directly
+  const resendKey = process.env.RESEND_API_KEY;
+  if (!resendKey) {
+    console.error('[welcome-email] RESEND_API_KEY not found in env');
+  } else {
+    fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${resendKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'BSOP <noreply@bsop.io>',
+        to: [cleanEmail],
+        subject: '¡Bienvenido a BSOP! Tu cuenta está lista',
+        html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px"><h1>¡Bienvenido, ${first_name.trim() || cleanEmail}!</h1><p>Tu cuenta en BSOP ha sido creada exitosamente.</p><a href="https://bsop.io" style="display:inline-block;background:#0070f3;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold">Entrar a BSOP</a><p style="color:#999;font-size:12px;margin-top:30px">Si no solicitaste esta cuenta, ignora este correo.</p></div>`,
+      }),
+    }).then(async (r) => {
+      const data = await r.json();
+      if (!r.ok) console.error('[welcome-email] Resend error:', JSON.stringify(data));
+      else console.log('[welcome-email] Sent:', data.id);
+    }).catch((err) => {
+      console.error('[welcome-email] Fetch error:', err?.message);
+    });
+  }
 
   revalidatePath('/settings/acceso');
 }
