@@ -12,13 +12,25 @@ import {
   type ReactNode,
 } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import { fetchUserPermissions, type UserPermissions } from '@/lib/permissions';
+import {
+  fetchUserPermissions,
+  fetchPermissionsForUserId,
+  type UserPermissions,
+} from '@/lib/permissions';
 
 // ── Permissions Context ────────────────────────────────────────────────────
+
+type ImpersonateTarget = {
+  userId: string;
+  label: string; // e.g. "Michelle (michelle@anorte.com)"
+};
 
 type PermissionsContextValue = {
   permissions: UserPermissions;
   refreshPermissions: () => void;
+  impersonating: ImpersonateTarget | null;
+  startImpersonate: (userId: string, label: string) => void;
+  stopImpersonate: () => void;
 };
 
 const DEFAULT_PERMISSIONS: UserPermissions = {
@@ -32,6 +44,9 @@ const DEFAULT_PERMISSIONS: UserPermissions = {
 const PermissionsContext = createContext<PermissionsContextValue>({
   permissions: DEFAULT_PERMISSIONS,
   refreshPermissions: () => {},
+  impersonating: null,
+  startImpersonate: () => {},
+  stopImpersonate: () => {},
 });
 
 export function usePermissions() {
@@ -40,41 +55,108 @@ export function usePermissions() {
 
 function PermissionsProvider({ children }: { children: ReactNode }) {
   const [permissions, setPermissions] = useState<UserPermissions>(DEFAULT_PERMISSIONS);
+  const [realPermissions, setRealPermissions] = useState<UserPermissions>(DEFAULT_PERMISSIONS);
+  const [impersonating, setImpersonating] = useState<ImpersonateTarget | null>(null);
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
-  const load = useCallback(async () => {
+  const loadReal = useCallback(async () => {
     try {
       const perms = await fetchUserPermissions(supabase);
-      setPermissions(perms);
+      setRealPermissions(perms);
+      // Only update visible permissions if not impersonating
+      setPermissions((prev) => {
+        // If we're impersonating, don't overwrite with real perms
+        return prev;
+      });
+      return perms;
     } catch {
-      setPermissions({ ...DEFAULT_PERMISSIONS, loading: false });
+      const fallback = { ...DEFAULT_PERMISSIONS, loading: false };
+      setRealPermissions(fallback);
+      return fallback;
     }
   }, [supabase]);
 
-  const refreshPermissions = useCallback(() => {
-    setPermissions((prev) => ({ ...prev, loading: true }));
-    void load();
-  }, [load]);
-
+  // Load initial permissions
   useEffect(() => {
-    void load();
+    void (async () => {
+      const perms = await loadReal();
+      // Only set visible permissions if not impersonating
+      if (!impersonating) {
+        setPermissions(perms);
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  // Auth state changes
+  useEffect(() => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
-        void load();
+        void (async () => {
+          const perms = await loadReal();
+          if (!impersonating) {
+            setPermissions(perms);
+          }
+        })();
       } else {
-        setPermissions({ ...DEFAULT_PERMISSIONS, loading: false });
+        const fallback = { ...DEFAULT_PERMISSIONS, loading: false };
+        setRealPermissions(fallback);
+        setPermissions(fallback);
+        setImpersonating(null);
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [supabase, load]);
+  }, [supabase, loadReal, impersonating]);
+
+  const refreshPermissions = useCallback(() => {
+    if (impersonating) {
+      setPermissions((prev) => ({ ...prev, loading: true }));
+      void (async () => {
+        try {
+          const perms = await fetchPermissionsForUserId(supabase, impersonating.userId);
+          setPermissions(perms);
+        } catch {
+          setPermissions({ ...DEFAULT_PERMISSIONS, loading: false });
+        }
+      })();
+    } else {
+      setPermissions((prev) => ({ ...prev, loading: true }));
+      void (async () => {
+        const perms = await loadReal();
+        setPermissions(perms);
+      })();
+    }
+  }, [supabase, loadReal, impersonating]);
+
+  const startImpersonate = useCallback(
+    (userId: string, label: string) => {
+      // Only admins can impersonate
+      if (!realPermissions.isAdmin) return;
+      setImpersonating({ userId, label });
+      setPermissions((prev) => ({ ...prev, loading: true }));
+      void (async () => {
+        try {
+          const perms = await fetchPermissionsForUserId(supabase, userId);
+          setPermissions(perms);
+        } catch {
+          setPermissions({ ...DEFAULT_PERMISSIONS, loading: false });
+        }
+      })();
+    },
+    [supabase, realPermissions.isAdmin],
+  );
+
+  const stopImpersonate = useCallback(() => {
+    setImpersonating(null);
+    setPermissions(realPermissions);
+  }, [realPermissions]);
 
   const value = useMemo(
-    () => ({ permissions, refreshPermissions }),
-    [permissions, refreshPermissions],
+    () => ({ permissions, refreshPermissions, impersonating, startImpersonate, stopImpersonate }),
+    [permissions, refreshPermissions, impersonating, startImpersonate, stopImpersonate],
   );
 
   return (

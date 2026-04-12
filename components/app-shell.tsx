@@ -251,7 +251,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setMenuOpen(false);
   }, [pathname]);
 
-  const { permissions } = usePermissions();
+  const { permissions, impersonating, stopImpersonate } = usePermissions();
 
   // Filter nav items based on permissions. While loading (permissions === null),
   // show nothing to avoid a flash of unauthorized items.
@@ -622,6 +622,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
+        {impersonating && (
+          <div className="sticky top-0 z-50 flex items-center justify-between gap-3 bg-amber-500 px-4 py-2 text-sm font-medium text-white shadow-sm print:hidden">
+            <span>👁️ Viendo como: <strong>{impersonating.label}</strong></span>
+            <button
+              onClick={stopImpersonate}
+              className="rounded-md bg-white/20 px-3 py-1 text-xs font-semibold hover:bg-white/30 transition-colors"
+            >
+              Salir de vista previa
+            </button>
+          </div>
+        )}
         <main className="px-4 py-6 sm:px-6 lg:px-8 print:p-0 print:m-0 print:absolute print:inset-0 print:w-full print:h-auto">{children}</main>
       </div>
     </div>

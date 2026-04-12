@@ -1,7 +1,8 @@
 'use client';
 
 import { type ReactNode, useState, useTransition } from 'react';
-import { Building2, Mail, ShieldCheck, Users, Plus, X, ChevronRight, Pencil, Trash2 } from 'lucide-react';
+import { usePermissions } from '@/components/providers';
+import { Building2, Eye, Mail, ShieldCheck, Users, Plus, X, ChevronRight, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -109,6 +110,7 @@ export function AccesoClient({
   excepciones,
 }: Props) {
   const [isPending, startTransition] = useTransition();
+  const { startImpersonate } = usePermissions();
 
   // Tab navigation
   const [tab, setTab] = useState<Tab>('usuarios');
@@ -649,6 +651,20 @@ export function AccesoClient({
                     </SheetDescription>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 text-xs text-blue-600 border-blue-500/30 hover:bg-blue-500/10 hover:text-blue-700"
+                      onClick={() => {
+                        startImpersonate(
+                          selectedUsuario.id,
+                          `${selectedUsuario.first_name ?? selectedUsuario.email} (${selectedUsuario.email})`,
+                        );
+                        setSheetOpen(false);
+                      }}
+                    >
+                      <Eye className="h-3 w-3" /> Ver como usuario
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
