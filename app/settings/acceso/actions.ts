@@ -26,7 +26,7 @@ export type PermisoRol = {
   acceso_lectura: boolean;
   acceso_escritura: boolean;
 };
-export type UsuarioCore = { id: string; email: string; first_name: string | null; activo: boolean };
+export type UsuarioCore = { id: string; email: string; first_name: string | null; activo: boolean; welcome_sent_at: string | null };
 export type UsuarioEmpresa = { usuario_id: string; empresa_id: string; rol_id: string | null };
 export type ExcepcionUsuario = {
   usuario_id: string;
@@ -426,6 +426,14 @@ export async function sendWelcomeEmailAction(usuario_id: string): Promise<{ succ
   await requireAdmin();
   try {
     await sendWelcomeEmail(usuario_id);
+    // Record timestamp
+    const admin = getSupabaseAdminClient()!;
+    await admin
+      .schema('core')
+      .from('usuarios')
+      .update({ welcome_sent_at: new Date().toISOString() })
+      .eq('id', usuario_id);
+    revalidatePath('/settings/acceso');
     return { success: true };
   } catch (err) {
     return { success: false, error: (err as Error)?.message ?? 'Error desconocido' };

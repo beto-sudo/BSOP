@@ -552,6 +552,7 @@ export function AccesoClient({
                     Empresas con acceso
                   </TableHead>
                   <TableHead className="dark:text-white/50 text-[var(--text)]/50">Estado</TableHead>
+                  <TableHead className="dark:text-white/50 text-[var(--text)]/50">Email</TableHead>
                   <TableHead className="w-8" />
                 </TableRow>
               </TableHeader>
@@ -613,6 +614,13 @@ export function AccesoClient({
                           )}
                         </TableCell>
                         <TableCell>
+                          {!u.welcome_sent_at && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-600 dark:text-amber-400">
+                              <Mail className="h-3 w-3" /> Sin bienvenida
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
                           <ChevronRight className="ml-auto h-4 w-4 dark:text-white/25 text-[var(--text)]/25" />
                         </TableCell>
                       </TableRow>
@@ -645,9 +653,15 @@ export function AccesoClient({
                       variant="outline"
                       size="sm"
                       disabled={isPending}
-                      className="gap-1.5 text-xs text-amber-600 border-amber-500/30 hover:bg-amber-500/10 hover:text-amber-700"
+                      className={cn(
+                        'gap-1.5 text-xs',
+                        selectedUsuario.welcome_sent_at
+                          ? 'text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-600'
+                          : 'text-amber-600 border-amber-500/30 hover:bg-amber-500/10 hover:text-amber-700',
+                      )}
                       onClick={() => {
-                        if (!confirm(`¿Enviar correo de bienvenida a ${selectedUsuario.email}?`)) return;
+                        const action = selectedUsuario.welcome_sent_at ? 'Reenviar' : 'Enviar';
+                        if (!confirm(`¿${action} correo de bienvenida a ${selectedUsuario.email}?`)) return;
                         run(async () => {
                           const { sendWelcomeEmailAction } = await import('./actions');
                           const result = await sendWelcomeEmailAction(selectedUsuario.id);
@@ -655,7 +669,8 @@ export function AccesoClient({
                         });
                       }}
                     >
-                      <Mail className="h-3 w-3" /> Enviar bienvenida
+                      <Mail className="h-3 w-3" />
+                      {selectedUsuario.welcome_sent_at ? 'Reenviar bienvenida' : 'Enviar bienvenida'}
                     </Button>
                     <Button
                       variant="outline"
