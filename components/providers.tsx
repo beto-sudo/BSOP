@@ -14,8 +14,8 @@ import {
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import {
   fetchUserPermissions,
-  fetchPermissionsForUserId,
   type UserPermissions,
+  type AccessLevel,
 } from '@/lib/permissions';
 
 // ── Permissions Context ────────────────────────────────────────────────────
@@ -111,12 +111,25 @@ function PermissionsProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, [supabase, loadReal, impersonating]);
 
+  const fetchImpersonatePerms = useCallback(async (userId: string): Promise<UserPermissions> => {
+    const res = await fetch(`/api/impersonate?userId=${encodeURIComponent(userId)}`);
+    if (!res.ok) return { ...DEFAULT_PERMISSIONS, loading: false };
+    const data = await res.json();
+    return {
+      isAdmin: data.isAdmin,
+      loading: false,
+      email: data.email,
+      empresas: new Map(Object.entries(data.empresas ?? {}) as [string, AccessLevel][]),
+      modulos: new Map(Object.entries(data.modulos ?? {}) as [string, AccessLevel][]),
+    };
+  }, []);
+
   const refreshPermissions = useCallback(() => {
     if (impersonating) {
       setPermissions((prev) => ({ ...prev, loading: true }));
       void (async () => {
         try {
-          const perms = await fetchPermissionsForUserId(supabase, impersonating.userId);
+          const perms = await fetchImpersonatePerms(impersonating.userId);
           setPermissions(perms);
         } catch {
           setPermissions({ ...DEFAULT_PERMISSIONS, loading: false });
@@ -129,7 +142,7 @@ function PermissionsProvider({ children }: { children: ReactNode }) {
         setPermissions(perms);
       })();
     }
-  }, [supabase, loadReal, impersonating]);
+  }, [loadReal, impersonating, fetchImpersonatePerms]);
 
   const startImpersonate = useCallback(
     (userId: string, label: string) => {
@@ -139,14 +152,14 @@ function PermissionsProvider({ children }: { children: ReactNode }) {
       setPermissions((prev) => ({ ...prev, loading: true }));
       void (async () => {
         try {
-          const perms = await fetchPermissionsForUserId(supabase, userId);
+          const perms = await fetchImpersonatePerms(userId);
           setPermissions(perms);
         } catch {
           setPermissions({ ...DEFAULT_PERMISSIONS, loading: false });
         }
       })();
     },
-    [supabase, realPermissions.isAdmin],
+    [realPermissions.isAdmin, fetchImpersonatePerms],
   );
 
   const stopImpersonate = useCallback(() => {
