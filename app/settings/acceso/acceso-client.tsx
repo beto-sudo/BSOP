@@ -650,79 +650,6 @@ export function AccesoClient({
                       {selectedUsuario.email}
                     </SheetDescription>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5 text-xs text-blue-600 border-blue-500/30 hover:bg-blue-500/10 hover:text-blue-700"
-                      onClick={() => {
-                        startImpersonate(
-                          selectedUsuario.id,
-                          `${selectedUsuario.first_name ?? selectedUsuario.email} (${selectedUsuario.email})`,
-                        );
-                        setSheetOpen(false);
-                      }}
-                    >
-                      <Eye className="h-3 w-3" /> Ver como usuario
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={isPending}
-                      className={cn(
-                        'gap-1.5 text-xs',
-                        selectedUsuario.welcome_sent_at
-                          ? 'text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-600'
-                          : 'text-amber-600 border-amber-500/30 hover:bg-amber-500/10 hover:text-amber-700',
-                      )}
-                      onClick={() => {
-                        const action = selectedUsuario.welcome_sent_at ? 'Reenviar' : 'Enviar';
-                        if (!confirm(`¿${action} correo de bienvenida a ${selectedUsuario.email}?`)) return;
-                        run(async () => {
-                          const { sendWelcomeEmailAction } = await import('./actions');
-                          const result = await sendWelcomeEmailAction(selectedUsuario.id);
-                          if (!result.success) throw new Error(result.error);
-                        });
-                      }}
-                    >
-                      <Mail className="h-3 w-3" />
-                      {selectedUsuario.welcome_sent_at ? 'Reenviar bienvenida' : 'Enviar bienvenida'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={isPending}
-                      onClick={() => {
-                        const nuevoEstado = !selectedUsuario.activo;
-                        if (!confirm(nuevoEstado ? '¿Reactivar este usuario?' : '¿Desactivar este usuario? Perderá acceso al sistema.')) return;
-                        run(() => toggleActivo(selectedUsuario.id, nuevoEstado));
-                      }}
-                      className={cn(
-                        'gap-1.5 text-xs',
-                        selectedUsuario.activo
-                          ? 'text-red-500 border-red-500/30 hover:bg-red-500/10 hover:text-red-600'
-                          : 'text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-600',
-                      )}
-                    >
-                      {selectedUsuario.activo ? (
-                        <><X className="h-3 w-3" /> Desactivar</>
-                      ) : (
-                        <><ShieldCheck className="h-3 w-3" /> Reactivar</>
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={isPending}
-                      className="gap-1.5 text-xs text-red-500 border-red-500/30 hover:bg-red-500/10 hover:text-red-600"
-                      onClick={() => {
-                        if (!confirm(`¿Eliminar permanentemente a ${selectedUsuario.email}? Esta acción no se puede deshacer.`)) return;
-                        run(() => removeUsuario(selectedUsuario.id), () => setSheetOpen(false));
-                      }}
-                    >
-                      <Trash2 className="h-3 w-3" /> Eliminar
-                    </Button>
-                  </div>
                 </div>
               </SheetHeader>
 
@@ -1001,6 +928,83 @@ export function AccesoClient({
                   </section>
                 </div>
               </ScrollArea>
+
+              {/* ── Action buttons footer ── */}
+              <div className="border-t border-[var(--border)] px-6 py-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs text-blue-600 border-blue-500/30 hover:bg-blue-500/10 hover:text-blue-700"
+                    onClick={() => {
+                      startImpersonate(
+                        selectedUsuario.id,
+                        `${selectedUsuario.first_name ?? selectedUsuario.email} (${selectedUsuario.email})`,
+                      );
+                      setSheetOpen(false);
+                    }}
+                  >
+                    <Eye className="h-3 w-3" /> Ver como usuario
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isPending}
+                    className={cn(
+                      'gap-1.5 text-xs',
+                      selectedUsuario.welcome_sent_at
+                        ? 'text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-600'
+                        : 'text-amber-600 border-amber-500/30 hover:bg-amber-500/10 hover:text-amber-700',
+                    )}
+                    onClick={() => {
+                      const action = selectedUsuario.welcome_sent_at ? 'Reenviar' : 'Enviar';
+                      if (!confirm(`¿${action} correo de bienvenida a ${selectedUsuario.email}?`)) return;
+                      run(async () => {
+                        const { sendWelcomeEmailAction } = await import('./actions');
+                        const result = await sendWelcomeEmailAction(selectedUsuario.id);
+                        if (!result.success) throw new Error(result.error);
+                      });
+                    }}
+                  >
+                    <Mail className="h-3 w-3" />
+                    {selectedUsuario.welcome_sent_at ? 'Reenviar bienvenida' : 'Enviar bienvenida'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isPending}
+                    onClick={() => {
+                      const nuevoEstado = !selectedUsuario.activo;
+                      if (!confirm(nuevoEstado ? '¿Reactivar este usuario?' : '¿Desactivar este usuario? Perderá acceso al sistema.')) return;
+                      run(() => toggleActivo(selectedUsuario.id, nuevoEstado));
+                    }}
+                    className={cn(
+                      'gap-1.5 text-xs',
+                      selectedUsuario.activo
+                        ? 'text-red-500 border-red-500/30 hover:bg-red-500/10 hover:text-red-600'
+                        : 'text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-600',
+                    )}
+                  >
+                    {selectedUsuario.activo ? (
+                      <><X className="h-3 w-3" /> Desactivar</>
+                    ) : (
+                      <><ShieldCheck className="h-3 w-3" /> Reactivar</>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isPending}
+                    className="gap-1.5 text-xs text-red-500 border-red-500/30 hover:bg-red-500/10 hover:text-red-600"
+                    onClick={() => {
+                      if (!confirm(`¿Eliminar permanentemente a ${selectedUsuario.email}? Esta acción no se puede deshacer.`)) return;
+                      run(() => removeUsuario(selectedUsuario.id), () => setSheetOpen(false));
+                    }}
+                  >
+                    <Trash2 className="h-3 w-3" /> Eliminar
+                  </Button>
+                </div>
+              </div>
             </>
           )}
         </SheetContent>
