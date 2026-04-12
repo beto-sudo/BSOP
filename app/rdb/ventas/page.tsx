@@ -3,6 +3,7 @@
 import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { getLocalDayBoundsUtc } from '@/lib/timezone';
 import {
   Table,
   TableBody,
@@ -431,8 +432,8 @@ export default function VentasPage() {
         .order('timestamp', { ascending: false }).limit(10000)
         ;
 
-      if (dateFrom) query = query.gte('timestamp', `${dateFrom}T00:00:00-06:00`);
-      if (dateTo) query = query.lte('timestamp', `${dateTo}T23:59:59-06:00`);
+      if (dateFrom) query = query.gte('timestamp', getLocalDayBoundsUtc(dateFrom, TZ).start);
+      if (dateTo) query = query.lte('timestamp', getLocalDayBoundsUtc(dateTo, TZ).end);
 
       const { data, error: err } = await query;
       if (err) throw err;

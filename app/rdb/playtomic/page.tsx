@@ -3,6 +3,7 @@
 import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { getLocalDayBoundsUtc } from '@/lib/timezone';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -654,11 +655,14 @@ export default function PlaytomicPage() {
       const supabase = createSupabaseBrowserClient();
       const schema = supabase.schema('playtomic');
 
+      const bookingsFromBounds = getLocalDayBoundsUtc(meta.fromIso, TZ);
+      const bookingsToBounds = getLocalDayBoundsUtc(meta.toIso, TZ);
+
       const bookingsQuery = schema
         .from('bookings')
         .select('booking_id,resource_name,sport_id,booking_start,booking_end,duration_min,price_amount,price_currency,status,is_canceled,owner_id,booking_type,origin,payment_status,synced_at')
-        .gte('booking_start', `${meta.fromIso}T00:00:00-06:00`)
-        .lte('booking_start', `${meta.toIso}T23:59:59-06:00`)
+        .gte('booking_start', bookingsFromBounds.start)
+        .lte('booking_start', bookingsToBounds.end)
         .order('booking_start', { ascending: true })
         .limit(range === 'all' || range === 'year' ? 15000 : range === '30d' || range === 'month' ? 5000 : 2000);
 

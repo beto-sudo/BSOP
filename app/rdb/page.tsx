@@ -4,6 +4,7 @@ import { RequireAccess } from '@/components/require-access';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { getLocalDayBoundsUtc } from '@/lib/timezone';
 import { AlertTriangle, CalendarRange, Loader2, Receipt, Scissors, ShoppingBag, TrendingUp } from 'lucide-react';
 
 type RangeKey = 'month' | '7d' | '30d' | 'year';
@@ -340,12 +341,15 @@ export default function RdbHomePage() {
       const supabase = createSupabaseBrowserClient();
       const meta = getRangeMeta(range);
 
+      const currentFromBounds = getLocalDayBoundsUtc(isoDateLocal(meta.from), TZ);
+      const currentToBounds = getLocalDayBoundsUtc(isoDateLocal(meta.to), TZ);
+
       const ordersCurrent = supabase
         .schema('rdb')
         .from('waitry_pedidos')
         .select('order_id,timestamp,total_amount,status,corte_id')
-        .gte('timestamp', `${isoDateLocal(meta.from)}T00:00:00-06:00`)
-        .lte('timestamp', `${isoDateLocal(meta.to)}T23:59:59-06:00`)
+        .gte('timestamp', currentFromBounds.start)
+        .lte('timestamp', currentToBounds.end)
         .order('timestamp', { ascending: true })
         .limit(range === 'year' ? 12000 : 6000);
 
@@ -353,26 +357,36 @@ export default function RdbHomePage() {
 
       const previousQuery =
         meta.compareMode === 'month'
-          ? supabase
-              .schema('rdb')
-              .from('waitry_pedidos')
-              .select('order_id,timestamp,total_amount,status,corte_id')
-              .gte('timestamp', `${isoDateLocal(meta.previousFrom)}T00:00:00-06:00`)
-              .lte('timestamp', `${isoDateLocal(meta.previousTo)}T23:59:59-06:00`)
-              .order('timestamp', { ascending: true })
-              .limit(6000)
+          ? (() => {
+              const previousFromBounds = getLocalDayBoundsUtc(isoDateLocal(meta.previousFrom), TZ);
+              const previousToBounds = getLocalDayBoundsUtc(isoDateLocal(meta.previousTo), TZ);
+
+              return supabase
+                .schema('rdb')
+                .from('waitry_pedidos')
+                .select('order_id,timestamp,total_amount,status,corte_id')
+                .gte('timestamp', previousFromBounds.start)
+                .lte('timestamp', previousToBounds.end)
+                .order('timestamp', { ascending: true })
+                .limit(6000);
+            })()
           : Promise.resolve({ data: [], error: null });
 
       const lastYearQuery =
         meta.compareMode === 'month'
-          ? supabase
-              .schema('rdb')
-              .from('waitry_pedidos')
-              .select('order_id,timestamp,total_amount,status,corte_id')
-              .gte('timestamp', `${isoDateLocal(meta.lastYearFrom)}T00:00:00-06:00`)
-              .lte('timestamp', `${isoDateLocal(meta.lastYearTo)}T23:59:59-06:00`)
-              .order('timestamp', { ascending: true })
-              .limit(6000)
+          ? (() => {
+              const lastYearFromBounds = getLocalDayBoundsUtc(isoDateLocal(meta.lastYearFrom), TZ);
+              const lastYearToBounds = getLocalDayBoundsUtc(isoDateLocal(meta.lastYearTo), TZ);
+
+              return supabase
+                .schema('rdb')
+                .from('waitry_pedidos')
+                .select('order_id,timestamp,total_amount,status,corte_id')
+                .gte('timestamp', lastYearFromBounds.start)
+                .lte('timestamp', lastYearToBounds.end)
+                .order('timestamp', { ascending: true })
+                .limit(6000);
+            })()
           : Promise.resolve({ data: [], error: null });
 
       const [currentRes, cortesRes, previousRes, lastYearRes] = await Promise.all([
