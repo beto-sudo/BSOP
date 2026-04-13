@@ -27,24 +27,94 @@ const priorityTone: Record<string, string> = {
   P2: 'border-sky-400/30 bg-sky-400/12 text-sky-200',
 };
 
-const councilById = Object.fromEntries(councilData.config.council.map((member) => [member.id, member]));
+type CouncilMember = {
+  id: string;
+  name: string;
+  model: string;
+  role: string;
+  emoji?: string;
+};
+
+type CouncilIdea = {
+  id: string;
+  title: string;
+  summary: string;
+  proposedBy: string;
+  impact: number;
+  effort: number;
+  votes: Record<string, number>;
+};
+
+type CouncilRecommendation = {
+  id: string;
+  title: string;
+  priority?: keyof typeof priorityTone;
+  rationale?: string;
+  description?: string;
+  owner?: string;
+  champion?: string;
+  actionItems?: string[];
+  firstSteps?: string[];
+};
+
+type CouncilDebateEntry = {
+  round: string;
+  topic?: string;
+  highlights?: Array<{
+    speaker: string;
+    message: string;
+  }>;
+};
+
+type CouncilMemo = {
+  id: string;
+  date: string;
+  generatedAt?: string;
+  runStarted?: string;
+  title: string;
+  status: keyof typeof badgeTone;
+  summary: string;
+  ideas?: CouncilIdea[];
+  recommendations?: CouncilRecommendation[];
+  debate?: CouncilDebateEntry[];
+};
+
+type CouncilStats = {
+  totalSessions: number;
+  totalIdeas: number;
+  implementedIdeas: number;
+  avgScore: number;
+};
+
+const councilMembers = councilData.config.council as CouncilMember[];
+const memos = councilData.memos as CouncilMemo[];
+const stats = ((councilData as { stats?: CouncilStats }).stats ?? {
+  totalSessions: memos.length,
+  totalIdeas: memos.reduce((sum, memo) => sum + (memo.ideas?.length ?? 0), 0),
+  implementedIdeas: 0,
+  avgScore: 0,
+}) as CouncilStats;
+const councilById = Object.fromEntries(councilMembers.map((member) => [member.id, member]));
 
 export default function RndCouncilPage() {
   const { t, locale } = useLocale();
-  const [selectedMemoId, setSelectedMemoId] = useState(councilData.memos[0].id);
+  const [selectedMemoId, setSelectedMemoId] = useState(memos[0].id);
 
-  const selectedMemo = councilData.memos.find((m) => m.id === selectedMemoId) ?? councilData.memos[0];
-  const isLatest = selectedMemoId === councilData.memos[0].id;
+  const selectedMemo = memos.find((m) => m.id === selectedMemoId) ?? memos[0];
+  const isLatest = selectedMemoId === memos[0].id;
   const selectedIdeas = selectedMemo.ideas ?? [];
   const selectedDebate = selectedMemo.debate ?? [];
   const selectedRecommendations = selectedMemo.recommendations ?? [];
 
-  const lastRun = new Date(selectedMemo.runStarted).toLocaleString(locale === 'es' ? 'es-MX' : 'en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+  const lastRunSource = selectedMemo.runStarted ?? selectedMemo.generatedAt ?? selectedMemo.date;
+  const lastRun = lastRunSource
+    ? new Date(lastRunSource).toLocaleString(locale === 'es' ? 'es-MX' : 'en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : '—';
 
   return (
     <RequireAccess adminOnly>
@@ -62,7 +132,7 @@ export default function RndCouncilPage() {
               [t('rnd.stat.last_run'), lastRun],
               [t('rnd.stat.next_run'), councilData.config.schedule],
               [t('rnd.stat.coverage'), t('rnd.stat.focus_areas', { count: councilData.config.scope.length })],
-              [t('rnd.stat.council_size'), t('rnd.stat.models', { count: councilData.config.council.length })],
+              [t('rnd.stat.council_size'), t('rnd.stat.models', { count: councilMembers.length })],
             ] as [string, string][]).map(([label, value]) => (
               <Surface key={label} className="border-amber-300/15 bg-[var(--bg)]/20 p-5">
                 <div className="text-xs uppercase tracking-[0.24em] text-[var(--text)]/35">{label}</div>
@@ -79,7 +149,7 @@ export default function RndCouncilPage() {
           <p className="mt-2 text-sm text-[var(--muted)]">{t('rnd.members.desc')}</p>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          {councilData.config.council.map((member) => (
+          {councilMembers.map((member) => (
             <Surface key={member.id} className={`p-5 ${memberTone[member.id] ?? 'border-[var(--border)] bg-[var(--card)]'}`}>
               <div className="flex items-center justify-between gap-3">
                 <div className="text-3xl">{member.emoji}</div>
@@ -94,10 +164,10 @@ export default function RndCouncilPage() {
 
       <section className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {([
-          [t('rnd.stats.total_sessions'), String(councilData.stats.totalSessions), t('rnd.stats.total_sessions_sub')],
-          [t('rnd.stats.ideas'), String(councilData.stats.totalIdeas), t('rnd.stats.ideas_sub')],
-          [t('rnd.stats.implemented'), String(councilData.stats.implementedIdeas), t('rnd.stats.implemented_sub')],
-          [t('rnd.stats.avg_score'), councilData.stats.avgScore.toFixed(1), t('rnd.stats.avg_score_sub')],
+          [t('rnd.stats.total_sessions'), String(stats.totalSessions), t('rnd.stats.total_sessions_sub')],
+          [t('rnd.stats.ideas'), String(stats.totalIdeas), t('rnd.stats.ideas_sub')],
+          [t('rnd.stats.implemented'), String(stats.implementedIdeas), t('rnd.stats.implemented_sub')],
+          [t('rnd.stats.avg_score'), stats.avgScore.toFixed(1), t('rnd.stats.avg_score_sub')],
         ] as [string, string, string][]).map(([label, value, sub]) => (
           <Surface key={label} className="p-5">
             <div className="text-xs uppercase tracking-[0.24em] text-[var(--text)]/35">{label}</div>
@@ -114,7 +184,7 @@ export default function RndCouncilPage() {
             <p className="mt-2 text-sm text-[var(--muted)]">{t('rnd.archive.desc')}</p>
           </div>
           <div className="space-y-4">
-            {councilData.memos.map((memo) => (
+            {memos.map((memo) => (
               <Link key={memo.id} href={`/rnd/${memo.id}`}>
                 <Surface className="p-5 transition hover:border-amber-300/30 hover:bg-[var(--card)]">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -226,11 +296,13 @@ export default function RndCouncilPage() {
             <section className="mt-8">
               <h4 className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--text)]/45">{t('rnd.memo.debate_section')}</h4>
               <div className="mt-4 space-y-4">
-                {selectedDebate.map((round) => (
+                {selectedDebate.map((round) => {
+                  const roundTopic = round.topic ?? '—';
+                  return (
                   <div key={round.round} className="rounded-3xl border border-[var(--border)] bg-[var(--bg)]/10 p-5">
-                    <div className="text-xs uppercase tracking-[0.2em] text-[var(--text)]/35">{t('rnd.memo.round', { n: round.round, topic: round.topic })}</div>
+                    <div className="text-xs uppercase tracking-[0.2em] text-[var(--text)]/35">{t('rnd.memo.round', { n: round.round, topic: roundTopic })}</div>
                     <div className="mt-4 space-y-3">
-                      {round.highlights.map((entry, index) => (
+                      {(round.highlights ?? []).map((entry, index) => (
                         <div key={`${round.round}-${index}`} className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3">
                           <div className="text-sm font-medium text-[var(--text)]">{councilById[entry.speaker]?.emoji} {councilById[entry.speaker]?.name}</div>
                           <p className="mt-2 text-sm leading-7 text-[var(--muted)]">{entry.message}</p>
@@ -238,7 +310,7 @@ export default function RndCouncilPage() {
                       ))}
                     </div>
                   </div>
-                ))}
+                )})}
               </div>
             </section>
 
@@ -246,9 +318,10 @@ export default function RndCouncilPage() {
               <h4 className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--text)]/45">{t('rnd.memo.recs_section')}</h4>
               <div className="mt-4 space-y-4">
                 {selectedRecommendations.map((recommendation, index) => {
-                  const recommendationSummary = 'rationale' in recommendation ? recommendation.rationale : recommendation.description;
-                  const recommendationOwner = 'owner' in recommendation ? recommendation.owner : recommendation.champion;
-                  const recommendationActions = 'actionItems' in recommendation ? recommendation.actionItems : recommendation.firstSteps;
+                  const recommendationSummary = ('rationale' in recommendation ? recommendation.rationale : recommendation.description) ?? '—';
+                  const recommendationOwner = ('owner' in recommendation ? recommendation.owner : recommendation.champion) ?? '—';
+                  const recommendationActions = ('actionItems' in recommendation ? recommendation.actionItems : recommendation.firstSteps) ?? [];
+                  const recommendationPriority = recommendation.priority ?? 'P2';
 
                   return (
                     <div key={recommendation.id} className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-5">
@@ -257,7 +330,7 @@ export default function RndCouncilPage() {
                           <div className="text-sm text-[var(--text)]/45">{t('rnd.memo.rec_n', { n: index + 1 })}</div>
                           <h5 className="mt-2 text-lg font-semibold text-[var(--text)]">{recommendation.title}</h5>
                         </div>
-                        <span className={`rounded-full border px-3 py-1 text-xs font-medium ${priorityTone[recommendation.priority] ?? priorityTone.P2}`}>{recommendation.priority}</span>
+                        <span className={`rounded-full border px-3 py-1 text-xs font-medium ${priorityTone[recommendationPriority]}`}>{recommendationPriority}</span>
                       </div>
                       <p className="mt-3 text-sm leading-7 text-[var(--muted)]">{recommendationSummary}</p>
                       <div className="mt-4 text-sm text-[var(--text)]/75">{t('rnd.memo.owner')} <span className="text-[var(--text)]">{recommendationOwner}</span></div>

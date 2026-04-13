@@ -34,23 +34,82 @@ const statusTone: Record<string, string> = {
   shipped: 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200',
 };
 
-const councilById = Object.fromEntries(councilData.config.council.map((member) => [member.id, member]));
+type CouncilMember = {
+  id: string;
+  name: string;
+  emoji?: string;
+};
+
+type CouncilIdea = {
+  id: string;
+  title: string;
+  summary: string;
+  proposedBy: string;
+  impact: number;
+  effort: number;
+  votes: Record<string, number>;
+};
+
+type CouncilRecommendation = {
+  id: string;
+  title: string;
+  summary?: string;
+  rationale?: string;
+  description?: string;
+  priority?: keyof typeof priorityTone;
+  implementationStatus?: keyof typeof statusTone;
+  owner?: string;
+  champion?: string;
+  timeline?: string;
+  actionItems?: string[];
+  firstSteps?: string[];
+};
+
+type CouncilDebateEntry = {
+  round: string;
+  topic?: string;
+  highlights?: Array<{
+    speaker: string;
+    message: string;
+  }>;
+};
+
+type CouncilMemo = {
+  id: string;
+  date: string;
+  generatedAt?: string;
+  runStarted?: string;
+  title: string;
+  status: keyof typeof badgeTone;
+  summary: string;
+  ideas?: CouncilIdea[];
+  recommendations?: CouncilRecommendation[];
+  debate?: CouncilDebateEntry[];
+  scores?: Record<string, number>;
+};
+
+const councilMembers = councilData.config.council as CouncilMember[];
+const memos = councilData.memos as CouncilMemo[];
+const councilById = Object.fromEntries(councilMembers.map((member) => [member.id, member]));
 
 export default function RndMemoDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const { t, locale } = useLocale();
 
-  const memo = councilData.memos.find((entry) => entry.id === id);
+  const memo = memos.find((entry) => entry.id === id);
   if (!memo) notFound();
 
-  const lastRun = new Date(memo.runStarted).toLocaleString(locale === 'es' ? 'es-MX' : 'en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+  const lastRunSource = memo.runStarted ?? memo.generatedAt ?? memo.date;
+  const lastRun = lastRunSource
+    ? new Date(lastRunSource).toLocaleString(locale === 'es' ? 'es-MX' : 'en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : '—';
   const ideas = memo.ideas ?? [];
   const recommendations = memo.recommendations ?? [];
   const debate = memo.debate ?? [];
@@ -181,13 +240,13 @@ export default function RndMemoDetailPage() {
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <div className="text-xs uppercase tracking-[0.2em] text-[var(--text)]/35">{t('rnd.detail.round_label', { n: round.round })}</div>
-                      <div className="mt-2 text-lg font-semibold text-[var(--text)]">{round.topic}</div>
+                      <div className="mt-2 text-lg font-semibold text-[var(--text)]">{round.topic ?? '—'}</div>
                     </div>
                     <div className="text-sm text-amber-300 transition group-open:rotate-90">›</div>
                   </div>
                 </summary>
                 <div className="mt-5 space-y-3 border-t border-[var(--border)] pt-5">
-                  {round.highlights.map((entry, highlightIndex) => (
+                  {(round.highlights ?? []).map((entry, highlightIndex) => (
                     <div key={`${round.round}-${highlightIndex}`} className="rounded-2xl border border-[var(--border)] bg-[var(--bg)]/10 px-4 py-4">
                       <div className="text-sm font-medium text-[var(--text)]">{councilById[entry.speaker]?.emoji} {councilById[entry.speaker]?.name}</div>
                       <p className="mt-2 text-sm leading-7 text-[var(--muted)]">{entry.message}</p>
@@ -204,9 +263,11 @@ export default function RndMemoDetailPage() {
           <p className="mt-2 text-sm text-[var(--muted)]">{t('rnd.detail.recs_desc')}</p>
           <div className="mt-6 space-y-4">
             {recommendations.map((recommendation, index) => {
-              const recommendationSummary = 'rationale' in recommendation ? recommendation.rationale : recommendation.description;
-              const recommendationOwner = 'owner' in recommendation ? recommendation.owner : recommendation.champion;
-              const recommendationActions = 'actionItems' in recommendation ? recommendation.actionItems : recommendation.firstSteps;
+              const recommendationSummary = ('rationale' in recommendation ? recommendation.rationale : recommendation.description) ?? '—';
+              const recommendationOwner = ('owner' in recommendation ? recommendation.owner : recommendation.champion) ?? '—';
+              const recommendationActions = ('actionItems' in recommendation ? recommendation.actionItems : recommendation.firstSteps) ?? [];
+              const recommendationPriority = recommendation.priority ?? 'P2';
+              const recommendationStatus = recommendation.implementationStatus ?? 'monitoring';
 
               return (
                 <div key={recommendation.id} className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-5">
@@ -216,8 +277,8 @@ export default function RndMemoDetailPage() {
                       <h3 className="mt-2 text-lg font-semibold text-[var(--text)]">{recommendation.title}</h3>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <span className={`rounded-full border px-3 py-1 text-xs font-medium ${priorityTone[recommendation.priority] ?? priorityTone.P2}`}>{recommendation.priority}</span>
-                      <span className={`rounded-full border px-3 py-1 text-xs font-medium ${statusTone[recommendation.implementationStatus] ?? statusTone.monitoring}`}>{recommendation.implementationStatus}</span>
+                      <span className={`rounded-full border px-3 py-1 text-xs font-medium ${priorityTone[recommendationPriority]}`}>{recommendationPriority}</span>
+                      <span className={`rounded-full border px-3 py-1 text-xs font-medium ${statusTone[recommendationStatus]}`}>{recommendationStatus}</span>
                     </div>
                   </div>
                   <p className="mt-3 text-sm leading-7 text-[var(--muted)]">{recommendationSummary}</p>
