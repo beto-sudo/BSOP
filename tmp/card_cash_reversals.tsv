@@ -1,0 +1,108 @@
+order_id	timestamp	status	layout_name	table_name	total_amount	total_discount	card_methods	card_amount	cash_returned	net_payments	exact_card_cash_match	product_lines	product_total	products	payments
+16862115	2026-04-12T19:55:20+00:00	order_ended	MOSTRADOR	Tiendita	205	205	credit_card_visa	205	205	0	yes	2	205	Miller High Life x3 | Flashlyte Coco x1	credit_card_visa:205 | cash:-205
+16861606	2026-04-12T19:29:00+00:00	order_ended	MOSTRADOR	Tiendita	110	110	credit_card_visa	110	110	0	yes	1	110	Miller High Life x2	credit_card_visa:110 | cash:-110
+16649222	2026-03-25T02:07:10+00:00	order_ended	MOSTRADOR	Tiendita	350	299	credit_card_visa	350	51	299	no	1	299	Amstel Ultra 355 ml x7	credit_card_visa:350 | cash:-51
+16609967	2026-03-22T03:49:13+00:00	order_ended	MOSTRADOR	Tiendita	830	779	credit_card_visa	830	51	779	no	3	779	Amstel Ultra 355 ml x13 | Papas Preparadas x2 | Agua Mineral Preparada Topochico x1	credit_card_visa:830 | cash:-51
+16379795	2026-03-04T03:21:31+00:00	order_ended	MOSTRADOR	Tiendita	300	249	credit_card_visa	300	51	249	no	1	249	Amstel Ultra 355 ml x6	credit_card_visa:300 | cash:-51
+16237597	2026-02-20T04:02:41+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Tecate Light 325 ml x6	credit_card_visa:270 | cash:-45.9
+16224740	2026-02-19T04:09:18+00:00	order_ended	MOSTRADOR	Tiendita	470	424.1	credit_card_visa	470	45.9	424.1	no	2	424.1	Renta Cancha Padel x1 | Tecate Light 325 ml x6	credit_card_visa:470 | cash:-45.9
+16224730	2026-02-19T03:36:34+00:00	order_ended	MOSTRADOR	Tiendita	420	374.1	credit_card_visa	420	45.9	374.1	no	2	374.1	Tecate Light 325 ml x6 | Malboro Lights x1	credit_card_visa:420 | cash:-45.9
+16166914	2026-02-14T06:04:43+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Bohemia Cristal x6	credit_card_visa:270 | cash:-45.9
+16166913	2026-02-14T06:04:23+00:00	order_ended	MOSTRADOR	Tiendita	300	249	credit_card_visa	300	51	249	no	1	249	Amstel Ultra 355 ml x6	credit_card_visa:300 | cash:-51
+16166912	2026-02-14T06:04:08+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Bohemia Cristal x6	credit_card_visa:270 | cash:-45.9
+16166911	2026-02-14T06:03:00+00:00	order_ended	MOSTRADOR	Tiendita	480	429	credit_card_visa	480	51	429	no	4	429	Amstel Ultra 355 ml x6 | Agua Mineral Topochico 600ml x2 | Powerade x1 | Agua RDB 1L x1	credit_card_visa:480 | cash:-51
+16166879	2026-02-14T04:49:30+00:00	order_ended	MOSTRADOR	Tiendita	240	199.2	credit_card_visa	240	40.8	199.2	no	1	199.2	Carta Blanca Caguamita x6	credit_card_visa:240 | cash:-40.8
+16166631	2026-02-14T01:31:54+00:00	order_ended	MOSTRADOR	Tiendita	380	329	credit_card_visa	380	51	329	no	2	329	Amstel Ultra 355 ml x6 | Clamato Preparado x1	credit_card_visa:380 | cash:-51
+16112549	2026-02-10T05:01:41+00:00	order_ended	MOSTRADOR	Tiendita	630	579	credit_card_visa	630	51	579	no	2	579	Miller High Life x6 | XX Lager 325 ml x6	credit_card_visa:630 | cash:-51
+16100314	2026-02-09T03:40:10+00:00	order_ended	MOSTRADOR	Tiendita	340	289	credit_card_visa	340	51	289	no	2	289	Amstel Ultra 355 ml x6 | Agua RDB 1L x1	credit_card_visa:340 | cash:-51
+16084664	2026-02-07T04:46:15+00:00	order_ended	MOSTRADOR	Tiendita	815	769.1	credit_card_visa	815	45.9	769.1	no	6	769.1	Agua RDB 1L x1 | Tecate Light 325 ml x6 | Amstel Ultra 355 ml x2 | Tostitos x1 | Carne Seca Sabor Limón x1 | Torneo Relampago x1	credit_card_visa:815 | cash:-45.9
+16084574	2026-02-07T02:48:19+00:00	order_ended	MOSTRADOR	Tiendita	300	259.2	credit_card_visa	300	40.8	259.2	no	2	259.2	Carta Blanca Caguamita x6 | Agua Mineral Preparada Topochico x1	credit_card_visa:300 | cash:-40.8
+16004254	2026-01-31T03:44:23+00:00	order_ended	MOSTRADOR	Tiendita	240	199.2	credit_card_visa	240	40.8	199.2	no	1	199.2	Carta Blanca Caguamita x6	credit_card_visa:240 | cash:-40.8
+16004181	2026-01-31T02:27:27+00:00	order_ended	MOSTRADOR	Tiendita	240	199.2	credit_card_visa	240	40.8	199.2	no	1	199.2	Carta Blanca Caguamita x6	credit_card_visa:240 | cash:-40.8
+16004179	2026-01-31T02:26:23+00:00	order_ended	MOSTRADOR	Tiendita	240	199.2	credit_card_visa	240	40.8	199.2	no	1	199.2	Carta Blanca Caguamita x6	credit_card_visa:240 | cash:-40.8
+16004123	2026-01-31T01:54:01+00:00	order_ended	MOSTRADOR	Tiendita	300	249	credit_card_visa	300	51	249	no	1	249	XX Lager 325 ml x6	credit_card_visa:300 | cash:-51
+16004001	2026-01-31T01:19:54+00:00	order_ended	MOSTRADOR	Tiendita	240	199.2	credit_card_visa	240	40.8	199.2	no	1	199.2	Carta Blanca Caguamita x6	credit_card_visa:240 | cash:-40.8
+15913764	2026-01-23T03:30:10+00:00	order_ended	MOSTRADOR	Tiendita	300	249	credit_card_visa	300	51	249	no	1	249	Amstel Ultra 355 ml x6	credit_card_visa:300 | cash:-51
+15874070	2026-01-20T04:13:39+00:00	order_ended	MOSTRADOR	Tiendita	2620	2523.1	credit_card_visa	2620	96.9	2523.1	no	4	2523.1	Tecate Light 325 ml x18 | Amstel Ultra 355 ml x7 | Agua Mineral Preparada Topochico x1 | Renta Cancha Padel x7	credit_card_visa:2620 | cash:-96.9
+15783227	2026-01-12T04:39:03+00:00	order_ended	MOSTRADOR	Tiendita	440	399.2	credit_card_visa	440	40.8	399.2	no	2	399.2	Carta Blanca Caguamita x6 | Renta Cancha Padel x1	credit_card_visa:440 | cash:-40.8
+15745412	2026-01-08T03:33:45+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Tecate Light 325 ml x6	credit_card_visa:270 | cash:-45.9
+15710189	2026-01-03T03:18:53+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Tecate Light 325 ml x6	credit_card_visa:270 | cash:-45.9
+15709435	2026-01-02T23:28:10+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	25	45.9	224.1	no	1	224.1	Tecate Light 325 ml x6	credit_card_visa:25 | cash:245 | cash:-45.9
+15551473	2025-12-13T05:05:42+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Bohemia Cristal x6	credit_card_visa:270 | cash:-45.9
+15551418	2025-12-13T03:41:36+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Tecate Light 325 ml x6	credit_card_visa:270 | cash:-45.9
+15551325	2025-12-13T02:16:36+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Bohemia Cristal x6	credit_card_visa:270 | cash:-45.9
+15510396	2025-12-10T03:54:05+00:00	order_ended	MOSTRADOR	Tiendita	240	199.2	credit_card_visa	240	40.8	199.2	no	1	199.2	Carta Blanca Caguamita x6	credit_card_visa:240 | cash:-40.8
+15495621	2025-12-09T00:34:45+00:00	order_ended	MOSTRADOR	Tiendita	500	449	credit_card_visa	500	51	449	no	2	449	Amstel Ultra 355 ml x6 | Renta Cancha Padel x1	credit_card_visa:500 | cash:-51
+15489078	2025-12-08T04:08:26+00:00	order_ended	MOSTRADOR	Tiendita	300	249	credit_card_visa	300	51	249	no	1	249	Amstel Ultra 355 ml x6	credit_card_visa:300 | cash:-51
+15488965	2025-12-08T02:11:05+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Tecate Light 325 ml x6	credit_card_visa:270 | cash:-45.9
+15459952	2025-12-05T04:38:48+00:00	order_ended	MOSTRADOR	Tiendita	350	299	credit_card_visa	350	51	299	no	1	299	Amstel Ultra 355 ml x7	credit_card_visa:350 | cash:-51
+15459930	2025-12-05T03:35:14+00:00	order_ended	MOSTRADOR	Tiendita	500	449	credit_card_visa	500	51	449	no	1	449	Amstel Ultra 355 ml x10	credit_card_visa:500 | cash:-51
+15459929	2025-12-05T03:34:18+00:00	order_ended	MOSTRADOR	Tiendita	310	264.1	credit_card_visa	20	45.9	264.1	no	2	264.1	Chips Fuego x1 | Bohemia Cristal x6	credit_card_visa:20 | cash:290 | cash:-45.9
+15446152	2025-12-04T04:45:02+00:00	order_ended	MOSTRADOR	Tiendita	1245	1148.1	credit_card_visa	1245	96.9	1148.1	no	4	1148.1	Tecate Light 325 ml x12 | Amstel Ultra 355 ml x12 | Tostitos x2 | Cerveza Indio 325 ml x1	credit_card_visa:1245 | cash:-96.9
+15346687	2025-11-26T01:01:39+00:00	order_ended	MOSTRADOR	Tiendita	300	249	credit_card_visa	300	51	249	no	1	249	Amstel Ultra 355 ml x6	credit_card_visa:300 | cash:-51
+15317744	2025-11-24T03:21:17+00:00	order_ended	MOSTRADOR	Tiendita	320	279.2	credit_card_visa	320	40.8	279.2	no	1	279.2	Carta Blanca Caguamita x8	credit_card_visa:320 | cash:-40.8
+15317698	2025-11-24T02:42:55+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Tecate Light 325 ml x6	credit_card_visa:270 | cash:-45.9
+15317689	2025-11-24T02:36:34+00:00	order_ended	MOSTRADOR	Tiendita	300	249	credit_card_visa	300	51	249	no	1	249	Amstel Ultra 355 ml x6	credit_card_visa:300 | cash:-51
+15317672	2025-11-24T02:29:05+00:00	order_in_progress	MOSTRADOR	Tiendita	330	279	credit_card_visa	330	51	279	no	2	279	Amstel Ultra 355 ml x6 | Tostitos x1	credit_card_visa:330 | cash:-51
+15317487	2025-11-24T01:25:36+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Tecate Light 325 ml x6	credit_card_visa:270 | cash:-45.9
+15317343	2025-11-24T00:53:14+00:00	order_ended	MOSTRADOR	Tiendita	400	349	credit_card_visa	400	51	349	no	2	349	Amstel Ultra 355 ml x6 | XX Lager 325 ml x2	credit_card_visa:400 | cash:-51
+15317022	2025-11-23T23:57:35+00:00	order_ended	MOSTRADOR	Tiendita	350	304.1	credit_card_visa	350	45.9	304.1	no	2	304.1	Clamato Preparado x1 | Tecate Light 325 ml x6	credit_card_visa:350 | cash:-45.9
+15316608	2025-11-23T22:39:47+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	2	224.1	Tecate Light 325 ml x6 | Vaso con hielo x2	credit_card_visa:270 | cash:-45.9
+15310679	2025-11-23T07:12:51+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Tecate Light 325 ml x6	credit_card_visa:270 | cash:-45.9
+15310676	2025-11-23T07:02:51+00:00	order_ended	MOSTRADOR	Tiendita	240	199.2	credit_card_visa	240	40.8	199.2	no	1	199.2	Carta Blanca Caguamita x6	credit_card_visa:240 | cash:-40.8
+15310669	2025-11-23T06:17:42+00:00	order_ended	MOSTRADOR	Tiendita	270	229.2	credit_card_visa	270	40.8	229.2	no	2	229.2	Carta Blanca Caguamita x6 | Tostitos x1	credit_card_visa:270 | cash:-40.8
+15310662	2025-11-23T05:48:38+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Tecate Light 325 ml x6	credit_card_visa:270 | cash:-45.9
+15310660	2025-11-23T05:41:30+00:00	order_ended	MOSTRADOR	Tiendita	300	249	credit_card_visa	300	51	249	no	1	249	Amstel Ultra 355 ml x6	credit_card_visa:300 | cash:-51
+15310651	2025-11-23T05:17:21+00:00	order_ended	MOSTRADOR	Tiendita	240	199.2	credit_card_visa	240	40.8	199.2	no	1	199.2	Carta Blanca Caguamita x6	credit_card_visa:240 | cash:-40.8
+15310615	2025-11-23T04:19:43+00:00	order_ended	MOSTRADOR	Tiendita	300	249	credit_card_visa	300	51	249	no	1	249	Amstel Ultra 355 ml x6	credit_card_visa:300 | cash:-51
+15310613	2025-11-23T04:17:51+00:00	order_ended	MOSTRADOR	Tiendita	350	299	credit_card_visa	350	51	299	no	2	299	Amstel Ultra 355 ml x6 | XX Lager 325 ml x1	credit_card_visa:350 | cash:-51
+15310609	2025-11-23T04:13:12+00:00	order_ready	MOSTRADOR	Tiendita	390	349.2	credit_card_visa	390	40.8	349.2	no	2	349.2	Carta Blanca Caguamita x6 | Malboro Lights x1	credit_card_visa:390 | cash:-40.8
+15310575	2025-11-23T03:46:05+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Bohemia Cristal x6	credit_card_visa:270 | cash:-45.9
+15310569	2025-11-23T03:37:38+00:00	order_ended	MOSTRADOR	Tiendita	300	249	credit_card_visa	300	51	249	no	1	249	Amstel Ultra 355 ml x6	credit_card_visa:300 | cash:-51
+15310564	2025-11-23T03:35:29+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Tecate Light 325 ml x6	credit_card_visa:270 | cash:-45.9
+15310557	2025-11-23T03:32:16+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Tecate Light 325 ml x6	credit_card_visa:270 | cash:-45.9
+15310554	2025-11-23T03:30:15+00:00	order_ended	MOSTRADOR	Tiendita	380	329	credit_card_visa	380	51	329	no	2	329	Agua RDB 1L x2 | Amstel Ultra 355 ml x6	credit_card_visa:380 | cash:-51
+15310501	2025-11-23T03:01:27+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Tecate Light 325 ml x6	credit_card_visa:270 | cash:-45.9
+15310456	2025-11-23T02:36:39+00:00	order_ended	MOSTRADOR	Tiendita	240	199.2	credit_card_visa	240	40.8	199.2	no	1	199.2	Carta Blanca Caguamita x6	credit_card_visa:240 | cash:-40.8
+15310245	2025-11-22T19:21:14+00:00	order_ended	MOSTRADOR	Tiendita	240	199.2	credit_card_visa	240	40.8	199.2	no	1	199.2	Carta Blanca Caguamita x6	credit_card_visa:240 | cash:-40.8
+15302381	2025-11-22T00:11:29+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Tecate Light 325 ml x6	credit_card_visa:270 | cash:-45.9
+15302368	2025-11-21T23:34:21+00:00	order_ready	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Tecate Light 325 ml x6	credit_card_visa:270 | cash:-45.9
+15302341	2025-11-21T22:34:03+00:00	order_ended	MOSTRADOR	Tiendita	330	279	credit_card_visa	330	51	279	no	2	279	Amstel Ultra 355 ml x6 | Tostitos x1	credit_card_visa:330 | cash:-51
+15302335	2025-11-21T22:27:32+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Tecate Light 325 ml x6	credit_card_visa:270 | cash:-45.9
+15302320	2025-11-21T22:06:31+00:00	order_ended	MOSTRADOR	Tiendita	420	374.1	credit_card_visa	420	45.9	374.1	no	2	374.1	Tecate Light 325 ml x6 | Whiskey Etiqueta Negra Pintado x1	credit_card_visa:420 | cash:-45.9
+15302316	2025-11-21T21:58:18+00:00	order_ended	MOSTRADOR	Tiendita	420	374.1	credit_card_visa	420	45.9	374.1	no	2	374.1	Tecate Light 325 ml x6 | Whiskey Etiqueta Negra Campechano x1	credit_card_visa:420 | cash:-45.9
+15302229	2025-11-21T21:02:39+00:00	order_ended	MOSTRADOR	Tiendita	300	249	credit_card_visa	300	51	249	no	1	249	Amstel Ultra 355 ml x6	credit_card_visa:300 | cash:-51
+15302084	2025-11-21T19:42:47+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Tecate Light 325 ml x6	credit_card_visa:270 | cash:-45.9
+15275486	2025-11-19T22:31:24+00:00	order_ended	MOSTRADOR	Tiendita	1035	984	credit_card_visa	1035	51	984	no	4	659	Amstel Ultra 355 ml x7 | Miller High Life x4 | Michelada Clamato x1 | Powerade Ponche x1	credit_card_visa:1035 | cash:-51
+15275450	2025-11-19T21:39:00+00:00	order_ended	MOSTRADOR	Tiendita	280	239.2	credit_card_visa	280	40.8	239.2	no	2	239.2	Carta Blanca Caguamita x6 | Coca Cola Regular 355 ml x1	credit_card_visa:280 | cash:-40.8
+15246308	2025-11-17T23:35:11+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Tecate Light 325 ml x6	credit_card_visa:270 | cash:-45.9
+15245911	2025-11-17T18:33:16+00:00	order_ended	MOSTRADOR	Tiendita	310	264.1	credit_card_visa	310	45.9	264.1	no	2	264.1	Tecate Light 325 ml x6 | Coca Cola Light 355 ml x1	credit_card_visa:310 | cash:-45.9
+15218236	2025-11-14T22:19:15+00:00	order_ended	MOSTRADOR	Tiendita	900	849	credit_card_visa	900	51	849	no	2	849	Torneo Relampago x2 | Amstel Ultra 355 ml x6	credit_card_visa:900 | cash:-51
+15176814	2025-11-11T21:25:34+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Tecate Light 325 ml x6	credit_card_visa:270 | cash:-45.9
+15139747	2025-11-07T19:46:10+00:00	order_ended	MOSTRADOR	Tiendita	360	309	credit_card_visa	360	51	309	no	2	309	XX Lager 325 ml x6 | Jicama Limon x1	credit_card_visa:360 | cash:-51
+14976491	2025-10-24T23:53:59+00:00	order_ended	MOSTRADOR	Tiendita	400	349	credit_card_visa	400	51	349	no	1	349	Amstel Ultra 355 ml x8	credit_card_visa:400 | cash:-51
+14976478	2025-10-24T23:01:57+00:00	order_ended	MOSTRADOR	Tiendita	540	489	credit_card_visa	540	51	489	no	3	489	Amstel Ultra 355 ml x6 | Galleta DR x1 | Clamato Preparado x2	credit_card_visa:540 | cash:-51
+14976130	2025-10-24T19:14:25+00:00	order_ended	MOSTRADOR	Tiendita	240	199.2	credit_card_visa	240	40.8	199.2	no	1	199.2	Carta Blanca Caguamita x6	credit_card_visa:240 | cash:-40.8
+14893970	2025-10-17T21:41:42+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Tecate Light 325 ml x6	credit_card_visa:270 | cash:-45.9
+14881793	2025-10-16T20:18:42+00:00	order_ended	MOSTRADOR	Tiendita	420	374.1	credit_card_visa	420	45.9	374.1	no	2	374.1	Tecate Light 325 ml x6 | Malboro Lights x1	credit_card_visa:420 | cash:-45.9
+14744642	2025-10-05T20:45:09+00:00	order_ended	MOSTRADOR	Tiendita	300	249	credit_card_visa	300	51	249	no	1	249	XX Lager 325 ml x6	credit_card_visa:300 | cash:-51
+14730490	2025-10-03T20:23:47+00:00	order_ended	MOSTRADOR	Tiendita	470	429.2	credit_card_visa	470	40.8	429.2	no	5	429.2	Powerade Moras x1 | Bubulubu x1 | Carta Blanca Caguamita x8 | Takis Fuego x1 | Tostitos x1	credit_card_visa:470 | cash:-40.8
+14646178	2025-09-26T22:04:48+00:00	order_ended	MOSTRADOR	Tiendita	310	269.2	credit_card_visa	310	40.8	269.2	no	3	269.2	Tostitos x1 | Chips Fuego x1 | Carta Blanca Caguamita x6	credit_card_visa:310 | cash:-40.8
+14634639	2025-09-26T00:07:28+00:00	order_ready	MOSTRADOR	Tiendita	340	289	credit_card_visa	340	51	289	no	2	289	Amstel Ultra 355 ml x6 | Coca Cola Regular 355 ml x1	credit_card_visa:340 | cash:-51
+14634217	2025-09-25T23:15:17+00:00	order_ended	MOSTRADOR	Tiendita	420	369	credit_card_visa	420	51	369	no	2	369	Amstel Ultra 355 ml x6 | Cacahuate Japones x4	credit_card_visa:420 | cash:-51
+14605535	2025-09-23T22:31:35+00:00	order_ended	MOSTRADOR	Tiendita	720	674.1	credit_card_visa	720	45.9	674.1	no	4	674.1	Agua 500 ml x1 | Coca Cola Regular 355 ml x1 | Tostitos x1 | Tecate Light 325 ml x14	credit_card_visa:720 | cash:-45.9
+14564770	2025-09-19T23:22:40+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Tecate Light 325 ml x6	credit_card_visa:270 | cash:-45.9
+14564756	2025-09-19T22:46:33+00:00	order_ended	MOSTRADOR	Tiendita	810	759	credit_card_visa	810	51	759	no	4	759	XX Lager 325 ml x12 | Tequila Tradicional Reposado Derecho x2 | Agua 500 ml x1 | Papirringas x1	credit_card_visa:810 | cash:-51
+14564720	2025-09-19T21:57:18+00:00	order_ended	MOSTRADOR	Tiendita	570	519	credit_card_visa	570	51	519	no	3	519	Orden de 5 Tacos Bistec Harina x1 | Amstel Ultra 355 ml x6 | Papas Preparadas x1	credit_card_visa:570 | cash:-51
+14564656	2025-09-19T20:45:59+00:00	order_ended	MOSTRADOR	Tiendita	300	249	credit_card_visa	300	51	249	no	1	249	Amstel Ultra 355 ml x6	credit_card_visa:300 | cash:-51
+14564631	2025-09-19T20:31:36+00:00	order_ready	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Tecate Light 325 ml x6	credit_card_visa:270 | cash:-45.9
+14564620	2025-09-19T20:20:21+00:00	order_ended	MOSTRADOR	Tiendita	375	324	credit_card_visa	375	51	324	no	3	324	Amstel Ultra 355 ml x6 | Bubulubu x1 | Electrolit Naranja-Mandarina x1	credit_card_visa:375 | cash:-51
+14564511	2025-09-19T19:25:04+00:00	order_ended	MOSTRADOR	Tiendita	430	379	credit_card_visa	430	51	379	no	2	379	Amstel Ultra 355 ml x8 | Tostitos x1	credit_card_visa:430 | cash:-51
+14553165	2025-09-18T21:29:00+00:00	order_ended	MOSTRADOR	Tiendita	855	804	credit_card_visa	855	51	804	no	4	804	Amstel Ultra 355 ml x6 | Don Julio Reposado Derecho x2 | Renta Cancha Padel x1 | Carne Seca Sabor Chile y Limón x1	credit_card_visa:855 | cash:-51
+14539731	2025-09-17T21:10:49+00:00	order_ended	MOSTRADOR	Tiendita	1070	1024.1	credit_card_visa	1070	45.9	1024.1	no	3	1024.1	Palbea Padel Overgrip x1 | Tecate Light 325 ml x6 | Clase Priv. Carlos 1 pers. x1	credit_card_visa:1070 | cash:-45.9
+14525764	2025-09-16T21:02:26+00:00	order_ended	MOSTRADOR	Tiendita	280	239.2	credit_card_visa	280	40.8	239.2	no	2	239.2	Carta Blanca Caguamita x6 | Chips Fuego x1	credit_card_visa:280 | cash:-40.8
+14525732	2025-09-16T20:13:40+00:00	order_ended	MOSTRADOR	Tiendita	240	199.2	credit_card_visa	240	40.8	199.2	no	1	199.2	Carta Blanca Caguamita x6	credit_card_visa:240 | cash:-40.8
+14512054	2025-09-15T21:08:02+00:00	order_ended	MOSTRADOR	Tiendita	470	424.1	credit_card_visa	470	45.9	424.1	no	2	424.1	Renta Cancha Padel x1 | Cerveza Indio 325 ml x6	credit_card_visa:470 | cash:-45.9
+14485410	2025-09-13T00:24:02+00:00	order_ended	MOSTRADOR	Tiendita	2320	2269	credit_card_visa	2320	51	2269	no	9	2169	Agua 500 ml x7 | Jicama Limon x1 | XX Lager 325 ml x12 | Electrolife Zero Uva x1 | Chokis Galletas x2 | Tequila Tradicional Reposado Derecho x2 | Torneo Noche Mexicana x2 | Propina $100 x1 | Propina $50 x1	credit_card_visa:2320 | cash:-51
+14485278	2025-09-12T21:13:53+00:00	order_ended	MOSTRADOR	Tiendita	270	224.1	credit_card_visa	270	45.9	224.1	no	1	224.1	Tecate Light 325 ml x6	credit_card_visa:270 | cash:-45.9
+14460511	2025-09-10T23:03:39+00:00	order_ended	MOSTRADOR	Tiendita	710	669.2	credit_card_visa	710	40.8	669.2	no	5	669.2	Pelotas Padel Head x1 | Electrolife Zero Uva x1 | Carta Blanca Caguamita x6 | Tequila JC Traditional Cristalino x1 | XX Lager 325 ml x1	credit_card_visa:710 | cash:-40.8

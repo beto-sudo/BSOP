@@ -29,6 +29,7 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   '/rdb/requisiciones': 'rdb.requisiciones',
   '/rdb/playtomic': 'rdb.playtomic',
   '/rdb/ordenes-compra': 'rdb.ordenes_compra',
+  '/rdb/tasks': 'rdb.tasks',
   '/settings/acceso': 'settings.acceso',
 };
 

@@ -55,6 +55,7 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'Requisiciones', href: '/rdb/requisiciones' },
       { label: 'Órdenes de Compra', href: '/rdb/ordenes-compra' },
       { label: 'Playtomic', href: '/rdb/playtomic' },
+      { label: 'Tareas', href: '/rdb/tasks' },
     ],
   },
   {
@@ -102,6 +103,7 @@ const ROUTE_TO_MODULE: Record<string, string> = {
   '/rdb/requisiciones': 'rdb.requisiciones',
   '/rdb/playtomic': 'rdb.playtomic',
   '/rdb/ordenes-compra': 'rdb.ordenes_compra',
+  '/rdb/tasks': 'rdb.tasks',
   '/rdb': 'rdb.home',
   '/settings/acceso': 'settings.acceso',
 };
