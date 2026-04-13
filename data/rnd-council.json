@@ -11,14 +11,14 @@
       {
         "id": "engineer",
         "name": "The Engineer",
-        "model": "openai/gpt-5.4 (fallback)",
+        "model": "openai/gpt-5.4",
         "role": "Technical feasibility, architecture, implementation paths",
         "emoji": "⚙️"
       },
       {
         "id": "analyst",
         "name": "The Analyst",
-        "model": "openai/gpt-5.4 (fallback, gemini failed)",
+        "model": "google/gemini-3.1-pro-preview",
         "role": "Data patterns, metrics, competitive analysis",
         "emoji": "📊"
       },
@@ -32,7 +32,7 @@
       {
         "id": "synthesizer",
         "name": "The Synthesizer",
-        "model": "openai/gpt-5.4 (fallback)",
+        "model": "openai/gpt-5.4 (fallback for unavailable openrouter/minimax/minimax-m2.5)",
         "role": "Consolidates debate, writes final memo",
         "emoji": "📝"
       }
@@ -48,345 +48,24 @@
   },
   "memos": [
     {
-      "id": "rnd-2026-04-05",
-      "date": "2026-04-05",
-      "generatedAt": "2026-04-06T04:12:58Z",
+      "id": "rnd-2026-04-12",
+      "date": "2026-04-12",
+      "generatedAt": "2026-04-13T01:00:00Z",
       "title": "R&D Council Session",
       "status": "complete",
-      "runStarted": "2026-04-06T04:12:58Z",
-      "summary": "Session #4 concluded that RDB is now the highest-leverage live systems priority because the Supabase-vs-Coda audit moved the issue from theory to proof: Coda is both computationally brittle and financially lossy. The council converged on five perspectives and two debate rounds around a common thesis: cross the RDB trust threshold first, use it as the canonical backend pilot for the broader architecture, and treat workspace discipline as execution infrastructure rather than housekeeping. The week should therefore focus on Caja V2, duplicate-policy resolution, bounded Coda bridge design, and lightweight enforcement of workspace rules, while deferring broader BSOP breadth.",
+      "runStarted": "2026-04-13T01:00:00Z",
+      "summary": "Session #5 converged on a depth-first answer: finish crossing the RDB trust threshold before broadening BSOP across the rest of the portfolio. The council agreed that the real constraint is no longer product imagination but operational trust, recoverability, and Beto's bandwidth. The week should therefore center on an RDB trust sprint: close access validation, formalize the procurement backbone, add anomaly-first trust visibility, and route only the important exceptions back to Beto through OpenClaw. Once RDB is boringly reliable, BSOP can package the pattern for DILESA, ANSA, and later COAGAN with much less strategic ambiguity.",
       "context": {
-        "sessionNumber": 4,
-        "priorSessionDate": "2026-04-01",
-        "keyShift": "RDB moved from suspected pain point to proven source-of-truth break, with Supabase established as the reliable ingestion layer and Coda demoted to frontend role.",
+        "sessionNumber": 5,
+        "priorSessionDate": "2026-04-05",
+        "keyShift": "The council moved from proving that RDB should be the canonical pilot to defining what must be finished now for that trust claim to become operationally real.",
         "updatedContext": [
-          "RDB Supabase schema and mathematical views created and executed successfully",
-          "Critical Waitry inbound trigger bug fixed; missed payments recovered",
-          "Coda full-table Filter formulas identified as freeze root cause in Cortes de Caja",
-          "Comparative audit across Cortes 350-395 confirms material data loss in Coda",
-          "Caja V2 page created in Coda but V2 tables must be created manually due to platform limits",
-          "Workspace discipline rules hardened in AGENTS, cron payloads, and HEARTBEAT",
-          "Derived daily files were still generated, proving enforcement gap remains",
-          "19 loose root artifacts moved into project folder, improving workspace hygiene",
-          "BSOP remains active, but breadth work should pause until RDB trust threshold is crossed"
-        ]
-      },
-      "members": [
-        {
-          "id": "architecture",
-          "name": "OpenClaw / Architecture",
-          "status": "complete",
-          "mainPoints": [
-            "RDB should become the canonical backend pilot for the full operating stack",
-            "Workspace rules need enforcement, not more prose",
-            "Source registry should begin with live exception zones",
-            "Shadow-mode comparators should become a reusable migration pattern"
-          ]
-        },
-        {
-          "id": "business-ops",
-          "name": "Business / Ops",
-          "status": "complete",
-          "mainPoints": [
-            "Caja V2 should dominate the week",
-            "RDB discrepancy should be framed as trust and leakage recovery",
-            "Broader BSOP breadth should be deferred",
-            "The council output should become a weekly execution scoreboard"
-          ]
-        },
-        {
-          "id": "personal-health",
-          "name": "Personal / Health",
-          "status": "complete",
-          "mainPoints": [
-            "Narrow the week to three critical moves only",
-            "Use health/workload as a throttle input rather than decoration",
-            "Reduce cognitive friction in the workspace",
-            "Maintain an explicit do-not-start list"
-          ]
-        },
-        {
-          "id": "data-intelligence",
-          "name": "Data / Intelligence",
-          "status": "complete",
-          "mainPoints": [
-            "Publish the RDB trust delta explicitly",
-            "Resolve duplicate policy before declaring parity",
-            "Start the source registry with high-trust conflict zones only",
-            "Define migration readiness metrics"
-          ]
-        },
-        {
-          "id": "travel-rdb",
-          "name": "Travel / RDB",
-          "status": "complete",
-          "mainPoints": [
-            "Keep Coda as cockpit but not as backend",
-            "Use aggregated views plus 30-day windows as the practical bridge",
-            "RDB should become the template for remote-friendly supervision",
-            "Travel-feature breadth should wait until the RDB crossing is complete"
-          ]
-        }
-      ],
-      "failures": [],
-      "round1": {
-        "name": "Cross-critique",
-        "summary": "Round 1 produced strong convergence around four themes: RDB as the first canonical backend pilot, duplicate-policy resolution as the gating trust milestone, bounded Coda bridge design via aggregated views and 30-day windows, and workspace-discipline enforcement as execution infrastructure. The strongest critiques rejected broad BSOP expansion, premature parity claims, and any attempt to push full heavy history back into Coda.",
-        "clusters": [
-          {
-            "theme": "RDB trust crossing",
-            "members": [
-              "architecture",
-              "business-ops",
-              "data-intelligence",
-              "travel-rdb"
-            ],
-            "notes": "All four treated RDB as the week's dominant systems priority."
-          },
-          {
-            "theme": "Execution concentration",
-            "members": [
-              "business-ops",
-              "personal-health",
-              "architecture"
-            ],
-            "notes": "The week should be narrowed deliberately to avoid diffusion."
-          },
-          {
-            "theme": "Hybrid frontend/backend operating model",
-            "members": [
-              "architecture",
-              "travel-rdb",
-              "data-intelligence"
-            ],
-            "notes": "Consensus that Coda should remain the cockpit while Supabase owns truth and computation."
-          },
-          {
-            "theme": "Workspace discipline as leverage",
-            "members": [
-              "architecture",
-              "business-ops",
-              "personal-health"
-            ],
-            "notes": "Process reliability now directly affects technical delivery quality."
-          }
-        ],
-        "strongestIdeas": [
-          "Cross the RDB trust threshold with Caja V2",
-          "Resolve duplicate policy and rerun parity",
-          "Turn workspace discipline into enforceable guardrails",
-          "Use bounded sync windows and aggregated views for the Coda bridge"
-        ],
-        "weakestIdeas": [
-          "Broad BSOP breadth work this week",
-          "Health-aware workload logic as a major standalone project right now",
-          "Full historical sync into Coda as the near-term answer"
-        ]
-      },
-      "round2": {
-        "name": "Resolution",
-        "summary": "Round 2 resolved the remaining disagreement by sequencing rather than flattening. RDB stayed P0, but the council narrowed the required crossing point to a usable Supabase-backed Caja V2 rather than a perfect total migration. Workspace guardrails survived because they directly protect execution on the live migration, while broader registry and dashboard ideas were retained only insofar as they support the RDB trust transition and weekly review rhythm.",
-        "rises": [
-          "Caja V2 trust crossing",
-          "Duplicate-policy resolution and rerun of parity",
-          "Workspace enforcement guardrails",
-          "Weekly migration-control ledger"
-        ],
-        "merges": [
-          {
-            "into": "RDB migration-control stream",
-            "from": [
-              "Trust delta reporting",
-              "Parity and duplicate review",
-              "Migration readiness metrics",
-              "Weekly execution scoreboard"
-            ]
-          },
-          {
-            "into": "Hybrid RDB bridge",
-            "from": [
-              "Coda as cockpit only",
-              "Aggregated cortes views",
-              "30-day sync windows",
-              "Manual V2 table creation in Coda"
-            ]
-          }
-        ],
-        "drops": [
-          "Broad BSOP feature expansion this week",
-          "Large health automation work",
-          "Full-history Coda sync ambition"
-        ],
-        "dissentToKeep": [
-          "Some Coda>manual discrepancies may reflect manual adjustments and should remain explicitly classified as uncertain until explained.",
-          "DILESA is strategically important and should rise again once RDB stabilizes.",
-          "Workspace enforcement must stay lightweight or it will become its own distraction."
-        ]
-      },
-      "recommendations": [
-        {
-          "id": "rec-1",
-          "rank": 1,
-          "title": "Cross the RDB trust threshold with Caja V2",
-          "priority": "P0",
-          "champion": "Business / Ops",
-          "description": "Finish the minimum path that lets Beto review a Supabase-backed caja result through a practical Coda V2 frontend. The goal is trustworthy daily use, not perfect migration completeness.",
-          "impact_score": 10,
-          "effort_score": 5,
-          "revenue_potential": "high",
-          "implementationStatus": "next-up",
-          "risks": [
-            "Over-scoping into historical completeness",
-            "UI bridge blocked by Coda constraints",
-            "Trust loss if parity is claimed early"
-          ],
-          "firstSteps": [
-            "Create the four V2 tables manually in Coda",
-            "Build Supabase views for aggregated cortes and 30-day windows",
-            "Connect the bounded Pack/sync bridge",
-            "Validate one full daily cut through the new path"
-          ]
-        },
-        {
-          "id": "rec-2",
-          "rank": 2,
-          "title": "Resolve duplicate policy and rerun parity on the RDB comparatives",
-          "priority": "P0",
-          "champion": "Data / Intelligence",
-          "description": "Classify pending duplicate candidates and rerun the Corte 395 and 350-395 comparison with an explained discrepancy model before declaring trust.",
-          "impact_score": 10,
-          "effort_score": 4,
-          "revenue_potential": "medium",
-          "implementationStatus": "next-up",
-          "risks": [
-            "Premature confidence",
-            "Residual ambiguous orders",
-            "Manual adjustments being misread as bugs"
-          ],
-          "firstSteps": [
-            "Review duplicate candidates for Corte 395 and worst-delta days",
-            "Tag each delta as duplicate, Coda omission, or unexplained/manual",
-            "Regenerate the discrepancy report",
-            "Freeze the working duplicate policy"
-          ]
-        },
-        {
-          "id": "rec-3",
-          "rank": 3,
-          "title": "Turn workspace discipline into enforceable guardrails",
-          "priority": "P0",
-          "champion": "OpenClaw / Architecture",
-          "description": "Add lightweight enforcement so daily-note hygiene, root cleanliness, and cron/subagent behavior become reliable defaults rather than best-effort compliance.",
-          "impact_score": 9,
-          "effort_score": 4,
-          "revenue_potential": "none",
-          "implementationStatus": "planning",
-          "risks": [
-            "Meta-work delaying real delivery",
-            "Overengineering the guardrails"
-          ],
-          "firstSteps": [
-            "Detect same-day derived daily files",
-            "Add root-artifact linting/reporting",
-            "Surface violations in heartbeat/cron summaries",
-            "Keep the first version lightweight"
-          ]
-        },
-        {
-          "id": "rec-4",
-          "rank": 4,
-          "title": "Create a weekly migration-control ledger in BSOP/R&D outputs",
-          "priority": "P1",
-          "champion": "Business / Ops + Data / Intelligence",
-          "description": "Make the council output double as an execution ledger tracking each active migration or system bet by milestone, trust status, blocker, and next action.",
-          "impact_score": 8,
-          "effort_score": 3,
-          "revenue_potential": "medium",
-          "implementationStatus": "planning",
-          "risks": [
-            "Becoming another passive dashboard",
-            "Weak review cadence"
-          ],
-          "firstSteps": [
-            "Track RDB, workspace discipline, DILESA prep, and one reliability item",
-            "Add status, blocker, next milestone, and owner fields",
-            "Review weekly from the council artifact itself"
-          ]
-        },
-        {
-          "id": "rec-5",
-          "rank": 5,
-          "title": "Freeze broad BSOP feature expansion until the RDB crossing is complete",
-          "priority": "P1",
-          "champion": "Personal / Health + Travel / RDB",
-          "description": "Put a temporary brake on attractive breadth work in Travel and placeholder BSOP sections so the week's real leverage is not diluted.",
-          "impact_score": 8,
-          "effort_score": 1,
-          "revenue_potential": "low",
-          "implementationStatus": "next-up",
-          "risks": [
-            "Short-term frustration from deferring interesting work",
-            "May feel conservative"
-          ],
-          "firstSteps": [
-            "Define a one-week do-not-start list",
-            "Explicitly defer non-critical Travel and placeholder-section work",
-            "Reopen breadth only after the Caja V2 trust milestone is reached"
-          ]
-        }
-      ],
-      "debateHighlights": [
-        "RDB is no longer just a migration candidate; it is the first system with enough forensic evidence to justify a decisive backend shift.",
-        "Supabase is already the truth layer; Coda has simply not been demoted yet.",
-        "Workspace discipline matters strategically because process drift degrades high-stakes technical execution.",
-        "Aggregated views plus 30-day windows beat full-history sync as the practical Coda bridge.",
-        "The council rejected broad BSOP breadth, health automation, and side-feature expansion until the RDB crossing point is complete."
-      ],
-      "dissent": [
-        "Some days where Coda exceeds Supabase may reflect real manual adjustments and should remain classified as uncertain until explained.",
-        "DILESA should return quickly after RDB stabilizes; current deferral is sequencing, not demotion.",
-        "Health-aware workload control should remain advisory rather than autonomous for now.",
-        "Workspace enforcement must stay lightweight or it will become its own distraction."
-      ],
-      "actionItems": [
-        "Approve RDB as the dominant systems priority for the week.",
-        "Resolve duplicate-policy cases for Corte 395 and worst-delta days.",
-        "Create the Caja V2 tables manually in Coda so the bridge can proceed.",
-        "Approve the bounded bridge design: aggregated cortes plus 30-day windows only.",
-        "Treat workspace-discipline enforcement as delivery quality, not housekeeping.",
-        "Maintain a short do-not-start list until the RDB trust threshold is crossed.",
-        "Use the next council session as an execution review rather than a wide ideation pass."
-      ],
-      "scores": {
-        "averageImpact": 9.0,
-        "averageEffort": 3.4,
-        "recommendationConfidence": 9.0,
-        "debateIntensity": 8.0
-      }
-    },
-    {
-      "id": "rnd-2026-04-01",
-      "date": "2026-04-01",
-      "generatedAt": "2026-04-01T23:08:12Z",
-      "title": "R&D Council Session",
-      "status": "complete-with-failure",
-      "runStarted": "2026-04-01T23:08:12Z",
-      "summary": "Session #3 concluded that the main bottleneck is now execution, not ideation. Since Session #2, BSOP gained meaningful new infrastructure — live health telemetry, the R&D dashboard, and Coda MCP — but the prior P0s still did not start. The council therefore narrowed toward shippable operating layers: a minimum Operating Pulse, a compressed metric registry as the Canonical Source Treaty, an MCP-assisted DILESA Clientes pilot, a COAGAN recovery scorecard, and immediate reliability fixes around offline RDB cameras and permissive Supabase RLS.",
-      "context": {
-        "sessionNumber": 3,
-        "priorSessionDate": "2026-03-29",
-        "executionGap": "Session #2 identified Canonical Source Treaty and Operating Pulse as P0s, but neither was started before Session #3.",
-        "updatedContext": [
-          "BSOP health dashboard v2 deployed",
-          "R&D Council dashboard deployed",
-          "Live usage telemetry available",
-          "Coda MCP connected with 27 tools",
-          "Health pipeline fully operational with 50,516 metrics",
-          "DILESA migration still not started",
-          "COAGAN recovery metrics still absent",
-          "RDB has 16 offline cameras",
-          "ANSA still lacks comparable live data pipeline",
-          "Beto is on family trip in Breckenridge with reduced bandwidth"
+          "Recent BSOP repo work centered on RDB ventas by corte, Waitry timezone correctness, impersonation, and onboarding/auth hardening",
+          "Supabase is now the practical operational truth layer for the hottest BSOP flows",
+          "RDB remains the most active live business inside BSOP, with ANSA and DILESA still strategically important but less instrumented",
+          "QMD semantic memory is working well; Active Memory is still unstable due to repeated timeouts",
+          "Playtomic has moved into production-grade integration, though financial/commission clarity still needs follow-through",
+          "Beto's recent sleep/BP context makes operator bandwidth a serious execution constraint"
         ]
       },
       "members": [
@@ -394,851 +73,325 @@
           "id": "strategist",
           "name": "The Strategist",
           "status": "complete",
+          "model": "anthropic/claude-sonnet-4-6",
           "mainPoints": [
-            "Operating Pulse is the P0 of P0s",
-            "Start DILESA Clientes migration in Q2",
-            "COAGAN recovery dashboard is urgent",
-            "Fix RDB's 16 offline cameras",
-            "Map ANSA data flows before ANSA intelligence"
+            "Use RDB progress to reduce Beto dependency, not to create more load",
+            "Finish access UI validation to unlock self-serve onboarding",
+            "Treat requisition to inventory closure as margin protection",
+            "Commercial packaging can come after reliability is earned"
           ]
         },
         {
           "id": "engineer",
           "name": "The Engineer",
           "status": "complete",
+          "model": "openai/gpt-5.4",
           "mainPoints": [
-            "Canonical data access layer plus source registry remains top technical drag",
-            "Operating Pulse should include system health and drift",
-            "Supabase RLS hardening is now a real liability",
-            "Use Coda MCP for migration factory artifacts",
-            "Solo-operator reliability needs explicit guardrails"
+            "Trust needs replayability, idempotency, and operational recoverability",
+            "Procurement flow should be modeled tightly in Supabase before UI breadth expands",
+            "Access changes should ship with smoke tests and release discipline",
+            "Operator digests should be anomaly-first"
           ]
         },
         {
           "id": "analyst",
           "name": "The Analyst",
           "status": "complete",
+          "model": "google/gemini-3.1-pro-preview",
           "mainPoints": [
-            "Weekly Operating Pulse with tightly bounded KPIs",
-            "Canonical Source Treaty as metric map",
-            "DILESA burn-down with throughput math",
-            "COAGAN recovery scorecard",
-            "Reliability Cost Index"
+            "Instrument ventas-by-corte reconciliation and anomaly alerting",
+            "Measure requisition-to-inventory variance explicitly",
+            "Do not let RDB focus permanently delay ANSA/DILESA telemetry",
+            "Camera uptime should be treated as measurable operational reliability"
           ]
         },
         {
           "id": "critic",
           "name": "The Critic",
-          "status": "failed",
-          "failureReason": "timeout",
-          "mainPoints": []
+          "status": "complete",
+          "model": "moonshot/kimi-k2.5",
+          "mainPoints": [
+            "Run a pre-mortem before declaring trust threshold success",
+            "Validate presence demand before incurring schema debt",
+            "Audit hidden Coda-to-Supabase dependencies",
+            "Treat operator bandwidth as a circuit-breaker input, not background context"
+          ]
         },
         {
           "id": "synthesizer",
           "name": "The Synthesizer",
-          "status": "complete",
+          "status": "complete_with_fallback",
+          "model": "openai/gpt-5.4",
           "mainPoints": [
-            "Turn Coda MCP into DILESA migration factory pilot",
-            "Minimum Operating Pulse around 5 signals",
-            "Health-aware workload routing",
-            "R&D Council dashboard as execution ledger",
-            "Start Source Treaty with top 20 metric registry"
+            "Collapse the strongest ideas into a single RDB trust sprint",
+            "Use OpenClaw as an operator compression layer",
+            "Formalize the source-of-truth contract now so later rollout is cleaner",
+            "Capture the RDB pilot playbook after trust is earned"
           ]
         }
       ],
       "failures": [
         {
-          "member": "critic",
-          "type": "timeout",
-          "impact": "downside testing and edge-case pressure were reduced; scope was kept conservative to compensate"
+          "phase": "ideation",
+          "member": "Synthesizer",
+          "requestedModel": "openrouter/minimax/minimax-m2.5",
+          "status": "unavailable",
+          "recovery": "Used openai/gpt-5.4 fallback and continued the session"
         }
       ],
       "round1": {
         "name": "Cross-critique",
-        "summary": "Round 1 found strong convergence around three themes: Operating Pulse, source-of-truth compression, and DILESA migration readiness. The main critique was that Session #2 already surfaced the right strategic shape, so repeating broad priorities would miss the actual issue: nothing converted into live execution. The strongest ideas were those that narrowed scope and attached themselves to already-shipped infrastructure; the weakest were the ones that still depended on broad architecture programs or absent data sources.",
+        "summary": "Round 1 produced strong convergence around RDB-first sequencing, operator bandwidth compression, procurement integrity, and anomaly-first trust visibility. The most challenged ideas were premature commercialization, early breadth into other businesses, and shipping the presence migration purely because code already exists.",
         "clusters": [
           {
-            "theme": "Operating layer and decision compression",
+            "theme": "RDB trust threshold first",
             "members": [
               "strategist",
-              "analyst",
-              "synthesizer",
-              "engineer"
-            ],
-            "notes": "All four members supported some version of Operating Pulse; differences were about breadth, cadence, and data prerequisites."
-          },
-          {
-            "theme": "Trust layer / canonical source",
-            "members": [
               "engineer",
-              "analyst",
+              "critic",
               "synthesizer"
             ],
-            "notes": "Consensus that trust is prerequisite, but challenge that a full canonical layer risks stalling again unless compressed into a metric registry."
+            "notes": "Most members argued that breadth should wait until RDB becomes boringly reliable."
           },
           {
-            "theme": "DILESA execution",
+            "theme": "Operator bandwidth as system constraint",
             "members": [
               "strategist",
               "engineer",
+              "critic",
+              "analyst"
+            ],
+            "notes": "Health and attention were treated as execution constraints, not personal side notes."
+          },
+          {
+            "theme": "Procurement integrity and inventory visibility",
+            "members": [
+              "strategist",
+              "engineer",
+              "analyst"
+            ],
+            "notes": "The requisition to inventory gap was framed as both margin leakage and trust debt."
+          },
+          {
+            "theme": "Anomaly-first trust layer",
+            "members": [
+              "engineer",
+              "analyst",
               "synthesizer",
-              "analyst"
+              "critic"
             ],
-            "notes": "Support for moving DILESA forward, but modification toward one MCP-assisted pilot instead of a broad Q2 migration push."
-          },
-          {
-            "theme": "Reliability and visible liabilities",
-            "members": [
-              "engineer",
-              "strategist",
-              "analyst"
-            ],
-            "notes": "RDB cameras, stale data, failed automations, and permissive RLS were seen as real risk, though the full reliability layer was judged too broad for immediate focus."
+            "notes": "Trust should be built around reconciliation, data freshness, recovery, and exception handling, not larger dashboards."
           }
         ],
         "strongestIdeas": [
-          "Minimum Operating Pulse using already-live signals",
-          "Metric registry as practical Canonical Source Treaty",
-          "MCP-assisted DILESA Clientes pilot"
+          "RDB trust threshold sprint",
+          "Access validation and self-serve onboarding readiness",
+          "Procurement backbone with audit trail and variance visibility",
+          "Operator pulse built around anomalies and exceptions"
         ],
         "weakestIdeas": [
-          "Broad ANSA intelligence before data-flow mapping",
-          "Fully automated health-based workload routing right now",
-          "Large all-at-once reliability program this week"
+          "Pitching BSOP externally before recoverability is mature",
+          "Starting broad ANSA/DILESA expansion immediately",
+          "Treating presence SQL migration as automatic next step"
         ]
       },
       "round2": {
         "name": "Resolution",
-        "summary": "Round 2 resolved the main disagreements by collapsing parallel ideas into smaller execution packages. The Operating Pulse rose to the top, but only as a minimum version. Canonical architecture work survived by shrinking into a top-20 KPI registry tied directly to Pulse cards. DILESA stayed high priority, but the council merged migration urgency with bandwidth caution by recommending a single MCP-assisted Clientes pilot. Reliability was split into immediate fixes now and a broader survivability layer later.",
+        "summary": "Round 2 resolved disagreement by sequencing. The council kept breadth ideas alive, but only after the RDB trust sprint. Trust instrumentation, procurement integrity, and access validation rose together as one near-term program, while commercialization and multi-business telemetry were delayed rather than discarded.",
         "rises": [
-          "Operating Pulse v1",
-          "Metric Registry / Canonical Source Treaty",
-          "COAGAN Recovery Scorecard"
+          "RDB trust threshold sprint",
+          "Access validation and release discipline",
+          "Procurement backbone plus variance tracking",
+          "Anomaly-first operator pulse and trust layer"
         ],
         "merges": [
           {
-            "into": "Minimum Operating Pulse v1",
+            "into": "RDB trust and exceptions layer",
             "from": [
-              "Strategist Operating Pulse",
-              "Analyst weekly 12 metrics",
-              "Synthesizer 5-signal pulse",
-              "Engineer system health console"
+              "Trust dashboard",
+              "Ventas-by-corte reconciliation",
+              "Source-of-truth contract",
+              "Exception-first operations layer",
+              "Camera and access anomaly visibility"
             ]
           },
           {
-            "into": "Metric Registry / Canonical Source Treaty",
+            "into": "Procurement integrity stream",
             "from": [
-              "Engineer source registry",
-              "Analyst metric map",
-              "Synthesizer top-20 metric registry"
+              "Requisition to inventario backbone",
+              "Variance tracking",
+              "Audit trail and state integrity",
+              "Margin leakage prevention"
             ]
           },
           {
-            "into": "DILESA Clientes Migration Factory Pilot",
+            "into": "Onboarding readiness stream",
             "from": [
-              "Strategist Q2 migration push",
-              "Engineer migration factory",
-              "Synthesizer MCP-assisted pilot"
+              "Access UI validation",
+              "Release pack",
+              "Role-path smoke tests",
+              "Self-serve onboarding unlock"
             ]
           }
         ],
         "drops": [
-          "ANSA build priority before instrumentation exists",
-          "Automatic health-aware workload routing as a top-5 item",
-          "Large generic reliability layer as this week's main deliverable"
+          "External commercialization this week",
+          "Broad multi-business rollout this week",
+          "Presence migration without user validation"
         ],
         "dissentToKeep": [
-          "Analyst's broader 12-metric Pulse may be more useful later once the minimum version earns trust.",
-          "Strategist's ANSA urgency remains valid and should resurface once data flows are mapped.",
-          "Engineer's broader reliability layer still matters after the immediate liabilities are closed."
+          "ANSA and DILESA still need baseline telemetry soon, or BSOP risks becoming an RDB-only success.",
+          "Presence should be validated with real staff before schema migration.",
+          "Operator bandwidth should explicitly gate scope if incidents spike."
         ]
       },
       "recommendations": [
         {
           "id": "rec-1",
           "rank": 1,
-          "title": "Launch the Minimum Operating Pulse v1",
+          "title": "RDB Trust Threshold Sprint",
           "priority": "P0",
-          "champion": "Strategist + Analyst + Synthesizer",
-          "description": "Ship a narrow decision layer with 5-12 signals and 3-7 ranked actions, using already-live telemetry and known operating exceptions instead of waiting for complete coverage.",
+          "champion": "The Synthesizer",
+          "description": "Run a 7 to 10 day sprint to make RDB the first fully trusted BSOP backend in day-to-day use, centered on access validation, procurement integrity, reconciliation visibility, and exception handling.",
           "impact_score": 10,
-          "effort_score": 4,
-          "revenue_potential": "medium",
+          "effort_score": 6,
+          "revenue_potential": "high",
           "implementationStatus": "next-up",
           "risks": [
-            "Scope creep back into dashboard sprawl",
-            "Trust loss if source metadata is weak"
+            "Scope creep into low-value breadth work",
+            "Hidden Coda dependencies creating trust gaps",
+            "Declaring success before multiple normal operating days are clean"
           ],
           "firstSteps": [
-            "Define 5 signal cards",
-            "Cap output at ranked actions only",
-            "Attach source/confidence badges",
-            "Run weekly before daily"
-          ],
-          "sourceIdeas": [
-            "Operating Pulse is the P0 of P0s",
-            "Weekly Operating Pulse with 12 metrics only",
-            "Minimum Operating Pulse around 5 signals",
-            "Operating Pulse as unified system health console"
+            "Define a trust checklist with owner, status, and acceptance criteria",
+            "Freeze nonessential breadth work for the sprint window",
+            "Review trust checklist daily until complete"
           ]
         },
         {
           "id": "rec-2",
           "rank": 2,
-          "title": "Start the Metric Registry / Canonical Source Treaty on 20 KPIs",
+          "title": "Access Validation and Self-Serve Onboarding Readiness",
           "priority": "P0",
-          "champion": "Engineer + Analyst + Synthesizer",
-          "description": "Compress source-of-truth work into a practical registry for the top 20 KPIs and first live entities so the Operating Pulse has an explicit trust layer.",
-          "impact_score": 10,
-          "effort_score": 5,
+          "champion": "The Strategist",
+          "description": "Finish access UI validation and turn the current auth/onboarding work into a path that does not require Beto to manually supervise every new user or role adjustment.",
+          "impact_score": 9,
+          "effort_score": 4,
           "revenue_potential": "medium",
           "implementationStatus": "next-up",
           "risks": [
-            "Documentation theater",
-            "Too many entities too early"
+            "False confidence from happy-path only testing",
+            "Unseen role edge cases after impersonation/auth changes",
+            "Onboarding friction persisting behind a superficially working UI"
           ],
           "firstSteps": [
-            "Define first 20 KPIs",
-            "Create registry fields for source, owner, cadence, confidence",
-            "Start with Health, Usage, and DILESA Clientes",
-            "Link Pulse cards back to registry entries"
-          ],
-          "sourceIdeas": [
-            "Canonical Data Access Layer + Source Registry",
-            "Canonical Source Treaty as metric map",
-            "Start Source Treaty with Metric Registry"
+            "Run end-to-end onboarding tests by role",
+            "Validate welcome email, invite, access gating, and impersonation boundaries",
+            "Create a lightweight release pack for future auth changes"
           ]
         },
         {
           "id": "rec-3",
           "rank": 3,
-          "title": "Turn Coda MCP into a DILESA Clientes Migration Factory Pilot",
-          "priority": "P1",
-          "champion": "Synthesizer + Engineer",
-          "description": "Use the newly connected Coda MCP to auto-generate migration artifacts for one bounded Clientes slice, turning DILESA progress into a visible pilot instead of a broad migration promise.",
+          "title": "Procurement Backbone and Variance Visibility",
+          "priority": "P0",
+          "champion": "The Engineer",
+          "description": "Close the requisition to OC to inventario loop with strict state transitions, audit trail, and variance tracking so RDB inventory operations stop leaking trust and margin.",
           "impact_score": 9,
-          "effort_score": 6,
+          "effort_score": 8,
           "revenue_potential": "high",
-          "implementationStatus": "planning",
+          "implementationStatus": "next-up",
           "risks": [
-            "Pilot artifacts disconnected from real cutover",
-            "Permission/protection issues slowing edits",
-            "Over-scoping into whole-ERP migration"
+            "Overbuilding UI before the data model is stable",
+            "Operational confusion from unclear statuses",
+            "Hidden downstream assumptions in Coda"
           ],
           "firstSteps": [
-            "Choose one bounded Clientes slice",
-            "Generate source-target mapping with MCP",
-            "Score parity and blockers",
-            "Delay first cut until readiness is visible"
-          ],
-          "sourceIdeas": [
-            "Start DILESA Clientes migration in Q2",
-            "Coda Migration Factory with MCP-Assisted Schema/Mapping",
-            "Turn Coda MCP into DILESA Migration Factory"
+            "Define the minimal Supabase event and status model",
+            "Map required inventory mutations and audit events",
+            "Track requisition age, fulfillment ratio, and variance explicitly"
           ]
         },
         {
           "id": "rec-4",
           "rank": 4,
-          "title": "Build the COAGAN Recovery Scorecard",
+          "title": "RDB Trust and Exceptions Layer",
           "priority": "P1",
-          "champion": "Strategist + Analyst",
-          "description": "Create the first live recovery model for the 5K lost walnut trees so recovery pace, irrigation coverage, cost, and yield impact become visible and reviewable weekly.",
-          "impact_score": 9,
-          "effort_score": 4,
-          "revenue_potential": "high",
-          "implementationStatus": "planning",
+          "champion": "The Analyst",
+          "description": "Combine reconciliation alerts, data freshness checks, access anomalies, camera uptime, and failure visibility into an anomaly-first layer that tells Beto only what needs intervention.",
+          "impact_score": 8,
+          "effort_score": 5,
+          "revenue_potential": "medium",
+          "implementationStatus": "planned",
           "risks": [
-            "Manual data collection drift",
-            "Dashboard without field update discipline"
+            "Too much alert noise",
+            "No clear owner for exception handling",
+            "Reporting bloat instead of intervention flow"
           ],
           "firstSteps": [
-            "Define zone/lote baseline",
-            "Track lost, recovered, and planned trees",
-            "Add irrigation, cost, and yield impact",
-            "Feed one exception into Pulse"
-          ],
-          "sourceIdeas": [
-            "COAGAN recovery dashboard",
-            "COAGAN recovery scorecard"
+            "Start with ventas-by-corte reconciliation",
+            "Add failed webhook and access anomaly visibility",
+            "Add camera heartbeat visibility only if it supports intervention"
           ]
         },
         {
           "id": "rec-5",
           "rank": 5,
-          "title": "Close Immediate Reliability Gaps: RDB Cameras + Supabase RLS",
+          "title": "Supabase Source-of-Truth Contract and RDB Pilot Playbook",
           "priority": "P1",
-          "champion": "Engineer + Strategist",
-          "description": "Treat the 16 offline RDB cameras and permissive Supabase RLS policies as immediate reliability liabilities that should be fixed before a broader survivability layer is designed.",
+          "champion": "The Synthesizer",
+          "description": "Document the current RDB operating contract and pilot pattern so the next rollout to DILESA, ANSA, or COAGAN starts from a tested operating template instead of fresh improvisation.",
           "impact_score": 8,
-          "effort_score": 3,
-          "revenue_potential": "low",
-          "implementationStatus": "next-up",
+          "effort_score": 4,
+          "revenue_potential": "high",
+          "implementationStatus": "planned",
           "risks": [
-            "Deferred as maintenance noise",
-            "RLS changes may break existing assumptions"
+            "Documenting too early while flows still move",
+            "Confusing current implementation detail with durable rule",
+            "Premature pressure to expand breadth"
           ],
           "firstSteps": [
-            "Inventory offline cameras with owner and ETA",
-            "Audit public-read tables",
-            "Patch highest-risk exposure first"
-          ],
-          "sourceIdeas": [
-            "Fix RDB's 16 offline cameras",
-            "Supabase RLS Hardening Sprint",
-            "Solo-Operator Reliability Layer"
+            "List canonical tables and authoritative surfaces",
+            "Define freshness expectations and failure states",
+            "Document reconciliation rules and downstream consumers"
           ]
         }
       ],
       "debateHighlights": [
-        "Execution gap from Session #2 to Session #3 became the central finding.",
-        "Operating Pulse remained the top idea, but only in a narrower shippable form.",
-        "Canonical work survived by compressing into a metric registry tied to live signals.",
-        "DILESA priority stayed high because MCP creates a new execution path, but scope was reduced to one pilot.",
-        "COAGAN outranked ANSA for immediate build priority because it has a bounded, asset-protection use case.",
-        "Reliability split into immediate liabilities now versus systemic layer later.",
-        "Critic timeout reduced adversarial pressure, so scoping was intentionally conservative."
+        "The strongest shared view was that BSOP does not need more vision right now, it needs more trust.",
+        "Strategist and Critic both treated operator bandwidth as a system design constraint, not a personal footnote.",
+        "Engineer and Analyst independently converged on the same need: reconciliation, anomaly detection, and recoverability before more breadth.",
+        "The council repeatedly reframed requisition to inventario as financial leakage control, not just workflow completeness.",
+        "Commercial packaging of BSOP was seen as attractive but premature until RDB can survive a bad week without manual heroics."
       ],
       "dissent": [
-        "The Pulse may eventually need Analyst's 12-metric format, not just the Synthesizer's 5-signal minimum.",
-        "ANSA remains strategically under-instrumented and should likely rise once data mapping exists.",
-        "Health-aware workload routing is promising, but not yet trusted enough for automation.",
-        "The missing Critic means untested downside cases may still exist around security and migration scope."
+        "ANSA and DILESA should not remain telemetry-poor much longer, even if they are not this week's primary build targets.",
+        "Presence migration should be gated by user validation with real staff, not just by code readiness.",
+        "If incident load spikes or Beto becomes the fallback path for too many issues, scope should contract immediately."
       ],
       "actionItems": [
-        "Approve Minimum Operating Pulse v1 with strict scope limits.",
-        "Approve the top-20 KPI metric registry as the practical Canonical Source Treaty.",
-        "Select one DILESA Clientes pilot slice for MCP-assisted migration artifacts.",
-        "Request COAGAN recovery baseline by zone/lote.",
-        "Request RDB camera incident list with owner and ETA.",
-        "Run targeted Supabase RLS hardening on exposed public-read tables.",
-        "Use health/operator energy as a prioritization input before any automatic throttling."
+        "Declare a one-week RDB trust sprint and freeze nonessential breadth work.",
+        "Finish BSOP access UI validation this week.",
+        "Define the minimal Supabase procurement model before adding more UI around it.",
+        "Add anomaly-only operator pulse delivery through OpenClaw using QMD-backed summaries, not Active Memory.",
+        "Require a short pre-mortem before approving the presence SQL migration.",
+        "After the sprint stabilizes, pick the next telemetry candidate between DILESA and ANSA."
       ],
-      "scores": {
-        "averageImpact": 9.2,
-        "averageEffort": 4.4,
-        "recommendationConfidence": 8.5,
-        "debateIntensity": 7.3
+      "files": {
+        "memo": "/Users/Beto/.openclaw/workspace/rnd/memos/2026-04-12.md",
+        "json": "/Users/Beto/BSOP/data/rnd-council.json"
       }
     },
     {
-      "id": "rnd-2026-03-29",
-      "date": "2026-03-29",
+      "id": "rnd-2026-04-05",
+      "date": "2026-04-05",
+      "generatedAt": "2026-04-06T04:12:58Z",
       "title": "R&D Council Session",
-      "status": "complete",
-      "runStarted": "2026-03-30T01:00:00Z",
-      "summary": "The council converged on a foundation-first agenda: establish canonical sources of truth, reduce operator fragility, and build a decision-oriented operating pulse before chasing broader monetization. DILESA remains strategically important, but only through staged, low-regret migration steps. Trusted business metrics, especially for COAGAN recovery, should feed a weekly operating cadence rather than exist as passive dashboards.",
-      "ideas": [
-        {
-          "id": "idea-1",
-          "title": "Canonical Source Treaty + Data Access Layer",
-          "summary": "Establish a unified source-of-truth program: typed adapters, app-visible source registry, explicit ownership and sync rules, and reconciliation logs for dual-source entities. This creates the trust layer required for both product and operating decisions.",
-          "proposedBy": "engineer",
-          "impact": 10,
-          "effort": 5,
-          "votes": {
-            "strategist": 10,
-            "engineer": 10,
-            "analyst": 10,
-            "critic": 10,
-            "synthesizer": 10
-          }
-        },
-        {
-          "id": "idea-2",
-          "title": "Operating Pulse — What Needs Beto Today?",
-          "summary": "Create a cross-business operating layer that ranks the 3-7 actions or decisions that deserve attention today, using KPI exceptions, infra health, calendar/travel context, DILESA risk, COAGAN recovery, and AI operations. It should reduce cognitive load rather than expand dashboards.",
-          "proposedBy": "synthesizer",
-          "impact": 10,
-          "effort": 6,
-          "votes": {
-            "strategist": 10,
-            "engineer": 10,
-            "analyst": 10,
-            "critic": 9,
-            "synthesizer": 10
-          }
-        },
-        {
-          "id": "idea-3",
-          "title": "DILESA Clientes Split + 3-Layer ERP Completion",
-          "summary": "Continue DILESA's ERP transformation, but through a staged, rollback-heavy migration centered on the Clientes split, Expediente extraction, and eventual 3-layer completion. Use practical access-pattern cuts rather than pursuing schema purity for its own sake.",
-          "proposedBy": "strategist",
-          "impact": 9,
-          "effort": 8,
-          "votes": {
-            "strategist": 10,
-            "engineer": 8,
-            "analyst": 10,
-            "critic": 8,
-            "synthesizer": 9
-          }
-        },
-        {
-          "id": "idea-4",
-          "title": "Solo-Operator Reliability Layer",
-          "summary": "Build the survivability stack for BSOP: release guardrails, operator scripts, degraded-mode runbooks, and a stress/load-management policy. The goal is not elegant infrastructure but dependable operation for a single human with AI support.",
-          "proposedBy": "engineer",
-          "impact": 9,
-          "effort": 5,
-          "votes": {
-            "strategist": 9,
-            "engineer": 10,
-            "analyst": 9,
-            "critic": 9,
-            "synthesizer": 9
-          }
-        },
-        {
-          "id": "idea-5",
-          "title": "Trustworthy Metrics Layer for COAGAN and Cross-Business Review",
-          "summary": "Start with a COAGAN tree-loss and recovery model, then build a narrow KPI layer across businesses that supports weekly review, funding, and escalation decisions. Metrics should be trusted, sparse, and action-linked.",
-          "proposedBy": "analyst",
-          "impact": 9,
-          "effort": 5,
-          "votes": {
-            "strategist": 9,
-            "engineer": 9,
-            "analyst": 10,
-            "critic": 9,
-            "synthesizer": 9
-          }
-        }
-      ],
-      "debate": [
-        {
-          "round": 1,
-          "topic": "Emerging consensus and strongest ideas",
-          "highlights": [
-            {
-              "speaker": "synthesizer",
-              "message": "Three separate ideas converged into one dominant thesis: canonical data truth must be explicit in both documentation and code before BSOP scales safely."
-            },
-            {
-              "speaker": "synthesizer",
-              "message": "The council rejected a false choice between metrics and judgment: dashboards only survive if they feed an operating pulse that changes what Beto reviews or funds this week."
-            },
-            {
-              "speaker": "critic",
-              "message": "DILESA stayed strategically important, but the Critic successfully shifted the migration logic from 'finish the big refactor' to 'de-risk the god table through staged, access-pattern-aware cuts.'"
-            },
-            {
-              "speaker": "synthesizer",
-              "message": "Reliability work gained rank because several members independently identified the same bottleneck: the system is useful, but too dependent on a single operator and too exposed to platform fragility."
-            },
-            {
-              "speaker": "synthesizer",
-              "message": "COAGAN's recovery model beat broader market-intelligence work because it directly informs asset protection, replanting, and future cash-flow expectations."
-            },
-            {
-              "speaker": "synthesizer",
-              "message": "The Family Office OS idea survived as option value only; the council wants productizable architecture choices now, but no active commercialization until internal trust and continuity improve."
-            }
-          ]
-        },
-        {
-          "round": 2,
-          "topic": "Remaining dissent and execution sequencing",
-          "highlights": [
-            {
-              "speaker": "critic",
-              "message": "Padel memberships and ANSA service upsell are still attractive commercial ideas, but the council judged them lower leverage than system foundations in the current moment."
-            },
-            {
-              "speaker": "critic",
-              "message": "Some members wanted health data to automatically throttle workstreams now; others argued that manual stress mode should come first to avoid brittle automation and false positives."
-            },
-            {
-              "speaker": "critic",
-              "message": "There remains real tension between architecturally pure DILESA normalization and pragmatic migration cuts optimized for access patterns and button safety."
-            },
-            {
-              "speaker": "critic",
-              "message": "A fuller internal event bus may become important later, but the council did not believe BSOP is ready to justify that complexity today."
-            },
-            {
-              "speaker": "engineer",
-              "message": "Action item: Approve a unified canonical source initiative combining registry, treaty, adapters, and reconciliation logging."
-            },
-            {
-              "speaker": "engineer",
-              "message": "Action item: Choose the first 3 BSOP routes and 10-20 entities that must declare canonical source explicitly."
-            },
-            {
-              "speaker": "engineer",
-              "message": "Action item: Begin DILESA Clientes migration with the documented preparation phase and make Expediente extraction the first live cut."
-            },
-            {
-              "speaker": "engineer",
-              "message": "Action item: Design the first Operating Pulse around exception signals only; cap output at a small ranked action list."
-            }
-          ]
-        }
-      ],
-      "recommendations": [
-        {
-          "id": "rec-1",
-          "title": "Canonical Source Treaty + Data Access Layer",
-          "priority": "P0",
-          "implementationStatus": "next-up",
-          "owner": "Engineer, Critic, Synthesizer",
-          "rationale": "Establish a unified source-of-truth program: typed adapters, app-visible source registry, explicit ownership and sync rules, and reconciliation logs for dual-source entities. This creates the trust layer required for both product and operating decisions.",
-          "actionItems": [
-            "Define registry fields for top entities and routes",
-            "Route selected risky pages through adapters only",
-            "Add undeclared-source logging",
-            "Publish concise DATA_TREATY.md tied to code"
-          ]
-        },
-        {
-          "id": "rec-2",
-          "title": "Operating Pulse — What Needs Beto Today?",
-          "priority": "P0",
-          "implementationStatus": "planning",
-          "owner": "Synthesizer, Analyst",
-          "rationale": "Create a cross-business operating layer that ranks the 3-7 actions or decisions that deserve attention today, using KPI exceptions, infra health, calendar/travel context, DILESA risk, COAGAN recovery, and AI operations. It should reduce cognitive load rather than expand dashboards.",
-          "actionItems": [
-            "Define a small set of exception-driven signal types",
-            "Limit output to ranked actions with source and confidence",
-            "Start from current known pain points rather than aiming for completeness"
-          ]
-        },
-        {
-          "id": "rec-3",
-          "title": "DILESA Clientes Split + 3-Layer ERP Completion",
-          "priority": "P1",
-          "implementationStatus": "planning",
-          "owner": "Strategist, Critic",
-          "rationale": "Continue DILESA's ERP transformation, but through a staged, rollback-heavy migration centered on the Clientes split, Expediente extraction, and eventual 3-layer completion. Use practical access-pattern cuts rather than pursuing schema purity for its own sake.",
-          "actionItems": [
-            "Execute migration preparation plan",
-            "Start with Expediente as first low-risk cut",
-            "Stage Operaciones de Venta cutover with backups and audits",
-            "Delay deletion of legacy fields until all views and dependencies validate"
-          ]
-        },
-        {
-          "id": "rec-4",
-          "title": "Solo-Operator Reliability Layer",
-          "priority": "P1",
-          "implementationStatus": "monitoring",
-          "owner": "Engineer, Critic, Synthesizer",
-          "rationale": "Build the survivability stack for BSOP: release guardrails, operator scripts, degraded-mode runbooks, and a stress/load-management policy. The goal is not elegant infrastructure but dependable operation for a single human with AI support.",
-          "actionItems": [
-            "Create scripts/ops for key health and deploy checks",
-            "Document one critical degraded-mode fallback path",
-            "Add manual stress mode and define first load-shedding rules"
-          ]
-        },
-        {
-          "id": "rec-5",
-          "title": "Trustworthy Metrics Layer for COAGAN and Cross-Business Review",
-          "priority": "P1",
-          "implementationStatus": "monitoring",
-          "owner": "Analyst, Synthesizer",
-          "rationale": "Start with a COAGAN tree-loss and recovery model, then build a narrow KPI layer across businesses that supports weekly review, funding, and escalation decisions. Metrics should be trusted, sparse, and action-linked.",
-          "actionItems": [
-            "Model COAGAN losses and recovery scenarios by zone/block",
-            "Define 5-7 KPIs per business with owners and thresholds",
-            "Show trend plus exception plus next action only"
-          ]
-        }
-      ],
-      "scores": {
-        "averageImpact": 9.4,
-        "averageEffort": 5.8,
-        "recommendationConfidence": 8.4,
-        "debateIntensity": 7.8
-      }
-    },
-    {
-      "id": "rnd-2026-03-23",
-      "date": "2026-03-23",
-      "title": "R&D Council Session",
-      "status": "complete",
-      "runStarted": "2026-03-23T20:00:00Z",
-      "summary": "The first council session landed on a disciplined operating thesis: BSOP should become a live operating spine, not just a polished static hub, but only through staged execution. The highest-confidence first move is a live telemetry pipeline for AI Operations because it is bounded, already useful, and reusable across future modules. In parallel, the most urgent business integrity issue is RDB order deduplication and Coda table hygiene, while DILESA should be treated as the first formal modernization program rather than an ad hoc cleanup effort.",
-      "ideas": [
-        {
-          "id": "idea-1",
-          "title": "Convert BSOP from showcase to live operating spine",
-          "summary": "Move BSOP from static credibility to operational trust by making the AI layer live first, then reusing that pattern elsewhere.",
-          "proposedBy": "strategist",
-          "impact": 10,
-          "effort": 6,
-          "votes": {
-            "strategist": 10,
-            "engineer": 9,
-            "analyst": 9,
-            "critic": 8,
-            "synthesizer": 9
-          }
-        },
-        {
-          "id": "idea-2",
-          "title": "Build the RDB ops core around Waitry instead of replacing the whole POS",
-          "summary": "Preserve what already works and build defensible control around it.",
-          "proposedBy": "strategist",
-          "impact": 9,
-          "effort": 5,
-          "votes": {
-            "strategist": 9,
-            "engineer": 10,
-            "analyst": 10,
-            "critic": 9,
-            "synthesizer": 9
-          }
-        },
-        {
-          "id": "idea-3",
-          "title": "Treat DILESA as the flagship modernization program",
-          "summary": "Sequence a serious modernization effort where the payoff is biggest.",
-          "proposedBy": "strategist",
-          "impact": 9,
-          "effort": 8,
-          "votes": {
-            "strategist": 10,
-            "engineer": 7,
-            "analyst": 9,
-            "critic": 7,
-            "synthesizer": 8
-          }
-        },
-        {
-          "id": "idea-4",
-          "title": "Ship a normalized telemetry pipeline for OpenClaw → BSOP",
-          "summary": "Build the live telemetry pipeline for AI Operations because it is bounded, already useful, and reusable across future modules.",
-          "proposedBy": "engineer",
-          "impact": 10,
-          "effort": 6,
-          "votes": {
-            "strategist": 9,
-            "engineer": 10,
-            "analyst": 9,
-            "critic": 8,
-            "synthesizer": 9
-          }
-        },
-        {
-          "id": "idea-5",
-          "title": "Install a deterministic dedupe and archiving layer for RDB orders",
-          "summary": "Create the deduplication layer for the 95 suspicious duplicate pairs found across 1,127 orders.",
-          "proposedBy": "engineer",
-          "impact": 9,
-          "effort": 5,
-          "votes": {
-            "strategist": 8,
-            "engineer": 10,
-            "analyst": 10,
-            "critic": 9,
-            "synthesizer": 9
-          }
-        },
-        {
-          "id": "idea-6",
-          "title": "Create an executive scoreboard across ANSA, DILESA, COAGAN, and RDB",
-          "summary": "Build a unified executive view across all four businesses with the metrics that matter most.",
-          "proposedBy": "analyst",
-          "impact": 9,
-          "effort": 6,
-          "votes": {
-            "strategist": 10,
-            "engineer": 8,
-            "analyst": 10,
-            "critic": 8,
-            "synthesizer": 9
-          }
-        },
-        {
-          "id": "idea-7",
-          "title": "Do not launch three migrations at once",
-          "summary": "Protect execution capacity by sequencing big moves instead of parallelizing them.",
-          "proposedBy": "critic",
-          "impact": 9,
-          "effort": 2,
-          "votes": {
-            "strategist": 8,
-            "engineer": 9,
-            "analyst": 9,
-            "critic": 10,
-            "synthesizer": 9
-          }
-        },
-        {
-          "id": "idea-8",
-          "title": "Use Supabase surgically, not as an excuse to rebuild everything",
-          "summary": "Treat Supabase as a selective substrate, not a default answer to every problem.",
-          "proposedBy": "critic",
-          "impact": 8,
-          "effort": 3,
-          "votes": {
-            "strategist": 8,
-            "engineer": 9,
-            "analyst": 8,
-            "critic": 10,
-            "synthesizer": 9
-          }
-        },
-        {
-          "id": "idea-9",
-          "title": "Make BSOP the wrapper, Coda the workflow UI, and Supabase the selective data spine",
-          "summary": "Define the architectural contract: BSOP wraps, Coda orchestrates workflows, Supabase holds selective data.",
-          "proposedBy": "synthesizer",
-          "impact": 10,
-          "effort": 5,
-          "votes": {
-            "strategist": 10,
-            "engineer": 9,
-            "analyst": 9,
-            "critic": 9,
-            "synthesizer": 10
-          }
-        },
-        {
-          "id": "idea-10",
-          "title": "Institute a weekly council-driven operating review",
-          "summary": "Convert council output into a recurring management rhythm and cross-business visibility practice.",
-          "proposedBy": "synthesizer",
-          "impact": 8,
-          "effort": 3,
-          "votes": {
-            "strategist": 9,
-            "engineer": 8,
-            "analyst": 9,
-            "critic": 7,
-            "synthesizer": 9
-          }
-        }
-      ],
-      "debate": [
-        {
-          "round": 1,
-          "topic": "BSOP as live spine vs static hub",
-          "highlights": [
-            {
-              "speaker": "strategist",
-              "message": "BSOP needs to move from static credibility to operational trust. The AI layer should be live first, then that pattern replicates elsewhere."
-            },
-            {
-              "speaker": "engineer",
-              "message": "AI Operations telemetry is the best first proving ground: raw data exists, scope is bounded, and it's reusable across future modules."
-            },
-            {
-              "speaker": "critic",
-              "message": "The Strategist pushed for a big transformation; I pushed back on multi-front migration and founder overload during an active PED deal window."
-            },
-            {
-              "speaker": "analyst",
-              "message": "RDB is already measurable and painful: 95 suspicious duplicate pairs across 1,127 orders. That should get attention now."
-            },
-            {
-              "speaker": "synthesizer",
-              "message": "Architecture crystallized: BSOP = wrapper, Coda = workflow UI, Supabase = selective data spine."
-            }
-          ]
-        },
-        {
-          "round": 2,
-          "topic": "Sequencing and resource protection",
-          "highlights": [
-            {
-              "speaker": "critic",
-              "message": "Travel sharing is strategically interesting but not urgent. Do not let it distract from operating leverage plays."
-            },
-            {
-              "speaker": "engineer",
-              "message": "DILESA architecture work should accelerate; the Critic argued for slowing it into a formal P1 program instead."
-            },
-            {
-              "speaker": "analyst",
-              "message": "Hard quantification of pain points before bigger bets. But the Strategist is right that some architectural moves are justified even before perfect measurement."
-            },
-            {
-              "speaker": "strategist",
-              "message": "Shared trip links as first external-facing BSOP product is promising, but follows more urgent operating leverage plays."
-            }
-          ]
-        }
-      ],
-      "recommendations": [
-        {
-          "id": "rec-1",
-          "title": "Build the OpenClaw → BSOP live telemetry spine first",
-          "priority": "P0",
-          "implementationStatus": "next-up",
-          "owner": "Engineer",
-          "rationale": "Lowest-risk live-data proving ground; immediate trust upgrade for BSOP AI Operations. Impact 10, effort 6, council support 9.6.",
-          "actionItems": [
-            "Define normalized schema",
-            "Build scheduled sync",
-            "Add freshness/source labels to BSOP pages"
-          ]
-        },
-        {
-          "id": "rec-2",
-          "title": "Harden RDB with duplicate detection, canonical orders, and archive policy",
-          "priority": "P0",
-          "implementationStatus": "planning",
-          "owner": "Analyst",
-          "rationale": "Real quantified issue affecting daily operations; avoids premature POS rebuild. Impact 9, effort 5, council support 9.0.",
-          "actionItems": [
-            "Formalize duplicate rules",
-            "Create canonical-order layer",
-            "Archive heavy raw tables on a schedule"
-          ]
-        },
-        {
-          "id": "rec-3",
-          "title": "Launch DILESA as the first formal modernization program",
-          "priority": "P1",
-          "implementationStatus": "planning",
-          "owner": "Strategist",
-          "rationale": "Highest long-term leverage across Coda-heavy systems. Impact 9, effort 8, council support 8.4.",
-          "actionItems": [
-            "Rank god tables/workflows by business criticality",
-            "Define stay/archive/sync tiers",
-            "Begin with land → anteproyectos → proyectos flow"
-          ]
-        },
-        {
-          "id": "rec-4",
-          "title": "Create a weekly executive scoreboard across the four businesses",
-          "priority": "P1",
-          "implementationStatus": "monitoring",
-          "owner": "Synthesizer",
-          "rationale": "Converts council output into management rhythm and cross-business visibility. Impact 9, effort 6, council support 8.8.",
-          "actionItems": [
-            "Pick 5–8 KPIs total",
-            "Assign source + owner + freshness mode",
-            "Publish v1 even if partially manual"
-          ]
-        },
-        {
-          "id": "rec-5",
-          "title": "Use shared trip links and expense settlement as BSOP's first outside-user surface",
-          "priority": "P2",
-          "implementationStatus": "monitoring",
-          "owner": "Strategist",
-          "rationale": "Best low-risk collaborative use case, but not the most urgent operational leverage. Impact 7, effort 4, council support 7.2.",
-          "actionItems": [
-            "Finish trip detail polish and mobile validation",
-            "Add balances/category/FX transparency",
-            "Use Taos as the real-world test case"
-          ]
-        }
-      ],
-      "scores": {
-        "averageImpact": 9.0,
-        "averageEffort": 4.9,
-        "recommendationConfidence": 8.7,
-        "debateIntensity": 7.5
+      "status": "archived_reference",
+      "summary": "Prior session established RDB as the canonical backend pilot and argued for crossing the trust threshold before broadening BSOP.",
+      "files": {
+        "memo": "/Users/Beto/.openclaw/workspace/rnd/memos/2026-04-05.md"
       }
     }
-  ],
-  "stats": {
-    "totalSessions": 4,
-    "totalIdeas": 20,
-    "implementedIdeas": 0,
-    "avgScore": 9.2
-  }
+  ]
 }
