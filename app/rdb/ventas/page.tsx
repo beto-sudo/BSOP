@@ -36,6 +36,15 @@ import { Search, RefreshCw, CalendarDays, ShoppingBag, Receipt } from 'lucide-re
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+type CorteOption = {
+  id: string;
+  corte_nombre: string | null;
+  caja_nombre: string | null;
+  hora_inicio: string | null;
+  hora_fin: string | null;
+  estado: string | null;
+};
+
 type Pedido = {
   id: number | string;
   order_id: string | null;
@@ -361,6 +370,8 @@ export default function VentasPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [corteFilter, setCorteFilter] = useState<string>('all');
+  const [cortes, setCortes] = useState<CorteOption[]>([]);
   const [dateFrom, setDateFrom] = useState(() => todayRange().from);
   const [dateTo, setDateTo] = useState(() => todayRange().to);
   const [presetKey, setPresetKey] = useState<string>('hoy');
@@ -415,6 +426,26 @@ export default function VentasPage() {
     }
   }, []);
 
+  // Fetch cortes for the selected date range
+  const fetchCortes = useCallback(async () => {
+    try {
+      const supabase = createSupabaseBrowserClient();
+      let query = supabase
+        .schema('rdb')
+        .from('cortes')
+        .select('id, corte_nombre, caja_nombre, hora_inicio, hora_fin, estado')
+        .order('hora_inicio', { ascending: false });
+
+      if (dateFrom) query = query.gte('hora_inicio', getLocalDayBoundsUtc(dateFrom, TZ).start);
+      if (dateTo) query = query.lte('hora_inicio', getLocalDayBoundsUtc(dateTo, TZ).end);
+
+      const { data } = await query;
+      setCortes(data ?? []);
+    } catch {
+      // non-fatal
+    }
+  }, [dateFrom, dateTo]);
+
   const fetchPedidos = useCallback(async () => {
     if (abortRef.current) abortRef.current.abort();
     abortRef.current = new AbortController();
@@ -432,8 +463,12 @@ export default function VentasPage() {
         .order('timestamp', { ascending: false }).limit(10000)
         ;
 
-      if (dateFrom) query = query.gte('timestamp', getLocalDayBoundsUtc(dateFrom, TZ).start);
-      if (dateTo) query = query.lte('timestamp', getLocalDayBoundsUtc(dateTo, TZ).end);
+      if (corteFilter !== 'all') {
+        query = query.eq('corte_id', corteFilter);
+      } else {
+        if (dateFrom) query = query.gte('timestamp', getLocalDayBoundsUtc(dateFrom, TZ).start);
+        if (dateTo) query = query.lte('timestamp', getLocalDayBoundsUtc(dateTo, TZ).end);
+      }
 
       const { data, error: err } = await query;
       if (err) throw err;
@@ -443,7 +478,11 @@ export default function VentasPage() {
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo]);
+  }, [dateFrom, dateTo, corteFilter]);
+
+  useEffect(() => {
+    void fetchCortes();
+  }, [fetchCortes]);
 
   useEffect(() => {
     void fetchPedidos();
@@ -494,13 +533,26 @@ export default function VentasPage() {
     );
   });
 
+  const selectedCorte = corteFilter !== 'all' ? cortes.find(c => c.id === corteFilter) : null;
+
   return (
     <RequireAccess empresa="rdb" modulo="rdb.ventas">
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Ventas</h1>
-        <p className="text-sm text-muted-foreground">Pedidos registrados en Waitry</p>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Ventas
+          {selectedCorte && (
+            <span className="ml-2 text-base font-normal text-muted-foreground">
+              — {selectedCorte.corte_nombre ?? selectedCorte.caja_nombre ?? 'Corte'}
+            </span>
+          )}
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          {selectedCorte
+            ? `Pedidos del corte ${selectedCorte.corte_nombre ?? selectedCorte.caja_nombre ?? ''}`
+            : 'Pedidos registrados en Waitry'}
+        </p>
       </div>
 
       {/* Summary stats */}
@@ -528,6 +580,26 @@ export default function VentasPage() {
                 {opt.label}
               </SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={corteFilter} onValueChange={(v) => setCorteFilter(v ?? 'all')}>
+          <SelectTrigger className="w-52">
+            <SelectValue placeholder="Todos los cortes" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los cortes</SelectItem>
+            {cortes.map((corte) => {
+              const label = corte.corte_nombre
+                ? `${corte.corte_nombre}`
+                : `${corte.caja_nombre ?? 'Corte'} ${formatDate(corte.hora_inicio)}`;
+              const estado = corte.estado?.toLowerCase() === 'abierto' ? ' 🟢' : '';
+              return (
+                <SelectItem key={corte.id} value={corte.id}>
+                  {label}{estado}
+                </SelectItem>
+              );
+            })}
           </SelectContent>
         </Select>
 
