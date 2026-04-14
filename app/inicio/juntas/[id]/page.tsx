@@ -43,6 +43,7 @@ import {
   Table2,
   Heading2,
   Heading3,
+  CheckCircle2,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -56,7 +57,7 @@ type Junta = {
   duracion_minutos: number;
   lugar: string | null;
   estado: 'programada' | 'en_curso' | 'completada' | 'cancelada';
-  tipo: 'operativa' | 'directiva' | 'seguimiento' | 'emergencia' | null;
+  tipo: string | null;
   creado_por: string | null;
   created_at: string;
   updated_at: string | null;
@@ -101,10 +102,21 @@ const ESTADO_TASK: Record<string, { label: string; cls: string }> = {
 };
 
 const TIPO_CONFIG: Record<string, string> = {
-  operativa:   '⚙️ Operativa',
-  directiva:   '🏛️ Directiva',
-  seguimiento: '📊 Seguimiento',
-  emergencia:  '🚨 Emergencia',
+  operativa:                    '⚙️ Operativa',
+  directiva:                    '🏛️ Directiva',
+  seguimiento:                  '📊 Seguimiento',
+  emergencia:                   '🚨 Emergencia',
+  Consejo:                      '🏢 Consejo',
+  'Comite Ejecutivo':           '👔 Comité Ejecutivo',
+  Ventas:                       '💰 Ventas',
+  'Atención PosVenta':          '🔧 Atención PosVenta',
+  Administración:               '📁 Administración',
+  Mercadotecnia:                '📣 Mercadotecnia',
+  Construcción:                 '🏗️ Construcción',
+  'Compras y Admon. Inventario':'📦 Compras y Admon. Inventario',
+  Maquinaria:                   '🚜 Maquinaria',
+  Proyectos:                    '🗂️ Proyectos',
+  'Rincón del Bosque':          '🌲 Rincón del Bosque',
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -206,7 +218,10 @@ function JuntaDetailInner() {
   const [duracion, setDuracion] = useState('60');
   const [lugar, setLugar] = useState('');
   const [estado, setEstado] = useState<Junta['estado']>('programada');
-  const [tipo, setTipo] = useState<Junta['tipo'] | ''>('');
+  const [tipo, setTipo] = useState<string>('');
+
+  const [terminating, setTerminating] = useState(false);
+  const [showTerminarDialog, setShowTerminarDialog] = useState(false);
 
   // Tiptap editor
   const editor = useEditor({
@@ -466,6 +481,35 @@ function JuntaDetailInner() {
     setShowAddTask(false);
   };
 
+  const handleTerminar = async () => {
+    if (!junta) return;
+    setTerminating(true);
+    try {
+      const res = await fetch('/api/juntas/terminar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ juntaId: junta.id }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        alert(`Error al terminar junta: ${result.error ?? 'Error desconocido'}`);
+        return;
+      }
+      setEstado('completada');
+      setJunta((prev) => (prev ? { ...prev, estado: 'completada' } : null));
+      setShowTerminarDialog(false);
+      const emailMsg =
+        result.emailsSent > 0
+          ? ` Minuta enviada a ${result.emailsSent} participante(s).`
+          : result.warning
+          ? ` (${result.warning})`
+          : '';
+      alert(`Junta terminada.${emailMsg}`);
+    } finally {
+      setTerminating(false);
+    }
+  };
+
   const empleadoMap = new Map(empleados.map((e) => [e.id, e]));
 
   if (loading) {
@@ -520,14 +564,27 @@ function JuntaDetailInner() {
             </p>
           </div>
         </div>
-        <Button
-          onClick={handleSave}
-          disabled={saving}
-          className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 shrink-0"
-        >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Guardar cambios
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          {estado !== 'completada' && estado !== 'cancelada' && (
+            <Button
+              variant="outline"
+              onClick={() => setShowTerminarDialog(true)}
+              disabled={terminating}
+              className="gap-1.5 rounded-xl border-green-500/40 text-green-500 hover:bg-green-500/10 hover:border-green-500/60"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Terminar junta
+            </Button>
+          )}
+          <Button
+            onClick={handleSave}
+            disabled={saving}
+            className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Guardar cambios
+          </Button>
+        </div>
       </div>
 
       {/* Main info card */}
@@ -582,7 +639,7 @@ function JuntaDetailInner() {
           </div>
           <div>
             <FieldLabel>Tipo</FieldLabel>
-            <Select value={tipo ?? ''} onValueChange={(v) => setTipo((v || '') as Junta['tipo'] | '')}>
+            <Select value={tipo ?? ''} onValueChange={(v) => setTipo(v || '')}>
               <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
                 <SelectValue placeholder="Sin tipo" />
               </SelectTrigger>
@@ -888,6 +945,36 @@ function JuntaDetailInner() {
             >
               {addingTask ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               Crear tarea
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Terminar junta confirmation */}
+      <Dialog open={showTerminarDialog} onOpenChange={setShowTerminarDialog}>
+        <DialogContent className="max-w-sm rounded-3xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
+          <DialogHeader>
+            <DialogTitle className="text-[var(--text)]">Terminar junta</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-[var(--text)]/70 pb-2">
+            Esta acción marcará la junta como <strong>completada</strong> y enviará la minuta por correo a los participantes que tienen email registrado. ¿Continuar?
+          </p>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowTerminarDialog(false)}
+              disabled={terminating}
+              className="rounded-xl border-[var(--border)] text-[var(--text)]"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleTerminar}
+              disabled={terminating}
+              className="gap-1.5 rounded-xl bg-green-600 text-white hover:bg-green-700 disabled:opacity-60"
+            >
+              {terminating ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+              Sí, terminar
             </Button>
           </DialogFooter>
         </DialogContent>

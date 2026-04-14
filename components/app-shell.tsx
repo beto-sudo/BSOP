@@ -52,6 +52,16 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
+    href: '/rh',
+    labelKey: 'Recursos Humanos',
+    icon: '👥',
+    children: [
+      { label: 'Empleados', href: '/rh/empleados' },
+      { label: 'Puestos', href: '/rh/puestos' },
+      { label: 'Departamentos', href: '/rh/departamentos' },
+    ],
+  },
+  {
     href: '/rdb',
     labelKey: 'Rincón del Bosque',
     icon: 'RDB_LOGO',

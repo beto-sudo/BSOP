@@ -42,7 +42,7 @@ type Junta = {
   duracion_minutos: number;
   lugar: string | null;
   estado: 'programada' | 'en_curso' | 'completada' | 'cancelada';
-  tipo: 'operativa' | 'directiva' | 'seguimiento' | 'emergencia' | null;
+  tipo: string | null;
   creado_por: string | null;
   created_at: string;
   updated_at: string | null;
@@ -58,10 +58,21 @@ const ESTADO_CONFIG: Record<Junta['estado'], { label: string; cls: string }> = {
 };
 
 const TIPO_CONFIG: Record<string, { label: string; icon: string }> = {
-  operativa:   { label: 'Operativa',   icon: '⚙️' },
-  directiva:   { label: 'Directiva',   icon: '🏛️' },
-  seguimiento: { label: 'Seguimiento', icon: '📊' },
-  emergencia:  { label: 'Emergencia',  icon: '🚨' },
+  operativa:                    { label: 'Operativa',                    icon: '⚙️' },
+  directiva:                    { label: 'Directiva',                    icon: '🏛️' },
+  seguimiento:                  { label: 'Seguimiento',                  icon: '📊' },
+  emergencia:                   { label: 'Emergencia',                   icon: '🚨' },
+  Consejo:                      { label: 'Consejo',                      icon: '🏢' },
+  'Comite Ejecutivo':           { label: 'Comité Ejecutivo',             icon: '👔' },
+  Ventas:                       { label: 'Ventas',                       icon: '💰' },
+  'Atención PosVenta':          { label: 'Atención PosVenta',            icon: '🔧' },
+  Administración:               { label: 'Administración',               icon: '📁' },
+  Mercadotecnia:                { label: 'Mercadotecnia',                icon: '📣' },
+  Construcción:                 { label: 'Construcción',                 icon: '🏗️' },
+  'Compras y Admon. Inventario':{ label: 'Compras y Admon. Inventario',  icon: '📦' },
+  Maquinaria:                   { label: 'Maquinaria',                   icon: '🚜' },
+  Proyectos:                    { label: 'Proyectos',                    icon: '🗂️' },
+  'Rincón del Bosque':          { label: 'Rincón del Bosque',            icon: '🌲' },
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -116,7 +127,7 @@ function JuntasInner() {
     fecha_hora: '',
     lugar: '',
     duracion_minutos: '60',
-    tipo: '' as Junta['tipo'] | '',
+    tipo: '' as string,
     estado: 'programada' as Junta['estado'],
   });
 
@@ -412,7 +423,7 @@ function JuntasInner() {
                 <FieldLabel>Tipo</FieldLabel>
                 <Select
                   value={createForm.tipo ?? ''}
-                  onValueChange={(v) => setCreateForm((f) => ({ ...f, tipo: (v || '') as Junta['tipo'] | '' }))}
+                  onValueChange={(v) => setCreateForm((f) => ({ ...f, tipo: v || '' }))}
                 >
                   <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
                     <SelectValue placeholder="Sin tipo" />
