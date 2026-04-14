@@ -595,7 +595,6 @@ export default function InventarioPage() {
         .schema('rdb')
         .from('v_inventario_stock')
         .select('*')
-        .eq('empresa_id', RDB_EMPRESA_ID)
         .order('nombre');
       if (error) throw error;
       setItems((data ?? []) as StockItem[]);
