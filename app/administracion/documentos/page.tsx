@@ -166,8 +166,8 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-const RESUMABLE_UPLOAD_THRESHOLD = 6 * 1024 * 1024;
-const RESUMABLE_CHUNK_SIZE = 6 * 1024 * 1024;
+const RESUMABLE_UPLOAD_THRESHOLD = 5 * 1024 * 1024;
+const RESUMABLE_CHUNK_SIZE = 5 * 1024 * 1024;
 
 function getStorageResumableEndpoint() {
   const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -202,7 +202,7 @@ async function uploadFileResumable(
         apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
         'x-upsert': 'false',
       },
-      uploadDataDuringCreation: true,
+      uploadDataDuringCreation: false,
       removeFingerprintOnSuccess: true,
       chunkSize: RESUMABLE_CHUNK_SIZE,
       metadata: {
