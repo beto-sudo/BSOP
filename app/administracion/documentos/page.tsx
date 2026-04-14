@@ -45,6 +45,7 @@ type Documento = {
   notaria: string | null;
   notario_proveedor_id: string | null;
   notas: string | null;
+  archivo_url: string | null;
   creado_por: string | null;
   created_at: string;
   updated_at: string | null;
@@ -505,35 +506,66 @@ function DocumentosInner() {
                 <TableHead className="font-medium text-[var(--text)]/55">Título</TableHead>
                 <TableHead className="w-32 font-medium text-[var(--text)]/55">No. Documento</TableHead>
                 <TableHead className="w-44 font-medium text-[var(--text)]/55">Tipo</TableHead>
+                <TableHead className="w-28 font-medium text-[var(--text)]/55">PDF</TableHead>
                 <TableHead className="w-32 font-medium text-[var(--text)]/55">Emisión</TableHead>
                 <TableHead className="w-40 font-medium text-[var(--text)]/55">Vencimiento</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((doc) => (
-                <TableRow
-                  key={doc.id}
-                  className="border-[var(--border)] cursor-pointer hover:bg-[var(--panel)]/50"
-                  onClick={() => setSelectedDoc(doc)}
-                >
-                  <TableCell>
-                    <span className="line-clamp-1 font-medium text-[var(--text)]">{doc.titulo}</span>
-                    {doc.notaria && (
-                      <span className="mt-0.5 block text-xs text-[var(--text)]/40">{doc.notaria}</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-[var(--text)]/70">{doc.numero_documento ?? '—'}</span>
-                  </TableCell>
-                  <TableCell><TipoBadge tipo={doc.tipo} /></TableCell>
-                  <TableCell>
-                    <span className="text-sm text-[var(--text)]/70">{formatDate(doc.fecha_emision)}</span>
-                  </TableCell>
-                  <TableCell>
-                    <VencimientoBadge dateStr={doc.fecha_vencimiento} />
-                  </TableCell>
-                </TableRow>
-              ))}
+              {filtered.map((doc) => {
+                const pdfUrl = doc.archivo_url
+                  ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/adjuntos/${doc.archivo_url}`
+                  : null;
+                return (
+                  <TableRow
+                    key={doc.id}
+                    className="border-[var(--border)] cursor-pointer hover:bg-[var(--panel)]/50"
+                    onClick={() => setSelectedDoc(doc)}
+                  >
+                    <TableCell>
+                      <span className="line-clamp-1 font-medium text-[var(--text)]">{doc.titulo}</span>
+                      {doc.notaria && (
+                        <span className="mt-0.5 block text-xs text-[var(--text)]/40">{doc.notaria}</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm text-[var(--text)]/70">{doc.numero_documento ?? '—'}</span>
+                    </TableCell>
+                    <TableCell><TipoBadge tipo={doc.tipo} /></TableCell>
+                    <TableCell>
+                      {pdfUrl ? (
+                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <a
+                            href={pdfUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-red-500/10 px-2 py-1 text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors"
+                          >
+                            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                            PDF
+                          </a>
+                          <a
+                            href={pdfUrl}
+                            download
+                            className="inline-flex items-center justify-center rounded-lg p-1 text-[var(--text)]/40 hover:text-[var(--text)]/70 hover:bg-[var(--panel)] transition-colors"
+                            title="Descargar"
+                          >
+                            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                          </a>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-[var(--text)]/25">Sin archivo</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm text-[var(--text)]/70">{formatDate(doc.fecha_emision)}</span>
+                    </TableCell>
+                    <TableCell>
+                      <VencimientoBadge dateStr={doc.fecha_vencimiento} />
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         )}
