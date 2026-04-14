@@ -4,8 +4,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
- * Default browser client — uses public schema.
- * Use for core, shared, and generic queries.
+ * Default browser client — uses public schema (singleton).
  */
 export function createSupabaseBrowserClient() {
   return createBrowserClient(
@@ -16,12 +15,15 @@ export function createSupabaseBrowserClient() {
 
 /**
  * ERP browser client — defaults to erp schema.
- * Tables queried without explicit .schema() will use 'erp'.
+ * isSingleton=false to avoid getting the cached public client from providers.
  */
 export function createSupabaseERPClient() {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { db: { schema: 'erp' } },
-  ) as unknown as SupabaseClient<any, 'public', any>;
+    {
+      db: { schema: 'erp' },
+      isSingleton: false,
+    },
+  ) as unknown as SupabaseClient;
 }
