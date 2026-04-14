@@ -1,7 +1,7 @@
 'use client';
 
 import { RequireAccess } from '@/components/require-access';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import {
   Table,
@@ -31,7 +31,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Search, RefreshCw, Loader2, TicketCheck } from 'lucide-react';
+import { Plus, Search, RefreshCw, Loader2, TicketCheck, Trash2 } from 'lucide-react';
 
 const EMPRESA_ID = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479';
 
@@ -41,10 +41,14 @@ type ErpTask = {
   titulo: string;
   descripcion: string | null;
   asignado_a: string | null;
+  asignado_por: string | null;
   creado_por: string | null;
   prioridad_id: string | null;
   estado: 'pendiente' | 'en_progreso' | 'bloqueado' | 'completado' | 'cancelado';
   fecha_vence: string | null;
+  fecha_completado: string | null;
+  completado_por: string | null;
+  porcentaje_avance: number;
   entidad_tipo: string | null;
   entidad_id: string | null;
   created_at: string;
@@ -61,6 +65,7 @@ type CreateForm = {
   asignado_a: string;
   estado: ErpTask['estado'];
   fecha_vence: string;
+  porcentaje_avance: number;
 };
 
 const ESTADO_CONFIG: Record<ErpTask['estado'], { label: string; cls: string }> = {
@@ -103,6 +108,19 @@ function PrioridadBadge({ prioridad }: { prioridad: Prioridad | undefined }) {
   );
 }
 
+function ProgressBar({ value }: { value: number }) {
+  const clamped = Math.max(0, Math.min(100, value));
+  const color = clamped === 100 ? 'bg-green-500' : clamped >= 50 ? 'bg-blue-500' : 'bg-amber-500';
+  return (
+    <div className="flex items-center gap-2">
+      <div className="h-1.5 w-16 rounded-full bg-[var(--border)]">
+        <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${clamped}%` }} />
+      </div>
+      <span className="text-xs text-[var(--text)]/50">{clamped}%</span>
+    </div>
+  );
+}
+
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50 mb-1.5">
@@ -116,6 +134,9 @@ function TasksInner() {
 
   const [prioridades, setPrioridades] = useState<Prioridad[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
+  const [currentEmpleadoId, setCurrentEmpleadoId] = useState<string | null>(null);
+  const [isDireccion, setIsDireccion] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const [tasks, setTasks] = useState<ErpTask[]>([]);
   const [loading, setLoading] = useState(true);
@@ -135,6 +156,7 @@ function TasksInner() {
     asignado_a: '',
     estado: 'pendiente',
     fecha_vence: '',
+    porcentaje_avance: 0,
   });
 
   const [showEdit, setShowEdit] = useState(false);
@@ -146,21 +168,84 @@ function TasksInner() {
     asignado_a: '',
     estado: 'pendiente',
     fecha_vence: '',
+    porcentaje_avance: 0,
   });
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchRefData = useCallback(async () => {
-    const [priRes, empRes] = await Promise.all([
+    const { data: { user } } = await supabase.auth.getUser();
+    const email = user?.email?.toLowerCase() ?? '';
+
+    const [priRes, empRes, coreUserRes] = await Promise.all([
       supabase.schema('shared' as any).from('prioridades').select('*').order('peso'),
       supabase.schema('erp' as any).from('empleados')
         .select('id, persona:persona_id(nombre, apellido_paterno)')
         .eq('empresa_id', EMPRESA_ID).eq('activo', true).is('deleted_at', null),
+      supabase.schema('core' as any).from('usuarios')
+        .select('id, rol').eq('email', email).maybeSingle(),
     ]);
+
     setPrioridades(priRes.data ?? []);
-    setEmpleados((empRes.data ?? []).map((e: any) => ({
+    const mappedEmpleados = (empRes.data ?? []).map((e: any) => ({
       id: e.id,
       nombre: [e.persona?.nombre, e.persona?.apellido_paterno].filter(Boolean).join(' '),
-    })));
+    }));
+    setEmpleados(mappedEmpleados);
+
+    if (coreUserRes.data?.rol === 'admin') {
+      setIsAdmin(true);
+      setIsDireccion(true);
+    }
+
+    // Find current user's empleado_id and role
+    if (email) {
+      const { data: persona } = await supabase
+        .schema('erp' as any)
+        .from('personas')
+        .select('id')
+        .eq('empresa_id', EMPRESA_ID)
+        .eq('email', email)
+        .maybeSingle();
+
+      if (persona) {
+        const { data: empleado } = await supabase
+          .schema('erp' as any)
+          .from('empleados')
+          .select('id')
+          .eq('empresa_id', EMPRESA_ID)
+          .eq('persona_id', persona.id)
+          .eq('activo', true)
+          .maybeSingle();
+
+        if (empleado) setCurrentEmpleadoId(empleado.id);
+      }
+
+      // Check if user has direccion role for this empresa
+      if (!coreUserRes.data || coreUserRes.data.rol !== 'admin') {
+        const { data: ue } = await supabase
+          .schema('core' as any)
+          .from('usuarios_empresas')
+          .select('rol_id')
+          .eq('usuario_id', coreUserRes.data?.id ?? '')
+          .eq('empresa_id', EMPRESA_ID)
+          .eq('activo', true)
+          .maybeSingle();
+
+        if (ue?.rol_id) {
+          const { data: role } = await supabase
+            .schema('core' as any)
+            .from('roles')
+            .select('nombre')
+            .eq('id', ue.rol_id)
+            .maybeSingle();
+
+          if (role?.nombre?.toLowerCase() === 'direccion' || role?.nombre?.toLowerCase() === 'dirección') {
+            setIsDireccion(true);
+          }
+        }
+      }
+    }
   }, [supabase]);
 
   const fetchTasks = useCallback(async () => {
@@ -195,17 +280,14 @@ function TasksInner() {
     setLoading(false);
   };
 
-  const resetForm = () =>
-    setCreateForm({ titulo: '', descripcion: '', prioridad_id: '', asignado_a: '', estado: 'pendiente', fecha_vence: '' });
+  const resetForm = (): CreateForm => ({
+    titulo: '', descripcion: '', prioridad_id: '', asignado_a: '',
+    estado: 'pendiente', fecha_vence: '', porcentaje_avance: 0,
+  });
 
   const handleCreate = async () => {
     if (!createForm.titulo.trim()) return;
     setCreating(true);
-
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data: coreUser } = await supabase
-      .schema('core' as any).from('usuarios').select('id')
-      .eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
 
     const { error: err } = await supabase
       .schema('erp' as any)
@@ -216,15 +298,16 @@ function TasksInner() {
         descripcion: createForm.descripcion.trim() || null,
         prioridad_id: createForm.prioridad_id || null,
         asignado_a: createForm.asignado_a || null,
+        asignado_por: currentEmpleadoId,
         estado: createForm.estado,
         fecha_vence: createForm.fecha_vence || null,
-        creado_por: coreUser?.id ?? null,
+        porcentaje_avance: createForm.porcentaje_avance,
       });
 
     setCreating(false);
     if (err) { alert(`Error al crear tarea: ${err.message}`); return; }
     setShowCreate(false);
-    resetForm();
+    setCreateForm(resetForm());
     await fetchTasks();
   };
 
@@ -237,25 +320,52 @@ function TasksInner() {
       asignado_a: task.asignado_a ?? '',
       estado: task.estado,
       fecha_vence: task.fecha_vence ? task.fecha_vence.split('T')[0] : '',
+      porcentaje_avance: task.porcentaje_avance ?? 0,
     });
     setShowEdit(true);
   };
+
+  const canModifyTask = useCallback((task: ErpTask | null) => {
+    if (!task) return false;
+    if (isAdmin || isDireccion) return true;
+    if (task.asignado_por === currentEmpleadoId) return true;
+    return false;
+  }, [isAdmin, isDireccion, currentEmpleadoId]);
+
+  const canCompleteTask = useCallback((task: ErpTask | null) => {
+    if (!task) return false;
+    if (isAdmin || isDireccion) return true;
+    // Creator can always complete their own tasks
+    if (task.asignado_por === currentEmpleadoId) return true;
+    // Assignee can complete if they are also the creator (self-assigned)
+    if (!task.asignado_por && task.asignado_a === currentEmpleadoId) return true;
+    return false;
+  }, [isAdmin, isDireccion, currentEmpleadoId]);
 
   const handleUpdate = async () => {
     if (!selectedTask || !editForm.titulo.trim()) return;
     setSaving(true);
 
+    const updatePayload: Record<string, unknown> = {
+      titulo: editForm.titulo.trim(),
+      descripcion: editForm.descripcion.trim() || null,
+      prioridad_id: editForm.prioridad_id || null,
+      asignado_a: editForm.asignado_a || null,
+      fecha_vence: editForm.fecha_vence || null,
+      porcentaje_avance: editForm.porcentaje_avance,
+    };
+
+    if (canCompleteTask(selectedTask)) {
+      updatePayload.estado = editForm.estado;
+      if (editForm.estado === 'completado' && selectedTask.estado !== 'completado') {
+        updatePayload.completado_por = currentEmpleadoId;
+      }
+    }
+
     const { error: err } = await supabase
       .schema('erp' as any)
       .from('tasks')
-      .update({
-        titulo: editForm.titulo.trim(),
-        descripcion: editForm.descripcion.trim() || null,
-        prioridad_id: editForm.prioridad_id || null,
-        asignado_a: editForm.asignado_a || null,
-        estado: editForm.estado,
-        fecha_vence: editForm.fecha_vence || null,
-      })
+      .update(updatePayload)
       .eq('id', selectedTask.id);
 
     setSaving(false);
@@ -265,12 +375,40 @@ function TasksInner() {
     await fetchTasks();
   };
 
-  const empleadoMap = new Map(empleados.map((e) => [e.id, e]));
-  const prioridadMap = new Map(prioridades.map((p) => [p.id, p]));
+  const handleDelete = async () => {
+    if (!selectedTask || !canModifyTask(selectedTask)) return;
+    if (!confirm('¿Eliminar esta tarea? Esta acción no se puede deshacer.')) return;
+    setDeleting(true);
+
+    const { error: err } = await supabase
+      .schema('erp' as any)
+      .from('tasks')
+      .delete()
+      .eq('id', selectedTask.id);
+
+    setDeleting(false);
+    if (err) { alert(`Error al eliminar: ${err.message}`); return; }
+    setShowEdit(false);
+    setSelectedTask(null);
+    await fetchTasks();
+  };
+
+  const empleadoMap = useMemo(() => new Map(empleados.map((e) => [e.id, e])), [empleados]);
+  const prioridadMap = useMemo(() => new Map(prioridades.map((p) => [p.id, p])), [prioridades]);
 
   const { sortKey, sortDir, onSort, sortData } = useSortableTable<ErpTask & { prioridad_peso: number | null; asignado_nombre: string | null }>('created_at', 'desc');
 
-  const filtered = tasks.filter((t) => {
+  // Visibility filter: only own tasks unless direccion/admin
+  const visibleTasks = useMemo(() => {
+    if (isAdmin || isDireccion) return tasks;
+    return tasks.filter((t) =>
+      t.asignado_a === currentEmpleadoId ||
+      t.asignado_por === currentEmpleadoId ||
+      t.creado_por === currentEmpleadoId,
+    );
+  }, [tasks, isAdmin, isDireccion, currentEmpleadoId]);
+
+  const filtered = visibleTasks.filter((t) => {
     if (search && !t.titulo.toLowerCase().includes(search.toLowerCase())) return false;
     if (filterEstado !== 'all' && t.estado !== filterEstado) return false;
     if (filterPrioridad !== 'all' && t.prioridad_id !== filterPrioridad) return false;
@@ -341,9 +479,9 @@ function TasksInner() {
           <div className="flex flex-col items-center justify-center p-16 text-center">
             <TicketCheck className="mb-3 h-10 w-10 text-[var(--text)]/20" />
             <p className="text-sm text-[var(--text)]/55">
-              {tasks.length === 0 ? 'No hay tareas creadas aún' : 'No hay tareas que coincidan con los filtros'}
+              {visibleTasks.length === 0 ? 'No hay tareas creadas aún' : 'No hay tareas que coincidan con los filtros'}
             </p>
-            {tasks.length === 0 && (
+            {visibleTasks.length === 0 && (
               <Button size="sm" onClick={() => setShowCreate(true)} className="mt-4 gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90">
                 <Plus className="h-4 w-4" />Crear primera tarea
               </Button>
@@ -355,6 +493,7 @@ function TasksInner() {
               <TableRow className="border-[var(--border)] hover:bg-transparent">
                 <SortableHead sortKey="titulo" label="Título" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
                 <SortableHead sortKey="estado" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
+                <SortableHead sortKey="porcentaje_avance" label="Avance" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
                 <SortableHead sortKey="prioridad_peso" label="Prioridad" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
                 <SortableHead sortKey="asignado_nombre" label="Asignado a" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-40" />
                 <SortableHead sortKey="fecha_vence" label="Vence" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
@@ -371,6 +510,7 @@ function TasksInner() {
                       {task.entidad_tipo && (<span className="mt-0.5 block text-xs text-[var(--text)]/40">{task.entidad_tipo}</span>)}
                     </TableCell>
                     <TableCell><EstadoBadge estado={task.estado} /></TableCell>
+                    <TableCell><ProgressBar value={task.porcentaje_avance ?? 0} /></TableCell>
                     <TableCell><PrioridadBadge prioridad={prio} /></TableCell>
                     <TableCell><span className="text-sm text-[var(--text)]/70">{empleado ? empleado.nombre : '—'}</span></TableCell>
                     <TableCell><span className="text-sm text-[var(--text)]/70">{formatDate(task.fecha_vence)}</span></TableCell>
@@ -382,10 +522,11 @@ function TasksInner() {
         )}
       </div>
 
-      {!loading && tasks.length > 0 && (
-        <p className="text-right text-xs text-[var(--text)]/40">{filtered.length} de {tasks.length} {tasks.length === 1 ? 'tarea' : 'tareas'}</p>
+      {!loading && visibleTasks.length > 0 && (
+        <p className="text-right text-xs text-[var(--text)]/40">{filtered.length} de {visibleTasks.length} {visibleTasks.length === 1 ? 'tarea' : 'tareas'}</p>
       )}
 
+      {/* ── Edit Dialog ──────────────────────────────────────────────────── */}
       <Dialog open={showEdit} onOpenChange={(open) => { setShowEdit(open); if (!open) setSelectedTask(null); }}>
         <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto rounded-3xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
           <DialogHeader><DialogTitle className="text-[var(--text)]">Editar Tarea</DialogTitle></DialogHeader>
@@ -393,15 +534,53 @@ function TasksInner() {
             <div><FieldLabel>Título *</FieldLabel><Input placeholder="Descripción breve de la tarea..." value={editForm.titulo} onChange={(e) => setEditForm((f) => ({ ...f, titulo: e.target.value }))} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
             <div><FieldLabel>Descripción</FieldLabel><Textarea placeholder="Detalla la tarea..." value={editForm.descripcion} onChange={(e) => setEditForm((f) => ({ ...f, descripcion: e.target.value }))} rows={3} className="resize-none rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
             <div className="grid grid-cols-2 gap-4">
-              <div><FieldLabel>Estado</FieldLabel><Select value={editForm.estado} onValueChange={(v) => setEditForm((f) => ({ ...f, estado: v as ErpTask['estado'] }))}><SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(ESTADO_CONFIG).map(([k, v]) => (<SelectItem key={k} value={k}>{v.label}</SelectItem>))}</SelectContent></Select></div>
+              <div>
+                <FieldLabel>Estado</FieldLabel>
+                <Select
+                  value={editForm.estado}
+                  onValueChange={(v) => setEditForm((f) => ({ ...f, estado: v as ErpTask['estado'] }))}
+                  disabled={!canCompleteTask(selectedTask)}
+                >
+                  <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue /></SelectTrigger>
+                  <SelectContent>{Object.entries(ESTADO_CONFIG).map(([k, v]) => (<SelectItem key={k} value={k}>{v.label}</SelectItem>))}</SelectContent>
+                </Select>
+                {!canCompleteTask(selectedTask) && (
+                  <p className="mt-1 text-[10px] text-[var(--text)]/40">Solo dirección o el creador pueden cambiar el estado</p>
+                )}
+              </div>
               <div><FieldLabel>Prioridad</FieldLabel><Select value={editForm.prioridad_id} onValueChange={(v) => setEditForm((f) => ({ ...f, prioridad_id: v ?? '' }))}><SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue placeholder="Sin prioridad" /></SelectTrigger><SelectContent>{prioridades.map((p) => (<SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>))}</SelectContent></Select></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div><FieldLabel>Asignado a</FieldLabel><Select value={editForm.asignado_a} onValueChange={(v) => setEditForm((f) => ({ ...f, asignado_a: v ?? '' }))}><SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue placeholder="Sin asignar" /></SelectTrigger><SelectContent>{empleados.map((e) => (<SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>))}</SelectContent></Select></div>
               <div><FieldLabel>Fecha límite</FieldLabel><Input type="date" value={editForm.fecha_vence} onChange={(e) => setEditForm((f) => ({ ...f, fecha_vence: e.target.value }))} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
             </div>
+            <div>
+              <FieldLabel>Avance ({editForm.porcentaje_avance}%)</FieldLabel>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={5}
+                value={editForm.porcentaje_avance}
+                onChange={(e) => setEditForm((f) => ({ ...f, porcentaje_avance: Number(e.target.value) }))}
+                className="w-full accent-[var(--accent)]"
+              />
+            </div>
+            {selectedTask?.asignado_por && (
+              <div className="text-xs text-[var(--text)]/40">
+                Asignada por: {empleadoMap.get(selectedTask.asignado_por)?.nombre ?? 'Desconocido'}
+                {selectedTask.fecha_completado && (
+                  <> · Completada: {formatDate(selectedTask.fecha_completado)}</>
+                )}
+              </div>
+            )}
           </div>
           <DialogFooter className="gap-2">
+            {canModifyTask(selectedTask) && (
+              <Button variant="outline" size="sm" onClick={handleDelete} disabled={deleting} className="mr-auto rounded-xl border-red-500/30 text-red-400 hover:bg-red-500/10">
+                {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              </Button>
+            )}
             <Button variant="outline" onClick={() => { setShowEdit(false); setSelectedTask(null); }} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">Cancelar</Button>
             <Button onClick={handleUpdate} disabled={saving || !editForm.titulo.trim()} className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Guardar cambios
@@ -410,6 +589,7 @@ function TasksInner() {
         </DialogContent>
       </Dialog>
 
+      {/* ── Create Dialog ────────────────────────────────────────────────── */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto rounded-3xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
           <DialogHeader><DialogTitle className="text-[var(--text)]">Nueva Tarea</DialogTitle></DialogHeader>
@@ -426,7 +606,7 @@ function TasksInner() {
             </div>
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => { setShowCreate(false); resetForm(); }} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">Cancelar</Button>
+            <Button variant="outline" onClick={() => { setShowCreate(false); setCreateForm(resetForm()); }} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">Cancelar</Button>
             <Button onClick={handleCreate} disabled={creating || !createForm.titulo.trim()} className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60">
               {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}Crear tarea
             </Button>
