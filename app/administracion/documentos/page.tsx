@@ -2,7 +2,7 @@
 
 import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useState } from 'react';
-import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import {
   Table,
   TableBody,
@@ -157,7 +157,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 // ─── Adjuntos subcomponent ──────────────────────────────────────────────────────
 
 function DocumentoAdjuntos({ documentoId, empresaId }: { documentoId: string; empresaId: string }) {
-  const supabase = createSupabaseBrowserClient();
+  const supabase = createSupabaseERPClient();
   const [adjuntos, setAdjuntos] = useState<Adjunto[]>([]);
   const [uploading, setUploading] = useState(false);
 
@@ -259,7 +259,7 @@ function DocumentoAdjuntos({ documentoId, empresaId }: { documentoId: string; em
 // ─── Main component ────────────────────────────────────────────────────────────
 
 function DocumentosInner() {
-  const supabase = createSupabaseBrowserClient();
+  const supabase = createSupabaseERPClient();
 
   const [empresaIds, setEmpresaIds] = useState<string[]>([]);
   const [primaryEmpresaId, setPrimaryEmpresaId] = useState<string>('');

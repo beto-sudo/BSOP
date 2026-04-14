@@ -2,7 +2,7 @@
 
 import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useState } from 'react';
-import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import {
   Table,
   TableBody,
@@ -55,7 +55,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 const EMPTY_FORM = { nombre: '', codigo: '', padre_id: '' };
 
 function DepartamentosInner() {
-  const supabase = createSupabaseBrowserClient();
+  const supabase = createSupabaseERPClient();
 
   const [empresaIds, setEmpresaIds] = useState<string[]>([]);
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);

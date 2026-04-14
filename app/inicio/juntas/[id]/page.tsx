@@ -3,7 +3,7 @@
 import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
@@ -199,7 +199,7 @@ function JuntaDetailInner() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
-  const supabase = createSupabaseBrowserClient();
+  const supabase = createSupabaseERPClient();
 
   const [junta, setJunta] = useState<Junta | null>(null);
   const [asistencia, setAsistencia] = useState<Asistencia[]>([]);

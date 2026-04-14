@@ -3,7 +3,7 @@
 import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import {
   Table,
   TableBody,
@@ -110,7 +110,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 
 function JuntasInner() {
   const router = useRouter();
-  const supabase = createSupabaseBrowserClient();
+  const supabase = createSupabaseERPClient();
 
   const [empresaIds, setEmpresaIds] = useState<string[]>([]);
   const [juntas, setJuntas] = useState<Junta[]>([]);
