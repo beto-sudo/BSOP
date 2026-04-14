@@ -45,6 +45,23 @@ export default function HomePage() {
       </section>
 
       <section className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {/* DILESA Card */}
+        <Surface className="flex flex-col p-6">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/10">
+            <img src="/logos/dilesa.jpg" alt="DILESA" className="h-7 w-7 rounded-md object-contain" />
+          </div>
+          <h2 className="mt-4 text-lg font-semibold text-white">DILESA</h2>
+          <p className="mt-2 text-sm text-white/60 flex-1">
+            Administración, recursos humanos y documentos de DILESA.
+          </p>
+          <div className="mt-6">
+            <Link href="/dilesa" className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-500/10 px-4 py-2.5 text-sm font-medium text-blue-400 transition hover:bg-blue-500/20">
+              Ir a DILESA
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </Surface>
+
         {/* Rincón del Bosque Card */}
         <Surface className="flex flex-col p-6">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10">

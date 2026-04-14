@@ -24,6 +24,7 @@ import { canAccessEmpresa, canAccessModulo } from '@/lib/permissions';
 type NavChild = {
   label: string;
   href: string;
+  divider?: boolean;
 };
 
 type NavItem = {
@@ -43,24 +44,18 @@ type AuthUser = {
 const NAV_ITEMS: NavItem[] = [
   { href: '/', labelKey: 'nav.overview', icon: '🏠' },
   {
-    href: '/inicio',
-    labelKey: 'Administración',
-    icon: '📋',
-    matchPaths: ['/inicio', '/administracion'],
+    href: '/dilesa',
+    labelKey: 'DILESA',
+    icon: 'DILESA_LOGO',
     children: [
-      { label: 'Tareas', href: '/inicio/tasks' },
-      { label: 'Juntas', href: '/inicio/juntas' },
-      { label: 'Documentos', href: '/administracion/documentos' },
-    ],
-  },
-  {
-    href: '/rh',
-    labelKey: 'Recursos Humanos',
-    icon: '👥',
-    children: [
-      { label: 'Empleados', href: '/rh/empleados' },
-      { label: 'Puestos', href: '/rh/puestos' },
-      { label: 'Departamentos', href: '/rh/departamentos' },
+      { label: 'Administración', href: '#', divider: true },
+      { label: 'Tareas', href: '/dilesa/tasks' },
+      { label: 'Juntas', href: '/dilesa/juntas' },
+      { label: 'Documentos', href: '/dilesa/documentos' },
+      { label: 'Recursos Humanos', href: '#', divider: true },
+      { label: 'Empleados', href: '/dilesa/rh/empleados' },
+      { label: 'Puestos', href: '/dilesa/rh/puestos' },
+      { label: 'Departamentos', href: '/dilesa/rh/departamentos' },
     ],
   },
   {
@@ -68,6 +63,7 @@ const NAV_ITEMS: NavItem[] = [
     labelKey: 'Rincón del Bosque',
     icon: 'RDB_LOGO',
     children: [
+      { label: 'Operaciones', href: '#', divider: true },
       { label: 'Ventas', href: '/rdb/ventas' },
       { label: 'Cortes', href: '/rdb/cortes' },
       { label: 'Productos', href: '/rdb/productos' },
@@ -76,6 +72,14 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'Requisiciones', href: '/rdb/requisiciones' },
       { label: 'Órdenes de Compra', href: '/rdb/ordenes-compra' },
       { label: 'Playtomic', href: '/rdb/playtomic' },
+      { label: 'Administración', href: '#', divider: true },
+      { label: 'Tareas', href: '/rdb/admin/tasks' },
+      { label: 'Juntas', href: '/rdb/admin/juntas' },
+      { label: 'Documentos', href: '/rdb/admin/documentos' },
+      { label: 'Recursos Humanos', href: '#', divider: true },
+      { label: 'Empleados', href: '/rdb/rh/empleados' },
+      { label: 'Puestos', href: '/rdb/rh/puestos' },
+      { label: 'Departamentos', href: '/rdb/rh/departamentos' },
     ],
   },
   {
@@ -116,9 +120,12 @@ const NAV_ITEMS: NavItem[] = [
 
 /** Maps route hrefs to their modulo slug for permission checks */
 const ROUTE_TO_MODULE: Record<string, string> = {
-  '/inicio/tasks': 'inicio.tasks',
-  '/inicio/juntas': 'inicio.juntas',
-  '/administracion/documentos': 'administracion.documentos',
+  '/dilesa/tasks': 'dilesa.tasks',
+  '/dilesa/juntas': 'dilesa.juntas',
+  '/dilesa/documentos': 'dilesa.documentos',
+  '/dilesa/rh/empleados': 'dilesa.rh.empleados',
+  '/dilesa/rh/puestos': 'dilesa.rh.puestos',
+  '/dilesa/rh/departamentos': 'dilesa.rh.departamentos',
   '/rdb/ventas': 'rdb.ventas',
   '/rdb/cortes': 'rdb.cortes',
   '/rdb/productos': 'rdb.productos',
@@ -127,12 +134,19 @@ const ROUTE_TO_MODULE: Record<string, string> = {
   '/rdb/requisiciones': 'rdb.requisiciones',
   '/rdb/playtomic': 'rdb.playtomic',
   '/rdb/ordenes-compra': 'rdb.ordenes_compra',
+  '/rdb/admin/tasks': 'rdb.admin.tasks',
+  '/rdb/admin/juntas': 'rdb.admin.juntas',
+  '/rdb/admin/documentos': 'rdb.admin.documentos',
+  '/rdb/rh/empleados': 'rdb.rh.empleados',
+  '/rdb/rh/puestos': 'rdb.rh.puestos',
+  '/rdb/rh/departamentos': 'rdb.rh.departamentos',
   '/rdb': 'rdb.home',
   '/settings/acceso': 'settings.acceso',
 };
 
 /** Maps top-level nav hrefs to their empresa slug */
 const NAV_TO_EMPRESA: Record<string, string> = {
+  '/dilesa': 'dilesa',
   '/rdb': 'rdb',
   '/coda': 'coda',
   '/family': 'familia',
@@ -451,7 +465,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   title={collapsed ? label : undefined}
                 >
                   <span className="text-lg leading-none">
-                    {item.icon === 'RDB_LOGO' ? (
+                    {item.icon === 'DILESA_LOGO' ? (
+                      <img src="/logos/dilesa.jpg" alt="DILESA" className="h-5 w-5 object-contain rounded-sm" />
+                    ) : item.icon === 'RDB_LOGO' ? (
                       <img src="/logos/rdb.jpg" alt="RDB" className="h-5 w-5 object-contain rounded-sm" />
                     ) : item.icon === 'SR_LOGO' ? (
                       <img src="/logo-familia-sr.jpg" alt="SR" className="h-5 w-5 object-contain rounded-sm" />
@@ -473,11 +489,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <div
                     className={[
                       'overflow-hidden transition-all duration-200 ease-in-out',
-                      expanded ? 'max-h-80 opacity-100' : 'max-h-0 opacity-0',
+                      expanded ? 'max-h-[36rem] opacity-100' : 'max-h-0 opacity-0',
                     ].join(' ')}
                   >
                     <div className="ml-7 mt-1 space-y-1 border-l border-[var(--border)] pl-4 pb-1">
                       {item.children?.map((child) => {
+                        if (child.divider) {
+                          return (
+                            <div
+                              key={child.label}
+                              className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] dark:text-white/35 text-[var(--text)]/40"
+                            >
+                              {child.label}
+                            </div>
+                          );
+                        }
                         const childActive = matchesPath(pathname, child.href);
                         return (
                           <Link
@@ -505,6 +531,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     </div>
                     <div className="space-y-1">
                       {item.children?.map((child) => {
+                        if (child.divider) {
+                          return (
+                            <div
+                              key={child.label}
+                              className="px-2 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] dark:text-white/35 text-[var(--text)]/40"
+                            >
+                              {child.label}
+                            </div>
+                          );
+                        }
                         const childActive = matchesPath(pathname, child.href);
                         return (
                           <Link
@@ -543,6 +579,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--panel)] backdrop-blur-xl">
           <div className="flex min-h-[76px] flex-col gap-3 px-6 py-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="pl-10 md:pl-0 flex items-center gap-4">
+              {sectionName === 'DILESA' && (
+                <div className="flex h-[3.25rem] w-[3.25rem] shrink-0 items-center justify-center rounded-xl bg-white p-1 shadow-sm ring-1 ring-inset ring-[var(--border)]">
+                  <img src="/logos/dilesa.jpg" alt="DILESA" className="h-full w-full rounded-lg object-contain" />
+                </div>
+              )}
               {sectionName === 'Rincón del Bosque' && (
                 <div className="flex h-[3.25rem] w-[3.25rem] shrink-0 items-center justify-center rounded-xl bg-white p-1 shadow-sm ring-1 ring-inset ring-[var(--border)]">
                   <img src="/logos/rdb.jpg" alt="RDB" className="h-full w-full rounded-lg object-contain" />
