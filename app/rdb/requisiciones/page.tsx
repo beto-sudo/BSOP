@@ -806,6 +806,7 @@ function NewRequestSheet({
 }
 
 const TZ = 'America/Matamoros';
+const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
 function todayRange(): { from: string; to: string } {
   const now = new Date();
   const formatter = new Intl.DateTimeFormat('sv-SE', { timeZone: TZ });
@@ -885,33 +886,42 @@ export default function RequisicionesPage() {
     try {
       const supabase = createSupabaseBrowserClient();
       let query = supabase
-        .schema('rdb')
+        .schema('erp')
         .from('requisiciones')
-        .select('*')
-        .order('fecha_solicitud', { ascending: false })
+        .select('id, codigo, justificacion, autorizada_at, solicitante_id, created_at')
+        .eq('empresa_id', RDB_EMPRESA_ID)
+        .order('created_at', { ascending: false })
         .limit(200);
 
       if (dateFrom) {
-        query = query.gte('fecha_solicitud', `${dateFrom}T00:00:00`);
+        query = query.gte('created_at', `${dateFrom}T00:00:00`);
       }
       if (dateTo) {
-        query = query.lte('fecha_solicitud', `${dateTo}T23:59:59`);
+        query = query.lte('created_at', `${dateTo}T23:59:59`);
       }
 
       const { data, error: fetchError } = await query;
       if (fetchError) throw fetchError;
 
-      const requisicionesData = (data ?? []) as Requisicion[];
+      const requisicionesData: Requisicion[] = (data ?? []).map((row) => ({
+        id: row.id,
+        folio: row.codigo ?? null,
+        estatus: row.autorizada_at ? 'aprobada' : 'enviada',
+        solicitado_por: row.solicitante_id ?? null,
+        aprobado_por: null,
+        fecha_solicitud: row.created_at ?? null,
+      }));
 
       const { data: prodData } = await supabase
-        .schema('rdb')
+        .schema('erp')
         .from('productos')
-        .select('id, nombre, unidad, categoria')
+        .select('id, nombre, unidad, tipo')
         .eq('activo', true)
+        .eq('empresa_id', RDB_EMPRESA_ID)
         .order('nombre');
 
       if (prodData) {
-        setCatalogoProductos(prodData);
+        setCatalogoProductos(prodData.map((p) => ({ ...p, categoria: p.tipo ?? null })));
       }
 
       const { data: userData } = await supabase.auth.getUser();
@@ -980,9 +990,10 @@ export default function RequisicionesPage() {
       const itemCountMap = new Map<string, number>();
       if (requisicionIds.length > 0) {
         const { data: itemRows } = await supabase
-          .schema('rdb')
-          .from('requisiciones_items')
+          .schema('erp')
+          .from('requisiciones_detalle')
           .select('requisicion_id')
+          .eq('empresa_id', RDB_EMPRESA_ID)
           .in('requisicion_id', requisicionIds);
 
         (itemRows ?? []).forEach((row: { requisicion_id: string }) => {
@@ -1026,15 +1037,17 @@ export default function RequisicionesPage() {
       const supabase = createSupabaseBrowserClient();
       const [itemsResult, ocResult] = await Promise.all([
         supabase
-          .schema('rdb')
-          .from('requisiciones_items')
+          .schema('erp')
+          .from('requisiciones_detalle')
           .select('*')
+          .eq('empresa_id', RDB_EMPRESA_ID)
           .eq('requisicion_id', requisicion.id)
           .limit(100),
         supabase
-          .schema('rdb')
+          .schema('erp')
           .from('ordenes_compra')
-          .select('folio')
+          .select('codigo')
+          .eq('empresa_id', RDB_EMPRESA_ID)
           .eq('requisicion_id', requisicion.id)
           .maybeSingle(),
       ]);
@@ -1046,7 +1059,7 @@ export default function RequisicionesPage() {
           ? {
               ...prev,
               items: (itemsResult.data ?? []) as RequisicionItem[],
-              oc_folio: ocResult.data?.folio ?? null,
+              oc_folio: ocResult.data?.codigo ?? null,
             }
           : prev,
       );

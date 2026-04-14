@@ -54,6 +54,8 @@ import {
   TrendingUp,
 } from 'lucide-react';
 
+const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type StockItem = {
@@ -77,7 +79,7 @@ type StockItem = {
 type MovimientoRow = {
   id: string;
   producto_id: string;
-  tipo: 'entrada' | 'salida' | 'ajuste';
+  tipo_movimiento: string;
   cantidad: number;
   costo_unitario: number | null;
   referencia_tipo: string | null;
@@ -216,9 +218,10 @@ function StockDetailDrawer({
       setLoading(true);
       const supabase = createSupabaseBrowserClient();
       supabase
-        .schema('rdb')
-        .from('inventario_movimientos')
-        .select('*')
+        .schema('erp')
+        .from('movimientos_inventario')
+        .select('id, producto_id, tipo_movimiento, cantidad, costo_unitario, referencia_tipo, notas, created_at')
+        .eq('empresa_id', RDB_EMPRESA_ID)
         .eq('producto_id', item.id)
         .order('created_at', { ascending: false })
         .limit(500)
@@ -331,7 +334,7 @@ function StockDetailDrawer({
                             {formatDate(mov.created_at).split(',')[0]}
                           </TableCell>
                           <TableCell className="text-sm">
-                            <div className="font-medium">{tipoLabel(mov.tipo, mov.cantidad)}</div>
+                            <div className="font-medium">{tipoLabel(mov.tipo_movimiento, mov.cantidad)}</div>
                             {mov.notas && <div className="text-xs text-muted-foreground truncate max-w-[120px]">{mov.notas}</div>}
                           </TableCell>
                           <TableCell className={["text-right font-medium tabular-nums", mov.cantidad > 0 ? "text-emerald-600" : "text-destructive"].join(" ")}>
@@ -398,12 +401,22 @@ function RegistrarMovimientoDialog({
     try {
       const { tipoDB, cantidadSigned } = mapTipoToDb(tipo, cantNum);
       const supabase = createSupabaseBrowserClient();
+      const { data: almacen } = await supabase
+        .schema('erp')
+        .from('almacenes')
+        .select('id')
+        .eq('empresa_id', RDB_EMPRESA_ID)
+        .limit(1)
+        .single();
+      if (!almacen) throw new Error('No se encontró almacén');
       const { error } = await supabase
-        .schema('rdb')
-        .from('inventario_movimientos')
+        .schema('erp')
+        .from('movimientos_inventario')
         .insert({
+          empresa_id: RDB_EMPRESA_ID,
+          almacen_id: almacen.id,
           producto_id: productoId,
-          tipo: tipoDB,
+          tipo_movimiento: tipoDB,
           cantidad: cantidadSigned,
           referencia_tipo: 'ajuste_manual',
           notas: notas.trim() || null,
@@ -579,9 +592,10 @@ export default function InventarioPage() {
     try {
       const supabase = createSupabaseBrowserClient();
       const { data, error } = await supabase
-        .schema('rdb')
+        .schema('erp')
         .from('v_inventario_stock')
         .select('*')
+        .eq('empresa_id', RDB_EMPRESA_ID)
         .order('nombre');
       if (error) throw error;
       setItems((data ?? []) as StockItem[]);
@@ -600,7 +614,7 @@ export default function InventarioPage() {
       // Fin del día en UTC para la fecha seleccionada (sin conversión timezone)
       const p_fecha = `${dateStr}T23:59:59.999Z`;
       const { data, error } = await supabase
-        .schema('rdb')
+        .schema('erp')
         .rpc('fn_inventario_al_corte', { p_fecha });
       if (error) throw error;
       setItems((data ?? []) as StockItem[]);
@@ -617,13 +631,14 @@ export default function InventarioPage() {
     try {
       const supabase = createSupabaseBrowserClient();
       const { data, error } = await supabase
-        .schema('rdb')
-        .from('inventario_movimientos')
-        .select('*, productos(nombre)')
+        .schema('erp')
+        .from('movimientos_inventario')
+        .select('id, producto_id, tipo_movimiento, cantidad, costo_unitario, referencia_tipo, notas, created_at, productos(nombre)')
+        .eq('empresa_id', RDB_EMPRESA_ID)
         .order('created_at', { ascending: false })
         .limit(300);
       if (error) throw error;
-      setMovimientos((data ?? []) as MovimientoRow[]);
+      setMovimientos((data ?? []) as unknown as MovimientoRow[]);
       setKardexLoaded(true);
     } catch (e: unknown) {
       setErrorMovimientos(
@@ -1204,17 +1219,17 @@ export default function InventarioPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1.5">
-                        {mov.tipo === 'entrada' ||
-                        (mov.tipo === 'ajuste' && mov.cantidad >= 0) ? (
+                        {mov.tipo_movimiento === 'entrada' ||
+                        (mov.tipo_movimiento === 'ajuste' && mov.cantidad >= 0) ? (
                           <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
                         ) : (
                           <TrendingDown className="h-3.5 w-3.5 text-destructive" />
                         )}
                         <Badge
                           variant="outline"
-                          className={tipoColorClass(mov.tipo, mov.cantidad)}
+                          className={tipoColorClass(mov.tipo_movimiento, mov.cantidad)}
                         >
-                          {tipoLabel(mov.tipo, mov.cantidad)}
+                          {tipoLabel(mov.tipo_movimiento, mov.cantidad)}
                         </Badge>
                       </div>
                     </TableCell>

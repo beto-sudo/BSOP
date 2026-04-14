@@ -70,6 +70,7 @@ type OrdenCompra = {
 };
 
 const TZ = 'America/Matamoros';
+const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -656,28 +657,54 @@ export default function OrdenesCompraPage() {
     try {
       const supabase = createSupabaseBrowserClient();
       let query = supabase
-        .schema('rdb')
+        .schema('erp')
         .from('ordenes_compra')
         .select(
-          'id, folio, requisicion_id, proveedor_id, estatus, total_estimado, total_real, fecha_emision, notas, proveedor:proveedores(id, nombre, contacto, email, telefono, rfc, direccion), requisicion:requisiciones(folio)',
+          'id, codigo, requisicion_id, proveedor_id, total, autorizada_at, created_at, proveedor:proveedores!proveedor_id(id, persona:personas!persona_id(nombre, email, telefono, rfc)), requisicion:requisiciones!requisicion_id(codigo)',
         )
-        .order('fecha_emision', { ascending: false });
+        .eq('empresa_id', RDB_EMPRESA_ID)
+        .order('created_at', { ascending: false });
 
-      if (dateFrom) query = query.gte('fecha_emision', `${dateFrom}T00:00:00`);
-      if (dateTo) query = query.lte('fecha_emision', `${dateTo}T23:59:59`);
+      if (dateFrom) query = query.gte('created_at', `${dateFrom}T00:00:00`);
+      if (dateTo) query = query.lte('created_at', `${dateTo}T23:59:59`);
 
       const { data, error: queryError } = await query;
       if (queryError) throw queryError;
 
-      setOrdenes((data ?? []) as OrdenCompra[]);
+      type RawOrden = { id: string; codigo: string | null; requisicion_id: string | null; proveedor_id: string | null; total: number | null; autorizada_at: string | null; created_at: string | null; proveedor: unknown; requisicion: unknown };
+      const ordenesMapped: OrdenCompra[] = ((data ?? []) as unknown as RawOrden[]).map((o) => {
+        const prov = o.proveedor as { id: string; persona: { nombre: string; email: string | null; telefono: string | null; rfc: string | null } | null } | null;
+        const persona = prov?.persona ?? null;
+        const proveedor: Proveedor | null = prov ? { id: prov.id, nombre: persona?.nombre ?? null, email: persona?.email ?? null, telefono: persona?.telefono ?? null, rfc: persona?.rfc ?? null } : null;
+        const req = o.requisicion as { codigo: string | null } | null;
+        return {
+          id: o.id,
+          folio: o.codigo ?? null,
+          requisicion_id: o.requisicion_id ?? null,
+          proveedor_id: o.proveedor_id ?? null,
+          estatus: o.autorizada_at ? 'enviada' : 'abierta',
+          total_estimado: o.total ?? null,
+          total_real: o.total ?? null,
+          fecha_emision: o.created_at ?? null,
+          notas: null,
+          proveedor,
+          requisicion: req ? { folio: req.codigo } : null,
+        };
+      });
+      setOrdenes(ordenesMapped);
 
-      const { data: provData } = await supabase
-        .schema('rdb')
+      const { data: provRaw } = await supabase
+        .schema('erp')
         .from('proveedores')
-        .select('id, nombre, contacto, email, telefono, rfc, direccion')
-        .eq('activo', true)
-        .order('nombre');
-      if (provData) setProveedores(provData as Proveedor[]);
+        .select('id, activo, persona:personas!persona_id(nombre, email, telefono, rfc)')
+        .eq('empresa_id', RDB_EMPRESA_ID)
+        .eq('activo', true);
+      type RawProv = { id: string; persona: { nombre: string; email: string | null; telefono: string | null; rfc: string | null } | null };
+      const provMapped: Proveedor[] = ((provRaw ?? []) as unknown as RawProv[]).map((p) => {
+        const persona = p.persona ?? null;
+        return { id: p.id, nombre: persona?.nombre ?? null, email: persona?.email ?? null, telefono: persona?.telefono ?? null, rfc: persona?.rfc ?? null };
+      }).sort((a, b) => (a.nombre ?? '').localeCompare(b.nombre ?? '', 'es'));
+      setProveedores(provMapped);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'No pude cargar las órdenes de compra.',
@@ -700,15 +727,16 @@ export default function OrdenesCompraPage() {
     try {
       const supabase = createSupabaseBrowserClient();
       const { data, error: itemsError } = await supabase
-        .schema('rdb')
-        .from('ordenes_compra_items')
-        .select('id, descripcion, cantidad, cantidad_recibida, precio_unitario, subtotal')
-        .eq('orden_id', orden.id)
+        .schema('erp')
+        .from('ordenes_compra_detalle')
+        .select('id, descripcion, cantidad, precio_unitario, subtotal')
+        .eq('empresa_id', RDB_EMPRESA_ID)
+        .eq('orden_compra_id', orden.id)
         .order('descripcion');
 
       if (itemsError) throw itemsError;
 
-      const items = (data ?? []) as OrdenCompraItem[];
+      const items = (data ?? []).map((item) => ({ ...item, cantidad_recibida: null })) as OrdenCompraItem[];
       const initialReceipts = items.reduce<Record<string, string>>((acc, item) => {
         acc[item.id] = String(item.cantidad_recibida ?? 0);
         return acc;
@@ -762,29 +790,17 @@ export default function OrdenesCompraPage() {
           return { ...item, cantidad_recibida: cantidadRecibida };
         });
 
-        for (const item of nextItems) {
-          const { error: e } = await supabase
-            .schema('rdb')
-            .from('ordenes_compra_items')
-            .update({ cantidad_recibida: item.cantidad_recibida })
-            .eq('id', item.id);
-          if (e) throw e;
-        }
-
-        const fullyReceived = nextItems.every(
-          (item) => (item.cantidad_recibida ?? 0) >= (item.cantidad ?? 0),
-        );
-        const partiallyReceived = nextItems.some((item) => (item.cantidad_recibida ?? 0) > 0);
-        const nextStatus = fullyReceived ? 'Recibida' : partiallyReceived ? 'Parcial' : 'Enviada';
         const totalReal = nextItems.reduce(
-          (acc, item) => acc + (item.cantidad_recibida ?? 0) * (item.precio_unitario ?? 0),
+          (acc, item) => acc + (item.cantidad ?? 0) * (item.precio_unitario ?? 0),
           0,
         );
+        const nextStatus = 'Recibida';
 
         const { error: e2 } = await supabase
-          .schema('rdb')
+          .schema('erp')
           .from('ordenes_compra')
-          .update({ estatus: nextStatus, total_real: totalReal })
+          .update({ total: totalReal })
+          .eq('empresa_id', RDB_EMPRESA_ID)
           .eq('id', selected.id);
         if (e2) throw e2;
 
@@ -824,9 +840,10 @@ export default function OrdenesCompraPage() {
       try {
         const supabase = createSupabaseBrowserClient();
         const { error: e } = await supabase
-          .schema('rdb')
+          .schema('erp')
           .from('ordenes_compra')
           .update({ proveedor_id: proveedorId })
+          .eq('empresa_id', RDB_EMPRESA_ID)
           .eq('id', selected.id);
         if (e) throw e;
 
@@ -859,17 +876,18 @@ export default function OrdenesCompraPage() {
         const subtotal = (item.cantidad ?? 0) * price;
         totalEstimado += subtotal;
         const { error: e } = await supabase
-          .schema('rdb')
-          .from('ordenes_compra_items')
+          .schema('erp')
+          .from('ordenes_compra_detalle')
           .update({ precio_unitario: price, subtotal })
           .eq('id', item.id);
         if (e) throw e;
       }
 
       const { error: e2 } = await supabase
-        .schema('rdb')
+        .schema('erp')
         .from('ordenes_compra')
-        .update({ estatus: 'Enviada', total_estimado: totalEstimado })
+        .update({ total: totalEstimado })
+        .eq('empresa_id', RDB_EMPRESA_ID)
         .eq('id', selected.id);
       if (e2) throw e2;
 

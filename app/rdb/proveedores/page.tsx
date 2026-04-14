@@ -25,6 +25,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { Truck, RefreshCw, Search, Phone, Mail, FileText, Save } from 'lucide-react';
 
+const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Proveedor = {
@@ -151,17 +153,28 @@ export default function ProveedoresPage() {
     setCreating(true);
     try {
       const supabase = createSupabaseBrowserClient();
+      const { data: persona, error: personaErr } = await supabase
+        .schema('erp')
+        .from('personas')
+        .insert({
+          empresa_id: RDB_EMPRESA_ID,
+          nombre: newNombre.trim(),
+          email: newEmail.trim() || null,
+          telefono: newTelefono.trim() || null,
+          rfc: newRFC.trim() || null,
+          tipo: 'proveedor',
+        })
+        .select('id')
+        .single();
+
+      if (personaErr) throw personaErr;
+
       const { error: err } = await supabase
-        .schema('rdb')
+        .schema('erp')
         .from('proveedores')
         .insert({
-          nombre: newNombre.trim(),
-          contacto: newContacto.trim() || null,
-          telefono: newTelefono.trim() || null,
-          email: newEmail.trim() || null,
-          rfc: newRFC.trim() || null,
-          direccion: newDireccion.trim() || null,
-          notas: newNotas.trim() || null,
+          empresa_id: RDB_EMPRESA_ID,
+          persona_id: persona.id,
           activo: true,
         });
 
@@ -190,12 +203,29 @@ export default function ProveedoresPage() {
     try {
       const supabase = createSupabaseBrowserClient();
       const { data, error: err } = await supabase
-        .schema('rdb')
+        .schema('erp')
         .from('proveedores')
-        .select('*')
-        .order('nombre');
+        .select('id, activo, created_at, updated_at, personas!persona_id(nombre, email, telefono, rfc)')
+        .eq('empresa_id', RDB_EMPRESA_ID);
       if (err) throw err;
-      setProveedores(data ?? []);
+      type RawProv = { id: string; activo: boolean; created_at: string | null; updated_at: string | null; personas: unknown };
+      const mapped: Proveedor[] = ((data ?? []) as unknown as RawProv[]).map((p) => {
+        const persona = p.personas as { nombre: string; email: string | null; telefono: string | null; rfc: string | null } | null;
+        return {
+          id: p.id,
+          nombre: persona?.nombre ?? '—',
+          contacto: null,
+          telefono: persona?.telefono ?? null,
+          email: persona?.email ?? null,
+          rfc: persona?.rfc ?? null,
+          direccion: null,
+          notas: null,
+          activo: p.activo,
+          created_at: p.created_at ?? null,
+          updated_at: p.updated_at ?? null,
+        };
+      }).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+      setProveedores(mapped);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error al cargar proveedores');
     } finally {

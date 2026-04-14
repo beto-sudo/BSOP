@@ -2,6 +2,8 @@
 
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 
+const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
+
 export type DraftItemInput = {
   producto_id?: string | null;
   descripcion: string;
@@ -84,26 +86,25 @@ export async function guardarRequisicion(
     }
 
     const { data: req, error: reqError } = await supabase
-      .schema('rdb')
+      .schema('erp')
       .from('requisiciones')
       .insert({
-        folio,
-        estatus: 'enviada',
-        solicitado_por: user.id,
-        fecha_solicitud: new Date().toISOString(),
-        notas: notas ?? null,
+        empresa_id: RDB_EMPRESA_ID,
+        codigo: folio,
+        justificacion: notas ?? null,
       })
-      .select('id, folio')
+      .select('id, codigo')
       .single();
 
     if (reqError) throw new Error(`Error creando requisición: ${reqError.message}`);
     if (!req) throw new Error('Error al crear la requisición');
 
     const { error: itemsError } = await supabase
-      .schema('rdb')
-      .from('requisiciones_items')
+      .schema('erp')
+      .from('requisiciones_detalle')
       .insert(
         sanitizedItems.map((item) => ({
+          empresa_id: RDB_EMPRESA_ID,
           requisicion_id: req.id,
           producto_id: item.producto_id,
           descripcion: item.descripcion,
@@ -115,7 +116,7 @@ export async function guardarRequisicion(
 
     if (itemsError) throw new Error(`Error creando items: ${itemsError.message}`);
 
-    return req as { id: string; folio: string };
+    return { id: req.id, folio: req.codigo } as { id: string; folio: string };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Error desconocido al guardar requisición';
     throw new Error(message);
@@ -146,39 +147,43 @@ export async function actualizarRequisicion(
   }
 
   const { data: requisicion, error: requisicionError } = await supabase
-    .schema('rdb')
+    .schema('erp')
     .from('requisiciones')
-    .select('estatus')
+    .select('autorizada_at')
     .eq('id', id)
+    .eq('empresa_id', RDB_EMPRESA_ID)
     .single();
 
   if (requisicionError) throw new Error(requisicionError.message);
 
-  if (['aprobada', 'autorizada', 'convertida', 'convertida_oc', 'cancelada', 'rechazada'].includes(String(requisicion?.estatus ?? '').toLowerCase())) {
+  if (requisicion?.autorizada_at) {
     throw new Error('La requisición ya no se puede editar');
   }
 
   const { error: updateReqError } = await supabase
-    .schema('rdb')
+    .schema('erp')
     .from('requisiciones')
-    .update({ notas: notas ?? null })
-    .eq('id', id);
+    .update({ justificacion: notas ?? null })
+    .eq('id', id)
+    .eq('empresa_id', RDB_EMPRESA_ID);
 
   if (updateReqError) throw new Error(updateReqError.message);
 
   const { error: deleteItemsError } = await supabase
-    .schema('rdb')
-    .from('requisiciones_items')
+    .schema('erp')
+    .from('requisiciones_detalle')
     .delete()
-    .eq('requisicion_id', id);
+    .eq('requisicion_id', id)
+    .eq('empresa_id', RDB_EMPRESA_ID);
 
   if (deleteItemsError) throw new Error(deleteItemsError.message);
 
   const { error: insertItemsError } = await supabase
-    .schema('rdb')
-    .from('requisiciones_items')
+    .schema('erp')
+    .from('requisiciones_detalle')
     .insert(
       sanitizedItems.map((item) => ({
+        empresa_id: RDB_EMPRESA_ID,
         requisicion_id: id,
         producto_id: item.producto_id,
         descripcion: item.descripcion,
@@ -195,10 +200,11 @@ export async function aprobarRequisicion(id: string): Promise<void> {
   const { supabase, user } = await requireAuth();
 
   const { error } = await supabase
-    .schema('rdb')
+    .schema('erp')
     .from('requisiciones')
-    .update({ estatus: 'aprobada', aprobado_por: user.id })
-    .eq('id', id);
+    .update({ autorizada_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('empresa_id', RDB_EMPRESA_ID);
 
   if (error) throw new Error(error.message);
 }
@@ -212,10 +218,11 @@ export async function generarOrdenCompra(
 
   // Load requisicion items
   const { data: reqItems, error: itemsErr } = await supabase
-    .schema('rdb')
-    .from('requisiciones_items')
+    .schema('erp')
+    .from('requisiciones_detalle')
     .select('*')
-    .eq('requisicion_id', requisicionId);
+    .eq('requisicion_id', requisicionId)
+    .eq('empresa_id', RDB_EMPRESA_ID);
 
   if (itemsErr) throw new Error(itemsErr.message);
 
@@ -223,16 +230,15 @@ export async function generarOrdenCompra(
 
   // Create orden de compra
   const { data: oc, error: ocErr } = await supabase
-    .schema('rdb')
+    .schema('erp')
     .from('ordenes_compra')
     .insert({
-      folio,
+      empresa_id: RDB_EMPRESA_ID,
+      codigo: folio,
       requisicion_id: requisicionId,
       proveedor_id: null,
-      estatus: 'abierta',
-      fecha_emision: new Date().toISOString(),
     })
-    .select('id, folio')
+    .select('id, codigo')
     .single();
 
   if (ocErr) throw new Error(ocErr.message);
@@ -241,15 +247,15 @@ export async function generarOrdenCompra(
   // Copy items
   if (reqItems && reqItems.length > 0) {
     const { error: ocItemsErr } = await supabase
-      .schema('rdb')
-      .from('ordenes_compra_items')
+      .schema('erp')
+      .from('ordenes_compra_detalle')
       .insert(
         reqItems.map((item: Record<string, unknown>) => ({
-          orden_id: oc.id,
+          empresa_id: RDB_EMPRESA_ID,
+          orden_compra_id: oc.id,
           producto_id: item.producto_id ?? null,
           descripcion: item.descripcion,
           cantidad: item.cantidad,
-          cantidad_recibida: 0,
           precio_unitario: 0,
         })),
       );
@@ -257,14 +263,15 @@ export async function generarOrdenCompra(
     if (ocItemsErr) throw new Error(ocItemsErr.message);
   }
 
-  // Update requisicion status
+  // Mark requisicion as authorized/converted
   const { error: updateErr } = await supabase
-    .schema('rdb')
+    .schema('erp')
     .from('requisiciones')
-    .update({ estatus: 'convertida' })
-    .eq('id', requisicionId);
+    .update({ autorizada_at: new Date().toISOString() })
+    .eq('id', requisicionId)
+    .eq('empresa_id', RDB_EMPRESA_ID);
 
   if (updateErr) throw new Error(updateErr.message);
 
-  return oc as { id: string; folio: string };
+  return { id: oc.id, folio: oc.codigo } as { id: string; folio: string };
 }

@@ -29,26 +29,24 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Package, RefreshCw, Search, Tag, Box, Settings2, Save, ChevronsUpDown, Check } from 'lucide-react';
+import { Package, RefreshCw, Search, Tag, Box, Settings2, Save } from 'lucide-react';
+
+const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Producto = {
   id: string;
-  waitry_item_id: number | null;
+  codigo: string | null;
   nombre: string;
   descripcion: string | null;
   precio: number;
   categoria: string | null;
   activo: boolean;
   unidad: string | null;
-  stock_minimo: number | null;
   created_at: string | null;
   updated_at: string | null;
   inventariable: boolean;
-  parent_id: string | null;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -77,8 +75,6 @@ export default function ProductosPage() {
   // Form State
   const [formCategoria, setFormCategoria] = useState('');
   const [formInventariable, setFormInventariable] = useState(false);
-  const [formParentId, setFormParentId] = useState<string>('none');
-  const [parentPopoverOpen, setParentPopoverOpen] = useState(false);
 
   // Create Form State
   const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
@@ -94,12 +90,29 @@ export default function ProductosPage() {
     try {
       const supabase = createSupabaseBrowserClient();
       const { data, error: err } = await supabase
-        .schema('rdb')
+        .schema('erp')
         .from('productos')
-        .select('*')
+        .select('id, codigo, nombre, descripcion, tipo, activo, unidad, inventariable, created_at, updated_at, productos_precios(precio_venta)')
+        .eq('empresa_id', RDB_EMPRESA_ID)
         .order('nombre');
       if (err) throw err;
-      setProductos(data ?? []);
+      const mapped: Producto[] = (data ?? []).map((p) => {
+        const precios = p.productos_precios as { precio_venta: number | null }[] | null;
+        return {
+          id: p.id,
+          codigo: p.codigo ?? null,
+          nombre: p.nombre,
+          descripcion: p.descripcion ?? null,
+          precio: precios?.[0]?.precio_venta ?? 0,
+          categoria: p.tipo ?? null,
+          activo: p.activo,
+          unidad: p.unidad ?? null,
+          created_at: p.created_at ?? null,
+          updated_at: p.updated_at ?? null,
+          inventariable: p.inventariable,
+        };
+      });
+      setProductos(mapped);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error al cargar productos');
     } finally {
@@ -115,7 +128,6 @@ export default function ProductosPage() {
     setSelectedProducto(p);
     setFormCategoria(p.categoria || '');
     setFormInventariable(p.inventariable ?? true);
-    setFormParentId(p.parent_id || 'none');
     setDrawerOpen(true);
   };
 
@@ -125,14 +137,14 @@ export default function ProductosPage() {
     try {
       const supabase = createSupabaseBrowserClient();
       const { error: err } = await supabase
-        .schema('rdb')
+        .schema('erp')
         .from('productos')
         .update({
-          categoria: formCategoria.trim() || null,
+          tipo: formCategoria.trim() || 'producto',
           inventariable: formInventariable,
-          parent_id: formParentId === 'none' ? null : formParentId,
           updated_at: new Date().toISOString(),
         })
+        .eq('empresa_id', RDB_EMPRESA_ID)
         .eq('id', selectedProducto.id);
 
       if (err) throw err;
@@ -155,19 +167,34 @@ export default function ProductosPage() {
     setCreating(true);
     try {
       const supabase = createSupabaseBrowserClient();
-      const { error: err } = await supabase
-        .schema('rdb')
+      const { data: newProd, error: err } = await supabase
+        .schema('erp')
         .from('productos')
         .insert({
+          empresa_id: RDB_EMPRESA_ID,
           nombre: newNombre.trim(),
-          precio: parseFloat(newPrecio) || 0,
-          categoria: newCategoria.trim() || null,
+          tipo: newCategoria.trim() || 'producto',
           inventariable: newInventariable,
           activo: true,
-        });
+        })
+        .select('id')
+        .single();
 
       if (err) throw err;
-      
+
+      const precioNum = parseFloat(newPrecio) || 0;
+      if (newProd && precioNum > 0) {
+        await supabase
+          .schema('erp')
+          .from('productos_precios')
+          .insert({
+            empresa_id: RDB_EMPRESA_ID,
+            producto_id: newProd.id,
+            precio_venta: precioNum,
+            vigente: true,
+          });
+      }
+
       setCreateDrawerOpen(false);
       setNewNombre('');
       setNewPrecio('0');
@@ -290,7 +317,6 @@ export default function ProductosPage() {
               <TableHead>Tipo</TableHead>
               <TableHead>Categoría</TableHead>
               <TableHead className="text-right">Precio</TableHead>
-              <TableHead>Padre</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead></TableHead>
             </TableRow>
@@ -313,9 +339,7 @@ export default function ProductosPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((p) => {
-                const parent = p.parent_id ? productos.find(x => x.id === p.parent_id) : null;
-                return (
+              filtered.map((p) => (
                 <TableRow key={p.id} className="cursor-pointer hover:bg-muted/50" onClick={() => openDrawer(p)}>
                   <TableCell>
                     <div className="font-medium">{p.nombre}</div>
@@ -336,9 +360,6 @@ export default function ProductosPage() {
                   <TableCell className="text-right font-medium tabular-nums">
                     {formatCurrency(p.precio)}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {parent ? parent.nombre : '—'}
-                  </TableCell>
                   <TableCell>
                     <Badge variant={p.activo ? 'default' : 'secondary'}>
                       {p.activo ? 'Activo' : 'Inactivo'}
@@ -350,7 +371,7 @@ export default function ProductosPage() {
                     </Button>
                   </TableCell>
                 </TableRow>
-              );})
+              ))
             )}
           </TableBody>
         </Table>
@@ -398,83 +419,20 @@ export default function ProductosPage() {
                     </label>
                  </div>
 
-                 {/* Categoria */}
+                 {/* Tipo / Categoría */}
                  <div className="space-y-2">
-                    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Categoría</label>
-                    <Select value={formCategoria || 'none'} onValueChange={(v) => setFormCategoria(v === 'none' || v === null ? '' : v)}>
+                    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Tipo</label>
+                    <Select value={formCategoria || 'producto'} onValueChange={(v) => setFormCategoria(v ?? 'producto')}>
                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar categoría..." />
+                          <SelectValue placeholder="Seleccionar tipo..." />
                        </SelectTrigger>
                        <SelectContent>
-                          <SelectItem value="none" className="italic text-muted-foreground">Sin Categoría</SelectItem>
-                          <SelectItem value="Alimentos">Alimentos</SelectItem>
-                          <SelectItem value="Bebidas">Bebidas</SelectItem>
-                          <SelectItem value="Licores">Licores</SelectItem>
-                          <SelectItem value="Articulos">Articulos</SelectItem>
-                          <SelectItem value="Deportes">Deportes</SelectItem>
-                          <SelectItem value="Consumibles">Consumibles</SelectItem>
+                          <SelectItem value="producto">Producto</SelectItem>
+                          <SelectItem value="servicio">Servicio</SelectItem>
+                          <SelectItem value="insumo">Insumo</SelectItem>
+                          <SelectItem value="refaccion">Refacción</SelectItem>
                        </SelectContent>
                     </Select>
-                 </div>
-
-                 {/* Producto Padre (Anidar) */}
-                 <div className="space-y-2">
-                    <label className="text-sm font-medium leading-none">Producto Padre (Agrupador)</label>
-                    <p className="text-sm text-muted-foreground">
-                       Si este producto es una variante o sabor, selecciona su producto principal.
-                    </p>
-                    <Popover open={parentPopoverOpen} onOpenChange={setParentPopoverOpen}>
-                       <PopoverTrigger
-                          render={
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              aria-expanded={parentPopoverOpen}
-                              className="w-full justify-between font-normal"
-                            />
-                          }
-                       >
-                          <span className="truncate">
-                            {formParentId === 'none'
-                              ? <span className="italic text-muted-foreground">Ninguno (Es producto raíz)</span>
-                              : productos.find(p => p.id === formParentId)?.nombre ?? 'Seleccionar...'}
-                          </span>
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                       </PopoverTrigger>
-                       <PopoverContent className="w-[420px] p-0" align="start">
-                          <Command>
-                            <CommandInput placeholder="Buscar producto..." />
-                            <CommandList className="max-h-64">
-                              <CommandEmpty>No se encontraron productos.</CommandEmpty>
-                              <CommandGroup>
-                                <CommandItem
-                                  value="none"
-                                  onSelect={() => { setFormParentId('none'); setParentPopoverOpen(false); }}
-                                >
-                                  <Check className={`mr-2 h-4 w-4 ${formParentId === 'none' ? 'opacity-100' : 'opacity-0'}`} />
-                                  <span className="italic text-muted-foreground">Ninguno (Es producto raíz)</span>
-                                </CommandItem>
-                                {productos
-                                  .filter(p => p.id !== selectedProducto.id)
-                                  .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
-                                  .map(p => (
-                                    <CommandItem
-                                      key={p.id}
-                                      value={p.nombre}
-                                      onSelect={() => { setFormParentId(p.id); setParentPopoverOpen(false); }}
-                                    >
-                                      <Check className={`mr-2 h-4 w-4 shrink-0 ${formParentId === p.id ? 'opacity-100' : 'opacity-0'}`} />
-                                      <span className="truncate">{p.nombre}</span>
-                                      {p.categoria && (
-                                        <span className="ml-auto text-xs text-muted-foreground shrink-0">{p.categoria}</span>
-                                      )}
-                                    </CommandItem>
-                                  ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                       </PopoverContent>
-                    </Popover>
                  </div>
 
               </div>
@@ -524,19 +482,16 @@ export default function ProductosPage() {
               </div>
 
               <div className="space-y-2">
-                 <label className="text-sm font-medium leading-none">Categoría</label>
-                 <Select value={newCategoria || 'none'} onValueChange={(v) => setNewCategoria(v === 'none' || v === null ? '' : v)}>
+                 <label className="text-sm font-medium leading-none">Tipo</label>
+                 <Select value={newCategoria || 'producto'} onValueChange={(v) => setNewCategoria(v ?? 'producto')}>
                     <SelectTrigger>
-                       <SelectValue placeholder="Seleccionar categoría..." />
+                       <SelectValue placeholder="Seleccionar tipo..." />
                     </SelectTrigger>
                     <SelectContent>
-                       <SelectItem value="none" className="italic text-muted-foreground">Sin Categoría</SelectItem>
-                       <SelectItem value="Alimentos">Alimentos</SelectItem>
-                       <SelectItem value="Bebidas">Bebidas</SelectItem>
-                       <SelectItem value="Licores">Licores</SelectItem>
-                       <SelectItem value="Articulos">Articulos</SelectItem>
-                       <SelectItem value="Deportes">Deportes</SelectItem>
-                       <SelectItem value="Consumibles">Consumibles</SelectItem>
+                       <SelectItem value="producto">Producto</SelectItem>
+                       <SelectItem value="servicio">Servicio</SelectItem>
+                       <SelectItem value="insumo">Insumo</SelectItem>
+                       <SelectItem value="refaccion">Refacción</SelectItem>
                     </SelectContent>
                  </Select>
               </div>
