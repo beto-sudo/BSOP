@@ -483,11 +483,11 @@ async function main() {
   for (const row of juntasRows) {
     const v = row.values;
 
-    const titulo = str(pick(v, juntasCols, 'título', 'titulo', 'name', 'nombre', row.name)) ?? row.name;
-    const tipo = str(pick(v, juntasCols, 'tipo', 'type', 'categoría', 'categoria'));
+    const titulo = str(pick(v, juntasCols, 'nombre de junta', 'título', 'titulo', 'name', 'nombre', row.name)) ?? row.name;
+    const tipo = str(pick(v, juntasCols, 'tipo de junta', 'tipo', 'type', 'categoría', 'categoria'));
     const lugar = str(pick(v, juntasCols, 'lugar', 'location', 'sala'));
-    const descripcion = str(pick(v, juntasCols, 'descripción', 'descripcion', 'notas', 'minuta', 'agenda'));
-    const fecha_hora = tsStr(pick(v, juntasCols, 'fecha', 'fecha y hora', 'fecha_hora', 'date', 'inicio'));
+    const descripcion = str(pick(v, juntasCols, 'temas', 'descripción', 'descripcion', 'notas', 'minuta', 'agenda'));
+    const fecha_hora = tsStr(pick(v, juntasCols, 'fecha de junta', 'fecha', 'fecha y hora', 'fecha_hora', 'date', 'inicio'));
     const duracion_raw = pick(v, juntasCols, 'duración', 'duracion', 'duration');
     const duracion_minutos = duracion_raw ? parseInt(String(duracion_raw)) || 60 : 60;
     const estadoRaw = str(pick(v, juntasCols, 'estado', 'status', 'estatus'));

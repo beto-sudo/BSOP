@@ -239,7 +239,7 @@ function JuntasInner() {
     return true;
   });
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable('fecha_inicio', 'desc');
+  const { sortKey, sortDir, onSort, sortData } = useSortableTable('fecha_hora', 'desc');
   return (
     <div className="space-y-6">
       {/* Header */}

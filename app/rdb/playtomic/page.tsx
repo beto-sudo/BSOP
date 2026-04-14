@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Activity, CalendarRange, CircleDollarSign, RefreshCw, Users, XCircle } from 'lucide-react';
+import { SortableHead } from '@/components/ui/sortable-head';
+import { useSortableTable } from '@/hooks/use-sortable-table';
 
 type RangeKey = '7d' | '30d' | 'month' | 'year' | 'all';
 type SportFilter = 'all' | 'PADEL' | 'TENNIS';
@@ -628,6 +630,7 @@ export default function PlaytomicPage() {
   const [playerQuery, setPlayerQuery] = useState('');
   const [playerSort, setPlayerSort] = useState<PlayerSortKey>('gasto');
   const [showPendingDetails, setShowPendingDetails] = useState(false);
+  const { sortKey: pendingSortKey, sortDir: pendingSortDir, onSort: pendingOnSort, sortData: pendingSortData } = useSortableTable<PendingBooking>('fecha', 'desc');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1579,13 +1582,13 @@ export default function PlaytomicPage() {
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Fecha</TableHead>
-                              <TableHead>Hora</TableHead>
-                              <TableHead>Cancha</TableHead>
-                              <TableHead>Deporte</TableHead>
-                              <TableHead className="text-right">Monto</TableHead>
-                              <TableHead>Jugador</TableHead>
-                              <TableHead>Email</TableHead>
+                              <SortableHead sortKey="fecha" label="Fecha" currentSort={pendingSortKey} currentDir={pendingSortDir} onSort={pendingOnSort} />
+                              <SortableHead sortKey="hora" label="Hora" currentSort={pendingSortKey} currentDir={pendingSortDir} onSort={pendingOnSort} />
+                              <SortableHead sortKey="cancha" label="Cancha" currentSort={pendingSortKey} currentDir={pendingSortDir} onSort={pendingOnSort} />
+                              <SortableHead sortKey="deporte" label="Deporte" currentSort={pendingSortKey} currentDir={pendingSortDir} onSort={pendingOnSort} />
+                              <SortableHead sortKey="monto" label="Monto" currentSort={pendingSortKey} currentDir={pendingSortDir} onSort={pendingOnSort} className="text-right" />
+                              <SortableHead sortKey="jugador" label="Jugador" currentSort={pendingSortKey} currentDir={pendingSortDir} onSort={pendingOnSort} />
+                              <SortableHead sortKey="email" label="Email" currentSort={pendingSortKey} currentDir={pendingSortDir} onSort={pendingOnSort} />
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -1596,7 +1599,7 @@ export default function PlaytomicPage() {
                                 </TableCell>
                               </TableRow>
                             ) : (
-                              pendingPayments.detailRows.map((booking, index) => (
+                              pendingSortData(pendingPayments.detailRows).map((booking, index) => (
                                 <TableRow key={`${booking.fecha}-${booking.hora}-${booking.email}-${index}`}>
                                   <TableCell className="font-medium text-[var(--text)]">{booking.fecha}</TableCell>
                                   <TableCell>{booking.hora}</TableCell>

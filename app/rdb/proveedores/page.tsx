@@ -344,7 +344,7 @@ export default function ProveedoresPage() {
     }
   };
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable('nombre', 'asc');
+  const { sortKey, sortDir, onSort, sortData } = useSortableTable<Proveedor>('nombre', 'asc');
   return (
     <RequireAccess empresa="rdb" modulo="rdb.proveedores">
     <div className="space-y-6">

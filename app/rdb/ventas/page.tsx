@@ -373,7 +373,7 @@ export default function VentasPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [corteFilter, setCorteFilter] = useState<string>('all');
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable('created_at', 'desc');
+  const { sortKey, sortDir, onSort, sortData } = useSortableTable<Pedido>('timestamp', 'desc');
   const [cortes, setCortes] = useState<CorteOption[]>([]);
   const [dateFrom, setDateFrom] = useState(() => todayRange().from);
   const [dateTo, setDateTo] = useState(() => todayRange().to);
@@ -669,12 +669,12 @@ export default function VentasPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <SortableHead sortKey="folio" label="Folio" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              <SortableHead sortKey="created_at" label="Fecha/Hora" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              <SortableHead sortKey="area" label="Área" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              <SortableHead sortKey="mesa" label="Mesa" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              <SortableHead sortKey="total" label="Total" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="text-right" />
-              <SortableHead sortKey="estado" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="order_id" label="Folio" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="timestamp" label="Fecha/Hora" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="place_name" label="Área" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="table_name" label="Mesa" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="total_amount" label="Total" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="text-right" />
+              <SortableHead sortKey="status" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
             </TableRow>
           </TableHeader>
           <TableBody>

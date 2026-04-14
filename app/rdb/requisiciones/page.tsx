@@ -1145,7 +1145,7 @@ export default function RequisicionesPage() {
     </TableRow>
   );
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable('created_at', 'desc');
+  const { sortKey, sortDir, onSort, sortData } = useSortableTable<Requisicion>('fecha_solicitud', 'desc');
   return (
     <RequireAccess empresa="rdb" modulo="rdb.requisiciones">
     <div className="space-y-6">
@@ -1251,10 +1251,10 @@ export default function RequisicionesPage() {
           <TableHeader>
             <TableRow>
               <SortableHead sortKey="folio" label="Folio" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              <SortableHead sortKey="created_at" label="Fecha Solicitud" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              <SortableHead sortKey="solicitante_nombre" label="Solicitante" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="fecha_solicitud" label="Fecha Solicitud" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="solicitado_por_nombre" label="Solicitante" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
               <SortableHead sortKey="estatus" label="Estatus" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              <SortableHead sortKey="items_count" label="Ítems" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="item_count" label="Ítems" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
             </TableRow>
           </TableHeader>
           <TableBody>

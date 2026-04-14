@@ -347,7 +347,7 @@ function TasksInner() {
   const empleadoMap = new Map(empleados.map((e) => [e.id, e]));
   const prioridadMap = new Map(prioridades.map((p) => [p.id, p]));
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable('due_date', 'desc');
+  const { sortKey, sortDir, onSort, sortData } = useSortableTable<ErpTask & { prioridad_peso: number | null; asignado_nombre: string | null }>('created_at', 'desc');
 
   const filtered = tasks.filter((t) => {
     if (search && !t.titulo.toLowerCase().includes(search.toLowerCase())) return false;

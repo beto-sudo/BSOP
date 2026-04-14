@@ -391,7 +391,7 @@ function TasksInner() {
   const estadoMap = new Map(estados.map((e) => [e.id, e]));
   const usuarioMap = new Map(usuarios.map((u) => [u.id, u]));
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable('fecha_limite', 'desc');
+  const { sortKey, sortDir, onSort, sortData } = useSortableTable<Task & { prioridad_nombre: string | null; responsable_nombre: string | null; estado_nombre: string | null }>('fecha_limite', 'desc');
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -529,16 +529,16 @@ function TasksInner() {
             <TableHeader>
               <TableRow className="border-[var(--border)] hover:bg-transparent">
                 <SortableHead sortKey="titulo" label="Título" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-                <SortableHead sortKey="tipo" label="Tipo" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-24" />
+                <SortableHead sortKey="kind" label="Tipo" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-24" />
                 <SortableHead sortKey="prioridad_nombre" label="Prioridad" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
-                <SortableHead sortKey="estado" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
+                <SortableHead sortKey="estado_nombre" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
                 <SortableHead sortKey="responsable_nombre" label="Responsable" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-36" />
                 <SortableHead sortKey="fecha_limite" label="Fecha límite" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortData(filtered).map((task) => {
+              {sortData(filtered.map((t) => ({ ...t, prioridad_nombre: prioridadMap.get(t.prioridad_id ?? '')?.nombre ?? null, responsable_nombre: (() => { const u = usuarioMap.get(t.responsable_id ?? ''); return u ? `${u.first_name ?? ''} ${u.email}`.trim() : null; })(), estado_nombre: estadoMap.get(t.estado_id ?? '')?.nombre ?? null }))).map((task) => {
                 const prio = prioridadMap.get(task.prioridad_id ?? '');
                 const estado = estadoMap.get(task.estado_id ?? '');
                 const responsable = usuarioMap.get(task.responsable_id ?? '');

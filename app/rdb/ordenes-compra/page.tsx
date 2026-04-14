@@ -933,7 +933,7 @@ export default function OrdenesCompraPage() {
     });
   }, [ordenes, search]);
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable('created_at', 'desc');
+  const { sortKey, sortDir, onSort, sortData } = useSortableTable('fecha_emision', 'desc');
   return (
     <RequireAccess empresa="rdb" modulo="rdb.ordenes_compra">
     <div className="space-y-6">

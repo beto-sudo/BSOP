@@ -4,7 +4,12 @@ import { useState, useCallback } from 'react';
 
 type SortDir = 'asc' | 'desc';
 
-export function useSortableTable(defaultKey: string, defaultDir: SortDir = 'asc') {
+// The optional type parameter _T is accepted for call-site annotation (e.g.
+// useSortableTable<MyType>('key', 'asc')) but is not used at runtime.
+// sortData infers its own <T> independently so the explicit annotation is
+// never required — it just silences TS at the call site.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function useSortableTable<_T = unknown>(defaultKey: string, defaultDir: SortDir = 'asc') {
   const [sortKey, setSortKey] = useState(defaultKey);
   const [sortDir, setSortDir] = useState<SortDir>(defaultDir);
 

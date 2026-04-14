@@ -1,22 +1,7 @@
-'use client';
-
 import Image from 'next/image';
 import { Globe } from 'lucide-react';
-import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 
 export function LoginCard({ unauthorized }: { unauthorized: boolean }) {
-  const handleSignIn = async () => {
-    const supabase = createSupabaseBrowserClient();
-    const origin = window.location.origin;
-
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${origin}/auth/callback`,
-      },
-    });
-  };
-
   return (
     <main className="flex min-h-screen items-center justify-center px-6 py-10">
       <div className="w-full max-w-md rounded-3xl border border-[var(--border)] bg-[var(--card)]/90 p-8 shadow-[0_24px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:p-10">
@@ -40,14 +25,13 @@ export function LoginCard({ unauthorized }: { unauthorized: boolean }) {
             </div>
           ) : null}
 
-          <button
-            type="button"
-            onClick={handleSignIn}
+          <a
+            href="/api/auth/google"
             className="mt-8 inline-flex w-full items-center justify-center gap-3 rounded-2xl border border-[var(--border)] bg-[#111522] px-5 py-4 text-sm font-medium text-white transition hover:border-[var(--accent)] hover:bg-[var(--accent)]/12 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40"
           >
             <Globe className="h-5 w-5" />
             Sign in with Google
-          </button>
+          </a>
 
           <p className="mt-4 text-xs text-white/40">Only approved accounts can access this workspace.</p>
         </div>

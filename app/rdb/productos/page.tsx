@@ -228,7 +228,7 @@ export default function ProductosPage() {
     );
   });
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable('nombre', 'asc');
+  const { sortKey, sortDir, onSort, sortData } = useSortableTable<Producto>('nombre', 'asc');
   return (
     <RequireAccess empresa="rdb" modulo="rdb.productos">
     <div className="space-y-6">
