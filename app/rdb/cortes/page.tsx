@@ -42,6 +42,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { CalendarDays, RefreshCw, Scissors, TrendingUp, Wallet, PlusCircle, Loader2, Printer, XCircle } from 'lucide-react';
 
+const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 // rdb.cortes columns
@@ -657,11 +659,12 @@ export default function CortesPage() {
           .eq('corte_id', corte.id)
           .maybeSingle(),
         supabase
-          .schema('rdb')
-          .from('movimientos')
-          .select('*')
+          .schema('erp')
+          .from('movimientos_caja')
+          .select('id,corte_id,fecha_hora:created_at,tipo,monto,nota:concepto,registrado_por:referencia')
+          .eq('empresa_id', RDB_EMPRESA_ID)
           .eq('corte_id', corte.id)
-          .order('fecha_hora', { ascending: true })
+          .order('created_at', { ascending: true })
           .limit(100),
         supabase
           .schema('rdb')
@@ -698,9 +701,10 @@ export default function CortesPage() {
       const firstName = userName.split(' ')[0] || '';
 
       const { data, error: err } = await supabase
-        .schema('rdb')
+        .schema('erp')
         .from('cajas')
         .select('id, nombre')
+        .eq('empresa_id', RDB_EMPRESA_ID)
         .order('nombre');
       if (err) throw err;
       

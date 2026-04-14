@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 
+const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
+
 export type AbrirCajaInput = {
   caja_id: string;
   caja_nombre: string;
@@ -21,11 +23,12 @@ export async function abrirCaja(input: AbrirCajaInput): Promise<{ id: string }> 
 
   // Check for an existing open turn on this caja (case-insensitive)
   const { data: existing, error: checkErr } = await supabase
-    .schema('rdb')
-    .from('cortes')
+    .schema('erp')
+    .from('cortes_caja')
     .select('id')
-    .eq('caja_id', input.caja_id)
-    .ilike('estado', 'abierto')
+    .eq('empresa_id', RDB_EMPRESA_ID)
+    .eq('caja_nombre', input.caja_nombre)
+    .eq('estado', 'abierto')
     .maybeSingle();
 
   if (checkErr) throw new Error(checkErr.message);
@@ -39,16 +42,16 @@ export async function abrirCaja(input: AbrirCajaInput): Promise<{ id: string }> 
   const now = new Date().toISOString();
 
   const { data: corte, error: insertErr } = await supabase
-    .schema('rdb')
-    .from('cortes')
+    .schema('erp')
+    .from('cortes_caja')
     .insert({
-      caja_id: input.caja_id,
+      empresa_id: RDB_EMPRESA_ID,
       caja_nombre: input.caja_nombre,
-      estado: 'Abierto',
-      responsable_apertura: input.responsable_apertura,
+      estado: 'abierto',
       efectivo_inicial: input.efectivo_inicial,
       fecha_operativa: input.fecha_operativa,
-      hora_inicio: now,
+      abierto_at: now,
+      observaciones: input.responsable_apertura,
     })
     .select('id')
     .single();
@@ -90,14 +93,16 @@ export async function cerrarCaja(input: CerrarCajaInput): Promise<void> {
 
   // Actualizar corte
   const { error } = await supabase
-    .schema('rdb')
-    .from('cortes')
+    .schema('erp')
+    .from('cortes_caja')
     .update({
       estado: 'cerrado',
-      hora_fin: now,
+      cerrado_at: now,
       efectivo_contado,
       observaciones: input.observaciones ?? null,
+      updated_at: now,
     })
+    .eq('empresa_id', RDB_EMPRESA_ID)
     .eq('id', input.corte_id);
 
   if (error) throw new Error(error.message);
@@ -114,9 +119,9 @@ export async function cerrarCaja(input: CerrarCajaInput): Promise<void> {
 
   if (rows.length > 0) {
     const { error: denomErr } = await supabase
-      .schema('rdb')
+      .schema('erp')
       .from('corte_conteo_denominaciones')
-      .upsert(rows, { onConflict: 'corte_id,denominacion' });
+      .upsert(rows.map((r) => ({ ...r, empresa_id: RDB_EMPRESA_ID })), { onConflict: 'corte_id,denominacion' });
     if (denomErr) throw new Error(denomErr.message);
   }
 
