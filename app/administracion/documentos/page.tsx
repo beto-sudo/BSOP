@@ -480,7 +480,7 @@ function DocumentosInner() {
   const expiredCount = documentos.filter((d) => getVencimientoStatus(d.fecha_vencimiento) === 'expired').length;
   const soonCount = documentos.filter((d) => getVencimientoStatus(d.fecha_vencimiento) === 'soon').length;
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable<Documento>('fecha_emision', 'desc');
+  const { sortKey, sortDir, onSort, sortData } = useSortableTable('fecha_emision', 'desc');
   return (
     <div className="space-y-6">
       {/* Header */}
