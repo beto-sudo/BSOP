@@ -43,10 +43,12 @@ type Documento = {
   fecha_emision: string | null;
   fecha_vencimiento: string | null;
   notaria: string | null;
+  notario_proveedor_id: string | null;
   notas: string | null;
   creado_por: string | null;
   created_at: string;
   updated_at: string | null;
+  deleted_at: string | null;
 };
 
 type Adjunto = {
@@ -312,10 +314,11 @@ function DocumentosInner() {
   const fetchDocumentos = useCallback(async (ids: string[]) => {
     if (ids.length === 0) { setDocumentos([]); return; }
     const { data, error: err } = await supabase
-      .schema('core' as any)
+      .schema('erp' as any)
       .from('documentos')
       .select('*')
       .in('empresa_id', ids)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
     if (err) { setError(err.message); return; }
     setDocumentos(data ?? []);
@@ -357,7 +360,7 @@ function DocumentosInner() {
       .maybeSingle();
 
     const { error: err } = await supabase
-      .schema('core' as any)
+      .schema('erp' as any)
       .from('documentos')
       .insert({
         empresa_id: primaryEmpresaId,

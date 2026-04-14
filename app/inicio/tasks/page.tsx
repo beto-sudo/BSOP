@@ -145,6 +145,18 @@ function TasksInner() {
     fecha_vence: '',
   });
 
+  const [showEdit, setShowEdit] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<ErpTask | null>(null);
+  const [editForm, setEditForm] = useState<CreateForm>({
+    titulo: '',
+    descripcion: '',
+    prioridad_id: '',
+    asignado_a: '',
+    estado: 'pendiente',
+    fecha_vence: '',
+  });
+  const [saving, setSaving] = useState(false);
+
   const fetchRefData = useCallback(async () => {
     const { data } = await supabase
       .schema('shared' as any)
@@ -288,6 +300,48 @@ function TasksInner() {
     await fetchTasks(empresaIds);
   };
 
+  const openEdit = (task: ErpTask) => {
+    setSelectedTask(task);
+    setEditForm({
+      titulo: task.titulo,
+      descripcion: task.descripcion ?? '',
+      prioridad_id: task.prioridad_id ?? '',
+      asignado_a: task.asignado_a ?? '',
+      estado: task.estado,
+      fecha_vence: task.fecha_vence ? task.fecha_vence.split('T')[0] : '',
+    });
+    setShowEdit(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!selectedTask || !editForm.titulo.trim()) return;
+    setSaving(true);
+
+    const { error: err } = await supabase
+      .schema('erp' as any)
+      .from('tasks')
+      .update({
+        titulo: editForm.titulo.trim(),
+        descripcion: editForm.descripcion.trim() || null,
+        prioridad_id: editForm.prioridad_id || null,
+        asignado_a: editForm.asignado_a || null,
+        estado: editForm.estado,
+        fecha_vence: editForm.fecha_vence || null,
+      })
+      .eq('id', selectedTask.id);
+
+    setSaving(false);
+
+    if (err) {
+      alert(`Error al guardar tarea: ${err.message}`);
+      return;
+    }
+
+    setShowEdit(false);
+    setSelectedTask(null);
+    await fetchTasks(empresaIds);
+  };
+
   const empleadoMap = new Map(empleados.map((e) => [e.id, e]));
   const prioridadMap = new Map(prioridades.map((p) => [p.id, p]));
 
@@ -424,7 +478,11 @@ function TasksInner() {
                 const prio = prioridadMap.get(task.prioridad_id ?? '');
                 const empleado = empleadoMap.get(task.asignado_a ?? '');
                 return (
-                  <TableRow key={task.id} className="border-[var(--border)]">
+                  <TableRow
+                    key={task.id}
+                    className="cursor-pointer border-[var(--border)] transition-colors hover:bg-[var(--panel)]"
+                    onClick={() => openEdit(task)}
+                  >
                     <TableCell>
                       <span className="line-clamp-1 font-medium text-[var(--text)]">{task.titulo}</span>
                       {task.entidad_tipo && (
@@ -456,6 +514,119 @@ function TasksInner() {
           {filtered.length} de {tasks.length} {tasks.length === 1 ? 'tarea' : 'tareas'}
         </p>
       )}
+
+      {/* Edit Dialog */}
+      <Dialog open={showEdit} onOpenChange={(open) => { setShowEdit(open); if (!open) setSelectedTask(null); }}>
+        <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto rounded-3xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
+          <DialogHeader>
+            <DialogTitle className="text-[var(--text)]">Editar Tarea</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div>
+              <FieldLabel>Título *</FieldLabel>
+              <Input
+                placeholder="Descripción breve de la tarea..."
+                value={editForm.titulo}
+                onChange={(e) => setEditForm((f) => ({ ...f, titulo: e.target.value }))}
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
+            </div>
+
+            <div>
+              <FieldLabel>Descripción</FieldLabel>
+              <Textarea
+                placeholder="Detalla la tarea..."
+                value={editForm.descripcion}
+                onChange={(e) => setEditForm((f) => ({ ...f, descripcion: e.target.value }))}
+                rows={3}
+                className="resize-none rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <FieldLabel>Estado</FieldLabel>
+                <Select
+                  value={editForm.estado}
+                  onValueChange={(v) => setEditForm((f) => ({ ...f, estado: v as ErpTask['estado'] }))}
+                >
+                  <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(ESTADO_CONFIG).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <FieldLabel>Prioridad</FieldLabel>
+                <Select
+                  value={editForm.prioridad_id}
+                  onValueChange={(v) => setEditForm((f) => ({ ...f, prioridad_id: v ?? '' }))}
+                >
+                  <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
+                    <SelectValue placeholder="Sin prioridad" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {prioridades.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <FieldLabel>Asignado a</FieldLabel>
+                <Select
+                  value={editForm.asignado_a}
+                  onValueChange={(v) => setEditForm((f) => ({ ...f, asignado_a: v ?? '' }))}
+                >
+                  <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
+                    <SelectValue placeholder="Sin asignar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {empleados.map((e) => (
+                      <SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <FieldLabel>Fecha límite</FieldLabel>
+                <Input
+                  type="date"
+                  value={editForm.fecha_vence}
+                  onChange={(e) => setEditForm((f) => ({ ...f, fecha_vence: e.target.value }))}
+                  className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => { setShowEdit(false); setSelectedTask(null); }}
+              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleUpdate}
+              disabled={saving || !editForm.titulo.trim()}
+              className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60"
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Guardar cambios
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Create Dialog */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>

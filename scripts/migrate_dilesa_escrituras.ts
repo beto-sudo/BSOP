@@ -2,7 +2,11 @@
  * migrate_dilesa_escrituras.ts
  *
  * Pulls Escrituras data from the DILESA Coda workspace (Doc ZNxWl_DI2D),
- * table 'grid-bUehiUcFiZ', and maps it to core.documentos in BSOP Supabase.
+ * table 'grid-bUehiUcFiZ', and maps it to erp.documentos in BSOP Supabase.
+ *
+ * Vincula notario_proveedor_id cuando la notaría del documento coincide con
+ * una entrada del catálogo ERP (erp.personas + erp.proveedores, categoria='notaria').
+ * Para poblar ese catálogo primero, ejecuta: migrate_dilesa_notarias.ts
  *
  * Prerequisites:
  *   CODA_API_KEY              – Coda personal API token
@@ -108,6 +112,17 @@ function getString(raw: unknown): string | null {
 // Adjust column names below to match the actual Coda table headers.
 // Run with DRY_RUN=1 first to see all available column names.
 
+// ─── Normalización para lookup de notarías ────────────────────────────────────
+
+function normalizeNotaria(s: string | null): string {
+  if (!s) return '';
+  return s
+    .trim()
+    .replace(/\.+$/, '')
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+}
+
 function mapRow(
   row: CodaRow,
   colMap: Map<string, string>,
@@ -135,10 +150,27 @@ function mapRow(
 
   if (!titulo) return null;
 
+  const contenido =
+    getString(get('contenido')) ??
+    getString(get('descripcion')) ??
+    null;
+
+  const pdfEscritura = getString(get('pdf escritura'));
+  const imagenPlano = getString(get('imagen plano'));
+  const complementos = getString(get('complementos'));
+
+  const notas = [
+    contenido,
+    pdfEscritura ? `PDF Escritura: ${pdfEscritura}` : null,
+    imagenPlano ? `Imagen Plano: ${imagenPlano}` : null,
+    complementos ? `Complementos: ${complementos}` : null,
+  ].filter(Boolean).join('\n\n') || null;
+
   return {
     empresa_id: DILESA_EMPRESA_ID,
     titulo,
     numero_documento:
+      getString(get('numero de escritura')) ??
       getString(get('número')) ??
       getString(get('numero')) ??
       getString(get('no. escritura')) ??
@@ -164,11 +196,7 @@ function mapRow(
       getString(get('notaria')) ??
       getString(get('notario')) ??
       null,
-    notas:
-      getString(get('notas')) ??
-      getString(get('observaciones')) ??
-      getString(get('comentarios')) ??
-      null,
+    notas,
   };
 }
 
@@ -210,29 +238,95 @@ async function main() {
     return;
   }
 
-  // 4. Upsert into core.documentos
+  // 4. Precargar catálogo de notarías (erp.proveedores categoria='notaria')
+  //    para ligar notario_proveedor_id en cada escritura.
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  const BATCH = 50;
+  console.log('🗂  Cargando catálogo de notarías ERP...');
+  const { data: notariasRows, error: notariasErr } = await supabase
+    .schema('erp' as any)
+    .from('proveedores')
+    .select('id, persona_id, personas!inner(nombre)')
+    .eq('empresa_id', DILESA_EMPRESA_ID)
+    .eq('categoria', 'notaria')
+    .is('deleted_at', null);
+
+  if (notariasErr) {
+    console.warn(`⚠️  No se pudo cargar catálogo de notarías: ${notariasErr.message}`);
+    console.warn('   notario_proveedor_id quedará NULL. Ejecuta migrate_dilesa_notarias.ts primero.');
+  }
+
+  // Mapa: nombreNormalizado → proveedor_id
+  const notariasMap = new Map<string, string>();
+  for (const row of notariasRows ?? []) {
+    const p = (row as any).personas;
+    const nombre = typeof p?.nombre === 'string' ? p.nombre : null;
+    if (nombre) {
+      notariasMap.set(normalizeNotaria(nombre), row.id as string);
+    }
+  }
+  console.log(`   ${notariasMap.size} notarías en catálogo ERP\n`);
+
   let inserted = 0;
+  let updated = 0;
+  let linkedNotarios = 0;
 
-  for (let i = 0; i < mapped.length; i += BATCH) {
-    const batch = mapped.slice(i, i + BATCH);
-    const { error } = await supabase
-      .schema('core')
+  for (const doc of mapped) {
+    const numero = doc.numero_documento ?? '';
+
+    // Resolver notario_proveedor_id desde el catálogo
+    const notariaKey = normalizeNotaria(doc.notaria);
+    const notarioProveedorId = notariaKey ? (notariasMap.get(notariaKey) ?? null) : null;
+    if (notarioProveedorId) linkedNotarios++;
+
+    const { data: existing, error: lookupError } = await supabase
+      .schema('erp' as any)
       .from('documentos')
-      .insert(batch);
+      .select('id')
+      .eq('empresa_id', doc.empresa_id)
+      .eq('titulo', doc.titulo)
+      .eq('numero_documento', numero)
+      .maybeSingle();
 
-    if (error) {
-      console.error(`❌ Batch ${i / BATCH + 1} failed: ${error.message}`);
+    if (lookupError) {
+      console.error(`❌ Lookup failed for ${doc.titulo}: ${lookupError.message}`);
       continue;
     }
 
-    inserted += batch.length;
-    process.stdout.write(`   Inserted ${inserted}/${mapped.length}\r`);
+    const payload = { ...doc, notario_proveedor_id: notarioProveedorId };
+
+    if (existing?.id) {
+      const { error } = await supabase
+        .schema('erp' as any)
+        .from('documentos')
+        .update(payload)
+        .eq('id', existing.id);
+
+      if (error) {
+        console.error(`❌ Update failed for ${doc.titulo}: ${error.message}`);
+        continue;
+      }
+
+      updated += 1;
+    } else {
+      const { error } = await supabase
+        .schema('erp' as any)
+        .from('documentos')
+        .insert(payload);
+
+      if (error) {
+        console.error(`❌ Insert failed for ${doc.titulo}: ${error.message}`);
+        continue;
+      }
+
+      inserted += 1;
+    }
+
+    process.stdout.write(`   Inserted ${inserted} | Updated ${updated} / ${mapped.length}\r`);
   }
 
-  console.log(`\n\n🎉 Done — inserted ${inserted} documentos into core.documentos`);
+  console.log(`\n\n🎉 Done — inserted ${inserted}, updated ${updated} documentos in erp.documentos`);
+  console.log(`   Vinculados a notario_proveedor_id: ${linkedNotarios} / ${mapped.length}`);
 }
 
 main().catch((err) => {

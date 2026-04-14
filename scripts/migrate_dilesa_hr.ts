@@ -229,12 +229,15 @@ async function main() {
   const puestoNameToId = new Map<string, string>();
 
   for (const row of puestosRows) {
-    const nombre = str(pick(row.values, puestosCols, 'nombre', 'puesto', 'name', row.name)) ?? row.name;
+    // Real Coda column names (DILESA): "Puesto", "Objetivo del Puesto", "Perfil del Puesto",
+    // "Requisitos del Puesto", "Esquema de Pago", "Reporta a:".
+    // Generic fallbacks kept for other docs.
+    const nombre = str(pick(row.values, puestosCols, 'puesto', 'nombre', 'name', row.name)) ?? row.name;
     const nivel = str(pick(row.values, puestosCols, 'nivel', 'level'));
     const deptName = str(pick(row.values, puestosCols, 'departamento', 'area', 'área'));
-    const objetivo = str(pick(row.values, puestosCols, 'objetivo', 'descripción', 'descripcion'));
-    const perfil = str(pick(row.values, puestosCols, 'perfil', 'perfil requerido'));
-    const requisitos = str(pick(row.values, puestosCols, 'requisitos', 'requerimientos'));
+    const objetivo = str(pick(row.values, puestosCols, 'objetivo del puesto', 'objetivo', 'descripción', 'descripcion'));
+    const perfil = str(pick(row.values, puestosCols, 'perfil del puesto', 'perfil', 'perfil requerido'));
+    const requisitos = str(pick(row.values, puestosCols, 'requisitos del puesto', 'requisitos', 'requerimientos'));
     const esquema_pago = str(pick(row.values, puestosCols, 'esquema de pago', 'esquema_pago', 'tipo pago'));
     const sueldo_min_raw = pick(row.values, puestosCols, 'sueldo mínimo', 'sueldo minimo', 'salario mínimo');
     const sueldo_max_raw = pick(row.values, puestosCols, 'sueldo máximo', 'sueldo maximo', 'salario máximo');
@@ -285,7 +288,19 @@ async function main() {
     }
   }
 
-  // ── 3. Personal (Personas + Empleados) ────────────────────────────────────
+  // Second pass: set reporta_a (hierarchy between puestos)
+  for (const row of puestosRows) {
+    const nombre = str(pick(row.values, puestosCols, 'puesto', 'nombre', 'name', row.name)) ?? row.name;
+    const reportaNombre = str(pick(row.values, puestosCols, 'reporta a:', 'reporta a', 'reporta_a', 'superior'));
+    if (!reportaNombre || DRY_RUN) continue;
+    const reportaId = puestoNameToId.get(reportaNombre.toLowerCase());
+    const selfId = puestoNameToId.get(nombre.toLowerCase());
+    if (reportaId && selfId) {
+      await supabase.schema('erp' as any).from('puestos').update({ reporta_a: reportaId }).eq('id', selfId);
+    }
+  }
+
+  // ── 3. Personal (Personas + Empleados + Accionistas) ──────────────────────
   console.log('\n─── Personal ────────────────────────────────────────────────');
   const personalCols = await fetchColumns(TABLE_IDS.personal);
   const personalRows = await fetchAllRows(TABLE_IDS.personal);
@@ -294,33 +309,78 @@ async function main() {
   for (const row of personalRows) {
     const v = row.values;
 
+    // Real DILESA column names:
+    //   "Nombre" (c-ObirnCVfea), "Apellido Paterno" (c-9mZy0PyzJn), "Apellido Materno" (c-aQHoeTWsXU)
+    //   "Nombre Completo" (c-Wrh0DnivNg) — fallback if no separate name parts
+    //   "email personal" (c-fpcE4Orz02), "email Empresa" (c-G54-vp08Xn)
+    //   "Telefono Celular" (c-9sXAREMQF9), "RFC" (c-6oNgTsqEz6), "CURP" (c-o5ZEovj7kg)
+    //   "#Seguro Social" (c-kBz-C21IJu) / "IMSS" (c-e6eLKmYuXi)
+    //   "Fecha de Nacimiento" (c-miyK9bE-dn), "Fecha Ingreso" (c-MdOKxIBTny)
+    //   "Fecha Baja" (c-Y8PqFUBlwx), "Razón por la baja" (c-wrpE9taxg1)
+    //   "Departamento" (c-uK--BTMPFL), "Puesto" (c-rQea5Ioo4v)
+    //   "Extension Empresa" (c-6NHjQDc4P_)
+    //   "Pertenece a:" (c-OsgLuvJG1Z) — "Accionista" | "Empleado"
+
     const nombre = str(pick(v, personalCols, 'nombre', 'name', 'nombres')) ?? row.name;
+    if (!nombre?.trim()) {
+      console.log(`  ⚠ skipped (empty nombre): row ${row.id}`);
+      continue;
+    }
     const apellido_paterno = str(pick(v, personalCols, 'apellido paterno', 'apellido_paterno', 'primer apellido'));
     const apellido_materno = str(pick(v, personalCols, 'apellido materno', 'apellido_materno', 'segundo apellido'));
-    const email = str(pick(v, personalCols, 'email', 'correo', 'correo electrónico'));
-    const telefono = str(pick(v, personalCols, 'teléfono', 'telefono', 'celular', 'móvil'));
+
+    // Prefer corporate email for ERP identity; fall back to personal
+    const emailEmpresa = str(pick(v, personalCols, 'email empresa', 'correo empresa', 'correo_empresa'));
+    const emailPersonal = str(pick(v, personalCols, 'email personal', 'email', 'correo', 'correo electrónico'));
+    const email = emailEmpresa ?? emailPersonal;
+
+    const telefono = str(pick(v, personalCols, 'telefono celular', 'teléfono celular', 'teléfono', 'telefono', 'celular', 'móvil'));
     const rfc = str(pick(v, personalCols, 'rfc'));
     const curp = str(pick(v, personalCols, 'curp'));
-    const nss = str(pick(v, personalCols, 'nss', 'número seguro social', 'imss'));
-    const fecha_nacimiento = dateStr(pick(v, personalCols, 'fecha nacimiento', 'fecha_nacimiento', 'nacimiento'));
+    // "#Seguro Social" is the NSS column (lowercased: "#seguro social")
+    const nss = str(pick(v, personalCols, '#seguro social', 'nss', 'número seguro social', 'imss'));
+    const fecha_nacimiento = dateStr(pick(v, personalCols, 'fecha de nacimiento', 'fecha nacimiento', 'fecha_nacimiento', 'nacimiento'));
     const fecha_ingreso = dateStr(pick(v, personalCols, 'fecha ingreso', 'fecha_ingreso', 'ingreso'));
+    const fecha_baja = dateStr(pick(v, personalCols, 'fecha baja', 'fecha_baja', 'baja'));
+    const motivo_baja = str(pick(v, personalCols, 'razón por la baja', 'razon por la baja', 'motivo_baja', 'motivo baja'));
     const numero_empleado = str(pick(v, personalCols, 'número empleado', 'numero_empleado', 'no. empleado', 'clave'));
     const deptName = str(pick(v, personalCols, 'departamento', 'área', 'area'));
-    const puestoName = str(pick(v, personalCols, 'puesto', 'cargo', 'posición'));
-    const telefono_empresa = str(pick(v, personalCols, 'teléfono empresa', 'telefono_empresa', 'ext'));
-    const extension_val = str(pick(v, personalCols, 'extensión', 'extension', 'ext'));
-    const activoRaw = pick(v, personalCols, 'activo', 'active', 'status', 'estado');
-    const activo = activoRaw !== undefined ? Boolean(activoRaw) : true;
+    const puestoRaw = str(pick(v, personalCols, 'puesto', 'cargo', 'posición'));
+    const telefono_empresa = str(pick(v, personalCols, 'teléfono empresa', 'telefono_empresa'));
+    const extension_val = str(pick(v, personalCols, 'extension empresa', 'extensión', 'extension', 'ext'));
 
+    // ── Tipo detection ─────────────────────────────────────────────────────────
+    // "Pertenece a:" column holds "Accionista" | "Empleado" (or empty → default empleado).
+    // Fallback: check if Puesto text contains "Accionista" (covers rows with no Pertenece a: set).
+    const perteneceA = str(pick(v, personalCols, 'pertenece a:', 'pertenece a', 'pertenece a :', 'tipo persona', 'categoria'));
+    const esAccionista =
+      (perteneceA?.toLowerCase() === 'accionista') ||
+      (!perteneceA && (puestoRaw?.toLowerCase().includes('accionista') ?? false));
+    const tipo = esAccionista ? 'accionista' : 'empleado';
+
+    // ── Puesto lookup (handles multi-value like "Accionista,Consejo de Administracion") ──
+    // Try exact match first, then each comma-separated part, then trimmed variants
     const departamento_id = deptName ? (deptNameToId.get(deptName.toLowerCase()) ?? null) : null;
-    const puesto_id = puestoName ? (puestoNameToId.get(puestoName.toLowerCase()) ?? null) : null;
+    let puesto_id: string | null = null;
+    if (puestoRaw) {
+      const variants = [puestoRaw, ...puestoRaw.split(',').map((p) => p.trim())];
+      for (const pv of variants) {
+        if (pv) {
+          puesto_id = puestoNameToId.get(pv.toLowerCase()) ?? null;
+          if (puesto_id) break;
+        }
+      }
+    }
+
+    // active = no fecha_baja set
+    const activo = !fecha_baja;
 
     if (DRY_RUN) {
-      console.log(`  [DRY] persona: ${nombre} ${apellido_paterno ?? ''} (${email ?? 'no email'})`);
+      console.log(`  [DRY] persona (${tipo}): ${nombre} ${apellido_paterno ?? ''} (${email ?? 'no email'}) dept=${deptName ?? '-'} puesto=${puestoRaw ?? '-'}`);
       continue;
     }
 
-    // Upsert persona (by email if available, else by nombre+apellido)
+    // ── Upsert persona (by email if available, else by nombre+apellido) ────────
     let personaId: string;
 
     if (email) {
@@ -335,13 +395,18 @@ async function main() {
       if (existing) {
         personaId = existing.id;
         await supabase.schema('erp' as any).from('personas').update({
-          nombre, apellido_paterno, apellido_materno, telefono, rfc, curp, tipo: 'empleado',
+          nombre, apellido_paterno, apellido_materno, telefono, rfc, curp, tipo,
         }).eq('id', personaId);
       } else {
         const { data: ins, error: insErr } = await supabase
           .schema('erp' as any)
           .from('personas')
-          .insert({ empresa_id: DILESA_EMPRESA_ID, nombre, apellido_paterno, apellido_materno, email: email.toLowerCase(), telefono, rfc, curp, tipo: 'empleado' })
+          .insert({
+            empresa_id: DILESA_EMPRESA_ID,
+            nombre, apellido_paterno, apellido_materno,
+            email: email.toLowerCase(),
+            telefono, rfc, curp, tipo,
+          })
           .select('id').single();
         if (insErr) { console.error(`  ✗ persona ${nombre}: ${insErr.message}`); continue; }
         personaId = ins.id;
@@ -358,18 +423,23 @@ async function main() {
 
       if (existing) {
         personaId = existing.id;
+        await supabase.schema('erp' as any).from('personas').update({ tipo }).eq('id', personaId);
       } else {
         const { data: ins, error: insErr } = await supabase
           .schema('erp' as any)
           .from('personas')
-          .insert({ empresa_id: DILESA_EMPRESA_ID, nombre, apellido_paterno, apellido_materno, telefono, rfc, curp, tipo: 'empleado' })
+          .insert({
+            empresa_id: DILESA_EMPRESA_ID,
+            nombre, apellido_paterno, apellido_materno,
+            telefono, rfc, curp, tipo,
+          })
           .select('id').single();
         if (insErr) { console.error(`  ✗ persona ${nombre}: ${insErr.message}`); continue; }
         personaId = ins.id;
       }
     }
 
-    // Upsert empleado
+    // ── Upsert empleado (accionistas get an empleado record too: same FK structure) ──
     const { data: existingEmp } = await supabase
       .schema('erp' as any)
       .from('empleados')
@@ -383,6 +453,8 @@ async function main() {
       persona_id: personaId,
       numero_empleado,
       fecha_ingreso,
+      fecha_baja,
+      motivo_baja,
       departamento_id,
       puesto_id,
       nss,
@@ -394,11 +466,11 @@ async function main() {
 
     if (existingEmp) {
       await supabase.schema('erp' as any).from('empleados').update(empPayload).eq('id', existingEmp.id);
-      console.log(`  ✓ updated: ${nombre} ${apellido_paterno ?? ''}`);
+      console.log(`  ✓ updated (${tipo}): ${nombre} ${apellido_paterno ?? ''}`);
     } else {
       const { error: insErr } = await supabase.schema('erp' as any).from('empleados').insert(empPayload);
       if (insErr) { console.error(`  ✗ empleado ${nombre}: ${insErr.message}`); continue; }
-      console.log(`  + created: ${nombre} ${apellido_paterno ?? ''}`);
+      console.log(`  + created (${tipo}): ${nombre} ${apellido_paterno ?? ''}`);
     }
   }
 

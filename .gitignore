@@ -1,4 +1,23 @@
 node_modules
 .next
 .env.local
+.env.test.local
+.env.test.local.example
 .vercel
+
+# Playwright
+playwright/.auth/
+playwright-report/
+test-results/
+
+# Build artifacts
+next-env.d.ts
+tsconfig.tsbuildinfo
+
+# Supabase CLI
+supabase/.temp/
+
+# Scratch / debug
+tmp/
+scripts/scratch/
+scripts/claude_documentos.sh
