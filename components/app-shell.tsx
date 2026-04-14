@@ -44,11 +44,13 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/', labelKey: 'nav.overview', icon: '🏠' },
   {
     href: '/inicio',
-    labelKey: 'Inicio',
+    labelKey: 'Administración',
     icon: '📋',
+    matchPaths: ['/inicio', '/administracion'],
     children: [
       { label: 'Tareas', href: '/inicio/tasks' },
       { label: 'Juntas', href: '/inicio/juntas' },
+      { label: 'Documentos', href: '/administracion/documentos' },
     ],
   },
   {
@@ -105,6 +107,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: '⚙️',
     children: [
       { label: 'Acceso', href: '/settings/acceso' },
+      { label: 'Empresas', href: '/settings/empresas' },
       { label: 'Integraciones', href: '/settings/integraciones' },
       { label: 'Preferencias', href: '/settings/preferencias' },
     ],
@@ -115,6 +118,7 @@ const NAV_ITEMS: NavItem[] = [
 const ROUTE_TO_MODULE: Record<string, string> = {
   '/inicio/tasks': 'inicio.tasks',
   '/inicio/juntas': 'inicio.juntas',
+  '/administracion/documentos': 'administracion.documentos',
   '/rdb/ventas': 'rdb.ventas',
   '/rdb/cortes': 'rdb.cortes',
   '/rdb/productos': 'rdb.productos',
