@@ -373,10 +373,56 @@ function SeguroFields({ meta, onChange }: { meta: Record<string, any>; onChange:
   );
 }
 
+function ActaConstitutivaFields({ meta, onChange }: { meta: Record<string, any>; onChange: (m: Record<string, any>) => void }) {
+  return (
+    <div className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--panel)]/50 p-3">
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--accent)]/70">🏛️ Datos del Acta Constitutiva</div>
+      <div className="grid grid-cols-2 gap-3">
+        <div><FLabel>No. de Acta</FLabel><Input placeholder="12345" value={meta.numero_acta ?? ''} onChange={(e) => onChange({ ...meta, numero_acta: e.target.value })} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
+        <div><FLabel>Fecha del Acta</FLabel><Input type="date" value={meta.fecha_acta ?? ''} onChange={(e) => onChange({ ...meta, fecha_acta: e.target.value })} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
+      </div>
+      <div><FLabel>Entidad Constituida</FLabel><Input placeholder="Nombre de la sociedad" value={meta.entidad ?? ''} onChange={(e) => onChange({ ...meta, entidad: e.target.value })} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
+      <div><FLabel>Objeto Social</FLabel><Input placeholder="Descripción breve" value={meta.objeto_social ?? ''} onChange={(e) => onChange({ ...meta, objeto_social: e.target.value })} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
+    </div>
+  );
+}
+
+function PoderFields({ meta, onChange }: { meta: Record<string, any>; onChange: (m: Record<string, any>) => void }) {
+  return (
+    <div className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--panel)]/50 p-3">
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--accent)]/70">⚖️ Datos del Poder</div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <FLabel>Tipo de Poder</FLabel>
+          <Select value={meta.tipo_poder || undefined} onValueChange={(v) => onChange({ ...meta, tipo_poder: v })}>
+            <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
+              <SelectValue placeholder="Seleccionar..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="General">General</SelectItem>
+              <SelectItem value="Especial">Especial</SelectItem>
+              <SelectItem value="Pleitos y cobranzas">Pleitos y cobranzas</SelectItem>
+              <SelectItem value="Actos de administración">Actos de administración</SelectItem>
+              <SelectItem value="Actos de dominio">Actos de dominio</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div><FLabel>Fecha del Poder</FLabel><Input type="date" value={meta.fecha_poder ?? ''} onChange={(e) => onChange({ ...meta, fecha_poder: e.target.value })} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div><FLabel>Otorgante</FLabel><Input placeholder="Nombre del poderdante" value={meta.otorgante ?? ''} onChange={(e) => onChange({ ...meta, otorgante: e.target.value })} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
+        <div><FLabel>Apoderado</FLabel><Input placeholder="Nombre del apoderado" value={meta.apoderado ?? ''} onChange={(e) => onChange({ ...meta, apoderado: e.target.value })} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
+      </div>
+    </div>
+  );
+}
+
 function SubtipoFields({ tipo, meta, onChange }: { tipo: string; meta: Record<string, any>; onChange: (m: Record<string, any>) => void }) {
   if (tipo === 'Escritura') return <EscrituraFields meta={meta} onChange={onChange} />;
   if (tipo === 'Contrato') return <ContratoFields meta={meta} onChange={onChange} />;
   if (tipo === 'Seguro') return <SeguroFields meta={meta} onChange={onChange} />;
+  if (tipo === 'Acta Constitutiva') return <ActaConstitutivaFields meta={meta} onChange={onChange} />;
+  if (tipo === 'Poder') return <PoderFields meta={meta} onChange={onChange} />;
   return null;
 }
 
@@ -512,10 +558,9 @@ function DetailSheet({
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState<DocForm>(emptyForm());
   const [saving, setSaving] = useState(false);
-  const [section, setSection] = useState<'info' | 'archivos'>('info');
 
   useEffect(() => {
-    if (doc) { setEditForm(docToForm(doc)); setEditing(false); setSection('info'); }
+    if (doc) { setEditForm(docToForm(doc)); setEditing(false); }
   }, [doc]);
 
   const handleSave = async () => {
@@ -531,6 +576,7 @@ function DetailSheet({
       notaria: editForm.notaria.trim() || null,
       notas: editForm.notas.trim() || null,
       subtipo_meta: Object.keys(editForm.subtipo_meta).length > 0 ? editForm.subtipo_meta : null,
+      updated_at: new Date().toISOString(),
     }).eq('id', doc.id);
     setSaving(false);
     if (err) { alert(`Error: ${err.message}`); return; }
@@ -557,7 +603,12 @@ function DetailSheet({
     numero_escritura: 'No. Escritura', fecha_escritura: 'Fecha Escritura', volumen: 'Volumen',
     parte_a: 'Parte A', parte_b: 'Parte B', vigencia_meses: 'Vigencia (meses)', monto: 'Monto',
     numero_poliza: 'No. Póliza', aseguradora: 'Aseguradora', cobertura: 'Cobertura', prima_anual: 'Prima Anual',
+    numero_acta: 'No. Acta', fecha_acta: 'Fecha Acta', entidad: 'Entidad Constituida', objeto_social: 'Objeto Social',
+    tipo_poder: 'Tipo de Poder', fecha_poder: 'Fecha del Poder', otorgante: 'Otorgante', apoderado: 'Apoderado',
   };
+
+  const hasPrincipalPdf = adjuntos.some((a) => a.rol === 'documento_principal');
+  const needsPdf = doc.tipo && doc.tipo !== 'Otro';
 
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -573,105 +624,63 @@ function DetailSheet({
           </div>
         </SheetHeader>
 
-        {/* Section switcher */}
-        <div className="flex gap-1 rounded-xl bg-[var(--panel)] p-1 mt-2">
-          <button
-            onClick={() => setSection('info')}
-            className={`flex-1 rounded-lg px-3 py-1.5 text-xs font-medium transition ${section === 'info' ? 'bg-[var(--card)] text-[var(--text)] shadow-sm' : 'text-[var(--text)]/50 hover:text-[var(--text)]/70'}`}
-          >
-            Información
-          </button>
-          <button
-            onClick={() => setSection('archivos')}
-            className={`flex-1 rounded-lg px-3 py-1.5 text-xs font-medium transition ${section === 'archivos' ? 'bg-[var(--card)] text-[var(--text)] shadow-sm' : 'text-[var(--text)]/50 hover:text-[var(--text)]/70'}`}
-          >
-            Archivos ({adjuntos.length})
-          </button>
-        </div>
-
         <ScrollArea className="flex-1 pr-1 print:h-auto">
           <div className="mt-4 space-y-5 pb-6">
-            {section === 'info' ? (
-              editing ? (
-                <>
-                  <DocFormFields form={editForm} setForm={setEditForm} notarias={notarias} onOpenCreateNotaria={onOpenCreateNotaria} />
-                  <div className="flex gap-2 pt-2">
-                    <Button variant="outline" onClick={() => { setEditForm(docToForm(doc)); setEditing(false); }} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">Cancelar</Button>
-                    <Button onClick={handleSave} disabled={saving || !editForm.titulo.trim()} className="rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90">
-                      {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}Guardar
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center gap-2">
-                    <TipoBadge tipo={doc.tipo} />
-                    <VencBadge d={doc.fecha_vencimiento} />
-                  </div>
-                  <Separator />
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div><FLabel>Número</FLabel><p className="text-[var(--text)]/80">{doc.numero_documento ?? '—'}</p></div>
-                    <div><FLabel>Emisión</FLabel><p className="text-[var(--text)]/80">{formatDate(doc.fecha_emision)}</p></div>
-                  </div>
-                  {doc.notaria && <div><FLabel>Notaría</FLabel><p className="text-sm text-[var(--text)]/80">{doc.notaria}</p></div>}
-
-                  {/* Subtipo meta display */}
-                  {metaEntries.length > 0 && (
-                    <>
-                      <Separator />
-                      <div className="grid grid-cols-2 gap-3 text-sm">
-                        {metaEntries.map(([k, v]) => (
-                          <div key={k}><FLabel>{metaLabels[k] ?? k}</FLabel><p className="text-[var(--text)]/80">{String(v)}</p></div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-
-                  {doc.notas && (
-                    <>
-                      <Separator />
-                      <div><FLabel>Notas</FLabel><p className="text-sm text-[var(--text)]/70 whitespace-pre-wrap">{doc.notas}</p></div>
-                    </>
-                  )}
-
-                  {/* Quick preview of principal PDF if exists */}
-                  {adjuntos.filter((a) => a.rol === 'documento_principal').length > 0 && (
-                    <>
-                      <Separator />
-                      <div>
-                        <FLabel>Documento principal</FLabel>
-                        <div className="mt-1 space-y-1">
-                          {adjuntos.filter((a) => a.rol === 'documento_principal').map((a) => (
-                            <a key={a.id} href={a.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-xs text-red-400 transition hover:bg-[var(--card)]">
-                              <FileText className="h-3.5 w-3.5" /><span className="truncate">{a.nombre}</span><span className="text-[var(--text)]/30 ml-auto">{fmtBytes(a.tamano_bytes)}</span>
-                            </a>
-                          ))}
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Quick preview of reference images */}
-                  {adjuntos.filter((a) => a.rol === 'imagen_referencia').length > 0 && (
-                    <>
-                      <Separator />
-                      <div>
-                        <FLabel>Imagen / Plano</FLabel>
-                        <div className="mt-1 flex gap-2 flex-wrap">
-                          {adjuntos.filter((a) => a.rol === 'imagen_referencia').map((a) => (
-                            <a key={a.id} href={a.url} target="_blank" rel="noopener noreferrer" className="shrink-0">
-                              <img src={a.url} alt={a.nombre} className="h-24 rounded-lg border border-[var(--border)] object-cover hover:opacity-80 transition-opacity" />
-                            </a>
-                          ))}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </>
-              )
+            {/* ── Info / Edit section ── */}
+            {editing ? (
+              <>
+                <DocFormFields form={editForm} setForm={setEditForm} notarias={notarias} onOpenCreateNotaria={onOpenCreateNotaria} />
+                <div className="flex gap-2 pt-2">
+                  <Button variant="outline" onClick={() => { setEditForm(docToForm(doc)); setEditing(false); }} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">Cancelar</Button>
+                  <Button onClick={handleSave} disabled={saving || !editForm.titulo.trim()} className="rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90">
+                    {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}Guardar
+                  </Button>
+                </div>
+              </>
             ) : (
-              <AdjuntosSection documentoId={doc.id} empresaId={doc.empresa_id} adjuntos={adjuntos} onRefresh={onRefreshAdjuntos} />
+              <>
+                <div className="flex items-center gap-2">
+                  <TipoBadge tipo={doc.tipo} />
+                  <VencBadge d={doc.fecha_vencimiento} />
+                </div>
+                <Separator />
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div><FLabel>Número</FLabel><p className="text-[var(--text)]/80">{doc.numero_documento ?? '—'}</p></div>
+                  <div><FLabel>Emisión</FLabel><p className="text-[var(--text)]/80">{formatDate(doc.fecha_emision)}</p></div>
+                </div>
+                {doc.notaria && <div><FLabel>Notaría</FLabel><p className="text-sm text-[var(--text)]/80">{doc.notaria}</p></div>}
+
+                {metaEntries.length > 0 && (
+                  <>
+                    <Separator />
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      {metaEntries.map(([k, v]) => (
+                        <div key={k}><FLabel>{metaLabels[k] ?? k}</FLabel><p className="text-[var(--text)]/80">{String(v)}</p></div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {doc.notas && (
+                  <>
+                    <Separator />
+                    <div><FLabel>Notas</FLabel><p className="text-sm text-[var(--text)]/70 whitespace-pre-wrap">{doc.notas}</p></div>
+                  </>
+                )}
+              </>
             )}
+
+            {/* ── Archivos section (always visible) ── */}
+            <Separator />
+
+            {needsPdf && !hasPrincipalPdf && (
+              <div className="flex items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-400">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                Este documento requiere un PDF escaneado como documento principal.
+              </div>
+            )}
+
+            <AdjuntosSection documentoId={doc.id} empresaId={doc.empresa_id} adjuntos={adjuntos} onRefresh={onRefreshAdjuntos} />
           </div>
         </ScrollArea>
       </SheetContent>
@@ -686,7 +695,7 @@ function CreateSheet({
 }: {
   open: boolean; onClose: () => void;
   notarias: NotariaOption[]; onOpenCreateNotaria: () => void;
-  primaryEmpresaId: string; onCreated: () => void;
+  primaryEmpresaId: string; onCreated: (doc: Documento) => void;
 }) {
   const supabase = createSupabaseERPClient();
   const [form, setForm] = useState<DocForm>(emptyForm());
@@ -699,7 +708,7 @@ function CreateSheet({
     setCreating(true);
     const { data: { user } } = await supabase.auth.getUser();
     const { data: cu } = await supabase.schema('core' as any).from('usuarios').select('id').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
-    const { error: err } = await supabase.schema('erp' as any).from('documentos').insert({
+    const { data: newDoc, error: err } = await supabase.schema('erp' as any).from('documentos').insert({
       empresa_id: primaryEmpresaId,
       titulo: form.titulo.trim(),
       numero_documento: form.numero_documento.trim() || null,
@@ -711,11 +720,11 @@ function CreateSheet({
       notas: form.notas.trim() || null,
       subtipo_meta: Object.keys(form.subtipo_meta).length > 0 ? form.subtipo_meta : null,
       creado_por: cu?.id ?? null,
-    });
+    }).select('*').single();
     setCreating(false);
-    if (err) { alert(`Error: ${err.message}`); return; }
+    if (err || !newDoc) { alert(`Error: ${err?.message ?? 'No se pudo crear'}`); return; }
     onClose();
-    onCreated();
+    onCreated(newDoc as Documento);
   };
 
   return (
@@ -730,10 +739,9 @@ function CreateSheet({
             <div className="flex gap-2 pt-4">
               <Button variant="outline" onClick={onClose} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">Cancelar</Button>
               <Button onClick={handleCreate} disabled={creating || !form.titulo.trim() || !form.tipo} className="rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 gap-1.5">
-                {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}Guardar
+                {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}Guardar y adjuntar archivos
               </Button>
             </div>
-            <p className="mt-3 text-[10px] text-[var(--text)]/40">Después de guardar, abre el documento para adjuntar archivos.</p>
           </div>
         </ScrollArea>
       </SheetContent>
@@ -834,12 +842,19 @@ function DocumentosInner() {
   };
 
   const handleRefreshAdjuntos = () => {
-    void fetchAdjuntosBulk(documentos.map((d) => d.id));
+    const ids = documentos.map((d) => d.id);
+    if (selectedDoc && !ids.includes(selectedDoc.id)) ids.push(selectedDoc.id);
+    void fetchAdjuntosBulk(ids);
   };
 
   const handleDocUpdated = (updated: Documento) => {
     setSelectedDoc(updated);
     setDocumentos((prev) => prev.map((d) => d.id === updated.id ? updated : d));
+  };
+
+  const handleDocCreated = (newDoc: Documento) => {
+    setDocumentos((prev) => [newDoc, ...prev]);
+    setSelectedDoc(newDoc);
   };
 
   const handleCreateNotaria = async () => {
@@ -969,7 +984,12 @@ function DocumentosInner() {
                 return (
                   <TableRow key={doc.id} className="border-[var(--border)] cursor-pointer hover:bg-[var(--panel)]/50" onClick={() => setSelectedDoc(doc)}>
                     <TableCell>
-                      <span className="line-clamp-1 font-medium text-[var(--text)]">{doc.titulo}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="line-clamp-1 font-medium text-[var(--text)]">{doc.titulo}</span>
+                        {doc.tipo && doc.tipo !== 'Otro' && pdfs.length === 0 && (
+                          <span title="Sin PDF principal" className="shrink-0 text-amber-400"><AlertTriangle className="h-3 w-3" /></span>
+                        )}
+                      </div>
                       {doc.notaria && <span className="mt-0.5 block text-xs text-[var(--text)]/40">{doc.notaria}</span>}
                     </TableCell>
                     <TableCell><TipoBadge tipo={doc.tipo} /></TableCell>
@@ -1023,7 +1043,7 @@ function DocumentosInner() {
       <CreateSheet
         open={showCreate} onClose={() => setShowCreate(false)}
         notarias={notarias} onOpenCreateNotaria={() => setShowCreateNotaria(true)}
-        primaryEmpresaId={primaryEmpresaId} onCreated={handleRefresh}
+        primaryEmpresaId={primaryEmpresaId} onCreated={handleDocCreated}
       />
 
       <DetailSheet
