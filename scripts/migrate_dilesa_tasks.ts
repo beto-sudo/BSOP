@@ -146,15 +146,21 @@ async function main() {
     .eq('activo', true)
     .is('deleted_at', null);
 
+  function normalize(s: string): string {
+    return s.toLowerCase().trim().replace(/\s+/g, ' ');
+  }
+
   const empleadoNameToId = new Map<string, string>();
+  const empleadoNombres: { full: string; id: string }[] = [];
   for (const e of empRows ?? []) {
     const p = e.persona as any;
     if (!p) continue;
-    const fullName = [p.nombre, p.apellido_paterno].filter(Boolean).join(' ').toLowerCase();
+    const fullName = normalize([p.nombre, p.apellido_paterno].filter(Boolean).join(' '));
     empleadoNameToId.set(fullName, e.id);
-    if (p.nombre) empleadoNameToId.set(p.nombre.toLowerCase(), e.id);
+    empleadoNombres.push({ full: fullName, id: e.id });
+    if (p.nombre) empleadoNameToId.set(normalize(p.nombre), e.id);
   }
-  console.log(`Loaded ${empleadoNameToId.size} name→id mappings`);
+  console.log(`Loaded ${empleadoNombres.length} empleados (${empleadoNameToId.size} name→id mappings)`);
 
   // ── Fetch tasks from Coda ─────────────────────────────────────────────────
   console.log('\n─── Tareas ──────────────────────────────────────────────────');
@@ -189,14 +195,26 @@ async function main() {
     const responsableRaw = str(pick(v, cols, 'responsable', 'asignado a', 'asignado'));
     let asignadoA: string | null = null;
     if (responsableRaw) {
-      asignadoA = empleadoNameToId.get(responsableRaw.toLowerCase()) ?? null;
+      const codaName = normalize(responsableRaw);
+      // 1. Exact match
+      asignadoA = empleadoNameToId.get(codaName) ?? null;
+      // 2. Coda name starts with nombre+apellido_paterno (handles extra apellido_materno)
       if (!asignadoA) {
-        // Try partial match (first name only)
-        const firstName = responsableRaw.split(' ')[0].toLowerCase();
+        const match = empleadoNombres.find((e) => codaName.startsWith(e.full));
+        asignadoA = match?.id ?? null;
+      }
+      // 3. nombre+apellido_paterno starts with Coda name (Coda has shorter name)
+      if (!asignadoA) {
+        const match = empleadoNombres.find((e) => e.full.startsWith(codaName));
+        asignadoA = match?.id ?? null;
+      }
+      // 4. First name only
+      if (!asignadoA) {
+        const firstName = codaName.split(' ')[0];
         asignadoA = empleadoNameToId.get(firstName) ?? null;
-        if (!asignadoA) {
-          console.log(`  ⚠ no empleado match for "${responsableRaw}"`);
-        }
+      }
+      if (!asignadoA) {
+        console.log(`  ⚠ no empleado match for "${responsableRaw}"`);
       }
     }
 
