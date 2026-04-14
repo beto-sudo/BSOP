@@ -43,6 +43,15 @@ type AuthUser = {
 const NAV_ITEMS: NavItem[] = [
   { href: '/', labelKey: 'nav.overview', icon: '🏠' },
   {
+    href: '/inicio',
+    labelKey: 'Inicio',
+    icon: '📋',
+    children: [
+      { label: 'Tareas', href: '/inicio/tasks' },
+      { label: 'Juntas', href: '/inicio/juntas' },
+    ],
+  },
+  {
     href: '/rdb',
     labelKey: 'Rincón del Bosque',
     icon: 'RDB_LOGO',
@@ -55,7 +64,6 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'Requisiciones', href: '/rdb/requisiciones' },
       { label: 'Órdenes de Compra', href: '/rdb/ordenes-compra' },
       { label: 'Playtomic', href: '/rdb/playtomic' },
-      { label: 'Tareas', href: '/rdb/tasks' },
     ],
   },
   {
@@ -95,6 +103,8 @@ const NAV_ITEMS: NavItem[] = [
 
 /** Maps route hrefs to their modulo slug for permission checks */
 const ROUTE_TO_MODULE: Record<string, string> = {
+  '/inicio/tasks': 'inicio.tasks',
+  '/inicio/juntas': 'inicio.juntas',
   '/rdb/ventas': 'rdb.ventas',
   '/rdb/cortes': 'rdb.cortes',
   '/rdb/productos': 'rdb.productos',
@@ -103,7 +113,6 @@ const ROUTE_TO_MODULE: Record<string, string> = {
   '/rdb/requisiciones': 'rdb.requisiciones',
   '/rdb/playtomic': 'rdb.playtomic',
   '/rdb/ordenes-compra': 'rdb.ordenes_compra',
-  '/rdb/tasks': 'rdb.tasks',
   '/rdb': 'rdb.home',
   '/settings/acceso': 'settings.acceso',
 };
