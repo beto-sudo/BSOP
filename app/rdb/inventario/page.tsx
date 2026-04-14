@@ -592,7 +592,7 @@ export default function InventarioPage() {
     try {
       const supabase = createSupabaseBrowserClient();
       const { data, error } = await supabase
-        .schema('erp')
+        .schema('rdb')
         .from('v_inventario_stock')
         .select('*')
         .eq('empresa_id', RDB_EMPRESA_ID)
@@ -614,7 +614,7 @@ export default function InventarioPage() {
       // Fin del día en UTC para la fecha seleccionada (sin conversión timezone)
       const p_fecha = `${dateStr}T23:59:59.999Z`;
       const { data, error } = await supabase
-        .schema('erp')
+        .schema('rdb')
         .rpc('fn_inventario_al_corte', { p_fecha });
       if (error) throw error;
       setItems((data ?? []) as StockItem[]);
