@@ -11,6 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableHead } from '@/components/ui/sortable-head';
+import { useSortableTable } from '@/hooks/use-sortable-table';
 import {
   Dialog,
   DialogContent,
@@ -151,6 +153,7 @@ function DepartamentosInner() {
   // Exclude self from padre_id options when editing
   const parentOptions = departamentos.filter((d) => d.id !== editingId && d.activo);
 
+  const { sortKey, sortDir, onSort, sortData } = useSortableTable('nombre', 'asc');
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -186,15 +189,15 @@ function DepartamentosInner() {
           <Table>
             <TableHeader>
               <TableRow className="border-[var(--border)] hover:bg-transparent">
-                <TableHead className="font-medium text-[var(--text)]/55">Nombre</TableHead>
-                <TableHead className="w-24 font-medium text-[var(--text)]/55">Código</TableHead>
-                <TableHead className="w-36 font-medium text-[var(--text)]/55">Reporta a</TableHead>
-                <TableHead className="w-20 font-medium text-[var(--text)]/55">Estado</TableHead>
+                <SortableHead sortKey="nombre" label="Nombre" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+                <SortableHead sortKey="codigo" label="Código" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-24" />
+                <SortableHead sortKey="reporta_a_nombre" label="Reporta a" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-36" />
+                <SortableHead sortKey="activo" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-20" />
                 <TableHead className="w-20" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {departamentos.map((d) => (
+              {sortData(departamentos.map((d) => ({ ...d, reporta_a_nombre: d.padre?.nombre ?? null }))).map((d) => (
                 <TableRow key={d.id} className="border-[var(--border)]">
                   <TableCell>
                     <span className="font-medium text-[var(--text)]">

@@ -11,6 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableHead } from '@/components/ui/sortable-head';
+import { useSortableTable } from '@/hooks/use-sortable-table';
 import {
   Dialog,
   DialogContent,
@@ -394,6 +396,7 @@ function DocumentosInner() {
   const expiredCount = documentos.filter((d) => getVencimientoStatus(d.fecha_vencimiento) === 'expired').length;
   const soonCount = documentos.filter((d) => getVencimientoStatus(d.fecha_vencimiento) === 'soon').length;
 
+  const { sortKey, sortDir, onSort, sortData } = useSortableTable('fecha_emision', 'desc');
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -503,16 +506,16 @@ function DocumentosInner() {
           <Table>
             <TableHeader>
               <TableRow className="border-[var(--border)] hover:bg-transparent">
-                <TableHead className="font-medium text-[var(--text)]/55">Título</TableHead>
-                <TableHead className="w-32 font-medium text-[var(--text)]/55">No. Documento</TableHead>
-                <TableHead className="w-44 font-medium text-[var(--text)]/55">Tipo</TableHead>
+                <SortableHead sortKey="titulo" label="Título" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+                <SortableHead sortKey="numero_documento" label="No. Documento" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-32" />
+                <SortableHead sortKey="tipo" label="Tipo" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-44" />
                 <TableHead className="w-28 font-medium text-[var(--text)]/55">PDF</TableHead>
-                <TableHead className="w-32 font-medium text-[var(--text)]/55">Emisión</TableHead>
-                <TableHead className="w-40 font-medium text-[var(--text)]/55">Vencimiento</TableHead>
+                <SortableHead sortKey="fecha_emision" label="Emisión" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-32" />
+                <SortableHead sortKey="fecha_vencimiento" label="Vencimiento" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-40" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((doc) => {
+              {sortData(filtered).map((doc) => {
                 const pdfUrl = doc.archivo_url
                   ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/adjuntos/${doc.archivo_url}`
                   : null;

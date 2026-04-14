@@ -11,6 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableHead } from '@/components/ui/sortable-head';
+import { useSortableTable } from '@/hooks/use-sortable-table';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -226,6 +228,7 @@ export default function ProductosPage() {
     );
   });
 
+  const { sortKey, sortDir, onSort, sortData } = useSortableTable('nombre', 'asc');
   return (
     <RequireAccess empresa="rdb" modulo="rdb.productos">
     <div className="space-y-6">
@@ -313,11 +316,11 @@ export default function ProductosPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Categoría</TableHead>
-              <TableHead className="text-right">Precio</TableHead>
-              <TableHead>Estado</TableHead>
+              <SortableHead sortKey="nombre" label="Nombre" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="tipo" label="Tipo" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="categoria" label="Categoría" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="precio" label="Precio" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="text-right" />
+              <SortableHead sortKey="activo" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
@@ -339,7 +342,7 @@ export default function ProductosPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((p) => (
+              sortData(filtered).map((p) => (
                 <TableRow key={p.id} className="cursor-pointer hover:bg-muted/50" onClick={() => openDrawer(p)}>
                   <TableCell>
                     <div className="font-medium">{p.nombre}</div>

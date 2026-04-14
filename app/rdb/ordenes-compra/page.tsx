@@ -11,6 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableHead } from '@/components/ui/sortable-head';
+import { useSortableTable } from '@/hooks/use-sortable-table';
 import {
   Sheet,
   SheetContent,
@@ -931,6 +933,7 @@ export default function OrdenesCompraPage() {
     });
   }, [ordenes, search]);
 
+  const { sortKey, sortDir, onSort, sortData } = useSortableTable('created_at', 'desc');
   return (
     <RequireAccess empresa="rdb" modulo="rdb.ordenes_compra">
     <div className="space-y-6">
@@ -1024,12 +1027,12 @@ export default function OrdenesCompraPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>OC / Folio</TableHead>
-              <TableHead>Requisición</TableHead>
-              <TableHead>Proveedor</TableHead>
-              <TableHead>Estatus</TableHead>
-              <TableHead>Fecha</TableHead>
-              <TableHead className="text-right">Total</TableHead>
+              <SortableHead sortKey="folio" label="OC / Folio" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="requisicion_folio" label="Requisición" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="proveedor_nombre" label="Proveedor" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="estatus" label="Estatus" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="fecha_emision" label="Fecha" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="total" label="Total" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="text-right" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -1050,11 +1053,11 @@ export default function OrdenesCompraPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((orden) => {
+              sortData(filtered.map((o) => ({ ...o, proveedor_nombre: getProveedorNombre(o.proveedor) ?? null, requisicion_folio: getRequisicionFolio(o.requisicion) ?? null, total: o.total_real ?? o.total_estimado ?? null }))).map((orden) => {
                 const reqFolio = getRequisicionFolio(orden.requisicion);
                 const nombre = getProveedorNombre(orden.proveedor);
                 const total = orden.total_real ?? orden.total_estimado;
-                return (
+  return (
                   <TableRow
                     key={orden.id}
                     className="cursor-pointer hover:bg-muted/50"

@@ -20,6 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableHead } from '@/components/ui/sortable-head';
+import { useSortableTable } from '@/hooks/use-sortable-table';
 import {
   Sheet,
   SheetContent,
@@ -796,6 +798,7 @@ export default function CortesPage() {
     });
   }
 
+  const { sortKey, sortDir, onSort, sortData } = useSortableTable('created_at', 'desc');
   return (
     <RequireAccess empresa="rdb" modulo="rdb.cortes">
     <div className="space-y-6">
@@ -892,17 +895,17 @@ export default function CortesPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="whitespace-nowrap">Caja</TableHead>
-              <TableHead className="whitespace-nowrap">Corte</TableHead>
-              <TableHead className="whitespace-nowrap">Inicio</TableHead>
-              <TableHead className="whitespace-nowrap">Fin</TableHead>
-              <TableHead className="whitespace-nowrap">Pedidos</TableHead>
-              <TableHead className="whitespace-nowrap">Estado</TableHead>
+              <SortableHead sortKey="caja_nombre" label="Caja" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="whitespace-nowrap" />
+              <SortableHead sortKey="corte_nombre" label="Corte" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="whitespace-nowrap" />
+              <SortableHead sortKey="hora_inicio" label="Inicio" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="whitespace-nowrap" />
+              <SortableHead sortKey="hora_fin" label="Fin" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="whitespace-nowrap" />
+              <SortableHead sortKey="pedidos_count" label="Pedidos" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="whitespace-nowrap" />
+              <SortableHead sortKey="estado" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="whitespace-nowrap" />
               <TableHead className="text-right whitespace-nowrap">Efectivo</TableHead>
               <TableHead className="text-right whitespace-nowrap">Tarjeta</TableHead>
               <TableHead className="text-right whitespace-nowrap">Stripe</TableHead>
               <TableHead className="text-right whitespace-nowrap">Transf.</TableHead>
-              <TableHead className="text-right whitespace-nowrap">Total</TableHead>
+              <SortableHead sortKey="total_ingresos" label="Total" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="text-right whitespace-nowrap" />
               <TableHead className="text-right whitespace-nowrap">Ef. Esperado</TableHead>
               <TableHead className="text-right whitespace-nowrap">Movimientos</TableHead>
               <TableHead className="text-right whitespace-nowrap">Ef. Contado</TableHead>
@@ -927,7 +930,7 @@ export default function CortesPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((corte) => {
+              sortData(filtered).map((corte) => {
                 const movimientosNeto = (corte.depositos ?? 0) - (corte.retiros ?? 0);
                 const diferencia = corte.efectivo_contado != null
                   ? (corte.efectivo_contado) - (corte.efectivo_esperado ?? 0)
@@ -1094,7 +1097,7 @@ export default function CortesPage() {
                 const total = cerrarDenom.reduce((s, d) => s + d.denominacion * d.cantidad, 0);
                 const esperado = cerrarCorte?.efectivo_esperado ?? 0;
                 const diff = total - esperado;
-                return (
+  return (
                   <div className="rounded-lg border bg-card p-3 space-y-1">
                     <div className="flex justify-between text-sm">
                       <span className="font-medium">Total contado</span>

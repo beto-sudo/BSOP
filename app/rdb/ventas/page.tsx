@@ -12,6 +12,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableHead } from '@/components/ui/sortable-head';
+import { useSortableTable } from '@/hooks/use-sortable-table';
 import {
   Sheet,
   SheetContent,
@@ -371,6 +373,7 @@ export default function VentasPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [corteFilter, setCorteFilter] = useState<string>('all');
+  const { sortKey, sortDir, onSort, sortData } = useSortableTable('created_at', 'desc');
   const [cortes, setCortes] = useState<CorteOption[]>([]);
   const [dateFrom, setDateFrom] = useState(() => todayRange().from);
   const [dateTo, setDateTo] = useState(() => todayRange().to);
@@ -594,7 +597,7 @@ export default function VentasPage() {
                 ? `${corte.corte_nombre}`
                 : `${corte.caja_nombre ?? 'Corte'} ${formatDate(corte.hora_inicio)}`;
               const estado = corte.estado?.toLowerCase() === 'abierto' ? ' 🟢' : '';
-              return (
+  return (
                 <SelectItem key={corte.id} value={corte.id}>
                   {label}{estado}
                 </SelectItem>
@@ -666,12 +669,12 @@ export default function VentasPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Folio</TableHead>
-              <TableHead>Fecha/Hora</TableHead>
-              <TableHead>Área</TableHead>
-              <TableHead>Mesa</TableHead>
-              <TableHead className="text-right">Total</TableHead>
-              <TableHead>Estado</TableHead>
+              <SortableHead sortKey="folio" label="Folio" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="created_at" label="Fecha/Hora" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="area" label="Área" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="mesa" label="Mesa" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="total" label="Total" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="text-right" />
+              <SortableHead sortKey="estado" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -695,7 +698,7 @@ export default function VentasPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((pedido) => (
+              sortData(filtered).map((pedido) => (
                 <TableRow
                   key={String(pedido.id)}
                   className="cursor-pointer hover:bg-muted/50"

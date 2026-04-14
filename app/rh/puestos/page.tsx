@@ -11,6 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableHead } from '@/components/ui/sortable-head';
+import { useSortableTable } from '@/hooks/use-sortable-table';
 import {
   Dialog,
   DialogContent,
@@ -184,6 +186,7 @@ function PuestosInner() {
     await fetchAll(empresaIds);
   };
 
+  const { sortKey, sortDir, onSort, sortData } = useSortableTable('nombre', 'asc');
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -219,15 +222,15 @@ function PuestosInner() {
           <Table>
             <TableHeader>
               <TableRow className="border-[var(--border)] hover:bg-transparent">
-                <TableHead className="font-medium text-[var(--text)]/55">Nombre</TableHead>
-                <TableHead className="w-32 font-medium text-[var(--text)]/55">Nivel</TableHead>
-                <TableHead className="w-36 font-medium text-[var(--text)]/55">Departamento</TableHead>
-                <TableHead className="w-32 font-medium text-[var(--text)]/55">Esquema pago</TableHead>
+                <SortableHead sortKey="nombre" label="Nombre" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+                <SortableHead sortKey="nivel" label="Nivel" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-32" />
+                <SortableHead sortKey="departamento_nombre" label="Departamento" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-36" />
+                <SortableHead sortKey="esquema_pago" label="Esquema pago" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-32" />
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {puestos.map((p) => (
+              {sortData(puestos.map((p) => ({ ...p, departamento_nombre: p.departamento?.nombre ?? null }))).map((p) => (
                 <TableRow key={p.id} className="border-[var(--border)]">
                   <TableCell>
                     <span className="font-medium text-[var(--text)]">{p.nombre}</span>

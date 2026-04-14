@@ -18,6 +18,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableHead } from '@/components/ui/sortable-head';
+import { useSortableTable } from '@/hooks/use-sortable-table';
 import {
   Sheet,
   SheetContent,
@@ -1143,6 +1145,7 @@ export default function RequisicionesPage() {
     </TableRow>
   );
 
+  const { sortKey, sortDir, onSort, sortData } = useSortableTable('created_at', 'desc');
   return (
     <RequireAccess empresa="rdb" modulo="rdb.requisiciones">
     <div className="space-y-6">
@@ -1247,11 +1250,11 @@ export default function RequisicionesPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Folio</TableHead>
-              <TableHead>Fecha Solicitud</TableHead>
-              <TableHead>Solicitante</TableHead>
-              <TableHead>Estatus</TableHead>
-              <TableHead>Ítems</TableHead>
+              <SortableHead sortKey="folio" label="Folio" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="created_at" label="Fecha Solicitud" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="solicitante_nombre" label="Solicitante" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="estatus" label="Estatus" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="items_count" label="Ítems" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -1267,10 +1270,10 @@ export default function RequisicionesPage() {
                 ))
               : filtered.length === 0
                 ? emptyState
-                : filtered.map((req) => {
+                : sortData(filtered).map((req) => {
                     const normalizedStatus = normalizeStatus(req.estatus);
                     const items = req.items ?? [];
-                    return (
+  return (
                       <TableRow
                         key={req.id}
                         className="cursor-pointer hover:bg-muted/50"

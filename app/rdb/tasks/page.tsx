@@ -12,6 +12,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableHead } from '@/components/ui/sortable-head';
+import { useSortableTable } from '@/hooks/use-sortable-table';
 import {
   Dialog,
   DialogContent,
@@ -389,6 +391,7 @@ function TasksInner() {
   const estadoMap = new Map(estados.map((e) => [e.id, e]));
   const usuarioMap = new Map(usuarios.map((u) => [u.id, u]));
 
+  const { sortKey, sortDir, onSort, sortData } = useSortableTable('fecha_limite', 'desc');
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -525,17 +528,17 @@ function TasksInner() {
           <Table>
             <TableHeader>
               <TableRow className="border-[var(--border)] hover:bg-transparent">
-                <TableHead className="font-medium text-[var(--text)]/55">Título</TableHead>
-                <TableHead className="w-24 font-medium text-[var(--text)]/55">Tipo</TableHead>
-                <TableHead className="w-28 font-medium text-[var(--text)]/55">Prioridad</TableHead>
-                <TableHead className="w-28 font-medium text-[var(--text)]/55">Estado</TableHead>
-                <TableHead className="w-36 font-medium text-[var(--text)]/55">Responsable</TableHead>
-                <TableHead className="w-28 font-medium text-[var(--text)]/55">Fecha límite</TableHead>
+                <SortableHead sortKey="titulo" label="Título" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+                <SortableHead sortKey="tipo" label="Tipo" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-24" />
+                <SortableHead sortKey="prioridad_nombre" label="Prioridad" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
+                <SortableHead sortKey="estado" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
+                <SortableHead sortKey="responsable_nombre" label="Responsable" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-36" />
+                <SortableHead sortKey="fecha_limite" label="Fecha límite" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((task) => {
+              {sortData(filtered).map((task) => {
                 const prio = prioridadMap.get(task.prioridad_id ?? '');
                 const estado = estadoMap.get(task.estado_id ?? '');
                 const responsable = usuarioMap.get(task.responsable_id ?? '');

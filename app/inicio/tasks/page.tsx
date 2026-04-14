@@ -11,6 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableHead } from '@/components/ui/sortable-head';
+import { useSortableTable } from '@/hooks/use-sortable-table';
 import {
   Dialog,
   DialogContent,
@@ -345,6 +347,8 @@ function TasksInner() {
   const empleadoMap = new Map(empleados.map((e) => [e.id, e]));
   const prioridadMap = new Map(prioridades.map((p) => [p.id, p]));
 
+  const { sortKey, sortDir, onSort, sortData } = useSortableTable('due_date', 'desc');
+
   const filtered = tasks.filter((t) => {
     if (search && !t.titulo.toLowerCase().includes(search.toLowerCase())) return false;
     if (filterEstado !== 'all' && t.estado !== filterEstado) return false;
@@ -466,15 +470,15 @@ function TasksInner() {
           <Table>
             <TableHeader>
               <TableRow className="border-[var(--border)] hover:bg-transparent">
-                <TableHead className="font-medium text-[var(--text)]/55">Título</TableHead>
-                <TableHead className="w-28 font-medium text-[var(--text)]/55">Estado</TableHead>
-                <TableHead className="w-28 font-medium text-[var(--text)]/55">Prioridad</TableHead>
-                <TableHead className="w-40 font-medium text-[var(--text)]/55">Asignado a</TableHead>
-                <TableHead className="w-28 font-medium text-[var(--text)]/55">Vence</TableHead>
+                <SortableHead sortKey="titulo" label="Título" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+                <SortableHead sortKey="estado" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
+                <SortableHead sortKey="prioridad_peso" label="Prioridad" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
+                <SortableHead sortKey="asignado_nombre" label="Asignado a" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-40" />
+                <SortableHead sortKey="fecha_vence" label="Vence" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((task) => {
+              {sortData(filtered.map((t) => ({ ...t, prioridad_peso: prioridadMap.get(t.prioridad_id ?? '')?.peso ?? null, asignado_nombre: empleadoMap.get(t.asignado_a ?? '')?.nombre ?? null }))).map((task) => {
                 const prio = prioridadMap.get(task.prioridad_id ?? '');
                 const empleado = empleadoMap.get(task.asignado_a ?? '');
                 return (

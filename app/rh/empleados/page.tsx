@@ -12,6 +12,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableHead } from '@/components/ui/sortable-head';
+import { useSortableTable } from '@/hooks/use-sortable-table';
 import {
   Dialog,
   DialogContent,
@@ -221,6 +223,7 @@ function EmpleadosInner() {
     return true;
   });
 
+  const { sortKey, sortDir, onSort, sortData } = useSortableTable('nombre', 'asc');
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -308,15 +311,15 @@ function EmpleadosInner() {
           <Table>
             <TableHeader>
               <TableRow className="border-[var(--border)] hover:bg-transparent">
-                <TableHead className="font-medium text-[var(--text)]/55">Nombre</TableHead>
-                <TableHead className="w-36 font-medium text-[var(--text)]/55">Departamento</TableHead>
-                <TableHead className="w-36 font-medium text-[var(--text)]/55">Puesto</TableHead>
-                <TableHead className="w-28 font-medium text-[var(--text)]/55">Ingreso</TableHead>
+                <SortableHead sortKey="nombre" label="Nombre" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+                <SortableHead sortKey="departamento_nombre" label="Departamento" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-36" />
+                <SortableHead sortKey="puesto_nombre" label="Puesto" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-36" />
+                <SortableHead sortKey="fecha_ingreso" label="Ingreso" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {visible.map((emp) => (
+              {sortData(visible.map((emp) => ({ ...emp, nombre: fullName(emp) || null, departamento_nombre: emp.departamento?.nombre ?? null, puesto_nombre: emp.puesto?.nombre ?? null }))).map((emp) => (
                 <TableRow
                   key={emp.id}
                   className="cursor-pointer border-[var(--border)] hover:bg-[var(--panel)] transition-colors"

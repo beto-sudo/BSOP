@@ -12,6 +12,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableHead } from '@/components/ui/sortable-head';
+import { useSortableTable } from '@/hooks/use-sortable-table';
 import {
   Sheet,
   SheetContent,
@@ -342,6 +344,7 @@ export default function ProveedoresPage() {
     }
   };
 
+  const { sortKey, sortDir, onSort, sortData } = useSortableTable('nombre', 'asc');
   return (
     <RequireAccess empresa="rdb" modulo="rdb.proveedores">
     <div className="space-y-6">
@@ -407,11 +410,11 @@ export default function ProveedoresPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Contacto</TableHead>
-              <TableHead>Teléfono</TableHead>
-              <TableHead>RFC</TableHead>
-              <TableHead>Estado</TableHead>
+              <SortableHead sortKey="nombre" label="Nombre" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="contacto" label="Contacto" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="telefono" label="Teléfono" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="rfc" label="RFC" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="activo" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -432,7 +435,7 @@ export default function ProveedoresPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((p) => (
+              sortData(filtered).map((p) => (
                 <TableRow
                   key={p.id}
                   className="cursor-pointer hover:bg-muted/50"

@@ -11,6 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableHead } from '@/components/ui/sortable-head';
+import { useSortableTable } from '@/hooks/use-sortable-table';
 import {
   Sheet,
   SheetContent,
@@ -571,6 +573,7 @@ export default function InventarioPage() {
 
   // Movimientos (kardex) state
   const [movimientos, setMovimientos] = useState<MovimientoRow[]>([]);
+  const { sortKey, sortDir, onSort, sortData } = useSortableTable('nombre', 'asc');
   const [loadingMovimientos, setLoadingMovimientos] = useState(false);
   const [errorMovimientos, setErrorMovimientos] = useState<string | null>(null);
   const [kardexLoaded, setKardexLoaded] = useState(false);
@@ -898,7 +901,7 @@ export default function InventarioPage() {
           .filter(([, s]) => s.count > 0)
           .sort((a, b) => b[1].valor - a[1].valor);
         if (sorted.length === 0) return null;
-        return (
+  return (
           <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
             {sorted.map(([cat, s]) => (
               <button
@@ -1085,13 +1088,13 @@ export default function InventarioPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Producto</TableHead>
-                <TableHead>Categoría</TableHead>
-                <TableHead className="text-right">Stock Actual</TableHead>
-                <TableHead className="text-right">Mínimo</TableHead>
-                <TableHead className="text-right">Último Costo</TableHead>
-                <TableHead className="text-right">Valor Total</TableHead>
-                <TableHead>Estado</TableHead>
+                <SortableHead sortKey="nombre" label="Producto" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+                <SortableHead sortKey="categoria" label="Categoría" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+                <SortableHead sortKey="stock_actual" label="Stock Actual" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="text-right" />
+                <SortableHead sortKey="stock_minimo" label="Mínimo" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="text-right" />
+                <SortableHead sortKey="ultimo_costo" label="Último Costo" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="text-right" />
+                <SortableHead sortKey="valor_inventario" label="Valor Total" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="text-right" />
+                <SortableHead sortKey="bajo_minimo" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1115,7 +1118,7 @@ export default function InventarioPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredStock.map((item) => (
+                sortData(filteredStock).map((item) => (
                   <TableRow
                     key={item.id}
                     className="cursor-pointer hover:bg-muted/50"

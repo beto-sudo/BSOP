@@ -12,6 +12,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableHead } from '@/components/ui/sortable-head';
+import { useSortableTable } from '@/hooks/use-sortable-table';
 import {
   Dialog,
   DialogContent,
@@ -230,12 +232,14 @@ function JuntasInner() {
     }
   };
 
+
   const filtered = juntas.filter((j) => {
     if (search && !j.titulo.toLowerCase().includes(search.toLowerCase())) return false;
     if (filterEstado !== 'all' && j.estado !== filterEstado) return false;
     return true;
   });
 
+  const { sortKey, sortDir, onSort, sortData } = useSortableTable('fecha_inicio', 'desc');
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -327,16 +331,16 @@ function JuntasInner() {
           <Table>
             <TableHeader>
               <TableRow className="border-[var(--border)] hover:bg-transparent">
-                <TableHead className="font-medium text-[var(--text)]/55">Título</TableHead>
-                <TableHead className="w-24 font-medium text-[var(--text)]/55">Tipo</TableHead>
-                <TableHead className="w-28 font-medium text-[var(--text)]/55">Estado</TableHead>
-                <TableHead className="w-48 font-medium text-[var(--text)]/55">Fecha y hora</TableHead>
-                <TableHead className="w-32 font-medium text-[var(--text)]/55">Lugar</TableHead>
+                <SortableHead sortKey="titulo" label="Título" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+                <SortableHead sortKey="tipo" label="Tipo" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-24" />
+                <SortableHead sortKey="estado" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
+                <SortableHead sortKey="fecha_hora" label="Fecha y hora" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-48" />
+                <SortableHead sortKey="lugar" label="Lugar" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-32" />
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((junta) => (
+              {sortData(filtered).map((junta) => (
                 <TableRow
                   key={junta.id}
                   className="cursor-pointer border-[var(--border)] transition-colors hover:bg-[var(--panel)]"
