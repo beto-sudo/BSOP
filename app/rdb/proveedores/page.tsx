@@ -2,6 +2,7 @@
 
 import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import {
   Table,
@@ -23,7 +24,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
-import { Truck, RefreshCw, Search, Phone, Mail, FileText, Save } from 'lucide-react';
+import { Truck, RefreshCw, Search, Phone, Mail, FileText, Save, Pencil, Ban, RotateCcw } from 'lucide-react';
 
 const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
 
@@ -31,6 +32,7 @@ const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
 
 type Proveedor = {
   id: string;
+  persona_id: string | null;
   nombre: string;
   contacto: string | null;
   telefono: string | null;
@@ -49,10 +51,16 @@ function ProveedorDetail({
   proveedor,
   open,
   onClose,
+  onEdit,
+  onToggleActivo,
+  saving,
 }: {
   proveedor: Proveedor | null;
   open: boolean;
   onClose: () => void;
+  onEdit: (p: Proveedor) => void;
+  onToggleActivo: (p: Proveedor) => void;
+  saving: boolean;
 }) {
   if (!proveedor) return null;
 
@@ -71,7 +79,15 @@ function ProveedorDetail({
         <img src="/membrete-rdb.jpg" alt="Membrete Rincón del Bosque" className="hidden print:block w-full object-contain mb-6" />
         <SheetHeader>
           <SheetTitle>{proveedor.nombre}</SheetTitle>
-          <div className="absolute right-12 top-4 hidden sm:flex print:hidden">
+          <div className="absolute right-12 top-4 hidden sm:flex gap-2 print:hidden">
+            <Button variant="outline" size="sm" onClick={() => onEdit(proveedor)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Editar
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => onToggleActivo(proveedor)} disabled={saving}>
+              {proveedor.activo ? <Ban className="mr-2 h-4 w-4" /> : <RotateCcw className="mr-2 h-4 w-4" />}
+              {proveedor.activo ? 'Inactivar' : 'Reactivar'}
+            </Button>
             <Button variant="outline" size="sm" onClick={() => window.print()}>
               Imprimir
             </Button>
@@ -126,6 +142,7 @@ function ProveedorDetail({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ProveedoresPage() {
+  const router = useRouter();
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -136,7 +153,9 @@ export default function ProveedoresPage() {
 
   // Form State
   const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
+  const [editDrawerOpen, setEditDrawerOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [newNombre, setNewNombre] = useState('');
   const [newContacto, setNewContacto] = useState('');
   const [newTelefono, setNewTelefono] = useState('');
@@ -144,6 +163,10 @@ export default function ProveedoresPage() {
   const [newRFC, setNewRFC] = useState('');
   const [newDireccion, setNewDireccion] = useState('');
   const [newNotas, setNewNotas] = useState('');
+  const [editNombre, setEditNombre] = useState('');
+  const [editTelefono, setEditTelefono] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editRFC, setEditRFC] = useState('');
 
   const handleCreate = async () => {
     if (!newNombre.trim()) {
@@ -205,14 +228,15 @@ export default function ProveedoresPage() {
       const { data, error: err } = await supabase
         .schema('erp')
         .from('proveedores')
-        .select('id, activo, created_at, updated_at, personas!persona_id(nombre, email, telefono, rfc)')
+        .select('id, persona_id, activo, created_at, updated_at, personas!persona_id(nombre, email, telefono, rfc)')
         .eq('empresa_id', RDB_EMPRESA_ID);
       if (err) throw err;
-      type RawProv = { id: string; activo: boolean; created_at: string | null; updated_at: string | null; personas: unknown };
+      type RawProv = { id: string; persona_id: string | null; activo: boolean; created_at: string | null; updated_at: string | null; personas: unknown };
       const mapped: Proveedor[] = ((data ?? []) as unknown as RawProv[]).map((p) => {
         const persona = p.personas as { nombre: string; email: string | null; telefono: string | null; rfc: string | null } | null;
         return {
           id: p.id,
+          persona_id: p.persona_id,
           nombre: persona?.nombre ?? '—',
           contacto: null,
           telefono: persona?.telefono ?? null,
@@ -250,6 +274,73 @@ export default function ProveedoresPage() {
   });
 
   const activos = proveedores.filter((p) => p.activo).length;
+
+  const openEdit = (p: Proveedor) => {
+    setEditNombre(p.nombre ?? '');
+    setEditTelefono(p.telefono ?? '');
+    setEditEmail(p.email ?? '');
+    setEditRFC(p.rfc ?? '');
+    setEditDrawerOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selected?.persona_id) return;
+    if (!editNombre.trim()) {
+      alert('El nombre es obligatorio');
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { error } = await supabase
+        .schema('erp')
+        .from('personas')
+        .update({
+          nombre: editNombre.trim(),
+          telefono: editTelefono.trim() || null,
+          email: editEmail.trim() || null,
+          rfc: editRFC.trim() || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('empresa_id', RDB_EMPRESA_ID)
+        .eq('id', selected.persona_id);
+      if (error) throw error;
+      setEditDrawerOpen(false);
+      await fetchProveedores();
+      router.refresh();
+    } catch (e) {
+      console.error(e);
+      alert('Error al guardar cambios del proveedor');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleToggleActivo = async (p: Proveedor) => {
+    const accion = p.activo ? 'inactivar' : 'reactivar';
+    if (!confirm(`¿Seguro que quieres ${accion} este proveedor?`)) return;
+    setSavingEdit(true);
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { error } = await supabase
+        .schema('erp')
+        .from('proveedores')
+        .update({ activo: !p.activo, updated_at: new Date().toISOString() })
+        .eq('empresa_id', RDB_EMPRESA_ID)
+        .eq('id', p.id);
+      if (error) throw error;
+      if (selected?.id === p.id) {
+        setSelected({ ...selected, activo: !p.activo });
+      }
+      await fetchProveedores();
+      router.refresh();
+    } catch (e) {
+      console.error(e);
+      alert(`Error al ${accion} proveedor`);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   return (
     <RequireAccess empresa="rdb" modulo="rdb.proveedores">
@@ -379,7 +470,46 @@ export default function ProveedoresPage() {
         proveedor={selected}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
+        onEdit={openEdit}
+        onToggleActivo={handleToggleActivo}
+        saving={savingEdit}
       />
+
+      <Sheet open={editDrawerOpen} onOpenChange={setEditDrawerOpen}>
+        <SheetContent className="sm:max-w-[600px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Editar Proveedor</SheetTitle>
+          </SheetHeader>
+          <div className="mt-8 space-y-6">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">Razón Social / Nombre Comercial <span className="text-destructive">*</span></label>
+                <Input value={editNombre} onChange={(e) => setEditNombre(e.target.value)} />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium leading-none">Teléfono</label>
+                  <Input value={editTelefono} onChange={(e) => setEditTelefono(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium leading-none">Email</label>
+                  <Input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">RFC</label>
+                <Input value={editRFC} onChange={(e) => setEditRFC(e.target.value)} className="uppercase" />
+              </div>
+            </div>
+            <div className="flex justify-end pt-6 border-t">
+              <Button onClick={handleSaveEdit} disabled={savingEdit} className="gap-2">
+                {savingEdit ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Guardar cambios
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Create Proveedor Drawer */}
       <Sheet open={createDrawerOpen} onOpenChange={setCreateDrawerOpen}>
