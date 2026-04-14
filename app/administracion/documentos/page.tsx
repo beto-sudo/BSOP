@@ -2,6 +2,7 @@
 
 import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useState } from 'react';
+import * as tus from 'tus-js-client';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import {
   Table,
@@ -157,12 +158,72 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+const RESUMABLE_UPLOAD_THRESHOLD = 6 * 1024 * 1024;
+const RESUMABLE_CHUNK_SIZE = 6 * 1024 * 1024;
+
+function getStorageResumableEndpoint() {
+  const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!baseUrl) throw new Error('Falta NEXT_PUBLIC_SUPABASE_URL');
+
+  const parsed = new URL(baseUrl);
+  parsed.hostname = parsed.hostname.replace('.supabase.co', '.storage.supabase.co');
+  parsed.pathname = '/storage/v1/upload/resumable';
+  parsed.search = '';
+  parsed.hash = '';
+  return parsed.toString();
+}
+
+async function uploadFileResumable(
+  supabase: ReturnType<typeof createSupabaseERPClient>,
+  file: File,
+  path: string,
+  onProgress?: (percent: number) => void,
+) {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) throw new Error('No encontré sesión activa para subir el archivo.');
+
+  const endpoint = getStorageResumableEndpoint();
+
+  await new Promise<void>((resolve, reject) => {
+    const upload = new tus.Upload(file, {
+      endpoint,
+      retryDelays: [0, 3000, 5000, 10000, 20000],
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        'x-upsert': 'false',
+      },
+      uploadDataDuringCreation: true,
+      removeFingerprintOnSuccess: true,
+      chunkSize: RESUMABLE_CHUNK_SIZE,
+      metadata: {
+        bucketName: 'adjuntos',
+        objectName: path,
+        contentType: file.type || 'application/octet-stream',
+      },
+      onError: (error) => reject(error),
+      onProgress: (bytesUploaded, bytesTotal) => {
+        if (!bytesTotal) return;
+        onProgress?.(Math.round((bytesUploaded / bytesTotal) * 100));
+      },
+      onSuccess: () => resolve(),
+    });
+
+    upload.findPreviousUploads().then((previousUploads) => {
+      if (previousUploads.length > 0) upload.resumeFromPreviousUpload(previousUploads[0]);
+      upload.start();
+    }).catch(reject);
+  });
+}
+
 // ─── Adjuntos subcomponent ──────────────────────────────────────────────────────
 
 function DocumentoAdjuntos({ documentoId, empresaId }: { documentoId: string; empresaId: string }) {
   const supabase = createSupabaseERPClient();
   const [adjuntos, setAdjuntos] = useState<Adjunto[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   const fetchAdjuntos = useCallback(async () => {
     const { data } = await supabase
@@ -182,17 +243,31 @@ function DocumentoAdjuntos({ documentoId, empresaId }: { documentoId: string; em
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
+    setUploadProgress(0);
 
     const ext = file.name.split('.').pop() ?? 'pdf';
     const path = `documentos/${empresaId}/${documentoId}/${Date.now()}.${ext}`;
 
-    const { data: uploadData, error: uploadErr } = await supabase.storage
-      .from('adjuntos')
-      .upload(path, file, { upsert: false });
+    let uploadErr: string | null = null;
 
-    if (uploadErr || !uploadData) {
-      alert(`Error al subir archivo: ${uploadErr?.message ?? 'desconocido'}`);
+    try {
+      if (file.size > RESUMABLE_UPLOAD_THRESHOLD) {
+        await uploadFileResumable(supabase, file, path, setUploadProgress);
+      } else {
+        const { error } = await supabase.storage
+          .from('adjuntos')
+          .upload(path, file, { upsert: false });
+        if (error) uploadErr = error.message;
+        setUploadProgress(100);
+      }
+    } catch (err: any) {
+      uploadErr = err?.message ?? 'Error desconocido';
+    }
+
+    if (uploadErr) {
+      alert(`Error al subir archivo: ${uploadErr}`);
       setUploading(false);
+      setUploadProgress(null);
       return;
     }
 
@@ -205,7 +280,7 @@ function DocumentoAdjuntos({ documentoId, empresaId }: { documentoId: string; em
       .eq('email', (await supabase.auth.getUser()).data.user?.email?.toLowerCase() ?? '')
       .maybeSingle();
 
-    await supabase
+    const { error: insertErr } = await supabase
       .schema('erp' as any)
       .from('adjuntos')
       .insert({
@@ -219,7 +294,16 @@ function DocumentoAdjuntos({ documentoId, empresaId }: { documentoId: string; em
         tamano_bytes: file.size,
       });
 
+    if (insertErr) {
+      alert(`Archivo subido, pero falló el registro del adjunto: ${insertErr.message}`);
+      setUploading(false);
+      setUploadProgress(null);
+      e.target.value = '';
+      return;
+    }
+
     setUploading(false);
+    setUploadProgress(null);
     e.target.value = '';
     void fetchAdjuntos();
   };
@@ -232,7 +316,7 @@ function DocumentoAdjuntos({ documentoId, empresaId }: { documentoId: string; em
           <input type="file" accept=".pdf,.doc,.docx,.jpg,.png" className="hidden" onChange={handleUpload} disabled={uploading} />
           <span className="inline-flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1 text-xs text-[var(--text)]/70 transition hover:bg-[var(--card)] hover:text-[var(--text)] cursor-pointer">
             {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Paperclip className="h-3 w-3" />}
-            {uploading ? 'Subiendo...' : 'Adjuntar'}
+            {uploading ? `Subiendo${uploadProgress != null ? ` ${uploadProgress}%` : '...'}` : 'Adjuntar'}
           </span>
         </label>
       </div>
@@ -396,7 +480,7 @@ function DocumentosInner() {
   const expiredCount = documentos.filter((d) => getVencimientoStatus(d.fecha_vencimiento) === 'expired').length;
   const soonCount = documentos.filter((d) => getVencimientoStatus(d.fecha_vencimiento) === 'soon').length;
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable('fecha_emision', 'desc');
+  const { sortKey, sortDir, onSort, sortData } = useSortableTable<Documento>('fecha_emision', 'desc');
   return (
     <div className="space-y-6">
       {/* Header */}
