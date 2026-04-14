@@ -85,8 +85,7 @@ function DepartamentosInner() {
   const fetchAll = useCallback(async (ids: string[]) => {
     if (ids.length === 0) { setDepartamentos([]); return; }
     const { data, error: err } = await supabase
-      .schema('erp' as any)
-      .from('departamentos')
+      .schema('erp' as any).from('departamentos')
       .select('id, empresa_id, nombre, codigo, padre_id, activo, padre:padre_id(nombre)')
       .in('empresa_id', ids)
       .order('nombre');
