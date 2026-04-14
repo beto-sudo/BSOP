@@ -309,7 +309,7 @@ function JuntaDetailInner() {
     <div className="space-y-6 pb-12">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => router.push('/dilesa/juntas')} className="rounded-xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]"><ArrowLeft className="h-4 w-4" /></Button>
+          <Button variant="outline" size="sm" onClick={() => router.push('/dilesa/admin/juntas')} className="rounded-xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]"><ArrowLeft className="h-4 w-4" /></Button>
           <div>
             <h1 className="text-xl font-bold tracking-tight text-[var(--text)] line-clamp-1">{junta.titulo}</h1>
             <p className="text-xs text-[var(--text)]/50 mt-0.5">{new Date(junta.fecha_hora).toLocaleString('es-MX', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}</p>

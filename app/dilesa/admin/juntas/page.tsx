@@ -153,7 +153,7 @@ function JuntasInner() {
     if (err) { alert(`Error al crear junta: ${err.message}`); return; }
     setShowCreate(false);
     setCreateForm({ titulo: '', fecha_hora: '', lugar: '', duracion_minutos: '60', tipo: '', estado: 'programada' });
-    if (newJunta) router.push(`/dilesa/juntas/${newJunta.id}`);
+    if (newJunta) router.push(`/dilesa/admin/juntas/${newJunta.id}`);
   };
 
   const filtered = juntas.filter((j) => {
@@ -227,7 +227,7 @@ function JuntasInner() {
             </TableHeader>
             <TableBody>
               {sortData(filtered).map((junta) => (
-                <TableRow key={junta.id} className="cursor-pointer border-[var(--border)] transition-colors hover:bg-[var(--panel)]" onClick={() => router.push(`/dilesa/juntas/${junta.id}`)}>
+                <TableRow key={junta.id} className="cursor-pointer border-[var(--border)] transition-colors hover:bg-[var(--panel)]" onClick={() => router.push(`/dilesa/admin/juntas/${junta.id}`)}>
                   <TableCell><span className="line-clamp-1 font-medium text-[var(--text)]">{junta.titulo}</span></TableCell>
                   <TableCell>
                     {junta.tipo ? (<span className="text-sm text-[var(--text)]/70">{TIPO_CONFIG[junta.tipo]?.icon} {TIPO_CONFIG[junta.tipo]?.label}</span>) : (<span className="text-[var(--text)]/40">—</span>)}

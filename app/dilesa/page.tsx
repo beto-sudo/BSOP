@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { ClipboardList, Users, FileText, Briefcase, Building2 } from 'lucide-react';
 
 const modules = [
-  { label: 'Tareas', href: '/dilesa/tasks', icon: ClipboardList, color: 'bg-blue-500/10 text-blue-500' },
-  { label: 'Juntas', href: '/dilesa/juntas', icon: Users, color: 'bg-violet-500/10 text-violet-500' },
-  { label: 'Documentos', href: '/dilesa/documentos', icon: FileText, color: 'bg-amber-500/10 text-amber-500' },
+  { label: 'Tareas', href: '/dilesa/admin/tasks', icon: ClipboardList, color: 'bg-blue-500/10 text-blue-500' },
+  { label: 'Juntas', href: '/dilesa/admin/juntas', icon: Users, color: 'bg-violet-500/10 text-violet-500' },
+  { label: 'Documentos', href: '/dilesa/admin/documentos', icon: FileText, color: 'bg-amber-500/10 text-amber-500' },
   { label: 'Empleados', href: '/dilesa/rh/empleados', icon: Users, color: 'bg-emerald-500/10 text-emerald-500' },
   { label: 'Puestos', href: '/dilesa/rh/puestos', icon: Briefcase, color: 'bg-cyan-500/10 text-cyan-500' },
   { label: 'Departamentos', href: '/dilesa/rh/departamentos', icon: Building2, color: 'bg-rose-500/10 text-rose-500' },

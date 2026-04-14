@@ -49,9 +49,9 @@ const NAV_ITEMS: NavItem[] = [
     icon: 'DILESA_LOGO',
     children: [
       { label: 'Administración', href: '#', divider: true },
-      { label: 'Tareas', href: '/dilesa/tasks' },
-      { label: 'Juntas', href: '/dilesa/juntas' },
-      { label: 'Documentos', href: '/dilesa/documentos' },
+      { label: 'Tareas', href: '/dilesa/admin/tasks' },
+      { label: 'Juntas', href: '/dilesa/admin/juntas' },
+      { label: 'Documentos', href: '/dilesa/admin/documentos' },
       { label: 'Recursos Humanos', href: '#', divider: true },
       { label: 'Empleados', href: '/dilesa/rh/empleados' },
       { label: 'Puestos', href: '/dilesa/rh/puestos' },
@@ -120,9 +120,9 @@ const NAV_ITEMS: NavItem[] = [
 
 /** Maps route hrefs to their modulo slug for permission checks */
 const ROUTE_TO_MODULE: Record<string, string> = {
-  '/dilesa/tasks': 'dilesa.tasks',
-  '/dilesa/juntas': 'dilesa.juntas',
-  '/dilesa/documentos': 'dilesa.documentos',
+  '/dilesa/admin/tasks': 'dilesa.admin.tasks',
+  '/dilesa/admin/juntas': 'dilesa.admin.juntas',
+  '/dilesa/admin/documentos': 'dilesa.admin.documentos',
   '/dilesa/rh/empleados': 'dilesa.rh.empleados',
   '/dilesa/rh/puestos': 'dilesa.rh.puestos',
   '/dilesa/rh/departamentos': 'dilesa.rh.departamentos',
