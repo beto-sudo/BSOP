@@ -344,7 +344,7 @@ function JuntaDetailInner() {
     setLugar(juntaData.lugar ?? '');
     setEstado(juntaData.estado);
     setTipo(juntaData.tipo ?? '');
-    if (editor && juntaData.descripcion) editor.commands.setContent(juntaData.descripcion);
+    // Content is set in a separate useEffect that depends on editor readiness
 
     const { data: asistData } = await supabase.schema('erp' as any).from('juntas_asistencia').select('*, persona:persona_id(nombre, apellido_paterno)').eq('junta_id', id).order('created_at');
     setAsistencia(asistData ?? []);
@@ -366,10 +366,19 @@ function JuntaDetailInner() {
     }
 
     setLoading(false);
-  }, [id, supabase, editor]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, supabase]);
 
   useEffect(() => { void fetchAll(); }, [fetchAll]);
-  useEffect(() => { if (editor && junta?.descripcion && editor.isEmpty) editor.commands.setContent(junta.descripcion); }, [editor, junta]);
+  useEffect(() => {
+    if (editor && junta?.descripcion) {
+      // Always set content when editor becomes ready or junta data changes
+      const currentContent = editor.getHTML();
+      if (currentContent === '' || currentContent === '<p></p>') {
+        editor.commands.setContent(junta.descripcion);
+      }
+    }
+  }, [editor, junta]);
 
   const handleSave = async () => {
     if (!junta) return;
