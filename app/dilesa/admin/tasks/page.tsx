@@ -586,7 +586,7 @@ function TasksInner() {
             )}
           </div>
         ) : (
-          <Table>
+          <Table className="min-w-[900px]">
             <TableHeader>
               <TableRow className="border-[var(--border)] hover:bg-transparent">
                 {(isDireccion || isAdmin) && <TableHead className="w-10" />}
