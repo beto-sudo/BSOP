@@ -67,6 +67,7 @@ type TaskForm = {
   estado: ErpTask['estado'];
   fecha_compromiso: string;
   porcentaje_avance: number;
+  motivo_bloqueo: string;
 };
 
 const PRIORIDAD_OPTIONS = ['Urgente', 'Alta', 'Media', 'Baja'] as const;
@@ -230,7 +231,7 @@ function TasksInner() {
 
   const emptyForm = (): TaskForm => ({
     titulo: '', descripcion: '', prioridad: '', asignado_a: '',
-    estado: 'en_progreso', fecha_compromiso: '', porcentaje_avance: 0,
+    estado: 'pendiente', fecha_compromiso: '', porcentaje_avance: 0, motivo_bloqueo: '',
   });
 
   const [showCreate, setShowCreate] = useState(false);
@@ -342,6 +343,7 @@ function TasksInner() {
         estado: createForm.estado,
         fecha_compromiso: createForm.fecha_compromiso || null,
         porcentaje_avance: createForm.porcentaje_avance,
+        motivo_bloqueo: createForm.estado === 'bloqueado' ? (createForm.motivo_bloqueo.trim() || null) : null,
       });
     setCreating(false);
     if (err) { alert(`Error al crear tarea: ${err.message}`); return; }
@@ -360,6 +362,7 @@ function TasksInner() {
       estado: task.estado,
       fecha_compromiso: task.fecha_compromiso ? task.fecha_compromiso.split('T')[0] : (task.fecha_vence ? task.fecha_vence.split('T')[0] : ''),
       porcentaje_avance: task.porcentaje_avance ?? 0,
+      motivo_bloqueo: task.motivo_bloqueo ?? '',
     });
     setShowEdit(true);
   };
@@ -395,6 +398,7 @@ function TasksInner() {
       if (editForm.estado === 'completado' && selectedTask.estado !== 'completado') {
         updatePayload.completado_por = currentEmpleadoId;
       }
+      updatePayload.motivo_bloqueo = editForm.estado === 'bloqueado' ? (editForm.motivo_bloqueo.trim() || null) : null;
     }
     const { error: err } = await supabase
       .schema('erp' as any).from('tasks').update(updatePayload).eq('id', selectedTask.id);
@@ -434,6 +438,13 @@ function TasksInner() {
     if (estado === 'completado') {
       update.completado_por = currentEmpleadoId;
       update.porcentaje_avance = 100;
+    }
+    if (estado === 'bloqueado') {
+      const motivo = prompt('Motivo del bloqueo:');
+      if (motivo === null) return; // cancelled
+      update.motivo_bloqueo = motivo.trim() || null;
+    } else {
+      update.motivo_bloqueo = null;
     }
     await supabase.schema('erp' as any).from('tasks').update(update).eq('id', taskId);
     await fetchTasks();
@@ -794,8 +805,21 @@ function TasksInner() {
                   </SelectContent>
                 </Select>
               </div>
-              {/* Estado se asigna automáticamente como 'en_progreso' */}
+              {/* Estado se asigna automáticamente como 'pendiente' */}
             </div>
+
+            {createForm.estado === 'bloqueado' && (
+              <div>
+                <FieldLabel required>Motivo del Bloqueo</FieldLabel>
+                <Textarea
+                  placeholder="Describe por qué está bloqueada..."
+                  value={createForm.motivo_bloqueo}
+                  onChange={(e) => setCreateForm(f => ({ ...f, motivo_bloqueo: e.target.value }))}
+                  rows={2}
+                  className="resize-none rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+                />
+              </div>
+            )}
 
             <div>
               <FieldLabel required>Responsable</FieldLabel>
@@ -907,6 +931,19 @@ function TasksInner() {
                 </Select>
               </div>
             </div>
+
+            {editForm.estado === 'bloqueado' && (
+              <div>
+                <FieldLabel required>Motivo del Bloqueo</FieldLabel>
+                <Textarea
+                  placeholder="Describe por qué está bloqueada..."
+                  value={editForm.motivo_bloqueo}
+                  onChange={(e) => setEditForm(f => ({ ...f, motivo_bloqueo: e.target.value }))}
+                  rows={2}
+                  className="resize-none rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+                />
+              </div>
+            )}
 
             <div>
               <FieldLabel>Responsable</FieldLabel>
