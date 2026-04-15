@@ -1049,7 +1049,7 @@ function DocumentosInner() {
 
 export default function DilesaDocumentosPage() {
   return (
-    <RequireAccess empresa="dilesa" modulo="dilesa.documentos">
+    <RequireAccess empresa="dilesa">
       <DocumentosInner />
     </RequireAccess>
   );
