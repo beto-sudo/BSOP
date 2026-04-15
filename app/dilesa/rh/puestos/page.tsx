@@ -9,8 +9,8 @@ import {
 import { SortableHead } from '@/components/ui/sortable-head';
 import { useSortableTable } from '@/hooks/use-sortable-table';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from '@/components/ui/dialog';
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter,
+} from '@/components/ui/sheet';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -40,6 +40,7 @@ function PuestosInner() {
   const supabase = createSupabaseERPClient();
   const [puestos, setPuestos] = useState<Puesto[]>([]);
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
+  const [empleadoCounts, setEmpleadoCounts] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterDepto, setFilterDepto] = useState('all');
@@ -49,15 +50,21 @@ function PuestosInner() {
   const [form, setForm] = useState(EMPTY_FORM);
 
   const fetchAll = useCallback(async () => {
-    const [pRes, dRes] = await Promise.all([
+    const [pRes, dRes, empRes] = await Promise.all([
       supabase.schema('erp' as any).from('puestos')
         .select('id, empresa_id, nombre, nivel, sueldo_min, sueldo_max, objetivo, perfil, requisitos, esquema_pago, reporta_a, activo, departamento:departamento_id(nombre)')
         .eq('empresa_id', EMPRESA_ID).order('nombre'),
       supabase.schema('erp' as any).from('departamentos').select('id, nombre').eq('empresa_id', EMPRESA_ID).eq('activo', true).order('nombre'),
+      supabase.schema('erp' as any).from('empleados').select('puesto_id').eq('empresa_id', EMPRESA_ID).eq('activo', true).is('deleted_at', null),
     ]);
     if (pRes.error) { setError(pRes.error.message); return; }
     setPuestos((pRes.data ?? []).map((p: any) => ({ ...p, departamento: Array.isArray(p.departamento) ? (p.departamento[0] ?? null) : p.departamento })) as Puesto[]);
     setDepartamentos(dRes.data ?? []);
+    const counts = new Map<string, number>();
+    (empRes.data ?? []).forEach((e: { puesto_id: string }) => {
+      if (e.puesto_id) counts.set(e.puesto_id, (counts.get(e.puesto_id) ?? 0) + 1);
+    });
+    setEmpleadoCounts(counts);
   }, [supabase]);
 
   useEffect(() => {
@@ -127,11 +134,12 @@ function PuestosInner() {
               <SortableHead sortKey="nivel" label="Nivel" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
               <SortableHead sortKey="departamento_nombre" label="Departamento" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-36" />
               <SortableHead sortKey="sueldo_min" label="Rango salarial" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-40" />
+              <SortableHead sortKey="emp_count" label="Empleados" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-24" />
               <SortableHead sortKey="esquema_pago" label="Esquema pago" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-32" />
               <TableHead className="w-10" />
             </TableRow></TableHeader>
             <TableBody>
-              {sortData(puestos.filter((p) => filterDepto === 'all' || p.departamento?.nombre === filterDepto).map((p) => ({ ...p, departamento_nombre: p.departamento?.nombre ?? null }))).map((p) => {
+              {sortData(puestos.filter((p) => filterDepto === 'all' || p.departamento?.nombre === filterDepto).map((p) => ({ ...p, departamento_nombre: p.departamento?.nombre ?? null, emp_count: empleadoCounts.get(p.id) ?? 0 }))).map((p) => {
                 const salaryRange = p.sueldo_min != null || p.sueldo_max != null
                   ? `$${(p.sueldo_min ?? 0).toLocaleString('es-MX')} – $${(p.sueldo_max ?? 0).toLocaleString('es-MX')}`
                   : '—';
@@ -141,6 +149,7 @@ function PuestosInner() {
                   <TableCell><span className="text-sm text-[var(--text)]/70">{p.nivel ?? '—'}</span></TableCell>
                   <TableCell><span className="text-sm text-[var(--text)]/70">{p.departamento?.nombre ?? '—'}</span></TableCell>
                   <TableCell><span className="text-xs font-mono text-[var(--text)]/60">{salaryRange}</span></TableCell>
+                  <TableCell><span className="text-sm text-[var(--text)]/60">{empleadoCounts.get(p.id) ?? 0}</span></TableCell>
                   <TableCell><span className="text-sm text-[var(--text)]/70">{p.esquema_pago ?? '—'}</span></TableCell>
                   <TableCell><Button variant="outline" size="sm" onClick={() => openEdit(p)} className="rounded-xl h-7 w-7 p-0 border-[var(--border)]"><Pencil className="h-3.5 w-3.5" /></Button></TableCell>
                 </TableRow>
@@ -151,10 +160,10 @@ function PuestosInner() {
         )}
       </div>
 
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto rounded-3xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
-          <DialogHeader><DialogTitle>{editingId ? 'Editar puesto' : 'Nuevo puesto'}</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-2">
+      <Sheet open={showDialog} onOpenChange={setShowDialog}>
+        <SheetContent side="right" className="w-full max-w-lg overflow-y-auto border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
+          <SheetHeader><SheetTitle>{editingId ? 'Editar puesto' : 'Nuevo puesto'}</SheetTitle></SheetHeader>
+          <div className="space-y-4 px-4">
             <div><FieldLabel>Nombre *</FieldLabel><Input value={form.nombre} onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))} placeholder="Director Comercial..." className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
             <div className="grid grid-cols-2 gap-4">
               <div><FieldLabel>Nivel</FieldLabel><Input value={form.nivel} onChange={(e) => setForm((f) => ({ ...f, nivel: e.target.value }))} placeholder="Senior, Jr, C-Level..." className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
@@ -169,14 +178,14 @@ function PuestosInner() {
             <div><FieldLabel>Perfil</FieldLabel><Textarea value={form.perfil} onChange={(e) => setForm((f) => ({ ...f, perfil: e.target.value }))} placeholder="Competencias, habilidades..." rows={3} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)] resize-none" /></div>
             <div><FieldLabel>Requisitos</FieldLabel><Textarea value={form.requisitos} onChange={(e) => setForm((f) => ({ ...f, requisitos: e.target.value }))} placeholder="Escolaridad, experiencia..." rows={3} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)] resize-none" /></div>
           </div>
-          <DialogFooter className="gap-2">
+          <SheetFooter className="gap-2">
             <Button variant="outline" onClick={() => setShowDialog(false)} className="rounded-xl border-[var(--border)] text-[var(--text)]">Cancelar</Button>
             <Button onClick={handleSubmit} disabled={submitting || !form.nombre.trim()} className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60">
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}{editingId ? 'Guardar' : 'Crear'}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

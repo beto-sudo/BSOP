@@ -10,8 +10,8 @@ import {
 import { SortableHead } from '@/components/ui/sortable-head';
 import { useSortableTable } from '@/hooks/use-sortable-table';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from '@/components/ui/dialog';
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter,
+} from '@/components/ui/sheet';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -203,9 +203,9 @@ function EmpleadosInner() {
         <p className="text-right text-xs text-[var(--text)]/40">{visible.length} de {empleados.length} empleado{empleados.length !== 1 ? 's' : ''}</p>
       )}
 
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto rounded-3xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
-          <DialogHeader><DialogTitle className="text-[var(--text)]">Nuevo empleado</DialogTitle></DialogHeader>
+      <Sheet open={showCreate} onOpenChange={setShowCreate}>
+        <SheetContent side="right" className="w-full max-w-lg overflow-y-auto border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
+          <SheetHeader><SheetTitle>Nuevo empleado</SheetTitle></SheetHeader>
           <div className="space-y-4 py-2">
             <div><FieldLabel>Persona *</FieldLabel><Select value={createForm.persona_id} onValueChange={(v) => setCreateForm((f) => ({ ...f, persona_id: v ?? '' }))}><SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue placeholder="Seleccionar persona..." /></SelectTrigger><SelectContent>{personas.map((p) => (<SelectItem key={p.id} value={p.id}>{[p.nombre, p.apellido_paterno].filter(Boolean).join(' ')}</SelectItem>))}</SelectContent></Select></div>
             <div className="grid grid-cols-2 gap-4">
@@ -217,14 +217,14 @@ function EmpleadosInner() {
               <div><FieldLabel>Fecha de ingreso</FieldLabel><Input type="date" value={createForm.fecha_ingreso} onChange={(e) => setCreateForm((f) => ({ ...f, fecha_ingreso: e.target.value }))} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
             </div>
           </div>
-          <DialogFooter className="gap-2">
+          <SheetFooter className="gap-2">
             <Button variant="outline" onClick={() => setShowCreate(false)} className="rounded-xl border-[var(--border)] text-[var(--text)]">Cancelar</Button>
             <Button onClick={handleCreate} disabled={creating || !createForm.persona_id} className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60">
               {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}Crear
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

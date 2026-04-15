@@ -9,8 +9,8 @@ import {
 import { SortableHead } from '@/components/ui/sortable-head';
 import { useSortableTable } from '@/hooks/use-sortable-table';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from '@/components/ui/dialog';
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter,
+} from '@/components/ui/sheet';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -138,22 +138,22 @@ function DepartamentosInner() {
         )}
       </div>
 
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="max-w-md rounded-3xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
-          <DialogHeader><DialogTitle>{editingId ? 'Editar departamento' : 'Nuevo departamento'}</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-2">
+      <Sheet open={showDialog} onOpenChange={setShowDialog}>
+        <SheetContent side="right" className="w-full max-w-md border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
+          <SheetHeader><SheetTitle>{editingId ? 'Editar departamento' : 'Nuevo departamento'}</SheetTitle></SheetHeader>
+          <div className="space-y-4 px-4">
             <div><FieldLabel>Nombre *</FieldLabel><Input value={form.nombre} onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))} placeholder="Ventas, Recursos Humanos..." className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
             <div><FieldLabel>Código</FieldLabel><Input value={form.codigo} onChange={(e) => setForm((f) => ({ ...f, codigo: e.target.value }))} placeholder="RRHH, VTA..." className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
             <div><FieldLabel>Departamento padre</FieldLabel><Select value={form.padre_id} onValueChange={(v) => setForm((f) => ({ ...f, padre_id: v ?? '' }))}><SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue placeholder="Ninguno (nivel raíz)" /></SelectTrigger><SelectContent>{parentOptions.map((d) => <SelectItem key={d.id} value={d.id}>{d.nombre}</SelectItem>)}</SelectContent></Select></div>
           </div>
-          <DialogFooter className="gap-2">
+          <SheetFooter className="gap-2">
             <Button variant="outline" onClick={() => setShowDialog(false)} className="rounded-xl border-[var(--border)] text-[var(--text)]">Cancelar</Button>
             <Button onClick={handleSubmit} disabled={submitting || !form.nombre.trim()} className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60">
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}{editingId ? 'Guardar' : 'Crear'}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

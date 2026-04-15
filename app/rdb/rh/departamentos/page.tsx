@@ -14,12 +14,8 @@ import {
 import { SortableHead } from '@/components/ui/sortable-head';
 import { useSortableTable } from '@/hooks/use-sortable-table';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter,
+} from '@/components/ui/sheet';
 import {
   Select,
   SelectContent,
@@ -58,6 +54,7 @@ function DepartamentosInner() {
   const supabase = createSupabaseERPClient();
 
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
+  const [empleadoCounts, setEmpleadoCounts] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,17 +64,25 @@ function DepartamentosInner() {
   const [form, setForm] = useState(EMPTY_FORM);
 
   const fetchAll = useCallback(async () => {
-    const { data, error: err } = await supabase
-      .schema('erp' as any).from('departamentos')
-      .select('id, empresa_id, nombre, codigo, padre_id, activo, padre:padre_id(nombre)')
-      .eq('empresa_id', EMPRESA_ID)
-      .order('nombre');
-    if (err) { setError(err.message); return; }
-    const normalized = (data ?? []).map((d: any) => ({
+    const [deptRes, empRes] = await Promise.all([
+      supabase.schema('erp' as any).from('departamentos')
+        .select('id, empresa_id, nombre, codigo, padre_id, activo, padre:padre_id(nombre)')
+        .eq('empresa_id', EMPRESA_ID).order('nombre'),
+      supabase.schema('erp' as any).from('empleados')
+        .select('departamento_id')
+        .eq('empresa_id', EMPRESA_ID).eq('activo', true).is('deleted_at', null),
+    ]);
+    if (deptRes.error) { setError(deptRes.error.message); return; }
+    const normalized = (deptRes.data ?? []).map((d: any) => ({
       ...d,
       padre: Array.isArray(d.padre) ? (d.padre[0] ?? null) : d.padre,
     })) as Departamento[];
     setDepartamentos(normalized);
+    const counts = new Map<string, number>();
+    (empRes.data ?? []).forEach((e: { departamento_id: string }) => {
+      if (e.departamento_id) counts.set(e.departamento_id, (counts.get(e.departamento_id) ?? 0) + 1);
+    });
+    setEmpleadoCounts(counts);
   }, [supabase]);
 
   useEffect(() => {
@@ -169,12 +174,13 @@ function DepartamentosInner() {
                 <SortableHead sortKey="nombre" label="Nombre" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
                 <SortableHead sortKey="codigo" label="Código" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-24" />
                 <SortableHead sortKey="reporta_a_nombre" label="Reporta a" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-36" />
+                <SortableHead sortKey="emp_count" label="Empleados" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-24" />
                 <SortableHead sortKey="activo" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-20" />
                 <TableHead className="w-20" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortData(departamentos.map((d) => ({ ...d, reporta_a_nombre: d.padre?.nombre ?? null }))).map((d) => (
+              {sortData(departamentos.map((d) => ({ ...d, reporta_a_nombre: d.padre?.nombre ?? null, emp_count: empleadoCounts.get(d.id) ?? 0 }))).map((d) => (
                 <TableRow key={d.id} className="border-[var(--border)]">
                   <TableCell>
                     <span className="font-medium text-[var(--text)]">
@@ -183,6 +189,7 @@ function DepartamentosInner() {
                   </TableCell>
                   <TableCell><span className="text-sm font-mono text-[var(--text)]/60">{d.codigo ?? '—'}</span></TableCell>
                   <TableCell><span className="text-sm text-[var(--text)]/70">{d.padre?.nombre ?? '—'}</span></TableCell>
+                  <TableCell><span className="text-sm text-[var(--text)]/60">{empleadoCounts.get(d.id) ?? 0}</span></TableCell>
                   <TableCell>
                     <button
                       type="button"
@@ -209,11 +216,11 @@ function DepartamentosInner() {
         )}
       </div>
 
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="max-w-md rounded-3xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
-          <DialogHeader>
-            <DialogTitle>{editingId ? 'Editar departamento' : 'Nuevo departamento'}</DialogTitle>
-          </DialogHeader>
+      <Sheet open={showDialog} onOpenChange={setShowDialog}>
+        <SheetContent side="right" className="w-full max-w-md border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
+          <SheetHeader>
+            <SheetTitle>{editingId ? 'Editar departamento' : 'Nuevo departamento'}</SheetTitle>
+          </SheetHeader>
           <div className="space-y-4 py-2">
             <div>
               <FieldLabel>Nombre *</FieldLabel>
@@ -233,15 +240,15 @@ function DepartamentosInner() {
               </Select>
             </div>
           </div>
-          <DialogFooter className="gap-2">
+          <SheetFooter className="gap-2">
             <Button variant="outline" onClick={() => setShowDialog(false)} className="rounded-xl border-[var(--border)] text-[var(--text)]">Cancelar</Button>
             <Button onClick={handleSubmit} disabled={submitting || !form.nombre.trim()} className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60">
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               {editingId ? 'Guardar' : 'Crear'}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
