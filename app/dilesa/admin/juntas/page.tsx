@@ -325,7 +325,7 @@ function JuntasInner() {
           <div className="space-y-5 py-4">
             <div>
               <FieldLabel>Tipo de Junta *</FieldLabel>
-              <Select value={createTipo} onValueChange={setCreateTipo}>
+              <Select value={createTipo} onValueChange={(v) => setCreateTipo(v ?? '')}>
                 <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
                   <SelectValue placeholder="Seleccionar tipo..." />
                 </SelectTrigger>
