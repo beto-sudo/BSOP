@@ -609,11 +609,12 @@ function TasksInner() {
             <TableHeader>
               <TableRow className="border-[var(--border)] hover:bg-transparent">
                 {(isDireccion || isAdmin) && <TableHead className="w-10 min-w-[40px]" />}
-                <SortableHead sortKey="titulo" label="Tarea" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[300px]" />
-                <SortableHead sortKey="prioridad" label="Prioridad" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[100px]" />
-                <SortableHead sortKey="estado" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[120px]" />
-                <SortableHead sortKey="asignado_nombre" label="Responsable" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[180px]" />
-                <SortableHead sortKey="fecha_compromiso" label="Compromiso" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[110px]" />
+                <SortableHead sortKey="titulo" label="Tarea" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[180px]" />
+                <SortableHead sortKey="prioridad" label="Prio" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[80px]" />
+                <SortableHead sortKey="estado" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[90px]" />
+                <SortableHead sortKey="porcentaje_avance" label="Avance" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[90px]" />
+                <SortableHead sortKey="asignado_nombre" label="Responsable" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[140px]" />
+                <SortableHead sortKey="fecha_compromiso" label="Compromiso" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[100px]" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -677,7 +678,39 @@ function TasksInner() {
                       )}
                     </TableCell>
 
-                    {/* Avance visible en Sheet de edición */}
+                    {/* Avance inline */}
+                    <TableCell onClick={(e) => isEditable ? e.stopPropagation() : undefined}>
+                      {isEditable ? (
+                        <Popover
+                          open={inlineAvance?.taskId === task.id}
+                          onOpenChange={(open) => {
+                            if (open) {
+                              setInlineAvance({ taskId: task.id, value: task.porcentaje_avance });
+                            } else if (inlineAvance && inlineAvance.taskId === task.id) {
+                              handleInlineAvanceSave(task.id, inlineAvance.value);
+                            }
+                          }}
+                        >
+                          <PopoverTrigger className="cursor-pointer">
+                            <ProgressBar value={task.porcentaje_avance} />
+                          </PopoverTrigger>
+                          <PopoverContent className="w-48 p-3" align="start">
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between text-xs text-[var(--text)]/60">
+                                <span>Avance</span>
+                                <span className="font-medium text-[var(--text)]">{inlineAvance?.taskId === task.id ? inlineAvance.value : task.porcentaje_avance}%</span>
+                              </div>
+                              <input type="range" min={0} max={100} step={5}
+                                value={inlineAvance?.taskId === task.id ? inlineAvance.value : task.porcentaje_avance}
+                                onChange={(e) => setInlineAvance(prev => prev ? { ...prev, value: Number(e.target.value) } : null)}
+                                className="w-full accent-[var(--accent)]" />
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      ) : (
+                        <ProgressBar value={task.porcentaje_avance ?? 0} />
+                      )}
+                    </TableCell>
 
                     <TableCell>
                       <span className="text-xs text-[var(--text)]/70 truncate block">{empleado ? empleado.nombre : '—'}</span>
