@@ -404,6 +404,24 @@ function JuntaDetailInner() {
     return () => { editor.off('update', handleUpdate); if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current); };
   }, [editor, junta, estado, supabase]);
 
+  // Emergency save on tab hide / page unload
+  useEffect(() => {
+    if (!editor || !junta) return;
+    if (estado === 'completada' || estado === 'cancelada') return;
+    const juntaId = junta.id;
+    const flushSave = () => {
+      const html = editor.getHTML();
+      if (html !== lastSavedHtmlRef.current && html !== '<p></p>') {
+        supabase.schema('erp' as any).from('juntas').update({ descripcion: html }).eq('id', juntaId).then(() => { lastSavedHtmlRef.current = html; });
+      }
+    };
+    const handleVisChange = () => { if (document.visibilityState === 'hidden') flushSave(); };
+    const handleBeforeUnload = () => flushSave();
+    document.addEventListener('visibilitychange', handleVisChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => { document.removeEventListener('visibilitychange', handleVisChange); window.removeEventListener('beforeunload', handleBeforeUnload); };
+  }, [editor, junta, estado, supabase]);
+
   // Live polling: refresh notes, tasks & attendance every 10s when active
   const isEditingRef = useRef(false);
   useEffect(() => {

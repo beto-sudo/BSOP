@@ -441,6 +441,30 @@ function JuntaDetailInner() {
     };
   }, [editor, junta, estado, supabase]);
 
+  // Emergency save: flush unsaved notes when tab loses visibility or page unloads
+  useEffect(() => {
+    if (!editor || !junta) return;
+    if (estado === 'completada' || estado === 'cancelada') return;
+    const juntaId = junta.id;
+    const flushSave = () => {
+      const html = editor.getHTML();
+      if (html !== lastSavedHtmlRef.current && html !== '<p></p>') {
+        // Fire-and-forget save
+        supabase.schema('erp' as any).from('juntas').update({
+          descripcion: html,
+        }).eq('id', juntaId).then(() => { lastSavedHtmlRef.current = html; });
+      }
+    };
+    const handleVisChange = () => { if (document.visibilityState === 'hidden') flushSave(); };
+    const handleBeforeUnload = () => flushSave();
+    document.addEventListener('visibilitychange', handleVisChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [editor, junta, estado, supabase]);
+
   // Live polling: refresh notes, tasks & attendance every 10s when junta is active
   const isEditingRef = useRef(false);
   useEffect(() => {
