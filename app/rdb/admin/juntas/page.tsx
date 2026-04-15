@@ -15,12 +15,8 @@ import {
 import { SortableHead } from '@/components/ui/sortable-head';
 import { useSortableTable } from '@/hooks/use-sortable-table';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter,
+} from '@/components/ui/sheet';
 import {
   Select,
   SelectContent,
@@ -112,8 +108,11 @@ function JuntasInner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [asistenciaCounts, setAsistenciaCounts] = useState<Map<string, number>>(new Map());
+  const [taskCounts, setTaskCounts] = useState<Map<string, number>>(new Map());
   const [search, setSearch] = useState('');
   const [filterEstado, setFilterEstado] = useState('all');
+  const [filterTipo, setFilterTipo] = useState('all');
 
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -127,15 +126,26 @@ function JuntasInner() {
   });
 
   const fetchJuntas = useCallback(async () => {
-    const { data, error: err } = await supabase
-      .schema('erp' as any)
-      .from('juntas')
-      .select('*')
-      .eq('empresa_id', EMPRESA_ID)
-      .order('fecha_hora', { ascending: false });
-
-    if (err) { setError(err.message); return; }
-    setJuntas(data ?? []);
+    const [jRes, aRes, tRes] = await Promise.all([
+      supabase.schema('erp' as any).from('juntas').select('*')
+        .eq('empresa_id', EMPRESA_ID).order('fecha_hora', { ascending: false }),
+      supabase.schema('erp' as any).from('juntas_asistencia').select('junta_id')
+        .eq('empresa_id', EMPRESA_ID),
+      supabase.schema('erp' as any).from('tasks').select('entidad_id')
+        .eq('empresa_id', EMPRESA_ID).eq('entidad_tipo', 'junta'),
+    ]);
+    if (jRes.error) { setError(jRes.error.message); return; }
+    setJuntas(jRes.data ?? []);
+    const aCounts = new Map<string, number>();
+    (aRes.data ?? []).forEach((a: { junta_id: string }) => {
+      aCounts.set(a.junta_id, (aCounts.get(a.junta_id) ?? 0) + 1);
+    });
+    setAsistenciaCounts(aCounts);
+    const tCounts = new Map<string, number>();
+    (tRes.data ?? []).forEach((t: { entidad_id: string }) => {
+      if (t.entidad_id) tCounts.set(t.entidad_id, (tCounts.get(t.entidad_id) ?? 0) + 1);
+    });
+    setTaskCounts(tCounts);
   }, [supabase]);
 
   useEffect(() => {
@@ -200,6 +210,7 @@ function JuntasInner() {
   const filtered = juntas.filter((j) => {
     if (search && !j.titulo.toLowerCase().includes(search.toLowerCase())) return false;
     if (filterEstado !== 'all' && j.estado !== filterEstado) return false;
+    if (filterTipo !== 'all' && j.tipo !== filterTipo) return false;
     return true;
   });
 
@@ -254,6 +265,17 @@ function JuntasInner() {
               ))}
             </SelectContent>
           </Select>
+          <Select value={filterTipo} onValueChange={(v) => setFilterTipo(v ?? 'all')}>
+            <SelectTrigger className="w-40 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
+              <SelectValue placeholder="Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los tipos</SelectItem>
+              {Object.entries(TIPO_CONFIG).map(([k, v]) => (
+                <SelectItem key={k} value={k}>{v.icon} {v.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -296,12 +318,13 @@ function JuntasInner() {
                 <SortableHead sortKey="tipo" label="Tipo" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-24" />
                 <SortableHead sortKey="estado" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
                 <SortableHead sortKey="fecha_hora" label="Fecha y hora" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-48" />
-                <SortableHead sortKey="lugar" label="Lugar" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-32" />
+                <SortableHead sortKey="asistentes" label="Asist." currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-16" />
+                <SortableHead sortKey="tareas" label="Tareas" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-16" />
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortData(filtered).map((junta) => (
+              {sortData(filtered.map((j) => ({ ...j, asistentes: asistenciaCounts.get(j.id) ?? 0, tareas: taskCounts.get(j.id) ?? 0 }))).map((junta) => (
                 <TableRow
                   key={junta.id}
                   className="cursor-pointer border-[var(--border)] transition-colors hover:bg-[var(--panel)]"
@@ -323,9 +346,8 @@ function JuntasInner() {
                   <TableCell>
                     <span className="text-sm text-[var(--text)]/70">{formatDateTime(junta.fecha_hora)}</span>
                   </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-[var(--text)]/70 line-clamp-1">{junta.lugar ?? '—'}</span>
-                  </TableCell>
+                  <TableCell><span className="text-sm text-[var(--text)]/60">{asistenciaCounts.get(junta.id) ?? 0}</span></TableCell>
+                  <TableCell><span className="text-sm text-[var(--text)]/60">{taskCounts.get(junta.id) ?? 0}</span></TableCell>
                   <TableCell>
                     <ChevronRight className="h-4 w-4 text-[var(--text)]/30" />
                   </TableCell>
@@ -342,11 +364,11 @@ function JuntasInner() {
         </p>
       )}
 
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto rounded-3xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
-          <DialogHeader>
-            <DialogTitle className="text-[var(--text)]">Crear nueva junta</DialogTitle>
-          </DialogHeader>
+      <Sheet open={showCreate} onOpenChange={setShowCreate}>
+        <SheetContent side="right" className="w-full max-w-lg overflow-y-auto border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
+          <SheetHeader>
+            <SheetTitle>Crear nueva junta</SheetTitle>
+          </SheetHeader>
 
           <div className="space-y-4 py-2">
             <div>
@@ -428,7 +450,7 @@ function JuntasInner() {
             </div>
           </div>
 
-          <DialogFooter className="gap-2">
+          <SheetFooter className="gap-2">
             <Button
               variant="outline"
               onClick={() => setShowCreate(false)}
@@ -444,9 +466,9 @@ function JuntasInner() {
               {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               Crear junta
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

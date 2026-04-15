@@ -121,8 +121,11 @@ function JuntasInner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [asistenciaCounts, setAsistenciaCounts] = useState<Map<string, number>>(new Map());
+  const [taskCounts, setTaskCounts] = useState<Map<string, number>>(new Map());
   const [search, setSearch] = useState('');
   const [filterEstado, setFilterEstado] = useState('all');
+  const [filterTipo, setFilterTipo] = useState('all');
   const [filterMonth, setFilterMonth] = useState('all');
 
   const [showCreate, setShowCreate] = useState(false);
@@ -133,12 +136,26 @@ function JuntasInner() {
   const [tituloOverridden, setTituloOverridden] = useState(false);
 
   const fetchJuntas = useCallback(async () => {
-    const { data, error: err } = await supabase
-      .schema('erp' as any).from('juntas').select('*')
-      .eq('empresa_id', EMPRESA_ID)
-      .order('fecha_hora', { ascending: false });
-    if (err) { setError(err.message); return; }
-    setJuntas(data ?? []);
+    const [jRes, aRes, tRes] = await Promise.all([
+      supabase.schema('erp' as any).from('juntas').select('*')
+        .eq('empresa_id', EMPRESA_ID).order('fecha_hora', { ascending: false }),
+      supabase.schema('erp' as any).from('juntas_asistencia').select('junta_id')
+        .eq('empresa_id', EMPRESA_ID),
+      supabase.schema('erp' as any).from('tasks').select('entidad_id')
+        .eq('empresa_id', EMPRESA_ID).eq('entidad_tipo', 'junta'),
+    ]);
+    if (jRes.error) { setError(jRes.error.message); return; }
+    setJuntas(jRes.data ?? []);
+    const aCounts = new Map<string, number>();
+    (aRes.data ?? []).forEach((a: { junta_id: string }) => {
+      aCounts.set(a.junta_id, (aCounts.get(a.junta_id) ?? 0) + 1);
+    });
+    setAsistenciaCounts(aCounts);
+    const tCounts = new Map<string, number>();
+    (tRes.data ?? []).forEach((t: { entidad_id: string }) => {
+      if (t.entidad_id) tCounts.set(t.entidad_id, (tCounts.get(t.entidad_id) ?? 0) + 1);
+    });
+    setTaskCounts(tCounts);
   }, [supabase]);
 
   useEffect(() => {
@@ -204,6 +221,7 @@ function JuntasInner() {
   const filtered = juntas.filter((j) => {
     if (search && !j.titulo.toLowerCase().includes(search.toLowerCase())) return false;
     if (filterEstado !== 'all' && j.estado !== filterEstado) return false;
+    if (filterTipo !== 'all' && j.tipo !== filterTipo) return false;
     if (filterMonth !== 'all') {
       const d = new Date(j.fecha_hora);
       const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -241,6 +259,13 @@ function JuntasInner() {
             <SelectContent>
               <SelectItem value="all">Todos los estados</SelectItem>
               {Object.entries(ESTADO_CONFIG).map(([k, v]) => (<SelectItem key={k} value={k}>{v.label}</SelectItem>))}
+            </SelectContent>
+          </Select>
+          <Select value={filterTipo} onValueChange={(v) => setFilterTipo(v ?? 'all')}>
+            <SelectTrigger className="w-40 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue placeholder="Tipo" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los tipos</SelectItem>
+              {TIPO_OPTIONS.map((t) => (<SelectItem key={t.value} value={t.value}>{t.icon} {t.label}</SelectItem>))}
             </SelectContent>
           </Select>
           <Select value={filterMonth} onValueChange={(v) => setFilterMonth(v ?? 'all')}>
@@ -282,13 +307,13 @@ function JuntasInner() {
                 <SortableHead sortKey="tipo" label="Tipo" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-24" />
                 <SortableHead sortKey="estado" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
                 <SortableHead sortKey="fecha_hora" label="Fecha y hora" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-48" />
-                <SortableHead sortKey="lugar" label="Lugar" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-32" />
-                <SortableHead sortKey="created_at" label="Creada" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
+                <SortableHead sortKey="asistentes" label="Asist." currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-16" />
+                <SortableHead sortKey="tareas" label="Tareas" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-16" />
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortData(filtered).map((junta) => (
+              {sortData(filtered.map((j) => ({ ...j, asistentes: asistenciaCounts.get(j.id) ?? 0, tareas: taskCounts.get(j.id) ?? 0 }))).map((junta) => (
                 <TableRow key={junta.id} className="cursor-pointer border-[var(--border)] transition-colors hover:bg-[var(--panel)]" onClick={() => router.push(`/dilesa/admin/juntas/${junta.id}`)}>
                   <TableCell><span className="line-clamp-1 font-medium text-[var(--text)]">{junta.titulo}</span></TableCell>
                   <TableCell>
@@ -296,8 +321,8 @@ function JuntasInner() {
                   </TableCell>
                   <TableCell><EstadoBadge estado={junta.estado} /></TableCell>
                   <TableCell><span className="text-sm text-[var(--text)]/70">{formatDateTime(junta.fecha_hora)}</span></TableCell>
-                  <TableCell><span className="text-sm text-[var(--text)]/70 line-clamp-1">{junta.lugar ?? '—'}</span></TableCell>
-                  <TableCell><span className="text-xs text-[var(--text)]/50">{new Date(junta.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}</span></TableCell>
+                  <TableCell><span className="text-sm text-[var(--text)]/60">{asistenciaCounts.get(junta.id) ?? 0}</span></TableCell>
+                  <TableCell><span className="text-sm text-[var(--text)]/60">{taskCounts.get(junta.id) ?? 0}</span></TableCell>
                   <TableCell><ChevronRight className="h-4 w-4 text-[var(--text)]/30" /></TableCell>
                 </TableRow>
               ))}
