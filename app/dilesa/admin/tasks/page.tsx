@@ -453,8 +453,16 @@ function TasksInner() {
   const empleadoMap = useMemo(() => new Map(empleados.map((e) => [e.id, e])), [empleados]);
   const empleadoOptions = useMemo(() => empleados.map(e => ({ id: e.id, label: e.nombre })), [empleados]);
   const deptoOptions = useMemo(() => {
-    const deptos = [...new Set(tasks.map(t => t.departamento_nombre).filter(Boolean))] as string[];
-    return deptos.sort().map(d => ({ id: d, label: d }));
+    const deptos = new Set<string>();
+    tasks.forEach(t => {
+      if (t.departamento_nombre) {
+        t.departamento_nombre.split(',').forEach(d => {
+          const trimmed = d.trim();
+          if (trimmed) deptos.add(trimmed);
+        });
+      }
+    });
+    return [...deptos].sort().map(d => ({ id: d, label: d }));
   }, [tasks]);
 
   const { sortKey, sortDir, onSort, sortData } = useSortableTable<ErpTask & { asignado_nombre: string | null }>('created_at', 'desc');
@@ -481,7 +489,10 @@ function TasksInner() {
     if (filterEstado !== 'all' && t.estado !== filterEstado) return false;
     if (filterPrioridad !== 'all' && t.prioridad?.toLowerCase() !== filterPrioridad.toLowerCase()) return false;
     if (filterAsignado !== 'all' && t.asignado_a !== filterAsignado) return false;
-    if (filterDepto !== 'all' && t.departamento_nombre !== filterDepto) return false;
+    if (filterDepto !== 'all') {
+      const taskDeptos = (t.departamento_nombre ?? '').split(',').map(d => d.trim()).filter(Boolean);
+      if (!taskDeptos.includes(filterDepto)) return false;
+    }
     return true;
   });
 
