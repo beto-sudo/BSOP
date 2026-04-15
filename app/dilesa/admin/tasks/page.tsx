@@ -534,7 +534,7 @@ function TasksInner() {
               <SelectValue placeholder="Estado" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos los estados</SelectItem>
+              <SelectItem value="all">Estado</SelectItem>
               {Object.entries(ESTADO_CONFIG).map(([k, v]) => (
                 <SelectItem key={k} value={k}>{v.label}</SelectItem>
               ))}
@@ -545,7 +545,7 @@ function TasksInner() {
               <SelectValue placeholder="Prioridad" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todas</SelectItem>
+              <SelectItem value="all">Prioridad</SelectItem>
               {PRIORIDAD_OPTIONS.map(p => (
                 <SelectItem key={p} value={p}>{p}</SelectItem>
               ))}
