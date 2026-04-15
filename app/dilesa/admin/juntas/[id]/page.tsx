@@ -426,6 +426,49 @@ function JuntaDetailInner() {
     if (err) alert(`Error al guardar: ${err.message}`);
   };
 
+  // Auto-save notes when junta is active (en_curso/programada)
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedHtmlRef = useRef<string>('');
+
+  useEffect(() => {
+    if (!editor || !junta) return;
+    // Only auto-save when junta is active
+    if (estado === 'completada' || estado === 'cancelada') return;
+
+    const handleUpdate = () => {
+      const html = editor.getHTML();
+      // Don't save if content hasn't changed from last save
+      if (html === lastSavedHtmlRef.current) return;
+
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = setTimeout(async () => {
+        const currentHtml = editor.getHTML();
+        if (currentHtml === lastSavedHtmlRef.current) return;
+        setAutoSaveStatus('saving');
+        const { error: err } = await supabase.schema('erp' as any).from('juntas').update({
+          descripcion: currentHtml && currentHtml !== '<p></p>' ? currentHtml : null,
+        }).eq('id', junta.id);
+        if (!err) {
+          lastSavedHtmlRef.current = currentHtml;
+          setAutoSaveStatus('saved');
+          setTimeout(() => setAutoSaveStatus('idle'), 2000);
+        } else {
+          setAutoSaveStatus('idle');
+        }
+      }, 3000); // 3 seconds debounce
+    };
+
+    editor.on('update', handleUpdate);
+    // Set initial reference
+    lastSavedHtmlRef.current = editor.getHTML();
+
+    return () => {
+      editor.off('update', handleUpdate);
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [editor, junta, estado, supabase]);
+
   const handleToggleAsistio = async (asistId: string, current: boolean | null) => {
     const next = current === null ? true : current === true ? false : null;
     await supabase.schema('erp' as any).from('juntas_asistencia').update({ asistio: next }).eq('id', asistId);
@@ -616,7 +659,13 @@ function JuntaDetailInner() {
           </div>
         </div>
         <div className="flex items-center gap-2 mt-2">
-          <p className="text-[10px] text-[var(--text)]/40 flex-1">Las notas se guardan al presionar &quot;Guardar cambios&quot;.</p>
+          <p className="text-[10px] text-[var(--text)]/40 flex-1">
+            {estado !== 'completada' && estado !== 'cancelada'
+              ? autoSaveStatus === 'saving' ? '⏳ Guardando notas...'
+                : autoSaveStatus === 'saved' ? '✅ Notas guardadas'
+                : 'Las notas se auto-guardan mientras escribes'
+              : 'Las notas se guardan al presionar "Guardar cambios"'}
+          </p>
           {uploadingImage && <span className="text-[10px] text-[var(--accent)] flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />Subiendo imagen...</span>}
         </div>
       </div>
