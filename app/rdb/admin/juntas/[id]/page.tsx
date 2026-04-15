@@ -248,6 +248,7 @@ function JuntaDetailInner() {
     fecha_vence: '',
   });
   const [addingTask, setAddingTask] = useState(false);
+  const [completingTask, setCompletingTask] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
     const { data: juntaData, error: jErr } = await supabase
@@ -782,7 +783,7 @@ function JuntaDetailInner() {
 
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
         <div className="flex items-center justify-between mb-3">
-          <SectionTitle>Tareas de esta junta</SectionTitle>
+          <SectionTitle>Tareas de esta junta {tasks.length > 0 && <span className="text-[var(--text)]/40 font-normal">({tasks.length})</span>}</SectionTitle>
           <Button
             variant="outline"
             size="sm"
@@ -799,34 +800,68 @@ function JuntaDetailInner() {
             <TicketCheck className="mb-2 h-8 w-8 text-[var(--text)]/20" />
             <p className="text-sm text-[var(--text)]/50">No hay tareas asociadas a esta junta</p>
           </div>
-        ) : (
-          <div className="space-y-2">
-            {tasks.map((task) => {
-              const cfg = ESTADO_TASK[task.estado] ?? { label: task.estado, cls: '' };
-              const asignado = empleadoMap.get(task.asignado_a ?? '');
-              return (
-                <div
-                  key={task.id}
-                  className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2.5"
-                >
-                  <TicketCheck className="h-4 w-4 shrink-0 text-[var(--text)]/40" />
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm font-medium text-[var(--text)] line-clamp-1">{task.titulo}</span>
-                    {asignado && (
-                      <span className="block text-xs text-[var(--text)]/50">{asignado.nombre}</span>
-                    )}
-                  </div>
-                  <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}>
-                    {cfg.label}
-                  </span>
-                  {task.fecha_vence && (
-                    <span className="text-xs text-[var(--text)]/40 shrink-0">{formatDate(task.fecha_vence)}</span>
+        ) : (() => {
+          const openTasks = tasks.filter(t => t.estado !== 'completado' && t.estado !== 'cancelado');
+          const closedTasks = tasks.filter(t => t.estado === 'completado' || t.estado === 'cancelado');
+          const renderTask = (task: JuntaTask) => {
+            const cfg = ESTADO_TASK[task.estado] ?? { label: task.estado, cls: '' };
+            const asignado = empleadoMap.get(task.asignado_a ?? '');
+            return (
+              <div
+                key={task.id}
+                className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2.5"
+              >
+                {task.estado !== 'completado' && task.estado !== 'cancelado' ? (
+                  <button
+                    type="button"
+                    title="Completar tarea"
+                    disabled={completingTask === task.id}
+                    onClick={async () => {
+                      setCompletingTask(task.id);
+                      const { error: err } = await supabase.schema('erp' as any).from('tasks').update({ estado: 'completado', porcentaje_avance: 100 }).eq('id', task.id);
+                      setCompletingTask(null);
+                      if (err) { alert(`Error: ${err.message}`); return; }
+                      setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, estado: 'completado' } : t));
+                    }}
+                    className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-green-500/30 bg-green-500/10 text-green-400 transition hover:bg-green-500/20 disabled:opacity-50"
+                  >
+                    {completingTask === task.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                  </button>
+                ) : (
+                  <TicketCheck className="h-4 w-4 shrink-0 text-green-400/60" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <span className={`text-sm font-medium line-clamp-1 ${task.estado === 'completado' ? 'text-[var(--text)]/40 line-through' : 'text-[var(--text)]'}`}>{task.titulo}</span>
+                  {asignado && (
+                    <span className="block text-xs text-[var(--text)]/50">{asignado.nombre}</span>
                   )}
                 </div>
-              );
-            })}
-          </div>
-        )}
+                <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}>
+                  {cfg.label}
+                </span>
+                {task.fecha_vence && (
+                  <span className="text-xs text-[var(--text)]/40 shrink-0">{formatDate(task.fecha_vence)}</span>
+                )}
+              </div>
+            );
+          };
+          return (
+            <div className="space-y-4">
+              {openTasks.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-[var(--text)]/50 uppercase tracking-wide">Pendientes ({openTasks.length})</p>
+                  {openTasks.map(renderTask)}
+                </div>
+              )}
+              {closedTasks.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-[var(--text)]/50 uppercase tracking-wide">Completadas ({closedTasks.length})</p>
+                  {closedTasks.map(renderTask)}
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       <Dialog open={showAddTask} onOpenChange={setShowAddTask}>
