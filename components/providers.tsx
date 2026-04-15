@@ -63,18 +63,17 @@ function PermissionsProvider({ children }: { children: ReactNode }) {
     try {
       const perms = await fetchUserPermissions(supabase);
       setRealPermissions(perms);
-      // Only update visible permissions if not impersonating
-      setPermissions((prev) => {
-        // If we're impersonating, don't overwrite with real perms
-        return prev;
-      });
+      // Update visible permissions only if not impersonating
+      if (!impersonating) {
+        setPermissions(perms);
+      }
       return perms;
     } catch {
-      const fallback = { ...DEFAULT_PERMISSIONS, loading: false };
-      setRealPermissions(fallback);
-      return fallback;
+      // On transient errors, keep previous permissions instead of resetting
+      // This prevents flashing "Acceso restringido" on network hiccups
+      return realPermissions;
     }
-  }, [supabase]);
+  }, [supabase, impersonating, realPermissions]);
 
   // Load initial permissions
   useEffect(() => {

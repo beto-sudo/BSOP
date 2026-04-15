@@ -2,7 +2,7 @@
 
 import { usePermissions } from '@/components/providers';
 import { canAccessEmpresa, canAccessModulo } from '@/lib/permissions';
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 
 interface RequireAccessProps {
   children: ReactNode;
@@ -68,25 +68,33 @@ export function RequireAccess({
   adminOnly = false,
 }: RequireAccessProps) {
   const { permissions } = usePermissions();
+  const hadAccessRef = useRef(false);
 
   // Still loading
-  if (permissions.loading) return <AccessLoading />;
+  if (permissions.loading) {
+    // If user previously had access, keep showing children to avoid flash
+    return hadAccessRef.current ? <>{children}</> : <AccessLoading />;
+  }
 
   // Admin bypass
-  if (permissions.isAdmin) return <>{children}</>;
+  if (permissions.isAdmin) { hadAccessRef.current = true; return <>{children}</>; }
 
   // Admin-only check
   if (adminOnly) return <AccessDenied />;
 
   // Empresa-level check
   if (empresa && !canAccessEmpresa(permissions, empresa)) {
+    // If user previously had access, give a grace period (transient auth refresh)
+    if (hadAccessRef.current) return <>{children}</>;
     return <AccessDenied />;
   }
 
   // Module-level check
   if (modulo && !canAccessModulo(permissions, modulo, write ? 'write' : 'read')) {
+    if (hadAccessRef.current) return <>{children}</>;
     return <AccessDenied />;
   }
 
+  hadAccessRef.current = true;
   return <>{children}</>;
 }
