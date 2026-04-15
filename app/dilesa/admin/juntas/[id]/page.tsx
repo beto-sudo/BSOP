@@ -361,7 +361,7 @@ function JuntaDetailInner() {
     // Check if user is admin/direccion
     const { data: { user } } = await supabase.auth.getUser();
     if (user?.email) {
-      const { data: coreUser } = await supabase.schema('core' as any).from('users').select('rol').eq('email', user.email).maybeSingle();
+      const { data: coreUser } = await supabase.schema('core' as any).from('usuarios').select('rol').eq('email', user.email).maybeSingle();
       if (coreUser?.rol === 'admin') setIsDireccion(true);
     }
 
@@ -500,10 +500,6 @@ function JuntaDetailInner() {
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 space-y-4">
         <SectionTitle>Información de la junta</SectionTitle>
         <div><FieldLabel>Título</FieldLabel><Input value={titulo} onChange={(e) => setTitulo(e.target.value)} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
-        <div className="grid grid-cols-2 gap-4">
-          <div><FieldLabel>Fecha y hora</FieldLabel><Input type="datetime-local" value={fechaHora} onChange={(e) => setFechaHora(e.target.value)} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
-          {/* Duración se calcula automáticamente al terminar la junta */}
-        </div>
         <div className="grid grid-cols-2 gap-4">
           <div><FieldLabel>Estado</FieldLabel><Select value={estado} onValueChange={(v) => setEstado(v as Junta['estado'])}><SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(ESTADO_JUNTA).map(([k, v]) => (<SelectItem key={k} value={k}>{v.label}</SelectItem>))}</SelectContent></Select></div>
           <div><FieldLabel>Tipo</FieldLabel><Select value={tipo ?? ''} onValueChange={(v) => setTipo(v || '')}><SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue placeholder="Sin tipo" /></SelectTrigger><SelectContent>{TIPO_OPTIONS.map(t => (<SelectItem key={t.value} value={t.value}>{t.icon} {t.label}</SelectItem>))}</SelectContent></Select></div>

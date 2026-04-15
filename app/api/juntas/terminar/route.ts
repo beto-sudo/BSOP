@@ -85,7 +85,7 @@ function generateMinutaHtml(opts: {
           <td style="padding:6px 0;font-size:13px;color:#64748b;font-weight:600;width:160px;vertical-align:top;">Junta Terminada</td>
           <td style="padding:6px 0;font-size:13px;color:#1e293b;">${formatDateCST(fechaTerminada)}</td>
         </tr>
-        ${duracionMinutos && duracionMinutos > 0 && duracionMinutos <= 480 ? `
+        ${duracionMinutos && duracionMinutos > 0 ? `
         <tr>
           <td style="padding:6px 0;font-size:13px;color:#64748b;font-weight:600;vertical-align:top;">Duración</td>
           <td style="padding:6px 0;font-size:13px;color:#1e293b;">${formatDuration(duracionMinutos)}</td>
@@ -168,7 +168,7 @@ export async function POST(req: NextRequest) {
     .update({
       estado: 'completada',
       fecha_terminada: now.toISOString(),
-      ...(duracionMinutos && duracionMinutos > 0 && duracionMinutos <= 480 ? { duracion_minutos: duracionMinutos } : {}),
+      ...(duracionMinutos && duracionMinutos > 0 ? { duracion_minutos: duracionMinutos } : {}),
     })
     .eq('id', juntaId)
     .select('id, titulo, tipo, fecha_hora, lugar, descripcion, empresa_id')
