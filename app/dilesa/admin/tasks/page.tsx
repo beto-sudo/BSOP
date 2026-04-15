@@ -605,15 +605,15 @@ function TasksInner() {
             )}
           </div>
         ) : (
-          <Table className="table-fixed">
+          <Table>
             <TableHeader>
               <TableRow className="border-[var(--border)] hover:bg-transparent">
-                {(isDireccion || isAdmin) && <TableHead className="w-10" />}
-                <SortableHead sortKey="titulo" label="Tarea" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-                <SortableHead sortKey="prioridad" label="Prioridad" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-20" />
-                <SortableHead sortKey="estado" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-24" />
-                <SortableHead sortKey="asignado_nombre" label="Responsable" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-40" />
-                <SortableHead sortKey="fecha_compromiso" label="Compromiso" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-24" />
+                {(isDireccion || isAdmin) && <TableHead className="w-10 min-w-[40px]" />}
+                <SortableHead sortKey="titulo" label="Tarea" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[300px]" />
+                <SortableHead sortKey="prioridad" label="Prioridad" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[100px]" />
+                <SortableHead sortKey="estado" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[120px]" />
+                <SortableHead sortKey="asignado_nombre" label="Responsable" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[180px]" />
+                <SortableHead sortKey="fecha_compromiso" label="Compromiso" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[110px]" />
               </TableRow>
             </TableHeader>
             <TableBody>
