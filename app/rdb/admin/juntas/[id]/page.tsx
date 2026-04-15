@@ -16,7 +16,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
+} from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -45,6 +49,8 @@ import {
   Heading2,
   Heading3,
   CheckCircle2,
+  MessageSquarePlus,
+  Clock,
 } from 'lucide-react';
 
 const EMPRESA_ID = '41c0b58f-5483-439b-aaa6-17b9d995697f';
@@ -84,6 +90,18 @@ type JuntaTask = {
 type Persona = { id: string; nombre: string };
 type Empleado = { id: string; nombre: string };
 type Prioridad = { id: string; nombre: string; color: string; peso: number };
+
+type TaskUpdate = {
+  id: string;
+  task_id: string;
+  tipo: string;
+  contenido: string | null;
+  valor_anterior: string | null;
+  valor_nuevo: string | null;
+  creado_por: string | null;
+  created_at: string;
+  usuario?: { nombre: string } | null;
+};
 
 const ESTADO_JUNTA: Record<Junta['estado'], { label: string; cls: string }> = {
   programada:  { label: 'Programada',  cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
@@ -250,6 +268,11 @@ function JuntaDetailInner() {
   const [addingTask, setAddingTask] = useState(false);
   const [completingTask, setCompletingTask] = useState<string | null>(null);
 
+  const [taskUpdates, setTaskUpdates] = useState<TaskUpdate[]>([]);
+  const [showAddUpdate, setShowAddUpdate] = useState<string | null>(null);
+  const [updateForm, setUpdateForm] = useState({ contenido: '', nuevoEstado: '', nuevaFecha: '' });
+  const [savingUpdate, setSavingUpdate] = useState(false);
+
   const fetchAll = useCallback(async () => {
     const { data: juntaData, error: jErr } = await supabase
       .schema('erp' as any)
@@ -294,6 +317,21 @@ function JuntaDetailInner() {
       .order('created_at');
 
     setTasks(tasksData ?? []);
+
+    const taskIds = (tasksData ?? []).map((t: any) => t.id);
+    if (taskIds.length > 0) {
+      const { data: updatesData } = await supabase.schema('erp' as any).from('task_updates').select('*').in('task_id', taskIds).order('created_at', { ascending: false });
+      if (updatesData && updatesData.length > 0) {
+        const userIds = [...new Set(updatesData.map((u: any) => u.creado_por).filter(Boolean))];
+        const { data: usersData } = userIds.length > 0
+          ? await supabase.schema('core' as any).from('usuarios').select('id, nombre').in('id', userIds)
+          : { data: [] };
+        const userMap = new Map((usersData ?? []).map((u: any) => [u.id, u.nombre]));
+        setTaskUpdates(updatesData.map((u: any) => ({ ...u, usuario: u.creado_por ? { nombre: userMap.get(u.creado_por) ?? 'Usuario' } : null })));
+      } else {
+        setTaskUpdates([]);
+      }
+    }
 
     const { data: personasData } = await supabase
       .schema('erp' as any)
@@ -451,7 +489,22 @@ function JuntaDetailInner() {
           }
         }
         const { data: tasksData } = await supabase.schema('erp' as any).from('tasks').select('id, titulo, estado, asignado_a, fecha_vence').eq('entidad_tipo', 'junta').eq('entidad_id', juntaId).order('created_at');
-        if (tasksData) setTasks(tasksData);
+        if (tasksData) {
+          setTasks(tasksData);
+          const tIds = tasksData.map((t: any) => t.id);
+          if (tIds.length > 0) {
+            const { data: updData } = await supabase.schema('erp' as any).from('task_updates')
+              .select('*').in('task_id', tIds).order('created_at', { ascending: false });
+            if (updData) {
+              const uIds = [...new Set(updData.map((u: any) => u.creado_por).filter(Boolean))];
+              const { data: uData } = uIds.length > 0
+                ? await supabase.schema('core' as any).from('usuarios').select('id, nombre').in('id', uIds)
+                : { data: [] };
+              const uMap = new Map((uData ?? []).map((u: any) => [u.id, u.nombre]));
+              setTaskUpdates(updData.map((u: any) => ({ ...u, usuario: u.creado_por ? { nombre: uMap.get(u.creado_por) ?? 'Usuario' } : null })));
+            }
+          }
+        }
         const { data: asistData } = await supabase.schema('erp' as any).from('juntas_asistencia').select('*, persona:persona_id(nombre, apellido_paterno)').eq('junta_id', juntaId).order('created_at');
         if (asistData) setAsistencia(asistData);
         setLastPoll(new Date().toLocaleTimeString());
@@ -581,6 +634,62 @@ function JuntaDetailInner() {
     } finally {
       setTerminating(false);
     }
+  };
+
+  const handleSaveUpdate = async () => {
+    const taskId = showAddUpdate;
+    if (!taskId || !updateForm.contenido.trim() || !junta) return;
+    setSavingUpdate(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: coreUser } = await supabase.schema('core' as any).from('usuarios').select('id, nombre').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
+    const userId = coreUser?.id ?? null;
+    const userName = coreUser?.nombre ?? 'Usuario';
+
+    const inserts: any[] = [];
+    inserts.push({ task_id: taskId, empresa_id: EMPRESA_ID, tipo: 'avance', contenido: updateForm.contenido.trim(), creado_por: userId });
+
+    const task = tasks.find(t => t.id === taskId);
+    if (updateForm.nuevoEstado && task && updateForm.nuevoEstado !== task.estado) {
+      inserts.push({ task_id: taskId, empresa_id: EMPRESA_ID, tipo: 'cambio_estado', valor_anterior: task.estado, valor_nuevo: updateForm.nuevoEstado, creado_por: userId });
+    }
+    if (updateForm.nuevaFecha && task && updateForm.nuevaFecha !== (task.fecha_vence ?? '')) {
+      inserts.push({ task_id: taskId, empresa_id: EMPRESA_ID, tipo: 'cambio_fecha', valor_anterior: task.fecha_vence ?? '', valor_nuevo: updateForm.nuevaFecha, creado_por: userId });
+    }
+
+    const { error: insErr } = await supabase.schema('erp' as any).from('task_updates').insert(inserts);
+    if (insErr) { alert(`Error: ${insErr.message}`); setSavingUpdate(false); return; }
+
+    const taskPatch: any = {};
+    if (updateForm.nuevoEstado && task && updateForm.nuevoEstado !== task.estado) {
+      taskPatch.estado = updateForm.nuevoEstado;
+      if (updateForm.nuevoEstado === 'completado') taskPatch.porcentaje_avance = 100;
+    }
+    if (updateForm.nuevaFecha && task && updateForm.nuevaFecha !== (task.fecha_vence ?? '')) {
+      taskPatch.fecha_compromiso = updateForm.nuevaFecha;
+      taskPatch.fecha_vence = updateForm.nuevaFecha;
+    }
+    if (Object.keys(taskPatch).length > 0) {
+      await supabase.schema('erp' as any).from('tasks').update(taskPatch).eq('id', taskId);
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...taskPatch } : t));
+    }
+
+    const now = new Date().toISOString();
+    const newUpdates: TaskUpdate[] = inserts.map((ins, i) => ({
+      id: `temp-${Date.now()}-${i}`,
+      task_id: taskId,
+      tipo: ins.tipo,
+      contenido: ins.contenido ?? null,
+      valor_anterior: ins.valor_anterior ?? null,
+      valor_nuevo: ins.valor_nuevo ?? null,
+      creado_por: userId,
+      created_at: now,
+      usuario: { nombre: userName },
+    }));
+    setTaskUpdates(prev => [...newUpdates, ...prev]);
+
+    setSavingUpdate(false);
+    setShowAddUpdate(null);
+    setUpdateForm({ contenido: '', nuevoEstado: '', nuevaFecha: '' });
   };
 
   const empleadoMap = new Map(empleados.map((e) => [e.id, e]));
@@ -936,6 +1045,12 @@ function JuntaDetailInner() {
                 {task.fecha_vence && (
                   <span className="text-xs text-[var(--text)]/40 shrink-0">{formatDate(task.fecha_vence)}</span>
                 )}
+                {task.estado !== 'completado' && task.estado !== 'cancelado' && (
+                  <button type="button" title="Agregar avance" onClick={() => { setShowAddUpdate(task.id); setUpdateForm({ contenido: '', nuevoEstado: '', nuevaFecha: '' }); }}
+                    className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 text-[var(--accent)] transition hover:bg-[var(--accent)]/20">
+                    <MessageSquarePlus className="h-3 w-3" />
+                  </button>
+                )}
               </div>
             );
           };
@@ -957,6 +1072,122 @@ function JuntaDetailInner() {
           );
         })()}
       </div>
+
+      {/* Actualizaciones de tareas */}
+      {tasks.length > 0 && (
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
+          <SectionTitle>Actualizaciones de tareas</SectionTitle>
+          {taskUpdates.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-6 text-center">
+              <Clock className="mb-2 h-8 w-8 text-[var(--text)]/20" />
+              <p className="text-sm text-[var(--text)]/50">No hay actualizaciones registradas</p>
+            </div>
+          ) : (() => {
+            const grouped = new Map<string, TaskUpdate[]>();
+            for (const u of taskUpdates) {
+              const arr = grouped.get(u.task_id) ?? [];
+              arr.push(u);
+              grouped.set(u.task_id, arr);
+            }
+            return (
+              <div className="space-y-4">
+                {Array.from(grouped.entries()).map(([taskId, updates]) => {
+                  const task = tasks.find(t => t.id === taskId);
+                  if (!task) return null;
+                  return (
+                    <div key={taskId} className="space-y-2">
+                      <p className="text-xs font-semibold text-[var(--text)]/50 uppercase tracking-wide">{task.titulo}</p>
+                      {updates.map(u => {
+                        const tipoCfg: Record<string, { label: string; cls: string }> = {
+                          avance: { label: 'Avance', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
+                          cambio_estado: { label: 'Estado', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
+                          cambio_fecha: { label: 'Fecha', cls: 'bg-purple-500/15 text-purple-400 border-purple-500/20' },
+                          nota: { label: 'Nota', cls: 'bg-[var(--border)]/60 text-[var(--text)]/60 border-[var(--border)]' },
+                          cambio_responsable: { label: 'Responsable', cls: 'bg-teal-500/15 text-teal-400 border-teal-500/20' },
+                        };
+                        const tc = tipoCfg[u.tipo] ?? { label: u.tipo, cls: '' };
+                        return (
+                          <div key={u.id} className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2.5">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[10px] font-medium ${tc.cls}`}>{tc.label}</span>
+                              <span className="text-[10px] text-[var(--text)]/40">{u.usuario?.nombre ?? 'Sistema'}</span>
+                              <span className="text-[10px] text-[var(--text)]/30 ml-auto">{formatDate(u.created_at)}</span>
+                            </div>
+                            {u.contenido && <p className="text-sm text-[var(--text)]/80">{u.contenido}</p>}
+                            {u.valor_anterior != null && u.valor_nuevo != null && (
+                              <p className="text-xs text-[var(--text)]/50">
+                                {u.tipo === 'cambio_estado'
+                                  ? `${ESTADO_TASK[u.valor_anterior]?.label ?? u.valor_anterior} → ${ESTADO_TASK[u.valor_nuevo]?.label ?? u.valor_nuevo}`
+                                  : `${u.valor_anterior || '—'} → ${u.valor_nuevo || '—'}`}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Sheet: Agregar avance */}
+      <Sheet open={!!showAddUpdate} onOpenChange={(open) => { if (!open) { setShowAddUpdate(null); setUpdateForm({ contenido: '', nuevoEstado: '', nuevaFecha: '' }); } }}>
+        <SheetContent side="right" className="w-full sm:max-w-lg border-[var(--border)] bg-[var(--card)] text-[var(--text)] overflow-y-auto">
+          <SheetHeader className="pb-2">
+            <SheetTitle className="text-[var(--text)] text-lg">Agregar avance</SheetTitle>
+            <SheetDescription className="text-[var(--text)]/50">
+              {showAddUpdate ? (tasks.find(t => t.id === showAddUpdate)?.titulo ?? '') : ''}
+            </SheetDescription>
+          </SheetHeader>
+          <div className="space-y-5 py-4">
+            <div>
+              <FieldLabel>Avance / Comentario *</FieldLabel>
+              <Textarea
+                placeholder="Describe el avance o actualización..."
+                value={updateForm.contenido}
+                onChange={(e) => setUpdateForm(f => ({ ...f, contenido: e.target.value }))}
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)] min-h-[100px]"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <FieldLabel>Cambiar estado</FieldLabel>
+                <Select value={updateForm.nuevoEstado} onValueChange={(v) => setUpdateForm(f => ({ ...f, nuevoEstado: v ?? '' }))}>
+                  <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
+                    <SelectValue placeholder="Sin cambio" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(ESTADO_TASK).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <FieldLabel>Cambiar fecha compromiso</FieldLabel>
+                <Input
+                  type="date"
+                  value={updateForm.nuevaFecha}
+                  onChange={(e) => setUpdateForm(f => ({ ...f, nuevaFecha: e.target.value }))}
+                  className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+                />
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 pt-4 border-t border-[var(--border)]">
+            <Button variant="outline" onClick={() => { setShowAddUpdate(null); setUpdateForm({ contenido: '', nuevoEstado: '', nuevaFecha: '' }); }}
+              className="flex-1 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">Cancelar</Button>
+            <Button onClick={handleSaveUpdate} disabled={savingUpdate || !updateForm.contenido.trim()}
+              className="flex-1 gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60">
+              {savingUpdate ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquarePlus className="h-4 w-4" />}
+              Guardar avance
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <Dialog open={showAddTask} onOpenChange={setShowAddTask}>
         <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto rounded-3xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
