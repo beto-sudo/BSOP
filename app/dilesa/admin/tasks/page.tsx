@@ -562,7 +562,7 @@ function TasksInner() {
       </div>
 
       {/* Table */}
-      <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)]">
+      <div className="overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--card)]">
         {error ? (
           <div className="flex items-center justify-center p-16 text-red-400">Error: {error}</div>
         ) : loading ? (
