@@ -437,6 +437,12 @@ function JuntaDetailInner() {
     if (!junta) return;
     setTerminating(true);
     try {
+      // Auto-save notes before finishing to ensure they are in the email/DB
+      const notesHtml = editor?.getHTML() ?? null;
+      await supabase.schema('erp' as any).from('juntas').update({
+        descripcion: notesHtml && notesHtml !== '<p></p>' ? notesHtml : null,
+      }).eq('id', junta.id);
+
       const res = await fetch('/api/juntas/terminar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ juntaId: junta.id }) });
       const result = await res.json();
       if (!res.ok) { alert(`Error al terminar junta: ${result.error ?? 'Error desconocido'}`); return; }
