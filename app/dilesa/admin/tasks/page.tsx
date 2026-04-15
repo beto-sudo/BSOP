@@ -488,7 +488,7 @@ function TasksInner() {
   const canCreateTask = !!createForm.titulo.trim() && !!createForm.prioridad && !!createForm.asignado_a && !!createForm.fecha_compromiso;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -605,7 +605,7 @@ function TasksInner() {
             )}
           </div>
         ) : (
-          <Table>
+          <Table className="table-fixed">
             <TableHeader>
               <TableRow className="border-[var(--border)] hover:bg-transparent">
                 {(isDireccion || isAdmin) && <TableHead className="w-10" />}
@@ -643,7 +643,7 @@ function TasksInner() {
                         )}
                       </TableCell>
                     )}
-                    <TableCell>
+                    <TableCell className="whitespace-normal">
                       <span className="line-clamp-1 font-medium text-[var(--text)]">{task.titulo}</span>
                       <span className="mt-0.5 block text-xs text-[var(--text)]/40 line-clamp-1">
                         {[task.departamento_nombre, task.descripcion].filter(Boolean).join(' · ') || ' '}
