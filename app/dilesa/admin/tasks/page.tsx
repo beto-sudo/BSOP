@@ -46,11 +46,18 @@ type ErpTask = {
   prioridad_id: string | null;
   estado: 'pendiente' | 'en_progreso' | 'bloqueado' | 'completado' | 'cancelado';
   fecha_vence: string | null;
+  fecha_compromiso: string | null;
   fecha_completado: string | null;
   completado_por: string | null;
   porcentaje_avance: number;
   entidad_tipo: string | null;
   entidad_id: string | null;
+  tipo: string | null;
+  motivo_bloqueo: string | null;
+  siguiente_accion: string | null;
+  iniciativa: string | null;
+  departamento_nombre: string | null;
+  prioridad: string | null;
   created_at: string;
   updated_at: string | null;
 };
@@ -146,6 +153,7 @@ function TasksInner() {
   const [filterEstado, setFilterEstado] = useState('all');
   const [filterPrioridad, setFilterPrioridad] = useState('all');
   const [filterAsignado, setFilterAsignado] = useState('all');
+  const [filterDepto, setFilterDepto] = useState('all');
 
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -409,10 +417,17 @@ function TasksInner() {
   }, [tasks, isAdmin, isDireccion, currentEmpleadoId]);
 
   const filtered = visibleTasks.filter((t) => {
-    if (search && !t.titulo.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search) {
+      const s = search.toLowerCase();
+      if (!t.titulo.toLowerCase().includes(s) &&
+          !t.descripcion?.toLowerCase().includes(s) &&
+          !t.departamento_nombre?.toLowerCase().includes(s) &&
+          !t.iniciativa?.toLowerCase().includes(s)) return false;
+    }
     if (filterEstado !== 'all' && t.estado !== filterEstado) return false;
     if (filterPrioridad !== 'all' && t.prioridad_id !== filterPrioridad) return false;
     if (filterAsignado !== 'all' && t.asignado_a !== filterAsignado) return false;
+    if (filterDepto !== 'all' && t.departamento_nombre !== filterDepto) return false;
     return true;
   });
 
@@ -461,6 +476,15 @@ function TasksInner() {
               {empleados.map((e) => (<SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>))}
             </SelectContent>
           </Select>
+          <Select value={filterDepto} onValueChange={(v) => setFilterDepto(v ?? 'all')}>
+            <SelectTrigger className="w-40 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue placeholder="Depto" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              {[...new Set(tasks.map(t => t.departamento_nombre).filter(Boolean))].sort().map(d => (
+                <SelectItem key={d!} value={d!}>{d}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -492,11 +516,13 @@ function TasksInner() {
             <TableHeader>
               <TableRow className="border-[var(--border)] hover:bg-transparent">
                 <SortableHead sortKey="titulo" label="Título" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+                <SortableHead sortKey="departamento_nombre" label="Depto" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-24" />
                 <SortableHead sortKey="estado" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
-                <SortableHead sortKey="porcentaje_avance" label="Avance" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
-                <SortableHead sortKey="prioridad_peso" label="Prioridad" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
-                <SortableHead sortKey="asignado_nombre" label="Asignado a" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-40" />
-                <SortableHead sortKey="fecha_vence" label="Vence" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
+                <SortableHead sortKey="porcentaje_avance" label="Avance" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-24" />
+                <SortableHead sortKey="asignado_nombre" label="Responsable" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-36" />
+                <SortableHead sortKey="created_at" label="Fecha Tarea" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
+                <SortableHead sortKey="fecha_compromiso" label="Compromiso" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
+                <SortableHead sortKey="iniciativa" label="Iniciativa" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -507,13 +533,15 @@ function TasksInner() {
                   <TableRow key={task.id} className="cursor-pointer border-[var(--border)] transition-colors hover:bg-[var(--panel)]" onClick={() => openEdit(task)}>
                     <TableCell>
                       <span className="line-clamp-1 font-medium text-[var(--text)]">{task.titulo}</span>
-                      {task.entidad_tipo && (<span className="mt-0.5 block text-xs text-[var(--text)]/40">{task.entidad_tipo}</span>)}
+                      {task.descripcion && (<span className="mt-0.5 block text-xs text-[var(--text)]/40 line-clamp-1">{task.descripcion}</span>)}
                     </TableCell>
+                    <TableCell><span className="text-xs text-[var(--text)]/60">{task.departamento_nombre || '—'}</span></TableCell>
                     <TableCell><EstadoBadge estado={task.estado} /></TableCell>
                     <TableCell><ProgressBar value={task.porcentaje_avance ?? 0} /></TableCell>
-                    <TableCell><PrioridadBadge prioridad={prio} /></TableCell>
                     <TableCell><span className="text-sm text-[var(--text)]/70">{empleado ? empleado.nombre : '—'}</span></TableCell>
-                    <TableCell><span className="text-sm text-[var(--text)]/70">{formatDate(task.fecha_vence)}</span></TableCell>
+                    <TableCell><span className="text-xs text-[var(--text)]/60">{formatDate(task.created_at)}</span></TableCell>
+                    <TableCell><span className="text-xs text-[var(--text)]/60">{formatDate(task.fecha_compromiso)}</span></TableCell>
+                    <TableCell><span className="text-xs text-[var(--text)]/60">{task.iniciativa || '—'}</span></TableCell>
                   </TableRow>
                 );
               })}
@@ -566,6 +594,34 @@ function TasksInner() {
                 className="w-full accent-[var(--accent)]"
               />
             </div>
+
+            {/* Metadatos adicionales (Read-only) */}
+            {(selectedTask?.departamento_nombre || selectedTask?.iniciativa || selectedTask?.prioridad || selectedTask?.tipo) && (
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl bg-[var(--panel)] p-3 border border-[var(--border)] text-[11px]">
+                {selectedTask.departamento_nombre && (
+                  <div><span className="font-semibold text-[var(--text)]/40 block">Depto</span> {selectedTask.departamento_nombre}</div>
+                )}
+                {selectedTask.iniciativa && (
+                  <div><span className="font-semibold text-[var(--text)]/40 block">Iniciativa</span> {selectedTask.iniciativa}</div>
+                )}
+                {selectedTask.prioridad && (
+                  <div><span className="font-semibold text-[var(--text)]/40 block">Prioridad (Original)</span> {selectedTask.prioridad}</div>
+                )}
+                {selectedTask.tipo && (
+                  <div><span className="font-semibold text-[var(--text)]/40 block">Tipo</span> {selectedTask.tipo}</div>
+                )}
+                {selectedTask.fecha_compromiso && (
+                  <div><span className="font-semibold text-[var(--text)]/40 block">Compromiso</span> {formatDate(selectedTask.fecha_compromiso)}</div>
+                )}
+                {selectedTask.motivo_bloqueo && (
+                  <div className="col-span-2"><span className="font-semibold text-[var(--text)]/40 block">Bloqueo</span> {selectedTask.motivo_bloqueo}</div>
+                )}
+                {selectedTask.siguiente_accion && (
+                  <div className="col-span-2"><span className="font-semibold text-[var(--text)]/40 block">Siguiente Acción</span> {selectedTask.siguiente_accion}</div>
+                )}
+              </div>
+            )}
+
             {selectedTask?.asignado_por && (
               <div className="text-xs text-[var(--text)]/40">
                 Asignada por: {empleadoMap.get(selectedTask.asignado_por)?.nombre ?? 'Desconocido'}

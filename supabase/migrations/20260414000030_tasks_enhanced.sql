@@ -13,12 +13,26 @@ ALTER TABLE erp.tasks
   ADD COLUMN IF NOT EXISTS fecha_completado  TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS completado_por    UUID REFERENCES erp.empleados(id),
   ADD COLUMN IF NOT EXISTS porcentaje_avance INTEGER DEFAULT 0
-    CHECK (porcentaje_avance BETWEEN 0 AND 100);
+    CHECK (porcentaje_avance BETWEEN 0 AND 100),
+  ADD COLUMN IF NOT EXISTS fecha_compromiso  DATE,
+  ADD COLUMN IF NOT EXISTS tipo              TEXT,
+  ADD COLUMN IF NOT EXISTS motivo_bloqueo    TEXT,
+  ADD COLUMN IF NOT EXISTS siguiente_accion  TEXT,
+  ADD COLUMN IF NOT EXISTS iniciativa        TEXT,
+  ADD COLUMN IF NOT EXISTS departamento_nombre TEXT,
+  ADD COLUMN IF NOT EXISTS prioridad         TEXT;
 
 COMMENT ON COLUMN erp.tasks.asignado_por      IS 'Empleado que asignó la tarea.';
 COMMENT ON COLUMN erp.tasks.fecha_completado  IS 'Timestamp cuando se marcó completada.';
 COMMENT ON COLUMN erp.tasks.completado_por    IS 'Empleado que completó la tarea.';
 COMMENT ON COLUMN erp.tasks.porcentaje_avance IS 'Progreso 0–100%.';
+COMMENT ON COLUMN erp.tasks.fecha_compromiso  IS 'Fecha compromiso / compromiso date del CSV.';
+COMMENT ON COLUMN erp.tasks.tipo              IS 'Tipo de tarea (CSV).';
+COMMENT ON COLUMN erp.tasks.motivo_bloqueo    IS 'Motivo de bloqueo (CSV).';
+COMMENT ON COLUMN erp.tasks.siguiente_accion  IS 'Siguiente acción (CSV).';
+COMMENT ON COLUMN erp.tasks.iniciativa        IS 'Iniciativa vinculada (CSV).';
+COMMENT ON COLUMN erp.tasks.departamento_nombre IS 'Nombre del departamento (CSV).';
+COMMENT ON COLUMN erp.tasks.prioridad         IS 'Prioridad como texto (CSV).';
 
 -- ── Indexes ─────────────────────────────────────────────────────────────────
 

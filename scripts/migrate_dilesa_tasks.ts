@@ -189,7 +189,25 @@ async function main() {
     const terminada =
       terminadaRaw === true ||
       String(terminadaRaw).toLowerCase() === 'true';
-    const estado = terminada ? 'completado' : 'pendiente';
+
+    // Priority & Status mapping from CSV logic
+    const estadoRaw = str(pick(v, cols, 'estado'));
+    const prioridadRaw = str(pick(v, cols, 'prioridad'));
+    const iniciativa = str(pick(v, cols, 'iniciativa'));
+    const departamentoNombre = str(pick(v, cols, 'departamento'));
+    const tipo = str(pick(v, cols, 'tipo de tarea', 'tipo'));
+    const motivoBloqueo = str(pick(v, cols, 'motivo bloqueo', 'motivo_bloqueo'));
+    const siguienteAccion = str(pick(v, cols, 'siguiente acción', 'siguiente_accion', 'siguiente accion'));
+    const avanceRaw = pick(v, cols, 'avance', '%avance', '% avance');
+    const avance = typeof avanceRaw === 'number' ? avanceRaw : (parseInt(String(avanceRaw)) || (terminada ? 100 : 0));
+
+    let estado = terminada ? 'completado' : 'pendiente';
+    if (!terminada && estadoRaw) {
+      const e = estadoRaw.toLowerCase();
+      if (e.includes('proceso')) estado = 'en_progreso';
+      if (e.includes('bloquea')) estado = 'bloqueado';
+      if (e.includes('cancel')) estado = 'cancelado';
+    }
 
     // Responsable: lookup text → empleado_id
     const responsableRaw = str(pick(v, cols, 'responsable', 'asignado a', 'asignado'));
@@ -225,8 +243,15 @@ async function main() {
       asignado_a: asignadoA,
       estado,
       fecha_vence: fechaVence,
+      fecha_compromiso: fechaVence, // in DILESA CSV, fecha compromiso is the primary date
       fecha_completado: terminada ? new Date().toISOString() : null,
-      porcentaje_avance: terminada ? 100 : 0,
+      porcentaje_avance: avance,
+      iniciativa,
+      departamento_nombre: departamentoNombre,
+      tipo,
+      motivo_bloqueo: motivoBloqueo,
+      siguiente_accion: siguienteAccion,
+      prioridad: prioridadRaw,
     };
 
     if (DRY_RUN) {
