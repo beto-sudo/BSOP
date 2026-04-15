@@ -227,6 +227,7 @@ function JuntaDetailInner() {
   const editor = useEditor({
     extensions: [
       StarterKit,
+      Underline,
       Image,
       Table.configure({ resizable: true }),
       TableRow,
