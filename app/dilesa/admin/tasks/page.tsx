@@ -464,6 +464,8 @@ function TasksInner() {
     });
     return [...deptos].sort().map(d => ({ id: d, label: d }));
   }, [tasks]);
+  const estadoOptions = useMemo(() => Object.entries(ESTADO_CONFIG).map(([k, v]) => ({ id: k, label: v.label })), []);
+  const prioridadOptions = useMemo(() => PRIORIDAD_OPTIONS.map(p => ({ id: p, label: p })), []);
 
   const { sortKey, sortDir, onSort, sortData } = useSortableTable<ErpTask & { asignado_nombre: string | null }>('created_at', 'desc');
 
@@ -529,28 +531,26 @@ function TasksInner() {
               className="pl-9 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
             />
           </div>
-          <Select value={filterEstado} onValueChange={(v) => setFilterEstado(v ?? 'all')}>
-            <SelectTrigger className="w-40 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Estado</SelectItem>
-              {Object.entries(ESTADO_CONFIG).map(([k, v]) => (
-                <SelectItem key={k} value={k}>{v.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={filterPrioridad} onValueChange={(v) => setFilterPrioridad(v ?? 'all')}>
-            <SelectTrigger className="w-36 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-              <SelectValue placeholder="Prioridad" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Prioridad</SelectItem>
-              {PRIORIDAD_OPTIONS.map(p => (
-                <SelectItem key={p} value={p}>{p}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Combobox
+            value={filterEstado}
+            onChange={setFilterEstado}
+            options={estadoOptions}
+            placeholder="Estado"
+            searchPlaceholder="Buscar estado..."
+            allowClear
+            clearLabel="Todos"
+            className="w-40"
+          />
+          <Combobox
+            value={filterPrioridad}
+            onChange={setFilterPrioridad}
+            options={prioridadOptions}
+            placeholder="Prioridad"
+            searchPlaceholder="Buscar prioridad..."
+            allowClear
+            clearLabel="Todas"
+            className="w-36"
+          />
           <Combobox
             value={filterAsignado}
             onChange={setFilterAsignado}
