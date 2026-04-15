@@ -310,6 +310,35 @@ function JuntaDetailInner() {
   const [taskForm, setTaskForm] = useState({ titulo: '', prioridad: '', asignado_a: '', estado: 'pendiente' as JuntaTask['estado'], fecha_vence: '' });
   const [addingTask, setAddingTask] = useState(false);
   const [completingTask, setCompletingTask] = useState<string | null>(null);
+  const [showLinkTask, setShowLinkTask] = useState(false);
+  const [linkableTasks, setLinkableTasks] = useState<{ id: string; titulo: string; estado: string }[]>([]);
+  const [linkingTask, setLinkingTask] = useState(false);
+
+  const fetchLinkableTasks = async () => {
+    if (!junta) return;
+    const { data } = await supabase.schema('erp' as any).from('tasks')
+      .select('id, titulo, estado')
+      .eq('empresa_id', junta.empresa_id)
+      .is('entidad_id', null)
+      .order('created_at', { ascending: false })
+      .limit(100);
+    setLinkableTasks(data ?? []);
+  };
+
+  const handleLinkTask = async (taskId: string) => {
+    if (!junta) return;
+    setLinkingTask(true);
+    const { error: err } = await supabase.schema('erp' as any).from('tasks')
+      .update({ entidad_tipo: 'junta', entidad_id: junta.id })
+      .eq('id', taskId);
+    setLinkingTask(false);
+    if (err) { alert(`Error: ${err.message}`); return; }
+    // Refresh tasks
+    const { data: tasksData } = await supabase.schema('erp' as any).from('tasks').select('id, titulo, estado, asignado_a, fecha_vence').eq('entidad_tipo', 'junta').eq('entidad_id', id).order('created_at');
+    setTasks(tasksData ?? []);
+    // Remove from linkable list
+    setLinkableTasks(prev => prev.filter(t => t.id !== taskId));
+  };
 
   const handleImageUpload = async (file: File) => {
     if (!editor || uploadingImage) return;
@@ -595,8 +624,30 @@ function JuntaDetailInner() {
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
         <div className="flex items-center justify-between mb-3">
           <SectionTitle>Tareas de esta junta {tasks.length > 0 && <span className="text-[var(--text)]/40 font-normal">({tasks.length})</span>}</SectionTitle>
-          <Button variant="outline" size="sm" onClick={() => setShowAddTask(true)} className="gap-1.5 rounded-xl border-[var(--border)] text-[var(--text)] hover:bg-[var(--panel)]"><Plus className="h-3.5 w-3.5" />Agregar tarea</Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => { fetchLinkableTasks(); setShowLinkTask(!showLinkTask); }} className="gap-1.5 rounded-xl border-[var(--border)] text-[var(--text)] hover:bg-[var(--panel)]">{showLinkTask ? <X className="h-3.5 w-3.5" /> : <TicketCheck className="h-3.5 w-3.5" />}{showLinkTask ? 'Cerrar' : 'Vincular existente'}</Button>
+            <Button variant="outline" size="sm" onClick={() => setShowAddTask(true)} className="gap-1.5 rounded-xl border-[var(--border)] text-[var(--text)] hover:bg-[var(--panel)]"><Plus className="h-3.5 w-3.5" />Nueva tarea</Button>
+          </div>
         </div>
+        {showLinkTask && (
+          <div className="mb-3 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-3">
+            <p className="text-xs font-semibold text-[var(--text)]/60 mb-2">Selecciona tareas existentes para vincular a esta junta:</p>
+            {linkableTasks.length === 0 ? (
+              <p className="text-xs text-[var(--text)]/40">No hay tareas disponibles para vincular</p>
+            ) : (
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                {linkableTasks.map(t => (
+                  <button key={t.id} type="button" onClick={() => handleLinkTask(t.id)} disabled={linkingTask}
+                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-[var(--panel)] transition disabled:opacity-50">
+                    <Plus className="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />
+                    <span className="flex-1 truncate text-[var(--text)]">{t.titulo}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded border ${(ESTADO_TASK[t.estado as JuntaTask['estado']] ?? { cls: '' }).cls}`}>{(ESTADO_TASK[t.estado as JuntaTask['estado']] ?? { label: t.estado }).label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {tasks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center"><TicketCheck className="mb-2 h-8 w-8 text-[var(--text)]/20" /><p className="text-sm text-[var(--text)]/50">No hay tareas asociadas a esta junta</p></div>
         ) : (() => {
