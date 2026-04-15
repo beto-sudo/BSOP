@@ -5,106 +5,68 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import {
+  Sheet, SheetContent, SheetHeader, SheetTitle,
+} from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-  ArrowLeft,
-  Loader2,
-  Save,
-  Send,
-  Lock,
-  Globe,
-  Paperclip,
-  Bug,
-  TicketCheck,
-  Sparkles,
-  MessageSquare,
-  ExternalLink,
-  Pencil,
-  X,
-  Check,
-  AlertTriangle,
+  ArrowLeft, Loader2, Save, Pencil, X, Check, AlertTriangle, Plus,
 } from 'lucide-react';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+const EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
 
-type Task = {
+type ErpTask = {
   id: string;
   empresa_id: string;
-  kind: 'task' | 'bug' | 'feature' | 'request';
   titulo: string;
   descripcion: string | null;
+  asignado_a: string | null;
+  creado_por: string | null;
   prioridad_id: string | null;
-  categoria_id: string | null;
-  estado_id: string | null;
-  creador_id: string | null;
-  responsable_id: string | null;
-  fecha_limite: string | null;
-  fecha_resolucion: string | null;
-  severidad: string | null;
-  modulo: string | null;
-  url_referencia: string | null;
+  estado: 'pendiente' | 'en_progreso' | 'bloqueado' | 'completado' | 'cancelado';
+  fecha_vence: string | null;
+  porcentaje_avance: number | null;
+  entidad_tipo: string | null;
+  entidad_id: string | null;
   created_at: string;
-  updated_at: string;
+  updated_at: string | null;
 };
 
 type Prioridad = { id: string; nombre: string; peso: number; color: string };
-type Estado = { id: string; nombre: string; tipo: string; color: string; orden: number };
-type Categoria = { id: string; nombre: string; icono: string | null };
-type Usuario = { id: string; email: string; first_name: string | null };
+type Empleado = { id: string; nombre: string };
 
-type Comment = {
+type TaskUpdate = {
   id: string;
   task_id: string;
-  usuario_id: string | null;
-  comentario: string;
-  es_interno: boolean;
+  tipo: 'avance' | 'cambio_estado' | 'cambio_fecha' | 'nota' | 'cambio_responsable';
+  contenido: string | null;
+  valor_anterior: string | null;
+  valor_nuevo: string | null;
+  creado_por: string | null;
   created_at: string;
+  usuario?: { nombre: string } | null;
 };
 
-type Attachment = {
-  id: string;
-  task_id: string;
-  nombre_archivo: string;
-  url_archivo: string;
-  tipo_mime: string | null;
-  tamano_bytes: number | null;
-  created_at: string;
+const ESTADO_CONFIG: Record<ErpTask['estado'], { label: string; cls: string }> = {
+  pendiente:   { label: 'Pendiente',   cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
+  en_progreso: { label: 'En progreso', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
+  bloqueado:   { label: 'Bloqueado',   cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
+  completado:  { label: 'Completado',  cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
+  cancelado:   { label: 'Cancelado',   cls: 'bg-[var(--border)]/60 text-[var(--text)]/40 border-[var(--border)]' },
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const KIND_CONFIG: Record<string, { label: string; cls: string; icon: React.ReactNode }> = {
-  task: {
-    label: 'Tarea',
-    cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
-    icon: <TicketCheck className="h-3.5 w-3.5" />,
-  },
-  bug: {
-    label: 'Bug',
-    cls: 'bg-red-500/15 text-red-400 border-red-500/20',
-    icon: <Bug className="h-3.5 w-3.5" />,
-  },
-  feature: {
-    label: 'Feature',
-    cls: 'bg-purple-500/15 text-purple-400 border-purple-500/20',
-    icon: <Sparkles className="h-3.5 w-3.5" />,
-  },
-  request: {
-    label: 'Solicitud',
-    cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
-    icon: <MessageSquare className="h-3.5 w-3.5" />,
-  },
+const TIPO_UPDATE_CONFIG: Record<string, { label: string; cls: string }> = {
+  avance:             { label: 'Avance',      cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
+  cambio_estado:      { label: 'Estado',      cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
+  cambio_fecha:       { label: 'Fecha',       cls: 'bg-purple-500/15 text-purple-400 border-purple-500/20' },
+  nota:               { label: 'Nota',        cls: 'bg-[var(--border)]/60 text-[var(--text)]/60 border-[var(--border)]' },
+  cambio_responsable: { label: 'Responsable', cls: 'bg-teal-500/15 text-teal-400 border-teal-500/20' },
 };
 
 function formatDate(dateStr: string | null) {
@@ -117,19 +79,8 @@ function formatDateTime(dateStr: string | null) {
   if (!dateStr) return '—';
   const d = new Date(dateStr);
   return d.toLocaleString('es-MX', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
   });
-}
-
-function formatBytes(bytes: number | null) {
-  if (!bytes) return '';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
@@ -140,43 +91,20 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-function KindBadge({ kind }: { kind: string }) {
-  const cfg = KIND_CONFIG[kind] ?? {
-    label: kind,
-    cls: 'bg-[var(--border)] text-[var(--text)]/70 border-[var(--border)]',
-    icon: null,
-  };
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold ${cfg.cls}`}
-    >
-      {cfg.icon}
-      {cfg.label}
-    </span>
-  );
-}
-
-// ─── Main component ───────────────────────────────────────────────────────────
-
 function TaskDetailInner() {
   const params = useParams<{ id: string }>();
   const taskId = params.id;
   const router = useRouter();
   const supabase = createSupabaseBrowserClient();
 
-  // Reference data
   const [prioridades, setPrioridades] = useState<Prioridad[]>([]);
-  const [estados, setEstados] = useState<Estado[]>([]);
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
-  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
-
-  // Task
-  const [task, setTask] = useState<Task | null>(null);
+  const [empleados, setEmpleados] = useState<Empleado[]>([]);
+  const [task, setTask] = useState<ErpTask | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // Inline editing
   const [editingTitulo, setEditingTitulo] = useState(false);
   const [tituloVal, setTituloVal] = useState('');
   const [editingDesc, setEditingDesc] = useState(false);
@@ -184,98 +112,39 @@ function TaskDetailInner() {
   const tituloRef = useRef<HTMLInputElement>(null);
   const descRef = useRef<HTMLTextAreaElement>(null);
 
-  // Comments
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [commentsLoading, setCommentsLoading] = useState(false);
-  const [newComment, setNewComment] = useState('');
-  const [isInterno, setIsInterno] = useState(false);
-  const [sendingComment, setSendingComment] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [taskUpdates, setTaskUpdates] = useState<TaskUpdate[]>([]);
+  const [updatesLoading, setUpdatesLoading] = useState(false);
 
-  // Attachments
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [attachmentsLoading, setAttachmentsLoading] = useState(false);
+  const [showUpdateSheet, setShowUpdateSheet] = useState(false);
+  const [sendingUpdate, setSendingUpdate] = useState(false);
+  const [updateForm, setUpdateForm] = useState({
+    contenido: '',
+    nuevoEstado: '',
+    nuevaFecha: '',
+  });
 
   const fetchRefData = useCallback(async () => {
-    const [priRes, estRes, catRes] = await Promise.all([
+    const [priRes, empRes] = await Promise.all([
       supabase.schema('shared' as any).from('prioridades').select('*').order('peso'),
-      supabase.schema('shared' as any).from('estados').select('*').order('orden'),
-      supabase.schema('shared' as any).from('categorias').select('*').order('nombre'),
+      supabase
+        .schema('erp' as any)
+        .from('empleados')
+        .select('id, persona:persona_id(nombre, apellido_paterno)')
+        .eq('empresa_id', EMPRESA_ID)
+        .eq('activo', true)
+        .is('deleted_at', null),
     ]);
     setPrioridades(priRes.data ?? []);
-    setEstados(estRes.data ?? []);
-    setCategorias(catRes.data ?? []);
+    setEmpleados(
+      (empRes.data ?? []).map((e: any) => ({
+        id: e.id,
+        nombre: [e.persona?.nombre, e.persona?.apellido_paterno].filter(Boolean).join(' '),
+      })),
+    );
   }, [supabase]);
 
-  const fetchUsersForTask = useCallback(
-    async (empresaId: string) => {
-      const { data: ueData } = await supabase
-        .schema('core' as any)
-        .from('usuarios_empresas')
-        .select('usuario_id')
-        .eq('empresa_id', empresaId)
-        .eq('activo', true);
-
-      const userIds = (ueData ?? []).map((u: any) => u.usuario_id);
-      if (userIds.length > 0) {
-        const { data: usersData } = await supabase
-          .schema('core' as any)
-          .from('usuarios')
-          .select('id, email, first_name')
-          .in('id', userIds)
-          .eq('activo', true);
-        setUsuarios(usersData ?? []);
-      }
-    },
-    [supabase],
-  );
-
-  const fetchTask = useCallback(async () => {
-    const { data, error: err } = await supabase
-      .schema('core' as any)
-      .from('tasks')
-      .select('*')
-      .eq('id', taskId)
-      .is('deleted_at', null)
-      .single();
-
-    if (err || !data) {
-      setError(err?.message ?? 'Tarea no encontrada');
-      return null;
-    }
-    setTask(data);
-    return data as Task;
-  }, [supabase, taskId]);
-
-  const fetchComments = useCallback(async () => {
-    setCommentsLoading(true);
-    const { data } = await supabase
-      .schema('core' as any)
-      .from('task_comentarios')
-      .select('*')
-      .eq('task_id', taskId)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: true });
-    setComments(data ?? []);
-    setCommentsLoading(false);
-  }, [supabase, taskId]);
-
-  const fetchAttachments = useCallback(async () => {
-    setAttachmentsLoading(true);
-    const { data } = await supabase
-      .schema('core' as any)
-      .from('task_adjuntos')
-      .select('*')
-      .eq('task_id', taskId)
-      .order('created_at', { ascending: false });
-    setAttachments(data ?? []);
-    setAttachmentsLoading(false);
-  }, [supabase, taskId]);
-
   const fetchCurrentUser = useCallback(async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user?.email) return;
     const { data: coreUser } = await supabase
       .schema('core' as any)
@@ -286,26 +155,62 @@ function TaskDetailInner() {
     setCurrentUserId(coreUser?.id ?? null);
   }, [supabase]);
 
+  const fetchTask = useCallback(async () => {
+    const { data, error: err } = await supabase
+      .schema('erp' as any)
+      .from('tasks')
+      .select('*')
+      .eq('id', taskId)
+      .single();
+    if (err || !data) {
+      setError(err?.message ?? 'Tarea no encontrada');
+      return null;
+    }
+    setTask(data);
+    return data as ErpTask;
+  }, [supabase, taskId]);
+
+  const fetchUpdates = useCallback(async () => {
+    setUpdatesLoading(true);
+    const { data: updatesData } = await supabase
+      .schema('erp' as any)
+      .from('task_updates')
+      .select('*')
+      .eq('task_id', taskId)
+      .order('created_at', { ascending: false });
+
+    if (updatesData && updatesData.length > 0) {
+      const userIds = [...new Set(updatesData.map((u: any) => u.creado_por).filter(Boolean))];
+      const { data: usersData } = userIds.length > 0
+        ? await supabase.schema('core' as any).from('usuarios').select('id, nombre').in('id', userIds)
+        : { data: [] };
+      const userMap = new Map((usersData ?? []).map((u: any) => [u.id, u.nombre]));
+      setTaskUpdates(
+        updatesData.map((u: any) => ({
+          ...u,
+          usuario: u.creado_por ? { nombre: userMap.get(u.creado_por) ?? 'Usuario' } : null,
+        })),
+      );
+    } else {
+      setTaskUpdates([]);
+    }
+    setUpdatesLoading(false);
+  }, [supabase, taskId]);
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-
     const init = async () => {
       await Promise.all([fetchRefData(), fetchCurrentUser()]);
       const taskData = await fetchTask();
       if (cancelled || !taskData) return;
-      await fetchUsersForTask(taskData.empresa_id);
-      await Promise.all([fetchComments(), fetchAttachments()]);
+      await fetchUpdates();
       if (!cancelled) setLoading(false);
     };
-
     void init();
-    return () => {
-      cancelled = true;
-    };
-  }, [fetchRefData, fetchTask, fetchComments, fetchAttachments, fetchCurrentUser, fetchUsersForTask]);
+    return () => { cancelled = true; };
+  }, [fetchRefData, fetchTask, fetchUpdates, fetchCurrentUser]);
 
-  // Auto-focus when entering edit mode
   useEffect(() => {
     if (editingTitulo) tituloRef.current?.focus();
   }, [editingTitulo]);
@@ -315,18 +220,18 @@ function TaskDetailInner() {
   }, [editingDesc]);
 
   const patchTask = useCallback(
-    async (updates: Partial<Task>) => {
+    async (updates: Partial<ErpTask>) => {
       if (!task) return;
       setSaving(true);
       const { data, error: err } = await supabase
-        .schema('core' as any)
+        .schema('erp' as any)
         .from('tasks')
         .update({ ...updates, updated_at: new Date().toISOString() })
         .eq('id', task.id)
         .select()
         .single();
       setSaving(false);
-      if (!err && data) setTask(data as Task);
+      if (!err && data) setTask(data as ErpTask);
     },
     [supabase, task],
   );
@@ -342,29 +247,71 @@ function TaskDetailInner() {
     await patchTask({ descripcion: descVal.trim() || null });
   };
 
-  const handleSendComment = async () => {
-    if (!newComment.trim()) return;
-    setSendingComment(true);
-    await supabase
-      .schema('core' as any)
-      .from('task_comentarios')
-      .insert({
+  const handleSendUpdate = async () => {
+    if (!updateForm.contenido.trim() && !updateForm.nuevoEstado && !updateForm.nuevaFecha) return;
+    if (!task) return;
+    setSendingUpdate(true);
+
+    const inserts: any[] = [];
+
+    if (updateForm.contenido.trim()) {
+      inserts.push({
         task_id: taskId,
-        usuario_id: currentUserId,
-        comentario: newComment.trim(),
-        es_interno: isInterno,
+        empresa_id: EMPRESA_ID,
+        tipo: 'avance',
+        contenido: updateForm.contenido.trim(),
+        creado_por: currentUserId,
       });
-    setNewComment('');
-    await fetchComments();
-    setSendingComment(false);
+    }
+
+    if (updateForm.nuevoEstado && updateForm.nuevoEstado !== task.estado) {
+      inserts.push({
+        task_id: taskId,
+        empresa_id: EMPRESA_ID,
+        tipo: 'cambio_estado',
+        valor_anterior: task.estado,
+        valor_nuevo: updateForm.nuevoEstado,
+        creado_por: currentUserId,
+      });
+    }
+
+    if (updateForm.nuevaFecha && updateForm.nuevaFecha !== (task.fecha_vence ?? '')) {
+      inserts.push({
+        task_id: taskId,
+        empresa_id: EMPRESA_ID,
+        tipo: 'cambio_fecha',
+        valor_anterior: task.fecha_vence ?? '',
+        valor_nuevo: updateForm.nuevaFecha,
+        creado_por: currentUserId,
+      });
+    }
+
+    if (inserts.length > 0) {
+      await supabase.schema('erp' as any).from('task_updates').insert(inserts);
+    }
+
+    const taskPatch: Partial<ErpTask> = {};
+    if (updateForm.nuevoEstado && updateForm.nuevoEstado !== task.estado) {
+      taskPatch.estado = updateForm.nuevoEstado as ErpTask['estado'];
+    }
+    if (updateForm.nuevaFecha && updateForm.nuevaFecha !== (task.fecha_vence ?? '')) {
+      taskPatch.fecha_vence = updateForm.nuevaFecha;
+    }
+    if (Object.keys(taskPatch).length > 0) {
+      await patchTask(taskPatch);
+    }
+
+    setUpdateForm({ contenido: '', nuevoEstado: '', nuevaFecha: '' });
+    setShowUpdateSheet(false);
+    await fetchUpdates();
+    if (Object.keys(taskPatch).length > 0) {
+      await fetchTask();
+    }
+    setSendingUpdate(false);
   };
 
   const prioridadMap = new Map(prioridades.map((p) => [p.id, p]));
-  const estadoMap = new Map(estados.map((e) => [e.id, e]));
-  const categoriaMap = new Map(categorias.map((c) => [c.id, c]));
-  const usuarioMap = new Map(usuarios.map((u) => [u.id, u]));
-
-  // ─── Loading state ──────────────────────────────────────────────────────────
+  const empleadoMap = new Map(empleados.map((e) => [e.id, e]));
 
   if (loading) {
     return (
@@ -406,13 +353,9 @@ function TaskDetailInner() {
     );
   }
 
-  const estado = estadoMap.get(task.estado_id ?? '');
   const prioridad = prioridadMap.get(task.prioridad_id ?? '');
-  const categoria = categoriaMap.get(task.categoria_id ?? '');
-  const responsable = usuarioMap.get(task.responsable_id ?? '');
-  const creador = usuarioMap.get(task.creador_id ?? '');
-
-  // ─── Render ─────────────────────────────────────────────────────────────────
+  const asignado = empleadoMap.get(task.asignado_a ?? '');
+  const estadoCfg = ESTADO_CONFIG[task.estado] ?? { label: task.estado, cls: '' };
 
   return (
     <div className="space-y-6">
@@ -433,30 +376,24 @@ function TaskDetailInner() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* ── Left column ─────────────────────────────────────────────────── */}
+        {/* Left column */}
         <div className="space-y-4 lg:col-span-2">
           {/* Titulo */}
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
-                <KindBadge kind={task.kind} />
-                {task.modulo && (
+                <span className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-xs font-semibold ${estadoCfg.cls}`}>
+                  {estadoCfg.label}
+                </span>
+                {task.entidad_tipo && (
                   <span className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-0.5 text-xs text-[var(--text)]/60">
-                    {task.modulo}
-                  </span>
-                )}
-                {task.kind === 'bug' && task.severidad && (
-                  <span className="rounded-lg border border-orange-500/25 bg-orange-500/15 px-2 py-0.5 text-xs font-medium text-orange-400">
-                    ⚠ {task.severidad}
+                    {task.entidad_tipo}
                   </span>
                 )}
               </div>
               {!editingTitulo && (
                 <button
-                  onClick={() => {
-                    setTituloVal(task.titulo);
-                    setEditingTitulo(true);
-                  }}
+                  onClick={() => { setTituloVal(task.titulo); setEditingTitulo(true); }}
                   className="shrink-0 rounded-lg p-1.5 text-[var(--text)]/30 transition hover:bg-[var(--panel)] hover:text-[var(--text)]"
                 >
                   <Pencil className="h-3.5 w-3.5" />
@@ -476,26 +413,15 @@ function TaskDetailInner() {
                   }}
                   className="flex-1 rounded-xl border-[var(--border)] bg-[var(--panel)] text-lg font-semibold text-[var(--text)]"
                 />
-                <Button
-                  size="sm"
-                  onClick={saveTitulo}
-                  className="rounded-xl bg-[var(--accent)] text-white"
-                >
+                <Button size="sm" onClick={saveTitulo} className="rounded-xl bg-[var(--accent)] text-white">
                   <Check className="h-4 w-4" />
                 </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setEditingTitulo(false)}
-                  className="rounded-xl border-[var(--border)]"
-                >
+                <Button size="sm" variant="outline" onClick={() => setEditingTitulo(false)} className="rounded-xl border-[var(--border)]">
                   <X className="h-4 w-4" />
                 </Button>
               </div>
             ) : (
-              <h1 className="text-xl font-semibold text-[var(--text)] leading-snug">
-                {task.titulo}
-              </h1>
+              <h1 className="text-xl font-semibold text-[var(--text)] leading-snug">{task.titulo}</h1>
             )}
           </div>
 
@@ -505,10 +431,7 @@ function TaskDetailInner() {
               <FieldLabel>Descripción</FieldLabel>
               {!editingDesc && (
                 <button
-                  onClick={() => {
-                    setDescVal(task.descripcion ?? '');
-                    setEditingDesc(true);
-                  }}
+                  onClick={() => { setDescVal(task.descripcion ?? ''); setEditingDesc(true); }}
                   className="rounded-lg p-1.5 text-[var(--text)]/30 transition hover:bg-[var(--panel)] hover:text-[var(--text)]"
                 >
                   <Pencil className="h-3.5 w-3.5" />
@@ -527,20 +450,11 @@ function TaskDetailInner() {
                   className="resize-none rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
                 />
                 <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={saveDesc}
-                    className="gap-1.5 rounded-xl bg-[var(--accent)] text-white"
-                  >
+                  <Button size="sm" onClick={saveDesc} className="gap-1.5 rounded-xl bg-[var(--accent)] text-white">
                     <Save className="h-3.5 w-3.5" />
                     Guardar
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setEditingDesc(false)}
-                    className="rounded-xl border-[var(--border)]"
-                  >
+                  <Button size="sm" variant="outline" onClick={() => setEditingDesc(false)} className="rounded-xl border-[var(--border)]">
                     Cancelar
                   </Button>
                 </div>
@@ -551,10 +465,7 @@ function TaskDetailInner() {
               </p>
             ) : (
               <button
-                onClick={() => {
-                  setDescVal('');
-                  setEditingDesc(true);
-                }}
+                onClick={() => { setDescVal(''); setEditingDesc(true); }}
                 className="text-sm italic text-[var(--text)]/35 hover:text-[var(--text)]/55 transition-colors"
               >
                 Sin descripción. Haz clic para agregar.
@@ -562,171 +473,89 @@ function TaskDetailInner() {
             )}
           </div>
 
-          {/* Adjuntos */}
+          {/* Actualizaciones */}
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
             <div className="mb-3 flex items-center justify-between">
-              <FieldLabel>Archivos adjuntos ({attachments.length})</FieldLabel>
+              <FieldLabel>Actualizaciones ({taskUpdates.length})</FieldLabel>
+              <Button
+                size="sm"
+                onClick={() => setShowUpdateSheet(true)}
+                className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Agregar avance
+              </Button>
             </div>
 
-            {attachmentsLoading ? (
-              <Skeleton className="h-12 w-full rounded-xl" />
-            ) : attachments.length === 0 ? (
-              <div className="flex items-center gap-2 rounded-xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--text)]/35">
-                <Paperclip className="h-4 w-4" />
-                Sin archivos adjuntos
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {attachments.map((att) => (
-                  <a
-                    key={att.id}
-                    href={att.url_archivo}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 text-sm transition hover:border-[var(--accent)]/40"
-                  >
-                    <Paperclip className="h-4 w-4 shrink-0 text-[var(--text)]/40" />
-                    <span className="flex-1 truncate text-[var(--text)]/80">{att.nombre_archivo}</span>
-                    {att.tamano_bytes && (
-                      <span className="shrink-0 text-xs text-[var(--text)]/40">
-                        {formatBytes(att.tamano_bytes)}
-                      </span>
-                    )}
-                    <ExternalLink className="h-3.5 w-3.5 shrink-0 text-[var(--text)]/30" />
-                  </a>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Comentarios */}
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
-            <FieldLabel>Comentarios ({comments.length})</FieldLabel>
-
-            {commentsLoading ? (
-              <div className="space-y-3 mt-3">
+            {updatesLoading ? (
+              <div className="space-y-3">
                 {[1, 2].map((i) => (
                   <Skeleton key={i} className="h-16 w-full rounded-xl" />
                 ))}
               </div>
-            ) : comments.length === 0 ? (
-              <p className="mt-3 text-sm italic text-[var(--text)]/35">Sin comentarios aún.</p>
+            ) : taskUpdates.length === 0 ? (
+              <p className="text-sm italic text-[var(--text)]/35">Sin actualizaciones aún.</p>
             ) : (
-              <div className="mt-3 space-y-3">
-                {comments.map((c) => {
-                  const author = usuarioMap.get(c.usuario_id ?? '');
+              <div className="space-y-3">
+                {taskUpdates.map((u) => {
+                  const tc = TIPO_UPDATE_CONFIG[u.tipo] ?? { label: u.tipo, cls: '' };
                   return (
-                    <div
-                      key={c.id}
-                      className={`rounded-xl border p-3 ${
-                        c.es_interno
-                          ? 'border-amber-500/20 bg-amber-500/8'
-                          : 'border-[var(--border)] bg-[var(--panel)]'
-                      }`}
-                    >
-                      <div className="mb-1.5 flex items-center gap-2">
-                        <span className="text-xs font-semibold text-[var(--text)]/70">
-                          {author ? (author.first_name ?? author.email) : 'Usuario'}
+                    <div key={u.id} className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2.5">
+                      <div className="mb-1.5 flex items-center gap-2 flex-wrap">
+                        <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[10px] font-medium ${tc.cls}`}>
+                          {tc.label}
                         </span>
-                        {c.es_interno && (
-                          <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/25 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-400">
-                            <Lock className="h-2.5 w-2.5" />
-                            Interno
-                          </span>
-                        )}
-                        <span className="ml-auto text-[10px] text-[var(--text)]/35">
-                          {formatDateTime(c.created_at)}
+                        <span className="text-[10px] text-[var(--text)]/40">
+                          {u.usuario?.nombre ?? 'Sistema'}
+                        </span>
+                        <span className="text-[10px] text-[var(--text)]/30 ml-auto">
+                          {formatDateTime(u.created_at)}
                         </span>
                       </div>
-                      <p className="whitespace-pre-wrap text-sm text-[var(--text)]/80">
-                        {c.comentario}
-                      </p>
+                      {u.contenido && (
+                        <p className="whitespace-pre-wrap text-sm text-[var(--text)]/80">{u.contenido}</p>
+                      )}
+                      {u.valor_anterior != null && u.valor_nuevo != null && (
+                        <p className="text-xs text-[var(--text)]/50 mt-1">
+                          {u.tipo === 'cambio_estado'
+                            ? `${ESTADO_CONFIG[u.valor_anterior as ErpTask['estado']]?.label ?? u.valor_anterior} → ${ESTADO_CONFIG[u.valor_nuevo as ErpTask['estado']]?.label ?? u.valor_nuevo}`
+                            : `${u.valor_anterior || '—'} → ${u.valor_nuevo || '—'}`}
+                        </p>
+                      )}
                     </div>
                   );
                 })}
               </div>
             )}
-
-            {/* Add comment */}
-            <div className="mt-4 space-y-2">
-              <Separator className="bg-[var(--border)]" />
-              <Textarea
-                placeholder="Escribe un comentario..."
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                rows={3}
-                className="mt-3 resize-none rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-              />
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setIsInterno((v) => !v)}
-                  className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition ${
-                    isInterno
-                      ? 'border-amber-500/30 bg-amber-500/15 text-amber-400'
-                      : 'border-[var(--border)] bg-[var(--panel)] text-[var(--text)]/55 hover:text-[var(--text)]'
-                  }`}
-                >
-                  {isInterno ? <Lock className="h-3 w-3" /> : <Globe className="h-3 w-3" />}
-                  {isInterno ? 'Interno' : 'Público'}
-                </button>
-                <Button
-                  size="sm"
-                  onClick={handleSendComment}
-                  disabled={sendingComment || !newComment.trim()}
-                  className="ml-auto gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60"
-                >
-                  {sendingComment ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Send className="h-3.5 w-3.5" />
-                  )}
-                  Comentar
-                </Button>
-              </div>
-            </div>
           </div>
         </div>
 
-        {/* ── Right column ─────────────────────────────────────────────────── */}
+        {/* Right column */}
         <div className="space-y-4">
           {/* Estado */}
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
             <FieldLabel>Estado</FieldLabel>
             <Select
-              value={task.estado_id ?? ''}
-              onValueChange={(v) => void patchTask({ estado_id: v || null })}
+              value={task.estado}
+              onValueChange={(v) => void patchTask({ estado: v as ErpTask['estado'] })}
             >
               <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                <SelectValue placeholder="Sin estado">
-                  {estado ? (
-                    <span
-                      className="inline-flex items-center gap-1.5"
-                      style={{ color: estado.color }}
-                    >
-                      <span
-                        className="h-2 w-2 rounded-full"
-                        style={{ backgroundColor: estado.color }}
-                      />
-                      {estado.nombre}
-                    </span>
-                  ) : (
-                    <span className="text-[var(--text)]/40">Sin estado</span>
-                  )}
+                <SelectValue>
+                  <span className={`inline-flex items-center gap-1.5 ${estadoCfg.cls.includes('text-') ? estadoCfg.cls.split(' ').find((c: string) => c.startsWith('text-')) : ''}`}>
+                    {estadoCfg.label}
+                  </span>
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {estados.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.nombre}
-                  </SelectItem>
+                {Object.entries(ESTADO_CONFIG).map(([k, v]) => (
+                  <SelectItem key={k} value={k}>{v.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Metadata card */}
+          {/* Metadata */}
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 space-y-4">
-            {/* Prioridad */}
             <div>
               <FieldLabel>Prioridad</FieldLabel>
               <Select
@@ -736,14 +565,8 @@ function TaskDetailInner() {
                 <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
                   <SelectValue placeholder="Sin prioridad">
                     {prioridad ? (
-                      <span
-                        className="inline-flex items-center gap-1.5"
-                        style={{ color: prioridad.color }}
-                      >
-                        <span
-                          className="h-2 w-2 rounded-full"
-                          style={{ backgroundColor: prioridad.color }}
-                        />
+                      <span className="inline-flex items-center gap-1.5" style={{ color: prioridad.color }}>
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: prioridad.color }} />
                         {prioridad.nombre}
                       </span>
                     ) : (
@@ -752,10 +575,9 @@ function TaskDetailInner() {
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="">Sin prioridad</SelectItem>
                   {prioridades.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.nombre}
-                    </SelectItem>
+                    <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -763,26 +585,23 @@ function TaskDetailInner() {
 
             <Separator className="bg-[var(--border)]" />
 
-            {/* Responsable */}
             <div>
-              <FieldLabel>Responsable</FieldLabel>
+              <FieldLabel>Asignado a</FieldLabel>
               <Select
-                value={task.responsable_id ?? ''}
-                onValueChange={(v) => void patchTask({ responsable_id: v || null })}
+                value={task.asignado_a ?? ''}
+                onValueChange={(v) => void patchTask({ asignado_a: v || null })}
               >
                 <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
                   <SelectValue placeholder="Sin asignar">
-                    {responsable
-                      ? (responsable.first_name ?? responsable.email)
+                    {asignado
+                      ? asignado.nombre
                       : <span className="text-[var(--text)]/40">Sin asignar</span>}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">Sin asignar</SelectItem>
-                  {usuarios.map((u) => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.first_name ?? u.email}
-                    </SelectItem>
+                  {empleados.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -790,118 +609,109 @@ function TaskDetailInner() {
 
             <Separator className="bg-[var(--border)]" />
 
-            {/* Categoria */}
-            <div>
-              <FieldLabel>Categoría</FieldLabel>
-              <Select
-                value={task.categoria_id ?? ''}
-                onValueChange={(v) => void patchTask({ categoria_id: v || null })}
-              >
-                <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                  <SelectValue placeholder="Sin categoría">
-                    {categoria
-                      ? `${categoria.icono ? `${categoria.icono} ` : ''}${categoria.nombre}`
-                      : <span className="text-[var(--text)]/40">Sin categoría</span>}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Sin categoría</SelectItem>
-                  {categorias.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.icono ? `${c.icono} ` : ''}
-                      {c.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <Separator className="bg-[var(--border)]" />
-
-            {/* Severidad (bugs only) */}
-            {task.kind === 'bug' && (
-              <>
-                <div>
-                  <FieldLabel>Severidad</FieldLabel>
-                  <Select
-                    value={task.severidad ?? ''}
-                    onValueChange={(v) => void patchTask({ severidad: v || null })}
-                  >
-                    <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                      <SelectValue placeholder="Sin severidad" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Sin severidad</SelectItem>
-                      <SelectItem value="critica">Crítica</SelectItem>
-                      <SelectItem value="alta">Alta</SelectItem>
-                      <SelectItem value="media">Media</SelectItem>
-                      <SelectItem value="baja">Baja</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Separator className="bg-[var(--border)]" />
-              </>
-            )}
-
-            {/* Fechas */}
             <div>
               <FieldLabel>Fecha límite</FieldLabel>
               <Input
                 type="date"
-                value={task.fecha_limite?.substring(0, 10) ?? ''}
-                onChange={(e) =>
-                  void patchTask({ fecha_limite: e.target.value || null })
-                }
+                value={task.fecha_vence?.substring(0, 10) ?? ''}
+                onChange={(e) => void patchTask({ fecha_vence: e.target.value || null })}
                 className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
               />
             </div>
 
-            {task.fecha_resolucion && (
-              <div>
-                <FieldLabel>Fecha resolución</FieldLabel>
-                <p className="text-sm text-[var(--text)]/70">{formatDate(task.fecha_resolucion)}</p>
-              </div>
+            {task.porcentaje_avance != null && task.porcentaje_avance > 0 && (
+              <>
+                <Separator className="bg-[var(--border)]" />
+                <div>
+                  <FieldLabel>Avance</FieldLabel>
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 flex-1 rounded-full bg-[var(--panel)]">
+                      <div
+                        className="h-2 rounded-full bg-[var(--accent)]"
+                        style={{ width: `${task.porcentaje_avance}%` }}
+                      />
+                    </div>
+                    <span className="text-xs font-medium text-[var(--text)]/60">{task.porcentaje_avance}%</span>
+                  </div>
+                </div>
+              </>
             )}
           </div>
 
           {/* Info card */}
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 space-y-3 text-xs">
             <div className="flex justify-between">
-              <span className="text-[var(--text)]/45">Creado por</span>
-              <span className="text-[var(--text)]/70 font-medium">
-                {creador ? (creador.first_name ?? creador.email) : '—'}
-              </span>
-            </div>
-            <div className="flex justify-between">
               <span className="text-[var(--text)]/45">Creado</span>
               <span className="text-[var(--text)]/70">{formatDate(task.created_at)}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-[var(--text)]/45">Actualizado</span>
-              <span className="text-[var(--text)]/70">{formatDate(task.updated_at)}</span>
-            </div>
-            {task.modulo && (
+            {task.updated_at && (
               <div className="flex justify-between">
-                <span className="text-[var(--text)]/45">Módulo</span>
-                <span className="text-[var(--text)]/70 font-medium">{task.modulo}</span>
-              </div>
-            )}
-            {task.url_referencia && (
-              <div className="flex justify-between items-center">
-                <span className="text-[var(--text)]/45">Referencia</span>
-                <a
-                  href={task.url_referencia}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-[var(--accent)] hover:underline"
-                >
-                  Abrir <ExternalLink className="h-3 w-3" />
-                </a>
+                <span className="text-[var(--text)]/45">Actualizado</span>
+                <span className="text-[var(--text)]/70">{formatDate(task.updated_at)}</span>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Update Sheet */}
+      <Sheet open={showUpdateSheet} onOpenChange={setShowUpdateSheet}>
+        <SheetContent className="border-[var(--border)] bg-[var(--card)] text-[var(--text)] sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle className="text-[var(--text)]">Agregar avance</SheetTitle>
+          </SheetHeader>
+
+          <div className="mt-6 space-y-5">
+            <div>
+              <FieldLabel>Contenido del avance</FieldLabel>
+              <Textarea
+                placeholder="Describe el avance o nota..."
+                value={updateForm.contenido}
+                onChange={(e) => setUpdateForm((f) => ({ ...f, contenido: e.target.value }))}
+                rows={4}
+                className="resize-none rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
+            </div>
+
+            <div>
+              <FieldLabel>Cambiar estado (opcional)</FieldLabel>
+              <Select
+                value={updateForm.nuevoEstado}
+                onValueChange={(v) => setUpdateForm((f) => ({ ...f, nuevoEstado: v ?? '' }))}
+              >
+                <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
+                  <SelectValue placeholder="Sin cambio" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Sin cambio</SelectItem>
+                  {Object.entries(ESTADO_CONFIG).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <FieldLabel>Cambiar fecha límite (opcional)</FieldLabel>
+              <Input
+                type="date"
+                value={updateForm.nuevaFecha}
+                onChange={(e) => setUpdateForm((f) => ({ ...f, nuevaFecha: e.target.value }))}
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
+            </div>
+
+            <Button
+              onClick={handleSendUpdate}
+              disabled={sendingUpdate || (!updateForm.contenido.trim() && !updateForm.nuevoEstado && !updateForm.nuevaFecha)}
+              className="w-full gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60"
+            >
+              {sendingUpdate ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Guardar avance
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
