@@ -108,16 +108,32 @@ const ESTADO_TASK: Record<string, { label: string; cls: string }> = {
   cancelado:   { label: 'Cancelado',   cls: 'bg-[var(--border)]/60 text-[var(--text)]/40 border-[var(--border)]' },
 };
 
-const TIPO_CONFIG: Record<string, string> = {
-  operativa:'⚙️ Operativa', directiva:'🏛️ Directiva', seguimiento:'📊 Seguimiento', emergencia:'🚨 Emergencia',
-  Consejo:'🏢 Consejo', 'Comite Ejecutivo':'👔 Comité Ejecutivo', 'Comité Ejecutivo':'👔 Comité Ejecutivo',
-  Ventas:'💰 Ventas', 'Atención PosVenta':'🔧 Atención PosVenta', Administración:'📁 Administración',
-  Mercadotecnia:'📣 Mercadotecnia', Construcción:'🏗️ Construcción',
-  'Compras y Admon. Inventario':'📦 Compras y Admon. Inventario',
-  Maquinaria:'🚜 Maquinaria', Proyectos:'🗂️ Proyectos', 'Rincón del Bosque':'🌲 Rincón del Bosque',
-  'Junta Operativa':'⚙️ Junta Operativa', 'Junta de Área':'📋 Junta de Área',
-  'Extraordinaria':'🚨 Extraordinaria', 'Otro':'📌 Otro',
-};
+const TIPO_OPTIONS: { value: string; label: string; icon: string }[] = [
+  { value: 'Comité Ejecutivo',             label: 'Comité Ejecutivo',             icon: '👔' },
+  { value: 'Consejo',                      label: 'Consejo',                      icon: '🏢' },
+  { value: 'Ventas',                       label: 'Ventas',                       icon: '💰' },
+  { value: 'Atención PosVenta',            label: 'Atención PosVenta',            icon: '🔧' },
+  { value: 'Administración',               label: 'Administración',               icon: '📁' },
+  { value: 'Mercadotecnia',                label: 'Mercadotecnia',                icon: '📣' },
+  { value: 'Construcción',                 label: 'Construcción',                 icon: '🏗️' },
+  { value: 'Compras y Admon. Inventario',  label: 'Compras y Admon. Inv.',        icon: '📦' },
+  { value: 'Maquinaria',                   label: 'Maquinaria',                   icon: '🚜' },
+  { value: 'Proyectos',                    label: 'Proyectos',                    icon: '🗂️' },
+  { value: 'Rincón del Bosque',            label: 'Rincón del Bosque',            icon: '🌲' },
+  { value: 'Extraordinaria',               label: 'Extraordinaria',               icon: '🚨' },
+  { value: 'Otro',                         label: 'Otro',                         icon: '📌' },
+];
+
+const TIPO_CONFIG: Record<string, string> = Object.fromEntries([
+  ...TIPO_OPTIONS.map(t => [t.value, `${t.icon} ${t.label}`]),
+  ['Comite Ejecutivo', '👔 Comité Ejecutivo'],
+  ['Junta Operativa', '⚙️ Junta Operativa'],
+  ['Junta de Área', '📋 Junta de Área'],
+  ['operativa', '⚙️ Operativa'],
+  ['directiva', '🏛️ Directiva'],
+  ['seguimiento', '📊 Seguimiento'],
+  ['emergencia', '🚨 Emergencia'],
+]);
 
 function toDatetimeLocal(iso: string) {
   const d = new Date(iso);
@@ -350,7 +366,7 @@ function JuntaDetailInner() {
     setSaving(true);
     const notesHtml = editor?.getHTML() ?? null;
     const { error: err } = await supabase.schema('erp' as any).from('juntas').update({
-      titulo: titulo.trim(), fecha_hora: fechaHora, duracion_minutos: parseInt(duracion) || 60,
+      titulo: titulo.trim(), fecha_hora: fechaHora,
       lugar: lugar.trim() || null, estado, tipo: tipo || null,
       descripcion: notesHtml && notesHtml !== '<p></p>' ? notesHtml : null,
     }).eq('id', junta.id);
@@ -460,11 +476,11 @@ function JuntaDetailInner() {
         <div><FieldLabel>Título</FieldLabel><Input value={titulo} onChange={(e) => setTitulo(e.target.value)} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
         <div className="grid grid-cols-2 gap-4">
           <div><FieldLabel>Fecha y hora</FieldLabel><Input type="datetime-local" value={fechaHora} onChange={(e) => setFechaHora(e.target.value)} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
-          <div><FieldLabel>Duración (minutos)</FieldLabel><Input type="number" min="15" step="15" value={duracion} onChange={(e) => setDuracion(e.target.value)} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
+          {/* Duración se calcula automáticamente al terminar la junta */}
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div><FieldLabel>Estado</FieldLabel><Select value={estado} onValueChange={(v) => setEstado(v as Junta['estado'])}><SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(ESTADO_JUNTA).map(([k, v]) => (<SelectItem key={k} value={k}>{v.label}</SelectItem>))}</SelectContent></Select></div>
-          <div><FieldLabel>Tipo</FieldLabel><Select value={tipo ?? ''} onValueChange={(v) => setTipo(v || '')}><SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue placeholder="Sin tipo" /></SelectTrigger><SelectContent>{Object.entries(TIPO_CONFIG).map(([k, v]) => (<SelectItem key={k} value={k}>{v}</SelectItem>))}</SelectContent></Select></div>
+          <div><FieldLabel>Tipo</FieldLabel><Select value={tipo ?? ''} onValueChange={(v) => setTipo(v || '')}><SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue placeholder="Sin tipo" /></SelectTrigger><SelectContent>{TIPO_OPTIONS.map(t => (<SelectItem key={t.value} value={t.value}>{t.icon} {t.label}</SelectItem>))}</SelectContent></Select></div>
         </div>
         <div><FieldLabel>Lugar</FieldLabel><Input placeholder="Ej: Sala de juntas, Zoom..." value={lugar} onChange={(e) => setLugar(e.target.value)} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
       </div>

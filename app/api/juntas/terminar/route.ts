@@ -6,11 +6,13 @@ import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 function generateJuntaMinutaHtml(opts: {
   titulo: string;
   fechaHora: string;
+  duracionMinutos: number | null;
   lugar: string | null;
   descripcion: string | null;
   asistentes: { nombre: string; asistio: boolean | null }[];
+  tareas: { titulo: string; responsable: string; fecha_compromiso: string | null }[];
 }): string {
-  const { titulo, fechaHora, lugar, descripcion, asistentes } = opts;
+  const { titulo, fechaHora, duracionMinutos, lugar, descripcion, asistentes, tareas } = opts;
 
   const fechaFormatted = new Date(fechaHora).toLocaleString('es-MX', {
     weekday: 'long',
@@ -75,6 +77,11 @@ function generateJuntaMinutaHtml(opts: {
           <td style="padding:4px 0;font-size:13px;color:#64748b;width:80px;">Fecha</td>
           <td style="padding:4px 0;font-size:13px;color:#1e293b;font-weight:600;">${fechaFormatted}</td>
         </tr>
+        ${duracionMinutos ? `
+        <tr>
+          <td style="padding:4px 0;font-size:13px;color:#64748b;">Duraci\u00f3n</td>
+          <td style="padding:4px 0;font-size:13px;color:#1e293b;">${duracionMinutos >= 60 ? `${Math.floor(duracionMinutos / 60)}h ${duracionMinutos % 60 > 0 ? `${duracionMinutos % 60}min` : ''}` : `${duracionMinutos} min`}</td>
+        </tr>` : ''}
         ${lugar ? `
         <tr>
           <td style="padding:4px 0;font-size:13px;color:#64748b;">Lugar</td>
@@ -97,6 +104,24 @@ function generateJuntaMinutaHtml(opts: {
       </table>
 
       ${notesSection}
+
+      ${tareas.length > 0 ? `
+      <div style="margin-top:28px;">
+        <h2 style="font-size:16px;font-weight:700;color:#0f172a;margin:0 0 12px;">Tareas Asignadas (${tareas.length})</h2>
+        <table style="width:100%;border-collapse:collapse;">
+          <tr style="background:#f1f5f9;">
+            <th style="padding:8px 8px;text-align:left;font-size:12px;color:#64748b;font-weight:600;border-bottom:1px solid #e2e8f0;">Tarea</th>
+            <th style="padding:8px 8px;text-align:left;font-size:12px;color:#64748b;font-weight:600;border-bottom:1px solid #e2e8f0;">Responsable</th>
+            <th style="padding:8px 8px;text-align:right;font-size:12px;color:#64748b;font-weight:600;border-bottom:1px solid #e2e8f0;">Compromiso</th>
+          </tr>
+          ${tareas.map(t => `
+          <tr>
+            <td style="padding:8px 8px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#1e293b;">${t.titulo}</td>
+            <td style="padding:8px 8px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#475569;">${t.responsable}</td>
+            <td style="padding:8px 8px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#475569;text-align:right;">${t.fecha_compromiso ? new Date(t.fecha_compromiso + 'T00:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
+          </tr>`).join('')}
+        </table>
+      </div>` : ''}
 
     </div>
 
@@ -129,13 +154,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'RESEND_API_KEY not configured' }, { status: 500 });
   }
 
-  // ── Update junta: mark as completada ───────────────────────────────────────
+  // ── Fetch junta first to calculate duration ─────────────────────────────────
+  const { data: existing } = await supabase
+    .schema('erp' as any).from('juntas').select('fecha_hora').eq('id', juntaId).single();
+
+  const now = new Date();
+  const duracionMinutos = existing?.fecha_hora
+    ? Math.round((now.getTime() - new Date(existing.fecha_hora as string).getTime()) / 60000)
+    : null;
+
+  // ── Update junta: mark as completada + auto duration ─────────────────────────
   const { data: junta, error: jErr } = await supabase
     .schema('erp' as any)
     .from('juntas')
     .update({
       estado: 'completada',
-      fecha_terminada: new Date().toISOString(),
+      fecha_terminada: now.toISOString(),
+      ...(duracionMinutos && duracionMinutos > 0 ? { duracion_minutos: duracionMinutos } : {}),
     })
     .eq('id', juntaId)
     .select('id, titulo, fecha_hora, lugar, descripcion, empresa_id')
@@ -165,6 +200,27 @@ export async function POST(req: NextRequest) {
     .filter((a) => Boolean(a.email))
     .map((a) => a.email as string);
 
+  // ── Fetch tasks created in this meeting ───────────────────────────────
+  const { data: tasksData } = await supabase
+    .schema('erp' as any)
+    .from('tasks')
+    .select('titulo, fecha_compromiso, asignado_a')
+    .eq('entidad_tipo', 'junta')
+    .eq('entidad_id', juntaId);
+
+  // Build responsable names from empleados
+  const empleadoIds = [...new Set((tasksData ?? []).map((t: any) => t.asignado_a).filter(Boolean))];
+  const { data: empData } = empleadoIds.length > 0
+    ? await supabase.schema('erp' as any).from('empleados').select('id, persona:persona_id(nombre, apellido_paterno)').in('id', empleadoIds)
+    : { data: [] };
+  const empMap = new Map((empData ?? []).map((e: any) => [e.id, [e.persona?.nombre, e.persona?.apellido_paterno].filter(Boolean).join(' ')]));
+
+  const tareas = (tasksData ?? []).map((t: any) => ({
+    titulo: t.titulo as string,
+    responsable: empMap.get(t.asignado_a) || 'Sin asignar',
+    fecha_compromiso: t.fecha_compromiso as string | null,
+  }));
+
   // ── Generate and send email ───────────────────────────────────────────────
   if (recipients.length === 0) {
     return NextResponse.json({
@@ -177,9 +233,11 @@ export async function POST(req: NextRequest) {
   const html = generateJuntaMinutaHtml({
     titulo: junta.titulo as string,
     fechaHora: junta.fecha_hora as string,
+    duracionMinutos,
     lugar: junta.lugar as string | null,
     descripcion: junta.descripcion as string | null,
     asistentes,
+    tareas,
   });
 
   const emailRes = await fetch('https://api.resend.com/emails', {

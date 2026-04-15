@@ -53,36 +53,33 @@ const ESTADO_CONFIG: Record<Junta['estado'], { label: string; cls: string }> = {
   cancelada:   { label: 'Cancelada',   cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
 };
 
-const TIPO_OPTIONS = [
-  'Comité Ejecutivo',
-  'Junta Operativa',
-  'Junta de Área',
-  'Extraordinaria',
-  'Otro',
-] as const;
+const TIPO_OPTIONS: { value: string; label: string; icon: string }[] = [
+  { value: 'Comité Ejecutivo',             label: 'Comité Ejecutivo',             icon: '👔' },
+  { value: 'Consejo',                      label: 'Consejo',                      icon: '🏢' },
+  { value: 'Ventas',                       label: 'Ventas',                       icon: '💰' },
+  { value: 'Atención PosVenta',            label: 'Atención PosVenta',            icon: '🔧' },
+  { value: 'Administración',               label: 'Administración',               icon: '📁' },
+  { value: 'Mercadotecnia',                label: 'Mercadotecnia',                icon: '📣' },
+  { value: 'Construcción',                 label: 'Construcción',                 icon: '🏗️' },
+  { value: 'Compras y Admon. Inventario',  label: 'Compras y Admon. Inv.',        icon: '📦' },
+  { value: 'Maquinaria',                   label: 'Maquinaria',                   icon: '🚜' },
+  { value: 'Proyectos',                    label: 'Proyectos',                    icon: '🗂️' },
+  { value: 'Rincón del Bosque',            label: 'Rincón del Bosque',            icon: '🌲' },
+  { value: 'Extraordinaria',               label: 'Extraordinaria',               icon: '🚨' },
+  { value: 'Otro',                         label: 'Otro',                         icon: '📌' },
+];
 
-const TIPO_CONFIG: Record<string, { label: string; icon: string }> = {
-  operativa:                    { label: 'Operativa',                    icon: '⚙️' },
-  directiva:                    { label: 'Directiva',                    icon: '🏛️' },
-  seguimiento:                  { label: 'Seguimiento',                  icon: '📊' },
-  emergencia:                   { label: 'Emergencia',                   icon: '🚨' },
-  Consejo:                      { label: 'Consejo',                      icon: '🏢' },
-  'Comite Ejecutivo':           { label: 'Comité Ejecutivo',             icon: '👔' },
-  'Comité Ejecutivo':           { label: 'Comité Ejecutivo',             icon: '👔' },
-  Ventas:                       { label: 'Ventas',                       icon: '💰' },
-  'Atención PosVenta':          { label: 'Atención PosVenta',            icon: '🔧' },
-  Administración:               { label: 'Administración',               icon: '📁' },
-  Mercadotecnia:                { label: 'Mercadotecnia',                icon: '📣' },
-  Construcción:                 { label: 'Construcción',                 icon: '🏗️' },
-  'Compras y Admon. Inventario':{ label: 'Compras y Admon. Inventario',  icon: '📦' },
-  Maquinaria:                   { label: 'Maquinaria',                   icon: '🚜' },
-  Proyectos:                    { label: 'Proyectos',                    icon: '🗂️' },
-  'Rincón del Bosque':          { label: 'Rincón del Bosque',            icon: '🌲' },
-  'Junta Operativa':            { label: 'Junta Operativa',              icon: '⚙️' },
-  'Junta de Área':              { label: 'Junta de Área',                icon: '📋' },
-  'Extraordinaria':             { label: 'Extraordinaria',               icon: '🚨' },
-  'Otro':                       { label: 'Otro',                         icon: '📌' },
-};
+const TIPO_CONFIG: Record<string, { label: string; icon: string }> = Object.fromEntries([
+  ...TIPO_OPTIONS.map(t => [t.value, { label: t.label, icon: t.icon }]),
+  // Legacy aliases from Coda import
+  ['Comite Ejecutivo', { label: 'Comité Ejecutivo', icon: '👔' }],
+  ['Junta Operativa', { label: 'Comité Ejecutivo', icon: '👔' }],
+  ['Junta de Área', { label: 'Junta de Área', icon: '📋' }],
+  ['operativa', { label: 'Operativa', icon: '⚙️' }],
+  ['directiva', { label: 'Directiva', icon: '🏛️' }],
+  ['seguimiento', { label: 'Seguimiento', icon: '📊' }],
+  ['emergencia', { label: 'Emergencia', icon: '🚨' }],
+]);
 
 function formatDateTime(dt: string) {
   return new Date(dt).toLocaleString('es-MX', {
@@ -331,7 +328,7 @@ function JuntasInner() {
                 </SelectTrigger>
                 <SelectContent>
                   {TIPO_OPTIONS.map((t) => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                    <SelectItem key={t.value} value={t.value}>{t.icon} {t.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
