@@ -605,18 +605,16 @@ function TasksInner() {
             )}
           </div>
         ) : (
-          <Table className="min-w-[900px]">
+          <Table>
             <TableHeader>
               <TableRow className="border-[var(--border)] hover:bg-transparent">
                 {(isDireccion || isAdmin) && <TableHead className="w-10" />}
-                <SortableHead sortKey="titulo" label="Título" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-                <SortableHead sortKey="departamento_nombre" label="Depto" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-24" />
-                <SortableHead sortKey="prioridad" label="Prioridad" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
+                <SortableHead sortKey="titulo" label="Tarea" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+                <SortableHead sortKey="prioridad" label="Prioridad" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-24" />
                 <SortableHead sortKey="estado" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
-                <SortableHead sortKey="porcentaje_avance" label="Avance" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
+                <SortableHead sortKey="porcentaje_avance" label="Avance" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-24" />
                 <SortableHead sortKey="asignado_nombre" label="Responsable" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-36" />
-                <SortableHead sortKey="fecha_compromiso" label="Fecha Compromiso" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-32" />
-                <SortableHead sortKey="fecha_vence" label="Fecha Vence" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
+                <SortableHead sortKey="fecha_compromiso" label="Compromiso" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -647,12 +645,9 @@ function TasksInner() {
                     )}
                     <TableCell>
                       <span className="line-clamp-1 font-medium text-[var(--text)]">{task.titulo}</span>
-                      {task.descripcion && (
-                        <span className="mt-0.5 block text-xs text-[var(--text)]/40 line-clamp-1">{task.descripcion}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-xs text-[var(--text)]/60">{task.departamento_nombre || '—'}</span>
+                      <span className="mt-0.5 block text-xs text-[var(--text)]/40 line-clamp-1">
+                        {[task.departamento_nombre, task.descripcion].filter(Boolean).join(' · ') || ' '}
+                      </span>
                     </TableCell>
                     <TableCell><PrioridadTextBadge text={task.prioridad} /></TableCell>
 
@@ -727,11 +722,6 @@ function TasksInner() {
                     </TableCell>
                     <TableCell>
                       <span className="text-xs text-[var(--text)]/60">{formatDate(task.fecha_compromiso)}</span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-xs text-[var(--text)]/60">
-                        {task.fecha_vence && task.fecha_vence !== task.fecha_compromiso ? formatDate(task.fecha_vence) : '—'}
-                      </span>
                     </TableCell>
                   </TableRow>
                 );
