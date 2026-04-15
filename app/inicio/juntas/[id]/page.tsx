@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import Underline from '@tiptap/extension-underline';
 import Image from '@tiptap/extension-image';
 import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table';
 import {
@@ -38,6 +39,7 @@ import {
   X,
   Bold,
   Italic,
+  Underline as UnderlineIcon,
   List,
   ListOrdered,
   Table2,
@@ -174,6 +176,7 @@ function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
     <div className="flex flex-wrap items-center gap-0.5 rounded-t-xl border border-[var(--border)] bg-[var(--card)] p-1.5">
       {btn(editor.isActive('bold'), () => editor.chain().focus().toggleBold().run(), 'Negrita', <Bold className="h-3.5 w-3.5" />)}
       {btn(editor.isActive('italic'), () => editor.chain().focus().toggleItalic().run(), 'Cursiva', <Italic className="h-3.5 w-3.5" />)}
+      {btn(editor.isActive('underline'), () => editor.chain().focus().toggleUnderline().run(), 'Subrayado', <UnderlineIcon className="h-3.5 w-3.5" />)}
       <div className="mx-1 h-5 w-px bg-[var(--border)]" />
       {btn(editor.isActive('heading', { level: 2 }), () => editor.chain().focus().toggleHeading({ level: 2 }).run(), 'Encabezado 2', <Heading2 className="h-3.5 w-3.5" />)}
       {btn(editor.isActive('heading', { level: 3 }), () => editor.chain().focus().toggleHeading({ level: 3 }).run(), 'Encabezado 3', <Heading3 className="h-3.5 w-3.5" />)}
