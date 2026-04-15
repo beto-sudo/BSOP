@@ -65,8 +65,8 @@ function generateMinutaHtml(opts: {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${titulo}</title>
 </head>
-<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-  <div style="max-width:800px;margin:0 auto;background:#ffffff;">
+<body style="margin:0;padding:0;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <div style="width:100%;background:#ffffff;">
 
     <!-- Header Image -->
     <div style="background:#1a1a2e;">
@@ -101,8 +101,8 @@ function generateMinutaHtml(opts: {
     ${descripcion ? `
     <div style="padding:28px 32px;">
       <h2 style="font-size:16px;font-weight:700;color:#0f172a;margin:0 0 16px;border-bottom:2px solid #e2e8f0;padding-bottom:8px;">Temas</h2>
-      <div style="font-size:14px;color:#334155;line-height:1.8;">
-        ${descripcion}
+      <div style="font-size:14px;color:#334155;line-height:1.8;word-break:break-word;">
+        ${descripcion.replace(/<img /g, '<img style="max-width:100%;height:auto;border-radius:8px;" ')}
       </div>
     </div>` : `
     <div style="padding:28px 32px;">
@@ -124,7 +124,7 @@ function generateMinutaHtml(opts: {
     </div>` : ''}
 
     <!-- Footer -->
-    <div style="padding:20px 32px;background:#f1f5f9;border-top:1px solid #e2e8f0;text-align:center;">
+    <div style="padding:20px 32px;border-top:1px solid #e2e8f0;text-align:center;">
       <p style="margin:0;font-size:11px;color:#94a3b8;">Enviado desde BSOP &middot; <a href="https://bsop.io" style="color:#6366f1;text-decoration:none;">bsop.io</a></p>
     </div>
   </div>
