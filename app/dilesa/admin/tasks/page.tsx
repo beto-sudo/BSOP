@@ -620,12 +620,13 @@ function TasksInner() {
             <TableHeader>
               <TableRow className="border-[var(--border)] hover:bg-transparent">
                 {(isDireccion || isAdmin) && <TableHead className="w-10 min-w-[40px]" />}
-                <SortableHead sortKey="titulo" label="Tarea" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[180px]" />
+                <SortableHead sortKey="titulo" label="Tarea" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[140px] max-w-[220px]" />
                 <SortableHead sortKey="prioridad" label="Prioridad" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[100px]" />
                 <SortableHead sortKey="estado" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[90px]" />
                 <SortableHead sortKey="porcentaje_avance" label="Avance" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[90px]" />
-                <SortableHead sortKey="asignado_nombre" label="Responsable" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[140px]" />
-                <SortableHead sortKey="fecha_compromiso" label="Compromiso" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[100px]" />
+                <SortableHead sortKey="asignado_nombre" label="Responsable" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[120px]" />
+                <SortableHead sortKey="fecha_compromiso" label="Compromiso" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[95px]" />
+                <SortableHead sortKey="created_at" label="Días" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[55px]" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -728,6 +729,14 @@ function TasksInner() {
                     </TableCell>
                     <TableCell>
                       <span className="text-xs text-[var(--text)]/60">{formatDate(task.fecha_compromiso)}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs text-[var(--text)]/60">
+                        {(() => {
+                          const days = Math.floor((Date.now() - new Date(task.created_at).getTime()) / 86400000);
+                          return days === 0 ? 'Hoy' : `${days}d`;
+                        })()}
+                      </span>
                     </TableCell>
                   </TableRow>
                 );
