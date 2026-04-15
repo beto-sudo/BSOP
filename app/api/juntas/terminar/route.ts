@@ -1,20 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 
-// ─── Email template ───────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function generateJuntaMinutaHtml(opts: {
-  titulo: string;
-  fechaHora: string;
-  duracionMinutos: number | null;
-  lugar: string | null;
-  descripcion: string | null;
-  asistentes: { nombre: string; asistio: boolean | null }[];
-  tareas: { titulo: string; responsable: string; fecha_compromiso: string | null }[];
-}): string {
-  const { titulo, fechaHora, duracionMinutos, lugar, descripcion, asistentes, tareas } = opts;
-
-  const fechaFormatted = new Date(fechaHora).toLocaleString('es-MX', {
+/** Format a UTC ISO string to CST (America/Matamoros) human-readable */
+function formatDateCST(iso: string): string {
+  return new Date(iso).toLocaleString('es-MX', {
     weekday: 'long',
     day: '2-digit',
     month: 'long',
@@ -22,36 +13,58 @@ function generateJuntaMinutaHtml(opts: {
     hour: '2-digit',
     minute: '2-digit',
     hour12: true,
-    timeZone: 'America/Mexico_City',
+    timeZone: 'America/Chicago', // CST/CDT — same as America/Matamoros
   });
+}
 
-  const asistentesHtml =
-    asistentes.length > 0
-      ? asistentes
-          .map((a) => {
-            const badge =
-              a.asistio === true
-                ? '<span style="color:#22c55e;font-weight:600;">✓ Asistió</span>'
-                : a.asistio === false
-                ? '<span style="color:#ef4444;font-weight:600;">✗ No asistió</span>'
-                : '<span style="color:#94a3b8;">— Sin confirmar</span>';
-            return `
-            <tr>
-              <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;font-size:14px;color:#1e293b;">${a.nombre}</td>
-              <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;font-size:13px;text-align:right;">${badge}</td>
-            </tr>`;
-          })
-          .join('')
-      : '<tr><td colspan="2" style="padding:8px 0;color:#94a3b8;font-size:13px;">Sin participantes registrados</td></tr>';
+function formatDuration(mins: number): string {
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m > 0 ? `${h}h ${m}min` : `${h}h`;
+}
 
-  const notesSection = descripcion
+function formatShortDate(dateStr: string | null): string {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr.includes('T') ? dateStr : `${dateStr}T12:00:00`);
+  return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Chicago' });
+}
+
+// ─── Email template ───────────────────────────────────────────────────────────
+
+const HEADER_IMAGE_URL = 'https://bsop.io/logos/dilesa-header.jpg';
+
+function generateMinutaHtml(opts: {
+  titulo: string;
+  tipo: string | null;
+  fechaInicio: string;
+  fechaTerminada: string;
+  duracionMinutos: number | null;
+  descripcion: string | null;
+  asistentes: { nombre: string }[];
+  tareas: { titulo: string; responsable: string; fecha_compromiso: string | null }[];
+}): string {
+  const { titulo, tipo, fechaInicio, fechaTerminada, duracionMinutos, descripcion, asistentes, tareas } = opts;
+
+  const asistentesStr = asistentes.length > 0
+    ? asistentes.map(a => a.nombre).join(', ')
+    : 'Sin participantes registrados';
+
+  const tareasHtml = tareas.length > 0
     ? `
-      <div style="margin-top:28px;">
-        <h2 style="font-size:16px;font-weight:700;color:#0f172a;margin:0 0 12px;">Notas y Minuta</h2>
-        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px 20px;font-size:14px;color:#334155;line-height:1.7;">
-          ${descripcion}
-        </div>
-      </div>`
+    <table style="width:100%;border-collapse:collapse;margin-top:8px;">
+      <tr style="background:#f1f5f9;">
+        <th style="padding:10px 12px;text-align:left;font-size:13px;color:#475569;font-weight:600;border-bottom:2px solid #e2e8f0;">Tarea</th>
+        <th style="padding:10px 12px;text-align:left;font-size:13px;color:#475569;font-weight:600;border-bottom:2px solid #e2e8f0;">Fecha Compromiso</th>
+        <th style="padding:10px 12px;text-align:left;font-size:13px;color:#475569;font-weight:600;border-bottom:2px solid #e2e8f0;">Responsable</th>
+      </tr>
+      ${tareas.map(t => `
+      <tr>
+        <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#1e293b;">${t.titulo}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#475569;white-space:nowrap;">${formatShortDate(t.fecha_compromiso)}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#475569;">${t.responsable}</td>
+      </tr>`).join('')}
+    </table>`
     : '';
 
   return `<!DOCTYPE html>
@@ -59,75 +72,75 @@ function generateJuntaMinutaHtml(opts: {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Minuta: ${titulo}</title>
+  <title>${titulo}</title>
 </head>
-<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <div style="max-width:560px;margin:40px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.07);">
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <div style="max-width:680px;margin:0 auto;background:#ffffff;">
 
-    <!-- Header -->
-    <div style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);padding:32px 32px 24px;">
-      <div style="font-size:11px;font-weight:700;letter-spacing:0.14em;color:#64748b;text-transform:uppercase;margin-bottom:8px;">BSOP · Minuta de Junta</div>
-      <h1 style="margin:0;font-size:22px;font-weight:800;color:#f8fafc;line-height:1.3;">${titulo}</h1>
+    <!-- Header Image -->
+    <div style="background:#1a1a2e;">
+      <img src="${HEADER_IMAGE_URL}" alt="DILESA" style="display:block;width:100%;max-width:680px;height:auto;" />
     </div>
 
-    <!-- Meta info -->
-    <div style="padding:20px 32px;background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+    <!-- Title Bar -->
+    <div style="background:#1a1a2e;padding:20px 32px 24px;">
+      <h1 style="margin:0;font-size:20px;font-weight:700;color:#ffffff;line-height:1.4;">${titulo}</h1>
+    </div>
+
+    <!-- Info Section -->
+    <div style="padding:24px 32px;background:#f8fafc;border-bottom:1px solid #e2e8f0;">
       <table style="width:100%;border-collapse:collapse;">
         <tr>
-          <td style="padding:4px 0;font-size:13px;color:#64748b;width:80px;">Fecha</td>
-          <td style="padding:4px 0;font-size:13px;color:#1e293b;font-weight:600;">${fechaFormatted}</td>
+          <td style="padding:6px 0;font-size:13px;color:#64748b;font-weight:600;width:140px;vertical-align:top;">Nombre de Junta</td>
+          <td style="padding:6px 0;font-size:13px;color:#1e293b;">${titulo}</td>
         </tr>
-        ${duracionMinutos ? `
+        ${tipo ? `
         <tr>
-          <td style="padding:4px 0;font-size:13px;color:#64748b;">Duraci\u00f3n</td>
-          <td style="padding:4px 0;font-size:13px;color:#1e293b;">${duracionMinutos >= 60 ? `${Math.floor(duracionMinutos / 60)}h ${duracionMinutos % 60 > 0 ? `${duracionMinutos % 60}min` : ''}` : `${duracionMinutos} min`}</td>
-        </tr>` : ''}
-        ${lugar ? `
-        <tr>
-          <td style="padding:4px 0;font-size:13px;color:#64748b;">Lugar</td>
-          <td style="padding:4px 0;font-size:13px;color:#1e293b;">${lugar}</td>
+          <td style="padding:6px 0;font-size:13px;color:#64748b;font-weight:600;vertical-align:top;">Tipo</td>
+          <td style="padding:6px 0;font-size:13px;color:#1e293b;">${tipo}</td>
         </tr>` : ''}
         <tr>
-          <td style="padding:4px 0;font-size:13px;color:#64748b;">Estado</td>
-          <td style="padding:4px 0;font-size:13px;color:#22c55e;font-weight:700;">Completada</td>
+          <td style="padding:6px 0;font-size:13px;color:#64748b;font-weight:600;vertical-align:top;">Fecha de Junta</td>
+          <td style="padding:6px 0;font-size:13px;color:#1e293b;">${formatDateCST(fechaInicio)}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0;font-size:13px;color:#64748b;font-weight:600;vertical-align:top;">Junta Terminada</td>
+          <td style="padding:6px 0;font-size:13px;color:#1e293b;">${formatDateCST(fechaTerminada)}</td>
+        </tr>
+        ${duracionMinutos && duracionMinutos > 0 ? `
+        <tr>
+          <td style="padding:6px 0;font-size:13px;color:#64748b;font-weight:600;vertical-align:top;">Duración</td>
+          <td style="padding:6px 0;font-size:13px;color:#1e293b;">${formatDuration(duracionMinutos)}</td>
+        </tr>` : ''}
+        <tr>
+          <td style="padding:6px 0;font-size:13px;color:#64748b;font-weight:600;vertical-align:top;">Asistentes</td>
+          <td style="padding:6px 0;font-size:13px;color:#1e293b;">${asistentesStr}</td>
         </tr>
       </table>
     </div>
 
-    <!-- Body -->
-    <div style="padding:28px 32px 36px;">
+    <!-- Temas / Minuta -->
+    ${descripcion ? `
+    <div style="padding:28px 32px;">
+      <h2 style="font-size:16px;font-weight:700;color:#0f172a;margin:0 0 16px;border-bottom:2px solid #e2e8f0;padding-bottom:8px;">Temas</h2>
+      <div style="font-size:14px;color:#334155;line-height:1.8;">
+        ${descripcion}
+      </div>
+    </div>` : `
+    <div style="padding:28px 32px;">
+      <p style="font-size:14px;color:#94a3b8;font-style:italic;">Sin notas registradas para esta junta.</p>
+    </div>`}
 
-      <!-- Participants -->
-      <h2 style="font-size:16px;font-weight:700;color:#0f172a;margin:0 0 12px;">Participantes</h2>
-      <table style="width:100%;border-collapse:collapse;">
-        ${asistentesHtml}
-      </table>
-
-      ${notesSection}
-
-      ${tareas.length > 0 ? `
-      <div style="margin-top:28px;">
-        <h2 style="font-size:16px;font-weight:700;color:#0f172a;margin:0 0 12px;">Tareas Asignadas (${tareas.length})</h2>
-        <table style="width:100%;border-collapse:collapse;">
-          <tr style="background:#f1f5f9;">
-            <th style="padding:8px 8px;text-align:left;font-size:12px;color:#64748b;font-weight:600;border-bottom:1px solid #e2e8f0;">Tarea</th>
-            <th style="padding:8px 8px;text-align:left;font-size:12px;color:#64748b;font-weight:600;border-bottom:1px solid #e2e8f0;">Responsable</th>
-            <th style="padding:8px 8px;text-align:right;font-size:12px;color:#64748b;font-weight:600;border-bottom:1px solid #e2e8f0;">Compromiso</th>
-          </tr>
-          ${tareas.map(t => `
-          <tr>
-            <td style="padding:8px 8px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#1e293b;">${t.titulo}</td>
-            <td style="padding:8px 8px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#475569;">${t.responsable}</td>
-            <td style="padding:8px 8px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#475569;text-align:right;">${t.fecha_compromiso ? new Date(t.fecha_compromiso + 'T00:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
-          </tr>`).join('')}
-        </table>
-      </div>` : ''}
-
-    </div>
+    <!-- Tareas -->
+    ${tareas.length > 0 ? `
+    <div style="padding:0 32px 28px;">
+      <h2 style="font-size:16px;font-weight:700;color:#0f172a;margin:0 0 12px;border-bottom:2px solid #e2e8f0;padding-bottom:8px;">Tareas Asignadas</h2>
+      ${tareasHtml}
+    </div>` : ''}
 
     <!-- Footer -->
-    <div style="padding:16px 32px;background:#f8fafc;border-top:1px solid #e2e8f0;text-align:center;">
-      <p style="margin:0;font-size:11px;color:#94a3b8;">Generado por BSOP &middot; bsop.io</p>
+    <div style="padding:20px 32px;background:#f1f5f9;border-top:1px solid #e2e8f0;text-align:center;">
+      <p style="margin:0;font-size:11px;color:#94a3b8;">Enviado desde BSOP &middot; <a href="https://bsop.io" style="color:#6366f1;text-decoration:none;">bsop.io</a></p>
     </div>
   </div>
 </body>
@@ -154,7 +167,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'RESEND_API_KEY not configured' }, { status: 500 });
   }
 
-  // ── Fetch junta first to calculate duration ─────────────────────────────────
+  // ── Fetch junta to calculate duration ──────────────────────────────────────
   const { data: existing } = await supabase
     .schema('erp' as any).from('juntas').select('fecha_hora').eq('id', juntaId).single();
 
@@ -163,7 +176,7 @@ export async function POST(req: NextRequest) {
     ? Math.round((now.getTime() - new Date(existing.fecha_hora as string).getTime()) / 60000)
     : null;
 
-  // ── Update junta: mark as completada + auto duration ─────────────────────────
+  // ── Update junta: completada + auto duration ───────────────────────────────
   const { data: junta, error: jErr } = await supabase
     .schema('erp' as any)
     .from('juntas')
@@ -173,17 +186,14 @@ export async function POST(req: NextRequest) {
       ...(duracionMinutos && duracionMinutos > 0 ? { duracion_minutos: duracionMinutos } : {}),
     })
     .eq('id', juntaId)
-    .select('id, titulo, fecha_hora, lugar, descripcion, empresa_id')
+    .select('id, titulo, tipo, fecha_hora, lugar, descripcion, empresa_id')
     .single();
 
   if (jErr || !junta) {
-    return NextResponse.json(
-      { error: jErr?.message ?? 'Junta not found' },
-      { status: 404 },
-    );
+    return NextResponse.json({ error: jErr?.message ?? 'Junta not found' }, { status: 404 });
   }
 
-  // ── Fetch attendees with email via personas ────────────────────────────────
+  // ── Fetch attendees ────────────────────────────────────────────────────────
   const { data: asistencia } = await supabase
     .schema('erp' as any)
     .from('juntas_asistencia')
@@ -200,7 +210,7 @@ export async function POST(req: NextRequest) {
     .filter((a) => Boolean(a.email))
     .map((a) => a.email as string);
 
-  // ── Fetch tasks created in this meeting ───────────────────────────────
+  // ── Fetch tasks created in this meeting ────────────────────────────────────
   const { data: tasksData } = await supabase
     .schema('erp' as any)
     .from('tasks')
@@ -208,7 +218,6 @@ export async function POST(req: NextRequest) {
     .eq('entidad_tipo', 'junta')
     .eq('entidad_id', juntaId);
 
-  // Build responsable names from empleados
   const empleadoIds = [...new Set((tasksData ?? []).map((t: any) => t.asignado_a).filter(Boolean))];
   const { data: empData } = empleadoIds.length > 0
     ? await supabase.schema('erp' as any).from('empleados').select('id, persona:persona_id(nombre, apellido_paterno)').in('id', empleadoIds)
@@ -221,24 +230,26 @@ export async function POST(req: NextRequest) {
     fecha_compromiso: t.fecha_compromiso as string | null,
   }));
 
-  // ── Generate and send email ───────────────────────────────────────────────
-  if (recipients.length === 0) {
-    return NextResponse.json({
-      success: true,
-      emailsSent: 0,
-      warning: 'No attendee emails found – DB updated but no email sent.',
-    });
-  }
-
-  const html = generateJuntaMinutaHtml({
+  // ── Generate email ─────────────────────────────────────────────────────────
+  const html = generateMinutaHtml({
     titulo: junta.titulo as string,
-    fechaHora: junta.fecha_hora as string,
+    tipo: junta.tipo as string | null,
+    fechaInicio: junta.fecha_hora as string,
+    fechaTerminada: now.toISOString(),
     duracionMinutos,
-    lugar: junta.lugar as string | null,
     descripcion: junta.descripcion as string | null,
     asistentes,
     tareas,
   });
+
+  // ── Send email ─────────────────────────────────────────────────────────────
+  if (recipients.length === 0) {
+    return NextResponse.json({
+      success: true,
+      emailsSent: 0,
+      warning: 'No attendee emails found – junta marked as completada but no email sent.',
+    });
+  }
 
   const emailRes = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -247,9 +258,9 @@ export async function POST(req: NextRequest) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'BSOP <noreply@bsop.io>',
+      from: 'DILESA <noreply@bsop.io>',
       to: recipients,
-      subject: `Minuta: ${junta.titulo}`,
+      subject: junta.titulo as string,
       html,
     }),
   });
@@ -257,12 +268,7 @@ export async function POST(req: NextRequest) {
   const emailResult = await emailRes.json();
 
   if (!emailRes.ok) {
-    // DB was updated; report email failure without rolling back
-    return NextResponse.json({
-      success: true,
-      emailsSent: 0,
-      emailError: emailResult,
-    });
+    return NextResponse.json({ success: true, emailsSent: 0, emailError: emailResult });
   }
 
   return NextResponse.json({
