@@ -15,12 +15,8 @@ import {
 import { SortableHead } from '@/components/ui/sortable-head';
 import { useSortableTable } from '@/hooks/use-sortable-table';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
+} from '@/components/ui/sheet';
 import {
   Select,
   SelectContent,
@@ -31,7 +27,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, RefreshCw, Loader2, CalendarDays, ChevronRight } from 'lucide-react';
+import { Plus, Search, RefreshCw, Loader2, CalendarDays, ChevronRight, Play } from 'lucide-react';
 
 const EMPRESA_ID = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479';
 
@@ -57,6 +53,14 @@ const ESTADO_CONFIG: Record<Junta['estado'], { label: string; cls: string }> = {
   cancelada:   { label: 'Cancelada',   cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
 };
 
+const TIPO_OPTIONS = [
+  'Comité Ejecutivo',
+  'Junta Operativa',
+  'Junta de Área',
+  'Extraordinaria',
+  'Otro',
+] as const;
+
 const TIPO_CONFIG: Record<string, { label: string; icon: string }> = {
   operativa:                    { label: 'Operativa',                    icon: '⚙️' },
   directiva:                    { label: 'Directiva',                    icon: '🏛️' },
@@ -64,6 +68,7 @@ const TIPO_CONFIG: Record<string, { label: string; icon: string }> = {
   emergencia:                   { label: 'Emergencia',                   icon: '🚨' },
   Consejo:                      { label: 'Consejo',                      icon: '🏢' },
   'Comite Ejecutivo':           { label: 'Comité Ejecutivo',             icon: '👔' },
+  'Comité Ejecutivo':           { label: 'Comité Ejecutivo',             icon: '👔' },
   Ventas:                       { label: 'Ventas',                       icon: '💰' },
   'Atención PosVenta':          { label: 'Atención PosVenta',            icon: '🔧' },
   Administración:               { label: 'Administración',               icon: '📁' },
@@ -73,6 +78,10 @@ const TIPO_CONFIG: Record<string, { label: string; icon: string }> = {
   Maquinaria:                   { label: 'Maquinaria',                   icon: '🚜' },
   Proyectos:                    { label: 'Proyectos',                    icon: '🗂️' },
   'Rincón del Bosque':          { label: 'Rincón del Bosque',            icon: '🌲' },
+  'Junta Operativa':            { label: 'Junta Operativa',              icon: '⚙️' },
+  'Junta de Área':              { label: 'Junta de Área',                icon: '📋' },
+  'Extraordinaria':             { label: 'Extraordinaria',               icon: '🚨' },
+  'Otro':                       { label: 'Otro',                         icon: '📌' },
 };
 
 function formatDateTime(dt: string) {
@@ -93,6 +102,20 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   return <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50 mb-1.5">{children}</div>;
 }
 
+function nowDatetimeLocal() {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function generateTitulo(fechaHora: string, tipo: string) {
+  if (!fechaHora || !tipo) return '';
+  const d = new Date(fechaHora);
+  const fecha = d.toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' });
+  const hora = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
+  return `${fecha}, ${hora} - ${tipo}`;
+}
+
 function JuntasInner() {
   const router = useRouter();
   const supabase = createSupabaseERPClient();
@@ -107,10 +130,10 @@ function JuntasInner() {
 
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [createForm, setCreateForm] = useState({
-    titulo: '', fecha_hora: '', lugar: '', duracion_minutos: '60',
-    tipo: '' as string, estado: 'programada' as Junta['estado'],
-  });
+  const [createTipo, setCreateTipo] = useState('');
+  const [createFechaHora, setCreateFechaHora] = useState('');
+  const [createTitulo, setCreateTitulo] = useState('');
+  const [tituloOverridden, setTituloOverridden] = useState(false);
 
   const fetchJuntas = useCallback(async () => {
     const { data, error: err } = await supabase
@@ -132,28 +155,43 @@ function JuntasInner() {
     return () => { cancelled = true; };
   }, [fetchJuntas]);
 
+  const openCreateSheet = () => {
+    const now = nowDatetimeLocal();
+    setCreateTipo('');
+    setCreateFechaHora(now);
+    setCreateTitulo('');
+    setTituloOverridden(false);
+    setShowCreate(true);
+  };
+
+  useEffect(() => {
+    if (!tituloOverridden && createTipo && createFechaHora) {
+      setCreateTitulo(generateTitulo(createFechaHora, createTipo));
+    }
+  }, [createTipo, createFechaHora, tituloOverridden]);
+
   const handleCreate = async () => {
-    if (!createForm.titulo.trim() || !createForm.fecha_hora) return;
+    if (!createTipo || !createFechaHora) return;
     setCreating(true);
     const { data: { user } } = await supabase.auth.getUser();
     const { data: coreUser } = await supabase.schema('core' as any).from('usuarios').select('id').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
 
+    const titulo = createTitulo.trim() || generateTitulo(createFechaHora, createTipo);
     const { data: newJunta, error: err } = await supabase
       .schema('erp' as any).from('juntas').insert({
         empresa_id: EMPRESA_ID,
-        titulo: createForm.titulo.trim(),
-        fecha_hora: createForm.fecha_hora,
-        lugar: createForm.lugar.trim() || null,
-        duracion_minutos: parseInt(createForm.duracion_minutos) || 60,
-        tipo: createForm.tipo || null,
-        estado: createForm.estado,
+        titulo,
+        fecha_hora: createFechaHora,
+        lugar: null,
+        duracion_minutos: 60,
+        tipo: createTipo,
+        estado: 'en_curso',
         creado_por: coreUser?.id ?? null,
       }).select().single();
 
     setCreating(false);
     if (err) { alert(`Error al crear junta: ${err.message}`); return; }
     setShowCreate(false);
-    setCreateForm({ titulo: '', fecha_hora: '', lugar: '', duracion_minutos: '60', tipo: '', estado: 'programada' });
     if (newJunta) router.push(`/dilesa/admin/juntas/${newJunta.id}`);
   };
 
@@ -189,7 +227,7 @@ function JuntasInner() {
           <Button variant="outline" size="sm" onClick={async () => { setLoading(true); await fetchJuntas(); setLoading(false); }} disabled={loading} className="rounded-xl border-[var(--border)] bg-[var(--card)] text-[var(--text)] hover:bg-[var(--panel)]">
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
-          <Button size="sm" onClick={() => setShowCreate(true)} className="rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 gap-1.5">
+          <Button size="sm" onClick={openCreateSheet} className="rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 gap-1.5">
             <Plus className="h-4 w-4" />Crear nueva junta
           </Button>
         </div>
@@ -236,7 +274,7 @@ function JuntasInner() {
             <CalendarDays className="mb-3 h-10 w-10 text-[var(--text)]/20" />
             <p className="text-sm text-[var(--text)]/55">{juntas.length === 0 ? 'No hay juntas registradas aún' : 'No hay juntas que coincidan con los filtros'}</p>
             {juntas.length === 0 && (
-              <Button size="sm" onClick={() => setShowCreate(true)} className="mt-4 gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90"><Plus className="h-4 w-4" />Crear primera junta</Button>
+              <Button size="sm" onClick={openCreateSheet} className="mt-4 gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90"><Plus className="h-4 w-4" />Crear primera junta</Button>
             )}
           </div>
         ) : (
@@ -257,7 +295,7 @@ function JuntasInner() {
                 <TableRow key={junta.id} className="cursor-pointer border-[var(--border)] transition-colors hover:bg-[var(--panel)]" onClick={() => router.push(`/dilesa/admin/juntas/${junta.id}`)}>
                   <TableCell><span className="line-clamp-1 font-medium text-[var(--text)]">{junta.titulo}</span></TableCell>
                   <TableCell>
-                    {junta.tipo ? (<span className="text-sm text-[var(--text)]/70">{TIPO_CONFIG[junta.tipo]?.icon} {TIPO_CONFIG[junta.tipo]?.label}</span>) : (<span className="text-[var(--text)]/40">—</span>)}
+                    {junta.tipo ? (<span className="text-sm text-[var(--text)]/70">{TIPO_CONFIG[junta.tipo]?.icon} {TIPO_CONFIG[junta.tipo]?.label ?? junta.tipo}</span>) : (<span className="text-[var(--text)]/40">—</span>)}
                   </TableCell>
                   <TableCell><EstadoBadge estado={junta.estado} /></TableCell>
                   <TableCell><span className="text-sm text-[var(--text)]/70">{formatDateTime(junta.fecha_hora)}</span></TableCell>
@@ -275,29 +313,73 @@ function JuntasInner() {
         <p className="text-right text-xs text-[var(--text)]/40">{filtered.length} de {juntas.length} {juntas.length === 1 ? 'junta' : 'juntas'}</p>
       )}
 
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto rounded-3xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
-          <DialogHeader><DialogTitle className="text-[var(--text)]">Crear nueva junta</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-2">
-            <div><FieldLabel>Título *</FieldLabel><Input placeholder="Ej: Revisión semanal de operaciones..." value={createForm.titulo} onChange={(e) => setCreateForm((f) => ({ ...f, titulo: e.target.value }))} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><FieldLabel>Fecha y hora *</FieldLabel><Input type="datetime-local" value={createForm.fecha_hora} onChange={(e) => setCreateForm((f) => ({ ...f, fecha_hora: e.target.value }))} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
-              <div><FieldLabel>Duración (min)</FieldLabel><Input type="number" min="15" step="15" value={createForm.duracion_minutos} onChange={(e) => setCreateForm((f) => ({ ...f, duracion_minutos: e.target.value }))} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
+      <Sheet open={showCreate} onOpenChange={(open) => { if (!open) setShowCreate(false); }}>
+        <SheetContent side="right" className="w-full sm:max-w-md border-[var(--border)] bg-[var(--card)] text-[var(--text)] overflow-y-auto">
+          <SheetHeader className="pb-2">
+            <SheetTitle className="text-[var(--text)] text-lg">Nueva Junta</SheetTitle>
+            <SheetDescription className="text-[var(--text)]/50">
+              Selecciona el tipo de junta para iniciar
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="space-y-5 py-4">
+            <div>
+              <FieldLabel>Tipo de Junta *</FieldLabel>
+              <Select value={createTipo} onValueChange={setCreateTipo}>
+                <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
+                  <SelectValue placeholder="Seleccionar tipo..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIPO_OPTIONS.map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><FieldLabel>Tipo</FieldLabel><Select value={createForm.tipo ?? ''} onValueChange={(v) => setCreateForm((f) => ({ ...f, tipo: v || '' }))}><SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue placeholder="Sin tipo" /></SelectTrigger><SelectContent>{Object.entries(TIPO_CONFIG).map(([k, v]) => (<SelectItem key={k} value={k}>{v.icon} {v.label}</SelectItem>))}</SelectContent></Select></div>
-              <div><FieldLabel>Estado</FieldLabel><Select value={createForm.estado} onValueChange={(v) => setCreateForm((f) => ({ ...f, estado: v as Junta['estado'] }))}><SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(ESTADO_CONFIG).map(([k, v]) => (<SelectItem key={k} value={k}>{v.label}</SelectItem>))}</SelectContent></Select></div>
+
+            <div>
+              <FieldLabel>Fecha y hora</FieldLabel>
+              <Input
+                type="datetime-local"
+                value={createFechaHora}
+                onChange={(e) => setCreateFechaHora(e.target.value)}
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
-            <div><FieldLabel>Lugar</FieldLabel><Input placeholder="Ej: Sala de juntas, Zoom..." value={createForm.lugar} onChange={(e) => setCreateForm((f) => ({ ...f, lugar: e.target.value }))} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
+
+            <div>
+              <FieldLabel>Título</FieldLabel>
+              <Input
+                placeholder="Se genera automáticamente..."
+                value={createTitulo}
+                onChange={(e) => { setCreateTitulo(e.target.value); setTituloOverridden(true); }}
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
+              <p className="mt-1 text-[10px] text-[var(--text)]/40">
+                Se genera como &quot;fecha, hora - tipo&quot;. Puedes editarlo si quieres.
+              </p>
+            </div>
           </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowCreate(false)} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">Cancelar</Button>
-            <Button onClick={handleCreate} disabled={creating || !createForm.titulo.trim() || !createForm.fecha_hora} className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60">
-              {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}Crear junta
+
+          <div className="flex items-center gap-2 pt-4 border-t border-[var(--border)]">
+            <Button
+              variant="outline"
+              onClick={() => setShowCreate(false)}
+              className="flex-1 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+            >
+              Cancelar
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <Button
+              onClick={handleCreate}
+              disabled={creating || !createTipo || !createFechaHora}
+              className="flex-1 gap-1.5 rounded-xl bg-green-600 text-white hover:bg-green-700 disabled:opacity-60"
+            >
+              {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+              Iniciar Junta
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

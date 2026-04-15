@@ -1,7 +1,7 @@
 'use client';
 
 import { RequireAccess } from '@/components/require-access';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -15,6 +15,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Popover, PopoverContent, PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem,
+} from '@/components/ui/command';
+import {
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
+} from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -43,6 +52,8 @@ import {
   Heading2,
   Heading3,
   CheckCircle2,
+  ImagePlus,
+  ChevronsUpDown,
 } from 'lucide-react';
 
 type Junta = {
@@ -79,7 +90,8 @@ type JuntaTask = {
 
 type Persona = { id: string; nombre: string };
 type Empleado = { id: string; nombre: string };
-type Prioridad = { id: string; nombre: string; color: string; peso: number };
+
+const PRIORIDAD_OPTIONS = ['Urgente', 'Alta', 'Media', 'Baja'] as const;
 
 const ESTADO_JUNTA: Record<Junta['estado'], { label: string; cls: string }> = {
   programada:  { label: 'Programada',  cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
@@ -98,10 +110,13 @@ const ESTADO_TASK: Record<string, { label: string; cls: string }> = {
 
 const TIPO_CONFIG: Record<string, string> = {
   operativa:'⚙️ Operativa', directiva:'🏛️ Directiva', seguimiento:'📊 Seguimiento', emergencia:'🚨 Emergencia',
-  Consejo:'🏢 Consejo', 'Comite Ejecutivo':'👔 Comité Ejecutivo', Ventas:'💰 Ventas',
-  'Atención PosVenta':'🔧 Atención PosVenta', Administración:'📁 Administración', Mercadotecnia:'📣 Mercadotecnia',
-  Construcción:'🏗️ Construcción', 'Compras y Admon. Inventario':'📦 Compras y Admon. Inventario',
+  Consejo:'🏢 Consejo', 'Comite Ejecutivo':'👔 Comité Ejecutivo', 'Comité Ejecutivo':'👔 Comité Ejecutivo',
+  Ventas:'💰 Ventas', 'Atención PosVenta':'🔧 Atención PosVenta', Administración:'📁 Administración',
+  Mercadotecnia:'📣 Mercadotecnia', Construcción:'🏗️ Construcción',
+  'Compras y Admon. Inventario':'📦 Compras y Admon. Inventario',
   Maquinaria:'🚜 Maquinaria', Proyectos:'🗂️ Proyectos', 'Rincón del Bosque':'🌲 Rincón del Bosque',
+  'Junta Operativa':'⚙️ Junta Operativa', 'Junta de Área':'📋 Junta de Área',
+  'Extraordinaria':'🚨 Extraordinaria', 'Otro':'📌 Otro',
 };
 
 function toDatetimeLocal(iso: string) {
@@ -116,15 +131,65 @@ function formatDate(s: string | null) {
   return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50 mb-1.5">{children}</div>;
+function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
+  return (
+    <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50 mb-1.5">
+      {children}{required && <span className="text-red-400 ml-0.5">*</span>}
+    </div>
+  );
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h2 className="text-sm font-semibold uppercase tracking-widest text-[var(--text)]/50 mb-3">{children}</h2>;
 }
 
-function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
+function Combobox({ value, onChange, options, placeholder, searchPlaceholder, emptyText, className }: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { id: string; label: string }[];
+  placeholder?: string;
+  searchPlaceholder?: string;
+  emptyText?: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find(o => o.id === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        className={`flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--panel)] text-[var(--text)] px-3 h-9 text-sm hover:bg-[var(--panel)]/80 transition-colors ${className ?? 'w-full'}`}
+      >
+        <span className={`truncate ${selected ? '' : 'text-[var(--text)]/40'}`}>
+          {selected ? selected.label : placeholder ?? 'Seleccionar...'}
+        </span>
+        <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-40" />
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-0" align="start">
+        <Command>
+          <CommandInput placeholder={searchPlaceholder ?? 'Buscar...'} />
+          <CommandList>
+            <CommandEmpty>{emptyText ?? 'Sin resultados'}</CommandEmpty>
+            <CommandGroup>
+              {options.map(o => (
+                <CommandItem
+                  key={o.id}
+                  value={o.label}
+                  onSelect={() => { onChange(o.id); setOpen(false); }}
+                  data-checked={value === o.id}
+                >
+                  {o.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function EditorToolbar({ editor, onInsertImage }: { editor: ReturnType<typeof useEditor>; onInsertImage: () => void }) {
   if (!editor) return null;
   const btn = (active: boolean, onClick: () => void, title: string, icon: React.ReactNode) => (
     <button type="button" title={title} onClick={onClick}
@@ -144,6 +209,9 @@ function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
       <div className="mx-1 h-5 w-px bg-[var(--border)]" />
       <button type="button" title="Insertar tabla" onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
         className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-sm text-[var(--text)]/60 hover:bg-[var(--panel)] hover:text-[var(--text)] transition"><Table2 className="h-3.5 w-3.5" /></button>
+      <div className="mx-1 h-5 w-px bg-[var(--border)]" />
+      <button type="button" title="Insertar imagen" onClick={onInsertImage}
+        className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-sm text-[var(--text)]/60 hover:bg-[var(--panel)] hover:text-[var(--text)] transition"><ImagePlus className="h-3.5 w-3.5" /></button>
     </div>
   );
 }
@@ -153,17 +221,18 @@ function JuntaDetailInner() {
   const router = useRouter();
   const id = params.id as string;
   const supabase = createSupabaseERPClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [junta, setJunta] = useState<Junta | null>(null);
   const [asistencia, setAsistencia] = useState<Asistencia[]>([]);
   const [tasks, setTasks] = useState<JuntaTask[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
-  const [prioridades, setPrioridades] = useState<Prioridad[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const [titulo, setTitulo] = useState('');
   const [fechaHora, setFechaHora] = useState('');
@@ -176,19 +245,74 @@ function JuntaDetailInner() {
   const [showTerminarDialog, setShowTerminarDialog] = useState(false);
 
   const editor = useEditor({
-    extensions: [StarterKit, Image, Table.configure({ resizable: true }), TableRow, TableHeader, TableCell],
+    extensions: [
+      StarterKit,
+      Image.configure({ inline: false, allowBase64: false }),
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableHeader,
+      TableCell,
+    ],
     content: '',
-    editorProps: { attributes: { class: 'prose prose-sm max-w-none focus:outline-none min-h-[200px] p-4 text-[var(--text)]' } },
+    editorProps: {
+      attributes: { class: 'prose prose-sm max-w-none focus:outline-none min-h-[200px] p-4 text-[var(--text)]' },
+      handleDrop(view, event, _slice, moved) {
+        if (moved || !event.dataTransfer?.files.length) return false;
+        const file = event.dataTransfer.files[0];
+        if (!file?.type.startsWith('image/')) return false;
+        event.preventDefault();
+        void handleImageUpload(file);
+        return true;
+      },
+      handlePaste(view, event) {
+        const items = event.clipboardData?.items;
+        if (!items) return false;
+        for (const item of Array.from(items)) {
+          if (item.type.startsWith('image/')) {
+            event.preventDefault();
+            const file = item.getAsFile();
+            if (file) void handleImageUpload(file);
+            return true;
+          }
+        }
+        return false;
+      },
+    },
   });
 
   const [showAddPersona, setShowAddPersona] = useState(false);
-  const [selectedPersonaId, setSelectedPersonaId] = useState('');
   const [addingPersona, setAddingPersona] = useState(false);
 
   const [showAddTask, setShowAddTask] = useState(false);
-  const [taskForm, setTaskForm] = useState({ titulo: '', descripcion: '', asignado_a: '', prioridad_id: '', estado: 'pendiente' as JuntaTask['estado'], fecha_vence: '' });
+  const [taskForm, setTaskForm] = useState({ titulo: '', prioridad: '', asignado_a: '', estado: 'en_progreso' as JuntaTask['estado'], fecha_vence: '' });
   const [addingTask, setAddingTask] = useState(false);
   const [completingTask, setCompletingTask] = useState<string | null>(null);
+
+  const handleImageUpload = async (file: File) => {
+    if (!editor || uploadingImage) return;
+    setUploadingImage(true);
+    try {
+      const ext = file.name.split('.').pop() ?? 'png';
+      const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const path = `juntas/${id}/${filename}`;
+      const { error: uploadErr } = await supabase.storage.from('adjuntos').upload(path, file, { upsert: false });
+      if (uploadErr) { alert(`Error al subir imagen: ${uploadErr.message}`); return; }
+      const { data: urlData } = supabase.storage.from('adjuntos').getPublicUrl(path);
+      editor.chain().focus().setImage({ src: urlData.publicUrl }).run();
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleInsertImageClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) void handleImageUpload(file);
+    e.target.value = '';
+  };
 
   const fetchAll = useCallback(async () => {
     const { data: juntaData, error: jErr } = await supabase.schema('erp' as any).from('juntas').select('*').eq('id', id).single();
@@ -215,8 +339,6 @@ function JuntaDetailInner() {
     const { data: empData } = await supabase.schema('erp' as any).from('empleados').select('id, persona:persona_id(nombre, apellido_paterno)').eq('empresa_id', juntaData.empresa_id).eq('activo', true).is('deleted_at', null);
     setEmpleados((empData ?? []).map((e: any) => ({ id: e.id, nombre: [e.persona?.nombre, e.persona?.apellido_paterno].filter(Boolean).join(' ') })));
 
-    const { data: priData } = await supabase.schema('shared' as any).from('prioridades').select('*').order('peso');
-    setPrioridades(priData ?? []);
     setLoading(false);
   }, [id, supabase, editor]);
 
@@ -247,33 +369,32 @@ function JuntaDetailInner() {
     setAsistencia((prev) => prev.filter((a) => a.id !== asistId));
   };
 
-  const handleAddParticipant = async () => {
-    if (!selectedPersonaId || !junta) return;
+  const handleAddParticipant = async (personaId: string) => {
+    if (!personaId || !junta) return;
     setAddingPersona(true);
     const { data, error: err } = await supabase.schema('erp' as any).from('juntas_asistencia')
-      .insert({ empresa_id: junta.empresa_id, junta_id: junta.id, persona_id: selectedPersonaId })
+      .insert({ empresa_id: junta.empresa_id, junta_id: junta.id, persona_id: personaId })
       .select('*, persona:persona_id(nombre, apellido_paterno)').single();
     setAddingPersona(false);
     if (err) { alert(`Error al agregar participante: ${err.message}`); return; }
     setAsistencia((prev) => [...prev, data]);
-    setSelectedPersonaId('');
     setShowAddPersona(false);
   };
 
   const handleAddTask = async () => {
-    if (!taskForm.titulo.trim() || !junta) return;
+    if (!taskForm.titulo.trim() || !taskForm.prioridad || !taskForm.asignado_a || !taskForm.fecha_vence || !junta) return;
     setAddingTask(true);
     const { data: { user } } = await supabase.auth.getUser();
     const { data: coreUser } = await supabase.schema('core' as any).from('usuarios').select('id').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
     const { data: newTask, error: err } = await supabase.schema('erp' as any).from('tasks').insert({
-      empresa_id: junta.empresa_id, titulo: taskForm.titulo.trim(), descripcion: taskForm.descripcion.trim() || null,
-      asignado_a: taskForm.asignado_a || null, prioridad_id: taskForm.prioridad_id || null, estado: taskForm.estado,
-      fecha_vence: taskForm.fecha_vence || null, creado_por: coreUser?.id ?? null, entidad_tipo: 'junta', entidad_id: junta.id,
+      empresa_id: junta.empresa_id, titulo: taskForm.titulo.trim(),
+      asignado_a: taskForm.asignado_a || null, prioridad: taskForm.prioridad, estado: taskForm.estado,
+      fecha_compromiso: taskForm.fecha_vence || null, creado_por: coreUser?.id ?? null, entidad_tipo: 'junta', entidad_id: junta.id,
     }).select('id, titulo, estado, asignado_a, fecha_vence').single();
     setAddingTask(false);
     if (err) { alert(`Error al crear tarea: ${err.message}`); return; }
     setTasks((prev) => [...prev, newTask]);
-    setTaskForm({ titulo: '', descripcion: '', asignado_a: '', prioridad_id: '', estado: 'pendiente', fecha_vence: '' });
+    setTaskForm({ titulo: '', prioridad: '', asignado_a: '', estado: 'en_progreso', fecha_vence: '' });
     setShowAddTask(false);
   };
 
@@ -293,6 +414,13 @@ function JuntaDetailInner() {
   };
 
   const empleadoMap = new Map(empleados.map((e) => [e.id, e]));
+  const empleadoOptions = useMemo(() => empleados.map(e => ({ id: e.id, label: e.nombre })), [empleados]);
+
+  const addedPersonaIds = useMemo(() => new Set(asistencia.map((a) => a.persona_id)), [asistencia]);
+  const availablePersonaOptions = useMemo(
+    () => personas.filter((p) => !addedPersonaIds.has(p.id)).map(p => ({ id: p.id, label: p.nombre })),
+    [personas, addedPersonaIds]
+  );
 
   if (loading) return <div className="space-y-6"><Skeleton className="h-8 w-64" /><Skeleton className="h-48 w-full rounded-2xl" /><Skeleton className="h-48 w-full rounded-2xl" /></div>;
 
@@ -303,11 +431,12 @@ function JuntaDetailInner() {
     </div>
   );
 
-  const addedPersonaIds = new Set(asistencia.map((a) => a.persona_id));
-  const availablePersonas = personas.filter((p) => !addedPersonaIds.has(p.id));
+  const canCreateTask = taskForm.titulo.trim() && taskForm.prioridad && taskForm.asignado_a && taskForm.fecha_vence;
 
   return (
     <div className="space-y-6 pb-12">
+      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" onClick={() => router.push('/dilesa/admin/juntas')} className="rounded-xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]"><ArrowLeft className="h-4 w-4" /></Button>
@@ -343,13 +472,16 @@ function JuntaDetailInner() {
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
         <SectionTitle>Notas y minuta</SectionTitle>
         <div className="overflow-hidden rounded-xl border border-[var(--border)]">
-          <EditorToolbar editor={editor} />
+          <EditorToolbar editor={editor} onInsertImage={handleInsertImageClick} />
           <div className="bg-[var(--panel)]">
-            <style>{`.ProseMirror { color: var(--text); } .ProseMirror p { margin: 0.4em 0; } .ProseMirror h2 { font-size: 1.1rem; font-weight: 700; margin: 0.8em 0 0.4em; } .ProseMirror h3 { font-size: 1rem; font-weight: 600; margin: 0.7em 0 0.35em; } .ProseMirror ul, .ProseMirror ol { padding-left: 1.4em; margin: 0.4em 0; } .ProseMirror li { margin: 0.2em 0; } .ProseMirror table { border-collapse: collapse; width: 100%; margin: 0.6em 0; } .ProseMirror td, .ProseMirror th { border: 1px solid var(--border); padding: 0.4em 0.6em; } .ProseMirror th { background: var(--card); font-weight: 600; } .ProseMirror p.is-editor-empty:first-child::before { color: var(--text); opacity: 0.35; content: attr(data-placeholder); float: left; height: 0; pointer-events: none; }`}</style>
+            <style>{`.ProseMirror { color: var(--text); } .ProseMirror p { margin: 0.4em 0; } .ProseMirror h2 { font-size: 1.1rem; font-weight: 700; margin: 0.8em 0 0.4em; } .ProseMirror h3 { font-size: 1rem; font-weight: 600; margin: 0.7em 0 0.35em; } .ProseMirror ul, .ProseMirror ol { padding-left: 1.4em; margin: 0.4em 0; } .ProseMirror li { margin: 0.2em 0; } .ProseMirror table { border-collapse: collapse; width: 100%; margin: 0.6em 0; } .ProseMirror td, .ProseMirror th { border: 1px solid var(--border); padding: 0.4em 0.6em; } .ProseMirror th { background: var(--card); font-weight: 600; } .ProseMirror p.is-editor-empty:first-child::before { color: var(--text); opacity: 0.35; content: attr(data-placeholder); float: left; height: 0; pointer-events: none; } .ProseMirror img { max-width: 100%; border-radius: 0.75rem; margin: 0.5em 0; }`}</style>
             <EditorContent editor={editor} />
           </div>
         </div>
-        <p className="mt-2 text-[10px] text-[var(--text)]/40">Las notas se guardan al presionar &quot;Guardar cambios&quot;.</p>
+        <div className="flex items-center gap-2 mt-2">
+          <p className="text-[10px] text-[var(--text)]/40 flex-1">Las notas se guardan al presionar &quot;Guardar cambios&quot;.</p>
+          {uploadingImage && <span className="text-[10px] text-[var(--accent)] flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />Subiendo imagen...</span>}
+        </div>
       </div>
 
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
@@ -380,14 +512,18 @@ function JuntaDetailInner() {
         )}
         {showAddPersona && (
           <div className="mt-3 flex items-center gap-2 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-3">
-            <Select value={selectedPersonaId} onValueChange={(v) => setSelectedPersonaId(v ?? '')}>
-              <SelectTrigger className="flex-1 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue placeholder="Seleccionar persona..." /></SelectTrigger>
-              <SelectContent>{availablePersonas.map((p) => (<SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>))}</SelectContent>
-            </Select>
-            <Button size="sm" onClick={handleAddParticipant} disabled={addingPersona || !selectedPersonaId} className="rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60">
-              {addingPersona ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => { setShowAddPersona(false); setSelectedPersonaId(''); }} className="rounded-xl border-[var(--border)] text-[var(--text)]"><X className="h-4 w-4" /></Button>
+            <div className="flex-1">
+              <Combobox
+                value=""
+                onChange={(personaId) => void handleAddParticipant(personaId)}
+                options={availablePersonaOptions}
+                placeholder="Buscar persona..."
+                searchPlaceholder="Escriba un nombre..."
+                emptyText="Sin resultados"
+              />
+            </div>
+            {addingPersona && <Loader2 className="h-4 w-4 animate-spin text-[var(--accent)]" />}
+            <Button variant="outline" size="sm" onClick={() => setShowAddPersona(false)} className="rounded-xl border-[var(--border)] text-[var(--text)]"><X className="h-4 w-4" /></Button>
           </div>
         )}
       </div>
@@ -438,28 +574,96 @@ function JuntaDetailInner() {
         )}
       </div>
 
-      <Dialog open={showAddTask} onOpenChange={setShowAddTask}>
-        <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto rounded-3xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
-          <DialogHeader><DialogTitle className="text-[var(--text)]">Nueva tarea para esta junta</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-2">
-            <div><FieldLabel>Título *</FieldLabel><Input placeholder="Descripción de la tarea..." value={taskForm.titulo} onChange={(e) => setTaskForm((f) => ({ ...f, titulo: e.target.value }))} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><FieldLabel>Estado</FieldLabel><Select value={taskForm.estado} onValueChange={(v) => setTaskForm((f) => ({ ...f, estado: v as JuntaTask['estado'] }))}><SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(ESTADO_TASK).map(([k, v]) => (<SelectItem key={k} value={k}>{v.label}</SelectItem>))}</SelectContent></Select></div>
-              <div><FieldLabel>Prioridad</FieldLabel><Select value={taskForm.prioridad_id} onValueChange={(v) => setTaskForm((f) => ({ ...f, prioridad_id: v ?? '' }))}><SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue placeholder="Sin prioridad" /></SelectTrigger><SelectContent>{prioridades.map((p) => (<SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>))}</SelectContent></Select></div>
+      <Sheet open={showAddTask} onOpenChange={(open) => { if (!open) { setShowAddTask(false); setTaskForm({ titulo: '', prioridad: '', asignado_a: '', estado: 'en_progreso', fecha_vence: '' }); } }}>
+        <SheetContent side="right" className="w-full sm:max-w-lg border-[var(--border)] bg-[var(--card)] text-[var(--text)] overflow-y-auto">
+          <SheetHeader className="pb-2">
+            <SheetTitle className="text-[var(--text)] text-lg">Nueva tarea para esta junta</SheetTitle>
+            <SheetDescription className="text-[var(--text)]/50">
+              Completa los campos requeridos para crear una tarea
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="space-y-5 py-4">
+            <div>
+              <FieldLabel required>Título</FieldLabel>
+              <Input
+                placeholder="Descripción de la tarea..."
+                value={taskForm.titulo}
+                onChange={(e) => setTaskForm((f) => ({ ...f, titulo: e.target.value }))}
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
+
             <div className="grid grid-cols-2 gap-4">
-              <div><FieldLabel>Asignar a</FieldLabel><Select value={taskForm.asignado_a} onValueChange={(v) => setTaskForm((f) => ({ ...f, asignado_a: v ?? '' }))}><SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue placeholder="Sin asignar" /></SelectTrigger><SelectContent>{empleados.map((e) => (<SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>))}</SelectContent></Select></div>
-              <div><FieldLabel>Fecha límite</FieldLabel><Input type="date" value={taskForm.fecha_vence} onChange={(e) => setTaskForm((f) => ({ ...f, fecha_vence: e.target.value }))} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
+              <div>
+                <FieldLabel required>Prioridad</FieldLabel>
+                <Select value={taskForm.prioridad} onValueChange={(v) => setTaskForm((f) => ({ ...f, prioridad: v ?? '' }))}>
+                  <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
+                    <SelectValue placeholder="Seleccionar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRIORIDAD_OPTIONS.map(p => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <FieldLabel>Estado</FieldLabel>
+                <Select value={taskForm.estado} onValueChange={(v) => setTaskForm((f) => ({ ...f, estado: v as JuntaTask['estado'] }))}>
+                  <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(ESTADO_TASK).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <FieldLabel required>Responsable</FieldLabel>
+              <Combobox
+                value={taskForm.asignado_a}
+                onChange={(v) => setTaskForm(f => ({ ...f, asignado_a: v }))}
+                options={empleadoOptions}
+                placeholder="Buscar responsable..."
+                searchPlaceholder="Escriba un nombre..."
+              />
+            </div>
+
+            <div>
+              <FieldLabel required>Fecha Compromiso</FieldLabel>
+              <Input
+                type="date"
+                value={taskForm.fecha_vence}
+                onChange={(e) => setTaskForm((f) => ({ ...f, fecha_vence: e.target.value }))}
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
           </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowAddTask(false)} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">Cancelar</Button>
-            <Button onClick={handleAddTask} disabled={addingTask || !taskForm.titulo.trim()} className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60">
-              {addingTask ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}Crear tarea
+
+          <div className="flex items-center gap-2 pt-4 border-t border-[var(--border)]">
+            <Button
+              variant="outline"
+              onClick={() => { setShowAddTask(false); setTaskForm({ titulo: '', prioridad: '', asignado_a: '', estado: 'en_progreso', fecha_vence: '' }); }}
+              className="flex-1 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+            >
+              Cancelar
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <Button
+              onClick={handleAddTask}
+              disabled={addingTask || !canCreateTask}
+              className="flex-1 gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60"
+            >
+              {addingTask ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              Crear tarea
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <Dialog open={showTerminarDialog} onOpenChange={setShowTerminarDialog}>
         <DialogContent className="max-w-sm rounded-3xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
