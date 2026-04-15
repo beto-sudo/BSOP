@@ -332,6 +332,14 @@ function TasksInner() {
   const handleCreate = async () => {
     if (!createForm.titulo.trim() || !createForm.prioridad || !createForm.asignado_a || !createForm.fecha_compromiso) return;
     setCreating(true);
+    // Auto-link to active junta if one exists
+    const { data: activeJunta } = await supabase.schema('erp' as any).from('juntas')
+      .select('id')
+      .eq('empresa_id', EMPRESA_ID)
+      .eq('estado', 'en_curso')
+      .order('fecha_hora', { ascending: false })
+      .limit(1)
+      .maybeSingle();
     const { error: err } = await supabase
       .schema('erp' as any).from('tasks').insert({
         empresa_id: EMPRESA_ID,
@@ -344,6 +352,7 @@ function TasksInner() {
         fecha_compromiso: createForm.fecha_compromiso || null,
         porcentaje_avance: createForm.porcentaje_avance,
         motivo_bloqueo: createForm.estado === 'bloqueado' ? (createForm.motivo_bloqueo.trim() || null) : null,
+        ...(activeJunta ? { entidad_tipo: 'junta', entidad_id: activeJunta.id } : {}),
       });
     setCreating(false);
     if (err) { alert(`Error al crear tarea: ${err.message}`); return; }
