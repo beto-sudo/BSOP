@@ -36,8 +36,9 @@ function generateMinutaHtml(opts: {
   asistentes: { nombre: string }[];
   tareasCreadas: { titulo: string; responsable: string; fecha_compromiso: string | null }[];
   tareasCompletadas: { titulo: string; responsable: string }[];
+  actualizaciones?: { tarea: string; contenido: string; tipo: string; autor: string }[];
 }): string {
-  const { titulo, fechaTerminada, duracionMinutos, descripcion, asistentes, tareasCreadas, tareasCompletadas } = opts;
+  const { titulo, fechaTerminada, duracionMinutos, descripcion, asistentes, tareasCreadas, tareasCompletadas, actualizaciones } = opts;
 
   const asistentesStr = asistentes.length > 0
     ? asistentes.map(a => a.nombre).join(', ')
@@ -121,6 +122,25 @@ function generateMinutaHtml(opts: {
     <div style="padding:0 32px 28px;">
       <h2 style="font-size:16px;font-weight:700;color:#22c55e;margin:0 0 12px;border-bottom:2px solid #e2e8f0;padding-bottom:8px;">✓ Tareas Completadas en esta Junta (${tareasCompletadas.length})</h2>
       ${tareasTable(tareasCompletadas, false)}
+    </div>` : ''}
+
+    <!-- Actualizaciones Reportadas -->
+    ${actualizaciones && actualizaciones.length > 0 ? `
+    <div style="padding:0 32px 28px;">
+      <h2 style="font-size:16px;font-weight:700;color:#6366f1;margin:0 0 12px;border-bottom:2px solid #e2e8f0;padding-bottom:8px;">Actualizaciones Reportadas (${actualizaciones.length})</h2>
+      <table style="width:100%;border-collapse:collapse;margin-top:8px;">
+        <tr style="background:#f1f5f9;">
+          <th style="padding:10px 12px;text-align:left;font-size:13px;color:#475569;font-weight:600;border-bottom:2px solid #e2e8f0;">Tarea</th>
+          <th style="padding:10px 12px;text-align:left;font-size:13px;color:#475569;font-weight:600;border-bottom:2px solid #e2e8f0;">Actualización</th>
+          <th style="padding:10px 12px;text-align:left;font-size:13px;color:#475569;font-weight:600;border-bottom:2px solid #e2e8f0;">Tipo</th>
+        </tr>
+        ${actualizaciones.map(a => `
+        <tr>
+          <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#1e293b;">${a.tarea}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#475569;">${a.contenido}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#475569;white-space:nowrap;">${a.tipo}</td>
+        </tr>`).join('')}
+      </table>
     </div>` : ''}
 
     <!-- Footer -->
@@ -222,6 +242,38 @@ export async function POST(req: NextRequest) {
   const tareasCreadas = allTasks.filter(t => t.estado !== 'completado' && t.estado !== 'cancelado');
   const tareasCompletadas = allTasks.filter(t => t.estado === 'completado');
 
+  // ── Fetch task updates reported during this meeting ────────────────────────
+  const taskIds = (tasksData ?? []).map((t: any) => t.id as string);
+  let actualizaciones: { tarea: string; contenido: string; tipo: string; autor: string }[] = [];
+  if (taskIds.length > 0) {
+    const { data: updatesData } = await supabase
+      .schema('erp' as any).from('task_updates').select('task_id, tipo, contenido, valor_anterior, valor_nuevo, creado_por')
+      .in('task_id', taskIds);
+
+    if (updatesData && updatesData.length > 0) {
+      const taskTitleMap = new Map((tasksData ?? []).map((t: any) => [t.id, t.titulo as string]));
+      const updateUserIds = [...new Set(updatesData.map((u: any) => u.creado_por).filter(Boolean))];
+      const { data: updateUsersData } = updateUserIds.length > 0
+        ? await supabase.schema('core' as any).from('usuarios').select('id, nombre').in('id', updateUserIds)
+        : { data: [] };
+      const updateUserMap = new Map((updateUsersData ?? []).map((u: any) => [u.id, u.nombre as string]));
+
+      const tipoLabels: Record<string, string> = { avance: 'Avance', cambio_estado: 'Cambio de estado', cambio_fecha: 'Cambio de fecha', nota: 'Nota', cambio_responsable: 'Cambio responsable' };
+      actualizaciones = updatesData.map((u: any) => {
+        let contenido = (u.contenido as string) ?? '';
+        if (u.valor_anterior != null && u.valor_nuevo != null) {
+          contenido = contenido ? `${contenido} (${u.valor_anterior} → ${u.valor_nuevo})` : `${u.valor_anterior} → ${u.valor_nuevo}`;
+        }
+        return {
+          tarea: taskTitleMap.get(u.task_id) ?? 'Tarea',
+          contenido,
+          tipo: tipoLabels[u.tipo as string] ?? u.tipo,
+          autor: updateUserMap.get(u.creado_por) ?? '',
+        };
+      });
+    }
+  }
+
   // ── Generate email ─────────────────────────────────────────────────────────
   const html = generateMinutaHtml({
     titulo: junta.titulo as string,
@@ -231,6 +283,7 @@ export async function POST(req: NextRequest) {
     asistentes,
     tareasCreadas,
     tareasCompletadas,
+    actualizaciones,
   });
 
   // ── Send email ─────────────────────────────────────────────────────────────
