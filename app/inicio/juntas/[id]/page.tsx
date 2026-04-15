@@ -1,7 +1,7 @@
 'use client';
 
 import { RequireAccess } from '@/components/require-access';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -393,6 +393,72 @@ function JuntaDetailInner() {
     }
   };
 
+  // Auto-save notes when junta is active
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedHtmlRef = useRef<string>('');
+
+  useEffect(() => {
+    if (!editor || !junta) return;
+    if (estado === 'completada' || estado === 'cancelada') return;
+    const handleUpdate = () => {
+      const html = editor.getHTML();
+      if (html === lastSavedHtmlRef.current) return;
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = setTimeout(async () => {
+        const currentHtml = editor.getHTML();
+        if (currentHtml === lastSavedHtmlRef.current) return;
+        setAutoSaveStatus('saving');
+        const { error: err } = await supabase.schema('erp' as any).from('juntas').update({
+          descripcion: currentHtml && currentHtml !== '<p></p>' ? currentHtml : null,
+        }).eq('id', junta.id);
+        if (!err) {
+          lastSavedHtmlRef.current = currentHtml;
+          setAutoSaveStatus('saved');
+          setTimeout(() => setAutoSaveStatus('idle'), 2000);
+        } else { setAutoSaveStatus('idle'); }
+      }, 3000);
+    };
+    editor.on('update', handleUpdate);
+    lastSavedHtmlRef.current = editor.getHTML();
+    return () => { editor.off('update', handleUpdate); if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current); };
+  }, [editor, junta, estado, supabase]);
+
+  // Live polling: refresh notes, tasks & attendance every 10s when active
+  const isEditingRef = useRef(false);
+  useEffect(() => {
+    if (editor) {
+      const onFocus = () => { isEditingRef.current = true; };
+      const onBlur = () => { isEditingRef.current = false; };
+      editor.on('focus', onFocus); editor.on('blur', onBlur);
+      return () => { editor.off('focus', onFocus); editor.off('blur', onBlur); };
+    }
+  }, [editor]);
+
+  useEffect(() => {
+    if (!junta || (estado === 'completada' || estado === 'cancelada')) return;
+    const interval = setInterval(async () => {
+      if (!isEditingRef.current && editor) {
+        const { data: fresh } = await supabase.schema('erp' as any).from('juntas').select('descripcion').eq('id', junta.id).maybeSingle();
+        if (fresh) {
+          const remoteHtml = fresh.descripcion ?? '';
+          const localHtml = editor.getHTML();
+          if (remoteHtml !== localHtml && remoteHtml !== lastSavedHtmlRef.current) {
+            const { from, to } = editor.state.selection;
+            editor.commands.setContent(remoteHtml, { emitUpdate: false });
+            try { editor.commands.setTextSelection({ from, to }); } catch {}
+            lastSavedHtmlRef.current = remoteHtml;
+          }
+        }
+      }
+      const { data: tasksData } = await supabase.schema('erp' as any).from('tasks').select('id, titulo, estado, asignado_a, fecha_vence').eq('entidad_tipo', 'junta').eq('entidad_id', junta.id).order('created_at');
+      if (tasksData) setTasks(tasksData);
+      const { data: asistData } = await supabase.schema('erp' as any).from('juntas_asistencia').select('*, persona:persona_id(nombre, apellido_paterno)').eq('junta_id', junta.id).order('created_at');
+      if (asistData) setAsistencia(asistData);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [junta, estado, editor, supabase, id]);
+
   const handleToggleAsistio = async (asistId: string, current: boolean | null) => {
     // Cycle: null → true → false → null
     const next = current === null ? true : current === true ? false : null;
@@ -705,7 +771,11 @@ function JuntaDetailInner() {
           </div>
         </div>
         <p className="mt-2 text-[10px] text-[var(--text)]/40">
-          Las notas se guardan al presionar "Guardar cambios".
+          {estado !== 'completada' && estado !== 'cancelada'
+              ? autoSaveStatus === 'saving' ? '⏳ Guardando notas...'
+                : autoSaveStatus === 'saved' ? '✅ Notas guardadas'
+                : 'Las notas se auto-guardan mientras escribes'
+              : 'Las notas se guardan al presionar "Guardar cambios"'}
         </p>
       </div>
 

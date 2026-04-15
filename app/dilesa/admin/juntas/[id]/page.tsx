@@ -441,6 +441,52 @@ function JuntaDetailInner() {
     };
   }, [editor, junta, estado, supabase]);
 
+  // Live polling: refresh notes, tasks & attendance every 10s when junta is active
+  const isEditingRef = useRef(false);
+  useEffect(() => {
+    if (editor) {
+      const onFocus = () => { isEditingRef.current = true; };
+      const onBlur = () => { isEditingRef.current = false; };
+      editor.on('focus', onFocus);
+      editor.on('blur', onBlur);
+      return () => { editor.off('focus', onFocus); editor.off('blur', onBlur); };
+    }
+  }, [editor]);
+
+  useEffect(() => {
+    if (!junta || (estado === 'completada' || estado === 'cancelada')) return;
+    const interval = setInterval(async () => {
+      // Refresh junta description (only if user is NOT actively editing)
+      if (!isEditingRef.current) {
+        const { data: fresh } = await supabase.schema('erp' as any).from('juntas')
+          .select('descripcion').eq('id', junta.id).maybeSingle();
+        if (fresh && editor) {
+          const remoteHtml = fresh.descripcion ?? '';
+          const localHtml = editor.getHTML();
+          if (remoteHtml !== localHtml && remoteHtml !== lastSavedHtmlRef.current) {
+            // Someone else changed it — update editor
+            const { from, to } = editor.state.selection;
+            editor.commands.setContent(remoteHtml, { emitUpdate: false });
+            // Try to restore cursor position
+            try { editor.commands.setTextSelection({ from, to }); } catch {}
+            lastSavedHtmlRef.current = remoteHtml;
+          }
+        }
+      }
+      // Refresh tasks
+      const { data: tasksData } = await supabase.schema('erp' as any).from('tasks')
+        .select('id, titulo, estado, asignado_a, fecha_vence')
+        .eq('entidad_tipo', 'junta').eq('entidad_id', junta.id).order('created_at');
+      if (tasksData) setTasks(tasksData);
+      // Refresh attendance
+      const { data: asistData } = await supabase.schema('erp' as any).from('juntas_asistencia')
+        .select('*, persona:persona_id(nombre, apellido_paterno)')
+        .eq('junta_id', junta.id).order('created_at');
+      if (asistData) setAsistencia(asistData);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [junta, estado, editor, supabase, id]);
+
   const handleToggleAsistio = async (asistId: string, current: boolean | null) => {
     const next = current === null ? true : current === true ? false : null;
     await supabase.schema('erp' as any).from('juntas_asistencia').update({ asistio: next }).eq('id', asistId);
