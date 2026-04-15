@@ -153,12 +153,15 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Fetch junta to calculate duration ──────────────────────────────────────
+  // Use created_at (server timestamp at real start) instead of fecha_hora
+  // (datetime-local input stored without timezone, often off by UTC offset)
   const { data: existing } = await supabase
-    .schema('erp' as any).from('juntas').select('fecha_hora').eq('id', juntaId).single();
+    .schema('erp' as any).from('juntas').select('fecha_hora, created_at').eq('id', juntaId).single();
 
   const now = new Date();
-  const duracionMinutos = existing?.fecha_hora
-    ? Math.round((now.getTime() - new Date(existing.fecha_hora as string).getTime()) / 60000)
+  const startRef = existing?.created_at ?? existing?.fecha_hora;
+  const duracionMinutos = startRef
+    ? Math.round((now.getTime() - new Date(startRef as string).getTime()) / 60000)
     : null;
 
   // ── Update junta: completada + auto duration ───────────────────────────────
