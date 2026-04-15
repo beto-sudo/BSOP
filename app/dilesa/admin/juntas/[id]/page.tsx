@@ -453,39 +453,43 @@ function JuntaDetailInner() {
     }
   }, [editor]);
 
+  const [lastPoll, setLastPoll] = useState<string>('');
   useEffect(() => {
-    if (!junta || (estado === 'completada' || estado === 'cancelada')) return;
-    const interval = setInterval(async () => {
-      // Refresh junta description (only if user is NOT actively editing)
-      if (!isEditingRef.current) {
-        const { data: fresh } = await supabase.schema('erp' as any).from('juntas')
-          .select('descripcion').eq('id', junta.id).maybeSingle();
-        if (fresh && editor) {
-          const remoteHtml = fresh.descripcion ?? '';
-          const localHtml = editor.getHTML();
-          if (remoteHtml !== localHtml && remoteHtml !== lastSavedHtmlRef.current) {
-            // Someone else changed it — update editor
-            const { from, to } = editor.state.selection;
-            editor.commands.setContent(remoteHtml, { emitUpdate: false });
-            // Try to restore cursor position
-            try { editor.commands.setTextSelection({ from, to }); } catch {}
-            lastSavedHtmlRef.current = remoteHtml;
+    if (!junta || estado === 'completada' || estado === 'cancelada') return;
+    const juntaId = junta.id;
+    const poll = async () => {
+      try {
+        // Refresh junta description (only if user is NOT actively editing)
+        if (!isEditingRef.current && editor) {
+          const { data: fresh } = await supabase.schema('erp' as any).from('juntas')
+            .select('descripcion').eq('id', juntaId).maybeSingle();
+          if (fresh) {
+            const remoteHtml = fresh.descripcion ?? '';
+            const localHtml = editor.getHTML();
+            if (remoteHtml !== localHtml && remoteHtml !== lastSavedHtmlRef.current) {
+              editor.commands.setContent(remoteHtml, { emitUpdate: false });
+              lastSavedHtmlRef.current = remoteHtml;
+            }
           }
         }
-      }
-      // Refresh tasks
-      const { data: tasksData } = await supabase.schema('erp' as any).from('tasks')
-        .select('id, titulo, estado, asignado_a, fecha_vence')
-        .eq('entidad_tipo', 'junta').eq('entidad_id', junta.id).order('created_at');
-      if (tasksData) setTasks(tasksData);
-      // Refresh attendance
-      const { data: asistData } = await supabase.schema('erp' as any).from('juntas_asistencia')
-        .select('*, persona:persona_id(nombre, apellido_paterno)')
-        .eq('junta_id', junta.id).order('created_at');
-      if (asistData) setAsistencia(asistData);
-    }, 10000);
+        // Refresh tasks
+        const { data: tasksData } = await supabase.schema('erp' as any).from('tasks')
+          .select('id, titulo, estado, asignado_a, fecha_vence')
+          .eq('entidad_tipo', 'junta').eq('entidad_id', juntaId).order('created_at');
+        if (tasksData) setTasks(tasksData);
+        // Refresh attendance
+        const { data: asistData } = await supabase.schema('erp' as any).from('juntas_asistencia')
+          .select('*, persona:persona_id(nombre, apellido_paterno)')
+          .eq('junta_id', juntaId).order('created_at');
+        if (asistData) setAsistencia(asistData);
+        setLastPoll(new Date().toLocaleTimeString());
+      } catch { /* ignore poll errors */ }
+    };
+    const interval = setInterval(poll, 10000);
+    // Also run once immediately
+    void poll();
     return () => clearInterval(interval);
-  }, [junta, estado, editor, supabase, id]);
+  }, [junta?.id, estado, editor, supabase]);
 
   const handleToggleAsistio = async (asistId: string, current: boolean | null) => {
     const next = current === null ? true : current === true ? false : null;
@@ -685,6 +689,7 @@ function JuntaDetailInner() {
               : 'Las notas se guardan al presionar "Guardar cambios"'}
           </p>
           {uploadingImage && <span className="text-[10px] text-[var(--accent)] flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />Subiendo imagen...</span>}
+          {lastPoll && estado !== 'completada' && estado !== 'cancelada' && <span className="text-[10px] text-[var(--text)]/30">• Sync: {lastPoll}</span>}
         </div>
       </div>
 
