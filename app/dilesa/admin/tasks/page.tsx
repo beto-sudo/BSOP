@@ -99,6 +99,13 @@ function EstadoBadge({ estado }: { estado: ErpTask['estado'] }) {
 function PrioridadTextBadge({ text }: { text: string | null }) {
   if (!text) return <span className="text-[var(--text)]/40">—</span>;
   const lower = text.toLowerCase();
+  const dotColor = (lower === 'alta' || lower === 'urgente')
+    ? 'bg-red-500'
+    : lower === 'media'
+    ? 'bg-amber-500'
+    : lower === 'baja'
+    ? 'bg-green-500'
+    : 'bg-gray-400';
   const cls = (lower === 'alta' || lower === 'urgente')
     ? 'bg-red-500/15 text-red-400 border-red-500/20'
     : lower === 'media'
@@ -107,7 +114,8 @@ function PrioridadTextBadge({ text }: { text: string | null }) {
     ? 'bg-green-500/15 text-green-400 border-green-500/20'
     : 'bg-[var(--border)]/40 text-[var(--text)]/60 border-[var(--border)]';
   return (
-    <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cls}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-0.5 text-xs font-medium ${cls}`}>
+      <span className={`h-2 w-2 rounded-full ${dotColor}`} />
       {text}
     </span>
   );
@@ -766,19 +774,7 @@ function TasksInner() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <FieldLabel>Estado</FieldLabel>
-                <Select value={createForm.estado} onValueChange={(v) => setCreateForm(f => ({ ...f, estado: v as ErpTask['estado'] }))}>
-                  <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(ESTADO_CONFIG).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>{v.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Estado se asigna automáticamente como 'en_progreso' */}
             </div>
 
             <div>
