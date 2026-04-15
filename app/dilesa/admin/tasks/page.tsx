@@ -25,7 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  Plus, Search, RefreshCw, Loader2, TicketCheck, Trash2, Check, ChevronsUpDown,
+  Plus, Search, RefreshCw, Loader2, TicketCheck, Trash2, Check, ChevronsUpDown, Eye, EyeOff,
 } from 'lucide-react';
 
 const EMPRESA_ID = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479';
@@ -226,6 +226,7 @@ function TasksInner() {
   const [filterPrioridad, setFilterPrioridad] = useState('all');
   const [filterAsignado, setFilterAsignado] = useState('all');
   const [filterDepto, setFilterDepto] = useState('all');
+  const [hideCompleted, setHideCompleted] = useState(true);
 
   const emptyForm = (): TaskForm => ({
     titulo: '', descripcion: '', prioridad: '', asignado_a: '',
@@ -468,6 +469,7 @@ function TasksInner() {
   }, [tasks, isAdmin, isDireccion, currentEmpleadoId]);
 
   const filtered = visibleTasks.filter((t) => {
+    if (hideCompleted && (t.estado === 'completado' || t.estado === 'cancelado')) return false;
     if (search) {
       const s = search.toLowerCase();
       const responsableName = empleadoMap.get(t.asignado_a ?? '')?.nombre?.toLowerCase() ?? '';
@@ -559,6 +561,23 @@ function TasksInner() {
             className="w-44"
           />
         </div>
+      </div>
+
+      {/* Toggle completadas */}
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => setHideCompleted(h => !h)}
+          className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)]/60 transition hover:bg-[var(--panel)] hover:text-[var(--text)]"
+        >
+          {hideCompleted ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+          {hideCompleted ? 'Mostrar completadas' : 'Ocultar completadas'}
+        </button>
+        {!loading && (
+          <span className="text-xs text-[var(--text)]/40">
+            {filtered.length} de {visibleTasks.length} tareas{hideCompleted ? ' (sin completadas)' : ''}
+          </span>
+        )}
       </div>
 
       {/* Table */}
@@ -722,11 +741,7 @@ function TasksInner() {
         )}
       </div>
 
-      {!loading && visibleTasks.length > 0 && (
-        <p className="text-right text-xs text-[var(--text)]/40">
-          {filtered.length} de {visibleTasks.length} {visibleTasks.length === 1 ? 'tarea' : 'tareas'}
-        </p>
-      )}
+
 
       {/* ── Create Sheet ──────────────────────────────────────────────── */}
       <Sheet open={showCreate} onOpenChange={(open) => { if (!open) { setShowCreate(false); setCreateForm(emptyForm()); } }}>
