@@ -31,7 +31,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Search, RefreshCw, Loader2, TicketCheck, Trash2, CheckCircle2, Check } from 'lucide-react';
+import { Plus, Search, RefreshCw, Loader2, TicketCheck, Trash2, Check } from 'lucide-react';
 
 const EMPRESA_ID = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479';
 
@@ -98,21 +98,19 @@ function EstadoBadge({ estado }: { estado: ErpTask['estado'] }) {
   );
 }
 
-const PRIORIDAD_TEXT_CONFIG: Record<string, { emoji: string; cls: string }> = {
-  alta:    { emoji: '🔴', cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
-  urgente: { emoji: '🔴', cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
-  media:   { emoji: '🟡', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
-  baja:    { emoji: '🟢', cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
-};
-
-function PrioridadTextBadge({ value }: { value: string | null }) {
-  if (!value) return null;
-  const key = value.toLowerCase().trim();
-  const cfg = PRIORIDAD_TEXT_CONFIG[key];
-  if (!cfg) return <span className="inline-flex items-center rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-0.5 text-xs font-medium text-[var(--text)]/60">{value}</span>;
+function PrioridadTextBadge({ text }: { text: string | null }) {
+  if (!text) return <span className="text-[var(--text)]/40">—</span>;
+  const lower = text.toLowerCase();
+  const cls = (lower === 'alta' || lower === 'urgente')
+    ? 'bg-red-500/15 text-red-400 border-red-500/20'
+    : lower === 'media'
+    ? 'bg-amber-500/15 text-amber-400 border-amber-500/20'
+    : lower === 'baja'
+    ? 'bg-green-500/15 text-green-400 border-green-500/20'
+    : 'bg-[var(--border)]/40 text-[var(--text)]/60 border-[var(--border)]';
   return (
-    <span className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}>
-      {cfg.emoji} {value}
+    <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cls}`}>
+      {text}
     </span>
   );
 }
@@ -420,23 +418,17 @@ function TasksInner() {
     await fetchTasks();
   };
 
-  const [completing, setCompleting] = useState<string | null>(null);
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
 
-  const handleQuickComplete = async (task: ErpTask, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (completing) return;
-    setCompleting(task.id);
+  const handleQuickComplete = async (taskId: string) => {
+    setCompletingTaskId(taskId);
     const { error: err } = await supabase
       .schema('erp' as any)
       .from('tasks')
-      .update({
-        estado: 'completado',
-        completado_por: currentEmpleadoId,
-        porcentaje_avance: 100,
-      })
-      .eq('id', task.id);
-    setCompleting(null);
-    if (err) { alert(`Error al completar: ${err.message}`); return; }
+      .update({ estado: 'completado', porcentaje_avance: 100, completado_por: currentEmpleadoId })
+      .eq('id', taskId);
+    setCompletingTaskId(null);
+    if (err) { alert(`Error: ${err.message}`); return; }
     await fetchTasks();
   };
 
@@ -554,16 +546,16 @@ function TasksInner() {
           <Table>
             <TableHeader>
               <TableRow className="border-[var(--border)] hover:bg-transparent">
+                {(isDireccion || isAdmin) && <TableHead className="w-10" />}
                 <SortableHead sortKey="titulo" label="Título" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
                 <SortableHead sortKey="departamento_nombre" label="Depto" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-24" />
+                <SortableHead sortKey="prioridad" label="Prioridad" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
                 <SortableHead sortKey="estado" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
                 <SortableHead sortKey="porcentaje_avance" label="Avance" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-24" />
                 <SortableHead sortKey="asignado_nombre" label="Responsable" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-36" />
                 <SortableHead sortKey="created_at" label="Fecha Tarea" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
                 <SortableHead sortKey="fecha_compromiso" label="Compromiso" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
-                <SortableHead sortKey="prioridad" label="Prioridad" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-24" />
                 <SortableHead sortKey="iniciativa" label="Iniciativa" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
-                {(isDireccion || isAdmin) && <TableHead className="w-12" />}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -572,33 +564,35 @@ function TasksInner() {
                 const empleado = empleadoMap.get(task.asignado_a ?? '');
                 return (
                   <TableRow key={task.id} className="cursor-pointer border-[var(--border)] transition-colors hover:bg-[var(--panel)]" onClick={() => openEdit(task)}>
+                    {(isDireccion || isAdmin) && (
+                      <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
+                        {task.estado !== 'completado' && task.estado !== 'cancelado' ? (
+                          <button
+                            type="button"
+                            title="Completar tarea"
+                            disabled={completingTaskId === task.id}
+                            onClick={() => handleQuickComplete(task.id)}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-green-500/30 bg-green-500/10 text-green-400 transition hover:bg-green-500/20 disabled:opacity-50"
+                          >
+                            {completingTaskId === task.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                          </button>
+                        ) : (
+                          <Check className="h-4 w-4 text-green-400/40" />
+                        )}
+                      </TableCell>
+                    )}
                     <TableCell>
                       <span className="line-clamp-1 font-medium text-[var(--text)]">{task.titulo}</span>
                       {task.descripcion && (<span className="mt-0.5 block text-xs text-[var(--text)]/40 line-clamp-1">{task.descripcion}</span>)}
                     </TableCell>
                     <TableCell><span className="text-xs text-[var(--text)]/60">{task.departamento_nombre || '—'}</span></TableCell>
+                    <TableCell><PrioridadTextBadge text={task.prioridad} /></TableCell>
                     <TableCell><EstadoBadge estado={task.estado} /></TableCell>
                     <TableCell><ProgressBar value={task.porcentaje_avance ?? 0} /></TableCell>
                     <TableCell><span className="text-sm text-[var(--text)]/70">{empleado ? empleado.nombre : '—'}</span></TableCell>
                     <TableCell><span className="text-xs text-[var(--text)]/60">{formatDate(task.created_at)}</span></TableCell>
                     <TableCell><span className="text-xs text-[var(--text)]/60">{formatDate(task.fecha_compromiso)}</span></TableCell>
-                    <TableCell><PrioridadTextBadge value={task.prioridad} /></TableCell>
                     <TableCell><span className="text-xs text-[var(--text)]/60">{task.iniciativa || '—'}</span></TableCell>
-                    {(isDireccion || isAdmin) && (
-                      <TableCell>
-                        {task.estado !== 'completado' && task.estado !== 'cancelado' && (
-                          <button
-                            type="button"
-                            title="Completar tarea"
-                            onClick={(e) => handleQuickComplete(task, e)}
-                            disabled={completing === task.id}
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-green-500/30 bg-green-500/10 text-green-400 transition hover:bg-green-500/20 hover:border-green-500/50 disabled:opacity-50"
-                          >
-                            {completing === task.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-                          </button>
-                        )}
-                      </TableCell>
-                    )}
                   </TableRow>
                 );
               })}

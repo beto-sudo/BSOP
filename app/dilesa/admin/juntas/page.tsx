@@ -248,6 +248,7 @@ function JuntasInner() {
                 <SortableHead sortKey="estado" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
                 <SortableHead sortKey="fecha_hora" label="Fecha y hora" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-48" />
                 <SortableHead sortKey="lugar" label="Lugar" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-32" />
+                <SortableHead sortKey="created_at" label="Creada" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
@@ -261,6 +262,7 @@ function JuntasInner() {
                   <TableCell><EstadoBadge estado={junta.estado} /></TableCell>
                   <TableCell><span className="text-sm text-[var(--text)]/70">{formatDateTime(junta.fecha_hora)}</span></TableCell>
                   <TableCell><span className="text-sm text-[var(--text)]/70 line-clamp-1">{junta.lugar ?? '—'}</span></TableCell>
+                  <TableCell><span className="text-xs text-[var(--text)]/50">{new Date(junta.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}</span></TableCell>
                   <TableCell><ChevronRight className="h-4 w-4 text-[var(--text)]/30" /></TableCell>
                 </TableRow>
               ))}
