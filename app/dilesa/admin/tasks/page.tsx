@@ -621,7 +621,7 @@ function TasksInner() {
               <TableRow className="border-[var(--border)] hover:bg-transparent">
                 {(isDireccion || isAdmin) && <TableHead className="w-10 min-w-[40px]" />}
                 <SortableHead sortKey="titulo" label="Tarea" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[180px]" />
-                <SortableHead sortKey="prioridad" label="Prio" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[80px]" />
+                <SortableHead sortKey="prioridad" label="Prioridad" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[100px]" />
                 <SortableHead sortKey="estado" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[90px]" />
                 <SortableHead sortKey="porcentaje_avance" label="Avance" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[90px]" />
                 <SortableHead sortKey="asignado_nombre" label="Responsable" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[140px]" />
