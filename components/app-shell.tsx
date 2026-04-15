@@ -296,6 +296,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // show nothing to avoid a flash of unauthorized items.
   const filteredNavItems = useMemo(() => {
     if (!permissions) return [];
+    // While loading, show all nav items to avoid flash of missing menus
+    if (permissions.loading) return NAV_ITEMS;
+    // Admin sees everything
+    if (permissions.isAdmin) return NAV_ITEMS;
 
     return NAV_ITEMS.reduce<NavItem[]>((acc, item) => {
       // Overview is always visible to authenticated users
