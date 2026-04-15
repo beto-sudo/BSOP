@@ -32,7 +32,7 @@ type ErpTask = {
   descripcion: string | null;
   asignado_a: string | null;
   creado_por: string | null;
-  prioridad_id: string | null;
+  prioridad: string | null;
   estado: 'pendiente' | 'en_progreso' | 'bloqueado' | 'completado' | 'cancelado';
   fecha_vence: string | null;
   porcentaje_avance: number | null;
@@ -42,12 +42,11 @@ type ErpTask = {
   updated_at: string | null;
 };
 
-type Prioridad = { id: string; nombre: string; peso: number; color: string };
 type Empleado = { id: string; nombre: string };
 type CreateForm = {
   titulo: string;
   descripcion: string;
-  prioridad_id: string;
+  prioridad: string;
   asignado_a: string;
   estado: ErpTask['estado'];
   fecha_vence: string;
@@ -60,6 +59,15 @@ const ESTADO_CONFIG: Record<ErpTask['estado'], { label: string; cls: string }> =
   completado:  { label: 'Completado',  cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
   cancelado:   { label: 'Cancelado',   cls: 'bg-[var(--border)]/60 text-[var(--text)]/40 border-[var(--border)]' },
 };
+
+const PRIORIDAD_CONFIG: Record<string, { label: string; cls: string }> = {
+  Urgente: { label: 'Urgente', cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
+  Alta:    { label: 'Alta',    cls: 'bg-orange-500/15 text-orange-400 border-orange-500/20' },
+  Media:   { label: 'Media',   cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
+  Baja:    { label: 'Baja',    cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
+};
+
+const PRIORIDAD_OPTIONS = ['Urgente', 'Alta', 'Media', 'Baja'] as const;
 
 function formatDate(dateStr: string | null) {
   if (!dateStr) return '—';
@@ -76,15 +84,12 @@ function EstadoBadge({ estado }: { estado: ErpTask['estado'] }) {
   );
 }
 
-function PrioridadBadge({ prioridad }: { prioridad: Prioridad | undefined }) {
+function PrioridadBadge({ prioridad }: { prioridad: string | null }) {
   if (!prioridad) return <span className="text-[var(--text)]/40">—</span>;
+  const cfg = PRIORIDAD_CONFIG[prioridad] ?? { label: prioridad, cls: '' };
   return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-0.5 text-xs font-medium"
-      style={{ backgroundColor: `${prioridad.color}25`, color: prioridad.color, borderColor: `${prioridad.color}35` }}
-    >
-      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: prioridad.color }} />
-      {prioridad.nombre}
+    <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}>
+      {cfg.label}
     </span>
   );
 }
@@ -101,7 +106,6 @@ function TasksInner() {
   const router = useRouter();
   const supabase = createSupabaseBrowserClient();
 
-  const [prioridades, setPrioridades] = useState<Prioridad[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [tasks, setTasks] = useState<ErpTask[]>([]);
   const [loading, setLoading] = useState(true);
@@ -115,23 +119,19 @@ function TasksInner() {
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createForm, setCreateForm] = useState<CreateForm>({
-    titulo: '', descripcion: '', prioridad_id: '', asignado_a: '', estado: 'pendiente', fecha_vence: '',
+    titulo: '', descripcion: '', prioridad: '', asignado_a: '', estado: 'pendiente', fecha_vence: '',
   });
 
   const fetchRefData = useCallback(async () => {
-    const [priRes, empRes] = await Promise.all([
-      supabase.schema('shared' as any).from('prioridades').select('*').order('peso'),
-      supabase
-        .schema('erp' as any)
-        .from('empleados')
-        .select('id, persona:persona_id(nombre, apellido_paterno)')
-        .eq('empresa_id', EMPRESA_ID)
-        .eq('activo', true)
-        .is('deleted_at', null),
-    ]);
-    setPrioridades(priRes.data ?? []);
+    const { data: empRes } = await supabase
+      .schema('erp' as any)
+      .from('empleados')
+      .select('id, persona:persona_id(nombre, apellido_paterno)')
+      .eq('empresa_id', EMPRESA_ID)
+      .eq('activo', true)
+      .is('deleted_at', null);
     setEmpleados(
-      (empRes.data ?? []).map((e: any) => ({
+      (empRes ?? []).map((e: any) => ({
         id: e.id,
         nombre: [e.persona?.nombre, e.persona?.apellido_paterno].filter(Boolean).join(' '),
       })),
@@ -173,7 +173,7 @@ function TasksInner() {
   };
 
   const resetForm = () =>
-    setCreateForm({ titulo: '', descripcion: '', prioridad_id: '', asignado_a: '', estado: 'pendiente', fecha_vence: '' });
+    setCreateForm({ titulo: '', descripcion: '', prioridad: '', asignado_a: '', estado: 'pendiente', fecha_vence: '' });
 
   const handleCreate = async () => {
     if (!createForm.titulo.trim()) return;
@@ -194,7 +194,7 @@ function TasksInner() {
         empresa_id: EMPRESA_ID,
         titulo: createForm.titulo.trim(),
         descripcion: createForm.descripcion.trim() || null,
-        prioridad_id: createForm.prioridad_id || null,
+        prioridad: createForm.prioridad || null,
         asignado_a: createForm.asignado_a || null,
         estado: createForm.estado,
         fecha_vence: createForm.fecha_vence || null,
@@ -216,12 +216,11 @@ function TasksInner() {
   };
 
   const empleadoMap = new Map(empleados.map((e) => [e.id, e]));
-  const prioridadMap = new Map(prioridades.map((p) => [p.id, p]));
 
   const filtered = tasks.filter((t) => {
     if (search && !t.titulo.toLowerCase().includes(search.toLowerCase())) return false;
     if (filterEstado !== 'all' && t.estado !== filterEstado) return false;
-    if (filterPrioridad !== 'all' && t.prioridad_id !== filterPrioridad) return false;
+    if (filterPrioridad !== 'all' && t.prioridad !== filterPrioridad) return false;
     if (filterAsignado !== 'all' && t.asignado_a !== filterAsignado) return false;
     return true;
   });
@@ -288,8 +287,8 @@ function TasksInner() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas</SelectItem>
-              {prioridades.map((p) => (
-                <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
+              {PRIORIDAD_OPTIONS.map((p) => (
+                <SelectItem key={p} value={p}>{p}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -357,11 +356,10 @@ function TasksInner() {
               {sortData(
                 filtered.map((t) => ({
                   ...t,
-                  prioridad_peso: prioridadMap.get(t.prioridad_id ?? '')?.peso ?? null,
+                  prioridad_peso: t.prioridad ? PRIORIDAD_OPTIONS.indexOf(t.prioridad as any) : null,
                   asignado_nombre: empleadoMap.get(t.asignado_a ?? '')?.nombre ?? null,
                 })),
               ).map((task) => {
-                const prio = prioridadMap.get(task.prioridad_id ?? '');
                 const empleado = empleadoMap.get(task.asignado_a ?? '');
                 return (
                   <TableRow
@@ -376,7 +374,7 @@ function TasksInner() {
                       )}
                     </TableCell>
                     <TableCell><EstadoBadge estado={task.estado} /></TableCell>
-                    <TableCell><PrioridadBadge prioridad={prio} /></TableCell>
+                    <TableCell><PrioridadBadge prioridad={task.prioridad} /></TableCell>
                     <TableCell>
                       <span className="text-sm text-[var(--text)]/70">
                         {empleado ? empleado.nombre : '—'}
@@ -449,15 +447,15 @@ function TasksInner() {
               <div>
                 <FieldLabel>Prioridad</FieldLabel>
                 <Select
-                  value={createForm.prioridad_id}
-                  onValueChange={(v) => setCreateForm((f) => ({ ...f, prioridad_id: v ?? '' }))}
+                  value={createForm.prioridad}
+                  onValueChange={(v) => setCreateForm((f) => ({ ...f, prioridad: v ?? '' }))}
                 >
                   <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
                     <SelectValue placeholder="Sin prioridad" />
                   </SelectTrigger>
                   <SelectContent>
-                    {prioridades.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
+                    {PRIORIDAD_OPTIONS.map((p) => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

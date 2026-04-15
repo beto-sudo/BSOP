@@ -317,6 +317,17 @@
 - created_at (timestamptz)
 - updated_at (timestamptz)
 
+### erp.task_updates
+- id (uuid)
+- task_id (uuid, FK erp.tasks, CASCADE)
+- empresa_id (uuid, FK core.empresas)
+- tipo (text: avance, cambio_estado, cambio_fecha, nota, cambio_responsable)
+- contenido (text)
+- valor_anterior (text)
+- valor_nuevo (text)
+- creado_por (uuid, FK core.usuarios)
+- created_at (timestamptz)
+
 ### erp.task_comentarios
 - id (uuid)
 - empresa_id (uuid)

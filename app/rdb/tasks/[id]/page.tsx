@@ -28,7 +28,7 @@ type ErpTask = {
   descripcion: string | null;
   asignado_a: string | null;
   creado_por: string | null;
-  prioridad_id: string | null;
+  prioridad: string | null;
   estado: 'pendiente' | 'en_progreso' | 'bloqueado' | 'completado' | 'cancelado';
   fecha_vence: string | null;
   porcentaje_avance: number | null;
@@ -38,7 +38,6 @@ type ErpTask = {
   updated_at: string | null;
 };
 
-type Prioridad = { id: string; nombre: string; peso: number; color: string };
 type Empleado = { id: string; nombre: string };
 
 type TaskUpdate = {
@@ -60,6 +59,15 @@ const ESTADO_CONFIG: Record<ErpTask['estado'], { label: string; cls: string }> =
   completado:  { label: 'Completado',  cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
   cancelado:   { label: 'Cancelado',   cls: 'bg-[var(--border)]/60 text-[var(--text)]/40 border-[var(--border)]' },
 };
+
+const PRIORIDAD_CONFIG: Record<string, { label: string; cls: string }> = {
+  Urgente: { label: 'Urgente', cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
+  Alta:    { label: 'Alta',    cls: 'bg-orange-500/15 text-orange-400 border-orange-500/20' },
+  Media:   { label: 'Media',   cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
+  Baja:    { label: 'Baja',    cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
+};
+
+const PRIORIDAD_OPTIONS = ['Urgente', 'Alta', 'Media', 'Baja'] as const;
 
 const TIPO_UPDATE_CONFIG: Record<string, { label: string; cls: string }> = {
   avance:             { label: 'Avance',      cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
@@ -97,7 +105,6 @@ function TaskDetailInner() {
   const router = useRouter();
   const supabase = createSupabaseBrowserClient();
 
-  const [prioridades, setPrioridades] = useState<Prioridad[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [task, setTask] = useState<ErpTask | null>(null);
   const [loading, setLoading] = useState(true);
@@ -124,19 +131,15 @@ function TaskDetailInner() {
   });
 
   const fetchRefData = useCallback(async () => {
-    const [priRes, empRes] = await Promise.all([
-      supabase.schema('shared' as any).from('prioridades').select('*').order('peso'),
-      supabase
-        .schema('erp' as any)
-        .from('empleados')
-        .select('id, persona:persona_id(nombre, apellido_paterno)')
-        .eq('empresa_id', EMPRESA_ID)
-        .eq('activo', true)
-        .is('deleted_at', null),
-    ]);
-    setPrioridades(priRes.data ?? []);
+    const { data: empRes } = await supabase
+      .schema('erp' as any)
+      .from('empleados')
+      .select('id, persona:persona_id(nombre, apellido_paterno)')
+      .eq('empresa_id', EMPRESA_ID)
+      .eq('activo', true)
+      .is('deleted_at', null);
     setEmpleados(
-      (empRes.data ?? []).map((e: any) => ({
+      (empRes ?? []).map((e: any) => ({
         id: e.id,
         nombre: [e.persona?.nombre, e.persona?.apellido_paterno].filter(Boolean).join(' '),
       })),
@@ -310,7 +313,6 @@ function TaskDetailInner() {
     setSendingUpdate(false);
   };
 
-  const prioridadMap = new Map(prioridades.map((p) => [p.id, p]));
   const empleadoMap = new Map(empleados.map((e) => [e.id, e]));
 
   if (loading) {
@@ -353,7 +355,6 @@ function TaskDetailInner() {
     );
   }
 
-  const prioridad = prioridadMap.get(task.prioridad_id ?? '');
   const asignado = empleadoMap.get(task.asignado_a ?? '');
   const estadoCfg = ESTADO_CONFIG[task.estado] ?? { label: task.estado, cls: '' };
 
@@ -559,15 +560,14 @@ function TaskDetailInner() {
             <div>
               <FieldLabel>Prioridad</FieldLabel>
               <Select
-                value={task.prioridad_id ?? ''}
-                onValueChange={(v) => void patchTask({ prioridad_id: v || null })}
+                value={task.prioridad ?? ''}
+                onValueChange={(v) => void patchTask({ prioridad: v || null } as any)}
               >
                 <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
                   <SelectValue placeholder="Sin prioridad">
-                    {prioridad ? (
-                      <span className="inline-flex items-center gap-1.5" style={{ color: prioridad.color }}>
-                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: prioridad.color }} />
-                        {prioridad.nombre}
+                    {task.prioridad ? (
+                      <span className={`inline-flex items-center gap-1.5 ${PRIORIDAD_CONFIG[task.prioridad]?.cls.split(' ').find((c: string) => c.startsWith('text-')) ?? ''}`}>
+                        {task.prioridad}
                       </span>
                     ) : (
                       <span className="text-[var(--text)]/40">Sin prioridad</span>
@@ -576,8 +576,8 @@ function TaskDetailInner() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">Sin prioridad</SelectItem>
-                  {prioridades.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
+                  {PRIORIDAD_OPTIONS.map((p) => (
+                    <SelectItem key={p} value={p}>{p}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

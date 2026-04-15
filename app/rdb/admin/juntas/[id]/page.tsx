@@ -89,8 +89,6 @@ type JuntaTask = {
 
 type Persona = { id: string; nombre: string };
 type Empleado = { id: string; nombre: string };
-type Prioridad = { id: string; nombre: string; color: string; peso: number };
-
 type TaskUpdate = {
   id: string;
   task_id: string;
@@ -117,6 +115,8 @@ const ESTADO_TASK: Record<string, { label: string; cls: string }> = {
   completado:  { label: 'Completado',  cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
   cancelado:   { label: 'Cancelado',   cls: 'bg-[var(--border)]/60 text-[var(--text)]/40 border-[var(--border)]' },
 };
+
+const PRIORIDAD_OPTIONS = ['Urgente', 'Alta', 'Media', 'Baja'] as const;
 
 const TIPO_CONFIG: Record<string, string> = {
   operativa:                    '⚙️ Operativa',
@@ -218,8 +218,6 @@ function JuntaDetailInner() {
   const [tasks, setTasks] = useState<JuntaTask[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
-  const [prioridades, setPrioridades] = useState<Prioridad[]>([]);
-
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -261,7 +259,7 @@ function JuntaDetailInner() {
     titulo: '',
     descripcion: '',
     asignado_a: '',
-    prioridad_id: '',
+    prioridad: '',
     estado: 'pendiente' as JuntaTask['estado'],
     fecha_vence: '',
   });
@@ -363,13 +361,6 @@ function JuntaDetailInner() {
         nombre: [e.persona?.nombre, e.persona?.apellido_paterno].filter(Boolean).join(' '),
       }))
     );
-
-    const { data: priData } = await supabase
-      .schema('shared' as any)
-      .from('prioridades')
-      .select('*')
-      .order('peso');
-    setPrioridades(priData ?? []);
 
     setLoading(false);
   }, [id, supabase, editor]);
@@ -585,7 +576,7 @@ function JuntaDetailInner() {
         titulo: taskForm.titulo.trim(),
         descripcion: taskForm.descripcion.trim() || null,
         asignado_a: taskForm.asignado_a || null,
-        prioridad_id: taskForm.prioridad_id || null,
+        prioridad: taskForm.prioridad || null,
         estado: taskForm.estado,
         fecha_vence: taskForm.fecha_vence || null,
         creado_por: coreUser?.id ?? null,
@@ -603,7 +594,7 @@ function JuntaDetailInner() {
     }
 
     setTasks((prev) => [...prev, newTask]);
-    setTaskForm({ titulo: '', descripcion: '', asignado_a: '', prioridad_id: '', estado: 'pendiente', fecha_vence: '' });
+    setTaskForm({ titulo: '', descripcion: '', asignado_a: '', prioridad: '', estado: 'pendiente', fecha_vence: '' });
     setShowAddTask(false);
   };
 
@@ -1226,15 +1217,15 @@ function JuntaDetailInner() {
               <div>
                 <FieldLabel>Prioridad</FieldLabel>
                 <Select
-                  value={taskForm.prioridad_id}
-                  onValueChange={(v) => setTaskForm((f) => ({ ...f, prioridad_id: v ?? '' }))}
+                  value={taskForm.prioridad}
+                  onValueChange={(v) => setTaskForm((f) => ({ ...f, prioridad: v ?? '' }))}
                 >
                   <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
                     <SelectValue placeholder="Sin prioridad" />
                   </SelectTrigger>
                   <SelectContent>
-                    {prioridades.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
+                    {(['Urgente', 'Alta', 'Media', 'Baja'] as const).map((p) => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

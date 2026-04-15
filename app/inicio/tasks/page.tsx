@@ -43,7 +43,7 @@ type ErpTask = {
   descripcion: string | null;
   asignado_a: string | null;
   creado_por: string | null;
-  prioridad_id: string | null;
+  prioridad: string | null;
   estado: 'pendiente' | 'en_progreso' | 'bloqueado' | 'completado' | 'cancelado';
   fecha_vence: string | null;
   entidad_tipo: string | null;
@@ -52,13 +52,12 @@ type ErpTask = {
   updated_at: string | null;
 };
 
-type Prioridad = { id: string; nombre: string; peso: number; color: string };
 type Empleado = { id: string; nombre: string };
 
 type CreateForm = {
   titulo: string;
   descripcion: string;
-  prioridad_id: string;
+  prioridad: string;
   asignado_a: string;
   estado: ErpTask['estado'];
   fecha_vence: string;
@@ -73,6 +72,15 @@ const ESTADO_CONFIG: Record<ErpTask['estado'], { label: string; cls: string }> =
   completado:  { label: 'Completado',  cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
   cancelado:   { label: 'Cancelado',   cls: 'bg-[var(--border)]/60 text-[var(--text)]/40 border-[var(--border)]' },
 };
+
+const PRIORIDAD_CONFIG: Record<string, { label: string; cls: string }> = {
+  Urgente: { label: 'Urgente', cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
+  Alta:    { label: 'Alta',    cls: 'bg-orange-500/15 text-orange-400 border-orange-500/20' },
+  Media:   { label: 'Media',   cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
+  Baja:    { label: 'Baja',    cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
+};
+
+const PRIORIDAD_OPTIONS = ['Urgente', 'Alta', 'Media', 'Baja'] as const;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -93,19 +101,12 @@ function EstadoBadge({ estado }: { estado: ErpTask['estado'] }) {
   );
 }
 
-function PrioridadBadge({ prioridad }: { prioridad: Prioridad | undefined }) {
+function PrioridadBadge({ prioridad }: { prioridad: string | null }) {
   if (!prioridad) return <span className="text-[var(--text)]/40">—</span>;
+  const cfg = PRIORIDAD_CONFIG[prioridad] ?? { label: prioridad, cls: '' };
   return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-0.5 text-xs font-medium"
-      style={{
-        backgroundColor: `${prioridad.color}25`,
-        color: prioridad.color,
-        borderColor: `${prioridad.color}35`,
-      }}
-    >
-      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: prioridad.color }} />
-      {prioridad.nombre}
+    <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}>
+      {cfg.label}
     </span>
   );
 }
@@ -124,7 +125,6 @@ function TasksInner() {
   const supabase = createSupabaseERPClient();
 
   const [empresaIds, setEmpresaIds] = useState<string[]>([]);
-  const [prioridades, setPrioridades] = useState<Prioridad[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
 
   const [tasks, setTasks] = useState<ErpTask[]>([]);
@@ -141,7 +141,7 @@ function TasksInner() {
   const [createForm, setCreateForm] = useState<CreateForm>({
     titulo: '',
     descripcion: '',
-    prioridad_id: '',
+    prioridad: '',
     asignado_a: '',
     estado: 'pendiente',
     fecha_vence: '',
@@ -152,7 +152,7 @@ function TasksInner() {
   const [editForm, setEditForm] = useState<CreateForm>({
     titulo: '',
     descripcion: '',
-    prioridad_id: '',
+    prioridad: '',
     asignado_a: '',
     estado: 'pendiente',
     fecha_vence: '',
@@ -160,13 +160,8 @@ function TasksInner() {
   const [saving, setSaving] = useState(false);
 
   const fetchRefData = useCallback(async () => {
-    const { data } = await supabase
-      .schema('shared' as any)
-      .from('prioridades')
-      .select('*')
-      .order('peso');
-    setPrioridades(data ?? []);
-  }, [supabase]);
+    // no-op: ref data now uses local constants
+  }, []);
 
   const fetchEmpresasAndEmpleados = useCallback(async (): Promise<string[]> => {
     const {
@@ -258,7 +253,7 @@ function TasksInner() {
   };
 
   const resetForm = () =>
-    setCreateForm({ titulo: '', descripcion: '', prioridad_id: '', asignado_a: '', estado: 'pendiente', fecha_vence: '' });
+    setCreateForm({ titulo: '', descripcion: '', prioridad: '', asignado_a: '', estado: 'pendiente', fecha_vence: '' });
 
   const handleCreate = async () => {
     if (!createForm.titulo.trim() || empresaIds.length === 0) return;
@@ -278,7 +273,7 @@ function TasksInner() {
       empresa_id: empresaIds[0],
       titulo: createForm.titulo.trim(),
       descripcion: createForm.descripcion.trim() || null,
-      prioridad_id: createForm.prioridad_id || null,
+      prioridad: createForm.prioridad || null,
       asignado_a: createForm.asignado_a || null,
       estado: createForm.estado,
       fecha_vence: createForm.fecha_vence || null,
@@ -307,7 +302,7 @@ function TasksInner() {
     setEditForm({
       titulo: task.titulo,
       descripcion: task.descripcion ?? '',
-      prioridad_id: task.prioridad_id ?? '',
+      prioridad: task.prioridad ?? '',
       asignado_a: task.asignado_a ?? '',
       estado: task.estado,
       fecha_vence: task.fecha_vence ? task.fecha_vence.split('T')[0] : '',
@@ -325,7 +320,7 @@ function TasksInner() {
       .update({
         titulo: editForm.titulo.trim(),
         descripcion: editForm.descripcion.trim() || null,
-        prioridad_id: editForm.prioridad_id || null,
+        prioridad: editForm.prioridad || null,
         asignado_a: editForm.asignado_a || null,
         estado: editForm.estado,
         fecha_vence: editForm.fecha_vence || null,
@@ -345,14 +340,13 @@ function TasksInner() {
   };
 
   const empleadoMap = new Map(empleados.map((e) => [e.id, e]));
-  const prioridadMap = new Map(prioridades.map((p) => [p.id, p]));
 
   const { sortKey, sortDir, onSort, sortData } = useSortableTable<ErpTask & { prioridad_peso: number | null; asignado_nombre: string | null }>('created_at', 'desc');
 
   const filtered = tasks.filter((t) => {
     if (search && !t.titulo.toLowerCase().includes(search.toLowerCase())) return false;
     if (filterEstado !== 'all' && t.estado !== filterEstado) return false;
-    if (filterPrioridad !== 'all' && t.prioridad_id !== filterPrioridad) return false;
+    if (filterPrioridad !== 'all' && t.prioridad !== filterPrioridad) return false;
     if (filterAsignado !== 'all' && t.asignado_a !== filterAsignado) return false;
     return true;
   });
@@ -415,8 +409,8 @@ function TasksInner() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas</SelectItem>
-              {prioridades.map((p) => (
-                <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
+              {PRIORIDAD_OPTIONS.map((p) => (
+                <SelectItem key={p} value={p}>{p}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -478,8 +472,7 @@ function TasksInner() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortData(filtered.map((t) => ({ ...t, prioridad_peso: prioridadMap.get(t.prioridad_id ?? '')?.peso ?? null, asignado_nombre: empleadoMap.get(t.asignado_a ?? '')?.nombre ?? null }))).map((task) => {
-                const prio = prioridadMap.get(task.prioridad_id ?? '');
+              {sortData(filtered.map((t) => ({ ...t, prioridad_peso: t.prioridad ? PRIORIDAD_OPTIONS.indexOf(t.prioridad as any) : null, asignado_nombre: empleadoMap.get(t.asignado_a ?? '')?.nombre ?? null }))).map((task) => {
                 const empleado = empleadoMap.get(task.asignado_a ?? '');
                 return (
                   <TableRow
@@ -496,7 +489,7 @@ function TasksInner() {
                       )}
                     </TableCell>
                     <TableCell><EstadoBadge estado={task.estado} /></TableCell>
-                    <TableCell><PrioridadBadge prioridad={prio} /></TableCell>
+                    <TableCell><PrioridadBadge prioridad={task.prioridad} /></TableCell>
                     <TableCell>
                       <span className="text-sm text-[var(--text)]/70">
                         {empleado ? empleado.nombre : '—'}
@@ -568,15 +561,15 @@ function TasksInner() {
               <div>
                 <FieldLabel>Prioridad</FieldLabel>
                 <Select
-                  value={editForm.prioridad_id}
-                  onValueChange={(v) => setEditForm((f) => ({ ...f, prioridad_id: v ?? '' }))}
+                  value={editForm.prioridad}
+                  onValueChange={(v) => setEditForm((f) => ({ ...f, prioridad: v ?? '' }))}
                 >
                   <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
                     <SelectValue placeholder="Sin prioridad" />
                   </SelectTrigger>
                   <SelectContent>
-                    {prioridades.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
+                    {PRIORIDAD_OPTIONS.map((p) => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -681,15 +674,15 @@ function TasksInner() {
               <div>
                 <FieldLabel>Prioridad</FieldLabel>
                 <Select
-                  value={createForm.prioridad_id}
-                  onValueChange={(v) => setCreateForm((f) => ({ ...f, prioridad_id: v ?? '' }))}
+                  value={createForm.prioridad}
+                  onValueChange={(v) => setCreateForm((f) => ({ ...f, prioridad: v ?? '' }))}
                 >
                   <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
                     <SelectValue placeholder="Sin prioridad" />
                   </SelectTrigger>
                   <SelectContent>
-                    {prioridades.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
+                    {PRIORIDAD_OPTIONS.map((p) => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
