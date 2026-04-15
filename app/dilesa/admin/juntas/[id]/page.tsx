@@ -307,7 +307,7 @@ function JuntaDetailInner() {
   const [addingPersona, setAddingPersona] = useState(false);
 
   const [showAddTask, setShowAddTask] = useState(false);
-  const [taskForm, setTaskForm] = useState({ titulo: '', prioridad: '', asignado_a: '', estado: 'en_progreso' as JuntaTask['estado'], fecha_vence: '' });
+  const [taskForm, setTaskForm] = useState({ titulo: '', prioridad: '', asignado_a: '', estado: 'pendiente' as JuntaTask['estado'], fecha_vence: '' });
   const [addingTask, setAddingTask] = useState(false);
   const [completingTask, setCompletingTask] = useState<string | null>(null);
 
@@ -433,7 +433,7 @@ function JuntaDetailInner() {
     setAddingTask(false);
     if (err) { alert(`Error al crear tarea: ${err.message}`); return; }
     setTasks((prev) => [...prev, newTask]);
-    setTaskForm({ titulo: '', prioridad: '', asignado_a: '', estado: 'en_progreso', fecha_vence: '' });
+    setTaskForm({ titulo: '', prioridad: '', asignado_a: '', estado: 'pendiente', fecha_vence: '' });
     setShowAddTask(false);
   };
 
@@ -508,7 +508,13 @@ function JuntaDetailInner() {
             <Button variant="outline" onClick={() => setShowDeleteDialog(true)} disabled={deleting} className="gap-1.5 rounded-xl border-red-500/40 text-red-500 hover:bg-red-500/10 hover:border-red-500/60"><Trash2 className="h-4 w-4" />Eliminar</Button>
           )}
           {estado !== 'completada' && estado !== 'cancelada' && (
-            <Button variant="outline" onClick={() => setShowTerminarDialog(true)} disabled={terminating} className="gap-1.5 rounded-xl border-green-500/40 text-green-500 hover:bg-green-500/10 hover:border-green-500/60"><CheckCircle2 className="h-4 w-4" />Terminar junta</Button>
+            <Button variant="outline" onClick={() => {
+              if (asistencia.length === 0) {
+                alert('Debes agregar al menos 1 participante antes de terminar la junta.');
+                return;
+              }
+              setShowTerminarDialog(true);
+            }} disabled={terminating} className="gap-1.5 rounded-xl border-green-500/40 text-green-500 hover:bg-green-500/10 hover:border-green-500/60"><CheckCircle2 className="h-4 w-4" />Terminar junta</Button>
           )}
           <Button onClick={handleSave} disabled={saving} className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Guardar cambios
@@ -524,6 +530,51 @@ function JuntaDetailInner() {
           <div><FieldLabel>Tipo</FieldLabel><Select value={tipo ?? ''} onValueChange={(v) => setTipo(v || '')}><SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue placeholder="Sin tipo" /></SelectTrigger><SelectContent>{TIPO_OPTIONS.map(t => (<SelectItem key={t.value} value={t.value}>{t.icon} {t.label}</SelectItem>))}</SelectContent></Select></div>
         </div>
         <div><FieldLabel>Lugar</FieldLabel><Input placeholder="Ej: Sala de juntas, Zoom..." value={lugar} onChange={(e) => setLugar(e.target.value)} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
+
+        {/* ── Participantes (inline dentro de info) ─────────────────── */}
+        <div className="pt-2 border-t border-[var(--border)]">
+          <div className="flex items-center justify-between mb-3">
+            <SectionTitle>Participantes</SectionTitle>
+            <Button variant="outline" size="sm" onClick={() => setShowAddPersona(true)} className="gap-1.5 rounded-xl border-[var(--border)] text-[var(--text)] hover:bg-[var(--panel)]"><Plus className="h-3.5 w-3.5" />Agregar</Button>
+          </div>
+          {asistencia.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-6 text-center"><Users className="mb-2 h-8 w-8 text-[var(--text)]/20" /><p className="text-sm text-[var(--text)]/50">No hay participantes registrados</p></div>
+          ) : (
+            <div className="space-y-2">
+              {asistencia.map((a) => {
+                const nombre = a.persona ? [a.persona.nombre, a.persona.apellido_paterno].filter(Boolean).join(' ') : 'Persona desconocida';
+                return (
+                  <div key={a.id} className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2.5">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent)]/15 text-xs font-semibold text-[var(--accent)]">{nombre.charAt(0).toUpperCase()}</div>
+                    <span className="flex-1 text-sm text-[var(--text)]">{nombre}</span>
+                    <button type="button" onClick={() => handleToggleAsistio(a.id, a.asistio)} title={a.asistio === null ? 'Sin confirmar' : a.asistio ? 'Asistió' : 'No asistió'}
+                      className={['inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs transition',
+                        a.asistio === true ? 'border-green-500/50 bg-green-500/15 text-green-400' : a.asistio === false ? 'border-red-500/50 bg-red-500/15 text-red-400' : 'border-[var(--border)] bg-[var(--card)] text-[var(--text)]/40'].join(' ')}>
+                      {a.asistio === true ? <Check className="h-3 w-3" /> : a.asistio === false ? <X className="h-3 w-3" /> : '?'}
+                    </button>
+                    <button type="button" onClick={() => handleRemoveParticipant(a.id)} className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[var(--text)]/30 hover:bg-red-500/10 hover:text-red-400 transition"><Trash2 className="h-3.5 w-3.5" /></button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {showAddPersona && (
+            <div className="mt-3 flex items-center gap-2 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-3">
+              <div className="flex-1">
+                <Combobox
+                  value=""
+                  onChange={(personaId) => void handleAddParticipant(personaId)}
+                  options={availablePersonaOptions}
+                  placeholder="Buscar persona..."
+                  searchPlaceholder="Escriba un nombre..."
+                  emptyText="Sin resultados"
+                />
+              </div>
+              {addingPersona && <Loader2 className="h-4 w-4 animate-spin text-[var(--accent)]" />}
+              <Button variant="outline" size="sm" onClick={() => setShowAddPersona(false)} className="rounded-xl border-[var(--border)] text-[var(--text)]"><X className="h-4 w-4" /></Button>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
@@ -539,50 +590,6 @@ function JuntaDetailInner() {
           <p className="text-[10px] text-[var(--text)]/40 flex-1">Las notas se guardan al presionar &quot;Guardar cambios&quot;.</p>
           {uploadingImage && <span className="text-[10px] text-[var(--accent)] flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />Subiendo imagen...</span>}
         </div>
-      </div>
-
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
-        <div className="flex items-center justify-between mb-3">
-          <SectionTitle>Participantes</SectionTitle>
-          <Button variant="outline" size="sm" onClick={() => setShowAddPersona(true)} className="gap-1.5 rounded-xl border-[var(--border)] text-[var(--text)] hover:bg-[var(--panel)]"><Plus className="h-3.5 w-3.5" />Agregar</Button>
-        </div>
-        {asistencia.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center"><Users className="mb-2 h-8 w-8 text-[var(--text)]/20" /><p className="text-sm text-[var(--text)]/50">No hay participantes registrados</p></div>
-        ) : (
-          <div className="space-y-2">
-            {asistencia.map((a) => {
-              const nombre = a.persona ? [a.persona.nombre, a.persona.apellido_paterno].filter(Boolean).join(' ') : 'Persona desconocida';
-              return (
-                <div key={a.id} className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2.5">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent)]/15 text-xs font-semibold text-[var(--accent)]">{nombre.charAt(0).toUpperCase()}</div>
-                  <span className="flex-1 text-sm text-[var(--text)]">{nombre}</span>
-                  <button type="button" onClick={() => handleToggleAsistio(a.id, a.asistio)} title={a.asistio === null ? 'Sin confirmar' : a.asistio ? 'Asistió' : 'No asistió'}
-                    className={['inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs transition',
-                      a.asistio === true ? 'border-green-500/50 bg-green-500/15 text-green-400' : a.asistio === false ? 'border-red-500/50 bg-red-500/15 text-red-400' : 'border-[var(--border)] bg-[var(--card)] text-[var(--text)]/40'].join(' ')}>
-                    {a.asistio === true ? <Check className="h-3 w-3" /> : a.asistio === false ? <X className="h-3 w-3" /> : '?'}
-                  </button>
-                  <button type="button" onClick={() => handleRemoveParticipant(a.id)} className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[var(--text)]/30 hover:bg-red-500/10 hover:text-red-400 transition"><Trash2 className="h-3.5 w-3.5" /></button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-        {showAddPersona && (
-          <div className="mt-3 flex items-center gap-2 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-3">
-            <div className="flex-1">
-              <Combobox
-                value=""
-                onChange={(personaId) => void handleAddParticipant(personaId)}
-                options={availablePersonaOptions}
-                placeholder="Buscar persona..."
-                searchPlaceholder="Escriba un nombre..."
-                emptyText="Sin resultados"
-              />
-            </div>
-            {addingPersona && <Loader2 className="h-4 w-4 animate-spin text-[var(--accent)]" />}
-            <Button variant="outline" size="sm" onClick={() => setShowAddPersona(false)} className="rounded-xl border-[var(--border)] text-[var(--text)]"><X className="h-4 w-4" /></Button>
-          </div>
-        )}
       </div>
 
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
@@ -631,7 +638,7 @@ function JuntaDetailInner() {
         )}
       </div>
 
-      <Sheet open={showAddTask} onOpenChange={(open) => { if (!open) { setShowAddTask(false); setTaskForm({ titulo: '', prioridad: '', asignado_a: '', estado: 'en_progreso', fecha_vence: '' }); } }}>
+      <Sheet open={showAddTask} onOpenChange={(open) => { if (!open) { setShowAddTask(false); setTaskForm({ titulo: '', prioridad: '', asignado_a: '', estado: 'pendiente', fecha_vence: '' }); } }}>
         <SheetContent side="right" className="w-full sm:max-w-lg border-[var(--border)] bg-[var(--card)] text-[var(--text)] overflow-y-auto">
           <SheetHeader className="pb-2">
             <SheetTitle className="text-[var(--text)] text-lg">Nueva tarea para esta junta</SheetTitle>
@@ -705,7 +712,7 @@ function JuntaDetailInner() {
           <div className="flex items-center gap-2 pt-4 border-t border-[var(--border)]">
             <Button
               variant="outline"
-              onClick={() => { setShowAddTask(false); setTaskForm({ titulo: '', prioridad: '', asignado_a: '', estado: 'en_progreso', fecha_vence: '' }); }}
+              onClick={() => { setShowAddTask(false); setTaskForm({ titulo: '', prioridad: '', asignado_a: '', estado: 'pendiente', fecha_vence: '' }); }}
               className="flex-1 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
             >
               Cancelar

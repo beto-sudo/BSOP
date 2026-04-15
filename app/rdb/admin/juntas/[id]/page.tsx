@@ -549,7 +549,13 @@ function JuntaDetailInner() {
           {estado !== 'completada' && estado !== 'cancelada' && (
             <Button
               variant="outline"
-              onClick={() => setShowTerminarDialog(true)}
+              onClick={() => {
+              if (asistencia.length === 0) {
+                alert('Debes agregar al menos 1 participante antes de terminar la junta.');
+                return;
+              }
+              setShowTerminarDialog(true);
+            }}
               disabled={terminating}
               className="gap-1.5 rounded-xl border-green-500/40 text-green-500 hover:bg-green-500/10 hover:border-green-500/60"
             >
