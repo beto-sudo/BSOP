@@ -188,6 +188,7 @@ function JuntaDetailInner() {
   const [showAddTask, setShowAddTask] = useState(false);
   const [taskForm, setTaskForm] = useState({ titulo: '', descripcion: '', asignado_a: '', prioridad_id: '', estado: 'pendiente' as JuntaTask['estado'], fecha_vence: '' });
   const [addingTask, setAddingTask] = useState(false);
+  const [completingTask, setCompletingTask] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
     const { data: juntaData, error: jErr } = await supabase.schema('erp' as any).from('juntas').select('*').eq('id', id).single();
@@ -405,9 +406,27 @@ function JuntaDetailInner() {
               const asignado = empleadoMap.get(task.asignado_a ?? '');
               return (
                 <div key={task.id} className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2.5">
-                  <TicketCheck className="h-4 w-4 shrink-0 text-[var(--text)]/40" />
+                  {task.estado !== 'completado' && task.estado !== 'cancelado' ? (
+                    <button
+                      type="button"
+                      title="Completar tarea"
+                      disabled={completingTask === task.id}
+                      onClick={async () => {
+                        setCompletingTask(task.id);
+                        const { error: err } = await supabase.schema('erp' as any).from('tasks').update({ estado: 'completado', porcentaje_avance: 100 }).eq('id', task.id);
+                        setCompletingTask(null);
+                        if (err) { alert(`Error: ${err.message}`); return; }
+                        setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, estado: 'completado' } : t));
+                      }}
+                      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-green-500/30 bg-green-500/10 text-green-400 transition hover:bg-green-500/20 disabled:opacity-50"
+                    >
+                      {completingTask === task.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                    </button>
+                  ) : (
+                    <TicketCheck className="h-4 w-4 shrink-0 text-green-400/60" />
+                  )}
                   <div className="flex-1 min-w-0">
-                    <span className="text-sm font-medium text-[var(--text)] line-clamp-1">{task.titulo}</span>
+                    <span className={`text-sm font-medium line-clamp-1 ${task.estado === 'completado' ? 'text-[var(--text)]/40 line-through' : 'text-[var(--text)]'}`}>{task.titulo}</span>
                     {asignado && <span className="block text-xs text-[var(--text)]/50">{asignado.nombre}</span>}
                   </div>
                   <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}>{cfg.label}</span>

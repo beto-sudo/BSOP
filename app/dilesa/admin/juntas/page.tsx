@@ -1,7 +1,7 @@
 'use client';
 
 import { RequireAccess } from '@/components/require-access';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import {
@@ -103,6 +103,7 @@ function JuntasInner() {
 
   const [search, setSearch] = useState('');
   const [filterEstado, setFilterEstado] = useState('all');
+  const [filterMonth, setFilterMonth] = useState('all');
 
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -156,9 +157,23 @@ function JuntasInner() {
     if (newJunta) router.push(`/dilesa/admin/juntas/${newJunta.id}`);
   };
 
+  const monthOptions = useMemo(() => {
+    const months = new Set<string>();
+    juntas.forEach((j) => {
+      const d = new Date(j.fecha_hora);
+      months.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    });
+    return [...months].sort().reverse();
+  }, [juntas]);
+
   const filtered = juntas.filter((j) => {
     if (search && !j.titulo.toLowerCase().includes(search.toLowerCase())) return false;
     if (filterEstado !== 'all' && j.estado !== filterEstado) return false;
+    if (filterMonth !== 'all') {
+      const d = new Date(j.fecha_hora);
+      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (ym !== filterMonth) return false;
+    }
     return true;
   });
 
@@ -191,6 +206,17 @@ function JuntasInner() {
             <SelectContent>
               <SelectItem value="all">Todos los estados</SelectItem>
               {Object.entries(ESTADO_CONFIG).map(([k, v]) => (<SelectItem key={k} value={k}>{v.label}</SelectItem>))}
+            </SelectContent>
+          </Select>
+          <Select value={filterMonth} onValueChange={(v) => setFilterMonth(v ?? 'all')}>
+            <SelectTrigger className="w-40 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue placeholder="Mes" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los meses</SelectItem>
+              {monthOptions.map((m) => {
+                const [y, mo] = m.split('-');
+                const label = new Date(Number(y), Number(mo) - 1).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+                return <SelectItem key={m} value={m}>{label.charAt(0).toUpperCase() + label.slice(1)}</SelectItem>;
+              })}
             </SelectContent>
           </Select>
         </div>

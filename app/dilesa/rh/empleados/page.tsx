@@ -59,6 +59,7 @@ function EmpleadosInner() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<'activos' | 'inactivos'>('activos');
   const [search, setSearch] = useState('');
+  const [filterDepto, setFilterDepto] = useState('all');
 
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -115,6 +116,7 @@ function EmpleadosInner() {
     if (tab === 'activos' && !isActive) return false;
     if (tab === 'inactivos' && isActive) return false;
     if (search) { const name = fullName(e).toLowerCase(); if (!name.includes(search.toLowerCase())) return false; }
+    if (filterDepto !== 'all' && e.departamento?.nombre !== filterDepto) return false;
     return true;
   });
 
@@ -143,6 +145,13 @@ function EmpleadosInner() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text)]/40" />
             <Input placeholder="Buscar por nombre..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" />
           </div>
+          <Select value={filterDepto} onValueChange={(v) => setFilterDepto(v ?? 'all')}>
+            <SelectTrigger className="w-44 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue placeholder="Departamento" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los deptos</SelectItem>
+              {departamentos.map((d) => <SelectItem key={d.id} value={d.nombre}>{d.nombre}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -157,9 +166,11 @@ function EmpleadosInner() {
           <Table>
             <TableHeader><TableRow className="border-[var(--border)] hover:bg-transparent">
               <SortableHead sortKey="nombre" label="Nombre" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+              <SortableHead sortKey="numero_empleado" label="No. Empleado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
               <SortableHead sortKey="departamento_nombre" label="Departamento" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-36" />
               <SortableHead sortKey="puesto_nombre" label="Puesto" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-36" />
               <SortableHead sortKey="fecha_ingreso" label="Ingreso" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
+              <TableHead className="w-16">Estado</TableHead>
               <TableHead className="w-10" />
             </TableRow></TableHeader>
             <TableBody>
@@ -171,9 +182,15 @@ function EmpleadosInner() {
                       <div><div className="font-medium text-[var(--text)]">{fullName(emp)}</div>{emp.persona?.email && <div className="text-xs text-[var(--text)]/50">{emp.persona.email}</div>}</div>
                     </div>
                   </TableCell>
+                  <TableCell><span className="text-sm font-mono text-[var(--text)]/60">{emp.numero_empleado ?? '—'}</span></TableCell>
                   <TableCell><span className="text-sm text-[var(--text)]/70">{emp.departamento?.nombre ?? '—'}</span></TableCell>
                   <TableCell><span className="text-sm text-[var(--text)]/70">{emp.puesto?.nombre ?? '—'}</span></TableCell>
                   <TableCell><span className="text-sm text-[var(--text)]/70">{formatDate(emp.fecha_ingreso)}</span></TableCell>
+                  <TableCell>
+                    <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${emp.activo ? 'border-green-500/20 bg-green-500/10 text-green-400' : 'border-[var(--border)] bg-[var(--panel)] text-[var(--text)]/40'}`}>
+                      {emp.activo ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </TableCell>
                   <TableCell><ChevronRight className="h-4 w-4 text-[var(--text)]/30" /></TableCell>
                 </TableRow>
               ))}

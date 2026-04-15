@@ -42,6 +42,7 @@ function PuestosInner() {
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [filterDepto, setFilterDepto] = useState('all');
   const [showDialog, setShowDialog] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -103,29 +104,48 @@ function PuestosInner() {
         </div>
       </div>
 
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 mb-6">
+        <div className="flex flex-wrap gap-3">
+          <Select value={filterDepto} onValueChange={(v) => setFilterDepto(v ?? 'all')}>
+            <SelectTrigger className="w-44 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue placeholder="Departamento" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los deptos</SelectItem>
+              {departamentos.map((d) => <SelectItem key={d.id} value={d.nombre}>{d.nombre}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)]">
         {error ? (<div className="flex items-center justify-center p-16 text-red-400">Error: {error}</div>
         ) : loading ? (<div className="divide-y divide-[var(--border)]">{Array.from({ length: 5 }).map((_, i) => (<div key={i} className="flex gap-4 p-4"><Skeleton className="h-4 w-48" /><Skeleton className="h-4 w-32 ml-auto" /></div>))}</div>
-        ) : puestos.length === 0 ? (<div className="flex flex-col items-center justify-center p-16"><Briefcase className="mb-3 h-10 w-10 text-[var(--text)]/20" /><p className="text-sm text-[var(--text)]/55">No hay puestos registrados</p></div>
+        ) : puestos.filter((p) => filterDepto === 'all' || p.departamento?.nombre === filterDepto).length === 0 ? (<div className="flex flex-col items-center justify-center p-16"><Briefcase className="mb-3 h-10 w-10 text-[var(--text)]/20" /><p className="text-sm text-[var(--text)]/55">No hay puestos registrados</p></div>
         ) : (
           <Table>
             <TableHeader><TableRow className="border-[var(--border)] hover:bg-transparent">
               <SortableHead sortKey="nombre" label="Nombre" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              <SortableHead sortKey="nivel" label="Nivel" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-32" />
+              <SortableHead sortKey="nivel" label="Nivel" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
               <SortableHead sortKey="departamento_nombre" label="Departamento" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-36" />
+              <SortableHead sortKey="sueldo_min" label="Rango salarial" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-40" />
               <SortableHead sortKey="esquema_pago" label="Esquema pago" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-32" />
               <TableHead className="w-10" />
             </TableRow></TableHeader>
             <TableBody>
-              {sortData(puestos.map((p) => ({ ...p, departamento_nombre: p.departamento?.nombre ?? null }))).map((p) => (
+              {sortData(puestos.filter((p) => filterDepto === 'all' || p.departamento?.nombre === filterDepto).map((p) => ({ ...p, departamento_nombre: p.departamento?.nombre ?? null }))).map((p) => {
+                const salaryRange = p.sueldo_min != null || p.sueldo_max != null
+                  ? `$${(p.sueldo_min ?? 0).toLocaleString('es-MX')} – $${(p.sueldo_max ?? 0).toLocaleString('es-MX')}`
+                  : '—';
+                return (
                 <TableRow key={p.id} className="border-[var(--border)]">
                   <TableCell><span className="font-medium text-[var(--text)]">{p.nombre}</span>{!p.activo && <span className="ml-2 text-xs text-[var(--text)]/40">(inactivo)</span>}</TableCell>
                   <TableCell><span className="text-sm text-[var(--text)]/70">{p.nivel ?? '—'}</span></TableCell>
                   <TableCell><span className="text-sm text-[var(--text)]/70">{p.departamento?.nombre ?? '—'}</span></TableCell>
+                  <TableCell><span className="text-xs font-mono text-[var(--text)]/60">{salaryRange}</span></TableCell>
                   <TableCell><span className="text-sm text-[var(--text)]/70">{p.esquema_pago ?? '—'}</span></TableCell>
                   <TableCell><Button variant="outline" size="sm" onClick={() => openEdit(p)} className="rounded-xl h-7 w-7 p-0 border-[var(--border)]"><Pencil className="h-3.5 w-3.5" /></Button></TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         )}

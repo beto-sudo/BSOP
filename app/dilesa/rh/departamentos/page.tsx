@@ -1,7 +1,7 @@
 'use client';
 
 import { RequireAccess } from '@/components/require-access';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -26,6 +26,8 @@ type Departamento = {
   padre_id: string | null; activo: boolean; padre: { nombre: string } | null;
 };
 
+type EmpleadoCount = { departamento_id: string };
+
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50 mb-1.5">{children}</div>;
 }
@@ -35,6 +37,7 @@ const EMPTY_FORM = { nombre: '', codigo: '', padre_id: '' };
 function DepartamentosInner() {
   const supabase = createSupabaseERPClient();
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
+  const [empleadoCounts, setEmpleadoCounts] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showDialog, setShowDialog] = useState(false);
@@ -43,11 +46,22 @@ function DepartamentosInner() {
   const [form, setForm] = useState(EMPTY_FORM);
 
   const fetchAll = useCallback(async () => {
-    const { data, error: err } = await supabase.schema('erp' as any).from('departamentos')
-      .select('id, empresa_id, nombre, codigo, padre_id, activo, padre:padre_id(nombre)')
-      .eq('empresa_id', EMPRESA_ID).order('nombre');
-    if (err) { setError(err.message); return; }
-    setDepartamentos((data ?? []).map((d: any) => ({ ...d, padre: Array.isArray(d.padre) ? (d.padre[0] ?? null) : d.padre })) as Departamento[]);
+    const [deptRes, empRes] = await Promise.all([
+      supabase.schema('erp' as any).from('departamentos')
+        .select('id, empresa_id, nombre, codigo, padre_id, activo, padre:padre_id(nombre)')
+        .eq('empresa_id', EMPRESA_ID).order('nombre'),
+      supabase.schema('erp' as any).from('empleados')
+        .select('departamento_id')
+        .eq('empresa_id', EMPRESA_ID).eq('activo', true).is('deleted_at', null),
+    ]);
+    if (deptRes.error) { setError(deptRes.error.message); return; }
+    setDepartamentos((deptRes.data ?? []).map((d: any) => ({ ...d, padre: Array.isArray(d.padre) ? (d.padre[0] ?? null) : d.padre })) as Departamento[]);
+
+    const counts = new Map<string, number>();
+    (empRes.data ?? []).forEach((e: EmpleadoCount) => {
+      if (e.departamento_id) counts.set(e.departamento_id, (counts.get(e.departamento_id) ?? 0) + 1);
+    });
+    setEmpleadoCounts(counts);
   }, [supabase]);
 
   useEffect(() => {
@@ -102,15 +116,17 @@ function DepartamentosInner() {
               <SortableHead sortKey="nombre" label="Nombre" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
               <SortableHead sortKey="codigo" label="Código" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-24" />
               <SortableHead sortKey="reporta_a_nombre" label="Reporta a" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-36" />
+              <SortableHead sortKey="emp_count" label="Empleados" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-24" />
               <SortableHead sortKey="activo" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-20" />
               <TableHead className="w-20" />
             </TableRow></TableHeader>
             <TableBody>
-              {sortData(departamentos.map((d) => ({ ...d, reporta_a_nombre: d.padre?.nombre ?? null }))).map((d) => (
+              {sortData(departamentos.map((d) => ({ ...d, reporta_a_nombre: d.padre?.nombre ?? null, emp_count: empleadoCounts.get(d.id) ?? 0 }))).map((d) => (
                 <TableRow key={d.id} className="border-[var(--border)]">
                   <TableCell><span className="font-medium text-[var(--text)]">{d.padre_id ? '  └ ' : ''}{d.nombre}</span></TableCell>
                   <TableCell><span className="text-sm font-mono text-[var(--text)]/60">{d.codigo ?? '—'}</span></TableCell>
                   <TableCell><span className="text-sm text-[var(--text)]/70">{d.padre?.nombre ?? '—'}</span></TableCell>
+                  <TableCell><span className="text-sm text-[var(--text)]/60">{empleadoCounts.get(d.id) ?? 0}</span></TableCell>
                   <TableCell>
                     <button type="button" onClick={() => handleToggleActivo(d)} className={['inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium transition', d.activo ? 'border-green-500/20 bg-green-500/10 text-green-400' : 'border-[var(--border)] bg-[var(--panel)] text-[var(--text)]/40'].join(' ')}>{d.activo ? 'Activo' : 'Inactivo'}</button>
                   </TableCell>
