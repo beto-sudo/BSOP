@@ -493,7 +493,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <div
                     className={[
                       'overflow-hidden transition-all duration-200 ease-in-out',
-                      expanded ? 'max-h-[36rem] opacity-100' : 'max-h-0 opacity-0',
+                      expanded ? 'max-h-[60rem] opacity-100' : 'max-h-0 opacity-0',
                     ].join(' ')}
                   >
                     <div className="ml-7 mt-1 space-y-1 border-l border-[var(--border)] pl-4 pb-1">
