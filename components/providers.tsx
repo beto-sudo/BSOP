@@ -8,6 +8,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -59,21 +60,25 @@ function PermissionsProvider({ children }: { children: ReactNode }) {
   const [impersonating, setImpersonating] = useState<ImpersonateTarget | null>(null);
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
+  const impersonatingRef = useRef(impersonating);
+  impersonatingRef.current = impersonating;
+  const realPermissionsRef = useRef(realPermissions);
+  realPermissionsRef.current = realPermissions;
+
   const loadReal = useCallback(async () => {
     try {
       const perms = await fetchUserPermissions(supabase);
       setRealPermissions(perms);
       // Update visible permissions only if not impersonating
-      if (!impersonating) {
+      if (!impersonatingRef.current) {
         setPermissions(perms);
       }
       return perms;
     } catch {
       // On transient errors, keep previous permissions instead of resetting
-      // This prevents flashing "Acceso restringido" on network hiccups
-      return realPermissions;
+      return realPermissionsRef.current;
     }
-  }, [supabase, impersonating, realPermissions]);
+  }, [supabase]);
 
   // Load initial permissions
   useEffect(() => {
