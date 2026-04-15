@@ -53,13 +53,6 @@ type ErpTask = {
   entidad_id: string | null;
   created_at: string;
   updated_at: string | null;
-  fecha_compromiso: string | null;
-  tipo: string | null;
-  motivo_bloqueo: string | null;
-  siguiente_accion: string | null;
-  iniciativa: string | null;
-  departamento_nombre: string | null;
-  prioridad: string | null;
 };
 
 type Prioridad = { id: string; nombre: string; peso: number; color: string };
@@ -153,7 +146,6 @@ function TasksInner() {
   const [filterEstado, setFilterEstado] = useState('all');
   const [filterPrioridad, setFilterPrioridad] = useState('all');
   const [filterAsignado, setFilterAsignado] = useState('all');
-  const [filterDepartamento, setFilterDepartamento] = useState('all');
 
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -333,15 +325,22 @@ function TasksInner() {
     setShowEdit(true);
   };
 
-  const canModifyTask = useCallback((_task: ErpTask | null) => {
-    if (!_task) return false;
-    return isAdmin || isDireccion;
-  }, [isAdmin, isDireccion]);
+  const canModifyTask = useCallback((task: ErpTask | null) => {
+    if (!task) return false;
+    if (isAdmin || isDireccion) return true;
+    if (task.asignado_por === currentEmpleadoId) return true;
+    return false;
+  }, [isAdmin, isDireccion, currentEmpleadoId]);
 
-  const canCompleteTask = useCallback((_task: ErpTask | null) => {
-    if (!_task) return false;
-    return isAdmin || isDireccion;
-  }, [isAdmin, isDireccion]);
+  const canCompleteTask = useCallback((task: ErpTask | null) => {
+    if (!task) return false;
+    if (isAdmin || isDireccion) return true;
+    // Creator can always complete their own tasks
+    if (task.asignado_por === currentEmpleadoId) return true;
+    // Assignee can complete if they are also the creator (self-assigned)
+    if (!task.asignado_por && task.asignado_a === currentEmpleadoId) return true;
+    return false;
+  }, [isAdmin, isDireccion, currentEmpleadoId]);
 
   const handleUpdate = async () => {
     if (!selectedTask || !editForm.titulo.trim()) return;
@@ -397,14 +396,6 @@ function TasksInner() {
   const empleadoMap = useMemo(() => new Map(empleados.map((e) => [e.id, e])), [empleados]);
   const prioridadMap = useMemo(() => new Map(prioridades.map((p) => [p.id, p])), [prioridades]);
 
-  const departamentos = useMemo(() => {
-    const set = new Set<string>();
-    for (const t of tasks) {
-      if (t.departamento_nombre) set.add(t.departamento_nombre);
-    }
-    return Array.from(set).sort();
-  }, [tasks]);
-
   const { sortKey, sortDir, onSort, sortData } = useSortableTable<ErpTask & { prioridad_peso: number | null; asignado_nombre: string | null }>('created_at', 'desc');
 
   // Visibility filter: only own tasks unless direccion/admin
@@ -422,7 +413,6 @@ function TasksInner() {
     if (filterEstado !== 'all' && t.estado !== filterEstado) return false;
     if (filterPrioridad !== 'all' && t.prioridad_id !== filterPrioridad) return false;
     if (filterAsignado !== 'all' && t.asignado_a !== filterAsignado) return false;
-    if (filterDepartamento !== 'all' && t.departamento_nombre !== filterDepartamento) return false;
     return true;
   });
 
@@ -437,12 +427,10 @@ function TasksInner() {
           <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loading} className="rounded-xl border-[var(--border)] bg-[var(--card)] text-[var(--text)] hover:bg-[var(--panel)]">
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
-          {(isAdmin || isDireccion) && (
-            <Button size="sm" onClick={() => setShowCreate(true)} className="rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 gap-1.5">
-              <Plus className="h-4 w-4" />
-              Nueva Tarea
-            </Button>
-          )}
+          <Button size="sm" onClick={() => setShowCreate(true)} className="rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 gap-1.5">
+            <Plus className="h-4 w-4" />
+            Nueva Tarea
+          </Button>
         </div>
       </div>
 
@@ -473,13 +461,6 @@ function TasksInner() {
               {empleados.map((e) => (<SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>))}
             </SelectContent>
           </Select>
-          <Select value={filterDepartamento} onValueChange={(v) => setFilterDepartamento(v ?? 'all')}>
-            <SelectTrigger className="w-44 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue placeholder="Departamento" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los deptos.</SelectItem>
-              {departamentos.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
-            </SelectContent>
-          </Select>
         </div>
       </div>
 
@@ -500,7 +481,7 @@ function TasksInner() {
             <p className="text-sm text-[var(--text)]/55">
               {visibleTasks.length === 0 ? 'No hay tareas creadas aún' : 'No hay tareas que coincidan con los filtros'}
             </p>
-            {visibleTasks.length === 0 && (isAdmin || isDireccion) && (
+            {visibleTasks.length === 0 && (
               <Button size="sm" onClick={() => setShowCreate(true)} className="mt-4 gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90">
                 <Plus className="h-4 w-4" />Crear primera tarea
               </Button>
@@ -511,31 +492,28 @@ function TasksInner() {
             <TableHeader>
               <TableRow className="border-[var(--border)] hover:bg-transparent">
                 <SortableHead sortKey="titulo" label="Título" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-                <SortableHead sortKey="departamento_nombre" label="Depto" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-36" />
                 <SortableHead sortKey="estado" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
                 <SortableHead sortKey="porcentaje_avance" label="Avance" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
-                <SortableHead sortKey="asignado_nombre" label="Responsable" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-40" />
-                <SortableHead sortKey="created_at" label="Fecha Tarea" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
-                <SortableHead sortKey="fecha_compromiso" label="Compromiso" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
-                <SortableHead sortKey="iniciativa" label="Iniciativa" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-36" />
+                <SortableHead sortKey="prioridad_peso" label="Prioridad" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
+                <SortableHead sortKey="asignado_nombre" label="Asignado a" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-40" />
+                <SortableHead sortKey="fecha_vence" label="Vence" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortData(filtered.map((t) => ({ ...t, prioridad_peso: prioridadMap.get(t.prioridad_id ?? '')?.peso ?? null, asignado_nombre: empleadoMap.get(t.asignado_a ?? '')?.nombre ?? null }))).map((task) => {
+                const prio = prioridadMap.get(task.prioridad_id ?? '');
                 const empleado = empleadoMap.get(task.asignado_a ?? '');
                 return (
                   <TableRow key={task.id} className="cursor-pointer border-[var(--border)] transition-colors hover:bg-[var(--panel)]" onClick={() => openEdit(task)}>
                     <TableCell>
                       <span className="line-clamp-1 font-medium text-[var(--text)]">{task.titulo}</span>
-                      {task.descripcion && (<span className="mt-0.5 block text-xs text-[var(--text)]/40 line-clamp-1">{task.descripcion}</span>)}
+                      {task.entidad_tipo && (<span className="mt-0.5 block text-xs text-[var(--text)]/40">{task.entidad_tipo}</span>)}
                     </TableCell>
-                    <TableCell><span className="text-sm text-[var(--text)]/70 line-clamp-1">{task.departamento_nombre ?? '—'}</span></TableCell>
                     <TableCell><EstadoBadge estado={task.estado} /></TableCell>
                     <TableCell><ProgressBar value={task.porcentaje_avance ?? 0} /></TableCell>
+                    <TableCell><PrioridadBadge prioridad={prio} /></TableCell>
                     <TableCell><span className="text-sm text-[var(--text)]/70">{empleado ? empleado.nombre : '—'}</span></TableCell>
-                    <TableCell><span className="text-sm text-[var(--text)]/70">{formatDate(task.created_at)}</span></TableCell>
-                    <TableCell><span className="text-sm text-[var(--text)]/70">{formatDate(task.fecha_compromiso)}</span></TableCell>
-                    <TableCell><span className="text-sm text-[var(--text)]/70 line-clamp-1">{task.iniciativa ?? '—'}</span></TableCell>
+                    <TableCell><span className="text-sm text-[var(--text)]/70">{formatDate(task.fecha_vence)}</span></TableCell>
                   </TableRow>
                 );
               })}
@@ -551,10 +529,10 @@ function TasksInner() {
       {/* ── Edit Dialog ──────────────────────────────────────────────────── */}
       <Dialog open={showEdit} onOpenChange={(open) => { setShowEdit(open); if (!open) setSelectedTask(null); }}>
         <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto rounded-3xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
-          <DialogHeader><DialogTitle className="text-[var(--text)]">{canModifyTask(selectedTask) ? 'Editar Tarea' : 'Detalle de Tarea'}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="text-[var(--text)]">Editar Tarea</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
-            <div><FieldLabel>Título {canModifyTask(selectedTask) && '*'}</FieldLabel><Input placeholder="Descripción breve de la tarea..." value={editForm.titulo} onChange={(e) => setEditForm((f) => ({ ...f, titulo: e.target.value }))} disabled={!canModifyTask(selectedTask)} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)] disabled:opacity-70" /></div>
-            <div><FieldLabel>Descripción</FieldLabel><Textarea placeholder="Detalla la tarea..." value={editForm.descripcion} onChange={(e) => setEditForm((f) => ({ ...f, descripcion: e.target.value }))} rows={3} disabled={!canModifyTask(selectedTask)} className="resize-none rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)] disabled:opacity-70" /></div>
+            <div><FieldLabel>Título *</FieldLabel><Input placeholder="Descripción breve de la tarea..." value={editForm.titulo} onChange={(e) => setEditForm((f) => ({ ...f, titulo: e.target.value }))} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
+            <div><FieldLabel>Descripción</FieldLabel><Textarea placeholder="Detalla la tarea..." value={editForm.descripcion} onChange={(e) => setEditForm((f) => ({ ...f, descripcion: e.target.value }))} rows={3} className="resize-none rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <FieldLabel>Estado</FieldLabel>
@@ -567,14 +545,14 @@ function TasksInner() {
                   <SelectContent>{Object.entries(ESTADO_CONFIG).map(([k, v]) => (<SelectItem key={k} value={k}>{v.label}</SelectItem>))}</SelectContent>
                 </Select>
                 {!canCompleteTask(selectedTask) && (
-                  <p className="mt-1 text-[10px] text-[var(--text)]/40">Solo dirección puede cambiar el estado</p>
+                  <p className="mt-1 text-[10px] text-[var(--text)]/40">Solo dirección o el creador pueden cambiar el estado</p>
                 )}
               </div>
-              <div><FieldLabel>Prioridad</FieldLabel><Select value={editForm.prioridad_id} onValueChange={(v) => setEditForm((f) => ({ ...f, prioridad_id: v ?? '' }))} disabled={!canModifyTask(selectedTask)}><SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue placeholder="Sin prioridad" /></SelectTrigger><SelectContent>{prioridades.map((p) => (<SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>))}</SelectContent></Select></div>
+              <div><FieldLabel>Prioridad</FieldLabel><Select value={editForm.prioridad_id} onValueChange={(v) => setEditForm((f) => ({ ...f, prioridad_id: v ?? '' }))}><SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue placeholder="Sin prioridad" /></SelectTrigger><SelectContent>{prioridades.map((p) => (<SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>))}</SelectContent></Select></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div><FieldLabel>Asignado a</FieldLabel><Select value={editForm.asignado_a} onValueChange={(v) => setEditForm((f) => ({ ...f, asignado_a: v ?? '' }))} disabled={!canModifyTask(selectedTask)}><SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue placeholder="Sin asignar" /></SelectTrigger><SelectContent>{empleados.map((e) => (<SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>))}</SelectContent></Select></div>
-              <div><FieldLabel>Fecha límite</FieldLabel><Input type="date" value={editForm.fecha_vence} onChange={(e) => setEditForm((f) => ({ ...f, fecha_vence: e.target.value }))} disabled={!canModifyTask(selectedTask)} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)] disabled:opacity-70" /></div>
+              <div><FieldLabel>Asignado a</FieldLabel><Select value={editForm.asignado_a} onValueChange={(v) => setEditForm((f) => ({ ...f, asignado_a: v ?? '' }))}><SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue placeholder="Sin asignar" /></SelectTrigger><SelectContent>{empleados.map((e) => (<SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>))}</SelectContent></Select></div>
+              <div><FieldLabel>Fecha límite</FieldLabel><Input type="date" value={editForm.fecha_vence} onChange={(e) => setEditForm((f) => ({ ...f, fecha_vence: e.target.value }))} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" /></div>
             </div>
             <div>
               <FieldLabel>Avance ({editForm.porcentaje_avance}%)</FieldLabel>
@@ -585,25 +563,16 @@ function TasksInner() {
                 step={5}
                 value={editForm.porcentaje_avance}
                 onChange={(e) => setEditForm((f) => ({ ...f, porcentaje_avance: Number(e.target.value) }))}
-                disabled={!canModifyTask(selectedTask)}
-                className="w-full accent-[var(--accent)] disabled:opacity-50"
+                className="w-full accent-[var(--accent)]"
               />
             </div>
-            {selectedTask && (
-              <div className="space-y-1 text-xs text-[var(--text)]/40">
-                {selectedTask.prioridad && <div>Prioridad: {selectedTask.prioridad}</div>}
-                {selectedTask.departamento_nombre && <div>Departamento: {selectedTask.departamento_nombre}</div>}
-                {selectedTask.iniciativa && <div>Iniciativa: {selectedTask.iniciativa}</div>}
-                {selectedTask.motivo_bloqueo && <div>Motivo bloqueo: {selectedTask.motivo_bloqueo}</div>}
-                {selectedTask.siguiente_accion && <div>Siguiente acción: {selectedTask.siguiente_accion}</div>}
-                {selectedTask.asignado_por && <div>Asignada por: {empleadoMap.get(selectedTask.asignado_por)?.nombre ?? 'Desconocido'}</div>}
-                {selectedTask.fecha_compromiso && <div>Fecha compromiso: {formatDate(selectedTask.fecha_compromiso)}</div>}
-                {selectedTask.fecha_completado && <div>Completada: {formatDate(selectedTask.fecha_completado)}</div>}
-                <div>Creada: {formatDate(selectedTask.created_at)}</div>
+            {selectedTask?.asignado_por && (
+              <div className="text-xs text-[var(--text)]/40">
+                Asignada por: {empleadoMap.get(selectedTask.asignado_por)?.nombre ?? 'Desconocido'}
+                {selectedTask.fecha_completado && (
+                  <> · Completada: {formatDate(selectedTask.fecha_completado)}</>
+                )}
               </div>
-            )}
-            {!canModifyTask(selectedTask) && (
-              <p className="text-[10px] text-[var(--text)]/40 italic">Solo usuarios con rol de dirección pueden editar tareas.</p>
             )}
           </div>
           <DialogFooter className="gap-2">
@@ -612,12 +581,10 @@ function TasksInner() {
                 {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
               </Button>
             )}
-            <Button variant="outline" onClick={() => { setShowEdit(false); setSelectedTask(null); }} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">{canModifyTask(selectedTask) ? 'Cancelar' : 'Cerrar'}</Button>
-            {canModifyTask(selectedTask) && (
-              <Button onClick={handleUpdate} disabled={saving || !editForm.titulo.trim()} className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60">
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Guardar cambios
-              </Button>
-            )}
+            <Button variant="outline" onClick={() => { setShowEdit(false); setSelectedTask(null); }} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">Cancelar</Button>
+            <Button onClick={handleUpdate} disabled={saving || !editForm.titulo.trim()} className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Guardar cambios
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

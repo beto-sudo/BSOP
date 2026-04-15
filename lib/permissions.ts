@@ -30,18 +30,11 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   '/rdb/playtomic': 'rdb.playtomic',
   '/rdb/ordenes-compra': 'rdb.ordenes_compra',
   '/rdb/tasks': 'rdb.tasks',
-  '/dilesa/admin/tasks': 'dilesa.tasks',
-  '/dilesa/admin/juntas': 'dilesa.juntas',
-  '/dilesa/admin/documentos': 'dilesa.documentos',
-  '/dilesa/rh/empleados': 'dilesa.rh',
-  '/dilesa/rh/departamentos': 'dilesa.rh',
-  '/dilesa/rh/puestos': 'dilesa.rh',
   '/settings/acceso': 'settings.acceso',
 };
 
 /** Maps a nav section href to its empresa slug */
 export const ROUTE_TO_EMPRESA: Record<string, string> = {
-  '/dilesa': 'dilesa',
   '/rdb': 'rdb',
   '/coda': 'coda',
   '/family': 'familia',
