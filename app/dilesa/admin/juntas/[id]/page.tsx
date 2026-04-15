@@ -259,6 +259,9 @@ function JuntaDetailInner() {
 
   const [terminating, setTerminating] = useState(false);
   const [showTerminarDialog, setShowTerminarDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [isDireccion, setIsDireccion] = useState(false);
 
   const editor = useEditor({
     extensions: [
@@ -355,6 +358,13 @@ function JuntaDetailInner() {
     const { data: empData } = await supabase.schema('erp' as any).from('empleados').select('id, persona:persona_id(nombre, apellido_paterno)').eq('empresa_id', juntaData.empresa_id).eq('activo', true).is('deleted_at', null);
     setEmpleados((empData ?? []).map((e: any) => ({ id: e.id, nombre: [e.persona?.nombre, e.persona?.apellido_paterno].filter(Boolean).join(' ') })));
 
+    // Check if user is admin/direccion
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.email) {
+      const { data: coreUser } = await supabase.schema('core' as any).from('users').select('rol').eq('email', user.email).maybeSingle();
+      if (coreUser?.rol === 'admin') setIsDireccion(true);
+    }
+
     setLoading(false);
   }, [id, supabase, editor]);
 
@@ -429,6 +439,19 @@ function JuntaDetailInner() {
     } finally { setTerminating(false); }
   };
 
+  const handleDelete = async () => {
+    if (!junta) return;
+    setDeleting(true);
+    try {
+      // Delete related records first
+      await supabase.schema('erp' as any).from('juntas_asistencia').delete().eq('junta_id', junta.id);
+      await supabase.schema('erp' as any).from('tasks').update({ entidad_tipo: null, entidad_id: null }).eq('entidad_tipo', 'junta').eq('entidad_id', junta.id);
+      const { error: err } = await supabase.schema('erp' as any).from('juntas').delete().eq('id', junta.id);
+      if (err) { alert(`Error al eliminar: ${err.message}`); return; }
+      router.push('/dilesa/admin/juntas');
+    } finally { setDeleting(false); }
+  };
+
   const empleadoMap = new Map(empleados.map((e) => [e.id, e]));
   const empleadoOptions = useMemo(() => empleados.map(e => ({ id: e.id, label: e.nombre })), [empleados]);
 
@@ -462,6 +485,9 @@ function JuntaDetailInner() {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {isDireccion && (
+            <Button variant="outline" onClick={() => setShowDeleteDialog(true)} disabled={deleting} className="gap-1.5 rounded-xl border-red-500/40 text-red-500 hover:bg-red-500/10 hover:border-red-500/60"><Trash2 className="h-4 w-4" />Eliminar</Button>
+          )}
           {estado !== 'completada' && estado !== 'cancelada' && (
             <Button variant="outline" onClick={() => setShowTerminarDialog(true)} disabled={terminating} className="gap-1.5 rounded-xl border-green-500/40 text-green-500 hover:bg-green-500/10 hover:border-green-500/60"><CheckCircle2 className="h-4 w-4" />Terminar junta</Button>
           )}
@@ -689,6 +715,19 @@ function JuntaDetailInner() {
             <Button variant="outline" onClick={() => setShowTerminarDialog(false)} disabled={terminating} className="rounded-xl border-[var(--border)] text-[var(--text)]">Cancelar</Button>
             <Button onClick={handleTerminar} disabled={terminating} className="gap-1.5 rounded-xl bg-green-600 text-white hover:bg-green-700 disabled:opacity-60">
               {terminating ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}Sí, terminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="max-w-sm rounded-3xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
+          <DialogHeader><DialogTitle className="text-red-400">Eliminar junta</DialogTitle></DialogHeader>
+          <p className="text-sm text-[var(--text)]/70 pb-2">Esta acción es <strong>irreversible</strong>. Se eliminará la junta, su asistencia y se desvincularán las tareas asociadas. ¿Estás seguro?</p>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={deleting} className="rounded-xl border-[var(--border)] text-[var(--text)]">Cancelar</Button>
+            <Button onClick={handleDelete} disabled={deleting} className="gap-1.5 rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-60">
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}Sí, eliminar
             </Button>
           </DialogFooter>
         </DialogContent>
