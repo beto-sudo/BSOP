@@ -66,11 +66,11 @@ function generateMinutaHtml(opts: {
   <title>${titulo}</title>
 </head>
 <body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-  <div style="max-width:680px;margin:0 auto;background:#ffffff;">
+  <div style="max-width:800px;margin:0 auto;background:#ffffff;">
 
     <!-- Header Image -->
     <div style="background:#1a1a2e;">
-      <img src="${HEADER_IMAGE_URL}" alt="DILESA" style="display:block;width:100%;max-width:680px;height:auto;" />
+      <img src="${HEADER_IMAGE_URL}" alt="DILESA" style="display:block;width:100%;height:auto;" />
     </div>
 
     <!-- Title Bar -->
@@ -85,7 +85,7 @@ function generateMinutaHtml(opts: {
           <td style="padding:6px 0;font-size:13px;color:#64748b;font-weight:600;width:160px;vertical-align:top;">Junta Terminada</td>
           <td style="padding:6px 0;font-size:13px;color:#1e293b;">${formatDateCST(fechaTerminada)}</td>
         </tr>
-        ${duracionMinutos && duracionMinutos > 0 ? `
+        ${duracionMinutos && duracionMinutos > 0 && duracionMinutos <= 480 ? `
         <tr>
           <td style="padding:6px 0;font-size:13px;color:#64748b;font-weight:600;vertical-align:top;">Duración</td>
           <td style="padding:6px 0;font-size:13px;color:#1e293b;">${formatDuration(duracionMinutos)}</td>
@@ -168,7 +168,7 @@ export async function POST(req: NextRequest) {
     .update({
       estado: 'completada',
       fecha_terminada: now.toISOString(),
-      ...(duracionMinutos && duracionMinutos > 0 ? { duracion_minutos: duracionMinutos } : {}),
+      ...(duracionMinutos && duracionMinutos > 0 && duracionMinutos <= 480 ? { duracion_minutos: duracionMinutos } : {}),
     })
     .eq('id', juntaId)
     .select('id, titulo, tipo, fecha_hora, lugar, descripcion, empresa_id')
