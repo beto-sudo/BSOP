@@ -391,7 +391,9 @@ function TasksInner() {
       porcentaje_avance: task.porcentaje_avance ?? 0,
       motivo_bloqueo: task.motivo_bloqueo ?? '',
     });
+    setUpdateForm({ contenido: '' });
     setShowEdit(true);
+    void fetchUpdatesForTask(task.id);
   };
 
   const canModifyTask = useCallback((task: ErpTask | null) => {
@@ -711,7 +713,6 @@ function TasksInner() {
                 <SortableHead sortKey="asignado_nombre" label="Responsable" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[120px]" />
                 <SortableHead sortKey="fecha_compromiso" label="Compromiso" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[95px]" />
                 <SortableHead sortKey="created_at" label="Días" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[55px]" />
-                <TableHead className="w-10 min-w-[40px]" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -725,19 +726,29 @@ function TasksInner() {
                   <TableRow key={task.id} className="cursor-pointer border-[var(--border)] transition-colors hover:bg-[var(--panel)]" onClick={() => openEdit(task)}>
                     {(isDireccion || isAdmin) && (
                       <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
-                        {task.estado !== 'completado' && task.estado !== 'cancelado' ? (
+                        <div className="flex items-center gap-1">
+                          {task.estado !== 'completado' && task.estado !== 'cancelado' ? (
+                            <button
+                              type="button"
+                              title="Completar tarea"
+                              disabled={completingTaskId === task.id}
+                              onClick={() => handleQuickComplete(task.id)}
+                              className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-green-500/30 bg-green-500/10 text-green-400 transition hover:bg-green-500/20 disabled:opacity-50"
+                            >
+                              {completingTaskId === task.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                            </button>
+                          ) : (
+                            <Check className="h-4 w-4 text-green-400/40" />
+                          )}
                           <button
                             type="button"
-                            title="Completar tarea"
-                            disabled={completingTaskId === task.id}
-                            onClick={() => handleQuickComplete(task.id)}
-                            className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-green-500/30 bg-green-500/10 text-green-400 transition hover:bg-green-500/20 disabled:opacity-50"
+                            title="Ver / agregar avances"
+                            onClick={() => handleOpenUpdatesSheet(task.id)}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 text-[var(--accent)] transition hover:bg-[var(--accent)]/20"
                           >
-                            {completingTaskId === task.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                            <MessageSquarePlus className="h-3 w-3" />
                           </button>
-                        ) : (
-                          <Check className="h-4 w-4 text-green-400/40" />
-                        )}
+                        </div>
                       </TableCell>
                     )}
                     <TableCell className="whitespace-normal">
@@ -823,16 +834,7 @@ function TasksInner() {
                         })()}
                       </span>
                     </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        title="Ver / agregar avances"
-                        onClick={() => handleOpenUpdatesSheet(task.id)}
-                        className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 text-[var(--accent)] transition hover:bg-[var(--accent)]/20"
-                      >
-                        <MessageSquarePlus className="h-3 w-3" />
-                      </button>
-                    </TableCell>
+
                   </TableRow>
                 );
               })}
@@ -1163,6 +1165,81 @@ function TasksInner() {
                 )}
               </div>
             )}
+
+            {/* ── Actualizaciones dentro del Edit Sheet ──────────── */}
+            <div className="border-t border-[var(--border)] pt-4">
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50 mb-3">Actualizaciones</div>
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <Textarea
+                    placeholder="Escribe un avance..."
+                    value={updateForm.contenido}
+                    onChange={(e) => setUpdateForm({ contenido: e.target.value })}
+                    className="flex-1 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)] min-h-[60px] text-sm"
+                  />
+                </div>
+                <Button
+                  onClick={async () => {
+                    if (!selectedTask || !updateForm.contenido.trim()) return;
+                    setSavingUpdate(true);
+                    const { data: { user } } = await supabase.auth.getUser();
+                    const { data: coreUser } = await supabase.schema('core' as any).from('usuarios').select('id, nombre').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
+                    const userId = coreUser?.id ?? null;
+                    const userName = coreUser?.nombre ?? 'Usuario';
+                    const { error: insErr } = await supabase.schema('erp' as any).from('task_updates').insert({
+                      task_id: selectedTask.id, empresa_id: EMPRESA_ID, tipo: 'avance', contenido: updateForm.contenido.trim(), creado_por: userId,
+                    });
+                    if (insErr) { alert(`Error: ${insErr.message}`); setSavingUpdate(false); return; }
+                    const now = new Date().toISOString();
+                    setTaskUpdates(prev => [{
+                      id: `temp-${Date.now()}`, task_id: selectedTask.id, tipo: 'avance', contenido: updateForm.contenido.trim(),
+                      valor_anterior: null, valor_nuevo: null, creado_por: userId, created_at: now, usuario: { nombre: userName },
+                    }, ...prev]);
+                    setSavingUpdate(false);
+                    setUpdateForm({ contenido: '' });
+                  }}
+                  disabled={savingUpdate || !updateForm.contenido.trim()}
+                  size="sm"
+                  className="w-full gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60"
+                >
+                  {savingUpdate ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageSquarePlus className="h-3.5 w-3.5" />}
+                  Agregar avance
+                </Button>
+              </div>
+              <div className="mt-3 space-y-2">
+                {loadingUpdates ? (
+                  <div className="flex items-center justify-center py-4"><Loader2 className="h-4 w-4 animate-spin text-[var(--text)]/30" /></div>
+                ) : taskUpdates.length === 0 ? (
+                  <p className="text-xs text-[var(--text)]/40 text-center py-3">Sin actualizaciones</p>
+                ) : (
+                  taskUpdates.map(u => {
+                    const tipoCfg: Record<string, { label: string; cls: string }> = {
+                      avance: { label: 'Avance', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
+                      cambio_estado: { label: 'Estado', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
+                      cambio_fecha: { label: 'Fecha', cls: 'bg-purple-500/15 text-purple-400 border-purple-500/20' },
+                      nota: { label: 'Nota', cls: 'bg-[var(--border)]/60 text-[var(--text)]/60 border-[var(--border)]' },
+                      cambio_responsable: { label: 'Responsable', cls: 'bg-teal-500/15 text-teal-400 border-teal-500/20' },
+                    };
+                    const tc = tipoCfg[u.tipo] ?? { label: u.tipo, cls: '' };
+                    return (
+                      <div key={u.id} className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className={`inline-flex items-center rounded-lg border px-1.5 py-0.5 text-[9px] font-medium ${tc.cls}`}>{tc.label}</span>
+                          <span className="text-[10px] text-[var(--text)]/40">{u.usuario?.nombre ?? 'Sistema'}</span>
+                          <span className="text-[10px] text-[var(--text)]/30 ml-auto">{new Date(u.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                        {u.contenido && <p className="text-xs text-[var(--text)]/80">{u.contenido}</p>}
+                        {u.valor_anterior != null && u.valor_nuevo != null && (
+                          <p className="text-[10px] text-[var(--text)]/50">
+                            {u.valor_anterior || '—'} → {u.valor_nuevo || '—'}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 pt-4 border-t border-[var(--border)]">
