@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
+import type { Json } from '@/types/supabase';
 
 const METRIC_NAME_NORMALIZE: Record<string, string> = {
   resting_heart_rate: 'Resting Heart Rate',
@@ -208,7 +209,7 @@ function normalizeWorkouts(workouts: unknown[]) {
       heart_rate_avg: parseNumber(avgHeartRate?.qty) ?? parseNumber(heartRate?.avg && typeof heartRate.avg === 'object' ? (heartRate.avg as Record<string, unknown>).qty : null),
       heart_rate_max: parseNumber(maxHeartRate?.qty) ?? parseNumber(heartRate?.max && typeof heartRate.max === 'object' ? (heartRate.max as Record<string, unknown>).qty : null),
       source: typeof row.source === 'string' ? row.source : 'Health Auto Export',
-      raw_json: row,
+      raw_json: row as Json,
     }];
   });
 }
@@ -224,7 +225,7 @@ function normalizeEcg(ecg: unknown[]) {
       date,
       classification: typeof row.classification === 'string' ? row.classification : null,
       heart_rate: parseNumber(row.averageHeartRate),
-      raw_json: row,
+      raw_json: row as Json,
     }];
   });
 }
@@ -240,7 +241,7 @@ function normalizeMedications(medications: unknown[]) {
       date,
       name: typeof row.displayText === 'string' ? row.displayText : typeof row.nickname === 'string' ? row.nickname : null,
       dose: row.dosage == null ? null : String(row.dosage),
-      raw_json: row,
+      raw_json: row as Json,
     }];
   });
 }

@@ -433,8 +433,12 @@ export default function VentasPage() {
   const fetchCortes = useCallback(async () => {
     try {
       const supabase = createSupabaseBrowserClient();
+      // TODO(B.1.extra): `rdb.cortes` exists in DB (see supabase/SCHEMA_REF.md)
+      // but was not emitted by the types autogen in PR #10 (likely a grants /
+      // SECURITY DEFINER exclusion). Drop the `as any` once the generator picks
+      // it up.
       let query = supabase
-        .schema('rdb')
+        .schema('rdb' as any)
         .from('cortes')
         .select('id, corte_nombre, caja_nombre, hora_inicio, hora_fin, estado')
         .order('hora_inicio', { ascending: false });
@@ -443,7 +447,7 @@ export default function VentasPage() {
       if (dateTo) query = query.lte('hora_inicio', getLocalDayBoundsUtc(dateTo, TZ).end);
 
       const { data } = await query;
-      setCortes(data ?? []);
+      setCortes((data ?? []) as CorteOption[]);
     } catch {
       // non-fatal
     }
@@ -498,18 +502,23 @@ export default function VentasPage() {
 
     try {
       const supabase = createSupabaseBrowserClient();
+      if (!pedido.order_id) {
+        setLoadingDetail(false);
+        return;
+      }
+      const orderId = pedido.order_id;
       const [itemsRes, pagosRes] = await Promise.all([
         supabase
           .schema('rdb')
           .from('waitry_productos')
           .select('*')
-          .eq('order_id', pedido.order_id)
+          .eq('order_id', orderId)
           .limit(50),
         supabase
           .schema('rdb')
           .from('waitry_pagos')
           .select('*')
-          .eq('order_id', pedido.order_id)
+          .eq('order_id', orderId)
           .limit(20),
       ]);
 

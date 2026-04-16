@@ -244,13 +244,13 @@ export async function generarOrdenCompra(
   if (ocErr) throw new Error(ocErr.message);
   if (!oc) throw new Error('Error al crear la orden de compra');
 
-  // Copy items
+  // Copy items — `reqItems` is typed from the select('*') against erp.requisiciones_detalle
   if (reqItems && reqItems.length > 0) {
     const { error: ocItemsErr } = await supabase
       .schema('erp')
       .from('ordenes_compra_detalle')
       .insert(
-        reqItems.map((item: Record<string, unknown>) => ({
+        reqItems.map((item) => ({
           empresa_id: RDB_EMPRESA_ID,
           orden_compra_id: oc.id,
           producto_id: item.producto_id ?? null,
