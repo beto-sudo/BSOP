@@ -21,6 +21,7 @@
     "test:report": "playwright show-report",
     "audit:ui": "npx tsx scripts/audit-ui.ts",
     "audit:ui:json": "npx tsx scripts/audit-ui.ts --json",
+    "db:types": "supabase gen types typescript --project-id ybklderteyhuugzfmxbi --schema public --schema core --schema erp --schema rdb --schema dilesa --schema playtomic > types/supabase.ts",
     "prepare": "husky"
   },
   "dependencies": {

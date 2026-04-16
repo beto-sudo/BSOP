@@ -1,0 +1,112 @@
+name: DB Types
+
+# Regenera `types/supabase.ts` a partir del esquema real de Supabase.
+#
+# Se ejecuta:
+#   - Manualmente desde la pestaña Actions (workflow_dispatch)
+#   - Automáticamente cada lunes a las 07:00 UTC (como red de seguridad)
+#
+# Cuando detecta cambios en los tipos, abre un PR automático a `main`.
+#
+# Requisitos:
+#   - Secret SUPABASE_ACCESS_TOKEN (Personal Access Token de Supabase)
+#     Generar en: https://supabase.com/dashboard/account/tokens
+#     Configurar en: Settings -> Secrets and variables -> Actions
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 7 * * 1'
+
+concurrency:
+  group: db-types-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regenerate:
+    name: Regenerate supabase types
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+
+    env:
+      SUPABASE_PROJECT_REF: ybklderteyhuugzfmxbi
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Generate TypeScript types (all schemas)
+        run: |
+          supabase gen types typescript \
+            --project-id "$SUPABASE_PROJECT_REF" \
+            --schema public \
+            --schema core \
+            --schema erp \
+            --schema rdb \
+            --schema dilesa \
+            --schema playtomic \
+            > types/supabase.ts.new
+
+          # Anteponer header con metadatos
+          {
+            echo "// =============================================================================="
+            echo "// Auto-generated Supabase database types."
+            echo "// Last regenerated: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "// Project ref: $SUPABASE_PROJECT_REF"
+            echo "// Schemas: public, core, erp, rdb, dilesa, playtomic"
+            echo "//"
+            echo "// DO NOT EDIT BY HAND. Regenerate via:"
+            echo "//   - GitHub Actions: trigger 'DB Types' workflow manually"
+            echo "//   - Local: npm run db:types (requiere supabase CLI + SUPABASE_ACCESS_TOKEN)"
+            echo "// =============================================================================="
+            echo ""
+            cat types/supabase.ts.new
+          } > types/supabase.ts
+
+          rm types/supabase.ts.new
+
+      - name: Detect changes
+        id: diff
+        run: |
+          if git diff --quiet types/supabase.ts; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No changes in supabase types."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Supabase types changed."
+          fi
+
+      - name: Create Pull Request
+        if: steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: chore/supabase-types-autogen
+          base: main
+          commit-message: 'chore(types): regenerate supabase database types'
+          title: 'chore(types): regenerate supabase database types'
+          body: |
+            Automated regeneration of `types/supabase.ts` from the live Supabase schema.
+
+            **Schemas incluidos:** public, core, erp, rdb, dilesa, playtomic
+
+            Este PR lo abrió el workflow `.github/workflows/db-types.yml`.
+            Revisa el diff con cuidado antes de mergear — cualquier cambio aquí
+            refleja un cambio real en la base de datos.
+          labels: |
+            automated
+            types
+          delete-branch: true
