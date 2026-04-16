@@ -67,6 +67,37 @@ npm run dev
 | `npm run test:e2e:anon` | Solo specs anónimas |
 | `npm run test:e2e:auth` | Solo specs autenticadas (requiere `.env.test.local`) |
 | `npm run audit:ui` | Audit heurístico de la UI |
+| `npm run db:types` | Regenera `types/supabase.ts` desde el schema real (requiere supabase CLI + `SUPABASE_ACCESS_TOKEN`) |
+
+---
+
+## Tipos de base de datos
+
+El archivo `types/supabase.ts` es la **única fuente de verdad** para tipar queries y mutaciones contra Supabase en el frontend/backend del app.
+
+- Cubre los schemas: `public`, `core`, `erp`, `rdb`, `dilesa`, `playtomic`.
+- Se consume vía el generic `Database` que se pasa a `createClient<Database>(...)`.
+- **No editar a mano** — se regenera desde el schema real.
+
+### Regenerar los tipos
+
+**Opción A — GitHub Actions (recomendada):**
+
+1. Ir a la pestaña **Actions** → **DB Types** → **Run workflow**.
+2. Si hay cambios vs. la copia en `main`, el workflow abre un PR automático (`chore/supabase-types-autogen`).
+3. Revisar el diff, validar que no haya drift accidental de schema, y mergear.
+
+También corre en schedule semanal (lunes 07:00 UTC) como red de seguridad.
+
+**Opción B — Local:**
+
+```bash
+export SUPABASE_ACCESS_TOKEN=<tu-PAT-de-supabase>
+npm run db:types
+git diff types/supabase.ts    # revisar
+```
+
+Generar el PAT en: https://supabase.com/dashboard/account/tokens
 
 ---
 
