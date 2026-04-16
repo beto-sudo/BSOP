@@ -108,10 +108,10 @@ function PuestosInner() {
   const fetchAll = useCallback(async (ids: string[]) => {
     if (ids.length === 0) { setPuestos([]); return; }
     const [pRes, dRes] = await Promise.all([
-      supabase.schema('erp' as any).from('puestos')
+      supabase.schema('erp').from('puestos')
         .select('id, empresa_id, nombre, nivel, sueldo_min, sueldo_max, objetivo, perfil, requisitos, esquema_pago, reporta_a, activo, departamento:departamento_id(nombre)')
         .in('empresa_id', ids).order('nombre'),
-      supabase.schema('erp' as any).from('departamentos')
+      supabase.schema('erp').from('departamentos')
         .select('id, nombre').in('empresa_id', ids).eq('activo', true).order('nombre'),
     ]);
     if (pRes.error) { setError(pRes.error.message); return; }
@@ -158,7 +158,7 @@ function PuestosInner() {
   const handleSubmit = async () => {
     if (!form.nombre.trim() || empresaIds.length === 0) return;
     setSubmitting(true);
-    const payload: Record<string, unknown> = {
+    const payload = {
       nombre: form.nombre.trim(),
       nivel: form.nivel.trim() || null,
       departamento_id: form.departamento_id || null,
@@ -173,10 +173,10 @@ function PuestosInner() {
 
     let err: { message: string } | null = null;
     if (editingId) {
-      const res = await supabase.schema('erp' as any).from('puestos').update(payload).eq('id', editingId);
+      const res = await supabase.schema('erp').from('puestos').update(payload).eq('id', editingId);
       err = res.error;
     } else {
-      const res = await supabase.schema('erp' as any).from('puestos').insert({ ...payload, empresa_id: empresaIds[0] });
+      const res = await supabase.schema('erp').from('puestos').insert({ ...payload, empresa_id: empresaIds[0] });
       err = res.error;
     }
 

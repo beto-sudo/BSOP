@@ -143,7 +143,7 @@ function EmpleadoDetailInner() {
 
   const fetchAll = useCallback(async () => {
     const { data: emp, error: eErr } = await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('empleados')
       .select('id, empresa_id, numero_empleado, fecha_ingreso, fecha_baja, motivo_baja, nss, fecha_nacimiento, telefono_empresa, extension, email_empresa, activo, persona:persona_id(id, nombre, apellido_paterno, apellido_materno, email, telefono, rfc, curp, nss, fecha_nacimiento), departamento:departamento_id(id, nombre), puesto:puesto_id(id, nombre)')
       .eq('id', id)
@@ -173,9 +173,9 @@ function EmpleadoDetailInner() {
     setEmailEmpresa(emp.email_empresa ?? '');
 
     const [deptRes, puestosRes, compRes] = await Promise.all([
-      supabase.schema('erp' as any).from('departamentos').select('id, nombre').eq('empresa_id', emp.empresa_id).eq('activo', true).order('nombre'),
-      supabase.schema('erp' as any).from('puestos').select('id, nombre').eq('empresa_id', emp.empresa_id).eq('activo', true).order('nombre'),
-      supabase.schema('erp' as any).from('empleados_compensacion')
+      supabase.schema('erp').from('departamentos').select('id, nombre').eq('empresa_id', emp.empresa_id).eq('activo', true).order('nombre'),
+      supabase.schema('erp').from('puestos').select('id, nombre').eq('empresa_id', emp.empresa_id).eq('activo', true).order('nombre'),
+      supabase.schema('erp').from('empleados_compensacion')
         .select('id, sueldo_mensual, sueldo_diario, comisiones_mensuales, bonificaciones_mensuales, compensaciones_mensuales, sdi, tipo_contrato, frecuencia_pago')
         .eq('empleado_id', id).eq('vigente', true).maybeSingle(),
     ]);
@@ -191,7 +191,7 @@ function EmpleadoDetailInner() {
     if (!empleado) return;
     setSaving(true);
     const { error: err } = await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('empleados')
       .update({
         numero_empleado: numeroEmpleado.trim() || null,
@@ -215,7 +215,7 @@ function EmpleadoDetailInner() {
     if (!empleado) return;
     setGivingBaja(true);
     const { error: err } = await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('empleados')
       .update({
         activo: false,
