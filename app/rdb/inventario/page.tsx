@@ -339,7 +339,7 @@ function StockDetailDrawer({
                             <div className="font-medium">{tipoLabel(mov.tipo_movimiento, mov.cantidad)}</div>
                             {mov.notas && <div className="text-xs text-muted-foreground truncate max-w-[120px]">{mov.notas}</div>}
                           </TableCell>
-                          <TableCell className={["text-right font-medium tabular-nums", tipoColorClass(mov.tipo_movimiento, mov.cantidad)].join(" ")}>
+                          <TableCell className={["text-right font-medium tabular-nums", mov.tipo_movimiento === 'entrada' || (mov.tipo_movimiento === 'ajuste' && mov.cantidad >= 0) ? 'text-emerald-600' : 'text-destructive'].join(" ")}>
                             {mov.tipo_movimiento === 'entrada' || (mov.tipo_movimiento === 'ajuste' && mov.cantidad >= 0) ? '+' : '−'}{Math.abs(mov.cantidad)}
                           </TableCell>
                         </TableRow>
