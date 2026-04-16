@@ -668,8 +668,12 @@ export default function CortesPage() {
           .eq('corte_id', corte.id)
           .order('created_at', { ascending: true })
           .limit(100),
+        // TODO(B.1.extra): `rdb.v_cortes_productos` exists in DB (see
+        // supabase/SCHEMA_REF.md) but was not emitted by the types autogen in
+        // PR #10 (likely a grants / SECURITY DEFINER exclusion on the view).
+        // Drop the `as any` once the generator picks it up.
         supabase
-          .schema('rdb')
+          .schema('rdb' as any)
           .from('v_cortes_productos')
           .select('*')
           .eq('corte_id', corte.id)
