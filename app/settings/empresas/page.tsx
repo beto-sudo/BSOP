@@ -436,20 +436,37 @@ function EmpresaCard({ empresa, onSaved }: { empresa: Empresa; onSaved: () => vo
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <TextField label="Fecha de Emisión" value={csfFechaEmision} onChange={setCsfFechaEmision} placeholder="YYYY-MM-DD" />
           <div className="sm:col-span-2">
-            <TextField label="URL del PDF" value={csfUrl} onChange={setCsfUrl} placeholder="https://..." />
+            <TextField label="Ruta del PDF (storage o URL)" value={csfUrl} onChange={setCsfUrl} placeholder="legal/empresa/csf/archivo.pdf" />
           </div>
           {empresa.csf_url && (
             <div className="flex items-end pb-0.5">
-              <a
-                href={empresa.csf_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-sm text-[var(--accent)] transition hover:bg-[var(--card)]"
+              <button
+                type="button"
+                onClick={async () => {
+                  const url = empresa.csf_url!;
+                  // If it's a full URL, open directly
+                  if (url.startsWith('http')) {
+                    window.open(url, '_blank');
+                    return;
+                  }
+                  // Otherwise it's a storage path — generate signed URL
+                  const bucket = url.split('/')[0];
+                  const path = url.split('/').slice(1).join('/');
+                  const { data, error } = await supabase.storage
+                    .from(bucket)
+                    .createSignedUrl(path, 3600); // 1 hour
+                  if (error || !data?.signedUrl) {
+                    alert(`Error al generar enlace: ${error?.message ?? 'unknown'}`);
+                    return;
+                  }
+                  window.open(data.signedUrl, '_blank');
+                }}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-sm text-[var(--accent)] transition hover:bg-[var(--card)] cursor-pointer"
               >
                 <FileText className="h-4 w-4" />
                 Ver CSF
                 <ExternalLink className="h-3 w-3" />
-              </a>
+              </button>
             </div>
           )}
         </div>
