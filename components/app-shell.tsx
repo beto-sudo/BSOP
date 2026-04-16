@@ -266,12 +266,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const { permissions, impersonating, stopImpersonate } = usePermissions();
 
-  // Filter nav items based on permissions. While loading (permissions === null),
-  // show nothing to avoid a flash of unauthorized items.
+  // While permissions are still loading we render a skeleton in place of the
+  // nav items (see NavSkeleton below). This keeps users from briefly seeing
+  // modules they shouldn't have access to.
+  const isLoadingPermissions = !permissions || permissions.loading;
+
   const filteredNavItems = useMemo(() => {
-    if (!permissions) return [];
-    // While loading, show all nav items to avoid flash of missing menus
-    if (permissions.loading) return NAV_ITEMS;
+    if (!permissions || permissions.loading) return [];
     // Admin sees everything
     if (permissions.isAdmin) return NAV_ITEMS;
 
@@ -413,7 +414,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-4">
-          {filteredNavItems.map((item) => {
+          {isLoadingPermissions ? <NavSkeleton collapsed={collapsed} /> : filteredNavItems.map((item) => {
             const active = isItemActive(pathname, item);
             const hasChildren = Boolean(item.children?.length);
             const expanded = !collapsed && expandedSection === item.href;
@@ -688,6 +689,44 @@ function InfoPill({ label, value }: { label: string; value: string }) {
     <div className="flex items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2">
       <span>{label}</span>
       <span className="dark:text-white/85 text-[var(--text)]/85">{value}</span>
+    </div>
+  );
+}
+
+/**
+ * Placeholder rows rendered in the sidebar while user permissions are loading.
+ * Width values are intentionally varied so the skeleton feels organic rather
+ * than mechanical. The row count (6) matches the current top-level nav layout
+ * (Inicio + 5 sections) — if the base nav grows, bump SKELETON_WIDTHS.
+ */
+const SKELETON_WIDTHS = [55, 78, 82, 68, 74, 60];
+
+function NavSkeleton({ collapsed }: { collapsed: boolean }) {
+  return (
+    <div
+      className="space-y-1"
+      role="status"
+      aria-live="polite"
+      aria-label="Cargando menú de navegación"
+    >
+      {SKELETON_WIDTHS.map((width, index) => (
+        <div
+          key={index}
+          className={[
+            'flex items-center gap-3 rounded-2xl border border-transparent px-3 py-2.5',
+            collapsed ? 'justify-center px-2' : '',
+          ].join(' ')}
+        >
+          <div className="h-5 w-5 shrink-0 animate-pulse rounded-md bg-[var(--card)]" />
+          {!collapsed ? (
+            <div
+              className="h-3 animate-pulse rounded bg-[var(--card)]"
+              style={{ width: `${width}%` }}
+            />
+          ) : null}
+        </div>
+      ))}
+      <span className="sr-only">Cargando menú de navegación…</span>
     </div>
   );
 }
