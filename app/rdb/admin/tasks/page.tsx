@@ -93,14 +93,14 @@ function TasksInner() {
   const [saving, setSaving] = useState(false);
 
   const fetchRefData = useCallback(async () => {
-    const { data: empRes } = await supabase.schema('erp' as any).from('empleados').select('id, persona:persona_id(nombre, apellido_paterno)').eq('empresa_id', EMPRESA_ID).eq('activo', true).is('deleted_at', null);
+    const { data: empRes } = await supabase.schema('erp').from('empleados').select('id, persona:persona_id(nombre, apellido_paterno)').eq('empresa_id', EMPRESA_ID).eq('activo', true).is('deleted_at', null);
     setEmpleados((empRes ?? []).map((e: any) => ({ id: e.id, nombre: [e.persona?.nombre, e.persona?.apellido_paterno].filter(Boolean).join(' ') })));
   }, [supabase]);
 
   const fetchTasks = useCallback(async () => {
-    const { data, error: err } = await supabase.schema('erp' as any).from('tasks').select('*').eq('empresa_id', EMPRESA_ID).order('created_at', { ascending: false });
+    const { data, error: err } = await supabase.schema('erp').from('tasks').select('*').eq('empresa_id', EMPRESA_ID).order('created_at', { ascending: false });
     if (err) { setError(err.message); return; }
-    setTasks(data ?? []);
+    setTasks((data ?? []) as ErpTask[]);
   }, [supabase]);
 
   useEffect(() => {
@@ -119,7 +119,7 @@ function TasksInner() {
     setCreating(true);
     const { data: { user } } = await supabase.auth.getUser();
     const { data: coreUser } = await supabase.schema('core' as any).from('usuarios').select('id').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
-    const { error: err } = await supabase.schema('erp' as any).from('tasks').insert({
+    const { error: err } = await supabase.schema('erp').from('tasks').insert({
       empresa_id: EMPRESA_ID, titulo: createForm.titulo.trim(), descripcion: createForm.descripcion.trim() || null,
       prioridad: createForm.prioridad || null, asignado_a: createForm.asignado_a || null,
       estado: createForm.estado, fecha_vence: createForm.fecha_vence || null, creado_por: coreUser?.id ?? null,
@@ -138,7 +138,7 @@ function TasksInner() {
   const handleUpdate = async () => {
     if (!selectedTask || !editForm.titulo.trim()) return;
     setSaving(true);
-    const { error: err } = await supabase.schema('erp' as any).from('tasks').update({
+    const { error: err } = await supabase.schema('erp').from('tasks').update({
       titulo: editForm.titulo.trim(), descripcion: editForm.descripcion.trim() || null,
       prioridad: editForm.prioridad || null, asignado_a: editForm.asignado_a || null,
       estado: editForm.estado, fecha_vence: editForm.fecha_vence || null,

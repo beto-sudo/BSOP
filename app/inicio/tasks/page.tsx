@@ -3,6 +3,9 @@
 import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useState } from 'react';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
+import type { TablesInsert } from '@/types/supabase';
+
+type TasksInsert = TablesInsert<{ schema: 'erp' }, 'tasks'>;
 import {
   Table,
   TableBody,
@@ -190,7 +193,7 @@ function TasksInner() {
 
     if (ids.length > 0) {
       const { data: empData } = await supabase
-        .schema('erp' as any)
+        .schema('erp')
         .from('empleados')
         .select('id, persona:persona_id(nombre, apellido_paterno)')
         .in('empresa_id', ids)
@@ -214,7 +217,7 @@ function TasksInner() {
         return;
       }
       const { data, error: err } = await supabase
-        .schema('erp' as any)
+        .schema('erp')
         .from('tasks')
         .select('*')
         .in('empresa_id', ids)
@@ -224,7 +227,7 @@ function TasksInner() {
         setError(err.message);
         return;
       }
-      setTasks(data ?? []);
+      setTasks((data ?? []) as ErpTask[]);
     },
     [supabase],
   );
@@ -269,7 +272,7 @@ function TasksInner() {
       .eq('email', (user?.email ?? '').toLowerCase())
       .maybeSingle();
 
-    const payload: Record<string, unknown> = {
+    const payload: TasksInsert = {
       empresa_id: empresaIds[0],
       titulo: createForm.titulo.trim(),
       descripcion: createForm.descripcion.trim() || null,
@@ -281,7 +284,7 @@ function TasksInner() {
     };
 
     const { error: err } = await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('tasks')
       .insert(payload);
 
@@ -315,7 +318,7 @@ function TasksInner() {
     setSaving(true);
 
     const { error: err } = await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('tasks')
       .update({
         titulo: editForm.titulo.trim(),
