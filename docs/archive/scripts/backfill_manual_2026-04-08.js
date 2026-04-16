@@ -3,10 +3,17 @@ const crypto = require('crypto');
 const { execFileSync } = require('child_process');
 const { createClient } = require('/Users/Beto/BSOP/node_modules/@supabase/supabase-js');
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ybklderteyhuugzfmxbi.supabase.co';
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlia2xkZXJ0ZXlodXVnemZteGJpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1Njc4ODEzMywiZXhwIjoyMDcyMzY0MTMzfQ.ZUMZVuuGl7Eva5AB0jUqT7DqdlVfT0b8odXfPNl-e24';
-const CODA_API_KEY = process.env.CODA_API_KEY || '6dd6568f-14b9-41d1-b340-2a1974620fe3';
-const CODA_DOC_ID = process.env.CODA_DOC_ID || 'yvrM3UilPt';
+// ARCHIVED — one-off backfill del 2026-04-08. Los fallbacks hardcodeados
+// (SUPABASE_SERVICE_ROLE_KEY, CODA_API_KEY, CODA_DOC_ID) fueron REDACTADOS
+// por estar comprometidos en el historial de git. Rota ambas keys antes de
+// volver a ejecutar y provee los valores vía process.env (sin fallback).
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const CODA_API_KEY = process.env.CODA_API_KEY;
+const CODA_DOC_ID = process.env.CODA_DOC_ID;
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !CODA_API_KEY || !CODA_DOC_ID) {
+  throw new Error('Faltan variables en el entorno (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, CODA_API_KEY, CODA_DOC_ID).');
+}
 
 const EXCEL_PATH = '/Users/Beto/.openclaw/media/inbound/OrderList_20260409062507_Waitry---929a96e4-3156-4634-bad9-0d6446834868.xlsx';
 const PDF_PATH = '/Users/Beto/.openclaw/media/inbound/correcto---cf0f0f32-0ca1-4b74-b041-7cf267c99f45.pdf';

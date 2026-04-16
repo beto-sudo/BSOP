@@ -1,8 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 
-const url = 'https://ybklderteyhuugzfmxbi.supabase.co';
-const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlia2xkZXJ0ZXlodXVnemZteGJpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1Njc4ODEzMywiZXhwIjoyMDcyMzY0MTMzfQ.ZUMZVuuGl7Eva5AB0jUqT7DqdlVfT0b8odXfPNl-e24';
+// ARCHIVED — one-off de limpieza. URL + service_role key originales fueron
+// REDACTADAS por estar hardcodeadas (ver PR de archivado). Rota la key antes
+// de volver a correr este script y lee del entorno.
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
+if (!url || !key) throw new Error('Falta NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY en el entorno.');
 const supabase = createClient(url, key, { auth: { persistSession: false }, db: { schema: 'rdb' } });
 
 async function run() {
