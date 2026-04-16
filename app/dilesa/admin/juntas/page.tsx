@@ -37,7 +37,7 @@ type Junta = {
   titulo: string;
   descripcion: string | null;
   fecha_hora: string;
-  duracion_minutos: number;
+  duracion_minutos: number | null;
   lugar: string | null;
   estado: 'programada' | 'en_curso' | 'completada' | 'cancelada';
   tipo: string | null;
@@ -137,22 +137,22 @@ function JuntasInner() {
 
   const fetchJuntas = useCallback(async () => {
     const [jRes, aRes, tRes] = await Promise.all([
-      supabase.schema('erp' as any).from('juntas').select('*')
+      supabase.schema('erp').from('juntas').select('*')
         .eq('empresa_id', EMPRESA_ID).order('fecha_hora', { ascending: false }),
-      supabase.schema('erp' as any).from('juntas_asistencia').select('junta_id')
+      supabase.schema('erp').from('juntas_asistencia').select('junta_id')
         .eq('empresa_id', EMPRESA_ID),
-      supabase.schema('erp' as any).from('tasks').select('entidad_id')
+      supabase.schema('erp').from('tasks').select('entidad_id')
         .eq('empresa_id', EMPRESA_ID).eq('entidad_tipo', 'junta'),
     ]);
     if (jRes.error) { setError(jRes.error.message); return; }
-    setJuntas(jRes.data ?? []);
+    setJuntas((jRes.data ?? []) as Junta[]);
     const aCounts = new Map<string, number>();
     (aRes.data ?? []).forEach((a: { junta_id: string }) => {
       aCounts.set(a.junta_id, (aCounts.get(a.junta_id) ?? 0) + 1);
     });
     setAsistenciaCounts(aCounts);
     const tCounts = new Map<string, number>();
-    (tRes.data ?? []).forEach((t: { entidad_id: string }) => {
+    (tRes.data ?? []).forEach((t: { entidad_id: string | null }) => {
       if (t.entidad_id) tCounts.set(t.entidad_id, (tCounts.get(t.entidad_id) ?? 0) + 1);
     });
     setTaskCounts(tCounts);
@@ -192,7 +192,7 @@ function JuntasInner() {
 
     const titulo = createTitulo.trim() || generateTitulo(createFechaHora, createTipo);
     const { data: newJunta, error: err } = await supabase
-      .schema('erp' as any).from('juntas').insert({
+      .schema('erp').from('juntas').insert({
         empresa_id: EMPRESA_ID,
         titulo,
         fecha_hora: createFechaHora,

@@ -41,7 +41,7 @@ type Junta = {
   titulo: string;
   descripcion: string | null;
   fecha_hora: string;
-  duracion_minutos: number;
+  duracion_minutos: number | null;
   lugar: string | null;
   estado: 'programada' | 'en_curso' | 'completada' | 'cancelada';
   tipo: string | null;
@@ -161,14 +161,14 @@ function JuntasInner() {
   const fetchJuntas = useCallback(async (ids: string[]) => {
     if (ids.length === 0) { setJuntas([]); return; }
     const { data, error: err } = await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('juntas')
       .select('*')
       .in('empresa_id', ids)
       .order('fecha_hora', { ascending: false });
 
     if (err) { setError(err.message); return; }
-    setJuntas(data ?? []);
+    setJuntas((data ?? []) as Junta[]);
   }, [supabase]);
 
   useEffect(() => {
@@ -199,7 +199,7 @@ function JuntasInner() {
       .eq('email', (user?.email ?? '').toLowerCase())
       .maybeSingle();
 
-    const payload: Record<string, unknown> = {
+    const payload = {
       empresa_id: empresaIds[0],
       titulo: createForm.titulo.trim(),
       fecha_hora: createForm.fecha_hora,
@@ -211,7 +211,7 @@ function JuntasInner() {
     };
 
     const { data: newJunta, error: err } = await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('juntas')
       .insert(payload)
       .select()
