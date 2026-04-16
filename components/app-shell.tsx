@@ -19,7 +19,7 @@ import { useTheme } from 'next-themes';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { useLocale, type Locale } from '@/lib/i18n';
 import { usePermissions } from '@/components/providers';
-import { canAccessEmpresa, canAccessModulo } from '@/lib/permissions';
+import { canAccessEmpresa, canAccessModulo, ROUTE_TO_MODULE } from '@/lib/permissions';
 
 type NavChild = {
   label: string;
@@ -117,32 +117,6 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
 ];
-
-/** Maps route hrefs to their modulo slug for permission checks */
-const ROUTE_TO_MODULE: Record<string, string> = {
-  '/dilesa/admin/tasks': 'dilesa.admin.tasks',
-  '/dilesa/admin/juntas': 'dilesa.admin.juntas',
-  '/dilesa/admin/documentos': 'dilesa.admin.documentos',
-  '/dilesa/rh/empleados': 'dilesa.rh.empleados',
-  '/dilesa/rh/puestos': 'dilesa.rh.puestos',
-  '/dilesa/rh/departamentos': 'dilesa.rh.departamentos',
-  '/rdb/ventas': 'rdb.ventas',
-  '/rdb/cortes': 'rdb.cortes',
-  '/rdb/productos': 'rdb.productos',
-  '/rdb/inventario': 'rdb.inventario',
-  '/rdb/proveedores': 'rdb.proveedores',
-  '/rdb/requisiciones': 'rdb.requisiciones',
-  '/rdb/playtomic': 'rdb.playtomic',
-  '/rdb/ordenes-compra': 'rdb.ordenes_compra',
-  '/rdb/admin/tasks': 'rdb.admin.tasks',
-  '/rdb/admin/juntas': 'rdb.admin.juntas',
-  '/rdb/admin/documentos': 'rdb.admin.documentos',
-  '/rdb/rh/empleados': 'rdb.rh.empleados',
-  '/rdb/rh/puestos': 'rdb.rh.puestos',
-  '/rdb/rh/departamentos': 'rdb.rh.departamentos',
-  '/rdb': 'rdb.home',
-  '/settings/acceso': 'settings.acceso',
-};
 
 /** Maps top-level nav hrefs to their empresa slug */
 const NAV_TO_EMPRESA: Record<string, string> = {

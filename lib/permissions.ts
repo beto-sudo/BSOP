@@ -18,8 +18,21 @@ export type UserPermissions = {
 
 // ── Route → Module/Empresa mapping ────────────────────────────────────────
 
-/** Maps a page route to its modulo slug (for module-level checks) */
+/**
+ * Maps a page route to its modulo slug (for module-level checks).
+ *
+ * Source of truth — do NOT duplicate this map in other files. Import from here.
+ */
 export const ROUTE_TO_MODULE: Record<string, string> = {
+  // DILESA
+  '/dilesa/admin/tasks': 'dilesa.admin.tasks',
+  '/dilesa/admin/juntas': 'dilesa.admin.juntas',
+  '/dilesa/admin/documentos': 'dilesa.admin.documentos',
+  '/dilesa/rh/empleados': 'dilesa.rh.empleados',
+  '/dilesa/rh/puestos': 'dilesa.rh.puestos',
+  '/dilesa/rh/departamentos': 'dilesa.rh.departamentos',
+
+  // RDB — home + operaciones
   '/rdb': 'rdb.home',
   '/rdb/ventas': 'rdb.ventas',
   '/rdb/cortes': 'rdb.cortes',
@@ -30,6 +43,16 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   '/rdb/playtomic': 'rdb.playtomic',
   '/rdb/ordenes-compra': 'rdb.ordenes_compra',
   '/rdb/tasks': 'rdb.tasks',
+
+  // RDB — administración
+  '/rdb/admin/tasks': 'rdb.admin.tasks',
+  '/rdb/admin/juntas': 'rdb.admin.juntas',
+  '/rdb/admin/documentos': 'rdb.admin.documentos',
+  '/rdb/rh/empleados': 'rdb.rh.empleados',
+  '/rdb/rh/puestos': 'rdb.rh.puestos',
+  '/rdb/rh/departamentos': 'rdb.rh.departamentos',
+
+  // Settings
   '/settings/acceso': 'settings.acceso',
 };
 
