@@ -21,3 +21,14 @@ supabase/.temp/
 tmp/
 scripts/scratch/
 scripts/claude_documentos.sh
+
+# Credentials — NEVER commit
+.env.auth
+.git-credentials
+*.pem
+*.key
+
+# Sandbox / debug leftovers
+zzz_*
+.git/.stale/
+
