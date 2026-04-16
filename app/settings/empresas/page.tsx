@@ -6,7 +6,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Building2, Upload, Loader2, RefreshCw, CheckCircle, FileText, ExternalLink } from 'lucide-react';
+import { Building2, Upload, Loader2, RefreshCw, CheckCircle, FileText, ExternalLink, ChevronDown, ChevronRight } from 'lucide-react';
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -204,9 +204,27 @@ function TextField({
   );
 }
 
-// ─── Empresa card ────────────────────────────────────────────────────────────────
+// ─── Estatus SAT badge ──────────────────────────────────────────────────────────
 
-function EmpresaCard({ empresa, onSaved }: { empresa: Empresa; onSaved: () => void }) {
+function EstatusBadge({ estatus }: { estatus: string | null }) {
+  if (!estatus) return <span className="text-[var(--text)]/30 text-xs">—</span>;
+  const isActivo = estatus.toUpperCase() === 'ACTIVO';
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+        isActivo
+          ? 'bg-green-500/15 text-green-400'
+          : 'bg-red-500/15 text-red-400'
+      }`}
+    >
+      {estatus}
+    </span>
+  );
+}
+
+// ─── Expanded detail panel ──────────────────────────────────────────────────────
+
+function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved: () => void }) {
   const supabase = createSupabaseBrowserClient();
   const [logoUrl, setLogoUrl] = useState(empresa.logo_url ?? '');
   const [headerUrl, setHeaderUrl] = useState(empresa.header_url ?? '');
@@ -296,28 +314,7 @@ function EmpresaCard({ empresa, onSaved }: { empresa: Empresa; onSaved: () => vo
   const obligaciones = empresa.obligaciones_fiscales ?? [];
 
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--panel)]">
-            <Building2 className="h-5 w-5 text-[var(--text)]/50" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-[var(--text)]">{empresa.nombre}</h3>
-            <p className="text-xs text-[var(--text)]/50">
-              slug: <code className="font-mono">{empresa.slug}</code>
-              {' · '}
-              {empresa.activa ? (
-                <span className="text-green-400">activa</span>
-              ) : (
-                <span className="text-[var(--text)]/40">inactiva</span>
-              )}
-            </p>
-          </div>
-        </div>
-      </div>
-
+    <div className="space-y-6">
       {/* Logo */}
       <ImageUploader
         label="Logo"
@@ -498,6 +495,10 @@ function EmpresaCard({ empresa, onSaved }: { empresa: Empresa; onSaved: () => vo
   );
 }
 
+// ─── Table row header cell style ────────────────────────────────────────────────
+
+const thClass = "px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50";
+
 // ─── Main component ──────────────────────────────────────────────────────────────
 
 function EmpresasSettingsInner() {
@@ -505,6 +506,7 @@ function EmpresasSettingsInner() {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const fetchEmpresas = useCallback(async () => {
     const { data, error: err } = await supabase
@@ -520,6 +522,10 @@ function EmpresasSettingsInner() {
     setLoading(true);
     fetchEmpresas().finally(() => setLoading(false));
   }, [fetchEmpresas]);
+
+  const toggleExpand = (id: string) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  };
 
   return (
     <div className="space-y-6">
@@ -548,14 +554,19 @@ function EmpresasSettingsInner() {
       )}
 
       {loading ? (
-        <div className="space-y-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 space-y-4">
-              <Skeleton className="h-10 w-64" />
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-10 w-32" />
-            </div>
-          ))}
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">
+          <div className="space-y-0">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-4 py-4 border-b border-[var(--border)] last:border-0">
+                <Skeleton className="h-4 w-4 rounded" />
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-5 w-16 rounded-full" />
+                <Skeleton className="h-4 w-48 hidden lg:block" />
+                <Skeleton className="h-4 w-32 hidden md:block" />
+              </div>
+            ))}
+          </div>
         </div>
       ) : empresas.length === 0 ? (
         <div className="flex flex-col items-center justify-center p-16 text-center rounded-2xl border border-[var(--border)] bg-[var(--card)]">
@@ -563,14 +574,101 @@ function EmpresasSettingsInner() {
           <p className="text-sm text-[var(--text)]/55">No hay empresas registradas.</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {empresas.map((e) => (
-            <EmpresaCard
-              key={e.id}
-              empresa={e}
-              onSaved={fetchEmpresas}
-            />
-          ))}
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[var(--border)] bg-[var(--panel)]">
+                <th className={`${thClass} w-10`} />
+                <th className={thClass}>Nombre</th>
+                <th className={`${thClass} hidden sm:table-cell`}>RFC</th>
+                <th className={`${thClass} hidden md:table-cell`}>Estatus SAT</th>
+                <th className={`${thClass} hidden lg:table-cell`}>Régimen Fiscal</th>
+                <th className={`${thClass} hidden lg:table-cell`}>Domicilio</th>
+                <th className={`${thClass} hidden sm:table-cell w-16 text-center`}>CSF</th>
+              </tr>
+            </thead>
+            <tbody>
+              {empresas.map((e) => {
+                const isExpanded = expandedId === e.id;
+                const domicilio = [e.domicilio_municipio, e.domicilio_estado]
+                  .filter(Boolean)
+                  .join(', ');
+
+                return (
+                  <tr key={e.id} className="group contents">
+                    {/* Summary row */}
+                    <td colSpan={7} className="p-0">
+                      <button
+                        type="button"
+                        onClick={() => toggleExpand(e.id)}
+                        className={`w-full text-left flex items-center transition-colors cursor-pointer ${
+                          isExpanded
+                            ? 'bg-[var(--panel)]'
+                            : 'hover:bg-[var(--panel)]/50'
+                        } border-b border-[var(--border)]`}
+                      >
+                        {/* Chevron */}
+                        <span className="flex items-center justify-center w-10 px-3 py-3.5 shrink-0">
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4 text-[var(--text)]/50 transition-transform" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-[var(--text)]/50 transition-transform" />
+                          )}
+                        </span>
+
+                        {/* Nombre */}
+                        <span className="flex-1 min-w-0 px-4 py-3.5">
+                          <span className="font-medium text-[var(--text)] truncate block">{e.nombre}</span>
+                        </span>
+
+                        {/* RFC */}
+                        <span className="hidden sm:block w-36 px-4 py-3.5 text-[var(--text)]/70 font-mono text-xs shrink-0">
+                          {e.rfc || '—'}
+                        </span>
+
+                        {/* Estatus SAT */}
+                        <span className="hidden md:flex w-28 px-4 py-3.5 shrink-0 items-center">
+                          <EstatusBadge estatus={e.estatus_sat} />
+                        </span>
+
+                        {/* Régimen Fiscal */}
+                        <span className="hidden lg:block w-48 px-4 py-3.5 text-[var(--text)]/60 text-xs truncate shrink-0">
+                          {e.regimen_fiscal || '—'}
+                        </span>
+
+                        {/* Domicilio */}
+                        <span className="hidden lg:block w-40 px-4 py-3.5 text-[var(--text)]/60 text-xs truncate shrink-0">
+                          {domicilio || '—'}
+                        </span>
+
+                        {/* CSF */}
+                        <span className="hidden sm:flex w-16 px-4 py-3.5 items-center justify-center shrink-0">
+                          {e.csf_url ? (
+                            <FileText className="h-4 w-4 text-[var(--accent)]" />
+                          ) : (
+                            <span className="text-[var(--text)]/20 text-xs">—</span>
+                          )}
+                        </span>
+                      </button>
+
+                      {/* Expanded detail panel */}
+                      <div
+                        className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                          isExpanded ? 'max-h-[5000px] opacity-100' : 'max-h-0 opacity-0'
+                        }`}
+                      >
+                        {isExpanded && (
+                          <div className="border-b border-[var(--border)] border-l-2 border-l-[var(--accent)] bg-[var(--panel)] p-6">
+                            <EmpresaDetail empresa={e} onSaved={fetchEmpresas} />
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
