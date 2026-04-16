@@ -87,7 +87,7 @@ function DepartamentosInner() {
   const fetchAll = useCallback(async (ids: string[]) => {
     if (ids.length === 0) { setDepartamentos([]); return; }
     const { data, error: err } = await supabase
-      .schema('erp' as any).from('departamentos')
+      .schema('erp').from('departamentos')
       .select('id, empresa_id, nombre, codigo, padre_id, activo, padre:padre_id(nombre)')
       .in('empresa_id', ids)
       .order('nombre');
@@ -124,7 +124,7 @@ function DepartamentosInner() {
   const handleSubmit = async () => {
     if (!form.nombre.trim() || empresaIds.length === 0) return;
     setSubmitting(true);
-    const payload: Record<string, unknown> = {
+    const payload = {
       nombre: form.nombre.trim(),
       codigo: form.codigo.trim() || null,
       padre_id: form.padre_id || null,
@@ -132,10 +132,10 @@ function DepartamentosInner() {
 
     let err: { message: string } | null = null;
     if (editingId) {
-      const res = await supabase.schema('erp' as any).from('departamentos').update(payload).eq('id', editingId);
+      const res = await supabase.schema('erp').from('departamentos').update(payload).eq('id', editingId);
       err = res.error;
     } else {
-      const res = await supabase.schema('erp' as any).from('departamentos').insert({ ...payload, empresa_id: empresaIds[0] });
+      const res = await supabase.schema('erp').from('departamentos').insert({ ...payload, empresa_id: empresaIds[0] });
       err = res.error;
     }
 
@@ -146,7 +146,7 @@ function DepartamentosInner() {
   };
 
   const handleToggleActivo = async (dept: Departamento) => {
-    await supabase.schema('erp' as any).from('departamentos').update({ activo: !dept.activo }).eq('id', dept.id);
+    await supabase.schema('erp').from('departamentos').update({ activo: !dept.activo }).eq('id', dept.id);
     await fetchAll(empresaIds);
   };
 

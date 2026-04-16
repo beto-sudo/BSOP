@@ -65,10 +65,10 @@ function DepartamentosInner() {
 
   const fetchAll = useCallback(async () => {
     const [deptRes, empRes] = await Promise.all([
-      supabase.schema('erp' as any).from('departamentos')
+      supabase.schema('erp').from('departamentos')
         .select('id, empresa_id, nombre, codigo, padre_id, activo, padre:padre_id(nombre)')
         .eq('empresa_id', EMPRESA_ID).order('nombre'),
-      supabase.schema('erp' as any).from('empleados')
+      supabase.schema('erp').from('empleados')
         .select('departamento_id')
         .eq('empresa_id', EMPRESA_ID).eq('activo', true).is('deleted_at', null),
     ]);
@@ -79,7 +79,7 @@ function DepartamentosInner() {
     })) as Departamento[];
     setDepartamentos(normalized);
     const counts = new Map<string, number>();
-    (empRes.data ?? []).forEach((e: { departamento_id: string }) => {
+    (empRes.data ?? []).forEach((e: { departamento_id: string | null }) => {
       if (e.departamento_id) counts.set(e.departamento_id, (counts.get(e.departamento_id) ?? 0) + 1);
     });
     setEmpleadoCounts(counts);
@@ -107,7 +107,7 @@ function DepartamentosInner() {
   const handleSubmit = async () => {
     if (!form.nombre.trim()) return;
     setSubmitting(true);
-    const payload: Record<string, unknown> = {
+    const payload = {
       nombre: form.nombre.trim(),
       codigo: form.codigo.trim() || null,
       padre_id: form.padre_id || null,
@@ -115,10 +115,10 @@ function DepartamentosInner() {
 
     let err: { message: string } | null = null;
     if (editingId) {
-      const res = await supabase.schema('erp' as any).from('departamentos').update(payload).eq('id', editingId);
+      const res = await supabase.schema('erp').from('departamentos').update(payload).eq('id', editingId);
       err = res.error;
     } else {
-      const res = await supabase.schema('erp' as any).from('departamentos').insert({ ...payload, empresa_id: EMPRESA_ID });
+      const res = await supabase.schema('erp').from('departamentos').insert({ ...payload, empresa_id: EMPRESA_ID });
       err = res.error;
     }
 
@@ -129,7 +129,7 @@ function DepartamentosInner() {
   };
 
   const handleToggleActivo = async (dept: Departamento) => {
-    await supabase.schema('erp' as any).from('departamentos').update({ activo: !dept.activo }).eq('id', dept.id);
+    await supabase.schema('erp').from('departamentos').update({ activo: !dept.activo }).eq('id', dept.id);
     await fetchAll();
   };
 

@@ -132,7 +132,7 @@ function EmpleadoDetailInner() {
 
   const fetchAll = useCallback(async () => {
     const { data: emp, error: eErr } = await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('empleados')
       .select('id, empresa_id, numero_empleado, fecha_ingreso, fecha_baja, motivo_baja, nss, fecha_nacimiento, telefono_empresa, extension, activo, persona:persona_id(id, nombre, apellido_paterno, apellido_materno, email, telefono, rfc, curp), departamento:departamento_id(id, nombre), puesto:puesto_id(id, nombre)')
       .eq('id', id)
@@ -161,8 +161,8 @@ function EmpleadoDetailInner() {
     setExtension(emp.extension ?? '');
 
     const [deptRes, puestosRes] = await Promise.all([
-      supabase.schema('erp' as any).from('departamentos').select('id, nombre').eq('empresa_id', emp.empresa_id).eq('activo', true).order('nombre'),
-      supabase.schema('erp' as any).from('puestos').select('id, nombre').eq('empresa_id', emp.empresa_id).eq('activo', true).order('nombre'),
+      supabase.schema('erp').from('departamentos').select('id, nombre').eq('empresa_id', emp.empresa_id).eq('activo', true).order('nombre'),
+      supabase.schema('erp').from('puestos').select('id, nombre').eq('empresa_id', emp.empresa_id).eq('activo', true).order('nombre'),
     ]);
     setDepartamentos(deptRes.data ?? []);
     setPuestos(puestosRes.data ?? []);
@@ -176,7 +176,7 @@ function EmpleadoDetailInner() {
     if (!empleado) return;
     setSaving(true);
     const { error: err } = await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('empleados')
       .update({
         numero_empleado: numeroEmpleado.trim() || null,
@@ -198,7 +198,7 @@ function EmpleadoDetailInner() {
     if (!empleado) return;
     setGivingBaja(true);
     const { error: err } = await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('empleados')
       .update({
         activo: false,

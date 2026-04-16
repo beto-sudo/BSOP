@@ -86,12 +86,12 @@ function PuestosInner() {
 
   const fetchAll = useCallback(async () => {
     const [pRes, dRes, empRes] = await Promise.all([
-      supabase.schema('erp' as any).from('puestos')
+      supabase.schema('erp').from('puestos')
         .select('id, empresa_id, nombre, nivel, sueldo_min, sueldo_max, objetivo, perfil, requisitos, esquema_pago, reporta_a, activo, departamento:departamento_id(nombre)')
         .eq('empresa_id', EMPRESA_ID).order('nombre'),
-      supabase.schema('erp' as any).from('departamentos')
+      supabase.schema('erp').from('departamentos')
         .select('id, nombre').eq('empresa_id', EMPRESA_ID).eq('activo', true).order('nombre'),
-      supabase.schema('erp' as any).from('empleados').select('puesto_id').eq('empresa_id', EMPRESA_ID).eq('activo', true).is('deleted_at', null),
+      supabase.schema('erp').from('empleados').select('puesto_id').eq('empresa_id', EMPRESA_ID).eq('activo', true).is('deleted_at', null),
     ]);
     if (pRes.error) { setError(pRes.error.message); return; }
     const normalizedPuestos = (pRes.data ?? []).map((p: any) => ({
@@ -101,7 +101,7 @@ function PuestosInner() {
     setPuestos(normalizedPuestos);
     setDepartamentos(dRes.data ?? []);
     const counts = new Map<string, number>();
-    (empRes.data ?? []).forEach((e: { puesto_id: string }) => {
+    (empRes.data ?? []).forEach((e: { puesto_id: string | null }) => {
       if (e.puesto_id) counts.set(e.puesto_id, (counts.get(e.puesto_id) ?? 0) + 1);
     });
     setEmpleadoCounts(counts);
@@ -140,7 +140,7 @@ function PuestosInner() {
   const handleSubmit = async () => {
     if (!form.nombre.trim()) return;
     setSubmitting(true);
-    const payload: Record<string, unknown> = {
+    const payload = {
       nombre: form.nombre.trim(),
       nivel: form.nivel.trim() || null,
       departamento_id: form.departamento_id || null,
@@ -155,10 +155,10 @@ function PuestosInner() {
 
     let err: { message: string } | null = null;
     if (editingId) {
-      const res = await supabase.schema('erp' as any).from('puestos').update(payload).eq('id', editingId);
+      const res = await supabase.schema('erp').from('puestos').update(payload).eq('id', editingId);
       err = res.error;
     } else {
-      const res = await supabase.schema('erp' as any).from('puestos').insert({ ...payload, empresa_id: EMPRESA_ID });
+      const res = await supabase.schema('erp').from('puestos').insert({ ...payload, empresa_id: EMPRESA_ID });
       err = res.error;
     }
 

@@ -67,13 +67,13 @@ function EmpleadosInner() {
 
   const fetchAll = useCallback(async () => {
     const [empRes, personasRes, deptRes, puestosRes] = await Promise.all([
-      supabase.schema('erp' as any).from('empleados')
+      supabase.schema('erp').from('empleados')
         .select('id, empresa_id, numero_empleado, fecha_ingreso, fecha_baja, activo, persona:persona_id(nombre, apellido_paterno, apellido_materno, email), departamento:departamento_id(nombre), puesto:puesto_id(nombre)')
         .eq('empresa_id', EMPRESA_ID).is('deleted_at', null).order('created_at', { ascending: false }),
-      supabase.schema('erp' as any).from('personas').select('id, nombre, apellido_paterno')
+      supabase.schema('erp').from('personas').select('id, nombre, apellido_paterno')
         .eq('empresa_id', EMPRESA_ID).eq('activo', true).is('deleted_at', null).order('nombre'),
-      supabase.schema('erp' as any).from('departamentos').select('id, nombre').eq('empresa_id', EMPRESA_ID).eq('activo', true).order('nombre'),
-      supabase.schema('erp' as any).from('puestos').select('id, nombre').eq('empresa_id', EMPRESA_ID).eq('activo', true).order('nombre'),
+      supabase.schema('erp').from('departamentos').select('id, nombre').eq('empresa_id', EMPRESA_ID).eq('activo', true).order('nombre'),
+      supabase.schema('erp').from('puestos').select('id, nombre').eq('empresa_id', EMPRESA_ID).eq('activo', true).order('nombre'),
     ]);
     if (empRes.error) { setError(empRes.error.message); return; }
     setEmpleados((empRes.data ?? []).map((e: any) => ({
@@ -98,7 +98,7 @@ function EmpleadosInner() {
   const handleCreate = async () => {
     if (!createForm.persona_id) return;
     setCreating(true);
-    const { data: newEmp, error: err } = await supabase.schema('erp' as any).from('empleados')
+    const { data: newEmp, error: err } = await supabase.schema('erp').from('empleados')
       .insert({
         empresa_id: EMPRESA_ID, persona_id: createForm.persona_id,
         departamento_id: createForm.departamento_id || null, puesto_id: createForm.puesto_id || null,
