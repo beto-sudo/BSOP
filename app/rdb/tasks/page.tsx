@@ -13,6 +13,9 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
 import {
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
+} from '@/components/ui/sheet';
+import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
@@ -20,7 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  Plus, Search, RefreshCw, ChevronRight, Loader2, TicketCheck,
+  Plus, Search, RefreshCw, ChevronRight, Loader2, TicketCheck, MessageSquarePlus, Clock,
 } from 'lucide-react';
 
 const EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
@@ -43,6 +46,19 @@ type ErpTask = {
 };
 
 type Empleado = { id: string; nombre: string };
+
+type TaskUpdate = {
+  id: string;
+  task_id: string;
+  tipo: string;
+  contenido: string | null;
+  valor_anterior: string | null;
+  valor_nuevo: string | null;
+  creado_por: string | null;
+  created_at: string;
+  usuario?: { nombre: string } | null;
+};
+
 type CreateForm = {
   titulo: string;
   descripcion: string;
@@ -121,6 +137,12 @@ function TasksInner() {
   const [createForm, setCreateForm] = useState<CreateForm>({
     titulo: '', descripcion: '', prioridad: '', asignado_a: '', estado: 'pendiente', fecha_vence: '',
   });
+
+  const [taskUpdates, setTaskUpdates] = useState<TaskUpdate[]>([]);
+  const [showUpdatesSheet, setShowUpdatesSheet] = useState<string | null>(null);
+  const [updateForm, setUpdateForm] = useState({ contenido: '' });
+  const [savingUpdate, setSavingUpdate] = useState(false);
+  const [loadingUpdates, setLoadingUpdates] = useState(false);
 
   const fetchRefData = useCallback(async () => {
     const { data: empRes } = await supabase
@@ -213,6 +235,52 @@ function TasksInner() {
     if (newTask) {
       router.push(`/rdb/tasks/${newTask.id}`);
     }
+  };
+
+  const fetchUpdatesForTask = async (taskId: string) => {
+    setLoadingUpdates(true);
+    const { data: updatesData } = await supabase.schema('erp' as any).from('task_updates').select('*').eq('task_id', taskId).order('created_at', { ascending: false });
+    if (updatesData && updatesData.length > 0) {
+      const userIds = [...new Set(updatesData.map((u: any) => u.creado_por).filter(Boolean))];
+      const { data: usersData } = userIds.length > 0
+        ? await supabase.schema('core' as any).from('usuarios').select('id, nombre').in('id', userIds)
+        : { data: [] };
+      const userMap = new Map((usersData ?? []).map((u: any) => [u.id, u.nombre]));
+      setTaskUpdates(updatesData.map((u: any) => ({ ...u, usuario: u.creado_por ? { nombre: userMap.get(u.creado_por) ?? 'Usuario' } : null })));
+    } else {
+      setTaskUpdates([]);
+    }
+    setLoadingUpdates(false);
+  };
+
+  const handleOpenUpdatesSheet = (taskId: string) => {
+    setShowUpdatesSheet(taskId);
+    setUpdateForm({ contenido: '' });
+    void fetchUpdatesForTask(taskId);
+  };
+
+  const handleSaveUpdate = async () => {
+    const taskId = showUpdatesSheet;
+    if (!taskId || !updateForm.contenido.trim()) return;
+    setSavingUpdate(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: coreUser } = await supabase.schema('core' as any).from('usuarios').select('id, nombre').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
+    const userId = coreUser?.id ?? null;
+    const userName = coreUser?.nombre ?? 'Usuario';
+
+    const { error: insErr } = await supabase.schema('erp' as any).from('task_updates').insert({
+      task_id: taskId, empresa_id: EMPRESA_ID, tipo: 'avance', contenido: updateForm.contenido.trim(), creado_por: userId,
+    });
+    if (insErr) { alert(`Error: ${insErr.message}`); setSavingUpdate(false); return; }
+
+    const now = new Date().toISOString();
+    setTaskUpdates(prev => [{
+      id: `temp-${Date.now()}`, task_id: taskId, tipo: 'avance', contenido: updateForm.contenido.trim(),
+      valor_anterior: null, valor_nuevo: null, creado_por: userId, created_at: now, usuario: { nombre: userName },
+    }, ...prev]);
+
+    setSavingUpdate(false);
+    setUpdateForm({ contenido: '' });
   };
 
   const empleadoMap = new Map(empleados.map((e) => [e.id, e]));
@@ -350,6 +418,7 @@ function TasksInner() {
                 <SortableHead sortKey="asignado_nombre" label="Asignado a" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-40" />
                 <SortableHead sortKey="fecha_vence" label="Vence" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
                 <TableHead className="w-10" />
+                <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -382,6 +451,16 @@ function TasksInner() {
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-[var(--text)]/70">{formatDate(task.fecha_vence)}</span>
+                    </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        title="Ver / agregar avances"
+                        onClick={() => handleOpenUpdatesSheet(task.id)}
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 text-[var(--accent)] transition hover:bg-[var(--accent)]/20"
+                      >
+                        <MessageSquarePlus className="h-3 w-3" />
+                      </button>
                     </TableCell>
                     <TableCell>
                       <ChevronRight className="h-4 w-4 text-[var(--text)]/30" />

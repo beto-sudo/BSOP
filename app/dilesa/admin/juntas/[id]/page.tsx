@@ -823,6 +823,66 @@ function JuntaDetailInner() {
         </div>
       </div>
 
+      {/* ── Actualizaciones de tareas ─────────────────────────── */}
+      {tasks.length > 0 && (
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
+          <SectionTitle>Actualizaciones de tareas</SectionTitle>
+          {taskUpdates.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-6 text-center">
+              <Clock className="mb-2 h-8 w-8 text-[var(--text)]/20" />
+              <p className="text-sm text-[var(--text)]/50">No hay actualizaciones registradas</p>
+            </div>
+          ) : (() => {
+            const grouped = new Map<string, TaskUpdate[]>();
+            for (const u of taskUpdates) {
+              const arr = grouped.get(u.task_id) ?? [];
+              arr.push(u);
+              grouped.set(u.task_id, arr);
+            }
+            return (
+              <div className="space-y-4">
+                {Array.from(grouped.entries()).map(([taskId, updates]) => {
+                  const task = tasks.find(t => t.id === taskId);
+                  if (!task) return null;
+                  return (
+                    <div key={taskId} className="space-y-2">
+                      <p className="text-xs font-semibold text-[var(--text)]/50 uppercase tracking-wide">{task.titulo}</p>
+                      {updates.map(u => {
+                        const tipoCfg: Record<string, { label: string; cls: string }> = {
+                          avance: { label: 'Avance', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
+                          cambio_estado: { label: 'Estado', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
+                          cambio_fecha: { label: 'Fecha', cls: 'bg-purple-500/15 text-purple-400 border-purple-500/20' },
+                          nota: { label: 'Nota', cls: 'bg-[var(--border)]/60 text-[var(--text)]/60 border-[var(--border)]' },
+                          cambio_responsable: { label: 'Responsable', cls: 'bg-teal-500/15 text-teal-400 border-teal-500/20' },
+                        };
+                        const tc = tipoCfg[u.tipo] ?? { label: u.tipo, cls: '' };
+                        return (
+                          <div key={u.id} className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2.5">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[10px] font-medium ${tc.cls}`}>{tc.label}</span>
+                              <span className="text-[10px] text-[var(--text)]/40">{u.usuario?.nombre ?? 'Sistema'}</span>
+                              <span className="text-[10px] text-[var(--text)]/30 ml-auto">{formatDate(u.created_at)}</span>
+                            </div>
+                            {u.contenido && <p className="text-sm text-[var(--text)]/80">{u.contenido}</p>}
+                            {u.valor_anterior != null && u.valor_nuevo != null && (
+                              <p className="text-xs text-[var(--text)]/50">
+                                {u.tipo === 'cambio_estado'
+                                  ? `${ESTADO_TASK[u.valor_anterior]?.label ?? u.valor_anterior} → ${ESTADO_TASK[u.valor_nuevo]?.label ?? u.valor_nuevo}`
+                                  : `${u.valor_anterior || '—'} → ${u.valor_nuevo || '—'}`}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
         <div className="flex items-center justify-between mb-3">
           <SectionTitle>Tareas de esta junta {tasks.length > 0 && <span className="text-[var(--text)]/40 font-normal">({tasks.length})</span>}</SectionTitle>
@@ -890,66 +950,6 @@ function JuntaDetailInner() {
           );
         })()}
       </div>
-
-      {/* ── Actualizaciones de tareas ─────────────────────────── */}
-      {tasks.length > 0 && (
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
-          <SectionTitle>Actualizaciones de tareas</SectionTitle>
-          {taskUpdates.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-6 text-center">
-              <Clock className="mb-2 h-8 w-8 text-[var(--text)]/20" />
-              <p className="text-sm text-[var(--text)]/50">No hay actualizaciones registradas</p>
-            </div>
-          ) : (() => {
-            const grouped = new Map<string, TaskUpdate[]>();
-            for (const u of taskUpdates) {
-              const arr = grouped.get(u.task_id) ?? [];
-              arr.push(u);
-              grouped.set(u.task_id, arr);
-            }
-            return (
-              <div className="space-y-4">
-                {Array.from(grouped.entries()).map(([taskId, updates]) => {
-                  const task = tasks.find(t => t.id === taskId);
-                  if (!task) return null;
-                  return (
-                    <div key={taskId} className="space-y-2">
-                      <p className="text-xs font-semibold text-[var(--text)]/50 uppercase tracking-wide">{task.titulo}</p>
-                      {updates.map(u => {
-                        const tipoCfg: Record<string, { label: string; cls: string }> = {
-                          avance: { label: 'Avance', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
-                          cambio_estado: { label: 'Estado', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
-                          cambio_fecha: { label: 'Fecha', cls: 'bg-purple-500/15 text-purple-400 border-purple-500/20' },
-                          nota: { label: 'Nota', cls: 'bg-[var(--border)]/60 text-[var(--text)]/60 border-[var(--border)]' },
-                          cambio_responsable: { label: 'Responsable', cls: 'bg-teal-500/15 text-teal-400 border-teal-500/20' },
-                        };
-                        const tc = tipoCfg[u.tipo] ?? { label: u.tipo, cls: '' };
-                        return (
-                          <div key={u.id} className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2.5">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[10px] font-medium ${tc.cls}`}>{tc.label}</span>
-                              <span className="text-[10px] text-[var(--text)]/40">{u.usuario?.nombre ?? 'Sistema'}</span>
-                              <span className="text-[10px] text-[var(--text)]/30 ml-auto">{formatDate(u.created_at)}</span>
-                            </div>
-                            {u.contenido && <p className="text-sm text-[var(--text)]/80">{u.contenido}</p>}
-                            {u.valor_anterior != null && u.valor_nuevo != null && (
-                              <p className="text-xs text-[var(--text)]/50">
-                                {u.tipo === 'cambio_estado'
-                                  ? `${ESTADO_TASK[u.valor_anterior]?.label ?? u.valor_anterior} → ${ESTADO_TASK[u.valor_nuevo]?.label ?? u.valor_nuevo}`
-                                  : `${u.valor_anterior || '—'} → ${u.valor_nuevo || '—'}`}
-                              </p>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
-        </div>
-      )}
 
       {/* ── Sheet: Agregar avance ──────────────────────────────── */}
       <Sheet open={!!showAddUpdate} onOpenChange={(open) => { if (!open) { setShowAddUpdate(null); setUpdateForm({ contenido: '', nuevoEstado: '', nuevaFecha: '' }); } }}>

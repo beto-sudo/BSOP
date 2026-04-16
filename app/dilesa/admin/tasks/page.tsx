@@ -25,7 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  Plus, Search, RefreshCw, Loader2, TicketCheck, Trash2, Check, ChevronsUpDown, Eye, EyeOff,
+  Plus, Search, RefreshCw, Loader2, TicketCheck, Trash2, Check, ChevronsUpDown, Eye, EyeOff, MessageSquarePlus, Clock,
 } from 'lucide-react';
 
 const EMPRESA_ID = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479';
@@ -58,6 +58,18 @@ type ErpTask = {
 };
 
 type Empleado = { id: string; nombre: string };
+
+type TaskUpdate = {
+  id: string;
+  task_id: string;
+  tipo: string;
+  contenido: string | null;
+  valor_anterior: string | null;
+  valor_nuevo: string | null;
+  creado_por: string | null;
+  created_at: string;
+  usuario?: { nombre: string } | null;
+};
 
 type TaskForm = {
   titulo: string;
@@ -246,6 +258,12 @@ function TasksInner() {
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
 
   const [inlineAvance, setInlineAvance] = useState<{ taskId: string; value: number } | null>(null);
+
+  const [taskUpdates, setTaskUpdates] = useState<TaskUpdate[]>([]);
+  const [showUpdatesSheet, setShowUpdatesSheet] = useState<string | null>(null);
+  const [updateForm, setUpdateForm] = useState({ contenido: '' });
+  const [savingUpdate, setSavingUpdate] = useState(false);
+  const [loadingUpdates, setLoadingUpdates] = useState(false);
 
   const fetchRefData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -470,6 +488,52 @@ function TasksInner() {
     await fetchTasks();
   };
 
+  const fetchUpdatesForTask = async (taskId: string) => {
+    setLoadingUpdates(true);
+    const { data: updatesData } = await supabase.schema('erp' as any).from('task_updates').select('*').eq('task_id', taskId).order('created_at', { ascending: false });
+    if (updatesData && updatesData.length > 0) {
+      const userIds = [...new Set(updatesData.map((u: any) => u.creado_por).filter(Boolean))];
+      const { data: usersData } = userIds.length > 0
+        ? await supabase.schema('core' as any).from('usuarios').select('id, nombre').in('id', userIds)
+        : { data: [] };
+      const userMap = new Map((usersData ?? []).map((u: any) => [u.id, u.nombre]));
+      setTaskUpdates(updatesData.map((u: any) => ({ ...u, usuario: u.creado_por ? { nombre: userMap.get(u.creado_por) ?? 'Usuario' } : null })));
+    } else {
+      setTaskUpdates([]);
+    }
+    setLoadingUpdates(false);
+  };
+
+  const handleOpenUpdatesSheet = (taskId: string) => {
+    setShowUpdatesSheet(taskId);
+    setUpdateForm({ contenido: '' });
+    void fetchUpdatesForTask(taskId);
+  };
+
+  const handleSaveUpdate = async () => {
+    const taskId = showUpdatesSheet;
+    if (!taskId || !updateForm.contenido.trim()) return;
+    setSavingUpdate(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: coreUser } = await supabase.schema('core' as any).from('usuarios').select('id, nombre').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
+    const userId = coreUser?.id ?? null;
+    const userName = coreUser?.nombre ?? 'Usuario';
+
+    const { error: insErr } = await supabase.schema('erp' as any).from('task_updates').insert({
+      task_id: taskId, empresa_id: EMPRESA_ID, tipo: 'avance', contenido: updateForm.contenido.trim(), creado_por: userId,
+    });
+    if (insErr) { alert(`Error: ${insErr.message}`); setSavingUpdate(false); return; }
+
+    const now = new Date().toISOString();
+    setTaskUpdates(prev => [{
+      id: `temp-${Date.now()}`, task_id: taskId, tipo: 'avance', contenido: updateForm.contenido.trim(),
+      valor_anterior: null, valor_nuevo: null, creado_por: userId, created_at: now, usuario: { nombre: userName },
+    }, ...prev]);
+
+    setSavingUpdate(false);
+    setUpdateForm({ contenido: '' });
+  };
+
   const empleadoMap = useMemo(() => new Map(empleados.map((e) => [e.id, e])), [empleados]);
   const empleadoOptions = useMemo(() => empleados.map(e => ({ id: e.id, label: e.nombre })), [empleados]);
   const deptoOptions = useMemo(() => {
@@ -647,6 +711,7 @@ function TasksInner() {
                 <SortableHead sortKey="asignado_nombre" label="Responsable" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[120px]" />
                 <SortableHead sortKey="fecha_compromiso" label="Compromiso" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[95px]" />
                 <SortableHead sortKey="created_at" label="Días" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[55px]" />
+                <TableHead className="w-10 min-w-[40px]" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -758,6 +823,16 @@ function TasksInner() {
                         })()}
                       </span>
                     </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        title="Ver / agregar avances"
+                        onClick={() => handleOpenUpdatesSheet(task.id)}
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 text-[var(--accent)] transition hover:bg-[var(--accent)]/20"
+                      >
+                        <MessageSquarePlus className="h-3 w-3" />
+                      </button>
+                    </TableCell>
                   </TableRow>
                 );
               })}
@@ -868,6 +943,80 @@ function TasksInner() {
               {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               Crear tarea
             </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* ── Updates Sheet ────────────────────────────────────────────── */}
+      <Sheet open={!!showUpdatesSheet} onOpenChange={(open) => { if (!open) { setShowUpdatesSheet(null); setTaskUpdates([]); setUpdateForm({ contenido: '' }); } }}>
+        <SheetContent side="right" className="w-full sm:max-w-lg border-[var(--border)] bg-[var(--card)] text-[var(--text)] overflow-y-auto">
+          <SheetHeader className="pb-2">
+            <SheetTitle className="text-[var(--text)] text-lg">Avances de tarea</SheetTitle>
+            <SheetDescription className="text-[var(--text)]/50">
+              {showUpdatesSheet ? (tasks.find(t => t.id === showUpdatesSheet)?.titulo ?? '') : ''}
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-3">
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50">Nuevo avance</div>
+              <Textarea
+                placeholder="Describe el avance o actualización..."
+                value={updateForm.contenido}
+                onChange={(e) => setUpdateForm({ contenido: e.target.value })}
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)] min-h-[80px]"
+              />
+              <Button
+                onClick={handleSaveUpdate}
+                disabled={savingUpdate || !updateForm.contenido.trim()}
+                className="w-full gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60"
+              >
+                {savingUpdate ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquarePlus className="h-4 w-4" />}
+                Guardar avance
+              </Button>
+            </div>
+
+            <div className="border-t border-[var(--border)] pt-4">
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50 mb-3">Historial</div>
+              {loadingUpdates ? (
+                <div className="flex items-center justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-[var(--text)]/30" /></div>
+              ) : taskUpdates.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-6 text-center">
+                  <Clock className="mb-2 h-8 w-8 text-[var(--text)]/20" />
+                  <p className="text-sm text-[var(--text)]/50">No hay actualizaciones registradas</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {taskUpdates.map(u => {
+                    const tipoCfg: Record<string, { label: string; cls: string }> = {
+                      avance: { label: 'Avance', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
+                      cambio_estado: { label: 'Estado', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
+                      cambio_fecha: { label: 'Fecha', cls: 'bg-purple-500/15 text-purple-400 border-purple-500/20' },
+                      nota: { label: 'Nota', cls: 'bg-[var(--border)]/60 text-[var(--text)]/60 border-[var(--border)]' },
+                      cambio_responsable: { label: 'Responsable', cls: 'bg-teal-500/15 text-teal-400 border-teal-500/20' },
+                    };
+                    const tc = tipoCfg[u.tipo] ?? { label: u.tipo, cls: '' };
+                    return (
+                      <div key={u.id} className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2.5">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[10px] font-medium ${tc.cls}`}>{tc.label}</span>
+                          <span className="text-[10px] text-[var(--text)]/40">{u.usuario?.nombre ?? 'Sistema'}</span>
+                          <span className="text-[10px] text-[var(--text)]/30 ml-auto">{formatDate(u.created_at)}</span>
+                        </div>
+                        {u.contenido && <p className="text-sm text-[var(--text)]/80">{u.contenido}</p>}
+                        {u.valor_anterior != null && u.valor_nuevo != null && (
+                          <p className="text-xs text-[var(--text)]/50">
+                            {u.tipo === 'cambio_estado'
+                              ? `${ESTADO_CONFIG[u.valor_anterior as ErpTask['estado']]?.label ?? u.valor_anterior} → ${ESTADO_CONFIG[u.valor_nuevo as ErpTask['estado']]?.label ?? u.valor_nuevo}`
+                              : `${u.valor_anterior || '—'} → ${u.valor_nuevo || '—'}`}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </SheetContent>
       </Sheet>
