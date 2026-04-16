@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint / Typecheck / Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: TypeScript — typecheck
+        run: npm run typecheck
+
+      - name: Vitest — unit tests
+        run: npm run test:run
+
+      # ESLint and Prettier `--check` are intentionally OUT of CI for now.
+      # The codebase has never been bulk-linted/formatted, so running either
+      # against the whole tree would produce hundreds of legacy errors and
+      # block every unrelated PR. Both are enforced on NEW / changed code via
+      # the Husky + lint-staged pre-commit hook (see package.json "lint-staged").
+      # A future dedicated cleanup PR will run a one-time mass lint+format and
+      # re-enable these checks in CI.
