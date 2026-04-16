@@ -78,7 +78,6 @@ type StockItem = {
   bajo_minimo: boolean;
   clasificacion?: string;
 };
-};
 
 type MovimientoRow = {
   id: string;
@@ -155,10 +154,13 @@ function tipoColorClass(tipo: string, cantidad: number): string {
 
 // ─── Summary Bar ──────────────────────────────────────────────────────────────
 
+const CLASIFICACION_INVENTARIO = ['inventariable', 'merchandising'];
+
 function SummaryBar({ items }: { items: StockItem[] }) {
-  const bajosMinimo = items.filter((i) => i.bajo_minimo).length;
-  const sinStock = items.filter((i) => i.stock_actual <= 0).length;
-  const totalValue = items.reduce((acc, curr) => acc + (curr.valor_inventario || 0), 0);
+  const valorables = items.filter((i) => CLASIFICACION_INVENTARIO.includes(i.clasificacion ?? ''));
+  const bajosMinimo = valorables.filter((i) => i.bajo_minimo).length;
+  const sinStock = valorables.filter((i) => i.stock_actual <= 0).length;
+  const totalValue = valorables.reduce((acc, curr) => acc + (curr.valor_inventario || 0), 0);
   return (
     <div className="grid grid-cols-4 gap-3">
       <div className="rounded-xl border bg-card px-4 py-3">
@@ -166,7 +168,7 @@ function SummaryBar({ items }: { items: StockItem[] }) {
           <Boxes className="h-3.5 w-3.5" />
           Productos
         </div>
-        <div className="mt-1 text-2xl font-semibold tabular-nums">{items.length}</div>
+        <div className="mt-1 text-2xl font-semibold tabular-nums">{valorables.length}</div>
       </div>
       <div className="rounded-xl border bg-card px-4 py-3">
         <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -590,6 +592,7 @@ export default function InventarioPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [fechaCorte, setFechaCorte] = useState<string | null>(null);
   const [categoriaFiltro, setCategoriaFiltro] = useState<string>('');
+  const [clasificacionFiltro, setClasificacionFiltro] = useState<string>('');
 
   const fetchStock = useCallback(async () => {
     setLoadingStock(true);
@@ -668,6 +671,7 @@ export default function InventarioPage() {
     setTab(newTab);
     setSearch('');
     setCategoriaFiltro('');
+    setClasificacionFiltro('');
   };
 
   const handleRefresh = () => {
@@ -845,6 +849,7 @@ export default function InventarioPage() {
     if (!showServicios && !i.inventariable) return false;
     if (showBajoMinimo && !i.bajo_minimo) return false;
     if (categoriaFiltro && i.categoria !== categoriaFiltro) return false;
+    if (clasificacionFiltro && i.clasificacion !== clasificacionFiltro) return false;
     if (!search) return true;
     const q = search.toLowerCase();
     return (
@@ -1009,6 +1014,20 @@ export default function InventarioPage() {
         )}
 
         {tab === 'stock' && (
+          <Select value={clasificacionFiltro} onValueChange={(v) => setClasificacionFiltro(v ?? '')}>
+            <SelectTrigger className="w-40 h-8 text-sm">
+              <SelectValue placeholder="Clasificación" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Todas</SelectItem>
+              {['inventariable','consumible','merchandising','activo_fijo'].map(c => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {tab === 'stock' && (
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Al corte:</span>
             <input
@@ -1091,6 +1110,7 @@ export default function InventarioPage() {
             <TableHeader>
               <TableRow>
                 <SortableHead sortKey="nombre" label="Producto" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+                <SortableHead sortKey="clasificacion" label="Clasif." currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
                 <SortableHead sortKey="categoria" label="Categoría" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
                 <SortableHead sortKey="stock_actual" label="Stock Actual" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="text-right" />
                 <SortableHead sortKey="stock_minimo" label="Mínimo" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="text-right" />
@@ -1103,7 +1123,7 @@ export default function InventarioPage() {
               {loadingStock ? (
                 Array.from({ length: 8 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 7 }).map((__, j) => (
+                    {Array.from({ length: 8 }).map((__, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-4 w-full" />
                       </TableCell>
@@ -1113,7 +1133,7 @@ export default function InventarioPage() {
               ) : filteredStock.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={7}
+                    colSpan={8}
                     className="py-12 text-center text-muted-foreground"
                   >
                     No se encontraron productos.
@@ -1131,6 +1151,11 @@ export default function InventarioPage() {
                   >
                     <TableCell>
                       <span className="font-medium">{item.nombre}</span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs font-normal">
+                        {item.clasificacion ?? '—'}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {item.categoria ?? '—'}
