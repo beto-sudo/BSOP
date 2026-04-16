@@ -1,0 +1,42 @@
+# Build output
+.next/
+dist/
+build/
+out/
+
+# Dependencies
+node_modules/
+
+# Coverage / test artifacts
+coverage/
+playwright-report/
+test-results/
+
+# Supabase generated files
+supabase/functions/_shared/
+types/supabase.ts
+
+# Lock files
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Archived legacy content — do not reformat
+docs/archive/
+
+# Env & credentials
+.env*
+!.env.local.example
+!.env.test.local.example
+.env.auth
+.git-credentials
+
+# IDE / OS
+.vscode/
+.DS_Store
+
+# Vercel
+.vercel/
+
+# TS build info
+*.tsbuildinfo
