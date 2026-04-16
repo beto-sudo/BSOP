@@ -176,7 +176,7 @@ export async function POST(req: NextRequest) {
   // Use created_at (server timestamp at real start) instead of fecha_hora
   // (datetime-local input stored without timezone, often off by UTC offset)
   const { data: existing } = await supabase
-    .schema('erp' as any).from('juntas').select('fecha_hora, created_at').eq('id', juntaId).single();
+    .schema('erp').from('juntas').select('fecha_hora, created_at').eq('id', juntaId).single();
 
   const now = new Date();
   const startRef = existing?.created_at ?? existing?.fecha_hora;
@@ -186,7 +186,7 @@ export async function POST(req: NextRequest) {
 
   // ── Update junta: completada + auto duration ───────────────────────────────
   const { data: junta, error: jErr } = await supabase
-    .schema('erp' as any)
+    .schema('erp')
     .from('juntas')
     .update({
       estado: 'completada',
@@ -203,7 +203,7 @@ export async function POST(req: NextRequest) {
 
   // ── Fetch attendees ────────────────────────────────────────────────────────
   const { data: asistencia } = await supabase
-    .schema('erp' as any)
+    .schema('erp')
     .from('juntas_asistencia')
     .select('asistio, persona:persona_id(nombre, apellido_paterno, email)')
     .eq('junta_id', juntaId);
@@ -220,7 +220,7 @@ export async function POST(req: NextRequest) {
 
   // ── Fetch tasks linked to this meeting ─────────────────────────────────────
   const { data: tasksData } = await supabase
-    .schema('erp' as any)
+    .schema('erp')
     .from('tasks')
     .select('titulo, estado, fecha_compromiso, asignado_a')
     .eq('entidad_tipo', 'junta')
@@ -228,7 +228,7 @@ export async function POST(req: NextRequest) {
 
   const empleadoIds = [...new Set((tasksData ?? []).map((t: any) => t.asignado_a).filter(Boolean))];
   const { data: empData } = empleadoIds.length > 0
-    ? await supabase.schema('erp' as any).from('empleados').select('id, persona:persona_id(nombre, apellido_paterno)').in('id', empleadoIds)
+    ? await supabase.schema('erp').from('empleados').select('id, persona:persona_id(nombre, apellido_paterno)').in('id', empleadoIds)
     : { data: [] };
   const empMap = new Map((empData ?? []).map((e: any) => [e.id, [e.persona?.nombre, e.persona?.apellido_paterno].filter(Boolean).join(' ')]));
 
@@ -247,7 +247,7 @@ export async function POST(req: NextRequest) {
   let actualizaciones: { tarea: string; contenido: string; tipo: string; autor: string }[] = [];
   if (taskIds.length > 0) {
     const { data: updatesData } = await supabase
-      .schema('erp' as any).from('task_updates').select('task_id, tipo, contenido, valor_anterior, valor_nuevo, creado_por')
+      .schema('erp').from('task_updates').select('task_id, tipo, contenido, valor_anterior, valor_nuevo, creado_por')
       .in('task_id', taskIds);
 
     if (updatesData && updatesData.length > 0) {

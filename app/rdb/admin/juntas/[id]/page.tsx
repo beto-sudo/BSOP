@@ -61,7 +61,7 @@ type Junta = {
   titulo: string;
   descripcion: string | null;
   fecha_hora: string;
-  duracion_minutos: number;
+  duracion_minutos: number | null;
   lugar: string | null;
   estado: 'programada' | 'en_curso' | 'completada' | 'cancelada';
   tipo: string | null;
@@ -76,7 +76,7 @@ type Asistencia = {
   persona_id: string | null;
   asistio: boolean | null;
   notas: string | null;
-  persona?: { nombre: string; apellido_paterno: string | null };
+  persona?: { nombre: string; apellido_paterno: string | null } | null;
 };
 
 type JuntaTask = {
@@ -273,7 +273,7 @@ function JuntaDetailInner() {
 
   const fetchAll = useCallback(async () => {
     const { data: juntaData, error: jErr } = await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('juntas')
       .select('*')
       .eq('id', id)
@@ -285,12 +285,12 @@ function JuntaDetailInner() {
       return;
     }
 
-    setJunta(juntaData);
+    setJunta(juntaData as Junta);
     setTitulo(juntaData.titulo);
     setFechaHora(toDatetimeLocal(juntaData.fecha_hora));
     setDuracion(String(juntaData.duracion_minutos ?? 60));
     setLugar(juntaData.lugar ?? '');
-    setEstado(juntaData.estado);
+    setEstado(juntaData.estado as Junta['estado']);
     setTipo(juntaData.tipo ?? '');
 
     if (editor && juntaData.descripcion) {
@@ -298,27 +298,27 @@ function JuntaDetailInner() {
     }
 
     const { data: asistData } = await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('juntas_asistencia')
       .select('*, persona:persona_id(nombre, apellido_paterno)')
       .eq('junta_id', id)
       .order('created_at');
 
-    setAsistencia(asistData ?? []);
+    setAsistencia((asistData ?? []) as Asistencia[]);
 
     const { data: tasksData } = await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('tasks')
       .select('id, titulo, estado, asignado_a, fecha_vence')
       .eq('entidad_tipo', 'junta')
       .eq('entidad_id', id)
       .order('created_at');
 
-    setTasks(tasksData ?? []);
+    setTasks((tasksData ?? []) as JuntaTask[]);
 
     const taskIds = (tasksData ?? []).map((t: any) => t.id);
     if (taskIds.length > 0) {
-      const { data: updatesData } = await supabase.schema('erp' as any).from('task_updates').select('*').in('task_id', taskIds).order('created_at', { ascending: false });
+      const { data: updatesData } = await supabase.schema('erp').from('task_updates').select('*').in('task_id', taskIds).order('created_at', { ascending: false });
       if (updatesData && updatesData.length > 0) {
         const userIds = [...new Set(updatesData.map((u: any) => u.creado_por).filter(Boolean))];
         const { data: usersData } = userIds.length > 0
@@ -332,7 +332,7 @@ function JuntaDetailInner() {
     }
 
     const { data: personasData } = await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('personas')
       .select('id, nombre, apellido_paterno')
       .eq('empresa_id', EMPRESA_ID)
@@ -348,7 +348,7 @@ function JuntaDetailInner() {
     );
 
     const { data: empData } = await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('empleados')
       .select('id, persona:persona_id(nombre, apellido_paterno)')
       .eq('empresa_id', EMPRESA_ID)
@@ -382,7 +382,7 @@ function JuntaDetailInner() {
     const notesHtml = editor?.getHTML() ?? null;
 
     const { error: err } = await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('juntas')
       .update({
         titulo: titulo.trim(),
@@ -418,7 +418,7 @@ function JuntaDetailInner() {
         const currentHtml = editor.getHTML();
         if (currentHtml === lastSavedHtmlRef.current) return;
         setAutoSaveStatus('saving');
-        const { error: err } = await supabase.schema('erp' as any).from('juntas').update({
+        const { error: err } = await supabase.schema('erp').from('juntas').update({
           descripcion: currentHtml && currentHtml !== '<p></p>' ? currentHtml : null,
         }).eq('id', junta.id);
         if (!err) {
@@ -441,7 +441,7 @@ function JuntaDetailInner() {
     const flushSave = () => {
       const html = editor.getHTML();
       if (html !== lastSavedHtmlRef.current && html !== '<p></p>') {
-        supabase.schema('erp' as any).from('juntas').update({ descripcion: html }).eq('id', juntaId).then(() => { lastSavedHtmlRef.current = html; });
+        supabase.schema('erp').from('juntas').update({ descripcion: html }).eq('id', juntaId).then(() => { lastSavedHtmlRef.current = html; });
       }
     };
     const handleVisChange = () => { if (document.visibilityState === 'hidden') flushSave(); };
@@ -469,7 +469,7 @@ function JuntaDetailInner() {
     const poll = async () => {
       try {
         if (!isEditingRef.current && editor) {
-          const { data: fresh } = await supabase.schema('erp' as any).from('juntas').select('descripcion').eq('id', juntaId).maybeSingle();
+          const { data: fresh } = await supabase.schema('erp').from('juntas').select('descripcion').eq('id', juntaId).maybeSingle();
           if (fresh) {
             const remoteHtml = fresh.descripcion ?? '';
             const localHtml = editor.getHTML();
@@ -479,12 +479,12 @@ function JuntaDetailInner() {
             }
           }
         }
-        const { data: tasksData } = await supabase.schema('erp' as any).from('tasks').select('id, titulo, estado, asignado_a, fecha_vence').eq('entidad_tipo', 'junta').eq('entidad_id', juntaId).order('created_at');
+        const { data: tasksData } = await supabase.schema('erp').from('tasks').select('id, titulo, estado, asignado_a, fecha_vence').eq('entidad_tipo', 'junta').eq('entidad_id', juntaId).order('created_at');
         if (tasksData) {
-          setTasks(tasksData);
+          setTasks(tasksData as JuntaTask[]);
           const tIds = tasksData.map((t: any) => t.id);
           if (tIds.length > 0) {
-            const { data: updData } = await supabase.schema('erp' as any).from('task_updates')
+            const { data: updData } = await supabase.schema('erp').from('task_updates')
               .select('*').in('task_id', tIds).order('created_at', { ascending: false });
             if (updData) {
               const uIds = [...new Set(updData.map((u: any) => u.creado_por).filter(Boolean))];
@@ -496,8 +496,8 @@ function JuntaDetailInner() {
             }
           }
         }
-        const { data: asistData } = await supabase.schema('erp' as any).from('juntas_asistencia').select('*, persona:persona_id(nombre, apellido_paterno)').eq('junta_id', juntaId).order('created_at');
-        if (asistData) setAsistencia(asistData);
+        const { data: asistData } = await supabase.schema('erp').from('juntas_asistencia').select('*, persona:persona_id(nombre, apellido_paterno)').eq('junta_id', juntaId).order('created_at');
+        if (asistData) setAsistencia(asistData as Asistencia[]);
         setLastPoll(new Date().toLocaleTimeString());
       } catch { /* ignore */ }
     };
@@ -509,7 +509,7 @@ function JuntaDetailInner() {
   const handleToggleAsistio = async (asistId: string, current: boolean | null) => {
     const next = current === null ? true : current === true ? false : null;
     await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('juntas_asistencia')
       .update({ asistio: next })
       .eq('id', asistId);
@@ -521,7 +521,7 @@ function JuntaDetailInner() {
 
   const handleRemoveParticipant = async (asistId: string) => {
     await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('juntas_asistencia')
       .delete()
       .eq('id', asistId);
@@ -534,7 +534,7 @@ function JuntaDetailInner() {
     setAddingPersona(true);
 
     const { data, error: err } = await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('juntas_asistencia')
       .insert({
         empresa_id: EMPRESA_ID,
@@ -551,7 +551,7 @@ function JuntaDetailInner() {
       return;
     }
 
-    setAsistencia((prev) => [...prev, data]);
+    setAsistencia((prev) => [...prev, data as Asistencia]);
     setSelectedPersonaId('');
     setShowAddPersona(false);
   };
@@ -569,7 +569,7 @@ function JuntaDetailInner() {
       .maybeSingle();
 
     const { data: newTask, error: err } = await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('tasks')
       .insert({
         empresa_id: EMPRESA_ID,
@@ -593,7 +593,7 @@ function JuntaDetailInner() {
       return;
     }
 
-    setTasks((prev) => [...prev, newTask]);
+    setTasks((prev) => [...prev, newTask as JuntaTask]);
     setTaskForm({ titulo: '', descripcion: '', asignado_a: '', prioridad: '', estado: 'pendiente', fecha_vence: '' });
     setShowAddTask(false);
   };
@@ -647,7 +647,7 @@ function JuntaDetailInner() {
       inserts.push({ task_id: taskId, empresa_id: EMPRESA_ID, tipo: 'cambio_fecha', valor_anterior: task.fecha_vence ?? '', valor_nuevo: updateForm.nuevaFecha, creado_por: userId });
     }
 
-    const { error: insErr } = await supabase.schema('erp' as any).from('task_updates').insert(inserts);
+    const { error: insErr } = await supabase.schema('erp').from('task_updates').insert(inserts);
     if (insErr) { alert(`Error: ${insErr.message}`); setSavingUpdate(false); return; }
 
     const taskPatch: any = {};
@@ -660,7 +660,7 @@ function JuntaDetailInner() {
       taskPatch.fecha_vence = updateForm.nuevaFecha;
     }
     if (Object.keys(taskPatch).length > 0) {
-      await supabase.schema('erp' as any).from('tasks').update(taskPatch).eq('id', taskId);
+      await supabase.schema('erp').from('tasks').update(taskPatch).eq('id', taskId);
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...taskPatch } : t));
     }
 
@@ -1072,7 +1072,7 @@ function JuntaDetailInner() {
                     disabled={completingTask === task.id}
                     onClick={async () => {
                       setCompletingTask(task.id);
-                      const { error: err } = await supabase.schema('erp' as any).from('tasks').update({ estado: 'completado', porcentaje_avance: 100 }).eq('id', task.id);
+                      const { error: err } = await supabase.schema('erp').from('tasks').update({ estado: 'completado', porcentaje_avance: 100 }).eq('id', task.id);
                       setCompletingTask(null);
                       if (err) { alert(`Error: ${err.message}`); return; }
                       setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, estado: 'completado' } : t));

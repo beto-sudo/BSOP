@@ -67,7 +67,7 @@ type Junta = {
   titulo: string;
   descripcion: string | null;
   fecha_hora: string;
-  duracion_minutos: number;
+  duracion_minutos: number | null;
   lugar: string | null;
   estado: 'programada' | 'en_curso' | 'completada' | 'cancelada';
   tipo: string | null;
@@ -82,7 +82,7 @@ type Asistencia = {
   persona_id: string | null;
   asistio: boolean | null;
   notas: string | null;
-  persona?: { nombre: string; apellido_paterno: string | null };
+  persona?: { nombre: string; apellido_paterno: string | null } | null;
 };
 
 type JuntaTask = {
@@ -359,27 +359,27 @@ function JuntaDetailInner() {
   };
 
   const fetchAll = useCallback(async () => {
-    const { data: juntaData, error: jErr } = await supabase.schema('erp' as any).from('juntas').select('*').eq('id', id).single();
+    const { data: juntaData, error: jErr } = await supabase.schema('erp').from('juntas').select('*').eq('id', id).single();
     if (jErr || !juntaData) { setError(jErr?.message ?? 'Junta no encontrada'); setLoading(false); return; }
 
-    setJunta(juntaData);
+    setJunta(juntaData as Junta);
     setTitulo(juntaData.titulo);
     setFechaHora(toDatetimeLocal(juntaData.fecha_hora));
     setDuracion(String(juntaData.duracion_minutos ?? 60));
     setLugar(juntaData.lugar ?? '');
-    setEstado(juntaData.estado);
+    setEstado(juntaData.estado as Junta['estado']);
     setTipo(juntaData.tipo ?? '');
     // Content is set in a separate useEffect that depends on editor readiness
 
-    const { data: asistData } = await supabase.schema('erp' as any).from('juntas_asistencia').select('*, persona:persona_id(nombre, apellido_paterno)').eq('junta_id', id).order('created_at');
-    setAsistencia(asistData ?? []);
+    const { data: asistData } = await supabase.schema('erp').from('juntas_asistencia').select('*, persona:persona_id(nombre, apellido_paterno)').eq('junta_id', id).order('created_at');
+    setAsistencia((asistData ?? []) as Asistencia[]);
 
-    const { data: tasksData } = await supabase.schema('erp' as any).from('tasks').select('id, titulo, estado, asignado_a, fecha_vence').eq('entidad_tipo', 'junta').eq('entidad_id', id).order('created_at');
-    setTasks(tasksData ?? []);
+    const { data: tasksData } = await supabase.schema('erp').from('tasks').select('id, titulo, estado, asignado_a, fecha_vence').eq('entidad_tipo', 'junta').eq('entidad_id', id).order('created_at');
+    setTasks((tasksData ?? []) as JuntaTask[]);
 
     const taskIds = (tasksData ?? []).map((t: any) => t.id);
     if (taskIds.length > 0) {
-      const { data: updatesData } = await supabase.schema('erp' as any).from('task_updates').select('*').in('task_id', taskIds).order('created_at', { ascending: false });
+      const { data: updatesData } = await supabase.schema('erp').from('task_updates').select('*').in('task_id', taskIds).order('created_at', { ascending: false });
       if (updatesData && updatesData.length > 0) {
         const userIds = [...new Set(updatesData.map((u: any) => u.creado_por).filter(Boolean))];
         const { data: usersData } = userIds.length > 0
@@ -392,10 +392,10 @@ function JuntaDetailInner() {
       }
     }
 
-    const { data: personasData } = await supabase.schema('erp' as any).from('personas').select('id, nombre, apellido_paterno').eq('empresa_id', juntaData.empresa_id).eq('activo', true).is('deleted_at', null).order('nombre');
+    const { data: personasData } = await supabase.schema('erp').from('personas').select('id, nombre, apellido_paterno').eq('empresa_id', juntaData.empresa_id).eq('activo', true).is('deleted_at', null).order('nombre');
     setPersonas((personasData ?? []).map((p: any) => ({ id: p.id, nombre: [p.nombre, p.apellido_paterno].filter(Boolean).join(' ') })));
 
-    const { data: empData } = await supabase.schema('erp' as any).from('empleados').select('id, persona:persona_id(nombre, apellido_paterno)').eq('empresa_id', juntaData.empresa_id).eq('activo', true).is('deleted_at', null);
+    const { data: empData } = await supabase.schema('erp').from('empleados').select('id, persona:persona_id(nombre, apellido_paterno)').eq('empresa_id', juntaData.empresa_id).eq('activo', true).is('deleted_at', null);
     setEmpleados((empData ?? []).map((e: any) => ({ id: e.id, nombre: [e.persona?.nombre, e.persona?.apellido_paterno].filter(Boolean).join(' ') })));
 
     // Check if user is admin/direccion
@@ -424,7 +424,7 @@ function JuntaDetailInner() {
     if (!junta) return;
     setSaving(true);
     const notesHtml = editor?.getHTML() ?? null;
-    const { error: err } = await supabase.schema('erp' as any).from('juntas').update({
+    const { error: err } = await supabase.schema('erp').from('juntas').update({
       titulo: titulo.trim(), fecha_hora: fechaHora,
       lugar: lugar.trim() || null, estado, tipo: tipo || null,
       descripcion: notesHtml && notesHtml !== '<p></p>' ? notesHtml : null,
@@ -453,7 +453,7 @@ function JuntaDetailInner() {
         const currentHtml = editor.getHTML();
         if (currentHtml === lastSavedHtmlRef.current) return;
         setAutoSaveStatus('saving');
-        const { error: err } = await supabase.schema('erp' as any).from('juntas').update({
+        const { error: err } = await supabase.schema('erp').from('juntas').update({
           descripcion: currentHtml && currentHtml !== '<p></p>' ? currentHtml : null,
         }).eq('id', junta.id);
         if (!err) {
@@ -485,7 +485,7 @@ function JuntaDetailInner() {
       const html = editor.getHTML();
       if (html !== lastSavedHtmlRef.current && html !== '<p></p>') {
         // Fire-and-forget save
-        supabase.schema('erp' as any).from('juntas').update({
+        supabase.schema('erp').from('juntas').update({
           descripcion: html,
         }).eq('id', juntaId).then(() => { lastSavedHtmlRef.current = html; });
       }
@@ -520,7 +520,7 @@ function JuntaDetailInner() {
       try {
         // Refresh junta description (only if user is NOT actively editing)
         if (!isEditingRef.current && editor) {
-          const { data: fresh } = await supabase.schema('erp' as any).from('juntas')
+          const { data: fresh } = await supabase.schema('erp').from('juntas')
             .select('descripcion').eq('id', juntaId).maybeSingle();
           if (fresh) {
             const remoteHtml = fresh.descripcion ?? '';
@@ -532,14 +532,14 @@ function JuntaDetailInner() {
           }
         }
         // Refresh tasks
-        const { data: tasksData } = await supabase.schema('erp' as any).from('tasks')
+        const { data: tasksData } = await supabase.schema('erp').from('tasks')
           .select('id, titulo, estado, asignado_a, fecha_vence')
           .eq('entidad_tipo', 'junta').eq('entidad_id', juntaId).order('created_at');
         if (tasksData) {
-          setTasks(tasksData);
+          setTasks(tasksData as JuntaTask[]);
           const tIds = tasksData.map((t: any) => t.id);
           if (tIds.length > 0) {
-            const { data: updData } = await supabase.schema('erp' as any).from('task_updates')
+            const { data: updData } = await supabase.schema('erp').from('task_updates')
               .select('*').in('task_id', tIds).order('created_at', { ascending: false });
             if (updData) {
               const uIds = [...new Set(updData.map((u: any) => u.creado_por).filter(Boolean))];
@@ -552,10 +552,10 @@ function JuntaDetailInner() {
           }
         }
         // Refresh attendance
-        const { data: asistData } = await supabase.schema('erp' as any).from('juntas_asistencia')
+        const { data: asistData } = await supabase.schema('erp').from('juntas_asistencia')
           .select('*, persona:persona_id(nombre, apellido_paterno)')
           .eq('junta_id', juntaId).order('created_at');
-        if (asistData) setAsistencia(asistData);
+        if (asistData) setAsistencia(asistData as Asistencia[]);
         setLastPoll(new Date().toLocaleTimeString());
       } catch { /* ignore poll errors */ }
     };
@@ -567,24 +567,24 @@ function JuntaDetailInner() {
 
   const handleToggleAsistio = async (asistId: string, current: boolean | null) => {
     const next = current === null ? true : current === true ? false : null;
-    await supabase.schema('erp' as any).from('juntas_asistencia').update({ asistio: next }).eq('id', asistId);
+    await supabase.schema('erp').from('juntas_asistencia').update({ asistio: next }).eq('id', asistId);
     setAsistencia((prev) => prev.map((a) => (a.id === asistId ? { ...a, asistio: next } : a)));
   };
 
   const handleRemoveParticipant = async (asistId: string) => {
-    await supabase.schema('erp' as any).from('juntas_asistencia').delete().eq('id', asistId);
+    await supabase.schema('erp').from('juntas_asistencia').delete().eq('id', asistId);
     setAsistencia((prev) => prev.filter((a) => a.id !== asistId));
   };
 
   const handleAddParticipant = async (personaId: string) => {
     if (!personaId || !junta) return;
     setAddingPersona(true);
-    const { data, error: err } = await supabase.schema('erp' as any).from('juntas_asistencia')
+    const { data, error: err } = await supabase.schema('erp').from('juntas_asistencia')
       .insert({ empresa_id: junta.empresa_id, junta_id: junta.id, persona_id: personaId })
       .select('*, persona:persona_id(nombre, apellido_paterno)').single();
     setAddingPersona(false);
     if (err) { alert(`Error al agregar participante: ${err.message}`); return; }
-    setAsistencia((prev) => [...prev, data]);
+    setAsistencia((prev) => [...prev, data as Asistencia]);
     setShowAddPersona(false);
   };
 
@@ -593,14 +593,14 @@ function JuntaDetailInner() {
     setAddingTask(true);
     const { data: { user } } = await supabase.auth.getUser();
     const { data: coreUser } = await supabase.schema('core' as any).from('usuarios').select('id').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
-    const { data: newTask, error: err } = await supabase.schema('erp' as any).from('tasks').insert({
+    const { data: newTask, error: err } = await supabase.schema('erp').from('tasks').insert({
       empresa_id: junta.empresa_id, titulo: taskForm.titulo.trim(),
       asignado_a: taskForm.asignado_a || null, prioridad: taskForm.prioridad, estado: taskForm.estado,
       fecha_compromiso: taskForm.fecha_vence || null, creado_por: coreUser?.id ?? null, entidad_tipo: 'junta', entidad_id: junta.id,
     }).select('id, titulo, estado, asignado_a, fecha_vence').single();
     setAddingTask(false);
     if (err) { alert(`Error al crear tarea: ${err.message}`); return; }
-    setTasks((prev) => [...prev, newTask]);
+    setTasks((prev) => [...prev, newTask as JuntaTask]);
     setTaskForm({ titulo: '', prioridad: '', asignado_a: '', estado: 'pendiente', fecha_vence: '' });
     setShowAddTask(false);
   };
@@ -625,7 +625,7 @@ function JuntaDetailInner() {
       inserts.push({ task_id: taskId, empresa_id: junta.empresa_id, tipo: 'cambio_fecha', valor_anterior: task.fecha_vence ?? '', valor_nuevo: updateForm.nuevaFecha, creado_por: userId });
     }
 
-    const { error: insErr } = await supabase.schema('erp' as any).from('task_updates').insert(inserts);
+    const { error: insErr } = await supabase.schema('erp').from('task_updates').insert(inserts);
     if (insErr) { alert(`Error: ${insErr.message}`); setSavingUpdate(false); return; }
 
     const taskPatch: any = {};
@@ -638,7 +638,7 @@ function JuntaDetailInner() {
       taskPatch.fecha_vence = updateForm.nuevaFecha;
     }
     if (Object.keys(taskPatch).length > 0) {
-      await supabase.schema('erp' as any).from('tasks').update(taskPatch).eq('id', taskId);
+      await supabase.schema('erp').from('tasks').update(taskPatch).eq('id', taskId);
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...taskPatch } : t));
     }
 
@@ -667,7 +667,7 @@ function JuntaDetailInner() {
     try {
       // Auto-save notes before finishing to ensure they are in the email/DB
       const notesHtml = editor?.getHTML() ?? null;
-      await supabase.schema('erp' as any).from('juntas').update({
+      await supabase.schema('erp').from('juntas').update({
         descripcion: notesHtml && notesHtml !== '<p></p>' ? notesHtml : null,
       }).eq('id', junta.id);
 
@@ -687,9 +687,9 @@ function JuntaDetailInner() {
     setDeleting(true);
     try {
       // Delete related records first
-      await supabase.schema('erp' as any).from('juntas_asistencia').delete().eq('junta_id', junta.id);
-      await supabase.schema('erp' as any).from('tasks').update({ entidad_tipo: null, entidad_id: null }).eq('entidad_tipo', 'junta').eq('entidad_id', junta.id);
-      const { error: err } = await supabase.schema('erp' as any).from('juntas').delete().eq('id', junta.id);
+      await supabase.schema('erp').from('juntas_asistencia').delete().eq('junta_id', junta.id);
+      await supabase.schema('erp').from('tasks').update({ entidad_tipo: null, entidad_id: null }).eq('entidad_tipo', 'junta').eq('entidad_id', junta.id);
+      const { error: err } = await supabase.schema('erp').from('juntas').delete().eq('id', junta.id);
       if (err) { alert(`Error al eliminar: ${err.message}`); return; }
       router.push('/dilesa/admin/juntas');
     } finally { setDeleting(false); }
@@ -905,7 +905,7 @@ function JuntaDetailInner() {
                     disabled={completingTask === task.id}
                     onClick={async () => {
                       setCompletingTask(task.id);
-                      const { error: err } = await supabase.schema('erp' as any).from('tasks').update({ estado: 'completado', porcentaje_avance: 100 }).eq('id', task.id);
+                      const { error: err } = await supabase.schema('erp').from('tasks').update({ estado: 'completado', porcentaje_avance: 100 }).eq('id', task.id);
                       setCompletingTask(null);
                       if (err) { alert(`Error: ${err.message}`); return; }
                       setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, estado: 'completado' } : t));
