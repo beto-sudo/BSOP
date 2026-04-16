@@ -76,6 +76,8 @@ type StockItem = {
   stock_actual: number;
   valor_inventario: number | null;
   bajo_minimo: boolean;
+  clasificacion?: string;
+};
 };
 
 type MovimientoRow = {
