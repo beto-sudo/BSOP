@@ -132,7 +132,7 @@ function TaskDetailInner() {
 
   const fetchRefData = useCallback(async () => {
     const { data: empRes } = await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('empleados')
       .select('id, persona:persona_id(nombre, apellido_paterno)')
       .eq('empresa_id', EMPRESA_ID)
@@ -160,7 +160,7 @@ function TaskDetailInner() {
 
   const fetchTask = useCallback(async () => {
     const { data, error: err } = await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('tasks')
       .select('*')
       .eq('id', taskId)
@@ -169,14 +169,14 @@ function TaskDetailInner() {
       setError(err?.message ?? 'Tarea no encontrada');
       return null;
     }
-    setTask(data);
+    setTask(data as ErpTask);
     return data as ErpTask;
   }, [supabase, taskId]);
 
   const fetchUpdates = useCallback(async () => {
     setUpdatesLoading(true);
     const { data: updatesData } = await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('task_updates')
       .select('*')
       .eq('task_id', taskId)
@@ -227,7 +227,7 @@ function TaskDetailInner() {
       if (!task) return;
       setSaving(true);
       const { data, error: err } = await supabase
-        .schema('erp' as any)
+        .schema('erp')
         .from('tasks')
         .update({ ...updates, updated_at: new Date().toISOString() })
         .eq('id', task.id)
@@ -290,7 +290,7 @@ function TaskDetailInner() {
     }
 
     if (inserts.length > 0) {
-      await supabase.schema('erp' as any).from('task_updates').insert(inserts);
+      await supabase.schema('erp').from('task_updates').insert(inserts);
     }
 
     const taskPatch: Partial<ErpTask> = {};

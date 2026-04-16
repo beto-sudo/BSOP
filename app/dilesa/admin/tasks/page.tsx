@@ -3,6 +3,9 @@
 import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
+import type { TablesUpdate } from '@/types/supabase';
+
+type TasksUpdate = TablesUpdate<{ schema: 'erp' }, 'tasks'>;
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -270,7 +273,7 @@ function TasksInner() {
     const email = user?.email?.toLowerCase() ?? '';
 
     const [empRes, coreUserRes] = await Promise.all([
-      supabase.schema('erp' as any).from('empleados')
+      supabase.schema('erp').from('empleados')
         .select('id, persona:persona_id(nombre, apellido_paterno)')
         .eq('empresa_id', EMPRESA_ID).eq('activo', true).is('deleted_at', null),
       supabase.schema('core' as any).from('usuarios')
@@ -290,12 +293,12 @@ function TasksInner() {
 
     if (email) {
       const { data: persona } = await supabase
-        .schema('erp' as any).from('personas').select('id')
+        .schema('erp').from('personas').select('id')
         .eq('empresa_id', EMPRESA_ID).eq('email', email).maybeSingle();
 
       if (persona) {
         const { data: empleado } = await supabase
-          .schema('erp' as any).from('empleados').select('id')
+          .schema('erp').from('empleados').select('id')
           .eq('empresa_id', EMPRESA_ID).eq('persona_id', persona.id)
           .eq('activo', true).maybeSingle();
         if (empleado) setCurrentEmpleadoId(empleado.id);
@@ -321,10 +324,10 @@ function TasksInner() {
 
   const fetchTasks = useCallback(async () => {
     const { data, error: err } = await supabase
-      .schema('erp' as any).from('tasks').select('*')
+      .schema('erp').from('tasks').select('*')
       .eq('empresa_id', EMPRESA_ID).order('created_at', { ascending: false });
     if (err) { setError(err.message); return; }
-    setTasks(data ?? []);
+    setTasks((data ?? []) as ErpTask[]);
   }, [supabase]);
 
   useEffect(() => {
@@ -351,7 +354,7 @@ function TasksInner() {
     if (!createForm.titulo.trim() || !createForm.prioridad || !createForm.asignado_a || !createForm.fecha_compromiso) return;
     setCreating(true);
     // Auto-link to active junta if one exists
-    const { data: activeJunta } = await supabase.schema('erp' as any).from('juntas')
+    const { data: activeJunta } = await supabase.schema('erp').from('juntas')
       .select('id')
       .eq('empresa_id', EMPRESA_ID)
       .eq('estado', 'en_curso')
@@ -359,7 +362,7 @@ function TasksInner() {
       .limit(1)
       .maybeSingle();
     const { error: err } = await supabase
-      .schema('erp' as any).from('tasks').insert({
+      .schema('erp').from('tasks').insert({
         empresa_id: EMPRESA_ID,
         titulo: createForm.titulo.trim(),
         descripcion: createForm.descripcion.trim() || null,
@@ -414,7 +417,7 @@ function TasksInner() {
   const handleUpdate = async () => {
     if (!selectedTask || !editForm.titulo.trim()) return;
     setSaving(true);
-    const updatePayload: Record<string, unknown> = {
+    const updatePayload: TasksUpdate = {
       titulo: editForm.titulo.trim(),
       descripcion: editForm.descripcion.trim() || null,
       prioridad: editForm.prioridad || null,
@@ -430,7 +433,7 @@ function TasksInner() {
       updatePayload.motivo_bloqueo = editForm.estado === 'bloqueado' ? (editForm.motivo_bloqueo.trim() || null) : null;
     }
     const { error: err } = await supabase
-      .schema('erp' as any).from('tasks').update(updatePayload).eq('id', selectedTask.id);
+      .schema('erp').from('tasks').update(updatePayload).eq('id', selectedTask.id);
     setSaving(false);
     if (err) { alert(`Error al guardar tarea: ${err.message}`); return; }
     setShowEdit(false);
@@ -443,7 +446,7 @@ function TasksInner() {
     if (!confirm('¿Eliminar esta tarea? Esta acción no se puede deshacer.')) return;
     setDeleting(true);
     const { error: err } = await supabase
-      .schema('erp' as any).from('tasks').delete().eq('id', selectedTask.id);
+      .schema('erp').from('tasks').delete().eq('id', selectedTask.id);
     setDeleting(false);
     if (err) { alert(`Error al eliminar: ${err.message}`); return; }
     setShowEdit(false);
@@ -454,7 +457,7 @@ function TasksInner() {
   const handleQuickComplete = async (taskId: string) => {
     setCompletingTaskId(taskId);
     const { error: err } = await supabase
-      .schema('erp' as any).from('tasks')
+      .schema('erp').from('tasks')
       .update({ estado: 'completado', porcentaje_avance: 100, completado_por: currentEmpleadoId })
       .eq('id', taskId);
     setCompletingTaskId(null);
@@ -463,7 +466,7 @@ function TasksInner() {
   };
 
   const handleInlineEstadoSave = async (taskId: string, estado: ErpTask['estado']) => {
-    const update: Record<string, unknown> = { estado };
+    const update: TasksUpdate = { estado };
     if (estado === 'completado') {
       update.completado_por = currentEmpleadoId;
       update.porcentaje_avance = 100;
@@ -475,24 +478,24 @@ function TasksInner() {
     } else {
       update.motivo_bloqueo = null;
     }
-    await supabase.schema('erp' as any).from('tasks').update(update).eq('id', taskId);
+    await supabase.schema('erp').from('tasks').update(update).eq('id', taskId);
     await fetchTasks();
   };
 
   const handleInlineAvanceSave = async (taskId: string, value: number) => {
-    const update: Record<string, unknown> = { porcentaje_avance: value };
+    const update: TasksUpdate = { porcentaje_avance: value };
     if (value === 100) {
       update.estado = 'completado';
       update.completado_por = currentEmpleadoId;
     }
-    await supabase.schema('erp' as any).from('tasks').update(update).eq('id', taskId);
+    await supabase.schema('erp').from('tasks').update(update).eq('id', taskId);
     setInlineAvance(null);
     await fetchTasks();
   };
 
   const fetchUpdatesForTask = async (taskId: string) => {
     setLoadingUpdates(true);
-    const { data: updatesData } = await supabase.schema('erp' as any).from('task_updates').select('*').eq('task_id', taskId).order('created_at', { ascending: false });
+    const { data: updatesData } = await supabase.schema('erp').from('task_updates').select('*').eq('task_id', taskId).order('created_at', { ascending: false });
     if (updatesData && updatesData.length > 0) {
       const userIds = [...new Set(updatesData.map((u: any) => u.creado_por).filter(Boolean))];
       const { data: usersData } = userIds.length > 0
@@ -521,7 +524,7 @@ function TasksInner() {
     const userId = coreUser?.id ?? null;
     const userName = coreUser?.nombre ?? 'Usuario';
 
-    const { error: insErr } = await supabase.schema('erp' as any).from('task_updates').insert({
+    const { error: insErr } = await supabase.schema('erp').from('task_updates').insert({
       task_id: taskId, empresa_id: EMPRESA_ID, tipo: 'avance', contenido: updateForm.contenido.trim(), creado_por: userId,
     });
     if (insErr) { alert(`Error: ${insErr.message}`); setSavingUpdate(false); return; }
@@ -1186,7 +1189,7 @@ function TasksInner() {
                     const { data: coreUser } = await supabase.schema('core' as any).from('usuarios').select('id, nombre').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
                     const userId = coreUser?.id ?? null;
                     const userName = coreUser?.nombre ?? 'Usuario';
-                    const { error: insErr } = await supabase.schema('erp' as any).from('task_updates').insert({
+                    const { error: insErr } = await supabase.schema('erp').from('task_updates').insert({
                       task_id: selectedTask.id, empresa_id: EMPRESA_ID, tipo: 'avance', contenido: updateForm.contenido.trim(), creado_por: userId,
                     });
                     if (insErr) { alert(`Error: ${insErr.message}`); setSavingUpdate(false); return; }

@@ -146,7 +146,7 @@ function TasksInner() {
 
   const fetchRefData = useCallback(async () => {
     const { data: empRes } = await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('empleados')
       .select('id, persona:persona_id(nombre, apellido_paterno)')
       .eq('empresa_id', EMPRESA_ID)
@@ -162,7 +162,7 @@ function TasksInner() {
 
   const fetchTasks = useCallback(async () => {
     const { data, error: err } = await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('tasks')
       .select('*')
       .eq('empresa_id', EMPRESA_ID)
@@ -171,7 +171,7 @@ function TasksInner() {
       setError(err.message);
       return;
     }
-    setTasks(data ?? []);
+    setTasks((data ?? []) as ErpTask[]);
   }, [supabase]);
 
   useEffect(() => {
@@ -210,7 +210,7 @@ function TasksInner() {
       .maybeSingle();
 
     const { data: newTask, error: err } = await supabase
-      .schema('erp' as any)
+      .schema('erp')
       .from('tasks')
       .insert({
         empresa_id: EMPRESA_ID,
@@ -239,7 +239,7 @@ function TasksInner() {
 
   const fetchUpdatesForTask = async (taskId: string) => {
     setLoadingUpdates(true);
-    const { data: updatesData } = await supabase.schema('erp' as any).from('task_updates').select('*').eq('task_id', taskId).order('created_at', { ascending: false });
+    const { data: updatesData } = await supabase.schema('erp').from('task_updates').select('*').eq('task_id', taskId).order('created_at', { ascending: false });
     if (updatesData && updatesData.length > 0) {
       const userIds = [...new Set(updatesData.map((u: any) => u.creado_por).filter(Boolean))];
       const { data: usersData } = userIds.length > 0
@@ -268,7 +268,7 @@ function TasksInner() {
     const userId = coreUser?.id ?? null;
     const userName = coreUser?.nombre ?? 'Usuario';
 
-    const { error: insErr } = await supabase.schema('erp' as any).from('task_updates').insert({
+    const { error: insErr } = await supabase.schema('erp').from('task_updates').insert({
       task_id: taskId, empresa_id: EMPRESA_ID, tipo: 'avance', contenido: updateForm.contenido.trim(), creado_por: userId,
     });
     if (insErr) { alert(`Error: ${insErr.message}`); setSavingUpdate(false); return; }
