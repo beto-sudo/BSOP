@@ -113,7 +113,10 @@ export async function GET(req: NextRequest) {
     for (const perm of rolePerms) {
       const moduloSlug = moduloIdToSlug[perm.modulo_id];
       if (!moduloSlug) continue;
-      modulos[moduloSlug] = { read: perm.acceso_lectura, write: perm.acceso_escritura };
+      modulos[moduloSlug] = {
+        read: perm.acceso_lectura ?? false,
+        write: perm.acceso_escritura ?? false,
+      };
     }
   }
 
@@ -121,7 +124,10 @@ export async function GET(req: NextRequest) {
   for (const exc of userExcepciones) {
     const moduloSlug = moduloIdToSlug[exc.modulo_id];
     if (!moduloSlug) continue;
-    modulos[moduloSlug] = { read: exc.acceso_lectura, write: exc.acceso_escritura };
+    modulos[moduloSlug] = {
+      read: exc.acceso_lectura ?? false,
+      write: exc.acceso_escritura ?? false,
+    };
   }
 
   return NextResponse.json({
