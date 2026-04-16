@@ -14,7 +14,7 @@ function getGreeting() {
 }
 
 export default function HomePage() {
-  const [userName, setUserName] = useState<string>('Beto');
+  const [userName, setUserName] = useState<string>('');
 
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
@@ -36,7 +36,7 @@ export default function HomePage() {
             BSOP 2.0
           </div>
           <h1 className="mt-6 text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-            {getGreeting()}, {userName}
+            {getGreeting()}{userName ? `, ${userName}` : ''}
           </h1>
           <p className="mt-4 max-w-3xl text-sm leading-7 text-white/62 sm:text-base">
             Bienvenido al panel central de operaciones. Desde aquí puedes monitorear y gestionar los módulos activos de tus empresas.
