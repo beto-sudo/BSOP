@@ -110,6 +110,34 @@ Reglas prácticas:
 - Actualiza [`SCHEMA_ARCHITECTURE.md`](./SCHEMA_ARCHITECTURE.md) y [`supabase/SCHEMA_REF.md`](./supabase/SCHEMA_REF.md) cuando agregues/muevas/borres tablas o columnas.
 - Antes de merger a `main`, corre la migración en un branch de Supabase o staging y valida.
 
+### Soft-delete (convención)
+
+Toda tabla de **dominio operativo** (departamentos, puestos, empleados, cortes, movimientos, documentos, etc.) debe soportar borrado lógico. El borrado físico se reserva para tablas efímeras (caches, logs, colas).
+
+**Checklist al crear una tabla de dominio:**
+
+- [ ] Columna `deleted_at timestamptz` — `NULL` = activa, valor = fecha/hora del borrado lógico.
+- [ ] Índice **parcial** sobre la clave de acceso más común, filtrando activas:
+  ```sql
+  CREATE INDEX <tabla>_deleted_idx
+    ON <schema>.<tabla> (empresa_id)  -- o la clave principal de filtrado
+    WHERE deleted_at IS NULL;
+  ```
+- [ ] `COMMENT ON COLUMN <tabla>.deleted_at IS 'Soft-delete timestamp. NULL = active row.'`.
+- [ ] Todas las queries de lista usan `.is('deleted_at', null)`.
+- [ ] UI de "Eliminar" pasa por `<ConfirmDialog>` (ver `ARCHITECTURE.md § UI Standards`), nunca `window.confirm`.
+
+**Activo vs Eliminado** — son semánticas distintas, no se deben mezclar:
+
+| Concepto | Columna | Semántica |
+|----------|---------|-----------|
+| **Activo** | `activo boolean` | Estado operativo (pausado/activo). Se puede togglear. |
+| **Eliminado** | `deleted_at timestamptz` | Soft-delete. Una vez eliminado no se "re-activa" — se recrea. |
+
+**Tablas que siguen el patrón hoy:** `erp.personas`, `erp.empleados`, `erp.documentos`, `erp.departamentos`, `erp.puestos`.
+
+**Si una tabla operativa no lo tiene**, añádelo en una migración antes de tocar su UI — ver ejemplo `supabase/migrations/20260417122412_add_soft_delete_to_erp_departamentos_puestos.sql`.
+
 ---
 
 ## Seguridad
