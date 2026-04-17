@@ -108,6 +108,15 @@ type Movimiento = {
   c_corte_desc: string | null;
 };
 
+// rdb.v_cortes_productos row shape — per-product aggregates per corte
+type CorteProducto = {
+  corte_id: string | null;
+  product_id: string | null;
+  producto_nombre: string | null;
+  cantidad_vendida: number | null;
+  importe_total: number | null;
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const TZ = 'America/Matamoros';
@@ -564,7 +573,7 @@ export default function CortesPage() {
   const [selected, setSelected] = useState<Corte | null>(null);
   const [selectedTotales, setSelectedTotales] = useState<CorteTotales | null>(null);
   const [selectedMovimientos, setSelectedMovimientos] = useState<Movimiento[]>([]);
-  const [selectedProductos, setSelectedProductos] = useState<any[]>([]);
+  const [selectedProductos, setSelectedProductos] = useState<CorteProducto[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -668,12 +677,12 @@ export default function CortesPage() {
           .eq('corte_id', corte.id)
           .order('created_at', { ascending: true })
           .limit(100),
-        // TODO(B.1.extra): `rdb.v_cortes_productos` exists in DB (see
-        // supabase/SCHEMA_REF.md) but was not emitted by the types autogen in
-        // PR #10 (likely a grants / SECURITY DEFINER exclusion on the view).
-        // Drop the `as any` once the generator picks it up.
+        // B.1.extra.b: `rdb.v_cortes_productos` — per-product aggregates per corte
+        // (RDB / Waitry POS). Joins rdb.waitry_productos ↔ rdb.waitry_pedidos via
+        // the corte_id FK (partial index `rdb_waitry_pedidos_corte_id_idx`).
+        // Created 2026-04-17, security_invoker = true.
         supabase
-          .schema('rdb' as any)
+          .schema('rdb')
           .from('v_cortes_productos')
           .select('*')
           .eq('corte_id', corte.id)
@@ -683,7 +692,7 @@ export default function CortesPage() {
 
       setSelectedTotales((totalesRes.data as CorteTotales | null) ?? null);
       setSelectedMovimientos((movimientosRes.data ?? []) as Movimiento[]);
-      setSelectedProductos((productosRes?.data ?? []) as any[]);
+      setSelectedProductos((productosRes?.data ?? []) as CorteProducto[]);
     } catch {
       // non-fatal — drawer still shows corte base info
     } finally {

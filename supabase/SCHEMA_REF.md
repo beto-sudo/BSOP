@@ -34,6 +34,8 @@
 - c_corte_desc (text)
 
 ### v_cortes_productos
+Schema: `rdb` · Created 2026-04-17 · `security_invoker = true`.
+Per-product sales aggregates per corte (Waitry POS). Source: `rdb.waitry_productos` ⋈ `rdb.waitry_pedidos` (order_id), grouped by corte × product. Excludes `status = 'order_canceled'` and `corte_id IS NULL`.
 - corte_id (uuid)
 - product_id (text)
 - producto_nombre (text)

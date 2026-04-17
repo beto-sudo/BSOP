@@ -5294,6 +5294,16 @@ export type Database = {
         }
         Relationships: []
       }
+      v_cortes_productos: {
+        Row: {
+          cantidad_vendida: number | null
+          corte_id: string | null
+          importe_total: number | null
+          product_id: string | null
+          producto_nombre: string | null
+        }
+        Relationships: []
+      }
       v_cortes_totales: {
         Row: {
           caja_nombre: string | null
