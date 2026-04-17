@@ -40,16 +40,16 @@ Complemento de [`SCHEMA_ARCHITECTURE.md`](./SCHEMA_ARCHITECTURE.md) (que cubre e
 
 ## Stack
 
-| Capa | Elección | Por qué |
-|------|----------|---------|
-| Framework | Next.js 15 App Router | RSC, streaming, data fetching server-side, routing por filesystem |
-| UI | Tailwind + shadcn/ui + Base UI | Primitivos accesibles + diseño tipado por utilidades |
-| Auth | Supabase Auth (cookie-based SSR) | Misma fuente que la DB, RLS integrado |
-| Datos | Supabase Postgres | Postgres completo + RLS + realtime + storage en una plataforma |
-| Rich text | TipTap | Editor extensible (juntas, documentos, tareas) |
-| Estado del servidor | Fetches server-side directos | No hay React Query todavía; candidato a introducir |
-| i18n | Custom provider (`lib/i18n.tsx`) | Ligero, suficiente para ES/EN |
-| Tests | Vitest + Playwright | Stack estándar de Next |
+| Capa                | Elección                         | Por qué                                                           |
+| ------------------- | -------------------------------- | ----------------------------------------------------------------- |
+| Framework           | Next.js 15 App Router            | RSC, streaming, data fetching server-side, routing por filesystem |
+| UI                  | Tailwind + shadcn/ui + Base UI   | Primitivos accesibles + diseño tipado por utilidades              |
+| Auth                | Supabase Auth (cookie-based SSR) | Misma fuente que la DB, RLS integrado                             |
+| Datos               | Supabase Postgres                | Postgres completo + RLS + realtime + storage en una plataforma    |
+| Rich text           | TipTap                           | Editor extensible (juntas, documentos, tareas)                    |
+| Estado del servidor | Fetches server-side directos     | No hay React Query todavía; candidato a introducir                |
+| i18n                | Custom provider (`lib/i18n.tsx`) | Ligero, suficiente para ES/EN                                     |
+| Tests               | Vitest + Playwright              | Stack estándar de Next                                            |
 
 ---
 
@@ -91,14 +91,14 @@ app/<módulo>/
 
 ### `app/api/` — API routes
 
-| Ruta | Método | Propósito | Auth |
-|------|--------|-----------|------|
-| `auth/google/route.ts` | GET | Redirect a Google OAuth | Anónimo |
-| `health/ingest/route.ts` | POST | Ingesta de datos de Apple Health | Token (`HEALTH_INGEST_TOKEN`) |
-| `impersonate/route.ts` | GET | Admin: ver la plataforma como otro usuario | Admin |
-| `juntas/terminar/route.ts` | POST | Cerrar junta + enviar email resumen | Session |
-| `usage/*` | GET | Dashboard de uso Claude/AI | Session |
-| `welcome-email/route.ts` | POST | Enviar email de bienvenida a usuario nuevo | Service role |
+| Ruta                       | Método | Propósito                                  | Auth                          |
+| -------------------------- | ------ | ------------------------------------------ | ----------------------------- |
+| `auth/google/route.ts`     | GET    | Redirect a Google OAuth                    | Anónimo                       |
+| `health/ingest/route.ts`   | POST   | Ingesta de datos de Apple Health           | Token (`HEALTH_INGEST_TOKEN`) |
+| `impersonate/route.ts`     | GET    | Admin: ver la plataforma como otro usuario | Admin                         |
+| `juntas/terminar/route.ts` | POST   | Cerrar junta + enviar email resumen        | Session                       |
+| `usage/*`                  | GET    | Dashboard de uso Claude/AI                 | Session                       |
+| `welcome-email/route.ts`   | POST   | Enviar email de bienvenida a usuario nuevo | Service role                  |
 
 ### `components/`
 
@@ -113,26 +113,27 @@ Tres capas:
 
 Lógica compartida, framework-agnostic donde sea posible.
 
-| Archivo | Rol |
-|---------|-----|
-| `supabase.ts`, `supabase-browser.ts`, `supabase-server.ts`, `supabase-admin.ts` | Factories de clientes según contexto |
-| `permissions.ts` | RBAC: `fetchUserPermissions`, `canAccessModulo`, `ROUTE_TO_MODULE` |
-| `i18n.tsx` | Provider de i18n (`lib/locales/en.json`, `es.json`) |
-| `timezone.ts` | Helpers de parseo/formato con timezone (crítico para cortes) |
-| `health.ts` | Utilidades del módulo Health |
-| `welcome-email.ts` | Generación del email de bienvenida |
-| `utils.ts` | Utilidades genéricas (`cn`, etc.) |
+| Archivo                                                                         | Rol                                                                |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `supabase.ts`, `supabase-browser.ts`, `supabase-server.ts`, `supabase-admin.ts` | Factories de clientes según contexto                               |
+| `permissions.ts`                                                                | RBAC: `fetchUserPermissions`, `canAccessModulo`, `ROUTE_TO_MODULE` |
+| `i18n.tsx`                                                                      | Provider de i18n (`lib/locales/en.json`, `es.json`)                |
+| `timezone.ts`                                                                   | Helpers de parseo/formato con timezone (crítico para cortes)       |
+| `health.ts`                                                                     | Utilidades del módulo Health                                       |
+| `welcome-email.ts`                                                              | Generación del email de bienvenida                                 |
+| `utils.ts`                                                                      | Utilidades genéricas (`cn`, etc.)                                  |
 
 ### `hooks/`
 
-| Hook | Rol |
-|------|-----|
-| `use-presence.ts` | Sincroniza presencia en realtime |
-| `use-sortable-table.ts` | Ordenamiento de tablas |
+| Hook                    | Rol                              |
+| ----------------------- | -------------------------------- |
+| `use-presence.ts`       | Sincroniza presencia en realtime |
+| `use-sortable-table.ts` | Ordenamiento de tablas           |
 
 ### `proxy.ts` — middleware
 
 Se ejecuta en cada request antes del renderizado:
+
 1. Hidrata la sesión de Supabase desde cookies.
 2. Determina el módulo objetivo según la ruta (`ROUTE_TO_MODULE`).
 3. Consulta permisos en `core.permisos_rol` + `core.permisos_usuario_excepcion`.
@@ -170,14 +171,14 @@ Ver [`SCHEMA_ARCHITECTURE.md`](./SCHEMA_ARCHITECTURE.md) para el mapa completo.
 
 Resumen:
 
-| Schema | Rol |
-|--------|-----|
-| `core` | Auth + acceso (plataforma) |
-| `erp` | Multi-empresa (todas las entidades compartidas) |
-| `rdb` | Lógica exclusiva de Rincón del Bosque (Waitry POS) |
-| `dilesa` | (Reservado) lógica exclusiva de DILESA |
-| `playtomic` | Sync de canchas deportivas |
-| `public` | Salud personal, usage tracking |
+| Schema      | Rol                                                |
+| ----------- | -------------------------------------------------- |
+| `core`      | Auth + acceso (plataforma)                         |
+| `erp`       | Multi-empresa (todas las entidades compartidas)    |
+| `rdb`       | Lógica exclusiva de Rincón del Bosque (Waitry POS) |
+| `dilesa`    | (Reservado) lógica exclusiva de DILESA             |
+| `playtomic` | Sync de canchas deportivas                         |
+| `public`    | Salud personal, usage tracking                     |
 
 **Migraciones**: todas en `supabase/migrations/`, nombradas con timestamp.
 
@@ -194,13 +195,13 @@ Resumen:
 
 ## Integraciones externas
 
-| Sistema | Propósito | Dónde se usa |
-|---------|-----------|--------------|
-| Resend | Emails transaccionales | `/api/welcome-email`, `/api/juntas/terminar`, `app/settings/acceso/actions.ts` |
-| Playtomic | Sync de reservas de canchas | `supabase/functions/playtomic-sync/` |
-| Apple Health | Ingesta de datos de salud | `/api/health/ingest` + shortcut iOS del usuario |
-| Coda | Migración histórica (read-only) | `scripts/migrate_dilesa_*.ts` (retirados después de migrar) |
-| Google OAuth | Login | `/api/auth/google` + `/auth/callback` |
+| Sistema      | Propósito                       | Dónde se usa                                                                   |
+| ------------ | ------------------------------- | ------------------------------------------------------------------------------ |
+| Resend       | Emails transaccionales          | `/api/welcome-email`, `/api/juntas/terminar`, `app/settings/acceso/actions.ts` |
+| Playtomic    | Sync de reservas de canchas     | `supabase/functions/playtomic-sync/`                                           |
+| Apple Health | Ingesta de datos de salud       | `/api/health/ingest` + shortcut iOS del usuario                                |
+| Coda         | Migración histórica (read-only) | `scripts/migrate_dilesa_*.ts` (retirados después de migrar)                    |
+| Google OAuth | Login                           | `/api/auth/google` + `/auth/callback`                                          |
 
 ---
 
@@ -310,15 +311,42 @@ Dos razones para preferir soft-delete frente a `DELETE`:
 
 ### Activo vs eliminado — cuándo usar cuál
 
-| Estado | Columna | UI | Significado |
-|--------|---------|----|-------------|
-| Activo | `activo = true`, `deleted_at IS NULL` | Fila normal | Aparece en selectores y reportes. |
-| Inactivo | `activo = false`, `deleted_at IS NULL` | Fila tenue / badge `Inactivo` | Fuera de uso operativo pero consultable. |
-| Eliminado | `deleted_at IS NOT NULL` | No aparece | Fuera de listados. Recuperable manualmente. |
+| Estado    | Columna                                | UI                            | Significado                                 |
+| --------- | -------------------------------------- | ----------------------------- | ------------------------------------------- |
+| Activo    | `activo = true`, `deleted_at IS NULL`  | Fila normal                   | Aparece en selectores y reportes.           |
+| Inactivo  | `activo = false`, `deleted_at IS NULL` | Fila tenue / badge `Inactivo` | Fuera de uso operativo pero consultable.    |
+| Eliminado | `deleted_at IS NOT NULL`               | No aparece                    | Fuera de listados. Recuperable manualmente. |
 
-### Smoke test sugerido (Playwright)
+### Error boundaries por módulo (`components/shared/module-error.tsx`)
 
-Ubicación propuesta: `tests/e2e/rh-row-actions.spec.ts`. Cubre por empresa (`/rh`, `/rdb/rh`, `/dilesa/rh`) y por recurso (`departamentos`, `puestos`, `empleados`) los tres caminos: editar-cancelar, toggle activo, eliminar-con-confirm. Ver tarea #9.
+Cada módulo top-level (`app/rh`, `app/rdb`, `app/dilesa`, `app/settings`, `app/administracion`, `app/health`, `app/travel`, `app/family`, …) tiene un `error.tsx` que delega en el componente canónico `ModuleError`:
+
+```tsx
+// app/<modulo>/error.tsx
+'use client';
+
+import { ModuleError } from '@/components/shared/module-error';
+
+export default function ModuloError(props: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  return <ModuleError {...props} moduleName="RH" />;
+}
+```
+
+`ModuleError`:
+
+- Renderiza título (`Error en {moduleName}`), mensaje del error, y el `digest` de Next.js para correlación con logs del servidor.
+- Expone un botón "Reintentar" cableado al `reset` de Next.js.
+- Loguea al console en `useEffect` con prefix `[{moduleName}]` — visible en preview deploys sin Sentry.
+- Tiene `role="alert"` + `aria-live="polite"` para lectores de pantalla.
+
+Rutas de submódulo pueden tener su propio `error.tsx` si necesitan un label más específico (p. ej. `app/rdb/requisiciones/error.tsx` usa `moduleName="Requisiciones"`).
+
+### Smoke test Playwright (RowActions)
+
+Ubicación: `tests/e2e/smoke/auth-rh-row-actions.spec.ts`. Cubre por empresa (`/rh`, `/rdb/rh`, `/dilesa/rh`) y por recurso (`departamentos`, `puestos`, `empleados`) los tres caminos: kebab aria-label, menú con Editar+Toggle+Eliminar, ConfirmDialog con Cancelar. Read-only por diseño (siempre cancela).
 
 ---
 
