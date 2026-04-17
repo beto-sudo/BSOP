@@ -73,11 +73,11 @@ function DepartamentosInner() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
     const { data: coreUser } = await supabase
-      .schema('core' as any).from('usuarios').select('id')
+      .schema('core').from('usuarios').select('id')
       .eq('email', (user.email ?? '').toLowerCase()).maybeSingle();
     if (!coreUser) return [];
     const { data: ueData } = await supabase
-      .schema('core' as any).from('usuarios_empresas').select('empresa_id')
+      .schema('core').from('usuarios_empresas').select('empresa_id')
       .eq('usuario_id', coreUser.id).eq('activo', true);
     const ids = (ueData ?? []).map((r: any) => r.empresa_id as string);
     setEmpresaIds(ids);
