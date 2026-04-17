@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'RESEND_API_KEY not configured' }, { status: 500 });
   }
 
-  console.log('[welcome-email-api] RESEND_API_KEY found:', resendKey.substring(0, 6) + '...');
+  console.log('[welcome-email-api] RESEND_API_KEY configured');
 
   // Fetch usuario_empresas
   const adminRes = await fetch(`${supabaseUrl}/rest/v1/usuarios_empresas?usuario_id=eq.${usuarioId}&select=empresa_id,roles:rol_id(nombre),empresas:empresa_id(slug,nombre)`, {

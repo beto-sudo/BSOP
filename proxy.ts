@@ -91,12 +91,23 @@ export default async function proxy(request: NextRequest) {
     .eq('activo', true)
     .maybeSingle();
 
-  if (!usuario && email !== 'beto@anorte.com') {
+  // Admin bypass: if the user is authenticated via Supabase but has no row in
+  // core.usuarios yet, optionally let them through if their email matches the
+  // ADMIN_BYPASS_EMAIL env var. Without that env var, the app defaults to the
+  // safest behavior (deny). This bypass should be temporary — once all admins
+  // are provisioned in core.usuarios, remove the var and this branch.
+  const adminBypassEmail = process.env.ADMIN_BYPASS_EMAIL?.toLowerCase();
+  if (!usuario && email !== adminBypassEmail) {
     await supabase.auth.signOut();
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = '/login';
     loginUrl.search = '?error=unauthorized';
     return NextResponse.redirect(loginUrl, { headers: response.headers });
+  }
+
+  if (!usuario && adminBypassEmail) {
+    // Surface admin bypass usage in runtime logs so it stays visible.
+    console.warn(`[proxy] ADMIN_BYPASS_EMAIL used by ${email}`);
   }
 
   if (pathname === '/login') {
