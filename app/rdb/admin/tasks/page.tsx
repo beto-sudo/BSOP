@@ -118,7 +118,7 @@ function TasksInner() {
     if (!createForm.titulo.trim()) return;
     setCreating(true);
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: coreUser } = await supabase.schema('core' as any).from('usuarios').select('id').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
+    const { data: coreUser } = await supabase.schema('core').from('usuarios').select('id').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
     const { error: err } = await supabase.schema('erp').from('tasks').insert({
       empresa_id: EMPRESA_ID, titulo: createForm.titulo.trim(), descripcion: createForm.descripcion.trim() || null,
       prioridad: createForm.prioridad || null, asignado_a: createForm.asignado_a || null,

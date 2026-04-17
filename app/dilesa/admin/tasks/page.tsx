@@ -276,7 +276,7 @@ function TasksInner() {
       supabase.schema('erp').from('empleados')
         .select('id, persona:persona_id(nombre, apellido_paterno)')
         .eq('empresa_id', EMPRESA_ID).eq('activo', true).is('deleted_at', null),
-      supabase.schema('core' as any).from('usuarios')
+      supabase.schema('core').from('usuarios')
         .select('id, rol').eq('email', email).maybeSingle(),
     ]);
 
@@ -306,13 +306,13 @@ function TasksInner() {
 
       if (!coreUserRes.data || coreUserRes.data.rol !== 'admin') {
         const { data: ue } = await supabase
-          .schema('core' as any).from('usuarios_empresas').select('rol_id')
+          .schema('core').from('usuarios_empresas').select('rol_id')
           .eq('usuario_id', coreUserRes.data?.id ?? '').eq('empresa_id', EMPRESA_ID)
           .eq('activo', true).maybeSingle();
 
         if (ue?.rol_id) {
           const { data: role } = await supabase
-            .schema('core' as any).from('roles').select('nombre')
+            .schema('core').from('roles').select('nombre')
             .eq('id', ue.rol_id).maybeSingle();
           if (role?.nombre?.toLowerCase() === 'direccion' || role?.nombre?.toLowerCase() === 'dirección') {
             setIsDireccion(true);
@@ -499,9 +499,9 @@ function TasksInner() {
     if (updatesData && updatesData.length > 0) {
       const userIds = [...new Set(updatesData.map((u: any) => u.creado_por).filter(Boolean))];
       const { data: usersData } = userIds.length > 0
-        ? await supabase.schema('core' as any).from('usuarios').select('id, nombre').in('id', userIds)
+        ? await supabase.schema('core').from('usuarios').select('id, first_name').in('id', userIds)
         : { data: [] };
-      const userMap = new Map((usersData ?? []).map((u: any) => [u.id, u.nombre]));
+      const userMap = new Map((usersData ?? []).map((u: any) => [u.id, u.first_name]));
       setTaskUpdates(updatesData.map((u: any) => ({ ...u, usuario: u.creado_por ? { nombre: userMap.get(u.creado_por) ?? 'Usuario' } : null })));
     } else {
       setTaskUpdates([]);
@@ -520,9 +520,9 @@ function TasksInner() {
     if (!taskId || !updateForm.contenido.trim()) return;
     setSavingUpdate(true);
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: coreUser } = await supabase.schema('core' as any).from('usuarios').select('id, nombre').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
+    const { data: coreUser } = await supabase.schema('core').from('usuarios').select('id, first_name').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
     const userId = coreUser?.id ?? null;
-    const userName = coreUser?.nombre ?? 'Usuario';
+    const userName = coreUser?.first_name ?? 'Usuario';
 
     const { error: insErr } = await supabase.schema('erp').from('task_updates').insert({
       task_id: taskId, empresa_id: EMPRESA_ID, tipo: 'avance', contenido: updateForm.contenido.trim(), creado_por: userId,
@@ -1186,9 +1186,9 @@ function TasksInner() {
                     if (!selectedTask || !updateForm.contenido.trim()) return;
                     setSavingUpdate(true);
                     const { data: { user } } = await supabase.auth.getUser();
-                    const { data: coreUser } = await supabase.schema('core' as any).from('usuarios').select('id, nombre').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
+                    const { data: coreUser } = await supabase.schema('core').from('usuarios').select('id, first_name').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
                     const userId = coreUser?.id ?? null;
-                    const userName = coreUser?.nombre ?? 'Usuario';
+                    const userName = coreUser?.first_name ?? 'Usuario';
                     const { error: insErr } = await supabase.schema('erp').from('task_updates').insert({
                       task_id: selectedTask.id, empresa_id: EMPRESA_ID, tipo: 'avance', contenido: updateForm.contenido.trim(), creado_por: userId,
                     });
