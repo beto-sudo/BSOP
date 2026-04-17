@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { generateWelcomeHtml, type WelcomeEmpresa } from '@/lib/welcome-email';
+import { validateBody } from '@/lib/validation';
 
 const LOGO_MAP: Record<string, string> = {
   rdb: 'https://bsop.io/logo-rdb.png',
@@ -8,15 +10,18 @@ const LOGO_MAP: Record<string, string> = {
   coagan: 'https://bsop.io/logo-coagan.png',
 };
 
+const WelcomeEmailSchema = z.object({
+  email: z.string().email('email must be a valid address').max(254),
+  firstName: z.string().trim().min(1).max(100).optional(),
+  usuarioId: z.string().uuid('usuarioId must be a valid UUID'),
+});
+
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const { email, firstName, usuarioId } = body;
+  const parsed = await validateBody(req, WelcomeEmailSchema);
+  if (!parsed.ok) return parsed.response;
+  const { email, firstName, usuarioId } = parsed.data;
 
   console.log('[welcome-email-api] Received:', { email, firstName, usuarioId });
-
-  if (!email || !usuarioId) {
-    return NextResponse.json({ error: 'Missing email or usuarioId' }, { status: 400 });
-  }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;

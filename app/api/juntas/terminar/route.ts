@@ -1,5 +1,18 @@
+/* eslint-disable @typescript-eslint/no-explicit-any --
+ * TODO(audit-T2): type the Supabase join results below with Database types.
+ * The `any` usages are on .map() callbacks over joined query rows where the
+ * Supabase client doesn't infer the join shape. Tracked in the 2026-04-16
+ * audit's T2 item (eliminate `any` progressively). Out of scope for this
+ * API-hardening PR; scheduled for a dedicated typing cleanup.
+ */
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
+import { validateBody } from '@/lib/validation';
+
+const TerminarJuntaSchema = z.object({
+  juntaId: z.string().uuid('juntaId must be a valid UUID'),
+});
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -155,12 +168,9 @@ function generateMinutaHtml(opts: {
 // ─── Route handler ─────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const { juntaId } = body as { juntaId?: string };
-
-  if (!juntaId) {
-    return NextResponse.json({ error: 'Missing juntaId' }, { status: 400 });
-  }
+  const parsed = await validateBody(req, TerminarJuntaSchema);
+  if (!parsed.ok) return parsed.response;
+  const { juntaId } = parsed.data;
 
   const supabase = getSupabaseAdminClient();
   if (!supabase) {
