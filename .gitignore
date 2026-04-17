@@ -31,4 +31,8 @@ scripts/claude_documentos.sh
 # Sandbox / debug leftovers
 zzz_*
 .git/.stale/
+.backup-stale/
+
+# macOS
+.DS_Store
 
