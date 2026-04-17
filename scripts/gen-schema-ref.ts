@@ -1,0 +1,429 @@
+#!/usr/bin/env npx tsx
+/**
+ * BSOP — Supabase schema reference generator
+ *
+ * Regenera `supabase/SCHEMA_REF.md` a partir del `information_schema` del
+ * proyecto Supabase. El output es determinístico (orden alfabético
+ * por schema → tabla → `ordinal_position` de columnas) para que los
+ * diffs en PRs sean fáciles de revisar.
+ *
+ * Uso:
+ *   SUPABASE_DB_URL=postgres://... npm run schema:ref
+ *   SUPABASE_DB_URL=postgres://... npm run schema:check
+ *
+ * Flags:
+ *   --schemas core,erp     Limita los schemas procesados (default:
+ *                          public,core,erp,rdb,dilesa,playtomic).
+ *   --out supabase/REF.md  Ruta de salida (default:
+ *                          supabase/SCHEMA_REF.md).
+ *   --dry-run              Escribe a stdout en lugar del archivo.
+ *
+ * Requiere `SUPABASE_DB_URL` en el entorno (connection string de Postgres con
+ * permiso de lectura sobre los schemas). La URL se obtiene en el dashboard
+ * de Supabase → Project Settings → Database → Connection string (URI).
+ * Úsala **solo localmente o en CI** — nunca la commitees.
+ */
+
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { Client } from 'pg';
+
+// ── CLI flags ─────────────────────────────────────────────────────────────────
+
+const args = process.argv.slice(2);
+const DRY_RUN = args.includes('--dry-run');
+
+function flagValue(flag: string, fallback: string): string {
+  const i = args.indexOf(flag);
+  return i >= 0 && args[i + 1] ? args[i + 1] : fallback;
+}
+
+const SCHEMAS = flagValue('--schemas', 'public,core,erp,rdb,dilesa,playtomic')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+const OUT_PATH = path.resolve(process.cwd(), flagValue('--out', 'supabase/SCHEMA_REF.md'));
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export type TableKind = 'table' | 'view' | 'mview';
+
+export interface TableRow {
+  schema: string;
+  name: string;
+  kind: TableKind;
+  comment: string | null;
+}
+
+export interface ColumnRow {
+  schema: string;
+  table: string;
+  name: string;
+  type: string;
+  nullable: boolean;
+  defaultExpr: string | null;
+  ordinal: number;
+}
+
+export interface PkInfo {
+  schema: string;
+  table: string;
+  columns: string[];
+}
+
+export interface FkInfo {
+  schema: string;
+  table: string;
+  column: string;
+  refSchema: string;
+  refTable: string;
+  refColumn: string;
+}
+
+export interface SchemaData {
+  tables: TableRow[];
+  columns: ColumnRow[];
+  pks: PkInfo[];
+  fks: FkInfo[];
+}
+
+// ── Pure formatter (exported for tests) ───────────────────────────────────────
+
+export interface FormatOptions {
+  schemas: string[];
+  generatedAt: string;
+}
+
+const KIND_LABEL: Record<TableKind, string> = {
+  table: '',
+  view: ' _(view)_',
+  mview: ' _(materialized view)_',
+};
+
+/**
+ * Formatea `SchemaData` como markdown determinístico.
+ *
+ * Contrato:
+ * - Schemas en el orden alfabético de `opts.schemas`.
+ * - Dentro de cada schema, tablas en orden alfabético.
+ * - Dentro de cada tabla, columnas en orden por `ordinal`.
+ * - Cada columna en una línea con tipo, nullable, default (si existe),
+ *   y marcas PK / FK si aplican.
+ */
+export function formatSchemaRef(data: SchemaData, opts: FormatOptions): string {
+  const sortedSchemas = [...opts.schemas].sort();
+
+  // Index helpers para lookup O(1) dentro del render.
+  const pkByTable = new Map<string, Set<string>>(); // key = schema.table
+  for (const pk of data.pks) {
+    pkByTable.set(`${pk.schema}.${pk.table}`, new Set(pk.columns));
+  }
+
+  const fkByColumn = new Map<string, FkInfo>(); // key = schema.table.column
+  for (const fk of data.fks) {
+    fkByColumn.set(`${fk.schema}.${fk.table}.${fk.column}`, fk);
+  }
+
+  const tablesBySchema = new Map<string, TableRow[]>();
+  for (const t of data.tables) {
+    const arr = tablesBySchema.get(t.schema) ?? [];
+    arr.push(t);
+    tablesBySchema.set(t.schema, arr);
+  }
+  for (const arr of tablesBySchema.values()) {
+    arr.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  const colsByTable = new Map<string, ColumnRow[]>(); // key = schema.table
+  for (const c of data.columns) {
+    const key = `${c.schema}.${c.table}`;
+    const arr = colsByTable.get(key) ?? [];
+    arr.push(c);
+    colsByTable.set(key, arr);
+  }
+  for (const arr of colsByTable.values()) {
+    arr.sort((a, b) => a.ordinal - b.ordinal);
+  }
+
+  // ── Header ─────────────────────────────────────────────────────────────────
+  const lines: string[] = [];
+  lines.push('# BSOP Supabase Schema Reference');
+  lines.push('');
+  lines.push('<!--');
+  lines.push('  Auto-generated by `scripts/gen-schema-ref.ts`.');
+  lines.push(`  Last regenerated: ${opts.generatedAt}`);
+  lines.push(`  Schemas: ${sortedSchemas.join(', ')}`);
+  lines.push('  DO NOT EDIT BY HAND.');
+  lines.push('  Regenerate via: `npm run schema:ref` (requires SUPABASE_DB_URL).');
+  lines.push('-->');
+  lines.push('');
+  lines.push(
+    `Referencia completa de tablas, vistas y columnas de BSOP en Supabase, tal como existen en el momento de la última regeneración. Para cambiar esta referencia, **aplica la migración correspondiente** y vuelve a correr \`npm run schema:ref\`.`
+  );
+  lines.push('');
+  lines.push(`**Schemas cubiertos:** ${sortedSchemas.map((s) => `\`${s}\``).join(' · ')}`);
+  lines.push('');
+
+  // ── Per-schema sections ────────────────────────────────────────────────────
+  for (const schema of sortedSchemas) {
+    lines.push('---');
+    lines.push('');
+    lines.push(`## Schema \`${schema}\``);
+    lines.push('');
+
+    const tables = tablesBySchema.get(schema) ?? [];
+    if (tables.length === 0) {
+      lines.push('_(sin tablas ni vistas)_');
+      lines.push('');
+      continue;
+    }
+
+    for (const t of tables) {
+      lines.push(`### \`${t.schema}.${t.name}\`${KIND_LABEL[t.kind]}`);
+      lines.push('');
+      if (t.comment) {
+        // El comentario puede ser multi-línea; lo citamos como blockquote.
+        for (const ln of t.comment.split(/\r?\n/)) {
+          lines.push(`> ${ln}`);
+        }
+        lines.push('');
+      }
+
+      const pkCols = pkByTable.get(`${t.schema}.${t.name}`) ?? new Set<string>();
+      const cols = colsByTable.get(`${t.schema}.${t.name}`) ?? [];
+
+      if (cols.length === 0) {
+        lines.push('_(sin columnas)_');
+      } else {
+        for (const c of cols) {
+          const parts: string[] = [];
+          parts.push(`\`${c.type}\``);
+          if (!c.nullable) parts.push('NOT NULL');
+          if (c.defaultExpr) parts.push(`DEFAULT \`${c.defaultExpr}\``);
+          const suffix: string[] = [];
+          if (pkCols.has(c.name)) suffix.push('PK');
+          const fk = fkByColumn.get(`${t.schema}.${t.name}.${c.name}`);
+          if (fk) suffix.push(`FK → \`${fk.refSchema}.${fk.refTable}(${fk.refColumn})\``);
+          const suffixStr = suffix.length ? ` — ${suffix.join(', ')}` : '';
+          lines.push(`- **${c.name}** ${parts.join(' ')}${suffixStr}`);
+        }
+      }
+      lines.push('');
+    }
+  }
+
+  // Normalizar trailing newline único.
+  return lines.join('\n').replace(/\n+$/, '') + '\n';
+}
+
+// ── Postgres fetch layer ──────────────────────────────────────────────────────
+
+async function fetchSchemaData(client: Client, schemas: string[]): Promise<SchemaData> {
+  // Tablas y vistas + comentario.
+  //
+  // pg_description(objoid, 'pg_class') trae el COMMENT ON TABLE/VIEW.
+  const tablesRes = await client.query<{
+    schema: string;
+    name: string;
+    relkind: 'r' | 'v' | 'm';
+    comment: string | null;
+  }>(
+    `
+    SELECT
+      n.nspname   AS schema,
+      c.relname   AS name,
+      c.relkind   AS relkind,
+      obj_description(c.oid, 'pg_class') AS comment
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = ANY($1::text[])
+      AND c.relkind IN ('r','v','m')
+    ORDER BY n.nspname, c.relname
+    `,
+    [schemas]
+  );
+
+  const tables: TableRow[] = tablesRes.rows.map((r) => ({
+    schema: r.schema,
+    name: r.name,
+    kind: r.relkind === 'r' ? 'table' : r.relkind === 'v' ? 'view' : 'mview',
+    comment: r.comment,
+  }));
+
+  // Columnas.
+  //
+  // `data_type` de information_schema es legible ("timestamp with time zone")
+  // en lugar del nombre interno de pg_type ("timestamptz"), lo cual prefiero
+  // para el SCHEMA_REF.md.
+  const colsRes = await client.query<{
+    schema: string;
+    table: string;
+    name: string;
+    type: string;
+    nullable: string;
+    default_expr: string | null;
+    ordinal: number;
+  }>(
+    `
+    SELECT
+      table_schema     AS schema,
+      table_name       AS "table",
+      column_name      AS name,
+      data_type        AS type,
+      is_nullable      AS nullable,
+      column_default   AS default_expr,
+      ordinal_position AS ordinal
+    FROM information_schema.columns
+    WHERE table_schema = ANY($1::text[])
+    ORDER BY table_schema, table_name, ordinal_position
+    `,
+    [schemas]
+  );
+
+  const columns: ColumnRow[] = colsRes.rows.map((r) => ({
+    schema: r.schema,
+    table: r.table,
+    name: r.name,
+    type: r.type,
+    nullable: r.nullable === 'YES',
+    defaultExpr: r.default_expr,
+    ordinal: r.ordinal,
+  }));
+
+  // Primary keys.
+  const pksRes = await client.query<{
+    schema: string;
+    table: string;
+    column: string;
+  }>(
+    `
+    SELECT
+      tc.table_schema AS schema,
+      tc.table_name   AS "table",
+      kcu.column_name AS "column"
+    FROM information_schema.table_constraints tc
+    JOIN information_schema.key_column_usage kcu
+      ON tc.constraint_name   = kcu.constraint_name
+     AND tc.constraint_schema = kcu.constraint_schema
+    WHERE tc.constraint_type = 'PRIMARY KEY'
+      AND tc.table_schema = ANY($1::text[])
+    ORDER BY tc.table_schema, tc.table_name, kcu.ordinal_position
+    `,
+    [schemas]
+  );
+
+  const pkMap = new Map<string, string[]>(); // key = schema.table
+  for (const row of pksRes.rows) {
+    const key = `${row.schema}.${row.table}`;
+    const arr = pkMap.get(key) ?? [];
+    arr.push(row.column);
+    pkMap.set(key, arr);
+  }
+  const pks: PkInfo[] = [...pkMap.entries()].map(([key, columns]) => {
+    const [schema, table] = key.split('.');
+    return { schema, table, columns };
+  });
+
+  // Foreign keys.
+  //
+  // `constraint_column_usage` es válido para FKs simples (1 columna origen).
+  // Para FKs compuestas (raro en BSOP), solo tomamos la primera pareja — es
+  // suficiente como pista en el SCHEMA_REF.
+  const fksRes = await client.query<{
+    schema: string;
+    table: string;
+    column: string;
+    ref_schema: string;
+    ref_table: string;
+    ref_column: string;
+  }>(
+    `
+    SELECT
+      tc.table_schema  AS schema,
+      tc.table_name    AS "table",
+      kcu.column_name  AS "column",
+      ccu.table_schema AS ref_schema,
+      ccu.table_name   AS ref_table,
+      ccu.column_name  AS ref_column
+    FROM information_schema.table_constraints tc
+    JOIN information_schema.key_column_usage kcu
+      ON tc.constraint_name   = kcu.constraint_name
+     AND tc.constraint_schema = kcu.constraint_schema
+    JOIN information_schema.constraint_column_usage ccu
+      ON ccu.constraint_name   = tc.constraint_name
+     AND ccu.constraint_schema = tc.constraint_schema
+    WHERE tc.constraint_type = 'FOREIGN KEY'
+      AND tc.table_schema = ANY($1::text[])
+    ORDER BY tc.table_schema, tc.table_name, kcu.ordinal_position
+    `,
+    [schemas]
+  );
+
+  const fks: FkInfo[] = fksRes.rows.map((r) => ({
+    schema: r.schema,
+    table: r.table,
+    column: r.column,
+    refSchema: r.ref_schema,
+    refTable: r.ref_table,
+    refColumn: r.ref_column,
+  }));
+
+  return { tables, columns, pks, fks };
+}
+
+// ── CLI entry ─────────────────────────────────────────────────────────────────
+
+async function main(): Promise<void> {
+  const connectionString = process.env.SUPABASE_DB_URL;
+  if (!connectionString) {
+    console.error(
+      '✖ SUPABASE_DB_URL no está definida.\n' +
+        '  Obtén el connection string en Supabase Dashboard → Project Settings → Database → Connection string (URI).\n' +
+        '  Ejemplo: SUPABASE_DB_URL=postgres://... npm run schema:ref'
+    );
+    process.exit(1);
+  }
+
+  const client = new Client({ connectionString });
+  await client.connect();
+  let output: string;
+  try {
+    const data = await fetchSchemaData(client, SCHEMAS);
+    output = formatSchemaRef(data, {
+      schemas: SCHEMAS,
+      generatedAt: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+    });
+  } finally {
+    await client.end();
+  }
+
+  if (DRY_RUN) {
+    process.stdout.write(output);
+    return;
+  }
+
+  fs.mkdirSync(path.dirname(OUT_PATH), { recursive: true });
+  fs.writeFileSync(OUT_PATH, output, 'utf8');
+  console.log(
+    `✔ Escrito ${path.relative(process.cwd(), OUT_PATH)} (${output.length.toLocaleString()} bytes, schemas: ${SCHEMAS.join(', ')})`
+  );
+}
+
+// Ejecutar solo cuando se invoca directamente (no al importar desde tests).
+const isMainModule = (() => {
+  try {
+    const invoked = process.argv[1] ? path.resolve(process.argv[1]) : '';
+    const here = path.resolve(__filename);
+    return invoked === here;
+  } catch {
+    return false;
+  }
+})();
+
+if (isMainModule) {
+  main().catch((err) => {
+    console.error('✖ Error al regenerar SCHEMA_REF.md:', err);
+    process.exit(1);
+  });
+}

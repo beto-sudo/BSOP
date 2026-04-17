@@ -19,19 +19,20 @@ Si vas a correr E2E tests, copia también `.env.test.local.example` → `.env.te
 
 Siempre partir de `main` actualizado.
 
-| Prefijo | Uso |
-|---------|-----|
-| `feat/` | Funcionalidad nueva |
-| `fix/` | Corrección de bug |
+| Prefijo     | Uso                                 |
+| ----------- | ----------------------------------- |
+| `feat/`     | Funcionalidad nueva                 |
+| `fix/`      | Corrección de bug                   |
 | `refactor/` | Cambio que no altera comportamiento |
-| `chore/` | Mantenimiento, tooling, build, deps |
-| `docs/` | Solo documentación |
-| `test/` | Solo tests |
-| `perf/` | Mejora de performance |
+| `chore/`    | Mantenimiento, tooling, build, deps |
+| `docs/`     | Solo documentación                  |
+| `test/`     | Solo tests                          |
+| `perf/`     | Mejora de performance               |
 
 Nombre de rama: `<prefijo>/descripcion-corta-en-kebab-case`.
 
 Ejemplos:
+
 - `fix/rdb-cortes-timezone-drift`
 - `feat/juntas-recordatorio-email`
 - `chore/eslint-prettier-husky`
@@ -61,6 +62,7 @@ fix: CSF viewer uses signed URLs for private storage bucket
 ```
 
 Reglas prácticas:
+
 - **Imperativo, no pasado** — "add feature", no "added feature".
 - **≤ 72 caracteres** en la línea de asunto.
 - **Un solo tema por commit** cuando sea razonable.
@@ -107,7 +109,8 @@ Reglas prácticas:
 - Todos los cambios de schema van por **migración versionada** en `supabase/migrations/`.
 - Nombra con timestamp: `YYYYMMDDHHMMSS_descripcion.sql`.
 - **Nunca** edites tablas directamente en el dashboard de producción.
-- Actualiza [`SCHEMA_ARCHITECTURE.md`](./SCHEMA_ARCHITECTURE.md) y [`supabase/SCHEMA_REF.md`](./supabase/SCHEMA_REF.md) cuando agregues/muevas/borres tablas o columnas.
+- Actualiza [`SCHEMA_ARCHITECTURE.md`](./SCHEMA_ARCHITECTURE.md) manualmente cuando cambie la forma general del schema (nuevo schema, nuevas relaciones entre módulos).
+- [`supabase/SCHEMA_REF.md`](./supabase/SCHEMA_REF.md) se **regenera automáticamente** con `npm run schema:ref` desde el `information_schema` real. Corre `npm run schema:check` antes de abrir PR para detectar drift entre la DB y el archivo versionado. Requiere `SUPABASE_DB_URL` en `.env.local` (ver `.env.local.example`).
 - Antes de merger a `main`, corre la migración en un branch de Supabase o staging y valida.
 
 ### Soft-delete (convención)
@@ -129,9 +132,9 @@ Toda tabla de **dominio operativo** (departamentos, puestos, empleados, cortes, 
 
 **Activo vs Eliminado** — son semánticas distintas, no se deben mezclar:
 
-| Concepto | Columna | Semántica |
-|----------|---------|-----------|
-| **Activo** | `activo boolean` | Estado operativo (pausado/activo). Se puede togglear. |
+| Concepto      | Columna                  | Semántica                                                     |
+| ------------- | ------------------------ | ------------------------------------------------------------- |
+| **Activo**    | `activo boolean`         | Estado operativo (pausado/activo). Se puede togglear.         |
 | **Eliminado** | `deleted_at timestamptz` | Soft-delete. Una vez eliminado no se "re-activa" — se recrea. |
 
 **Tablas que siguen el patrón hoy:** `erp.personas`, `erp.empleados`, `erp.documentos`, `erp.departamentos`, `erp.puestos`.
