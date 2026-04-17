@@ -4,12 +4,16 @@ import { createServerClient } from '@supabase/ssr';
 import { z } from 'zod';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { validateQuery } from '@/lib/validation';
+import { impersonateRateLimiter, extractIdentifier } from '@/lib/ratelimit';
 
 const ImpersonateQuerySchema = z.object({
   userId: z.string().uuid('userId must be a valid UUID'),
 });
 
 export async function GET(req: NextRequest) {
+  const rate = await impersonateRateLimiter.check(extractIdentifier(req));
+  if (!rate.ok) return rate.response;
+
   const parsed = validateQuery(req, ImpersonateQuerySchema);
   if (!parsed.ok) return parsed.response;
   const { userId: targetUserId } = parsed.data;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
+import { healthIngestRateLimiter, extractIdentifier } from '@/lib/ratelimit';
 import type { Json } from '@/types/supabase';
 
 // Envelope schema — validates only the top-level shape. Sample-level
@@ -280,6 +281,12 @@ export async function POST(request: NextRequest) {
   if (!expectedToken || !providedToken || providedToken !== expectedToken) {
     return unauthorized();
   }
+
+  // Rate limit AFTER auth so invalid tokens don't consume counter slots for
+  // the legitimate shortcut. Identifier prefers the bearer token (stable),
+  // falls back to IP.
+  const rate = await healthIngestRateLimiter.check(extractIdentifier(request));
+  if (!rate.ok) return rate.response;
 
   const supabase = getSupabaseAdminClient();
   if (!supabase) {
