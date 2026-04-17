@@ -2,6 +2,7 @@
 
 import { ThemeProvider } from 'next-themes';
 import { LocaleProvider } from '@/lib/i18n';
+import { ToastProvider } from '@/components/ui/toast';
 import {
   createContext,
   useCallback,
@@ -187,7 +188,9 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
       <LocaleProvider>
-        <PermissionsProvider>{children}</PermissionsProvider>
+        <ToastProvider>
+          <PermissionsProvider>{children}</PermissionsProvider>
+        </ToastProvider>
       </LocaleProvider>
     </ThemeProvider>
   );

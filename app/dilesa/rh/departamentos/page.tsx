@@ -17,7 +17,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Pencil, RefreshCw, Loader2, Network } from 'lucide-react';
+import { RowActions } from '@/components/shared/row-actions';
+import { useToast } from '@/components/ui/toast';
+import { Plus, RefreshCw, Loader2, Network } from 'lucide-react';
 
 const EMPRESA_ID = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479';
 
@@ -36,6 +38,7 @@ const EMPTY_FORM = { nombre: '', codigo: '', padre_id: '' };
 
 function DepartamentosInner() {
   const supabase = createSupabaseERPClient();
+  const toast = useToast();
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
   const [empleadoCounts, setEmpleadoCounts] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -49,7 +52,9 @@ function DepartamentosInner() {
     const [deptRes, empRes] = await Promise.all([
       supabase.schema('erp').from('departamentos')
         .select('id, empresa_id, nombre, codigo, padre_id, activo, padre:padre_id(nombre)')
-        .eq('empresa_id', EMPRESA_ID).order('nombre'),
+        .eq('empresa_id', EMPRESA_ID)
+        .is('deleted_at', null)
+        .order('nombre'),
       supabase.schema('erp').from('empleados')
         .select('departamento_id')
         .eq('empresa_id', EMPRESA_ID).eq('activo', true).is('deleted_at', null),
@@ -83,13 +88,44 @@ function DepartamentosInner() {
     if (editingId) { const res = await supabase.schema('erp').from('departamentos').update(payload).eq('id', editingId); err = res.error; }
     else { const res = await supabase.schema('erp').from('departamentos').insert({ ...payload, empresa_id: EMPRESA_ID }); err = res.error; }
     setSubmitting(false);
-    if (err) { alert(`Error: ${err.message}`); return; }
+    if (err) {
+      toast.add({ title: 'No se pudo guardar', description: err.message, type: 'error' });
+      return;
+    }
     setShowDialog(false);
+    toast.add({
+      title: editingId ? 'Departamento actualizado' : 'Departamento creado',
+      type: 'success',
+    });
     await fetchAll();
   };
 
   const handleToggleActivo = async (dept: Departamento) => {
-    await supabase.schema('erp').from('departamentos').update({ activo: !dept.activo }).eq('id', dept.id);
+    const { error: err } = await supabase
+      .schema('erp').from('departamentos')
+      .update({ activo: !dept.activo })
+      .eq('id', dept.id);
+    if (err) {
+      toast.add({ title: 'Error al cambiar estado', description: err.message, type: 'error' });
+      return;
+    }
+    toast.add({
+      title: dept.activo ? 'Departamento desactivado' : 'Departamento activado',
+      type: 'success',
+    });
+    await fetchAll();
+  };
+
+  const handleSoftDelete = async (dept: Departamento) => {
+    const { error: err } = await supabase
+      .schema('erp').from('departamentos')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', dept.id);
+    if (err) {
+      toast.add({ title: 'No se pudo eliminar', description: err.message, type: 'error' });
+      return;
+    }
+    toast.add({ title: `Departamento "${dept.nombre}" eliminado`, type: 'success' });
     await fetchAll();
   };
 
@@ -128,9 +164,22 @@ function DepartamentosInner() {
                   <TableCell><span className="text-sm text-[var(--text)]/70">{d.padre?.nombre ?? '—'}</span></TableCell>
                   <TableCell><span className="text-sm text-[var(--text)]/60">{empleadoCounts.get(d.id) ?? 0}</span></TableCell>
                   <TableCell>
-                    <button type="button" onClick={() => handleToggleActivo(d)} className={['inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium transition', d.activo ? 'border-green-500/20 bg-green-500/10 text-green-400' : 'border-[var(--border)] bg-[var(--panel)] text-[var(--text)]/40'].join(' ')}>{d.activo ? 'Activo' : 'Inactivo'}</button>
+                    <span className={['inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium', d.activo ? 'border-green-500/20 bg-green-500/10 text-green-400' : 'border-[var(--border)] bg-[var(--panel)] text-[var(--text)]/40'].join(' ')}>{d.activo ? 'Activo' : 'Inactivo'}</span>
                   </TableCell>
-                  <TableCell><Button variant="outline" size="sm" onClick={() => openEdit(d)} className="rounded-xl h-7 w-7 p-0 border-[var(--border)]"><Pencil className="h-3.5 w-3.5" /></Button></TableCell>
+                  <TableCell>
+                    <RowActions
+                      ariaLabel={`Acciones para ${d.nombre}`}
+                      onEdit={{ onClick: () => openEdit(d) }}
+                      onToggle={{ activo: d.activo, onClick: () => handleToggleActivo(d) }}
+                      onDelete={{
+                        onConfirm: () => handleSoftDelete(d),
+                        confirmTitle: `¿Eliminar "${d.nombre}"?`,
+                        confirmDescription:
+                          'Esta acción marcará el departamento como eliminado. ' +
+                          'Los empleados asignados conservarán su historial y podrá restaurarse desde auditoría.',
+                      }}
+                    />
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

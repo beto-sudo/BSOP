@@ -31,7 +31,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, RefreshCw, Loader2, Users, ChevronRight } from 'lucide-react';
+import { RowActions } from '@/components/shared/row-actions';
+import { useToast } from '@/components/ui/toast';
+import { Plus, Search, RefreshCw, Loader2, Users } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -82,6 +84,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 function EmpleadosInner() {
   const router = useRouter();
   const supabase = createSupabaseERPClient();
+  const toast = useToast();
 
   const [empresaIds, setEmpresaIds] = useState<string[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
@@ -206,10 +209,43 @@ function EmpleadosInner() {
       .select()
       .single();
     setCreating(false);
-    if (err) { alert(`Error al crear empleado: ${err.message}`); return; }
+    if (err) {
+      toast.add({ title: 'No se pudo crear el empleado', description: err.message, type: 'error' });
+      return;
+    }
     setShowCreate(false);
     setCreateForm({ persona_id: '', departamento_id: '', puesto_id: '', numero_empleado: '', fecha_ingreso: '' });
+    toast.add({ title: 'Empleado creado', type: 'success' });
     if (newEmp) router.push(`/rh/empleados/${newEmp.id}`);
+  };
+
+  const handleToggleActivo = async (emp: Empleado) => {
+    const { error: err } = await supabase
+      .schema('erp').from('empleados')
+      .update({ activo: !emp.activo })
+      .eq('id', emp.id);
+    if (err) {
+      toast.add({ title: 'Error al cambiar estado', description: err.message, type: 'error' });
+      return;
+    }
+    toast.add({
+      title: emp.activo ? 'Empleado desactivado' : 'Empleado activado',
+      type: 'success',
+    });
+    await fetchAll(empresaIds);
+  };
+
+  const handleSoftDelete = async (emp: Empleado) => {
+    const { error: err } = await supabase
+      .schema('erp').from('empleados')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', emp.id);
+    if (err) {
+      toast.add({ title: 'No se pudo eliminar', description: err.message, type: 'error' });
+      return;
+    }
+    toast.add({ title: `Empleado "${fullName(emp)}" eliminado`, type: 'success' });
+    await fetchAll(empresaIds);
   };
 
   const visible = empleados.filter((e) => {
@@ -348,7 +384,21 @@ function EmpleadosInner() {
                     <span className="text-sm text-[var(--text)]/70">{formatDate(emp.fecha_ingreso)}</span>
                   </TableCell>
                   <TableCell>
-                    <ChevronRight className="h-4 w-4 text-[var(--text)]/30" />
+                    <RowActions
+                      ariaLabel={`Acciones para ${fullName(emp)}`}
+                      onEdit={{
+                        label: 'Ver / editar',
+                        onClick: () => router.push(`/rh/empleados/${emp.id}`),
+                      }}
+                      onToggle={{ activo: emp.activo, onClick: () => handleToggleActivo(emp) }}
+                      onDelete={{
+                        onConfirm: () => handleSoftDelete(emp),
+                        confirmTitle: `¿Eliminar a "${fullName(emp)}"?`,
+                        confirmDescription:
+                          'Esta acción marcará al empleado como eliminado. ' +
+                          'Su historial se preserva y podrá restaurarse desde auditoría.',
+                      }}
+                    />
                   </TableCell>
                 </TableRow>
               ))}

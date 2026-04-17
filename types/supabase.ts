@@ -1178,6 +1178,7 @@ export type Database = {
           activo: boolean
           codigo: string | null
           created_at: string
+          deleted_at: string | null
           empresa_id: string
           id: string
           nombre: string
@@ -1187,6 +1188,7 @@ export type Database = {
           activo?: boolean
           codigo?: string | null
           created_at?: string
+          deleted_at?: string | null
           empresa_id: string
           id?: string
           nombre: string
@@ -1196,6 +1198,7 @@ export type Database = {
           activo?: boolean
           codigo?: string | null
           created_at?: string
+          deleted_at?: string | null
           empresa_id?: string
           id?: string
           nombre?: string
@@ -2539,6 +2542,7 @@ export type Database = {
         Row: {
           activo: boolean
           created_at: string
+          deleted_at: string | null
           departamento_id: string | null
           empresa_id: string
           esquema_pago: string | null
@@ -2555,6 +2559,7 @@ export type Database = {
         Insert: {
           activo?: boolean
           created_at?: string
+          deleted_at?: string | null
           departamento_id?: string | null
           empresa_id: string
           esquema_pago?: string | null
@@ -2571,6 +2576,7 @@ export type Database = {
         Update: {
           activo?: boolean
           created_at?: string
+          deleted_at?: string | null
           departamento_id?: string | null
           empresa_id?: string
           esquema_pago?: string | null
