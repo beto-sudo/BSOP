@@ -173,7 +173,7 @@ function TasksInner() {
     if (!user) return [];
 
     const { data: coreUser } = await supabase
-      .schema('core' as any)
+      .schema('core')
       .from('usuarios')
       .select('id')
       .eq('email', (user.email ?? '').toLowerCase())
@@ -182,7 +182,7 @@ function TasksInner() {
     if (!coreUser) return [];
 
     const { data: ueData } = await supabase
-      .schema('core' as any)
+      .schema('core')
       .from('usuarios_empresas')
       .select('empresa_id')
       .eq('usuario_id', coreUser.id)
@@ -266,7 +266,7 @@ function TasksInner() {
       data: { user },
     } = await supabase.auth.getUser();
     const { data: coreUser } = await supabase
-      .schema('core' as any)
+      .schema('core')
       .from('usuarios')
       .select('id')
       .eq('email', (user?.email ?? '').toLowerCase())

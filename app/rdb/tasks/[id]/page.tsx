@@ -150,7 +150,7 @@ function TaskDetailInner() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user?.email) return;
     const { data: coreUser } = await supabase
-      .schema('core' as any)
+      .schema('core')
       .from('usuarios')
       .select('id')
       .eq('email', user.email.toLowerCase())
@@ -185,9 +185,9 @@ function TaskDetailInner() {
     if (updatesData && updatesData.length > 0) {
       const userIds = [...new Set(updatesData.map((u: any) => u.creado_por).filter(Boolean))];
       const { data: usersData } = userIds.length > 0
-        ? await supabase.schema('core' as any).from('usuarios').select('id, nombre').in('id', userIds)
+        ? await supabase.schema('core').from('usuarios').select('id, first_name').in('id', userIds)
         : { data: [] };
-      const userMap = new Map((usersData ?? []).map((u: any) => [u.id, u.nombre]));
+      const userMap = new Map((usersData ?? []).map((u: any) => [u.id, u.first_name]));
       setTaskUpdates(
         updatesData.map((u: any) => ({
           ...u,
