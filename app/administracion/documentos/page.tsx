@@ -237,7 +237,7 @@ function AdjuntosSection({
       if (err) { alert(`Error: ${err}`); break; }
       const { data: urlData } = supabase.storage.from('adjuntos').getPublicUrl(path);
       const { data: cu } = await supabase.schema('core' as any).from('usuarios').select('id').eq('email', (await supabase.auth.getUser()).data.user?.email?.toLowerCase() ?? '').maybeSingle();
-      await supabase.schema('erp' as any).from('adjuntos').insert({
+      await supabase.schema('erp').from('adjuntos').insert({
         empresa_id: empresaId, entidad_tipo: 'documento', entidad_id: documentoId,
         uploaded_by: cu?.id ?? null, nombre: file.name, url: urlData.publicUrl,
         tipo_mime: file.type || null, tamano_bytes: file.size, rol: uploadRole,
@@ -249,7 +249,7 @@ function AdjuntosSection({
 
   const handleDelete = async (a: Adjunto) => {
     if (!confirm(`¿Eliminar "${a.nombre}"?`)) return;
-    await supabase.schema('erp' as any).from('adjuntos').delete().eq('id', a.id);
+    await supabase.schema('erp').from('adjuntos').delete().eq('id', a.id);
     onRefresh();
   };
 
@@ -566,7 +566,7 @@ function DetailSheet({
   const handleSave = async () => {
     if (!doc || !editForm.titulo.trim()) return;
     setSaving(true);
-    const { error: err } = await supabase.schema('erp' as any).from('documentos').update({
+    const { error: err } = await supabase.schema('erp').from('documentos').update({
       titulo: editForm.titulo.trim(),
       numero_documento: editForm.numero_documento.trim() || null,
       tipo: editForm.tipo || null,
@@ -708,7 +708,7 @@ function CreateSheet({
     setCreating(true);
     const { data: { user } } = await supabase.auth.getUser();
     const { data: cu } = await supabase.schema('core' as any).from('usuarios').select('id').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
-    const { data: newDoc, error: err } = await supabase.schema('erp' as any).from('documentos').insert({
+    const { data: newDoc, error: err } = await supabase.schema('erp').from('documentos').insert({
       empresa_id: primaryEmpresaId,
       titulo: form.titulo.trim(),
       numero_documento: form.numero_documento.trim() || null,
@@ -788,24 +788,24 @@ function DocumentosInner() {
 
   const fetchDocumentos = useCallback(async (ids: string[]) => {
     if (ids.length === 0) { setDocumentos([]); return; }
-    const { data, error: err } = await supabase.schema('erp' as any).from('documentos').select('*').in('empresa_id', ids).is('deleted_at', null).order('created_at', { ascending: false });
+    const { data, error: err } = await supabase.schema('erp').from('documentos').select('*').in('empresa_id', ids).is('deleted_at', null).order('created_at', { ascending: false });
     if (err) { setError(err.message); return; }
-    setDocumentos(data ?? []);
+    setDocumentos((data ?? []) as Documento[]);
   }, [supabase]);
 
   const fetchNotarias = useCallback(async (ids: string[]) => {
     if (ids.length === 0) { setNotarias([]); return; }
-    const { data: provData } = await supabase.schema('erp' as any).from('proveedores').select('id, persona_id, empresa_id').in('empresa_id', ids).eq('categoria', 'notaria').eq('activo', true).is('deleted_at', null);
+    const { data: provData } = await supabase.schema('erp').from('proveedores').select('id, persona_id, empresa_id').in('empresa_id', ids).eq('categoria', 'notaria').eq('activo', true).is('deleted_at', null);
     const pIds = [...new Set((provData ?? []).map((p: any) => p.persona_id).filter(Boolean))];
     if (pIds.length === 0) { setNotarias([]); return; }
-    const { data: persData } = await supabase.schema('erp' as any).from('personas').select('id, nombre').in('id', pIds).is('deleted_at', null);
+    const { data: persData } = await supabase.schema('erp').from('personas').select('id, nombre').in('id', pIds).is('deleted_at', null);
     const pm = new Map((persData ?? []).map((p: any) => [p.id, p.nombre as string]));
     setNotarias((provData ?? []).map((p: any) => ({ id: p.id, empresa_id: p.empresa_id, nombre: pm.get(p.persona_id) ?? 'Sin nombre' })).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es-MX')));
   }, [supabase]);
 
   const fetchAdjuntosBulk = useCallback(async (docIds: string[]) => {
     if (docIds.length === 0) { setAdjuntosPorDoc({}); return; }
-    const { data } = await supabase.schema('erp' as any).from('adjuntos').select('id, nombre, url, tipo_mime, tamano_bytes, created_at, entidad_id, rol').eq('entidad_tipo', 'documento').in('entidad_id', docIds).order('created_at', { ascending: false });
+    const { data } = await supabase.schema('erp').from('adjuntos').select('id, nombre, url, tipo_mime, tamano_bytes, created_at, entidad_id, rol').eq('entidad_tipo', 'documento').in('entidad_id', docIds).order('created_at', { ascending: false });
     const map: Record<string, Adjunto[]> = {};
     for (const a of data ?? []) {
       const key = a.entidad_id as string;
@@ -861,9 +861,9 @@ function DocumentosInner() {
     if (!newNotariaNombre.trim() || !primaryEmpresaId) return;
     setCreatingNotaria(true);
     try {
-      const { data: persona, error: pe } = await supabase.schema('erp' as any).from('personas').insert({ empresa_id: primaryEmpresaId, nombre: newNotariaNombre.trim(), tipo: 'proveedor' }).select('id').single();
+      const { data: persona, error: pe } = await supabase.schema('erp').from('personas').insert({ empresa_id: primaryEmpresaId, nombre: newNotariaNombre.trim(), tipo: 'proveedor' }).select('id').single();
       if (pe) throw pe;
-      const { data: prov, error: pre } = await supabase.schema('erp' as any).from('proveedores').insert({ empresa_id: primaryEmpresaId, persona_id: persona.id, categoria: 'notaria', activo: true }).select('id, empresa_id').single();
+      const { data: prov, error: pre } = await supabase.schema('erp').from('proveedores').insert({ empresa_id: primaryEmpresaId, persona_id: persona.id, categoria: 'notaria', activo: true }).select('id, empresa_id').single();
       if (pre) throw pre;
       const nn = { id: prov.id, empresa_id: prov.empresa_id, nombre: newNotariaNombre.trim() };
       setNotarias((prev) => [...prev, nn].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es-MX')));
