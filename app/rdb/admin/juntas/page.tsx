@@ -168,7 +168,7 @@ function JuntasInner() {
 
     const { data: { user } } = await supabase.auth.getUser();
     const { data: coreUser } = await supabase
-      .schema('core' as any)
+      .schema('core')
       .from('usuarios')
       .select('id')
       .eq('email', (user?.email ?? '').toLowerCase())
