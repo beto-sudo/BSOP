@@ -96,7 +96,7 @@ type CorteTotales = {
   efectivo_esperado: number | null;
 };
 
-// rdb.movimientos columns
+// erp.movimientos_caja columns (filtered by empresa_id = RDB_EMPRESA_ID)
 type Movimiento = {
   id: string;
   corte_id: string;
