@@ -277,7 +277,7 @@ function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved: () => 
   const handleSave = async () => {
     setSaving(true);
     const { error } = await supabase
-      .schema('core' as any)
+      .schema('core')
       .from('empresas')
       .update({
         logo_url: logoUrl.trim() || null,
@@ -510,12 +510,15 @@ function EmpresasSettingsInner() {
 
   const fetchEmpresas = useCallback(async () => {
     const { data, error: err } = await supabase
-      .schema('core' as any)
+      .schema('core')
       .from('empresas')
       .select('id, nombre, slug, activa, logo_url, header_url, rfc, razon_social, regimen_capital, nombre_comercial, fecha_inicio_operaciones, estatus_sat, id_cif, regimen_fiscal, domicilio_cp, domicilio_calle, domicilio_numero_ext, domicilio_numero_int, domicilio_colonia, domicilio_localidad, domicilio_municipio, domicilio_estado, actividades_economicas, obligaciones_fiscales, csf_fecha_emision, csf_url')
       .order('nombre');
     if (err) { setError(err.message); return; }
-    setEmpresas(data ?? []);
+    // Hydration assert (Patterns B + Y): autogen widens `activa` to `boolean | null` and
+    // `actividades_economicas`/`obligaciones_fiscales` to `Json[] | null`, but our local
+    // `Empresa` type narrows these via UI invariants.
+    setEmpresas((data ?? []) as Empresa[]);
   }, [supabase]);
 
   useEffect(() => {
