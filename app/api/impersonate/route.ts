@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
+import { z } from 'zod';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
+import { validateQuery } from '@/lib/validation';
+
+const ImpersonateQuerySchema = z.object({
+  userId: z.string().uuid('userId must be a valid UUID'),
+});
 
 export async function GET(req: NextRequest) {
-  const targetUserId = req.nextUrl.searchParams.get('userId');
-  if (!targetUserId) {
-    return NextResponse.json({ error: 'Missing userId' }, { status: 400 });
-  }
+  const parsed = validateQuery(req, ImpersonateQuerySchema);
+  if (!parsed.ok) return parsed.response;
+  const { userId: targetUserId } = parsed.data;
 
   // Verify the caller is an admin
   const cookieStore = await cookies();
@@ -109,7 +114,7 @@ export async function GET(req: NextRequest) {
   const modulos: Record<string, { read: boolean; write: boolean }> = {};
   for (const ue of userEmpresas) {
     if (!ue.rol_id) continue;
-    const rolePerms = allPermisos.filter((p: any) => p.rol_id === ue.rol_id);
+    const rolePerms = allPermisos.filter((p) => p.rol_id === ue.rol_id);
     for (const perm of rolePerms) {
       const moduloSlug = moduloIdToSlug[perm.modulo_id];
       if (!moduloSlug) continue;
