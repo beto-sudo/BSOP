@@ -1,6 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import type { Json } from '@/types/supabase';
+
+// Envelope schema — validates only the top-level shape. Sample-level
+// coercion/validation happens in the normalizers below, which already
+// defend against malformed individual rows with runtime type guards.
+// The payload wrapper is optional (some clients POST the `data` object
+// at the root; others nest under `data`).
+const HealthIngestEnvelopeSchema = z.object({
+  data: z
+    .object({
+      metrics: z.array(z.unknown()).optional(),
+      workouts: z.array(z.unknown()).optional(),
+      ecg: z.array(z.unknown()).optional(),
+      medications: z.array(z.unknown()).optional(),
+    })
+    .passthrough()
+    .optional(),
+  metrics: z.array(z.unknown()).optional(),
+  workouts: z.array(z.unknown()).optional(),
+  ecg: z.array(z.unknown()).optional(),
+  medications: z.array(z.unknown()).optional(),
+}).passthrough();
+
+// Hard limit on raw payload size. Apple Health Auto Export usually sends
+// under 1 MB per batch. 5 MB gives ample headroom while rejecting
+// obvious abuse (e.g. a flood of fabricated samples meant to fill the DB).
+const MAX_PAYLOAD_BYTES = 5 * 1024 * 1024;
 
 const METRIC_NAME_NORMALIZE: Record<string, string> = {
   resting_heart_rate: 'Resting Heart Rate',
@@ -262,14 +289,40 @@ export async function POST(request: NextRequest) {
   const rawBody = await request.text();
   const payloadSizeBytes = Buffer.byteLength(rawBody, 'utf8');
 
-  let payload: Record<string, unknown>;
+  if (payloadSizeBytes > MAX_PAYLOAD_BYTES) {
+    return NextResponse.json(
+      {
+        error: 'Payload too large',
+        maxBytes: MAX_PAYLOAD_BYTES,
+        receivedBytes: payloadSizeBytes,
+      },
+      { status: 413 },
+    );
+  }
+
+  let rawPayload: unknown;
   try {
-    payload = JSON.parse(rawBody) as Record<string, unknown>;
+    rawPayload = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ error: 'Invalid JSON payload.' }, { status: 400 });
   }
 
-  const data = payload.data && typeof payload.data === 'object' ? (payload.data as Record<string, unknown>) : payload;
+  const envelopeParsed = HealthIngestEnvelopeSchema.safeParse(rawPayload);
+  if (!envelopeParsed.success) {
+    return NextResponse.json(
+      {
+        error: 'Invalid envelope shape',
+        issues: envelopeParsed.error.issues.map((i) => ({
+          path: i.path.join('.') || '(root)',
+          message: i.message,
+        })),
+      },
+      { status: 400 },
+    );
+  }
+
+  const payload = envelopeParsed.data;
+  const data = payload.data ?? payload;
   const metrics = normalizeMetricRecords(Array.isArray(data.metrics) ? data.metrics : []);
   const workouts = normalizeWorkouts(Array.isArray(data.workouts) ? data.workouts : []);
   const ecg = normalizeEcg(Array.isArray(data.ecg) ? data.ecg : []);
