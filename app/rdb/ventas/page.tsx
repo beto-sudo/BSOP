@@ -433,13 +433,14 @@ export default function VentasPage() {
   const fetchCortes = useCallback(async () => {
     try {
       const supabase = createSupabaseBrowserClient();
-      // TODO(B.1.extra): `rdb.cortes` exists in DB (see supabase/SCHEMA_REF.md)
-      // but was not emitted by the types autogen in PR #10 (likely a grants /
-      // SECURITY DEFINER exclusion). Drop the `as any` once the generator picks
-      // it up.
+      // B.1.extra.a: `rdb.cortes` is a ghost relation (doesn't exist in the DB —
+      // it was never created during the phase-2 `caja` → `rdb` migration).
+      // The canonical proxy for RDB is `rdb.v_cortes_lista`, which already
+      // projects `id, corte_nombre, caja_nombre, hora_inicio, hora_fin, estado`
+      // on top of the shared `erp.cortes_caja` base table.
       let query = supabase
-        .schema('rdb' as any)
-        .from('cortes')
+        .schema('rdb')
+        .from('v_cortes_lista')
         .select('id, corte_nombre, caja_nombre, hora_inicio, hora_fin, estado')
         .order('hora_inicio', { ascending: false });
 
