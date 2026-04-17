@@ -31,7 +31,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Pencil, RefreshCw, Loader2, Briefcase } from 'lucide-react';
+import { RowActions } from '@/components/shared/row-actions';
+import { useToast } from '@/components/ui/toast';
+import { Plus, RefreshCw, Loader2, Briefcase } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -78,6 +80,7 @@ const EMPTY_FORM = {
 
 function PuestosInner() {
   const supabase = createSupabaseERPClient();
+  const toast = useToast();
 
   const [empresaIds, setEmpresaIds] = useState<string[]>([]);
   const [puestos, setPuestos] = useState<Puesto[]>([]);
@@ -110,9 +113,12 @@ function PuestosInner() {
     const [pRes, dRes] = await Promise.all([
       supabase.schema('erp').from('puestos')
         .select('id, empresa_id, nombre, nivel, sueldo_min, sueldo_max, objetivo, perfil, requisitos, esquema_pago, reporta_a, activo, departamento:departamento_id(nombre)')
-        .in('empresa_id', ids).order('nombre'),
+        .in('empresa_id', ids)
+        .is('deleted_at', null)
+        .order('nombre'),
       supabase.schema('erp').from('departamentos')
-        .select('id, nombre').in('empresa_id', ids).eq('activo', true).order('nombre'),
+        .select('id, nombre').in('empresa_id', ids).eq('activo', true)
+        .is('deleted_at', null).order('nombre'),
     ]);
     if (pRes.error) { setError(pRes.error.message); return; }
     const normalizedPuestos = (pRes.data ?? []).map((p: any) => ({
@@ -181,8 +187,44 @@ function PuestosInner() {
     }
 
     setSubmitting(false);
-    if (err) { alert(`Error: ${err.message}`); return; }
+    if (err) {
+      toast.add({ title: 'No se pudo guardar', description: err.message, type: 'error' });
+      return;
+    }
     setShowDialog(false);
+    toast.add({
+      title: editingId ? 'Puesto actualizado' : 'Puesto creado',
+      type: 'success',
+    });
+    await fetchAll(empresaIds);
+  };
+
+  const handleToggleActivo = async (p: Puesto) => {
+    const { error: err } = await supabase
+      .schema('erp').from('puestos')
+      .update({ activo: !p.activo })
+      .eq('id', p.id);
+    if (err) {
+      toast.add({ title: 'Error al cambiar estado', description: err.message, type: 'error' });
+      return;
+    }
+    toast.add({
+      title: p.activo ? 'Puesto desactivado' : 'Puesto activado',
+      type: 'success',
+    });
+    await fetchAll(empresaIds);
+  };
+
+  const handleSoftDelete = async (p: Puesto) => {
+    const { error: err } = await supabase
+      .schema('erp').from('puestos')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', p.id);
+    if (err) {
+      toast.add({ title: 'No se pudo eliminar', description: err.message, type: 'error' });
+      return;
+    }
+    toast.add({ title: `Puesto "${p.nombre}" eliminado`, type: 'success' });
     await fetchAll(empresaIds);
   };
 
@@ -226,6 +268,7 @@ function PuestosInner() {
                 <SortableHead sortKey="nivel" label="Nivel" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-32" />
                 <SortableHead sortKey="departamento_nombre" label="Departamento" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-36" />
                 <SortableHead sortKey="esquema_pago" label="Esquema pago" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-32" />
+                <SortableHead sortKey="activo" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-20" />
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
@@ -234,15 +277,35 @@ function PuestosInner() {
                 <TableRow key={p.id} className="border-[var(--border)]">
                   <TableCell>
                     <span className="font-medium text-[var(--text)]">{p.nombre}</span>
-                    {!p.activo && <span className="ml-2 text-xs text-[var(--text)]/40">(inactivo)</span>}
                   </TableCell>
                   <TableCell><span className="text-sm text-[var(--text)]/70">{p.nivel ?? '—'}</span></TableCell>
                   <TableCell><span className="text-sm text-[var(--text)]/70">{p.departamento?.nombre ?? '—'}</span></TableCell>
                   <TableCell><span className="text-sm text-[var(--text)]/70">{p.esquema_pago ?? '—'}</span></TableCell>
                   <TableCell>
-                    <Button variant="outline" size="sm" onClick={() => openEdit(p)} className="rounded-xl h-7 w-7 p-0 border-[var(--border)]">
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
+                    <span
+                      className={[
+                        'inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium',
+                        p.activo
+                          ? 'border-green-500/20 bg-green-500/10 text-green-400'
+                          : 'border-[var(--border)] bg-[var(--panel)] text-[var(--text)]/40',
+                      ].join(' ')}
+                    >
+                      {p.activo ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <RowActions
+                      ariaLabel={`Acciones para ${p.nombre}`}
+                      onEdit={{ onClick: () => openEdit(p) }}
+                      onToggle={{ activo: p.activo, onClick: () => handleToggleActivo(p) }}
+                      onDelete={{
+                        onConfirm: () => handleSoftDelete(p),
+                        confirmTitle: `¿Eliminar "${p.nombre}"?`,
+                        confirmDescription:
+                          'Esta acción marcará el puesto como eliminado. ' +
+                          'Los empleados asignados conservarán su historial y podrá restaurarse desde auditoría.',
+                      }}
+                    />
                   </TableCell>
                 </TableRow>
               ))}

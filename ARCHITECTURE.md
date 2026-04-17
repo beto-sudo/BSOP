@@ -106,7 +106,8 @@ Tres capas:
 
 1. **`ui/`** — primitivos shadcn/ui (`button`, `table`, `sheet`, `popover`, …). No saben de dominio.
 2. **`layout/`** — layout compartido (headers, sidebars).
-3. **Raíz** — componentes de dominio grandes (`app-shell.tsx`, `health-dashboard-view.tsx`, `travel-expense-tracker.tsx`, `trip-*.tsx`, `presence-bar.tsx`, etc.). Refactor pendiente para separar en subcarpetas por dominio.
+3. **`shared/`** — componentes de aplicación reutilizables, agnósticos de dominio pero conscientes del patrón de uso (`row-actions.tsx`, `confirm-dialog.tsx`). Ver [UI Standards](#ui-standards).
+4. **Raíz** — componentes de dominio grandes (`app-shell.tsx`, `health-dashboard-view.tsx`, `travel-expense-tracker.tsx`, `trip-*.tsx`, `presence-bar.tsx`, etc.). Refactor pendiente para separar en subcarpetas por dominio.
 
 ### `lib/`
 
@@ -222,6 +223,102 @@ Ver [`docs/AUDIT_2026-04-16.md`](./docs/AUDIT_2026-04-16.md) para el estado actu
 - Duplicación estructural entre módulos RDB ↔ DILESA — candidato a patrón parametrizable.
 - `'use client'` aplicado de más — oportunidad de RSC.
 - Sin rate limiting en APIs públicas.
+
+---
+
+## UI Standards
+
+Estos estándares aplican a **toda pantalla de tipo lista/tabla** del proyecto, independiente del módulo o empresa. El objetivo: consistencia visual, accesibilidad, y una única definición del comportamiento destructivo.
+
+### Row actions (editar · activar/desactivar · eliminar)
+
+Componente canónico: **`components/shared/row-actions.tsx`**.
+
+Renderiza un kebab menu (`⋮`) en la última columna de la tabla con, en este orden:
+
+1. **Editar** (o "Ver / editar" si el row se navega a detalle).
+2. **Toggle Activo / Inactivo** — side-effect directo (sin confirmación) porque es reversible.
+3. **Eliminar** — destructivo, siempre pasa por `ConfirmDialog` (AlertDialog shadcn).
+
+Contrato del componente:
+
+```tsx
+<RowActions
+  ariaLabel={`Acciones para ${row.nombre}`}
+  onEdit={{ onClick: () => openEdit(row) }}
+  onToggle={{ activo: row.activo, onClick: () => handleToggleActivo(row) }}
+  onDelete={{
+    onConfirm: () => handleSoftDelete(row),
+    confirmTitle: `¿Eliminar "${row.nombre}"?`,
+    confirmDescription: 'Esta acción se puede revertir desde la base de datos.',
+  }}
+/>
+```
+
+Cualquier prop puede omitirse si la acción no aplica (por ejemplo, tablas de solo lectura omiten `onEdit` y `onDelete`). El menú se colapsa automáticamente.
+
+Notas de implementación:
+
+- `stopPropagation` interno para que el row permanezca clickeable (navegación a detalle) sin disparar el menú.
+- `aria-label` obligatorio — identifica la fila para lectores de pantalla.
+- Nunca usar `window.confirm` ni `alert` para acciones de fila. Usar `ConfirmDialog` + `useToast`.
+
+### Confirmación destructiva (`components/shared/confirm-dialog.tsx`)
+
+Envuelve `AlertDialog` de shadcn. Soporta `onConfirm` sincrónico o `async` — mientras resuelve, el botón Confirmar queda en loading. Props:
+
+```tsx
+<ConfirmDialog
+  open={open}
+  onOpenChange={setOpen}
+  title="¿Eliminar ...?"
+  description="..."
+  confirmLabel="Eliminar"
+  cancelLabel="Cancelar"
+  variant="destructive"
+  onConfirm={async () => { ... }}
+/>
+```
+
+### Notificaciones (`components/ui/toast.tsx`)
+
+Wrapper sobre `@base-ui/react/toast`. Expuesto vía `useToast()`:
+
+```tsx
+const toast = useToast();
+toast.add({ title: 'Departamento eliminado', type: 'success' });
+toast.add({ title: 'No se pudo eliminar', description: err.message, type: 'error' });
+```
+
+`ToastProvider` está montado una sola vez en `components/providers.tsx` (envuelve a `PermissionsProvider`). **No** se debe instanciar localmente.
+
+### Soft-delete (convención de datos)
+
+Toda tabla operativa de dominio usa `deleted_at timestamptz NULL` en lugar de `DELETE` físico:
+
+- **Eliminar** = `UPDATE ... SET deleted_at = NOW() WHERE id = ?`.
+- **Leer listas** = `.is('deleted_at', null)` en el query.
+- **Índice partial** recomendado:
+  `CREATE INDEX <tabla>_deleted_idx ON <schema>.<tabla> (empresa_id) WHERE deleted_at IS NULL;`
+
+Tablas ya convertidas: `erp.empleados`, `erp.personas`, `erp.departamentos`, `erp.puestos`, `erp.documentos`. Pendientes (pendientes de auditar): tablas de `rdb.*` y `dilesa.*` de alto volumen.
+
+Dos razones para preferir soft-delete frente a `DELETE`:
+
+1. Cualquier FK histórica (reportes, nómina, auditoría) deja de romperse.
+2. Reversible en segundos sin restore de backup.
+
+### Activo vs eliminado — cuándo usar cuál
+
+| Estado | Columna | UI | Significado |
+|--------|---------|----|-------------|
+| Activo | `activo = true`, `deleted_at IS NULL` | Fila normal | Aparece en selectores y reportes. |
+| Inactivo | `activo = false`, `deleted_at IS NULL` | Fila tenue / badge `Inactivo` | Fuera de uso operativo pero consultable. |
+| Eliminado | `deleted_at IS NOT NULL` | No aparece | Fuera de listados. Recuperable manualmente. |
+
+### Smoke test sugerido (Playwright)
+
+Ubicación propuesta: `tests/e2e/rh-row-actions.spec.ts`. Cubre por empresa (`/rh`, `/rdb/rh`, `/dilesa/rh`) y por recurso (`departamentos`, `puestos`, `empleados`) los tres caminos: editar-cancelar, toggle activo, eliminar-con-confirm. Ver tarea #9.
 
 ---
 
