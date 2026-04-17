@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { generateWelcomeHtml, type WelcomeEmpresa } from '@/lib/welcome-email';
 import { validateBody } from '@/lib/validation';
+import { welcomeEmailRateLimiter, extractIdentifier } from '@/lib/ratelimit';
 
 const LOGO_MAP: Record<string, string> = {
   rdb: 'https://bsop.io/logo-rdb.png',
@@ -17,6 +18,9 @@ const WelcomeEmailSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const rate = await welcomeEmailRateLimiter.check(extractIdentifier(req));
+  if (!rate.ok) return rate.response;
+
   const parsed = await validateBody(req, WelcomeEmailSchema);
   if (!parsed.ok) return parsed.response;
   const { email, firstName, usuarioId } = parsed.data;
