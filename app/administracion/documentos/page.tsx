@@ -236,7 +236,7 @@ function AdjuntosSection({
       } catch (ex: any) { err = ex?.message ?? 'Error'; }
       if (err) { alert(`Error: ${err}`); break; }
       const { data: urlData } = supabase.storage.from('adjuntos').getPublicUrl(path);
-      const { data: cu } = await supabase.schema('core' as any).from('usuarios').select('id').eq('email', (await supabase.auth.getUser()).data.user?.email?.toLowerCase() ?? '').maybeSingle();
+      const { data: cu } = await supabase.schema('core').from('usuarios').select('id').eq('email', (await supabase.auth.getUser()).data.user?.email?.toLowerCase() ?? '').maybeSingle();
       await supabase.schema('erp').from('adjuntos').insert({
         empresa_id: empresaId, entidad_tipo: 'documento', entidad_id: documentoId,
         uploaded_by: cu?.id ?? null, nombre: file.name, url: urlData.publicUrl,
@@ -707,7 +707,7 @@ function CreateSheet({
     if (!form.titulo.trim() || !primaryEmpresaId) return;
     setCreating(true);
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: cu } = await supabase.schema('core' as any).from('usuarios').select('id').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
+    const { data: cu } = await supabase.schema('core').from('usuarios').select('id').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
     const { data: newDoc, error: err } = await supabase.schema('erp').from('documentos').insert({
       empresa_id: primaryEmpresaId,
       titulo: form.titulo.trim(),
@@ -777,9 +777,9 @@ function DocumentosInner() {
   const fetchEmpresaIds = useCallback(async (): Promise<string[]> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
-    const { data: cu } = await supabase.schema('core' as any).from('usuarios').select('id').eq('email', (user.email ?? '').toLowerCase()).maybeSingle();
+    const { data: cu } = await supabase.schema('core').from('usuarios').select('id').eq('email', (user.email ?? '').toLowerCase()).maybeSingle();
     if (!cu) return [];
-    const { data: ueData } = await supabase.schema('core' as any).from('usuarios_empresas').select('empresa_id').eq('usuario_id', cu.id).eq('activo', true);
+    const { data: ueData } = await supabase.schema('core').from('usuarios_empresas').select('empresa_id').eq('usuario_id', cu.id).eq('activo', true);
     const ids = (ueData ?? []).map((r: any) => r.empresa_id as string);
     setEmpresaIds(ids);
     if (ids.length > 0) setPrimaryEmpresaId(ids[0]);

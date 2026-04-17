@@ -238,7 +238,7 @@ function AdjuntosSection({
       } catch (ex: any) { err = ex?.message ?? 'Error'; }
       if (err) { alert(`Error: ${err}`); break; }
       const { data: urlData } = supabase.storage.from('adjuntos').getPublicUrl(path);
-      const { data: cu } = await supabase.schema('core' as any).from('usuarios').select('id').eq('email', (await supabase.auth.getUser()).data.user?.email?.toLowerCase() ?? '').maybeSingle();
+      const { data: cu } = await supabase.schema('core').from('usuarios').select('id').eq('email', (await supabase.auth.getUser()).data.user?.email?.toLowerCase() ?? '').maybeSingle();
       await supabase.schema('erp').from('adjuntos').insert({
         empresa_id: empresaId, entidad_tipo: 'documento', entidad_id: documentoId,
         uploaded_by: cu?.id ?? null, nombre: file.name, url: urlData.publicUrl,
@@ -703,7 +703,7 @@ function CreateSheet({
     if (!form.titulo.trim()) return;
     setCreating(true);
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: cu } = await supabase.schema('core' as any).from('usuarios').select('id').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
+    const { data: cu } = await supabase.schema('core').from('usuarios').select('id').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
     const { data: newDoc, error: err } = await supabase.schema('erp').from('documentos').insert({
       empresa_id: EMPRESA_ID,
       titulo: form.titulo.trim(),
