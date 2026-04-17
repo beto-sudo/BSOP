@@ -1,6 +1,7 @@
 'use client';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/types/supabase';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -72,7 +73,7 @@ export const ADMIN_ONLY_ROUTES = new Set(['/agents', '/usage', '/rnd']);
 // ── Fetcher ────────────────────────────────────────────────────────────────
 
 export async function fetchPermissionsForUserId(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   userId: string,
 ): Promise<UserPermissions> {
   const empty: UserPermissions = {
@@ -85,7 +86,7 @@ export async function fetchPermissionsForUserId(
 
   // Look up core.usuarios by ID
   const { data: coreUser } = await supabase
-    .schema('core' as any)
+    .schema('core')
     .from('usuarios')
     .select('id, email, rol, activo')
     .eq('id', userId)
@@ -104,22 +105,22 @@ export async function fetchPermissionsForUserId(
   const [empresasRes, modulosRes, permisosRolRes, excepcionesRes, allEmpresasRes] =
     await Promise.all([
       supabase
-        .schema('core' as any)
+        .schema('core')
         .from('usuarios_empresas')
         .select('empresa_id, rol_id, activo')
         .eq('usuario_id', coreUser.id)
         .eq('activo', true),
-      supabase.schema('core' as any).from('modulos').select('id, slug'),
+      supabase.schema('core').from('modulos').select('id, slug'),
       supabase
-        .schema('core' as any)
+        .schema('core')
         .from('permisos_rol')
         .select('rol_id, modulo_id, acceso_lectura, acceso_escritura'),
       supabase
-        .schema('core' as any)
+        .schema('core')
         .from('permisos_usuario_excepcion')
         .select('empresa_id, modulo_id, acceso_lectura, acceso_escritura')
         .eq('usuario_id', coreUser.id),
-      supabase.schema('core' as any).from('empresas').select('id, slug'),
+      supabase.schema('core').from('empresas').select('id, slug'),
     ]);
 
   const userEmpresas = empresasRes.data ?? [];
@@ -142,25 +143,31 @@ export async function fetchPermissionsForUserId(
   const modulos = new Map<string, AccessLevel>();
   for (const ue of userEmpresas) {
     if (!ue.rol_id) continue;
-    const rolePerms = allPermisos.filter((p: any) => p.rol_id === ue.rol_id);
+    const rolePerms = allPermisos.filter((p) => p.rol_id === ue.rol_id);
     for (const perm of rolePerms) {
       const moduloSlug = moduloIdToSlug.get(perm.modulo_id);
       if (!moduloSlug) continue;
-      modulos.set(moduloSlug, { read: perm.acceso_lectura, write: perm.acceso_escritura });
+      modulos.set(moduloSlug, {
+        read: perm.acceso_lectura ?? false,
+        write: perm.acceso_escritura ?? false,
+      });
     }
   }
 
   for (const exc of userExcepciones) {
     const moduloSlug = moduloIdToSlug.get(exc.modulo_id);
     if (!moduloSlug) continue;
-    modulos.set(moduloSlug, { read: exc.acceso_lectura, write: exc.acceso_escritura });
+    modulos.set(moduloSlug, {
+      read: exc.acceso_lectura ?? false,
+      write: exc.acceso_escritura ?? false,
+    });
   }
 
   return { isAdmin: false, loading: false, email, empresas, modulos };
 }
 
 export async function fetchUserPermissions(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
 ): Promise<UserPermissions> {
   const empty: UserPermissions = {
     isAdmin: false,
@@ -180,7 +187,7 @@ export async function fetchUserPermissions(
 
   // 2. Look up core.usuarios
   const { data: coreUser } = await supabase
-    .schema('core' as any)
+    .schema('core')
     .from('usuarios')
     .select('id, rol, activo')
     .eq('email', email)
@@ -197,22 +204,22 @@ export async function fetchUserPermissions(
   const [empresasRes, modulosRes, permisosRolRes, excepcionesRes, allEmpresasRes] =
     await Promise.all([
       supabase
-        .schema('core' as any)
+        .schema('core')
         .from('usuarios_empresas')
         .select('empresa_id, rol_id, activo')
         .eq('usuario_id', coreUser.id)
         .eq('activo', true),
-      supabase.schema('core' as any).from('modulos').select('id, slug'),
+      supabase.schema('core').from('modulos').select('id, slug'),
       supabase
-        .schema('core' as any)
+        .schema('core')
         .from('permisos_rol')
         .select('rol_id, modulo_id, acceso_lectura, acceso_escritura'),
       supabase
-        .schema('core' as any)
+        .schema('core')
         .from('permisos_usuario_excepcion')
         .select('empresa_id, modulo_id, acceso_lectura, acceso_escritura')
         .eq('usuario_id', coreUser.id),
-      supabase.schema('core' as any).from('empresas').select('id, slug'),
+      supabase.schema('core').from('empresas').select('id, slug'),
     ]);
 
   const userEmpresas = empresasRes.data ?? [];
@@ -244,14 +251,14 @@ export async function fetchUserPermissions(
     if (!ue.rol_id) continue;
 
     // Find role permisos
-    const rolePerms = allPermisos.filter((p: any) => p.rol_id === ue.rol_id);
+    const rolePerms = allPermisos.filter((p) => p.rol_id === ue.rol_id);
 
     for (const perm of rolePerms) {
       const moduloSlug = moduloIdToSlug.get(perm.modulo_id);
       if (!moduloSlug) continue;
       modulos.set(moduloSlug, {
-        read: perm.acceso_lectura,
-        write: perm.acceso_escritura,
+        read: perm.acceso_lectura ?? false,
+        write: perm.acceso_escritura ?? false,
       });
     }
   }
@@ -261,8 +268,8 @@ export async function fetchUserPermissions(
     const moduloSlug = moduloIdToSlug.get(exc.modulo_id);
     if (!moduloSlug) continue;
     modulos.set(moduloSlug, {
-      read: exc.acceso_lectura,
-      write: exc.acceso_escritura,
+      read: exc.acceso_lectura ?? false,
+      write: exc.acceso_escritura ?? false,
     });
   }
 
