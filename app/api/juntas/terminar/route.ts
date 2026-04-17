@@ -254,9 +254,9 @@ export async function POST(req: NextRequest) {
       const taskTitleMap = new Map((tasksData ?? []).map((t: any) => [t.id, t.titulo as string]));
       const updateUserIds = [...new Set(updatesData.map((u: any) => u.creado_por).filter(Boolean))];
       const { data: updateUsersData } = updateUserIds.length > 0
-        ? await supabase.schema('core' as any).from('usuarios').select('id, nombre').in('id', updateUserIds)
+        ? await supabase.schema('core').from('usuarios').select('id, first_name').in('id', updateUserIds)
         : { data: [] };
-      const updateUserMap = new Map((updateUsersData ?? []).map((u: any) => [u.id, u.nombre as string]));
+      const updateUserMap = new Map((updateUsersData ?? []).map((u: any) => [u.id, (u.first_name as string | null) ?? '']));
 
       const tipoLabels: Record<string, string> = { avance: 'Avance', cambio_estado: 'Cambio de estado', cambio_fecha: 'Cambio de fecha', nota: 'Nota', cambio_responsable: 'Cambio responsable' };
       actualizaciones = updatesData.map((u: any) => {

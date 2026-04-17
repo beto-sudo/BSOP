@@ -188,7 +188,7 @@ function JuntasInner() {
     if (!createTipo || !createFechaHora) return;
     setCreating(true);
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: coreUser } = await supabase.schema('core' as any).from('usuarios').select('id').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
+    const { data: coreUser } = await supabase.schema('core').from('usuarios').select('id').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
 
     const titulo = createTitulo.trim() || generateTitulo(createFechaHora, createTipo);
     const { data: newJunta, error: err } = await supabase

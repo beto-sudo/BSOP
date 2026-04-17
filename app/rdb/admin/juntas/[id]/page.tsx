@@ -322,9 +322,9 @@ function JuntaDetailInner() {
       if (updatesData && updatesData.length > 0) {
         const userIds = [...new Set(updatesData.map((u: any) => u.creado_por).filter(Boolean))];
         const { data: usersData } = userIds.length > 0
-          ? await supabase.schema('core' as any).from('usuarios').select('id, nombre').in('id', userIds)
+          ? await supabase.schema('core').from('usuarios').select('id, first_name').in('id', userIds)
           : { data: [] };
-        const userMap = new Map((usersData ?? []).map((u: any) => [u.id, u.nombre]));
+        const userMap = new Map((usersData ?? []).map((u: any) => [u.id, u.first_name]));
         setTaskUpdates(updatesData.map((u: any) => ({ ...u, usuario: u.creado_por ? { nombre: userMap.get(u.creado_por) ?? 'Usuario' } : null })));
       } else {
         setTaskUpdates([]);
@@ -489,9 +489,9 @@ function JuntaDetailInner() {
             if (updData) {
               const uIds = [...new Set(updData.map((u: any) => u.creado_por).filter(Boolean))];
               const { data: uData } = uIds.length > 0
-                ? await supabase.schema('core' as any).from('usuarios').select('id, nombre').in('id', uIds)
+                ? await supabase.schema('core').from('usuarios').select('id, first_name').in('id', uIds)
                 : { data: [] };
-              const uMap = new Map((uData ?? []).map((u: any) => [u.id, u.nombre]));
+              const uMap = new Map((uData ?? []).map((u: any) => [u.id, u.first_name]));
               setTaskUpdates(updData.map((u: any) => ({ ...u, usuario: u.creado_por ? { nombre: uMap.get(u.creado_por) ?? 'Usuario' } : null })));
             }
           }
@@ -562,7 +562,7 @@ function JuntaDetailInner() {
 
     const { data: { user } } = await supabase.auth.getUser();
     const { data: coreUser } = await supabase
-      .schema('core' as any)
+      .schema('core')
       .from('usuarios')
       .select('id')
       .eq('email', (user?.email ?? '').toLowerCase())
@@ -632,9 +632,9 @@ function JuntaDetailInner() {
     if (!taskId || !updateForm.contenido.trim() || !junta) return;
     setSavingUpdate(true);
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: coreUser } = await supabase.schema('core' as any).from('usuarios').select('id, nombre').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
+    const { data: coreUser } = await supabase.schema('core').from('usuarios').select('id, first_name').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
     const userId = coreUser?.id ?? null;
-    const userName = coreUser?.nombre ?? 'Usuario';
+    const userName = coreUser?.first_name ?? 'Usuario';
 
     const inserts: any[] = [];
     inserts.push({ task_id: taskId, empresa_id: EMPRESA_ID, tipo: 'avance', contenido: updateForm.contenido.trim(), creado_por: userId });
