@@ -1,7 +1,7 @@
 import { ArrowUpRight, Calendar, CheckCircle2, Link2, MapPin, Route, Users, Wallet } from 'lucide-react';
 import { Surface } from '@/components/ui';
 import { type TravelTrip } from '@/data/site';
-import { TravelExpenseTracker } from '@/components/travel-expense-tracker';
+import { TravelExpenseTracker } from '@/components/travel/travel-expense-tracker';
 
 const budgetStatusMeta = {
   confirmed: { label: 'Confirmado', icon: '✅', className: 'text-emerald-300' },
