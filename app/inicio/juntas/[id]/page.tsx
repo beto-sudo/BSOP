@@ -9,6 +9,7 @@ import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
+import { normalizeHtmlImagesToPaths, rewriteHtmlImagesToSigned } from '@/lib/adjuntos';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -454,18 +455,25 @@ function JuntaDetailInner() {
     void fetchAll();
   }, [fetchAll]);
 
-  // Sync editor content once junta loads (editor might not be ready on first render)
+  // Sync editor content once junta loads (editor might not be ready on first render).
+  // Rewrite any stored <img src> (bare path or legacy public URL) to a signed URL
+  // so the private `adjuntos` bucket renders correctly.
   useEffect(() => {
     if (editor && junta?.descripcion && editor.isEmpty) {
-      editor.commands.setContent(junta.descripcion);
+      void (async () => {
+        const hydrated = await rewriteHtmlImagesToSigned(supabase, junta.descripcion, 6 * 3600);
+        editor.commands.setContent(hydrated);
+      })();
     }
-  }, [editor, junta]);
+  }, [editor, junta, supabase]);
 
   const handleSave = async () => {
     if (!junta) return;
     setSaving(true);
 
-    const notesHtml = editor?.getHTML() ?? null;
+    // Normalize signed URLs back to bare paths so the DB never holds a
+    // soon-to-expire URL — getAdjuntoPath handles legacy rows too.
+    const notesHtml = normalizeHtmlImagesToPaths(editor?.getHTML() ?? null) || null;
 
     const { error: err } = await supabase
       .schema('erp')
