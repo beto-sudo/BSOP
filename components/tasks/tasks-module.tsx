@@ -29,36 +29,20 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, RefreshCw, Search, Eye, EyeOff } from 'lucide-react';
+import { Plus, RefreshCw, Eye, EyeOff } from 'lucide-react';
 
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import type { TablesInsert, TablesUpdate } from '@/types/supabase';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useSortableTable } from '@/hooks/use-sortable-table';
 
-import {
-  Combobox,
-  emptyTaskForm,
-  ESTADO_CONFIG,
-  PRIORIDAD_OPTIONS,
-  type Empleado,
-  type ErpTask,
-  type TaskEstado,
-  type TaskFormValues,
-  type TaskUpdateRow,
-} from './tasks-shared';
+import { emptyTaskForm } from './tasks-shared';
+import type { Empleado, ErpTask, TaskEstado, TaskFormValues, TaskUpdateRow } from './tasks-shared';
 import { TasksTable } from './tasks-table';
 import { TasksCreateForm } from './tasks-create-form';
 import { TasksEditForm } from './tasks-edit-form';
 import { TasksUpdatesSheet } from './tasks-updates-sheet';
+import { TasksFiltersBar } from './tasks-filters-bar';
 
 type TasksInsert = TablesInsert<{ schema: 'erp' }, 'tasks'>;
 type TasksUpdatePayload = TablesUpdate<{ schema: 'erp' }, 'tasks'>;
@@ -113,7 +97,7 @@ export function TasksModule({
 
   // ── Empresa scope ──────────────────────────────────────────────────────────
   const [empresaIds, setEmpresaIds] = useState<string[]>(
-    scope === 'empresa' && empresaId ? [empresaId] : [],
+    scope === 'empresa' && empresaId ? [empresaId] : []
   );
 
   // ── Identity / role state (rich only) ──────────────────────────────────────
@@ -273,7 +257,7 @@ export function TasksModule({
         }
       }
     },
-    [supabase, isRich],
+    [supabase, isRich]
   );
 
   const fetchTasks = useCallback(
@@ -294,7 +278,7 @@ export function TasksModule({
       }
       setTasks((data ?? []) as unknown as ErpTask[]);
     },
-    [supabase],
+    [supabase]
   );
 
   useEffect(() => {
@@ -333,7 +317,7 @@ export function TasksModule({
       if (task.asignado_por === currentEmpleadoId) return true;
       return false;
     },
-    [isAdmin, isDireccion, currentEmpleadoId],
+    [isAdmin, isDireccion, currentEmpleadoId]
   );
 
   const canCompleteTask = useCallback(
@@ -344,7 +328,7 @@ export function TasksModule({
       if (!task.asignado_por && task.asignado_a === currentEmpleadoId) return true;
       return false;
     },
-    [isAdmin, isDireccion, currentEmpleadoId],
+    [isAdmin, isDireccion, currentEmpleadoId]
   );
 
   const canEditInline = isAdmin || isDireccion;
@@ -583,15 +567,24 @@ export function TasksModule({
     if (updatesData && updatesData.length > 0) {
       const userIds = [
         ...new Set(
-          (updatesData as Array<{ creado_por: string | null }>).map((u) => u.creado_por).filter(Boolean),
+          (updatesData as Array<{ creado_por: string | null }>)
+            .map((u) => u.creado_por)
+            .filter(Boolean)
         ),
       ] as string[];
       const usersRes =
         userIds.length > 0
-          ? await supabase.schema('core').from('usuarios').select('id, first_name').in('id', userIds)
+          ? await supabase
+              .schema('core')
+              .from('usuarios')
+              .select('id, first_name')
+              .in('id', userIds)
           : { data: [] as Array<{ id: string; first_name: string | null }> };
       const userMap = new Map(
-        (usersRes.data ?? []).map((u: { id: string; first_name: string | null }) => [u.id, u.first_name]),
+        (usersRes.data ?? []).map((u: { id: string; first_name: string | null }) => [
+          u.id,
+          u.first_name,
+        ])
       );
       setTaskUpdates(
         (updatesData as Array<Record<string, unknown>>).map((u) => ({
@@ -599,7 +592,7 @@ export function TasksModule({
           usuario: u.creado_por
             ? { nombre: userMap.get(u.creado_por as string) ?? 'Usuario' }
             : null,
-        })),
+        }))
       );
     } else {
       setTaskUpdates([]);
@@ -632,16 +625,13 @@ export function TasksModule({
     const userId = coreUser?.id ?? null;
     const userName = coreUser?.first_name ?? 'Usuario';
 
-    const { error: insErr } = await supabase
-      .schema('erp')
-      .from('task_updates')
-      .insert({
-        task_id: id,
-        empresa_id: insertEmpresaId,
-        tipo: 'avance',
-        contenido: updateContent.trim(),
-        creado_por: userId,
-      });
+    const { error: insErr } = await supabase.schema('erp').from('task_updates').insert({
+      task_id: id,
+      empresa_id: insertEmpresaId,
+      tipo: 'avance',
+      contenido: updateContent.trim(),
+      creado_por: userId,
+    });
     if (insErr) {
       alert(`Error: ${insErr.message}`);
       setSavingUpdate(false);
@@ -674,30 +664,7 @@ export function TasksModule({
   const empleadoMap = useMemo(() => new Map(empleados.map((e) => [e.id, e])), [empleados]);
   const empleadoOptions = useMemo(
     () => empleados.map((e) => ({ id: e.id, label: e.nombre })),
-    [empleados],
-  );
-
-  const deptoOptions = useMemo(() => {
-    if (!isRich) return [];
-    const deptos = new Set<string>();
-    tasks.forEach((t) => {
-      if (t.departamento_nombre) {
-        t.departamento_nombre.split(',').forEach((d) => {
-          const trimmed = d.trim();
-          if (trimmed) deptos.add(trimmed);
-        });
-      }
-    });
-    return [...deptos].sort().map((d) => ({ id: d, label: d }));
-  }, [tasks, isRich]);
-
-  const estadoOptions = useMemo(
-    () => Object.entries(ESTADO_CONFIG).map(([k, v]) => ({ id: k, label: v.label })),
-    [],
-  );
-  const prioridadOptions = useMemo(
-    () => PRIORIDAD_OPTIONS.map((p) => ({ id: p, label: p })),
-    [],
+    [empleados]
   );
 
   const { sortKey, sortDir, onSort, sortData } = useSortableTable('created_at', 'desc');
@@ -709,7 +676,7 @@ export function TasksModule({
       (t) =>
         t.asignado_a === currentEmpleadoId ||
         t.asignado_por === currentEmpleadoId ||
-        t.creado_por === currentEmpleadoId,
+        t.creado_por === currentEmpleadoId
     );
   }, [tasks, isRich, isAdmin, isDireccion, currentEmpleadoId]);
 
@@ -749,13 +716,10 @@ export function TasksModule({
     return true;
   });
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Render
-  // ───────────────────────────────────────────────────────────────────────────
-
+  // ── Render ────────────────────────────────────────────────────────────────
   const updatesSheetTask = useMemo(
-    () => (showUpdatesSheet ? tasks.find((t) => t.id === showUpdatesSheet) ?? null : null),
-    [showUpdatesSheet, tasks],
+    () => (showUpdatesSheet ? (tasks.find((t) => t.id === showUpdatesSheet) ?? null) : null),
+    [showUpdatesSheet, tasks]
   );
 
   return (
@@ -791,108 +755,22 @@ export function TasksModule({
       </div>
 
       {/* Filters */}
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
-        <div className="flex flex-wrap gap-3">
-          <div className="relative min-w-48 flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text)]/40" />
-            <Input
-              placeholder={
-                isRich ? 'Buscar por título, descripción o responsable...' : 'Buscar tareas...'
-              }
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-            />
-          </div>
-
-          {isRich ? (
-            <>
-              <Combobox
-                value={filterEstado}
-                onChange={setFilterEstado}
-                options={estadoOptions}
-                placeholder="Estado"
-                searchPlaceholder="Buscar estado..."
-                allowClear
-                clearLabel="Todos"
-                className="w-40"
-              />
-              <Combobox
-                value={filterPrioridad}
-                onChange={setFilterPrioridad}
-                options={prioridadOptions}
-                placeholder="Prioridad"
-                searchPlaceholder="Buscar prioridad..."
-                allowClear
-                clearLabel="Todas"
-                className="w-36"
-              />
-              <Combobox
-                value={filterAsignado}
-                onChange={setFilterAsignado}
-                options={empleadoOptions}
-                placeholder="Asignado a"
-                searchPlaceholder="Buscar responsable..."
-                allowClear
-                clearLabel="Todos"
-                className="w-48"
-              />
-              <Combobox
-                value={filterDepto}
-                onChange={setFilterDepto}
-                options={deptoOptions}
-                placeholder="Depto"
-                searchPlaceholder="Buscar departamento..."
-                allowClear
-                clearLabel="Todos"
-                className="w-44"
-              />
-            </>
-          ) : (
-            <>
-              <Select value={filterEstado} onValueChange={(v) => setFilterEstado(v ?? 'all')}>
-                <SelectTrigger className="w-40 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                  <SelectValue placeholder="Estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los estados</SelectItem>
-                  {Object.entries(ESTADO_CONFIG).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>
-                      {v.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={filterPrioridad} onValueChange={(v) => setFilterPrioridad(v ?? 'all')}>
-                <SelectTrigger className="w-36 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                  <SelectValue placeholder="Prioridad" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  {PRIORIDAD_OPTIONS.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {p}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={filterAsignado} onValueChange={(v) => setFilterAsignado(v ?? 'all')}>
-                <SelectTrigger className="w-40 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                  <SelectValue placeholder="Asignado a" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {empleados.map((e) => (
-                    <SelectItem key={e.id} value={e.id}>
-                      {e.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </>
-          )}
-        </div>
-      </div>
+      <TasksFiltersBar
+        variant={isRich ? 'rich' : 'simple'}
+        tasks={tasks}
+        search={search}
+        onSearchChange={setSearch}
+        filterEstado={filterEstado}
+        onFilterEstadoChange={setFilterEstado}
+        filterPrioridad={filterPrioridad}
+        onFilterPrioridadChange={setFilterPrioridad}
+        filterAsignado={filterAsignado}
+        onFilterAsignadoChange={setFilterAsignado}
+        filterDepto={filterDepto}
+        onFilterDeptoChange={setFilterDepto}
+        empleados={empleados}
+        empleadoOptions={empleadoOptions}
+      />
 
       {/* Hide-completadas toggle (rich only) */}
       {isRich && (
