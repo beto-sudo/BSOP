@@ -1,7 +1,10 @@
 import { RequireAccess } from '@/components/require-access';
 import { BarChart3, Bot, Coins, Cpu, DollarSign, Gauge, Wrench } from 'lucide-react';
 import usage from '@/data/usage.json';
-import { ActionLink, SectionHeading, Shell, Surface } from '@/components/ui';
+import { ActionLink } from '@/components/ui/action-link';
+import { SectionHeading } from '@/components/ui/section-heading';
+import { Shell } from '@/components/ui/shell';
+import { Surface } from '@/components/ui/surface';
 
 const money=(value:number)=>value.toLocaleString('en-US',{style:'currency',currency:'USD',minimumFractionDigits:value<1?4:2,maximumFractionDigits:value<1?4:2});
 const int=(value:number)=>value.toLocaleString('en-US');

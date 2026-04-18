@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import { Surface } from '@/components/ui';
+import { Surface } from '@/components/ui/surface';
 import { formatMetricValue } from '@/lib/health';
 import { getDelta, getStats } from './helpers';
 import { StatPill } from './stat-pill';

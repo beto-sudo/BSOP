@@ -1,4 +1,5 @@
-import { SectionHeading, Surface } from '@/components/ui';
+import { SectionHeading } from '@/components/ui/section-heading';
+import { Surface } from '@/components/ui/surface';
 import type { HeroCard } from './types';
 
 /**

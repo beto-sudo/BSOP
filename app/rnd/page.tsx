@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import councilData from '@/data/rnd-council.json';
-import { SectionHeading, Shell, Surface } from '@/components/ui';
+import { SectionHeading } from '@/components/ui/section-heading';
+import { Shell } from '@/components/ui/shell';
+import { Surface } from '@/components/ui/surface';
 import { useLocale } from '@/lib/i18n';
 import { RequireAccess } from '@/components/require-access';
 

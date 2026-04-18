@@ -1,5 +1,5 @@
 import { BedDouble, MoonStar } from 'lucide-react';
-import { Surface } from '@/components/ui';
+import { Surface } from '@/components/ui/surface';
 import { formatDurationHours, formatMetricValue, type HealthMetricRow } from '@/lib/health';
 import { StatPill } from './stat-pill';
 import { TONES } from './tones';

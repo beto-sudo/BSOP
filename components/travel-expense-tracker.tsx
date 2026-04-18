@@ -2,7 +2,7 @@
 
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { Calculator, Copy, Loader2, Plus, Share2, Users, Wallet } from 'lucide-react';
-import { Surface } from '@/components/ui';
+import { Surface } from '@/components/ui/surface';
 import { getSupabaseClient } from '@/lib/supabase';
 
 export type ExpenseParticipantPreset = { name: string; emoji?: string };

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Activity, Footprints, HeartPulse, MoonStar, Waves, Weight } from 'lucide-react';
-import { Surface } from '@/components/ui';
+import { Surface } from '@/components/ui/surface';
 import { formatDurationHours, formatMetricValue } from '@/lib/health';
 import { ChartModal } from './chart-modal';
 import { groupDailyAverage, summarizeWindow } from './helpers';

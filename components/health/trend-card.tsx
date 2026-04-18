@@ -1,4 +1,4 @@
-import { Surface } from '@/components/ui';
+import { Surface } from '@/components/ui/surface';
 import { formatMetricValue } from '@/lib/health';
 import { EmptyState } from './empty-state';
 import { getStats } from './helpers';

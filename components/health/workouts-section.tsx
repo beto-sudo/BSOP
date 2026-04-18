@@ -1,5 +1,5 @@
 import { Activity, BedDouble } from 'lucide-react';
-import { Surface } from '@/components/ui';
+import { Surface } from '@/components/ui/surface';
 import { formatMetricValue, type HealthWorkoutRow } from '@/lib/health';
 import { EmptyState } from './empty-state';
 import { StatPill } from './stat-pill';

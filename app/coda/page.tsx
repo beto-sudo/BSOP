@@ -16,7 +16,9 @@ import {
   Target,
   Waypoints,
 } from 'lucide-react';
-import { SectionHeading, Shell, Surface } from '@/components/ui';
+import { SectionHeading } from '@/components/ui/section-heading';
+import { Shell } from '@/components/ui/shell';
+import { Surface } from '@/components/ui/surface';
 import { codaData, formatAuditTimestamp, formatInt, getHealthColor } from '@/data/coda';
 
 const processIcons = [ScanSearch, GitBranch, Activity, Blocks, ShieldAlert, Target, Waypoints, FileBarChart];
