@@ -572,10 +572,11 @@ describe('rewriteTiptapImagesToSigned', () => {
       ],
     };
     const out = (await rewriteTiptapImagesToSigned(client, tree)) as typeof tree;
-    expect(out.content[0].attrs.src).toBe('signed://a');
+    const first = out.content[0] as { attrs: { src: string } };
+    expect(first.attrs.src).toBe('signed://a');
     // Type assertion: b.png lives inside paragraph content.
-    const inner = out.content[1].content as { attrs: { src: string } }[];
-    expect(inner[0].attrs.src).toBe('signed://b');
+    const second = out.content[1] as { content: { attrs: { src: string } }[] };
+    expect(second.content[0]!.attrs.src).toBe('signed://b');
   });
 
   it('does not mutate the original tree', async () => {
