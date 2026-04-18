@@ -145,41 +145,22 @@
         "clusters": [
           {
             "theme": "RDB trust threshold first",
-            "members": [
-              "strategist",
-              "engineer",
-              "critic",
-              "synthesizer"
-            ],
+            "members": ["strategist", "engineer", "critic", "synthesizer"],
             "notes": "Most members argued that breadth should wait until RDB becomes boringly reliable."
           },
           {
             "theme": "Operator bandwidth as system constraint",
-            "members": [
-              "strategist",
-              "engineer",
-              "critic",
-              "analyst"
-            ],
+            "members": ["strategist", "engineer", "critic", "analyst"],
             "notes": "Health and attention were treated as execution constraints, not personal side notes."
           },
           {
             "theme": "Procurement integrity and inventory visibility",
-            "members": [
-              "strategist",
-              "engineer",
-              "analyst"
-            ],
+            "members": ["strategist", "engineer", "analyst"],
             "notes": "The requisition to inventory gap was framed as both margin leakage and trust debt."
           },
           {
             "theme": "Anomaly-first trust layer",
-            "members": [
-              "engineer",
-              "analyst",
-              "synthesizer",
-              "critic"
-            ],
+            "members": ["engineer", "analyst", "synthesizer", "critic"],
             "notes": "Trust should be built around reconciliation, data freshness, recovery, and exception handling, not larger dashboards."
           }
         ],

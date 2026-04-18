@@ -1,6 +1,7 @@
 # Plan de Acción BSOP — 2026-04-17
 
 > Plan unificado derivado de:
+>
 > - [`AUDIT_2026-04-16.md`](./AUDIT_2026-04-16.md) — repo / Next.js
 > - [`AUDIT_SUPABASE_2026-04-17.md`](./AUDIT_SUPABASE_2026-04-17.md) — base de datos
 >
@@ -124,6 +125,7 @@ export async function validateRequest<T>(req: Request, schema: z.ZodSchema<T>) {
   - Validar que RLS de tablas base aplica como se espera.
 
 Vistas críticas identificadas:
+
 - `playtomic.v_ocupacion_diaria`
 - `rdb.v_cortes_lista`, `rdb.v_cortes_totales_*`
 - `rdb.v_waitry_pedidos_reversa_sospechosa`
@@ -235,12 +237,15 @@ Vistas críticas identificadas:
 ### 5.2 Refactor de componentes
 
 **`components/app-shell.tsx` (732 LOC)** → `components/layout/app-shell/`:
+
 - [ ] `sidebar.tsx`, `topbar.tsx`, `presence-indicator.tsx`, `user-menu.tsx`.
 
 **`components/health-dashboard-view.tsx` (757 LOC)** → `components/health/`:
+
 - [ ] `metrics-summary.tsx`, `workouts-table.tsx`, `ecg-chart.tsx`, `medications-list.tsx`.
 
 **`components/travel-expense-tracker.tsx` (456 LOC)** → `components/travel/`:
+
 - [ ] `expense-form.tsx`, `expense-list.tsx`, `split-calculator.tsx`.
 
 ### 5.3 Dedup permissions
@@ -273,6 +278,7 @@ Vistas críticas identificadas:
 **Observación**: `app/rdb/rh/empleados/page.tsx` ≈ `app/dilesa/rh/empleados/page.tsx` ≈ `app/rh/empleados/page.tsx` (tres copias).
 
 Propuesta:
+
 - [ ] Crear `components/modules/rh/empleados-module.tsx` que reciba `empresaId` por prop.
 - [ ] Las tres pages colapsan a: `<EmpleadosModule empresaId={...} />`.
 - [ ] Repetir con `departamentos`, `puestos`, `tasks`, `juntas`.
@@ -297,15 +303,15 @@ Propuesta:
 
 ## Resumen cronológico
 
-| Sprint | Duración | Foco | Exit criteria principal |
-|--------|---------:|------|-------------------------|
-| 0 | 2-3 días | Bleeding fixes | 2 leaks resueltos, raíz limpia, edge fns al repo |
-| 1 | 1 semana | API hardening | Zod en 5 routes + rate limit + CSP |
-| 2 | 1 semana | DB seguridad crítica | 0 advisors ERROR |
-| 3 | 1 semana | DB RLS sweep | ≤10 always_true restantes |
-| 4 | 1 semana | DB perf + higiene | Advisors <50, 0 placeholders |
-| 5 | 2 semanas | Tests + componentes | Coverage 30%+, componentes <300 LOC |
-| 6 | 2 semanas (opc) | RSC + módulos | `'use client'` ≤30, dedup RDB/DILESA |
+| Sprint |        Duración | Foco                 | Exit criteria principal                          |
+| ------ | --------------: | -------------------- | ------------------------------------------------ |
+| 0      |        2-3 días | Bleeding fixes       | 2 leaks resueltos, raíz limpia, edge fns al repo |
+| 1      |        1 semana | API hardening        | Zod en 5 routes + rate limit + CSP               |
+| 2      |        1 semana | DB seguridad crítica | 0 advisors ERROR                                 |
+| 3      |        1 semana | DB RLS sweep         | ≤10 always_true restantes                        |
+| 4      |        1 semana | DB perf + higiene    | Advisors <50, 0 placeholders                     |
+| 5      |       2 semanas | Tests + componentes  | Coverage 30%+, componentes <300 LOC              |
+| 6      | 2 semanas (opc) | RSC + módulos        | `'use client'` ≤30, dedup RDB/DILESA             |
 
 **Total: 7–9 semanas** para llegar al estado "production-grade, maintainable".
 

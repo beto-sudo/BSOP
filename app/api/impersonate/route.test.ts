@@ -54,8 +54,7 @@ vi.mock('@/lib/ratelimit', () => ({
 }));
 
 vi.mock('@/lib/supabase-admin', () => ({
-  getSupabaseAdminClient: () =>
-    adminClientOverrideActive ? adminClientOverride : adminClient,
+  getSupabaseAdminClient: () => (adminClientOverrideActive ? adminClientOverride : adminClient),
 }));
 
 // ── Test-wide state ──────────────────────────────────────────────────────
@@ -158,10 +157,8 @@ function installAdminMock(script: Script) {
             eq: (col: string, ..._args: unknown[]) => Chain;
             maybeSingle: () => Promise<MaybeSingleResult<unknown>>;
             then: <R1 = ListResult<unknown>, R2 = never>(
-              onFulfilled?:
-                | ((value: ListResult<unknown>) => R1 | PromiseLike<R1>)
-                | null,
-              onRejected?: ((reason: unknown) => R2 | PromiseLike<R2>) | null,
+              onFulfilled?: ((value: ListResult<unknown>) => R1 | PromiseLike<R1>) | null,
+              onRejected?: ((reason: unknown) => R2 | PromiseLike<R2>) | null
             ) => Promise<R1 | R2>;
           };
 

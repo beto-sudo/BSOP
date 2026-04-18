@@ -74,7 +74,7 @@ export const ADMIN_ONLY_ROUTES = new Set(['/agents', '/usage', '/rnd']);
 
 export async function fetchPermissionsForUserId(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  userId: string
 ): Promise<UserPermissions> {
   const empty: UserPermissions = {
     isAdmin: false,
@@ -167,7 +167,7 @@ export async function fetchPermissionsForUserId(
 }
 
 export async function fetchUserPermissions(
-  supabase: SupabaseClient<Database>,
+  supabase: SupabaseClient<Database>
 ): Promise<UserPermissions> {
   const empty: UserPermissions = {
     isAdmin: false,
@@ -278,10 +278,7 @@ export async function fetchUserPermissions(
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-export function canAccessEmpresa(
-  perms: UserPermissions,
-  empresaSlug: string,
-): boolean {
+export function canAccessEmpresa(perms: UserPermissions, empresaSlug: string): boolean {
   if (perms.isAdmin) return true;
   return perms.empresas.has(empresaSlug);
 }
@@ -289,7 +286,7 @@ export function canAccessEmpresa(
 export function canAccessModulo(
   perms: UserPermissions,
   moduloSlug: string,
-  mode: 'read' | 'write' = 'read',
+  mode: 'read' | 'write' = 'read'
 ): boolean {
   if (perms.isAdmin) return true;
   const access = perms.modulos.get(moduloSlug);
@@ -298,6 +295,8 @@ export function canAccessModulo(
 }
 
 export function isAdminOnly(pathname: string): boolean {
-  return ADMIN_ONLY_ROUTES.has(pathname) ||
-    Array.from(ADMIN_ONLY_ROUTES).some((r) => pathname.startsWith(`${r}/`));
+  return (
+    ADMIN_ONLY_ROUTES.has(pathname) ||
+    Array.from(ADMIN_ONLY_ROUTES).some((r) => pathname.startsWith(`${r}/`))
+  );
 }

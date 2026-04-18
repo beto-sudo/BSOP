@@ -1,12 +1,27 @@
 'use client';
 
+/* eslint-disable react-hooks/set-state-in-effect --
+ * Cleanup PR (#30): pre-existing data-sync pattern flagged by the new React
+ * hook rule. Rewriting changes render semantics — out of scope for lint cleanup.
+ */
+
 import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Building2, Upload, Loader2, RefreshCw, CheckCircle, FileText, ExternalLink, ChevronDown, ChevronRight } from 'lucide-react';
+import {
+  Building2,
+  Upload,
+  Loader2,
+  RefreshCw,
+  CheckCircle,
+  FileText,
+  ExternalLink,
+  ChevronDown,
+  ChevronRight,
+} from 'lucide-react';
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -163,7 +178,11 @@ function ImageUploader({
             onChange={handleUpload}
           />
           <span className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--text)]/70 transition hover:bg-[var(--panel)] hover:text-[var(--text)] cursor-pointer whitespace-nowrap">
-            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            {uploading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Upload className="h-4 w-4" />
+            )}
             {uploading ? 'Subiendo...' : 'Subir imagen'}
           </span>
         </label>
@@ -212,9 +231,7 @@ function EstatusBadge({ estatus }: { estatus: string | null }) {
   return (
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-        isActivo
-          ? 'bg-green-500/15 text-green-400'
-          : 'bg-red-500/15 text-red-400'
+        isActivo ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'
       }`}
     >
       {estatus}
@@ -304,7 +321,10 @@ function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved: () => 
       .eq('id', empresa.id);
 
     setSaving(false);
-    if (error) { alert(`Error al guardar: ${error.message}`); return; }
+    if (error) {
+      alert(`Error al guardar: ${error.message}`);
+      return;
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
     onSaved();
@@ -339,12 +359,31 @@ function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved: () => 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <TextField label="RFC" value={rfc} onChange={setRfc} placeholder="ABC123456XX0" />
           <TextField label="Razón Social" value={razonSocial} onChange={setRazonSocial} />
-          <TextField label="Régimen Capital" value={regimenCapital} onChange={setRegimenCapital} placeholder="SA de CV" />
-          <TextField label="Nombre Comercial" value={nombreComercial} onChange={setNombreComercial} />
+          <TextField
+            label="Régimen Capital"
+            value={regimenCapital}
+            onChange={setRegimenCapital}
+            placeholder="SA de CV"
+          />
+          <TextField
+            label="Nombre Comercial"
+            value={nombreComercial}
+            onChange={setNombreComercial}
+          />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <TextField label="Fecha Inicio Operaciones" value={fechaInicioOps} onChange={setFechaInicioOps} placeholder="YYYY-MM-DD" />
-          <TextField label="Estatus SAT" value={estatusSat} onChange={setEstatusSat} placeholder="ACTIVO" />
+          <TextField
+            label="Fecha Inicio Operaciones"
+            value={fechaInicioOps}
+            onChange={setFechaInicioOps}
+            placeholder="YYYY-MM-DD"
+          />
+          <TextField
+            label="Estatus SAT"
+            value={estatusSat}
+            onChange={setEstatusSat}
+            placeholder="ACTIVO"
+          />
           <TextField label="idCIF" value={idCif} onChange={setIdCif} />
           <TextField label="Régimen Fiscal" value={regimenFiscal} onChange={setRegimenFiscal} />
         </div>
@@ -379,10 +418,18 @@ function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved: () => 
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[var(--border)] bg-[var(--panel)]">
-                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50">#</th>
-                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50">Actividad</th>
-                  <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50">%</th>
-                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50">Fecha Inicio</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50">
+                    #
+                  </th>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50">
+                    Actividad
+                  </th>
+                  <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50">
+                    %
+                  </th>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50">
+                    Fecha Inicio
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -390,8 +437,12 @@ function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved: () => 
                   <tr key={i} className="border-b border-[var(--border)] last:border-0">
                     <td className="px-3 py-2 text-[var(--text)]/60 tabular-nums">{a.orden}</td>
                     <td className="px-3 py-2 text-[var(--text)]">{a.actividad}</td>
-                    <td className="px-3 py-2 text-right text-[var(--text)]/70 tabular-nums">{a.porcentaje}</td>
-                    <td className="px-3 py-2 text-[var(--text)]/60 tabular-nums whitespace-nowrap">{a.fecha_inicio}</td>
+                    <td className="px-3 py-2 text-right text-[var(--text)]/70 tabular-nums">
+                      {a.porcentaje}
+                    </td>
+                    <td className="px-3 py-2 text-[var(--text)]/60 tabular-nums whitespace-nowrap">
+                      {a.fecha_inicio}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -408,9 +459,15 @@ function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved: () => 
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[var(--border)] bg-[var(--panel)]">
-                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50">Descripción</th>
-                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50">Vencimiento</th>
-                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50">Fecha Inicio</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50">
+                    Descripción
+                  </th>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50">
+                    Vencimiento
+                  </th>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50">
+                    Fecha Inicio
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -418,7 +475,9 @@ function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved: () => 
                   <tr key={i} className="border-b border-[var(--border)] last:border-0">
                     <td className="px-3 py-2 text-[var(--text)]">{o.descripcion}</td>
                     <td className="px-3 py-2 text-[var(--text)]/70 text-xs">{o.vencimiento}</td>
-                    <td className="px-3 py-2 text-[var(--text)]/60 tabular-nums whitespace-nowrap">{o.fecha_inicio}</td>
+                    <td className="px-3 py-2 text-[var(--text)]/60 tabular-nums whitespace-nowrap">
+                      {o.fecha_inicio}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -431,9 +490,19 @@ function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved: () => 
       <div className="space-y-4">
         <SectionTitle>Constancia de Situación Fiscal (CSF)</SectionTitle>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <TextField label="Fecha de Emisión" value={csfFechaEmision} onChange={setCsfFechaEmision} placeholder="YYYY-MM-DD" />
+          <TextField
+            label="Fecha de Emisión"
+            value={csfFechaEmision}
+            onChange={setCsfFechaEmision}
+            placeholder="YYYY-MM-DD"
+          />
           <div className="sm:col-span-2">
-            <TextField label="Ruta del PDF (storage o URL)" value={csfUrl} onChange={setCsfUrl} placeholder="legal/empresa/csf/archivo.pdf" />
+            <TextField
+              label="Ruta del PDF (storage o URL)"
+              value={csfUrl}
+              onChange={setCsfUrl}
+              placeholder="legal/empresa/csf/archivo.pdf"
+            />
           </div>
           {empresa.csf_url && (
             <div className="flex items-end pb-0.5">
@@ -497,7 +566,8 @@ function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved: () => 
 
 // ─── Table row header cell style ────────────────────────────────────────────────
 
-const thClass = "px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50";
+const thClass =
+  'px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50';
 
 // ─── Main component ──────────────────────────────────────────────────────────────
 
@@ -512,9 +582,14 @@ function EmpresasSettingsInner() {
     const { data, error: err } = await supabase
       .schema('core')
       .from('empresas')
-      .select('id, nombre, slug, activa, logo_url, header_url, rfc, razon_social, regimen_capital, nombre_comercial, fecha_inicio_operaciones, estatus_sat, id_cif, regimen_fiscal, domicilio_cp, domicilio_calle, domicilio_numero_ext, domicilio_numero_int, domicilio_colonia, domicilio_localidad, domicilio_municipio, domicilio_estado, actividades_economicas, obligaciones_fiscales, csf_fecha_emision, csf_url')
+      .select(
+        'id, nombre, slug, activa, logo_url, header_url, rfc, razon_social, regimen_capital, nombre_comercial, fecha_inicio_operaciones, estatus_sat, id_cif, regimen_fiscal, domicilio_cp, domicilio_calle, domicilio_numero_ext, domicilio_numero_int, domicilio_colonia, domicilio_localidad, domicilio_municipio, domicilio_estado, actividades_economicas, obligaciones_fiscales, csf_fecha_emision, csf_url'
+      )
       .order('nombre');
-    if (err) { setError(err.message); return; }
+    if (err) {
+      setError(err.message);
+      return;
+    }
     // Hydration assert (Patterns B + Y): autogen widens `activa` to `boolean | null` and
     // `actividades_economicas`/`obligaciones_fiscales` to `Json[] | null`, but our local
     // `Empresa` type narrows these via UI invariants.
@@ -542,7 +617,10 @@ function EmpresasSettingsInner() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => { setLoading(true); fetchEmpresas().finally(() => setLoading(false)); }}
+          onClick={() => {
+            setLoading(true);
+            fetchEmpresas().finally(() => setLoading(false));
+          }}
           disabled={loading}
           className="rounded-xl border-[var(--border)] bg-[var(--card)] text-[var(--text)] hover:bg-[var(--panel)]"
         >
@@ -560,7 +638,10 @@ function EmpresasSettingsInner() {
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">
           <div className="space-y-0">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-4 px-4 py-4 border-b border-[var(--border)] last:border-0">
+              <div
+                key={i}
+                className="flex items-center gap-4 px-4 py-4 border-b border-[var(--border)] last:border-0"
+              >
                 <Skeleton className="h-4 w-4 rounded" />
                 <Skeleton className="h-4 w-40" />
                 <Skeleton className="h-4 w-28" />
@@ -605,9 +686,7 @@ function EmpresasSettingsInner() {
                         type="button"
                         onClick={() => toggleExpand(e.id)}
                         className={`w-full text-left flex items-center transition-colors cursor-pointer ${
-                          isExpanded
-                            ? 'bg-[var(--panel)]'
-                            : 'hover:bg-[var(--panel)]/50'
+                          isExpanded ? 'bg-[var(--panel)]' : 'hover:bg-[var(--panel)]/50'
                         } border-b border-[var(--border)]`}
                       >
                         {/* Chevron */}
@@ -621,7 +700,9 @@ function EmpresasSettingsInner() {
 
                         {/* Nombre */}
                         <span className="flex-1 min-w-0 px-4 py-3.5">
-                          <span className="font-medium text-[var(--text)] truncate block">{e.nombre}</span>
+                          <span className="font-medium text-[var(--text)] truncate block">
+                            {e.nombre}
+                          </span>
                         </span>
 
                         {/* RFC */}

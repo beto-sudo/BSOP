@@ -21,7 +21,13 @@ export function RdbHeader() {
 
       {/* Logo — shown on mobile only (desktop logo is in sidebar) */}
       <Link href="/" className="flex items-center gap-2 md:hidden">
-        <Image src="/logo-bs.png" alt="BSOP" width={28} height={28} className="h-7 w-7 object-contain" />
+        <Image
+          src="/logo-bs.png"
+          alt="BSOP"
+          width={28}
+          height={28}
+          className="h-7 w-7 object-contain"
+        />
       </Link>
 
       {/* Breadcrumb */}

@@ -18,9 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
-export type ValidationResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; response: NextResponse };
+export type ValidationResult<T> = { ok: true; data: T } | { ok: false; response: NextResponse };
 
 function errorResponse(error: z.ZodError): NextResponse {
   return NextResponse.json(
@@ -32,7 +30,7 @@ function errorResponse(error: z.ZodError): NextResponse {
         code: issue.code,
       })),
     },
-    { status: 400 },
+    { status: 400 }
   );
 }
 
@@ -44,7 +42,7 @@ function errorResponse(error: z.ZodError): NextResponse {
  */
 export async function validateBody<T extends z.ZodTypeAny>(
   req: NextRequest,
-  schema: T,
+  schema: T
 ): Promise<ValidationResult<z.infer<T>>> {
   let body: unknown;
   try {
@@ -52,10 +50,7 @@ export async function validateBody<T extends z.ZodTypeAny>(
   } catch {
     return {
       ok: false,
-      response: NextResponse.json(
-        { error: 'Invalid JSON body' },
-        { status: 400 },
-      ),
+      response: NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 }),
     };
   }
 
@@ -75,7 +70,7 @@ export async function validateBody<T extends z.ZodTypeAny>(
  */
 export function validateQuery<T extends z.ZodTypeAny>(
   req: NextRequest,
-  schema: T,
+  schema: T
 ): ValidationResult<z.infer<T>> {
   const entries = Object.fromEntries(req.nextUrl.searchParams.entries());
   const parsed = schema.safeParse(entries);

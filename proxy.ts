@@ -54,11 +54,15 @@ export default async function proxy(request: NextRequest) {
           });
         },
       },
-    },
+    }
   );
 
-  const { data: { session } } = await supabase.auth.getSession();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
     const loginUrl = request.nextUrl.clone();
@@ -80,7 +84,7 @@ export default async function proxy(request: NextRequest) {
   const adminClient = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } },
+    { auth: { persistSession: false, autoRefreshToken: false } }
   );
 
   const { data: usuario } = await adminClient

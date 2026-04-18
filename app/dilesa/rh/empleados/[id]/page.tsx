@@ -1,15 +1,29 @@
 'use client';
 
+/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect --
+ * Cleanup PR (#30): pre-existing debt. `any` in Supabase row mapping;
+ * set-state-in-effect in data-sync pattern. Both are behavioral rewrites,
+ * out of scope for bulk lint cleanup.
+ */
+
 import { RequireAccess } from '@/components/require-access';
 import { usePermissions } from '@/components/providers';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -21,16 +35,30 @@ const EMPRESA_ID = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479';
 const EMPRESA_SLUG = 'dilesa';
 
 type Persona = {
-  id: string; nombre: string; apellido_paterno: string | null; apellido_materno: string | null;
-  email: string | null; telefono: string | null; rfc: string | null; curp: string | null;
-  nss: string | null; fecha_nacimiento: string | null;
+  id: string;
+  nombre: string;
+  apellido_paterno: string | null;
+  apellido_materno: string | null;
+  email: string | null;
+  telefono: string | null;
+  rfc: string | null;
+  curp: string | null;
+  nss: string | null;
+  fecha_nacimiento: string | null;
 };
 
 type EmpleadoDetail = {
-  id: string; empresa_id: string; numero_empleado: string | null;
-  fecha_ingreso: string | null; fecha_baja: string | null; motivo_baja: string | null;
-  nss: string | null; fecha_nacimiento: string | null;
-  telefono_empresa: string | null; extension: string | null; email_empresa: string | null;
+  id: string;
+  empresa_id: string;
+  numero_empleado: string | null;
+  fecha_ingreso: string | null;
+  fecha_baja: string | null;
+  motivo_baja: string | null;
+  nss: string | null;
+  fecha_nacimiento: string | null;
+  telefono_empresa: string | null;
+  extension: string | null;
+  email_empresa: string | null;
   activo: boolean;
   persona: Persona | null;
   departamento: { id: string; nombre: string } | null;
@@ -38,10 +66,15 @@ type EmpleadoDetail = {
 };
 
 type Compensacion = {
-  id: string; sueldo_mensual: number | null; sueldo_diario: number | null;
-  comisiones_mensuales: number | null; bonificaciones_mensuales: number | null;
-  compensaciones_mensuales: number | null; sdi: number | null;
-  tipo_contrato: string | null; frecuencia_pago: string | null;
+  id: string;
+  sueldo_mensual: number | null;
+  sueldo_diario: number | null;
+  comisiones_mensuales: number | null;
+  bonificaciones_mensuales: number | null;
+  compensaciones_mensuales: number | null;
+  sdi: number | null;
+  tipo_contrato: string | null;
+  frecuencia_pago: string | null;
 };
 
 type Departamento = { id: string; nombre: string };
@@ -50,13 +83,16 @@ type Puesto = { id: string; nombre: string };
 function fullName(emp: EmpleadoDetail) {
   if (!emp.persona) return '—';
   return [emp.persona.nombre, emp.persona.apellido_paterno, emp.persona.apellido_materno]
-    .filter(Boolean).join(' ');
+    .filter(Boolean)
+    .join(' ');
 }
 
 function formatDate(d: string | null) {
   if (!d) return '—';
   return new Date(d.includes('T') ? d : `${d}T00:00:00`).toLocaleDateString('es-MX', {
-    day: '2-digit', month: 'long', year: 'numeric',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
   });
 }
 
@@ -65,7 +101,11 @@ function calcAge(d: string | null): string | null {
   const birth = new Date(d.includes('T') ? d : `${d}T00:00:00`);
   const now = new Date();
   let age = now.getFullYear() - birth.getFullYear();
-  if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) age--;
+  if (
+    now.getMonth() < birth.getMonth() ||
+    (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())
+  )
+    age--;
   return `${age} años`;
 }
 
@@ -79,7 +119,9 @@ function calcSeniority(d: string | null): string | null {
   if (totalMonths < 12) return `${Math.max(0, totalMonths)} meses`;
   const y = Math.floor(totalMonths / 12);
   const m = totalMonths % 12;
-  return m > 0 ? `${y} año${y !== 1 ? 's' : ''}, ${m} mes${m !== 1 ? 'es' : ''}` : `${y} año${y !== 1 ? 's' : ''}`;
+  return m > 0
+    ? `${y} año${y !== 1 ? 's' : ''}, ${m} mes${m !== 1 ? 'es' : ''}`
+    : `${y} año${y !== 1 ? 's' : ''}`;
 }
 
 function formatCurrency(n: number | null): string {
@@ -88,14 +130,30 @@ function formatCurrency(n: number | null): string {
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50 mb-1.5">{children}</div>;
+  return (
+    <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50 mb-1.5">
+      {children}
+    </div>
+  );
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h2 className="text-sm font-semibold uppercase tracking-widest text-[var(--text)]/50 mb-3">{children}</h2>;
+  return (
+    <h2 className="text-sm font-semibold uppercase tracking-widest text-[var(--text)]/50 mb-3">
+      {children}
+    </h2>
+  );
 }
 
-function InfoRow({ label, value, sub }: { label: string; value: string | null; sub?: string | null }) {
+function InfoRow({
+  label,
+  value,
+  sub,
+}: {
+  label: string;
+  value: string | null;
+  sub?: string | null;
+}) {
   return (
     <div>
       <FieldLabel>{label}</FieldLabel>
@@ -106,7 +164,10 @@ function InfoRow({ label, value, sub }: { label: string; value: string | null; s
 }
 
 const TIPO_CONTRATO_LABELS: Record<string, string> = {
-  indefinido: 'Indefinido', temporal: 'Temporal', por_obra: 'Por obra', honorarios: 'Honorarios',
+  indefinido: 'Indefinido',
+  temporal: 'Temporal',
+  por_obra: 'Por obra',
+  honorarios: 'Honorarios',
 };
 
 function EmpleadoDetailInner() {
@@ -145,7 +206,9 @@ function EmpleadoDetailInner() {
     const { data: emp, error: eErr } = await supabase
       .schema('erp')
       .from('empleados')
-      .select('id, empresa_id, numero_empleado, fecha_ingreso, fecha_baja, motivo_baja, nss, fecha_nacimiento, telefono_empresa, extension, email_empresa, activo, persona:persona_id(id, nombre, apellido_paterno, apellido_materno, email, telefono, rfc, curp, nss, fecha_nacimiento), departamento:departamento_id(id, nombre), puesto:puesto_id(id, nombre)')
+      .select(
+        'id, empresa_id, numero_empleado, fecha_ingreso, fecha_baja, motivo_baja, nss, fecha_nacimiento, telefono_empresa, extension, email_empresa, activo, persona:persona_id(id, nombre, apellido_paterno, apellido_materno, email, telefono, rfc, curp, nss, fecha_nacimiento), departamento:departamento_id(id, nombre), puesto:puesto_id(id, nombre)'
+      )
       .eq('id', id)
       .single();
 
@@ -158,7 +221,9 @@ function EmpleadoDetailInner() {
     const normalized = {
       ...emp,
       persona: Array.isArray(emp.persona) ? (emp.persona[0] ?? null) : emp.persona,
-      departamento: Array.isArray(emp.departamento) ? (emp.departamento[0] ?? null) : emp.departamento,
+      departamento: Array.isArray(emp.departamento)
+        ? (emp.departamento[0] ?? null)
+        : emp.departamento,
       puesto: Array.isArray(emp.puesto) ? (emp.puesto[0] ?? null) : emp.puesto,
     } as unknown as EmpleadoDetail;
     setEmpleado(normalized);
@@ -173,11 +238,29 @@ function EmpleadoDetailInner() {
     setEmailEmpresa(emp.email_empresa ?? '');
 
     const [deptRes, puestosRes, compRes] = await Promise.all([
-      supabase.schema('erp').from('departamentos').select('id, nombre').eq('empresa_id', emp.empresa_id).eq('activo', true).order('nombre'),
-      supabase.schema('erp').from('puestos').select('id, nombre').eq('empresa_id', emp.empresa_id).eq('activo', true).order('nombre'),
-      supabase.schema('erp').from('empleados_compensacion')
-        .select('id, sueldo_mensual, sueldo_diario, comisiones_mensuales, bonificaciones_mensuales, compensaciones_mensuales, sdi, tipo_contrato, frecuencia_pago')
-        .eq('empleado_id', id).eq('vigente', true).maybeSingle(),
+      supabase
+        .schema('erp')
+        .from('departamentos')
+        .select('id, nombre')
+        .eq('empresa_id', emp.empresa_id)
+        .eq('activo', true)
+        .order('nombre'),
+      supabase
+        .schema('erp')
+        .from('puestos')
+        .select('id, nombre')
+        .eq('empresa_id', emp.empresa_id)
+        .eq('activo', true)
+        .order('nombre'),
+      supabase
+        .schema('erp')
+        .from('empleados_compensacion')
+        .select(
+          'id, sueldo_mensual, sueldo_diario, comisiones_mensuales, bonificaciones_mensuales, compensaciones_mensuales, sdi, tipo_contrato, frecuencia_pago'
+        )
+        .eq('empleado_id', id)
+        .eq('vigente', true)
+        .maybeSingle(),
     ]);
     setDepartamentos(deptRes.data ?? []);
     setPuestos(puestosRes.data ?? []);
@@ -185,7 +268,9 @@ function EmpleadoDetailInner() {
     setLoading(false);
   }, [id, supabase]);
 
-  useEffect(() => { void fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    void fetchAll();
+  }, [fetchAll]);
 
   const handleSave = async () => {
     if (!empleado) return;
@@ -206,7 +291,10 @@ function EmpleadoDetailInner() {
       })
       .eq('id', empleado.id);
     setSaving(false);
-    if (err) { alert(`Error al guardar: ${err.message}`); return; }
+    if (err) {
+      alert(`Error al guardar: ${err.message}`);
+      return;
+    }
     setEditing(false);
     await fetchAll();
   };
@@ -224,7 +312,10 @@ function EmpleadoDetailInner() {
       })
       .eq('id', empleado.id);
     setGivingBaja(false);
-    if (err) { alert(`Error: ${err.message}`); return; }
+    if (err) {
+      alert(`Error: ${err.message}`);
+      return;
+    }
     setShowBajaDialog(false);
     await fetchAll();
   };
@@ -261,7 +352,8 @@ function EmpleadoDetailInner() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-3">
           <Button
-            variant="outline" size="sm"
+            variant="outline"
+            size="sm"
             onClick={() => router.push(`/${EMPRESA_SLUG}/rh/empleados`)}
             className="rounded-xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]"
           >
@@ -271,9 +363,12 @@ function EmpleadoDetailInner() {
             {(persona?.nombre?.[0] ?? '?').toUpperCase()}
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-[var(--text)]">{fullName(empleado)}</h1>
+            <h1 className="text-xl font-bold tracking-tight text-[var(--text)]">
+              {fullName(empleado)}
+            </h1>
             <p className="text-xs text-[var(--text)]/50 mt-0.5">
-              {empleado.puesto?.nombre ?? 'Sin puesto'} · {empleado.departamento?.nombre ?? 'Sin departamento'}
+              {empleado.puesto?.nombre ?? 'Sin puesto'} ·{' '}
+              {empleado.departamento?.nombre ?? 'Sin departamento'}
             </p>
           </div>
           {isBaja ? (
@@ -299,15 +394,31 @@ function EmpleadoDetailInner() {
             )}
             {editing ? (
               <>
-                <Button variant="outline" onClick={() => setEditing(false)} className="gap-1.5 rounded-xl border-[var(--border)] text-[var(--text)]">
+                <Button
+                  variant="outline"
+                  onClick={() => setEditing(false)}
+                  className="gap-1.5 rounded-xl border-[var(--border)] text-[var(--text)]"
+                >
                   <X className="h-4 w-4" /> Cancelar
                 </Button>
-                <Button onClick={handleSave} disabled={saving} className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90">
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Guardar
+                <Button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90"
+                >
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}{' '}
+                  Guardar
                 </Button>
               </>
             ) : (
-              <Button onClick={() => setEditing(true)} className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90">
+              <Button
+                onClick={() => setEditing(true)}
+                className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90"
+              >
                 <Pencil className="h-4 w-4" /> Editar
               </Button>
             )}
@@ -336,7 +447,11 @@ function EmpleadoDetailInner() {
           <InfoRow label="RFC" value={persona?.rfc ?? null} />
           <InfoRow label="CURP" value={persona?.curp ?? null} />
           <InfoRow label="NSS" value={persona?.nss ?? empleado.nss ?? null} />
-          <InfoRow label="Fecha de nacimiento" value={formatDate(birthDate)} sub={calcAge(birthDate)} />
+          <InfoRow
+            label="Fecha de nacimiento"
+            value={formatDate(birthDate)}
+            sub={calcAge(birthDate)}
+          />
         </div>
       </div>
 
@@ -347,51 +462,106 @@ function EmpleadoDetailInner() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div>
               <FieldLabel>No. Empleado</FieldLabel>
-              <Input value={numeroEmpleado} onChange={(e) => setNumeroEmpleado(e.target.value)} placeholder="EMP-001" className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" />
+              <Input
+                value={numeroEmpleado}
+                onChange={(e) => setNumeroEmpleado(e.target.value)}
+                placeholder="EMP-001"
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
             <div>
               <FieldLabel>Fecha de ingreso</FieldLabel>
-              <Input type="date" value={fechaIngreso} onChange={(e) => setFechaIngreso(e.target.value)} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" />
+              <Input
+                type="date"
+                value={fechaIngreso}
+                onChange={(e) => setFechaIngreso(e.target.value)}
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
             <div>
               <FieldLabel>Departamento</FieldLabel>
               <Select value={departamentoId} onValueChange={(v) => setDepartamentoId(v ?? '')}>
-                <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue placeholder="Sin departamento" /></SelectTrigger>
-                <SelectContent>{departamentos.map((d) => <SelectItem key={d.id} value={d.id}>{d.nombre}</SelectItem>)}</SelectContent>
+                <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
+                  <SelectValue placeholder="Sin departamento" />
+                </SelectTrigger>
+                <SelectContent>
+                  {departamentos.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div>
               <FieldLabel>Puesto</FieldLabel>
               <Select value={puestoId} onValueChange={(v) => setPuestoId(v ?? '')}>
-                <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"><SelectValue placeholder="Sin puesto" /></SelectTrigger>
-                <SelectContent>{puestos.map((p) => <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>)}</SelectContent>
+                <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
+                  <SelectValue placeholder="Sin puesto" />
+                </SelectTrigger>
+                <SelectContent>
+                  {puestos.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div>
               <FieldLabel>Email empresa</FieldLabel>
-              <Input value={emailEmpresa} onChange={(e) => setEmailEmpresa(e.target.value)} placeholder="nombre@dilesa.com" className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" />
+              <Input
+                value={emailEmpresa}
+                onChange={(e) => setEmailEmpresa(e.target.value)}
+                placeholder="nombre@dilesa.com"
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
             <div>
               <FieldLabel>Teléfono empresa</FieldLabel>
-              <Input value={telefonoEmpresa} onChange={(e) => setTelefonoEmpresa(e.target.value)} placeholder="(844) 000-0000" className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" />
+              <Input
+                value={telefonoEmpresa}
+                onChange={(e) => setTelefonoEmpresa(e.target.value)}
+                placeholder="(844) 000-0000"
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
             <div>
               <FieldLabel>Extensión</FieldLabel>
-              <Input value={extensionVal} onChange={(e) => setExtensionVal(e.target.value)} placeholder="101" className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" />
+              <Input
+                value={extensionVal}
+                onChange={(e) => setExtensionVal(e.target.value)}
+                placeholder="101"
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
             <div>
               <FieldLabel>NSS</FieldLabel>
-              <Input value={nss} onChange={(e) => setNss(e.target.value)} placeholder="000-00-0000-0" className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" />
+              <Input
+                value={nss}
+                onChange={(e) => setNss(e.target.value)}
+                placeholder="000-00-0000-0"
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
             <div>
               <FieldLabel>Fecha de nacimiento</FieldLabel>
-              <Input type="date" value={fechaNacimiento} onChange={(e) => setFechaNacimiento(e.target.value)} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" />
+              <Input
+                type="date"
+                value={fechaNacimiento}
+                onChange={(e) => setFechaNacimiento(e.target.value)}
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <InfoRow label="No. Empleado" value={empleado.numero_empleado} />
-            <InfoRow label="Fecha de ingreso" value={formatDate(empleado.fecha_ingreso)} sub={calcSeniority(empleado.fecha_ingreso)} />
+            <InfoRow
+              label="Fecha de ingreso"
+              value={formatDate(empleado.fecha_ingreso)}
+              sub={calcSeniority(empleado.fecha_ingreso)}
+            />
             <InfoRow label="Departamento" value={empleado.departamento?.nombre ?? null} />
             <InfoRow label="Puesto" value={empleado.puesto?.nombre ?? null} />
             <InfoRow label="Email empresa" value={empleado.email_empresa} />
@@ -408,23 +578,44 @@ function EmpleadoDetailInner() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <InfoRow label="Sueldo mensual" value={formatCurrency(compensacion.sueldo_mensual)} />
             <InfoRow label="Comisiones" value={formatCurrency(compensacion.comisiones_mensuales)} />
-            <InfoRow label="Bonificaciones" value={formatCurrency(compensacion.bonificaciones_mensuales)} />
-            <InfoRow label="Compensaciones" value={formatCurrency(compensacion.compensaciones_mensuales)} />
+            <InfoRow
+              label="Bonificaciones"
+              value={formatCurrency(compensacion.bonificaciones_mensuales)}
+            />
+            <InfoRow
+              label="Compensaciones"
+              value={formatCurrency(compensacion.compensaciones_mensuales)}
+            />
             <InfoRow label="SDI" value={formatCurrency(compensacion.sdi)} />
-            <InfoRow label="Tipo de contrato" value={compensacion.tipo_contrato ? (TIPO_CONTRATO_LABELS[compensacion.tipo_contrato] ?? compensacion.tipo_contrato) : null} />
+            <InfoRow
+              label="Tipo de contrato"
+              value={
+                compensacion.tipo_contrato
+                  ? (TIPO_CONTRATO_LABELS[compensacion.tipo_contrato] ?? compensacion.tipo_contrato)
+                  : null
+              }
+            />
           </div>
           <Separator className="bg-[var(--border)]" />
           <div className="grid grid-cols-2 gap-4">
             <InfoRow
               label="Total percepciones mensuales"
               value={formatCurrency(
-                (compensacion.sueldo_mensual ?? 0)
-                + (compensacion.comisiones_mensuales ?? 0)
-                + (compensacion.bonificaciones_mensuales ?? 0)
-                + (compensacion.compensaciones_mensuales ?? 0)
+                (compensacion.sueldo_mensual ?? 0) +
+                  (compensacion.comisiones_mensuales ?? 0) +
+                  (compensacion.bonificaciones_mensuales ?? 0) +
+                  (compensacion.compensaciones_mensuales ?? 0)
               )}
             />
-            <InfoRow label="Frecuencia de pago" value={compensacion.frecuencia_pago ? compensacion.frecuencia_pago.charAt(0).toUpperCase() + compensacion.frecuencia_pago.slice(1) : null} />
+            <InfoRow
+              label="Frecuencia de pago"
+              value={
+                compensacion.frecuencia_pago
+                  ? compensacion.frecuencia_pago.charAt(0).toUpperCase() +
+                    compensacion.frecuencia_pago.slice(1)
+                  : null
+              }
+            />
           </div>
         </div>
       )}
@@ -438,17 +629,42 @@ function EmpleadoDetailInner() {
           <div className="space-y-4 py-2">
             <div>
               <FieldLabel>Fecha de baja</FieldLabel>
-              <Input type="date" value={fechaBaja} onChange={(e) => setFechaBaja(e.target.value)} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" />
+              <Input
+                type="date"
+                value={fechaBaja}
+                onChange={(e) => setFechaBaja(e.target.value)}
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
             <div>
               <FieldLabel>Motivo de baja</FieldLabel>
-              <Input placeholder="Renuncia voluntaria, término de contrato..." value={motivoBaja} onChange={(e) => setMotivoBaja(e.target.value)} className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]" />
+              <Input
+                placeholder="Renuncia voluntaria, término de contrato..."
+                value={motivoBaja}
+                onChange={(e) => setMotivoBaja(e.target.value)}
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowBajaDialog(false)} className="rounded-xl border-[var(--border)] text-[var(--text)]">Cancelar</Button>
-            <Button onClick={handleBaja} disabled={givingBaja} className="gap-1.5 rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-60">
-              {givingBaja ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserX className="h-4 w-4" />} Confirmar baja
+            <Button
+              variant="outline"
+              onClick={() => setShowBajaDialog(false)}
+              className="rounded-xl border-[var(--border)] text-[var(--text)]"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleBaja}
+              disabled={givingBaja}
+              className="gap-1.5 rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+            >
+              {givingBaja ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <UserX className="h-4 w-4" />
+              )}{' '}
+              Confirmar baja
             </Button>
           </DialogFooter>
         </DialogContent>

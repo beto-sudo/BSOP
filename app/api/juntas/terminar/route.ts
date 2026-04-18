@@ -18,8 +18,13 @@ const TerminarJuntaSchema = z.object({
 
 function formatDateCST(iso: string): string {
   return new Date(iso).toLocaleString('es-MX', {
-    weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', hour12: true,
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
     timeZone: 'America/Chicago',
   });
 }
@@ -34,7 +39,12 @@ function formatDuration(mins: number): string {
 function formatShortDate(dateStr: string | null): string {
   if (!dateStr) return '—';
   const d = new Date(dateStr.includes('T') ? dateStr : `${dateStr}T12:00:00`);
-  return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Chicago' });
+  return d.toLocaleDateString('es-MX', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'America/Chicago',
+  });
 }
 
 // ─── Email template ───────────────────────────────────────────────────────────
@@ -51,25 +61,42 @@ function generateMinutaHtml(opts: {
   tareasCompletadas: { titulo: string; responsable: string }[];
   actualizaciones?: { tarea: string; contenido: string; tipo: string; autor: string }[];
 }): string {
-  const { titulo, fechaTerminada, duracionMinutos, descripcion, asistentes, tareasCreadas, tareasCompletadas, actualizaciones } = opts;
+  const {
+    titulo,
+    fechaTerminada,
+    duracionMinutos,
+    descripcion,
+    asistentes,
+    tareasCreadas,
+    tareasCompletadas,
+    actualizaciones,
+  } = opts;
 
-  const asistentesStr = asistentes.length > 0
-    ? asistentes.map(a => a.nombre).join(', ')
-    : 'Sin participantes registrados';
+  const asistentesStr =
+    asistentes.length > 0
+      ? asistentes.map((a) => a.nombre).join(', ')
+      : 'Sin participantes registrados';
 
-  const tareasTable = (items: { titulo: string; responsable: string; fecha_compromiso?: string | null }[], showFecha: boolean) => `
+  const tareasTable = (
+    items: { titulo: string; responsable: string; fecha_compromiso?: string | null }[],
+    showFecha: boolean
+  ) => `
     <table style="width:100%;border-collapse:collapse;margin-top:8px;">
       <tr style="background:#f1f5f9;">
         <th style="padding:10px 12px;text-align:left;font-size:13px;color:#475569;font-weight:600;border-bottom:2px solid #e2e8f0;">Tarea</th>
         ${showFecha ? '<th style="padding:10px 12px;text-align:left;font-size:13px;color:#475569;font-weight:600;border-bottom:2px solid #e2e8f0;">Fecha Compromiso</th>' : ''}
         <th style="padding:10px 12px;text-align:left;font-size:13px;color:#475569;font-weight:600;border-bottom:2px solid #e2e8f0;">Responsable</th>
       </tr>
-      ${items.map(t => `
+      ${items
+        .map(
+          (t) => `
       <tr>
         <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#1e293b;">${t.titulo}</td>
         ${showFecha ? `<td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#475569;white-space:nowrap;">${formatShortDate((t as any).fecha_compromiso)}</td>` : ''}
         <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#475569;">${t.responsable}</td>
-      </tr>`).join('')}
+      </tr>`
+        )
+        .join('')}
     </table>`;
 
   return `<!DOCTYPE html>
@@ -99,11 +126,15 @@ function generateMinutaHtml(opts: {
           <td style="padding:6px 0;font-size:13px;color:#64748b;font-weight:600;width:160px;vertical-align:top;">Junta Terminada</td>
           <td style="padding:6px 0;font-size:13px;color:#1e293b;">${formatDateCST(fechaTerminada)}</td>
         </tr>
-        ${duracionMinutos && duracionMinutos > 0 ? `
+        ${
+          duracionMinutos && duracionMinutos > 0
+            ? `
         <tr>
           <td style="padding:6px 0;font-size:13px;color:#64748b;font-weight:600;vertical-align:top;">Duración</td>
           <td style="padding:6px 0;font-size:13px;color:#1e293b;">${formatDuration(duracionMinutos)}</td>
-        </tr>` : ''}
+        </tr>`
+            : ''
+        }
         <tr>
           <td style="padding:6px 0;font-size:13px;color:#64748b;font-weight:600;vertical-align:top;">Asistentes</td>
           <td style="padding:6px 0;font-size:13px;color:#1e293b;">${asistentesStr}</td>
@@ -112,33 +143,47 @@ function generateMinutaHtml(opts: {
     </div>
 
     <!-- Temas / Minuta -->
-    ${descripcion ? `
+    ${
+      descripcion
+        ? `
     <div style="padding:28px 32px;">
       <h2 style="font-size:16px;font-weight:700;color:#0f172a;margin:0 0 16px;border-bottom:2px solid #e2e8f0;padding-bottom:8px;">Temas</h2>
       <div style="font-size:14px;color:#334155;line-height:1.8;word-break:break-word;">
         ${descripcion.replace(/<img /g, '<img style="max-width:100%;height:auto;border-radius:8px;" ')}
       </div>
-    </div>` : `
+    </div>`
+        : `
     <div style="padding:28px 32px;">
       <p style="font-size:14px;color:#94a3b8;font-style:italic;">Sin notas registradas para esta junta.</p>
-    </div>`}
+    </div>`
+    }
 
     <!-- Tareas Creadas -->
-    ${tareasCreadas.length > 0 ? `
+    ${
+      tareasCreadas.length > 0
+        ? `
     <div style="padding:0 32px 28px;">
       <h2 style="font-size:16px;font-weight:700;color:#0f172a;margin:0 0 12px;border-bottom:2px solid #e2e8f0;padding-bottom:8px;">Tareas Asignadas (${tareasCreadas.length})</h2>
       ${tareasTable(tareasCreadas, true)}
-    </div>` : ''}
+    </div>`
+        : ''
+    }
 
     <!-- Tareas Completadas -->
-    ${tareasCompletadas.length > 0 ? `
+    ${
+      tareasCompletadas.length > 0
+        ? `
     <div style="padding:0 32px 28px;">
       <h2 style="font-size:16px;font-weight:700;color:#22c55e;margin:0 0 12px;border-bottom:2px solid #e2e8f0;padding-bottom:8px;">✓ Tareas Completadas en esta Junta (${tareasCompletadas.length})</h2>
       ${tareasTable(tareasCompletadas, false)}
-    </div>` : ''}
+    </div>`
+        : ''
+    }
 
     <!-- Actualizaciones Reportadas -->
-    ${actualizaciones && actualizaciones.length > 0 ? `
+    ${
+      actualizaciones && actualizaciones.length > 0
+        ? `
     <div style="padding:0 32px 28px;">
       <h2 style="font-size:16px;font-weight:700;color:#6366f1;margin:0 0 12px;border-bottom:2px solid #e2e8f0;padding-bottom:8px;">Actualizaciones Reportadas (${actualizaciones.length})</h2>
       <table style="width:100%;border-collapse:collapse;margin-top:8px;">
@@ -147,14 +192,20 @@ function generateMinutaHtml(opts: {
           <th style="padding:10px 12px;text-align:left;font-size:13px;color:#475569;font-weight:600;border-bottom:2px solid #e2e8f0;">Actualización</th>
           <th style="padding:10px 12px;text-align:left;font-size:13px;color:#475569;font-weight:600;border-bottom:2px solid #e2e8f0;">Tipo</th>
         </tr>
-        ${actualizaciones.map(a => `
+        ${actualizaciones
+          .map(
+            (a) => `
         <tr>
           <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#1e293b;">${a.tarea}</td>
           <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#475569;">${a.contenido}</td>
           <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#475569;white-space:nowrap;">${a.tipo}</td>
-        </tr>`).join('')}
+        </tr>`
+          )
+          .join('')}
       </table>
-    </div>` : ''}
+    </div>`
+        : ''
+    }
 
     <!-- Footer -->
     <div style="padding:20px 32px;border-top:1px solid #e2e8f0;text-align:center;">
@@ -186,7 +237,11 @@ export async function POST(req: NextRequest) {
   // Use created_at (server timestamp at real start) instead of fecha_hora
   // (datetime-local input stored without timezone, often off by UTC offset)
   const { data: existing } = await supabase
-    .schema('erp').from('juntas').select('fecha_hora, created_at').eq('id', juntaId).single();
+    .schema('erp')
+    .from('juntas')
+    .select('fecha_hora, created_at')
+    .eq('id', juntaId)
+    .single();
 
   const now = new Date();
   const startRef = existing?.created_at ?? existing?.fecha_hora;
@@ -219,14 +274,13 @@ export async function POST(req: NextRequest) {
     .eq('junta_id', juntaId);
 
   const asistentes = (asistencia ?? []).map((a: any) => ({
-    nombre: [a.persona?.nombre, a.persona?.apellido_paterno].filter(Boolean).join(' ') || 'Participante',
+    nombre:
+      [a.persona?.nombre, a.persona?.apellido_paterno].filter(Boolean).join(' ') || 'Participante',
     email: (a.persona?.email as string | null) ?? null,
     asistio: a.asistio as boolean | null,
   }));
 
-  const recipients = asistentes
-    .filter((a) => Boolean(a.email))
-    .map((a) => a.email as string);
+  const recipients = asistentes.filter((a) => Boolean(a.email)).map((a) => a.email as string);
 
   // ── Fetch tasks linked to this meeting ─────────────────────────────────────
   const { data: tasksData } = await supabase
@@ -237,10 +291,20 @@ export async function POST(req: NextRequest) {
     .eq('entidad_id', juntaId);
 
   const empleadoIds = [...new Set((tasksData ?? []).map((t: any) => t.asignado_a).filter(Boolean))];
-  const { data: empData } = empleadoIds.length > 0
-    ? await supabase.schema('erp').from('empleados').select('id, persona:persona_id(nombre, apellido_paterno)').in('id', empleadoIds)
-    : { data: [] };
-  const empMap = new Map((empData ?? []).map((e: any) => [e.id, [e.persona?.nombre, e.persona?.apellido_paterno].filter(Boolean).join(' ')]));
+  const { data: empData } =
+    empleadoIds.length > 0
+      ? await supabase
+          .schema('erp')
+          .from('empleados')
+          .select('id, persona:persona_id(nombre, apellido_paterno)')
+          .in('id', empleadoIds)
+      : { data: [] };
+  const empMap = new Map(
+    (empData ?? []).map((e: any) => [
+      e.id,
+      [e.persona?.nombre, e.persona?.apellido_paterno].filter(Boolean).join(' '),
+    ])
+  );
 
   const allTasks = (tasksData ?? []).map((t: any) => ({
     titulo: t.titulo as string,
@@ -249,30 +313,49 @@ export async function POST(req: NextRequest) {
     fecha_compromiso: t.fecha_compromiso as string | null,
   }));
 
-  const tareasCreadas = allTasks.filter(t => t.estado !== 'completado' && t.estado !== 'cancelado');
-  const tareasCompletadas = allTasks.filter(t => t.estado === 'completado');
+  const tareasCreadas = allTasks.filter(
+    (t) => t.estado !== 'completado' && t.estado !== 'cancelado'
+  );
+  const tareasCompletadas = allTasks.filter((t) => t.estado === 'completado');
 
   // ── Fetch task updates reported during this meeting ────────────────────────
   const taskIds = (tasksData ?? []).map((t: any) => t.id as string);
   let actualizaciones: { tarea: string; contenido: string; tipo: string; autor: string }[] = [];
   if (taskIds.length > 0) {
     const { data: updatesData } = await supabase
-      .schema('erp').from('task_updates').select('task_id, tipo, contenido, valor_anterior, valor_nuevo, creado_por')
+      .schema('erp')
+      .from('task_updates')
+      .select('task_id, tipo, contenido, valor_anterior, valor_nuevo, creado_por')
       .in('task_id', taskIds);
 
     if (updatesData && updatesData.length > 0) {
       const taskTitleMap = new Map((tasksData ?? []).map((t: any) => [t.id, t.titulo as string]));
       const updateUserIds = [...new Set(updatesData.map((u: any) => u.creado_por).filter(Boolean))];
-      const { data: updateUsersData } = updateUserIds.length > 0
-        ? await supabase.schema('core').from('usuarios').select('id, first_name').in('id', updateUserIds)
-        : { data: [] };
-      const updateUserMap = new Map((updateUsersData ?? []).map((u: any) => [u.id, (u.first_name as string | null) ?? '']));
+      const { data: updateUsersData } =
+        updateUserIds.length > 0
+          ? await supabase
+              .schema('core')
+              .from('usuarios')
+              .select('id, first_name')
+              .in('id', updateUserIds)
+          : { data: [] };
+      const updateUserMap = new Map(
+        (updateUsersData ?? []).map((u: any) => [u.id, (u.first_name as string | null) ?? ''])
+      );
 
-      const tipoLabels: Record<string, string> = { avance: 'Avance', cambio_estado: 'Cambio de estado', cambio_fecha: 'Cambio de fecha', nota: 'Nota', cambio_responsable: 'Cambio responsable' };
+      const tipoLabels: Record<string, string> = {
+        avance: 'Avance',
+        cambio_estado: 'Cambio de estado',
+        cambio_fecha: 'Cambio de fecha',
+        nota: 'Nota',
+        cambio_responsable: 'Cambio responsable',
+      };
       actualizaciones = updatesData.map((u: any) => {
         let contenido = (u.contenido as string) ?? '';
         if (u.valor_anterior != null && u.valor_nuevo != null) {
-          contenido = contenido ? `${contenido} (${u.valor_anterior} → ${u.valor_nuevo})` : `${u.valor_anterior} → ${u.valor_nuevo}`;
+          contenido = contenido
+            ? `${contenido} (${u.valor_anterior} → ${u.valor_nuevo})`
+            : `${u.valor_anterior} → ${u.valor_nuevo}`;
         }
         return {
           tarea: taskTitleMap.get(u.task_id) ?? 'Tarea',
@@ -299,7 +382,8 @@ export async function POST(req: NextRequest) {
   // ── Send email ─────────────────────────────────────────────────────────────
   if (recipients.length === 0) {
     return NextResponse.json({
-      success: true, emailsSent: 0,
+      success: true,
+      emailsSent: 0,
       warning: 'No attendee emails found – junta completada but no email sent.',
     });
   }
@@ -324,5 +408,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, emailsSent: 0, emailError: emailResult });
   }
 
-  return NextResponse.json({ success: true, emailsSent: recipients.length, emailId: emailResult.id });
+  return NextResponse.json({
+    success: true,
+    emailsSent: recipients.length,
+    emailId: emailResult.id,
+  });
 }

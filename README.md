@@ -8,18 +8,18 @@ Producción: **https://bsop.io**
 
 ## Stack
 
-| Capa | Tecnología |
-|------|-----------|
-| Framework | Next.js 15 (App Router, React Server Components) |
-| Lenguaje | TypeScript (strict) |
-| UI | Tailwind CSS + shadcn/ui + Base UI |
-| Editor rich-text | TipTap |
-| Datos | Supabase (Postgres + Auth + Storage + Edge Functions) |
-| Schemas | `core`, `erp`, `rdb`, `dilesa`, `playtomic`, `public` |
-| Email | Resend |
-| Integraciones | Coda (migración histórica), Playtomic (sync de canchas), Apple Health |
-| Tests | Vitest (unit) + Playwright (E2E) |
-| Despliegue | Vercel |
+| Capa             | Tecnología                                                            |
+| ---------------- | --------------------------------------------------------------------- |
+| Framework        | Next.js 15 (App Router, React Server Components)                      |
+| Lenguaje         | TypeScript (strict)                                                   |
+| UI               | Tailwind CSS + shadcn/ui + Base UI                                    |
+| Editor rich-text | TipTap                                                                |
+| Datos            | Supabase (Postgres + Auth + Storage + Edge Functions)                 |
+| Schemas          | `core`, `erp`, `rdb`, `dilesa`, `playtomic`, `public`                 |
+| Email            | Resend                                                                |
+| Integraciones    | Coda (migración histórica), Playtomic (sync de canchas), Apple Health |
+| Tests            | Vitest (unit) + Playwright (E2E)                                      |
+| Despliegue       | Vercel                                                                |
 
 ---
 
@@ -53,21 +53,21 @@ npm run dev
 
 ## Scripts disponibles
 
-| Comando | Descripción |
-|---------|-------------|
-| `npm run dev` | Dev server (Turbopack si está habilitado) |
-| `npm run build` | Build de producción |
-| `npm run start` | Correr el build de producción local |
-| `npm run lint` | ESLint (Next.js) |
-| `npm run test` | Unit tests con Vitest en watch mode |
-| `npm run test:run` | Unit tests single run |
-| `npm run test:coverage` | Coverage report (v8) |
-| `npm run test:e2e` | E2E tests con Playwright |
-| `npm run test:e2e:ui` | Playwright en modo UI |
-| `npm run test:e2e:anon` | Solo specs anónimas |
-| `npm run test:e2e:auth` | Solo specs autenticadas (requiere `.env.test.local`) |
-| `npm run audit:ui` | Audit heurístico de la UI |
-| `npm run db:types` | Regenera `types/supabase.ts` desde el schema real (requiere supabase CLI + `SUPABASE_ACCESS_TOKEN`) |
+| Comando                 | Descripción                                                                                         |
+| ----------------------- | --------------------------------------------------------------------------------------------------- |
+| `npm run dev`           | Dev server (Turbopack si está habilitado)                                                           |
+| `npm run build`         | Build de producción                                                                                 |
+| `npm run start`         | Correr el build de producción local                                                                 |
+| `npm run lint`          | ESLint (Next.js)                                                                                    |
+| `npm run test`          | Unit tests con Vitest en watch mode                                                                 |
+| `npm run test:run`      | Unit tests single run                                                                               |
+| `npm run test:coverage` | Coverage report (v8)                                                                                |
+| `npm run test:e2e`      | E2E tests con Playwright                                                                            |
+| `npm run test:e2e:ui`   | Playwright en modo UI                                                                               |
+| `npm run test:e2e:anon` | Solo specs anónimas                                                                                 |
+| `npm run test:e2e:auth` | Solo specs autenticadas (requiere `.env.test.local`)                                                |
+| `npm run audit:ui`      | Audit heurístico de la UI                                                                           |
+| `npm run db:types`      | Regenera `types/supabase.ts` desde el schema real (requiere supabase CLI + `SUPABASE_ACCESS_TOKEN`) |
 
 ---
 

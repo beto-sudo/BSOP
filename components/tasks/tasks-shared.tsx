@@ -9,11 +9,7 @@
 
 import { useState } from 'react';
 import { ChevronsUpDown } from 'lucide-react';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Command,
   CommandEmpty,
@@ -25,12 +21,7 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type TaskEstado =
-  | 'pendiente'
-  | 'en_progreso'
-  | 'bloqueado'
-  | 'completado'
-  | 'cancelado';
+export type TaskEstado = 'pendiente' | 'en_progreso' | 'bloqueado' | 'completado' | 'cancelado';
 
 /**
  * Super-set row shape — some columns only exist on the richer DILESA variant
@@ -108,11 +99,14 @@ export const emptyTaskForm = (): TaskFormValues => ({
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 export const ESTADO_CONFIG: Record<TaskEstado, { label: string; cls: string }> = {
-  pendiente:   { label: 'Pendiente',   cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
+  pendiente: { label: 'Pendiente', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
   en_progreso: { label: 'En progreso', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
-  bloqueado:   { label: 'Bloqueado',   cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
-  completado:  { label: 'Completado',  cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
-  cancelado:   { label: 'Cancelado',   cls: 'bg-[var(--border)]/60 text-[var(--text)]/40 border-[var(--border)]' },
+  bloqueado: { label: 'Bloqueado', cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
+  completado: { label: 'Completado', cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
+  cancelado: {
+    label: 'Cancelado',
+    cls: 'bg-[var(--border)]/60 text-[var(--text)]/40 border-[var(--border)]',
+  },
 };
 
 export const ESTADO_ORDER: TaskEstado[] = [
@@ -125,19 +119,25 @@ export const ESTADO_ORDER: TaskEstado[] = [
 
 export const PRIORIDAD_CONFIG: Record<string, { label: string; cls: string }> = {
   Urgente: { label: 'Urgente', cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
-  Alta:    { label: 'Alta',    cls: 'bg-orange-500/15 text-orange-400 border-orange-500/20' },
-  Media:   { label: 'Media',   cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
-  Baja:    { label: 'Baja',    cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
+  Alta: { label: 'Alta', cls: 'bg-orange-500/15 text-orange-400 border-orange-500/20' },
+  Media: { label: 'Media', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
+  Baja: { label: 'Baja', cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
 };
 
 export const PRIORIDAD_OPTIONS = ['Urgente', 'Alta', 'Media', 'Baja'] as const;
 
 export const UPDATE_TIPO_CONFIG: Record<string, { label: string; cls: string }> = {
-  avance:             { label: 'Avance',      cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
-  cambio_estado:      { label: 'Estado',      cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
-  cambio_fecha:       { label: 'Fecha',       cls: 'bg-purple-500/15 text-purple-400 border-purple-500/20' },
-  nota:               { label: 'Nota',        cls: 'bg-[var(--border)]/60 text-[var(--text)]/60 border-[var(--border)]' },
-  cambio_responsable: { label: 'Responsable', cls: 'bg-teal-500/15 text-teal-400 border-teal-500/20' },
+  avance: { label: 'Avance', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
+  cambio_estado: { label: 'Estado', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
+  cambio_fecha: { label: 'Fecha', cls: 'bg-purple-500/15 text-purple-400 border-purple-500/20' },
+  nota: {
+    label: 'Nota',
+    cls: 'bg-[var(--border)]/60 text-[var(--text)]/60 border-[var(--border)]',
+  },
+  cambio_responsable: {
+    label: 'Responsable',
+    cls: 'bg-teal-500/15 text-teal-400 border-teal-500/20',
+  },
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -164,7 +164,9 @@ export function formatDateTime(dateStr: string | null | undefined) {
 export function EstadoBadge({ estado }: { estado: TaskEstado }) {
   const cfg = ESTADO_CONFIG[estado] ?? { label: estado, cls: '' };
   return (
-    <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}>
+    <span
+      className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}
+    >
       {cfg.label}
     </span>
   );
@@ -178,7 +180,9 @@ export function PrioridadBadge({ prioridad }: { prioridad: string | null }) {
   if (!prioridad) return <span className="text-[var(--text)]/40">—</span>;
   const cfg = PRIORIDAD_CONFIG[prioridad] ?? { label: prioridad, cls: '' };
   return (
-    <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}>
+    <span
+      className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}
+    >
       {cfg.label}
     </span>
   );
@@ -208,7 +212,9 @@ export function PrioridadTextBadge({ text }: { text: string | null }) {
           ? 'bg-green-500/15 text-green-400 border-green-500/20'
           : 'bg-[var(--border)]/40 text-[var(--text)]/60 border-[var(--border)]';
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-0.5 text-xs font-medium ${cls}`}>
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-0.5 text-xs font-medium ${cls}`}
+    >
       <span className={`h-2 w-2 rounded-full ${dotColor}`} />
       {text}
     </span>
@@ -217,12 +223,14 @@ export function PrioridadTextBadge({ text }: { text: string | null }) {
 
 export function ProgressBar({ value }: { value: number }) {
   const clamped = Math.max(0, Math.min(100, value));
-  const color =
-    clamped === 100 ? 'bg-green-500' : clamped >= 50 ? 'bg-blue-500' : 'bg-amber-500';
+  const color = clamped === 100 ? 'bg-green-500' : clamped >= 50 ? 'bg-blue-500' : 'bg-amber-500';
   return (
     <div className="flex items-center gap-2">
       <div className="h-1.5 w-16 rounded-full bg-[var(--border)]">
-        <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${clamped}%` }} />
+        <div
+          className={`h-full rounded-full transition-all ${color}`}
+          style={{ width: `${clamped}%` }}
+        />
       </div>
       <span className="text-xs text-[var(--text)]/50">{clamped}%</span>
     </div>

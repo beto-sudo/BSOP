@@ -3,7 +3,8 @@ import fs from 'node:fs';
 
 const SUPABASE_URL = 'https://ybklderteyhuugzfmxbi.supabase.co';
 const ENV_PATH = '/Users/Beto/BSOP/.env.local';
-const CSV_PATH = '/Users/Beto/.openclaw/media/inbound/Movimientos_de_Caja---06a15b7b-438f-4913-823e-8b22001f6228.csv';
+const CSV_PATH =
+  '/Users/Beto/.openclaw/media/inbound/Movimientos_de_Caja---06a15b7b-438f-4913-823e-8b22001f6228.csv';
 const SCHEMA = 'rdb';
 const BATCH_SIZE = 20;
 
@@ -11,7 +12,10 @@ function getEnvValue(name, fallback = null) {
   const env = fs.readFileSync(ENV_PATH, 'utf8');
   for (const line of env.split(/\r?\n/)) {
     if (!line.startsWith(`${name}=`)) continue;
-    return line.slice(name.length + 1).trim().replace(/^['"]|['"]$/g, '');
+    return line
+      .slice(name.length + 1)
+      .trim()
+      .replace(/^['"]|['"]$/g, '');
   }
   return fallback;
 }
@@ -50,7 +54,7 @@ function parseCsv(text) {
       if (char === '\r' && next === '\n') i++;
       row.push(field);
       field = '';
-      if (row.some(cell => cell !== '')) rows.push(row);
+      if (row.some((cell) => cell !== '')) rows.push(row);
       row = [];
       continue;
     }
@@ -60,15 +64,20 @@ function parseCsv(text) {
 
   if (field.length || row.length) {
     row.push(field);
-    if (row.some(cell => cell !== '')) rows.push(row);
+    if (row.some((cell) => cell !== '')) rows.push(row);
   }
 
   const [headers, ...dataRows] = rows;
-  return dataRows.map(values => Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ''])));
+  return dataRows.map((values) =>
+    Object.fromEntries(headers.map((header, index) => [header, values[index] ?? '']))
+  );
 }
 
 function parseMoney(value) {
-  const normalized = String(value ?? '').trim().replace(/\$/g, '').replace(/,/g, '');
+  const normalized = String(value ?? '')
+    .trim()
+    .replace(/\$/g, '')
+    .replace(/,/g, '');
   if (!normalized) return null;
   const num = Number(normalized);
   return Number.isFinite(num) ? num : null;
@@ -94,9 +103,9 @@ function mapTipo(original) {
     'Caja Negra': 'Retiro',
     'Retiro Efectivo': 'Retiro',
     'Aporta Efectivo': 'Depósito',
-    'Repartidor': 'Retiro',
-    'Proveedor': 'Retiro',
-    'Propina': 'Retiro',
+    Repartidor: 'Retiro',
+    Proveedor: 'Retiro',
+    Propina: 'Retiro',
   };
   return mapping[normalized] || normalized;
 }
@@ -136,9 +145,12 @@ async function fetchAll(endpoint) {
   let offset = 0;
   const limit = 500;
   while (true) {
-    const { data } = await supabaseFetch(`${endpoint}${endpoint.includes('?') ? '&' : '?'}limit=${limit}&offset=${offset}`, {
-      headers: { 'Accept-Profile': SCHEMA },
-    });
+    const { data } = await supabaseFetch(
+      `${endpoint}${endpoint.includes('?') ? '&' : '?'}limit=${limit}&offset=${offset}`,
+      {
+        headers: { 'Accept-Profile': SCHEMA },
+      }
+    );
     rows.push(...data);
     if (data.length < limit) break;
     offset += limit;
@@ -156,7 +168,7 @@ async function main() {
   const movimientoColumns = Object.keys(sampleRows[0] || {});
 
   const cortes = await fetchAll('/rest/v1/cortes?select=id,corte_nombre');
-  const corteByName = new Map(cortes.map(row => [String(row.corte_nombre ?? '').trim(), row.id]));
+  const corteByName = new Map(cortes.map((row) => [String(row.corte_nombre ?? '').trim(), row.id]));
 
   const ignored = [];
   const transformed = [];
@@ -212,13 +224,17 @@ async function main() {
   };
 
   try {
-    await supabaseFetch('/rest/v1/movimientos?id=neq.00000000-0000-0000-0000-000000000000', {
-      method: 'DELETE',
-      headers: {
-        'Content-Profile': SCHEMA,
-        Prefer: 'return=minimal',
+    await supabaseFetch(
+      '/rest/v1/movimientos?id=neq.00000000-0000-0000-0000-000000000000',
+      {
+        method: 'DELETE',
+        headers: {
+          'Content-Profile': SCHEMA,
+          Prefer: 'return=minimal',
+        },
       },
-    }, { write: true });
+      { write: true }
+    );
     report.deletedExisting = true;
   } catch (error) {
     errors.push({
@@ -236,15 +252,19 @@ async function main() {
   for (let i = 0; i < transformed.length; i += BATCH_SIZE) {
     const batch = transformed.slice(i, i + BATCH_SIZE);
     try {
-      await supabaseFetch('/rest/v1/movimientos', {
-        method: 'POST',
-        headers: {
-          'Content-Profile': SCHEMA,
-          'Content-Type': 'application/json',
-          Prefer: 'return=minimal',
+      await supabaseFetch(
+        '/rest/v1/movimientos',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Profile': SCHEMA,
+            'Content-Type': 'application/json',
+            Prefer: 'return=minimal',
+          },
+          body: JSON.stringify(batch),
         },
-        body: JSON.stringify(batch),
-      }, { write: true });
+        { write: true }
+      );
       report.insertedSuccessfully += batch.length;
     } catch (error) {
       errors.push({
@@ -262,7 +282,7 @@ async function main() {
   console.log(JSON.stringify(report, null, 2));
 }
 
-main().catch(error => {
+main().catch((error) => {
   console.error(error);
   process.exit(1);
 });

@@ -18,44 +18,42 @@ import { getLocalDayBoundsUtc, zonedDateTimeToUtcIso } from './timezone';
 describe('zonedDateTimeToUtcIso', () => {
   it('converts Mexico City midnight to 06:00 UTC (UTC-6, no DST)', () => {
     expect(zonedDateTimeToUtcIso('2026-01-15', '00:00:00', 'America/Mexico_City')).toBe(
-      '2026-01-15T06:00:00.000Z',
+      '2026-01-15T06:00:00.000Z'
     );
   });
 
   it('converts Mexico City noon in summer to 18:00 UTC (still UTC-6, MX dropped DST in 2022)', () => {
     // This guards against someone re-enabling DST-like behavior for Mexico.
     expect(zonedDateTimeToUtcIso('2026-07-15', '12:00:00', 'America/Mexico_City')).toBe(
-      '2026-07-15T18:00:00.000Z',
+      '2026-07-15T18:00:00.000Z'
     );
   });
 
   it('is a no-op for UTC input', () => {
-    expect(zonedDateTimeToUtcIso('2026-01-15', '12:30:45', 'UTC')).toBe(
-      '2026-01-15T12:30:45.000Z',
-    );
+    expect(zonedDateTimeToUtcIso('2026-01-15', '12:30:45', 'UTC')).toBe('2026-01-15T12:30:45.000Z');
   });
 
   it('converts Tokyo noon to 03:00 UTC (UTC+9)', () => {
     expect(zonedDateTimeToUtcIso('2026-07-15', '12:00:00', 'Asia/Tokyo')).toBe(
-      '2026-07-15T03:00:00.000Z',
+      '2026-07-15T03:00:00.000Z'
     );
   });
 
   it('applies EST (UTC-5) for New York in January', () => {
     expect(zonedDateTimeToUtcIso('2026-01-15', '12:00:00', 'America/New_York')).toBe(
-      '2026-01-15T17:00:00.000Z',
+      '2026-01-15T17:00:00.000Z'
     );
   });
 
   it('applies EDT (UTC-4) for New York in July', () => {
     expect(zonedDateTimeToUtcIso('2026-07-15', '12:00:00', 'America/New_York')).toBe(
-      '2026-07-15T16:00:00.000Z',
+      '2026-07-15T16:00:00.000Z'
     );
   });
 
   it('handles leap day without corruption', () => {
     expect(zonedDateTimeToUtcIso('2028-02-29', '10:30:00', 'America/Mexico_City')).toBe(
-      '2028-02-29T16:30:00.000Z',
+      '2028-02-29T16:30:00.000Z'
     );
   });
 });

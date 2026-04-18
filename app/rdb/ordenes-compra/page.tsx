@@ -1,5 +1,10 @@
 'use client';
 
+/* eslint-disable react-hooks/set-state-in-effect --
+ * Cleanup PR (#30): pre-existing data-sync pattern flagged by the new React
+ * hook rule. Rewriting changes render semantics — out of scope for lint cleanup.
+ */
+
 import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
@@ -78,7 +83,9 @@ const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
 
 function formatDate(ts: string | null | undefined) {
   if (!ts) return '—';
-  return new Intl.DateTimeFormat('es-MX', { timeZone: TZ, dateStyle: 'medium' }).format(new Date(ts));
+  return new Intl.DateTimeFormat('es-MX', { timeZone: TZ, dateStyle: 'medium' }).format(
+    new Date(ts)
+  );
 }
 
 function formatDateLong(ts: string | null | undefined) {
@@ -125,7 +132,7 @@ function getEstatusLabel(estatus: string | null, proveedorId: string | null) {
 
 function getBadgeVariant(
   estatus: string | null,
-  proveedorId: string | null,
+  proveedorId: string | null
 ): 'default' | 'secondary' | 'destructive' | 'outline' {
   const s = (estatus ?? '').toLowerCase();
   if (s === 'recibida') return 'default';
@@ -139,7 +146,7 @@ function getBadgeVariant(
 
 function SummaryBar({ ordenes }: { ordenes: OrdenCompra[] }) {
   const sinProveedor = ordenes.filter(
-    (o) => (o.estatus ?? '').toLowerCase() === 'abierta' && !o.proveedor_id,
+    (o) => (o.estatus ?? '').toLowerCase() === 'abierta' && !o.proveedor_id
   ).length;
 
   const activas = ordenes.filter((o) => {
@@ -147,10 +154,7 @@ function SummaryBar({ ordenes }: { ordenes: OrdenCompra[] }) {
     return ['enviada', 'parcial', 'abierta'].includes(s);
   }).length;
 
-  const total = ordenes.reduce(
-    (acc, o) => acc + (o.total_real ?? o.total_estimado ?? 0),
-    0,
-  );
+  const total = ordenes.reduce((acc, o) => acc + (o.total_real ?? o.total_estimado ?? 0), 0);
 
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -252,7 +256,6 @@ function OrdenDetail({
   return (
     <Sheet open={open} onOpenChange={(value) => !value && onClose()}>
       <SheetContent className="flex min-h-0 flex-col overflow-hidden p-6 print:p-0 sm:max-w-[700px]">
-
         {/* ═══ PRINT: Header block ═══ */}
         <div className="hidden print:block">
           <img
@@ -264,7 +267,9 @@ function OrdenDetail({
             <div>
               <h2 className="text-2xl font-bold uppercase tracking-widest">Orden de Compra</h2>
               <p className="mt-1 text-base font-semibold">{orden?.folio ?? 'OC-BORRADOR'}</p>
-              <p className="mt-0.5 text-sm text-gray-600">Fecha: {formatDateLong(orden?.fecha_emision)}</p>
+              <p className="mt-0.5 text-sm text-gray-600">
+                Fecha: {formatDateLong(orden?.fecha_emision)}
+              </p>
               {reqFolio && (
                 <p className="mt-0.5 text-sm text-gray-600">Ref. Requisición: {reqFolio}</p>
               )}
@@ -272,18 +277,14 @@ function OrdenDetail({
             <div className="max-w-52 text-right text-sm">
               <div className="mb-1 text-xs font-bold uppercase tracking-wider">Proveedor</div>
               <div className="font-semibold">{proveedorObj?.nombre ?? '—'}</div>
-              {proveedorObj?.rfc && (
-                <div className="text-gray-600">RFC: {proveedorObj.rfc}</div>
-              )}
+              {proveedorObj?.rfc && <div className="text-gray-600">RFC: {proveedorObj.rfc}</div>}
               {proveedorObj?.contacto && (
                 <div className="text-gray-600">{proveedorObj.contacto}</div>
               )}
               {proveedorObj?.telefono && (
                 <div className="text-gray-600">Tel: {proveedorObj.telefono}</div>
               )}
-              {proveedorObj?.email && (
-                <div className="text-gray-600">{proveedorObj.email}</div>
-              )}
+              {proveedorObj?.email && <div className="text-gray-600">{proveedorObj.email}</div>}
             </div>
           </div>
           <hr className="mb-4 border-black" />
@@ -303,12 +304,7 @@ function OrdenDetail({
                 Asigna proveedor primero
               </span>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.print()}
-              disabled={!canPrint}
-            >
+            <Button variant="outline" size="sm" onClick={() => window.print()} disabled={!canPrint}>
               Imprimir OC
             </Button>
           </div>
@@ -316,7 +312,6 @@ function OrdenDetail({
 
         <ScrollArea className="flex-1 pr-1 print:h-auto print:overflow-visible">
           <div className="space-y-6 pb-6 pt-6 print:space-y-4 print:pt-0">
-
             {/* ── Screen: Status + meta ── */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between print:hidden">
               <div className="space-y-1 text-sm">
@@ -332,7 +327,9 @@ function OrdenDetail({
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <Badge variant={getBadgeVariant(orden?.estatus ?? null, orden?.proveedor_id ?? null)}>
+                <Badge
+                  variant={getBadgeVariant(orden?.estatus ?? null, orden?.proveedor_id ?? null)}
+                >
                   {getEstatusLabel(orden?.estatus ?? null, orden?.proveedor_id ?? null)}
                 </Badge>
                 <div className="text-right text-sm">
@@ -357,7 +354,10 @@ function OrdenDetail({
                   Asignación de proveedor
                 </div>
                 <div className="flex gap-2">
-                  <Select value={selectedProveedorId} onValueChange={(v) => setSelectedProveedorId(v ?? '')}>
+                  <Select
+                    value={selectedProveedorId}
+                    onValueChange={(v) => setSelectedProveedorId(v ?? '')}
+                  >
                     <SelectTrigger className="flex-1">
                       <SelectValue placeholder="Seleccionar proveedor…" />
                     </SelectTrigger>
@@ -371,9 +371,7 @@ function OrdenDetail({
                   </Select>
                   <Button
                     size="sm"
-                    disabled={
-                      !selectedProveedorId || selectedProveedorId === orden?.proveedor_id
-                    }
+                    disabled={!selectedProveedorId || selectedProveedorId === orden?.proveedor_id}
                     onClick={() => void onAsignarProveedor(selectedProveedorId)}
                   >
                     Asignar
@@ -439,9 +437,7 @@ function OrdenDetail({
                         const priceValue =
                           editedPrices[item.id] ?? String(item.precio_unitario ?? '');
                         const priceNum = parseFloat(priceValue) || 0;
-                        const displaySubtotal = isAbierta
-                          ? max * priceNum
-                          : (item.subtotal ?? 0);
+                        const displaySubtotal = isAbierta ? max * priceNum : (item.subtotal ?? 0);
                         return (
                           <TableRow key={item.id} className="print:border-b-gray-300">
                             <TableCell className="print:py-1">
@@ -516,9 +512,7 @@ function OrdenDetail({
                   <div className="text-sm">
                     <span className="font-bold">Total estimado: </span>
                     <span className="tabular-nums">
-                      {formatCurrency(
-                        printTotal > 0 ? printTotal : (orden?.total_estimado ?? 0),
-                      )}
+                      {formatCurrency(printTotal > 0 ? printTotal : (orden?.total_estimado ?? 0))}
                     </span>
                   </div>
                 </div>
@@ -554,11 +548,7 @@ function OrdenDetail({
         <div className="space-y-3 border-t pt-4 print:hidden">
           {isAbierta && orden?.proveedor_id && items.length > 0 && (
             <div className="flex justify-end">
-              <Button
-                variant="outline"
-                onClick={() => void onMarcarEnviada()}
-                className="gap-2"
-              >
+              <Button variant="outline" onClick={() => void onMarcarEnviada()} className="gap-2">
                 <Send className="h-4 w-4" />
                 Guardar precios y marcar Enviada
               </Button>
@@ -650,7 +640,6 @@ export default function OrdenesCompraPage() {
     if (saved && saved !== 'mes') {
       handlePreset(saved);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchOrdenes = useCallback(async () => {
@@ -662,7 +651,7 @@ export default function OrdenesCompraPage() {
         .schema('erp')
         .from('ordenes_compra')
         .select(
-          'id, codigo, requisicion_id, proveedor_id, total, autorizada_at, created_at, proveedor:proveedores!proveedor_id(id, persona:personas!persona_id(nombre, email, telefono, rfc)), requisicion:requisiciones!requisicion_id(codigo)',
+          'id, codigo, requisicion_id, proveedor_id, total, autorizada_at, created_at, proveedor:proveedores!proveedor_id(id, persona:personas!persona_id(nombre, email, telefono, rfc)), requisicion:requisiciones!requisicion_id(codigo)'
         )
         .eq('empresa_id', RDB_EMPRESA_ID)
         .order('created_at', { ascending: false });
@@ -673,11 +662,37 @@ export default function OrdenesCompraPage() {
       const { data, error: queryError } = await query;
       if (queryError) throw queryError;
 
-      type RawOrden = { id: string; codigo: string | null; requisicion_id: string | null; proveedor_id: string | null; total: number | null; autorizada_at: string | null; created_at: string | null; proveedor: unknown; requisicion: unknown };
+      type RawOrden = {
+        id: string;
+        codigo: string | null;
+        requisicion_id: string | null;
+        proveedor_id: string | null;
+        total: number | null;
+        autorizada_at: string | null;
+        created_at: string | null;
+        proveedor: unknown;
+        requisicion: unknown;
+      };
       const ordenesMapped: OrdenCompra[] = ((data ?? []) as unknown as RawOrden[]).map((o) => {
-        const prov = o.proveedor as { id: string; persona: { nombre: string; email: string | null; telefono: string | null; rfc: string | null } | null } | null;
+        const prov = o.proveedor as {
+          id: string;
+          persona: {
+            nombre: string;
+            email: string | null;
+            telefono: string | null;
+            rfc: string | null;
+          } | null;
+        } | null;
         const persona = prov?.persona ?? null;
-        const proveedor: Proveedor | null = prov ? { id: prov.id, nombre: persona?.nombre ?? null, email: persona?.email ?? null, telefono: persona?.telefono ?? null, rfc: persona?.rfc ?? null } : null;
+        const proveedor: Proveedor | null = prov
+          ? {
+              id: prov.id,
+              nombre: persona?.nombre ?? null,
+              email: persona?.email ?? null,
+              telefono: persona?.telefono ?? null,
+              rfc: persona?.rfc ?? null,
+            }
+          : null;
         const req = o.requisicion as { codigo: string | null } | null;
         return {
           id: o.id,
@@ -701,16 +716,30 @@ export default function OrdenesCompraPage() {
         .select('id, activo, persona:personas!persona_id(nombre, email, telefono, rfc)')
         .eq('empresa_id', RDB_EMPRESA_ID)
         .eq('activo', true);
-      type RawProv = { id: string; persona: { nombre: string; email: string | null; telefono: string | null; rfc: string | null } | null };
-      const provMapped: Proveedor[] = ((provRaw ?? []) as unknown as RawProv[]).map((p) => {
-        const persona = p.persona ?? null;
-        return { id: p.id, nombre: persona?.nombre ?? null, email: persona?.email ?? null, telefono: persona?.telefono ?? null, rfc: persona?.rfc ?? null };
-      }).sort((a, b) => (a.nombre ?? '').localeCompare(b.nombre ?? '', 'es'));
+      type RawProv = {
+        id: string;
+        persona: {
+          nombre: string;
+          email: string | null;
+          telefono: string | null;
+          rfc: string | null;
+        } | null;
+      };
+      const provMapped: Proveedor[] = ((provRaw ?? []) as unknown as RawProv[])
+        .map((p) => {
+          const persona = p.persona ?? null;
+          return {
+            id: p.id,
+            nombre: persona?.nombre ?? null,
+            email: persona?.email ?? null,
+            telefono: persona?.telefono ?? null,
+            rfc: persona?.rfc ?? null,
+          };
+        })
+        .sort((a, b) => (a.nombre ?? '').localeCompare(b.nombre ?? '', 'es'));
       setProveedores(provMapped);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'No pude cargar las órdenes de compra.',
-      );
+      setError(err instanceof Error ? err.message : 'No pude cargar las órdenes de compra.');
     } finally {
       setLoading(false);
     }
@@ -738,7 +767,10 @@ export default function OrdenesCompraPage() {
 
       if (itemsError) throw itemsError;
 
-      const items = (data ?? []).map((item) => ({ ...item, cantidad_recibida: null })) as OrdenCompraItem[];
+      const items = (data ?? []).map((item) => ({
+        ...item,
+        cantidad_recibida: null,
+      })) as OrdenCompraItem[];
       const initialReceipts = items.reduce<Record<string, string>>((acc, item) => {
         acc[item.id] = String(item.cantidad_recibida ?? 0);
         return acc;
@@ -762,8 +794,7 @@ export default function OrdenesCompraPage() {
   }, []);
 
   const handleReceiveChange = useCallback((itemId: string, value: string, max: number) => {
-    const normalized =
-      value === '' ? '' : String(Math.min(Math.max(Number(value) || 0, 0), max));
+    const normalized = value === '' ? '' : String(Math.min(Math.max(Number(value) || 0, 0), max));
     setEditedReceipts((prev) => ({ ...prev, [itemId]: normalized }));
   }, []);
 
@@ -783,18 +814,15 @@ export default function OrdenesCompraPage() {
           const cantidadRecibida = markAll
             ? cantidadPedida
             : Math.min(
-                Math.max(
-                  Number(editedReceipts[item.id] ?? item.cantidad_recibida ?? 0),
-                  0,
-                ),
-                cantidadPedida,
+                Math.max(Number(editedReceipts[item.id] ?? item.cantidad_recibida ?? 0), 0),
+                cantidadPedida
               );
           return { ...item, cantidad_recibida: cantidadRecibida };
         });
 
         const totalReal = nextItems.reduce(
           (acc, item) => acc + (item.cantidad ?? 0) * (item.precio_unitario ?? 0),
-          0,
+          0
         );
         const nextStatus = 'Recibida';
 
@@ -815,16 +843,14 @@ export default function OrdenesCompraPage() {
         setSelected(updatedOrden);
         setOrdenes((prev) =>
           prev.map((o) =>
-            o.id === updatedOrden.id
-              ? { ...o, estatus: nextStatus, total_real: totalReal }
-              : o,
-          ),
+            o.id === updatedOrden.id ? { ...o, estatus: nextStatus, total_real: totalReal } : o
+          )
         );
         setEditedReceipts(
           nextItems.reduce<Record<string, string>>((acc, item) => {
             acc[item.id] = String(item.cantidad_recibida ?? 0);
             return acc;
-          }, {}),
+          }, {})
         );
       } catch (err) {
         setError(err instanceof Error ? err.message : 'No pude guardar la recepción.');
@@ -832,7 +858,7 @@ export default function OrdenesCompraPage() {
         setSaving(false);
       }
     },
-    [editedReceipts, selected],
+    [editedReceipts, selected]
   );
 
   const handleAsignarProveedor = useCallback(
@@ -854,8 +880,8 @@ export default function OrdenesCompraPage() {
         setSelected(updatedOrden);
         setOrdenes((prev) =>
           prev.map((o) =>
-            o.id === selected.id ? { ...o, proveedor_id: proveedorId, proveedor } : o,
-          ),
+            o.id === selected.id ? { ...o, proveedor_id: proveedorId, proveedor } : o
+          )
         );
       } catch (err) {
         setError(err instanceof Error ? err.message : 'No pude asignar el proveedor.');
@@ -863,7 +889,7 @@ export default function OrdenesCompraPage() {
         setSaving(false);
       }
     },
-    [selected, proveedores],
+    [selected, proveedores]
   );
 
   const handleSavePricesAndMarkEnviada = useCallback(async () => {
@@ -907,10 +933,8 @@ export default function OrdenesCompraPage() {
       setSelected(updatedOrden);
       setOrdenes((prev) =>
         prev.map((o) =>
-          o.id === selected.id
-            ? { ...o, estatus: 'Enviada', total_estimado: totalEstimado }
-            : o,
-        ),
+          o.id === selected.id ? { ...o, estatus: 'Enviada', total_estimado: totalEstimado } : o
+        )
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No pude guardar los precios.');
@@ -936,203 +960,243 @@ export default function OrdenesCompraPage() {
   const { sortKey, sortDir, onSort, sortData } = useSortableTable('fecha_emision', 'desc');
   return (
     <RequireAccess empresa="rdb" modulo="rdb.ordenes_compra">
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Órdenes de Compra</h1>
-          <p className="text-sm text-muted-foreground">
-            Gestión operativa de compras a proveedores
-          </p>
-        </div>
-      </div>
-
-      {!loading && !error ? <SummaryBar ordenes={filtered} /> : null}
-
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="relative min-w-52">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar folio, proveedor o requisición…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Órdenes de Compra</h1>
+            <p className="text-sm text-muted-foreground">
+              Gestión operativa de compras a proveedores
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <Input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => {
-              setDateFrom(e.target.value);
-              setPresetKey('custom');
-            }}
-            className="w-36"
-          />
-          <span className="text-muted-foreground">—</span>
-          <Input
-            type="date"
-            value={dateTo}
-            onChange={(e) => {
-              setDateTo(e.target.value);
-              setPresetKey('custom');
-            }}
-            className="w-36"
-          />
+        {!loading && !error ? <SummaryBar ordenes={filtered} /> : null}
+
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="relative min-w-52">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar folio, proveedor o requisición…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => {
+                setDateFrom(e.target.value);
+                setPresetKey('custom');
+              }}
+              className="w-36"
+            />
+            <span className="text-muted-foreground">—</span>
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => {
+                setDateTo(e.target.value);
+                setPresetKey('custom');
+              }}
+              className="w-36"
+            />
+          </div>
+
+          <Select value={presetKey} onValueChange={handlePreset}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Rango..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="hoy">Hoy</SelectItem>
+              <SelectItem value="ayer">Ayer</SelectItem>
+              <SelectItem value="semana">Esta semana</SelectItem>
+              <SelectItem value="7dias">Últimos 7 días</SelectItem>
+              <SelectItem value="mes">Este mes</SelectItem>
+              <SelectItem value="30dias">Últimos 30 días</SelectItem>
+              <SelectItem value="ano">Este año</SelectItem>
+              <SelectItem value="custom" className="hidden">
+                Personalizado
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => void fetchOrdenes()}
+            aria-label="Actualizar"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+
+          <span className="text-sm text-muted-foreground">
+            {loading ? 'Cargando…' : `${filtered.length} orden${filtered.length === 1 ? '' : 'es'}`}
+            {saving ? ' · guardando…' : ''}
+          </span>
         </div>
 
-        <Select value={presetKey} onValueChange={handlePreset}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Rango..." />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="hoy">Hoy</SelectItem>
-            <SelectItem value="ayer">Ayer</SelectItem>
-            <SelectItem value="semana">Esta semana</SelectItem>
-            <SelectItem value="7dias">Últimos 7 días</SelectItem>
-            <SelectItem value="mes">Este mes</SelectItem>
-            <SelectItem value="30dias">Últimos 30 días</SelectItem>
-            <SelectItem value="ano">Este año</SelectItem>
-            <SelectItem value="custom" className="hidden">
-              Personalizado
-            </SelectItem>
-          </SelectContent>
-        </Select>
+        {error ? (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        ) : null}
 
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => void fetchOrdenes()}
-          aria-label="Actualizar"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-        </Button>
-
-        <span className="text-sm text-muted-foreground">
-          {loading
-            ? 'Cargando…'
-            : `${filtered.length} orden${filtered.length === 1 ? '' : 'es'}`}
-          {saving ? ' · guardando…' : ''}
-        </span>
-      </div>
-
-      {error ? (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
-      ) : null}
-
-      <div className="rounded-xl border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <SortableHead sortKey="folio" label="OC / Folio" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              <SortableHead sortKey="requisicion_folio" label="Requisición" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              <SortableHead sortKey="proveedor_nombre" label="Proveedor" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              <SortableHead sortKey="estatus" label="Estatus" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              <SortableHead sortKey="fecha_emision" label="Fecha" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              <SortableHead sortKey="total" label="Total" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="text-right" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              Array.from({ length: 6 }).map((_, i) => (
-                <TableRow key={i}>
-                  {Array.from({ length: 6 }).map((__, j) => (
-                    <TableCell key={j}>
-                      <Skeleton className="h-4 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : filtered.length === 0 ? (
+        <div className="rounded-xl border bg-card">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">
-                  No se encontraron órdenes de compra.
-                </TableCell>
+                <SortableHead
+                  sortKey="folio"
+                  label="OC / Folio"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                />
+                <SortableHead
+                  sortKey="requisicion_folio"
+                  label="Requisición"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                />
+                <SortableHead
+                  sortKey="proveedor_nombre"
+                  label="Proveedor"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                />
+                <SortableHead
+                  sortKey="estatus"
+                  label="Estatus"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                />
+                <SortableHead
+                  sortKey="fecha_emision"
+                  label="Fecha"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                />
+                <SortableHead
+                  sortKey="total"
+                  label="Total"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                  className="text-right"
+                />
               </TableRow>
-            ) : (
-              sortData(filtered.map((o) => ({ ...o, proveedor_nombre: getProveedorNombre(o.proveedor) ?? null, requisicion_folio: getRequisicionFolio(o.requisicion) ?? null, total: o.total_real ?? o.total_estimado ?? null }))).map((orden) => {
-                const reqFolio = getRequisicionFolio(orden.requisicion);
-                const nombre = getProveedorNombre(orden.proveedor);
-                const total = orden.total_real ?? orden.total_estimado;
-  return (
-                  <TableRow
-                    key={orden.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => void openDetail(orden)}
-                  >
-                    <TableCell className="font-mono text-xs font-medium">
-                      {orden.folio ?? '—'}
-                    </TableCell>
-                    <TableCell>
-                      {reqFolio ? (
-                        <span className="font-mono text-xs text-muted-foreground">
-                          {reqFolio}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground/40">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {nombre ? (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Truck className="h-3.5 w-3.5 text-muted-foreground" />
-                          {nombre}
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 text-sm text-amber-600">
-                          <AlertTriangle className="h-3.5 w-3.5" />
-                          Sin proveedor
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={getBadgeVariant(orden.estatus, orden.proveedor_id)}
-                      >
-                        {getEstatusLabel(orden.estatus, orden.proveedor_id)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {formatDate(orden.fecha_emision)}
-                    </TableCell>
-                    <TableCell className="text-right font-medium tabular-nums">
-                      {total != null && total > 0 ? (
-                        formatCurrency(total)
-                      ) : (
-                        <span className="text-xs text-muted-foreground/50">Sin precios</span>
-                      )}
-                    </TableCell>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array.from({ length: 6 }).map((__, j) => (
+                      <TableCell key={j}>
+                        <Skeleton className="h-4 w-full" />
+                      </TableCell>
+                    ))}
                   </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                ))
+              ) : filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">
+                    No se encontraron órdenes de compra.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                sortData(
+                  filtered.map((o) => ({
+                    ...o,
+                    proveedor_nombre: getProveedorNombre(o.proveedor) ?? null,
+                    requisicion_folio: getRequisicionFolio(o.requisicion) ?? null,
+                    total: o.total_real ?? o.total_estimado ?? null,
+                  }))
+                ).map((orden) => {
+                  const reqFolio = getRequisicionFolio(orden.requisicion);
+                  const nombre = getProveedorNombre(orden.proveedor);
+                  const total = orden.total_real ?? orden.total_estimado;
+                  return (
+                    <TableRow
+                      key={orden.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => void openDetail(orden)}
+                    >
+                      <TableCell className="font-mono text-xs font-medium">
+                        {orden.folio ?? '—'}
+                      </TableCell>
+                      <TableCell>
+                        {reqFolio ? (
+                          <span className="font-mono text-xs text-muted-foreground">
+                            {reqFolio}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground/40">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {nombre ? (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Truck className="h-3.5 w-3.5 text-muted-foreground" />
+                            {nombre}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 text-sm text-amber-600">
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                            Sin proveedor
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getBadgeVariant(orden.estatus, orden.proveedor_id)}>
+                          {getEstatusLabel(orden.estatus, orden.proveedor_id)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatDate(orden.fecha_emision)}
+                      </TableCell>
+                      <TableCell className="text-right font-medium tabular-nums">
+                        {total != null && total > 0 ? (
+                          formatCurrency(total)
+                        ) : (
+                          <span className="text-xs text-muted-foreground/50">Sin precios</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
 
-      <OrdenDetail
-        orden={selected}
-        proveedores={proveedores}
-        loadingItems={loadingItems}
-        open={drawerOpen}
-        editedReceipts={editedReceipts}
-        editedPrices={editedPrices}
-        onClose={() => setDrawerOpen(false)}
-        onReceiveChange={handleReceiveChange}
-        onPriceChange={handlePriceChange}
-        onReceivePartial={async () => {
-          await persistReception(false);
-        }}
-        onReceiveAll={async () => {
-          await persistReception(true);
-        }}
-        onAsignarProveedor={handleAsignarProveedor}
-        onMarcarEnviada={handleSavePricesAndMarkEnviada}
-      />
-    </div>
+        <OrdenDetail
+          orden={selected}
+          proveedores={proveedores}
+          loadingItems={loadingItems}
+          open={drawerOpen}
+          editedReceipts={editedReceipts}
+          editedPrices={editedPrices}
+          onClose={() => setDrawerOpen(false)}
+          onReceiveChange={handleReceiveChange}
+          onPriceChange={handlePriceChange}
+          onReceivePartial={async () => {
+            await persistReception(false);
+          }}
+          onReceiveAll={async () => {
+            await persistReception(true);
+          }}
+          onAsignarProveedor={handleAsignarProveedor}
+          onMarcarEnviada={handleSavePricesAndMarkEnviada}
+        />
+      </div>
     </RequireAccess>
   );
 }

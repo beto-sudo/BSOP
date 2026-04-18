@@ -26,7 +26,13 @@ export type PermisoRol = {
   acceso_lectura: boolean;
   acceso_escritura: boolean;
 };
-export type UsuarioCore = { id: string; email: string; first_name: string | null; activo: boolean; welcome_sent_at: string | null };
+export type UsuarioCore = {
+  id: string;
+  email: string;
+  first_name: string | null;
+  activo: boolean;
+  welcome_sent_at: string | null;
+};
 export type UsuarioEmpresa = { usuario_id: string; empresa_id: string; rol_id: string | null };
 export type ExcepcionUsuario = {
   usuario_id: string;
@@ -50,7 +56,7 @@ async function requireAdmin(): Promise<void> {
           cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
         },
       },
-    },
+    }
   );
 
   const {
@@ -69,7 +75,8 @@ async function requireAdmin(): Promise<void> {
     .eq('activo', true)
     .maybeSingle();
 
-  if (data?.rol !== 'admin') throw new Error('Solo los administradores pueden realizar esta acción');
+  if (data?.rol !== 'admin')
+    throw new Error('Solo los administradores pueden realizar esta acción');
 }
 
 // ── Legacy actions ─────────────────────────────────────────────────────────
@@ -191,14 +198,17 @@ export async function upsertPermisoRol(
   rol_id: string,
   modulo_id: string,
   acceso_lectura: boolean,
-  acceso_escritura: boolean,
+  acceso_escritura: boolean
 ): Promise<void> {
   await requireAdmin();
   const admin = getSupabaseAdminClient()!;
   const { error } = await admin
     .schema('core')
     .from('permisos_rol')
-    .upsert({ rol_id, modulo_id, acceso_lectura, acceso_escritura }, { onConflict: 'rol_id,modulo_id' });
+    .upsert(
+      { rol_id, modulo_id, acceso_lectura, acceso_escritura },
+      { onConflict: 'rol_id,modulo_id' }
+    );
   if (error) throw new Error(error.message);
   revalidatePath('/settings/acceso');
 }
@@ -229,7 +239,8 @@ export async function createUsuarioCore(email: string, first_name: string): Prom
 
   // 3. If not in auth, send Supabase invite (magic link for auth)
   if (!authUserId) {
-    const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(cleanEmail);
+    const { data: inviteData, error: inviteError } =
+      await admin.auth.admin.inviteUserByEmail(cleanEmail);
     if (inviteError) {
       throw new Error('Error al enviar invitación: ' + inviteError.message);
     }
@@ -262,7 +273,7 @@ export async function createUsuarioCore(email: string, first_name: string): Prom
 export async function setUsuarioEmpresaAcceso(
   usuario_id: string,
   empresa_id: string,
-  has_access: boolean,
+  has_access: boolean
 ): Promise<void> {
   await requireAdmin();
   const admin = getSupabaseAdminClient()!;
@@ -289,7 +300,7 @@ export async function setUsuarioEmpresaAcceso(
 export async function updateUsuarioEmpresaRol(
   usuario_id: string,
   empresa_id: string,
-  rol_id: string | null,
+  rol_id: string | null
 ): Promise<void> {
   await requireAdmin();
   const admin = getSupabaseAdminClient()!;
@@ -373,7 +384,10 @@ async function sendWelcomeEmail(usuarioId: string): Promise<void> {
             .eq('acceso_lectura', true);
 
           modulos = (perms ?? [])
-            .map((p: Record<string, unknown>) => (p.modulos as unknown as { nombre: string } | null)?.nombre ?? '')
+            .map(
+              (p: Record<string, unknown>) =>
+                (p.modulos as unknown as { nombre: string } | null)?.nombre ?? ''
+            )
             .filter(Boolean);
         }
       }
@@ -422,7 +436,9 @@ async function sendWelcomeEmail(usuarioId: string): Promise<void> {
 
 // ── Send welcome email manually ──────────────────────────────────────────────
 
-export async function sendWelcomeEmailAction(usuario_id: string): Promise<{ success: boolean; error?: string }> {
+export async function sendWelcomeEmailAction(
+  usuario_id: string
+): Promise<{ success: boolean; error?: string }> {
   await requireAdmin();
   try {
     await sendWelcomeEmail(usuario_id);
@@ -454,7 +470,7 @@ export async function upsertExcepcionUsuario(datos: ExcepcionUsuario): Promise<v
 export async function deleteExcepcionUsuario(
   usuario_id: string,
   empresa_id: string,
-  modulo_id: string,
+  modulo_id: string
 ): Promise<void> {
   await requireAdmin();
   const admin = getSupabaseAdminClient()!;

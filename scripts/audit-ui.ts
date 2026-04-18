@@ -31,7 +31,7 @@ type Check = {
   test: (src: string) => boolean;
   /** When true, absence of this check in a page that uses a sibling is a WARNING */
   warnIfMissing?: string; // e.g. "sheet" means warn if sheet present but this missing
-  critical?: boolean;     // issues reported as CRITICAL
+  critical?: boolean; // issues reported as CRITICAL
 };
 
 const CHECKS: Check[] = [
@@ -53,7 +53,10 @@ const CHECKS: Check[] = [
   {
     key: 'search',
     label: 'Search / filter',
-    test: (s) => /<Search[\s/>]|Search\b.*lucide|placeholder.*buscar|placeholder.*search|placeholder.*filtrar/i.test(s),
+    test: (s) =>
+      /<Search[\s/>]|Search\b.*lucide|placeholder.*buscar|placeholder.*search|placeholder.*filtrar/i.test(
+        s
+      ),
   },
   {
     key: 'refresh',
@@ -64,7 +67,9 @@ const CHECKS: Check[] = [
     key: 'emptyState',
     label: 'Empty state',
     test: (s) =>
-      /\.length\s*===?\s*0\s*[&|?]|\.length\s*==\s*0|!data\.length|data\.length\s*<\s*1|sin\s+datos|no\s+(hay|results|data)|PlaceholderSection|empty.*state/i.test(s),
+      /\.length\s*===?\s*0\s*[&|?]|\.length\s*==\s*0|!data\.length|data\.length\s*<\s*1|sin\s+datos|no\s+(hay|results|data)|PlaceholderSection|empty.*state/i.test(
+        s
+      ),
   },
   {
     key: 'createBtn',
@@ -152,14 +157,14 @@ const PUBLIC_PAGES = new Set([
   'login/login-card',
   'compartir/[token]',
   'auth/callback',
-  'page',          // root /  — nav hub, no raw data; app-shell handles auth state
-  'rh',            // RH index — section landing page, no sensitive data
-  'settings',      // Settings index — section landing, routes to protected sub-pages
-  'rdb',           // RDB index — dashboard overview
-  'health',        // Health — personal data, app-shell handles auth
-  'family',        // Family — personal data
-  'travel',        // Travel — personal data
-  'usage',         // Usage stats — admin visible only via nav permission
+  'page', // root /  — nav hub, no raw data; app-shell handles auth state
+  'rh', // RH index — section landing page, no sensitive data
+  'settings', // Settings index — section landing, routes to protected sub-pages
+  'rdb', // RDB index — dashboard overview
+  'health', // Health — personal data, app-shell handles auth
+  'family', // Family — personal data
+  'travel', // Travel — personal data
+  'usage', // Usage stats — admin visible only via nav permission
 ]);
 
 // ── File discovery ─────────────────────────────────────────────────────────────
@@ -180,12 +185,12 @@ function findPages(dir: string): string[] {
 // ── Analysis ───────────────────────────────────────────────────────────────────
 
 type ModuleReport = {
-  module: string;      // e.g. "rdb/ventas"
-  file: string;        // absolute path
+  module: string; // e.g. "rdb/ventas"
+  file: string; // absolute path
   isPublic: boolean;
   checks: Record<string, boolean>;
   issues: { level: 'critical' | 'warning' | 'info'; message: string }[];
-  score: number;       // 0-100
+  score: number; // 0-100
 };
 
 function analyseFile(filePath: string, appRoot: string): ModuleReport {
@@ -194,7 +199,8 @@ function analyseFile(filePath: string, appRoot: string): ModuleReport {
   const moduleName = rel.replace(/\/?page\.tsx$/, '') || 'page';
   const src = fs.readFileSync(filePath, 'utf8');
 
-  const isPublic = PUBLIC_PAGES.has(moduleName) ||
+  const isPublic =
+    PUBLIC_PAGES.has(moduleName) ||
     moduleName === 'page' ||
     moduleName.startsWith('compartir') ||
     moduleName === 'login';
@@ -239,12 +245,18 @@ function analyseFile(filePath: string, appRoot: string): ModuleReport {
 
   // 6. Dialog without DialogFooter
   if (checks.dialog && !checks.dialogFooter) {
-    issues.push({ level: 'warning', message: 'Dialog missing DialogFooter (may lack action buttons)' });
+    issues.push({
+      level: 'warning',
+      message: 'Dialog missing DialogFooter (may lack action buttons)',
+    });
   }
 
   // 7. Table with no clickable rows
   if (checks.table && !checks.tableRowClick) {
-    issues.push({ level: 'info', message: 'Table rows have no onClick — rows may not be interactive' });
+    issues.push({
+      level: 'info',
+      message: 'Table rows have no onClick — rows may not be interactive',
+    });
   }
 
   // 8. Table with no empty state
@@ -312,9 +324,13 @@ function checkMark(val: boolean, applicable: boolean) {
 function printReport(reports: ModuleReport[]) {
   const now = new Date().toLocaleString('es-MX', { timeZone: 'America/Matamoros' });
 
-  console.log(`\n${BOLD}╔══════════════════════════════════════════════════════════════════╗${RESET}`);
+  console.log(
+    `\n${BOLD}╔══════════════════════════════════════════════════════════════════╗${RESET}`
+  );
   console.log(`${BOLD}║         BSOP — UI Consistency Audit Report                      ║${RESET}`);
-  console.log(`${BOLD}╚══════════════════════════════════════════════════════════════════╝${RESET}`);
+  console.log(
+    `${BOLD}╚══════════════════════════════════════════════════════════════════╝${RESET}`
+  );
   console.log(`${DIM}  Generated: ${now}${RESET}\n`);
 
   // ── Summary ────────────────────────────────────────────────────────────────
@@ -424,11 +440,20 @@ function printReport(reports: ModuleReport[]) {
     { label: 'Sheet (side panel)', count: nonPublic.filter((r) => r.checks.sheet).length },
     { label: 'Dialog (modal)', count: nonPublic.filter((r) => r.checks.dialog).length },
     { label: 'Has table', count: nonPublic.filter((r) => r.checks.table).length },
-    { label: 'Table + clickable rows', count: nonPublic.filter((r) => r.checks.tableRowClick).length },
+    {
+      label: 'Table + clickable rows',
+      count: nonPublic.filter((r) => r.checks.tableRowClick).length,
+    },
     { label: 'Has create button', count: nonPublic.filter((r) => r.checks.createBtn).length },
     { label: 'Has print button', count: nonPublic.filter((r) => r.checks.printBtn).length },
-    { label: 'useTransition (optimistic UI)', count: nonPublic.filter((r) => r.checks.useTransition).length },
-    { label: 'Has error boundary file', count: nonPublic.filter((r) => r.checks.errorBoundary).length },
+    {
+      label: 'useTransition (optimistic UI)',
+      count: nonPublic.filter((r) => r.checks.useTransition).length,
+    },
+    {
+      label: 'Has error boundary file',
+      count: nonPublic.filter((r) => r.checks.errorBoundary).length,
+    },
   ];
 
   for (const s of stats) {
@@ -447,10 +472,14 @@ function printReport(reports: ModuleReport[]) {
   console.log(`  Dialog (modal)     : ${dialogModules.join(', ') || 'none'}`);
   const both = nonPublic.filter((r) => r.checks.sheet && r.checks.dialog).map((r) => r.module);
   if (both.length) {
-    console.log(`  Both Sheet+Dialog  : ${YELLOW}${both.join(', ')}${RESET} — ${DIM}verify each usage is intentional${RESET}`);
+    console.log(
+      `  Both Sheet+Dialog  : ${YELLOW}${both.join(', ')}${RESET} — ${DIM}verify each usage is intentional${RESET}`
+    );
   }
 
-  console.log(`\n${DIM}  Run "npm run audit:ui:json > audit-report.json" for machine-readable output.${RESET}`);
+  console.log(
+    `\n${DIM}  Run "npm run audit:ui:json > audit-report.json" for machine-readable output.${RESET}`
+  );
   console.log(`  Tip: annotate pages with data-testid for richer Playwright selectors.\n`);
 }
 
@@ -490,7 +519,9 @@ function main() {
 
   printReport(reports);
 
-  const criticalCount = reports.flatMap((r) => r.issues).filter((i) => i.level === 'critical').length;
+  const criticalCount = reports
+    .flatMap((r) => r.issues)
+    .filter((i) => i.level === 'critical').length;
   process.exit(criticalCount > 0 ? 1 : 0);
 }
 

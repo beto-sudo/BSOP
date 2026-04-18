@@ -106,10 +106,7 @@ function SimpleCreateDialog({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <FieldLabel>Estado</FieldLabel>
-              <Select
-                value={value.estado}
-                onValueChange={(v) => set({ estado: v as TaskEstado })}
-              >
+              <Select value={value.estado} onValueChange={(v) => set({ estado: v as TaskEstado })}>
                 <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
                   <SelectValue />
                 </SelectTrigger>
@@ -124,10 +121,7 @@ function SimpleCreateDialog({
             </div>
             <div>
               <FieldLabel>Prioridad</FieldLabel>
-              <Select
-                value={value.prioridad}
-                onValueChange={(v) => set({ prioridad: v ?? '' })}
-              >
+              <Select value={value.prioridad} onValueChange={(v) => set({ prioridad: v ?? '' })}>
                 <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
                   <SelectValue placeholder="Sin prioridad" />
                 </SelectTrigger>
@@ -145,10 +139,7 @@ function SimpleCreateDialog({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <FieldLabel>Asignado a</FieldLabel>
-              <Select
-                value={value.asignado_a}
-                onValueChange={(v) => set({ asignado_a: v ?? '' })}
-              >
+              <Select value={value.asignado_a} onValueChange={(v) => set({ asignado_a: v ?? '' })}>
                 <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
                   <SelectValue placeholder="Sin asignar" />
                 </SelectTrigger>
@@ -246,10 +237,7 @@ function RichCreateSheet({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <FieldLabel required>Prioridad</FieldLabel>
-              <Select
-                value={value.prioridad}
-                onValueChange={(v) => set({ prioridad: v ?? '' })}
-              >
+              <Select value={value.prioridad} onValueChange={(v) => set({ prioridad: v ?? '' })}>
                 <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
                   <SelectValue placeholder="Seleccionar" />
                 </SelectTrigger>

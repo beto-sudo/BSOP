@@ -2,7 +2,18 @@
 
 import { type ReactNode, useState, useTransition } from 'react';
 import { usePermissions } from '@/components/providers';
-import { Building2, Eye, Mail, ShieldCheck, Users, Plus, X, ChevronRight, Pencil, Trash2 } from 'lucide-react';
+import {
+  Building2,
+  Eye,
+  Mail,
+  ShieldCheck,
+  Users,
+  Plus,
+  X,
+  ChevronRight,
+  Pencil,
+  Trash2,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -156,10 +167,7 @@ export function AccesoClient({
 
   // ── Action helper ──
 
-  function run(
-    action: () => Promise<void>,
-    onSuccess?: () => void,
-  ) {
+  function run(action: () => Promise<void>, onSuccess?: () => void) {
     setDialogError(null);
     startTransition(async () => {
       try {
@@ -252,7 +260,7 @@ export function AccesoClient({
               'flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors',
               tab === id
                 ? 'bg-[var(--accent)] text-white shadow-sm'
-                : 'dark:text-white/55 text-[var(--text)]/55 dark:hover:text-white hover:text-[var(--text)] dark:hover:bg-white/5 hover:bg-black/3',
+                : 'dark:text-white/55 text-[var(--text)]/55 dark:hover:text-white hover:text-[var(--text)] dark:hover:bg-white/5 hover:bg-black/3'
             )}
           >
             {icon}
@@ -266,13 +274,10 @@ export function AccesoClient({
         <>
           <div className="flex items-center justify-between">
             <p className="text-sm dark:text-white/40 text-[var(--text)]/40">
-              {empresas.length} empresa{empresas.length !== 1 ? 's' : ''} registrada{empresas.length !== 1 ? 's' : ''}
+              {empresas.length} empresa{empresas.length !== 1 ? 's' : ''} registrada
+              {empresas.length !== 1 ? 's' : ''}
             </p>
-            <Button
-              size="sm"
-              onClick={() => openEmpresaDialog(null)}
-              className="gap-1.5"
-            >
+            <Button size="sm" onClick={() => openEmpresaDialog(null)} className="gap-1.5">
               <Plus className="h-4 w-4" />
               Nueva empresa
             </Button>
@@ -393,7 +398,7 @@ export function AccesoClient({
                           'group flex items-center gap-1 px-3 py-2 text-sm transition-colors cursor-pointer',
                           selectedRolId === rol.id
                             ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium'
-                            : 'dark:text-white/70 text-[var(--text)]/70 dark:hover:bg-white/5 hover:bg-black/3',
+                            : 'dark:text-white/70 text-[var(--text)]/70 dark:hover:bg-white/5 hover:bg-black/3'
                         )}
                         onClick={() => setSelectedRolId(rol.id)}
                       >
@@ -416,9 +421,12 @@ export function AccesoClient({
                           onClick={(e) => {
                             e.stopPropagation();
                             if (!confirm(`¿Eliminar el rol "${rol.nombre}"?`)) return;
-                            run(() => deleteRolRecord(rol.id), () => {
-                              if (selectedRolId === rol.id) setSelectedRolId(null);
-                            });
+                            run(
+                              () => deleteRolRecord(rol.id),
+                              () => {
+                                if (selectedRolId === rol.id) setSelectedRolId(null);
+                              }
+                            );
                           }}
                         >
                           <Trash2 className="h-3 w-3" />
@@ -494,8 +502,8 @@ export function AccesoClient({
                                         selectedRol.id,
                                         mod.id,
                                         e.target.checked,
-                                        perm?.acceso_escritura ?? false,
-                                      ),
+                                        perm?.acceso_escritura ?? false
+                                      )
                                     );
                                   }}
                                   className="h-4 w-4 cursor-pointer rounded accent-[var(--accent)]"
@@ -512,8 +520,8 @@ export function AccesoClient({
                                         selectedRol.id,
                                         mod.id,
                                         perm?.acceso_lectura ?? false,
-                                        e.target.checked,
-                                      ),
+                                        e.target.checked
+                                      )
                                     );
                                   }}
                                   className="h-4 w-4 cursor-pointer rounded accent-[var(--accent)]"
@@ -537,7 +545,8 @@ export function AccesoClient({
         <>
           <div className="flex items-center justify-between">
             <p className="text-sm dark:text-white/40 text-[var(--text)]/40">
-              {usuarios.length} usuario{usuarios.length !== 1 ? 's' : ''} registrado{usuarios.length !== 1 ? 's' : ''}
+              {usuarios.length} usuario{usuarios.length !== 1 ? 's' : ''} registrado
+              {usuarios.length !== 1 ? 's' : ''}
             </p>
             <Button size="sm" onClick={openUsuarioDialog} className="gap-1.5">
               <Plus className="h-4 w-4" />
@@ -576,7 +585,7 @@ export function AccesoClient({
                         key={u.id}
                         className={cn(
                           'cursor-pointer border-[var(--border)] transition-colors',
-                          !u.activo ? 'opacity-50' : 'dark:hover:bg-white/3 hover:bg-black/2',
+                          !u.activo ? 'opacity-50' : 'dark:hover:bg-white/3 hover:bg-black/2'
                         )}
                         onClick={() => openUserSheet(u)}
                       >
@@ -668,8 +677,7 @@ export function AccesoClient({
                       ) : (
                         empresas.map((emp) => {
                           const ue = usuariosEmpresas.find(
-                            (x) =>
-                              x.usuario_id === selectedUsuario.id && x.empresa_id === emp.id,
+                            (x) => x.usuario_id === selectedUsuario.id && x.empresa_id === emp.id
                           );
                           const empRoles = roles.filter((r) => r.empresa_id === emp.id);
 
@@ -688,8 +696,8 @@ export function AccesoClient({
                                       setUsuarioEmpresaAcceso(
                                         selectedUsuario.id,
                                         emp.id,
-                                        e.target.checked,
-                                      ),
+                                        e.target.checked
+                                      )
                                     );
                                   }}
                                   className="h-4 w-4 cursor-pointer rounded accent-[var(--accent)]"
@@ -712,14 +720,17 @@ export function AccesoClient({
                                         updateUsuarioEmpresaRol(
                                           selectedUsuario.id,
                                           emp.id,
-                                          v === '__none__' ? null : v,
-                                        ),
+                                          v === '__none__' ? null : v
+                                        )
                                       );
                                     }}
                                   >
                                     <SelectTrigger className="h-7 w-48 text-xs">
                                       <SelectValue placeholder="Sin rol">
-                                        {ue.rol_id ? roles.find((r) => r.id === ue.rol_id)?.nombre ?? 'Sin rol' : 'Sin rol'}
+                                        {ue.rol_id
+                                          ? (roles.find((r) => r.id === ue.rol_id)?.nombre ??
+                                            'Sin rol')
+                                          : 'Sin rol'}
                                       </SelectValue>
                                     </SelectTrigger>
                                     <SelectContent>
@@ -781,7 +792,12 @@ export function AccesoClient({
                             <p className="text-xs dark:text-white/45 text-[var(--text)]/45">
                               Empresa
                             </p>
-                            <Select value={newExcEmpresaId} onValueChange={(v) => { if (v) setNewExcEmpresaId(v); }}>
+                            <Select
+                              value={newExcEmpresaId}
+                              onValueChange={(v) => {
+                                if (v) setNewExcEmpresaId(v);
+                              }}
+                            >
                               <SelectTrigger className="h-8 text-xs">
                                 <SelectValue placeholder="Empresa" />
                               </SelectTrigger>
@@ -798,7 +814,12 @@ export function AccesoClient({
                             <p className="text-xs dark:text-white/45 text-[var(--text)]/45">
                               Módulo
                             </p>
-                            <Select value={newExcModuloId} onValueChange={(v) => { if (v) setNewExcModuloId(v); }}>
+                            <Select
+                              value={newExcModuloId}
+                              onValueChange={(v) => {
+                                if (v) setNewExcModuloId(v);
+                              }}
+                            >
                               <SelectTrigger className="h-8 text-xs">
                                 <SelectValue placeholder="Módulo" />
                               </SelectTrigger>
@@ -852,7 +873,7 @@ export function AccesoClient({
                                 setNewExcModuloId('');
                                 setNewExcLectura(false);
                                 setNewExcEscritura(false);
-                              },
+                              }
                             );
                           }}
                         >
@@ -912,8 +933,8 @@ export function AccesoClient({
                                       deleteExcepcionUsuario(
                                         ex.usuario_id,
                                         ex.empresa_id,
-                                        ex.modulo_id,
-                                      ),
+                                        ex.modulo_id
+                                      )
                                     );
                                   }}
                                 >
@@ -939,7 +960,7 @@ export function AccesoClient({
                     onClick={() => {
                       startImpersonate(
                         selectedUsuario.id,
-                        `${selectedUsuario.first_name ?? selectedUsuario.email} (${selectedUsuario.email})`,
+                        `${selectedUsuario.first_name ?? selectedUsuario.email} (${selectedUsuario.email})`
                       );
                       setSheetOpen(false);
                     }}
@@ -954,11 +975,12 @@ export function AccesoClient({
                       'gap-1.5 text-xs',
                       selectedUsuario.welcome_sent_at
                         ? 'text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-600'
-                        : 'text-amber-600 border-amber-500/30 hover:bg-amber-500/10 hover:text-amber-700',
+                        : 'text-amber-600 border-amber-500/30 hover:bg-amber-500/10 hover:text-amber-700'
                     )}
                     onClick={() => {
                       const action = selectedUsuario.welcome_sent_at ? 'Reenviar' : 'Enviar';
-                      if (!confirm(`¿${action} correo de bienvenida a ${selectedUsuario.email}?`)) return;
+                      if (!confirm(`¿${action} correo de bienvenida a ${selectedUsuario.email}?`))
+                        return;
                       run(async () => {
                         const { sendWelcomeEmailAction } = await import('./actions');
                         const result = await sendWelcomeEmailAction(selectedUsuario.id);
@@ -975,20 +997,31 @@ export function AccesoClient({
                     disabled={isPending}
                     onClick={() => {
                       const nuevoEstado = !selectedUsuario.activo;
-                      if (!confirm(nuevoEstado ? '¿Reactivar este usuario?' : '¿Desactivar este usuario? Perderá acceso al sistema.')) return;
+                      if (
+                        !confirm(
+                          nuevoEstado
+                            ? '¿Reactivar este usuario?'
+                            : '¿Desactivar este usuario? Perderá acceso al sistema.'
+                        )
+                      )
+                        return;
                       run(() => toggleActivo(selectedUsuario.id, nuevoEstado));
                     }}
                     className={cn(
                       'gap-1.5 text-xs',
                       selectedUsuario.activo
                         ? 'text-red-500 border-red-500/30 hover:bg-red-500/10 hover:text-red-600'
-                        : 'text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-600',
+                        : 'text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-600'
                     )}
                   >
                     {selectedUsuario.activo ? (
-                      <><X className="h-3 w-3" /> Desactivar</>
+                      <>
+                        <X className="h-3 w-3" /> Desactivar
+                      </>
                     ) : (
-                      <><ShieldCheck className="h-3 w-3" /> Reactivar</>
+                      <>
+                        <ShieldCheck className="h-3 w-3" /> Reactivar
+                      </>
                     )}
                   </Button>
                   <Button
@@ -997,8 +1030,16 @@ export function AccesoClient({
                     disabled={isPending}
                     className="gap-1.5 text-xs text-red-500 border-red-500/30 hover:bg-red-500/10 hover:text-red-600"
                     onClick={() => {
-                      if (!confirm(`¿Eliminar permanentemente a ${selectedUsuario.email}? Esta acción no se puede deshacer.`)) return;
-                      run(() => removeUsuario(selectedUsuario.id), () => setSheetOpen(false));
+                      if (
+                        !confirm(
+                          `¿Eliminar permanentemente a ${selectedUsuario.email}? Esta acción no se puede deshacer.`
+                        )
+                      )
+                        return;
+                      run(
+                        () => removeUsuario(selectedUsuario.id),
+                        () => setSheetOpen(false)
+                      );
                     }}
                   >
                     <Trash2 className="h-3 w-3" /> Eliminar
@@ -1019,9 +1060,7 @@ export function AccesoClient({
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {empresaDialog.editing ? 'Editar empresa' : 'Nueva empresa'}
-            </DialogTitle>
+            <DialogTitle>{empresaDialog.editing ? 'Editar empresa' : 'Nueva empresa'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
@@ -1074,11 +1113,15 @@ export function AccesoClient({
                     editing
                       ? updateEmpresa(editing.id, empresaNombre, empresaSlug)
                       : createEmpresa(empresaNombre, empresaSlug),
-                  () => setEmpresaDialog({ open: false, editing: null }),
+                  () => setEmpresaDialog({ open: false, editing: null })
                 );
               }}
             >
-              {isPending ? 'Guardando…' : empresaDialog.editing ? 'Guardar cambios' : 'Crear empresa'}
+              {isPending
+                ? 'Guardando…'
+                : empresaDialog.editing
+                  ? 'Guardar cambios'
+                  : 'Crear empresa'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1093,9 +1136,7 @@ export function AccesoClient({
       >
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>
-              {rolDialog.editing ? 'Editar rol' : 'Nuevo rol'}
-            </DialogTitle>
+            <DialogTitle>{rolDialog.editing ? 'Editar rol' : 'Nuevo rol'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             {!rolDialog.editing && (
@@ -1138,7 +1179,7 @@ export function AccesoClient({
                     editing
                       ? updateRolRecord(editing.id, rolNombre)
                       : createRolRecord(rolNombre, filterEmpresaId),
-                  () => setRolDialog({ open: false, editing: null }),
+                  () => setRolDialog({ open: false, editing: null })
                 );
               }}
             >
@@ -1194,7 +1235,7 @@ export function AccesoClient({
               onClick={() => {
                 run(
                   () => createUsuarioCore(usuarioEmail, usuarioFirstName),
-                  () => setUsuarioDialogOpen(false),
+                  () => setUsuarioDialogOpen(false)
                 );
               }}
             >

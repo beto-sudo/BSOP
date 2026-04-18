@@ -44,7 +44,9 @@ export function TasksUpdatesSheet({
       >
         <SheetHeader className="pb-2">
           <SheetTitle className="text-[var(--text)] text-lg">Avances de tarea</SheetTitle>
-          <SheetDescription className="text-[var(--text)]/50">{task?.titulo ?? ''}</SheetDescription>
+          <SheetDescription className="text-[var(--text)]/50">
+            {task?.titulo ?? ''}
+          </SheetDescription>
         </SheetHeader>
 
         <div className="space-y-4 py-4">

@@ -36,7 +36,7 @@ async function requireAuth() {
 
 async function resolveUserDisplayName(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
-  user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> | null },
+  user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> | null }
 ) {
   const metadata = user.user_metadata ?? {};
   const fullName = typeof metadata.full_name === 'string' ? metadata.full_name.trim() : '';
@@ -64,7 +64,7 @@ async function resolveUserDisplayName(
 
 export async function guardarRequisicion(
   items: DraftItemInput[],
-  notas?: string | null,
+  notas?: string | null
 ): Promise<{ id: string; folio: string }> {
   try {
     const { supabase, user } = await requireAuth();
@@ -111,14 +111,15 @@ export async function guardarRequisicion(
           cantidad: item.cantidad,
           unidad: item.unidad,
           notas: item.notas,
-        })),
+        }))
       );
 
     if (itemsError) throw new Error(`Error creando items: ${itemsError.message}`);
 
     return { id: req.id, folio: req.codigo } as { id: string; folio: string };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Error desconocido al guardar requisición';
+    const message =
+      error instanceof Error ? error.message : 'Error desconocido al guardar requisición';
     throw new Error(message);
   }
 }
@@ -128,7 +129,7 @@ export async function guardarRequisicion(
 export async function actualizarRequisicion(
   id: string,
   items: DraftItemInput[],
-  notas?: string | null,
+  notas?: string | null
 ): Promise<void> {
   const { supabase } = await requireAuth();
 
@@ -190,7 +191,7 @@ export async function actualizarRequisicion(
         cantidad: item.cantidad,
         unidad: item.unidad,
         notas: item.notas,
-      })),
+      }))
     );
 
   if (insertItemsError) throw new Error(insertItemsError.message);
@@ -212,7 +213,7 @@ export async function aprobarRequisicion(id: string): Promise<void> {
 // ── Generar Orden de Compra ────────────────────────────────────────────────────
 
 export async function generarOrdenCompra(
-  requisicionId: string,
+  requisicionId: string
 ): Promise<{ id: string; folio: string }> {
   const { supabase } = await requireAuth();
 
@@ -257,7 +258,7 @@ export async function generarOrdenCompra(
           descripcion: item.descripcion,
           cantidad: item.cantidad,
           precio_unitario: 0,
-        })),
+        }))
       );
 
     if (ocItemsErr) throw new Error(ocItemsErr.message);

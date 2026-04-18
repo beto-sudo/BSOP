@@ -2,10 +2,14 @@ import { config } from 'dotenv';
 config({ path: '/Users/Beto/BSOP/.env.local' });
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 const { data: cashNegs, error: negError } = await supabase
-  .schema('rdb').from('waitry_pagos')
+  .schema('rdb')
+  .from('waitry_pagos')
   .select('order_id, payment_id, payment_method, amount, created_at')
   .eq('payment_method', 'cash')
   .lt('amount', 0);
@@ -16,20 +20,30 @@ if (!cashNegs?.length) {
   process.exit(0);
 }
 
-const orderIds = [...new Set(cashNegs.map(p => p.order_id))];
+const orderIds = [...new Set(cashNegs.map((p) => p.order_id))];
 
-const [{ data: pagos, error: pagosError }, { data: pedidos, error: pedidosError }, { data: productos, error: productosError }] = await Promise.all([
-  supabase.schema('rdb').from('waitry_pagos')
+const [
+  { data: pagos, error: pagosError },
+  { data: pedidos, error: pedidosError },
+  { data: productos, error: productosError },
+] = await Promise.all([
+  supabase
+    .schema('rdb')
+    .from('waitry_pagos')
     .select('order_id, payment_id, payment_method, amount, created_at')
     .in('order_id', orderIds)
     .order('created_at'),
-  supabase.schema('rdb').from('waitry_pedidos')
+  supabase
+    .schema('rdb')
+    .from('waitry_pedidos')
     .select('order_id, status, total_amount, total_discount, layout_name, table_name, timestamp')
     .in('order_id', orderIds)
     .order('timestamp', { ascending: false }),
-  supabase.schema('rdb').from('waitry_productos')
+  supabase
+    .schema('rdb')
+    .from('waitry_productos')
     .select('order_id, product_id, quantity, total_price')
-    .in('order_id', orderIds)
+    .in('order_id', orderIds),
 ]);
 
 if (pagosError) throw pagosError;
@@ -53,20 +67,24 @@ for (const ped of pedidos || []) {
   const orderPagos = pagosByOrder.get(ped.order_id) || [];
   const orderProductos = productosByOrder.get(ped.order_id) || [];
 
-  const cardPos = orderPagos.filter(p => p.amount > 0 && p.payment_method !== 'cash');
-  const cashNeg = orderPagos.filter(p => p.payment_method === 'cash' && p.amount < 0);
+  const cardPos = orderPagos.filter((p) => p.amount > 0 && p.payment_method !== 'cash');
+  const cashNeg = orderPagos.filter((p) => p.payment_method === 'cash' && p.amount < 0);
 
   if (!cardPos.length || !cashNeg.length || !orderProductos.length) continue;
 
-  const totalPositive = orderPagos.filter(p => p.amount > 0).reduce((s, p) => s + Number(p.amount), 0);
-  const totalNegative = orderPagos.filter(p => p.amount < 0).reduce((s, p) => s + Number(p.amount), 0);
+  const totalPositive = orderPagos
+    .filter((p) => p.amount > 0)
+    .reduce((s, p) => s + Number(p.amount), 0);
+  const totalNegative = orderPagos
+    .filter((p) => p.amount < 0)
+    .reduce((s, p) => s + Number(p.amount), 0);
   const netPayments = totalPositive + totalNegative;
 
-  const exactCashBackMatch = cashNeg.some(neg =>
-    cardPos.some(card => Math.abs(Number(card.amount) - Math.abs(Number(neg.amount))) < 0.01)
+  const exactCashBackMatch = cashNeg.some((neg) =>
+    cardPos.some((card) => Math.abs(Number(card.amount) - Math.abs(Number(neg.amount))) < 0.01)
   );
 
-  const cardMethods = [...new Set(cardPos.map(p => p.payment_method))].join(', ');
+  const cardMethods = [...new Set(cardPos.map((p) => p.payment_method))].join(', ');
   const cardAmount = cardPos.reduce((s, p) => s + Number(p.amount), 0);
   const cashReturned = Math.abs(cashNeg.reduce((s, p) => s + Number(p.amount), 0));
   const productLines = orderProductos.length;
@@ -87,20 +105,30 @@ for (const ped of pedidos || []) {
     cash_returned: Number(cashReturned.toFixed(2)),
     net_payments: Number(netPayments.toFixed(2)),
     exact_cashback_match: exactCashBackMatch,
-    payments: orderPagos.map(p => ({ method: p.payment_method, amount: Number(p.amount), created_at: p.created_at }))
+    payments: orderPagos.map((p) => ({
+      method: p.payment_method,
+      amount: Number(p.amount),
+      created_at: p.created_at,
+    })),
   });
 }
 
 rows.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-const exact = rows.filter(r => r.exact_cashback_match);
-const zeroNet = exact.filter(r => Math.abs(r.net_payments) < 0.01);
-const partialNet = exact.filter(r => Math.abs(r.net_payments) >= 0.01);
+const exact = rows.filter((r) => r.exact_cashback_match);
+const zeroNet = exact.filter((r) => Math.abs(r.net_payments) < 0.01);
+const partialNet = exact.filter((r) => Math.abs(r.net_payments) >= 0.01);
 
-console.log(JSON.stringify({
-  totalOrdersWithCardAndCashReturn: rows.length,
-  exactCardCashMatch: exact.length,
-  zeroNet: zeroNet.length,
-  partialNet: partialNet.length,
-  rows: exact
-}, null, 2));
+console.log(
+  JSON.stringify(
+    {
+      totalOrdersWithCardAndCashReturn: rows.length,
+      exactCardCashMatch: exact.length,
+      zeroNet: zeroNet.length,
+      partialNet: partialNet.length,
+      rows: exact,
+    },
+    null,
+    2
+  )
+);

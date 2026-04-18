@@ -29,20 +29,20 @@ import { createClient } from '@supabase/supabase-js';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const CODA_API_KEY        = process.env.CODA_API_KEY ?? '';
-const SUPABASE_URL        = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
-const SUPABASE_KEY        = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
-const DILESA_EMPRESA_ID   = process.env.DILESA_EMPRESA_ID ?? '';
-const DRY_RUN             = process.env.DRY_RUN === '1';
+const CODA_API_KEY = process.env.CODA_API_KEY ?? '';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
+const DILESA_EMPRESA_ID = process.env.DILESA_EMPRESA_ID ?? '';
+const DRY_RUN = process.env.DRY_RUN === '1';
 
-const CODA_DOC_ID  = 'ZNxWl_DI2D';
-const TABLE_ID     = 'grid-QQBtnCWp7z';
+const CODA_DOC_ID = 'ZNxWl_DI2D';
+const TABLE_ID = 'grid-QQBtnCWp7z';
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
-if (!CODA_API_KEY)      throw new Error('Missing CODA_API_KEY');
-if (!SUPABASE_URL)      throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL');
-if (!SUPABASE_KEY)      throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY');
+if (!CODA_API_KEY) throw new Error('Missing CODA_API_KEY');
+if (!SUPABASE_URL) throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL');
+if (!SUPABASE_KEY) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY');
 if (!DILESA_EMPRESA_ID) throw new Error('Missing DILESA_EMPRESA_ID');
 
 // ─── Coda types ───────────────────────────────────────────────────────────────
@@ -73,7 +73,7 @@ async function codaGet<T>(path: string): Promise<T> {
 
 async function fetchColumns(tableId: string): Promise<Map<string, string>> {
   const data = await codaGet<{ items: CodaColumn[] }>(
-    `/docs/${CODA_DOC_ID}/tables/${tableId}/columns`,
+    `/docs/${CODA_DOC_ID}/tables/${tableId}/columns`
   );
   const map = new Map<string, string>();
   for (const col of data.items) {
@@ -103,8 +103,8 @@ async function fetchAllRows(tableId: string): Promise<CodaRow[]> {
 function normalizeKey(s: string): string {
   return s
     .trim()
-    .replace(/\.+$/, '')       // quita punto(s) al final
-    .replace(/\s+/g, ' ')      // colapsa espacios múltiples
+    .replace(/\.+$/, '') // quita punto(s) al final
+    .replace(/\s+/g, ' ') // colapsa espacios múltiples
     .toLowerCase();
 }
 
@@ -124,8 +124,8 @@ function getString(raw: unknown): string | null {
 // Si hay columnas distintas, ejecuta con DRY_RUN=1 primero para verlas.
 
 interface NotariaRow {
-  nombre: string;              // nombre normalizado (sin punto final)
-  nombre_original: string;     // tal cual vino de Coda (para notas/display)
+  nombre: string; // nombre normalizado (sin punto final)
+  nombre_original: string; // tal cual vino de Coda (para notas/display)
   numero_notaria: string | null;
   rfc: string | null;
   telefono: string | null;
@@ -154,7 +154,7 @@ function mapRow(row: CodaRow, colMap: Map<string, string>): NotariaRow | null {
   if (!nombreRaw) return null;
 
   return {
-    nombre: normalizeKey(nombreRaw),  // usado para dedup y como nombre canónico en ERP
+    nombre: normalizeKey(nombreRaw), // usado para dedup y como nombre canónico en ERP
     nombre_original: nombreRaw,
     numero_notaria:
       getString(get('número')) ??
@@ -164,23 +164,15 @@ function mapRow(row: CodaRow, colMap: Map<string, string>): NotariaRow | null {
       getString(get('no. notaria')) ??
       getString(get('no. notaría')) ??
       null,
-    rfc:
-      getString(get('rfc')) ??
-      null,
+    rfc: getString(get('rfc')) ?? null,
     telefono:
-      getString(get('teléfono')) ??
-      getString(get('telefono')) ??
-      getString(get('tel')) ??
-      null,
+      getString(get('teléfono')) ?? getString(get('telefono')) ?? getString(get('tel')) ?? null,
     email:
       getString(get('email')) ??
       getString(get('correo')) ??
       getString(get('correo electrónico')) ??
       null,
-    ciudad:
-      getString(get('ciudad')) ??
-      getString(get('municipio')) ??
-      null,
+    ciudad: getString(get('ciudad')) ?? getString(get('municipio')) ?? null,
     direccion:
       getString(get('dirección')) ??
       getString(get('direccion')) ??
@@ -217,7 +209,9 @@ async function main() {
   const duplicates: string[] = [];
   for (const r of mapped) {
     if (seen.has(r.nombre)) {
-      duplicates.push(`  dup: "${r.nombre_original}" → ya existe "${seen.get(r.nombre)!.nombre_original}"`);
+      duplicates.push(
+        `  dup: "${r.nombre_original}" → ya existe "${seen.get(r.nombre)!.nombre_original}"`
+      );
     } else {
       seen.set(r.nombre, r);
     }
@@ -242,8 +236,8 @@ async function main() {
     unique.slice(0, 10).forEach((n, i) => {
       console.log(`  [${i + 1}] ${n.nombre}`);
       if (n.numero_notaria) console.log(`       No. ${n.numero_notaria}`);
-      if (n.rfc)            console.log(`       RFC: ${n.rfc}`);
-      if (n.ciudad)         console.log(`       Ciudad: ${n.ciudad}`);
+      if (n.rfc) console.log(`       RFC: ${n.rfc}`);
+      if (n.ciudad) console.log(`       Ciudad: ${n.ciudad}`);
     });
     console.log('\n🛑 Dry run completo — sin escritura en base de datos.');
     return;
@@ -252,11 +246,11 @@ async function main() {
   // 4. Insertar en Supabase
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  let insertedPersonas  = 0;
-  let updatedPersonas   = 0;
+  let insertedPersonas = 0;
+  let updatedPersonas = 0;
   let insertedProveedores = 0;
-  let updatedProveedores  = 0;
-  let errors            = 0;
+  let updatedProveedores = 0;
+  let errors = 0;
 
   for (const n of unique) {
     // ── Persona ──────────────────────────────────────────────────────────────
@@ -284,9 +278,9 @@ async function main() {
         .schema('erp' as any)
         .from('personas')
         .update({
-          rfc:      n.rfc      ?? undefined,
+          rfc: n.rfc ?? undefined,
           telefono: n.telefono ?? undefined,
-          email:    n.email    ?? undefined,
+          email: n.email ?? undefined,
         })
         .eq('id', existingPersona.id);
 
@@ -302,15 +296,15 @@ async function main() {
         .schema('erp' as any)
         .from('personas')
         .insert({
-          empresa_id:       DILESA_EMPRESA_ID,
-          nombre:           n.nombre,          // canónico normalizado
+          empresa_id: DILESA_EMPRESA_ID,
+          nombre: n.nombre, // canónico normalizado
           apellido_paterno: null,
           apellido_materno: null,
-          rfc:              n.rfc ?? null,
-          telefono:         n.telefono ?? null,
-          email:            n.email ?? null,
-          tipo:             'proveedor',
-          activo:           true,
+          rfc: n.rfc ?? null,
+          telefono: n.telefono ?? null,
+          email: n.email ?? null,
+          tipo: 'proveedor',
+          activo: true,
         })
         .select('id')
         .single();
@@ -360,10 +354,10 @@ async function main() {
         .insert({
           empresa_id: DILESA_EMPRESA_ID,
           persona_id: personaId,
-          categoria:  'notaria',
-          activo:     true,
+          categoria: 'notaria',
+          activo: true,
           // codigo: numero_notaria se puede asignar si está disponible
-          codigo:     n.numero_notaria ?? null,
+          codigo: n.numero_notaria ?? null,
         });
 
       if (insProvErr) {
@@ -375,13 +369,15 @@ async function main() {
     }
 
     process.stdout.write(
-      `   personas +${insertedPersonas} ~${updatedPersonas} | proveedores +${insertedProveedores} ~${updatedProveedores} / ${unique.length}\r`,
+      `   personas +${insertedPersonas} ~${updatedPersonas} | proveedores +${insertedProveedores} ~${updatedProveedores} / ${unique.length}\r`
     );
   }
 
   console.log(`\n\n🎉 Done:`);
   console.log(`   Personas  : +${insertedPersonas} nuevas, ~${updatedPersonas} actualizadas`);
-  console.log(`   Proveedores: +${insertedProveedores} nuevos, ~${updatedProveedores} actualizados`);
+  console.log(
+    `   Proveedores: +${insertedProveedores} nuevos, ~${updatedProveedores} actualizados`
+  );
   if (errors > 0) console.log(`   ⚠️  ${errors} errores — revisar arriba`);
   console.log(`\n➡️  Ejecuta ahora: npx tsx scripts/migrate_dilesa_escrituras.ts`);
   console.log(`   para ligar cada escritura a su notario_proveedor_id.`);

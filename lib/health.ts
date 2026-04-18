@@ -94,7 +94,9 @@ function startOfDateIso(dateInput: string) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-export function resolveHealthDashboardRange(input?: Partial<HealthDateRange>): HealthDashboardRange {
+export function resolveHealthDashboardRange(
+  input?: Partial<HealthDateRange>
+): HealthDashboardRange {
   const preset = input?.preset ?? '7d';
   const nowIso = new Date().toISOString();
 
@@ -144,7 +146,10 @@ export function resolveHealthDashboardRange(input?: Partial<HealthDateRange>): H
     if (from && to) {
       const fromDate = new Date(from);
       const toDate = new Date(to);
-      const trendDays = Math.max(1, Math.round((toDate.getTime() - fromDate.getTime()) / 86_400_000) + 1);
+      const trendDays = Math.max(
+        1,
+        Math.round((toDate.getTime() - fromDate.getTime()) / 86_400_000) + 1
+      );
       const label = `${input?.from} → ${input?.to}`;
       return {
         preset,
@@ -291,7 +296,9 @@ export async function getHealthDashboardData(rangeInput?: Partial<HealthDateRang
       .returns<HealthMetricRow[]>(),
     supabase
       .from('health_workouts')
-      .select('id, name, start_time, end_time, duration_minutes, distance_km, energy_kcal, heart_rate_avg, heart_rate_max, source')
+      .select(
+        'id, name, start_time, end_time, duration_minutes, distance_km, energy_kcal, heart_rate_avg, heart_rate_max, source'
+      )
       .gte('start_time', range.trendFromIso)
       .lte('start_time', workoutsToIso)
       .order('start_time', { ascending: false })

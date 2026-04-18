@@ -17,6 +17,11 @@ const eslintConfig = [
       'test-results/**',
       'supabase/functions/**',
       'next-env.d.ts',
+      // One-off historical migration scripts — kept for reference only, not
+      // part of the active codebase. Per CONTRIBUTING.md they are not touched.
+      'scripts/archive/**',
+      // One-off backfill scripts run ad-hoc from node; use CommonJS require().
+      'scripts/backfill_coda_*.js',
     ],
   },
   ...nextCoreWebVitals,

@@ -18,7 +18,7 @@ const AVATAR_COLORS = [
 function hashColor(userId: string): string {
   let h = 0;
   for (let i = 0; i < userId.length; i++) {
-    h = ((h * 31) + userId.charCodeAt(i)) >>> 0;
+    h = (h * 31 + userId.charCodeAt(i)) >>> 0;
   }
   return AVATAR_COLORS[h % AVATAR_COLORS.length];
 }
@@ -36,9 +36,7 @@ function AvatarImage({
   user: Pick<PresenceUser, 'user_id' | 'email' | 'display_name' | 'avatar_url'>;
   ownRing?: boolean;
 }) {
-  const ringClass = ownRing
-    ? 'ring-2 ring-green-500'
-    : 'ring-2 ring-[var(--panel)]';
+  const ringClass = ownRing ? 'ring-2 ring-green-500' : 'ring-2 ring-[var(--panel)]';
   const label = user.display_name ?? user.email;
 
   if (user.avatar_url) {
@@ -126,10 +124,7 @@ export function PresenceBar() {
       )}
 
       {currentUser && (
-        <div
-          className="relative"
-          style={{ marginLeft: hasOthers ? '-8px' : 0, zIndex: 0 }}
-        >
+        <div className="relative" style={{ marginLeft: hasOthers ? '-8px' : 0, zIndex: 0 }}>
           <AvatarImage user={currentUser} ownRing />
         </div>
       )}

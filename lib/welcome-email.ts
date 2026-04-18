@@ -9,15 +9,13 @@ export type WelcomeEmpresa = {
 
 export function generateWelcomeHtml(firstName: string, empresas: WelcomeEmpresa[]): string {
   const empresaRows = empresas
-    .map(
-      (e, i) => {
-        const borderBottom = i < empresas.length - 1
-          ? 'border-bottom:1px solid #e5e5e5;'
-          : '';
-        const modulosHtml = e.modulos.length > 0
+    .map((e, i) => {
+      const borderBottom = i < empresas.length - 1 ? 'border-bottom:1px solid #e5e5e5;' : '';
+      const modulosHtml =
+        e.modulos.length > 0
           ? `<tr><td colspan="2" style="padding:4px 0 0 0;font-size:12px;color:#888;line-height:1.4">${e.modulos.join(' · ')}</td></tr>`
           : '';
-        return `
+      return `
         <tr>
           <td style="padding:14px 0;${borderBottom}" colspan="2">
             <table cellpadding="0" cellspacing="0" border="0" width="100%">
@@ -36,8 +34,7 @@ export function generateWelcomeHtml(firstName: string, empresas: WelcomeEmpresa[
             </table>
           </td>
         </tr>`;
-      },
-    )
+    })
     .join('\n');
 
   return `

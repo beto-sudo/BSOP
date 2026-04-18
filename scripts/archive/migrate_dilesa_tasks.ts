@@ -33,8 +33,7 @@ import { createClient } from '@supabase/supabase-js';
 const CODA_API_KEY = process.env.CODA_API_KEY ?? '';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
-const DILESA_EMPRESA_ID =
-  process.env.DILESA_EMPRESA_ID ?? 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479';
+const DILESA_EMPRESA_ID = process.env.DILESA_EMPRESA_ID ?? 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479';
 const DRY_RUN = process.env.DRY_RUN === '1';
 
 const CODA_DOC_ID = 'ZNxWl_DI2D';
@@ -66,7 +65,7 @@ async function codaGet<T>(path: string): Promise<T> {
 
 async function fetchColumns(tableId: string): Promise<Map<string, string>> {
   const data = await codaGet<{ items: CodaColumn[] }>(
-    `/docs/${CODA_DOC_ID}/tables/${tableId}/columns`,
+    `/docs/${CODA_DOC_ID}/tables/${tableId}/columns`
   );
   const map = new Map<string, string>();
   for (const col of data.items) {
@@ -85,7 +84,7 @@ async function fetchAllRows(tableId: string): Promise<CodaRow[]> {
     if (pageToken) qs.set('pageToken', pageToken);
 
     const data = await codaGet<{ items: CodaRow[]; nextPageToken?: string }>(
-      `/docs/${CODA_DOC_ID}/tables/${tableId}/rows?${qs}`,
+      `/docs/${CODA_DOC_ID}/tables/${tableId}/rows?${qs}`
     );
     rows.push(...data.items);
     pageToken = data.nextPageToken;
@@ -160,7 +159,9 @@ async function main() {
     empleadoNombres.push({ full: fullName, id: e.id });
     if (p.nombre) empleadoNameToId.set(normalize(p.nombre), e.id);
   }
-  console.log(`Loaded ${empleadoNombres.length} empleados (${empleadoNameToId.size} name→id mappings)`);
+  console.log(
+    `Loaded ${empleadoNombres.length} empleados (${empleadoNameToId.size} name→id mappings)`
+  );
 
   // ── Fetch tasks from Coda ─────────────────────────────────────────────────
   console.log('\n─── Tareas ──────────────────────────────────────────────────');
@@ -182,13 +183,13 @@ async function main() {
     }
 
     const descripcion = str(pick(v, cols, 'comentarios', 'descripcion', 'descripción', 'notas'));
-    const fechaVence = dateStr(pick(v, cols, 'fecha compromiso', 'fecha_compromiso', 'fecha vencimiento', 'fecha límite'));
+    const fechaVence = dateStr(
+      pick(v, cols, 'fecha compromiso', 'fecha_compromiso', 'fecha vencimiento', 'fecha límite')
+    );
 
     // Terminada: boolean or "true"/"false" string
     const terminadaRaw = pick(v, cols, 'terminada', 'completada', 'done', 'completado');
-    const terminada =
-      terminadaRaw === true ||
-      String(terminadaRaw).toLowerCase() === 'true';
+    const terminada = terminadaRaw === true || String(terminadaRaw).toLowerCase() === 'true';
 
     // Priority & Status mapping from CSV logic
     const estadoRaw = str(pick(v, cols, 'estado'));
@@ -197,9 +198,14 @@ async function main() {
     const departamentoNombre = str(pick(v, cols, 'departamento'));
     const tipo = str(pick(v, cols, 'tipo de tarea', 'tipo'));
     const motivoBloqueo = str(pick(v, cols, 'motivo bloqueo', 'motivo_bloqueo'));
-    const siguienteAccion = str(pick(v, cols, 'siguiente acción', 'siguiente_accion', 'siguiente accion'));
+    const siguienteAccion = str(
+      pick(v, cols, 'siguiente acción', 'siguiente_accion', 'siguiente accion')
+    );
     const avanceRaw = pick(v, cols, 'avance', '%avance', '% avance');
-    const avance = typeof avanceRaw === 'number' ? avanceRaw : (parseInt(String(avanceRaw)) || (terminada ? 100 : 0));
+    const avance =
+      typeof avanceRaw === 'number'
+        ? avanceRaw
+        : parseInt(String(avanceRaw)) || (terminada ? 100 : 0);
 
     let estado = terminada ? 'completado' : 'pendiente';
     if (!terminada && estadoRaw) {
@@ -255,7 +261,9 @@ async function main() {
     };
 
     if (DRY_RUN) {
-      console.log(`  [DRY] task: ${titulo} | estado=${estado} | resp=${responsableRaw ?? '-'} → ${asignadoA ?? 'unmatched'}`);
+      console.log(
+        `  [DRY] task: ${titulo} | estado=${estado} | resp=${responsableRaw ?? '-'} → ${asignadoA ?? 'unmatched'}`
+      );
       continue;
     }
 

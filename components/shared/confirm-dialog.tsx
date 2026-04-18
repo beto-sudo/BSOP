@@ -1,6 +1,6 @@
-"use client"
+'use client';
 
-import * as React from "react"
+import * as React from 'react';
 
 import {
   AlertDialog,
@@ -11,39 +11,37 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import type { buttonVariants } from "@/components/ui/button"
-import type { VariantProps } from "class-variance-authority"
+} from '@/components/ui/alert-dialog';
+import type { buttonVariants } from '@/components/ui/button';
+import type { VariantProps } from 'class-variance-authority';
 
-type ConfirmButtonVariant = NonNullable<
-  VariantProps<typeof buttonVariants>["variant"]
->
+type ConfirmButtonVariant = NonNullable<VariantProps<typeof buttonVariants>['variant']>;
 
 export type ConfirmDialogProps = {
   /** Controlled open state. */
-  open: boolean
+  open: boolean;
   /** Called when the user cancels or the dialog is dismissed. */
-  onOpenChange: (open: boolean) => void
+  onOpenChange: (open: boolean) => void;
   /**
    * Triggered when the user confirms. Can be async; the button disables
    * itself while the promise resolves.
    */
-  onConfirm: () => void | Promise<void>
+  onConfirm: () => void | Promise<void>;
   /** Dialog title. Keep it short (“¿Eliminar departamento?”). */
-  title: React.ReactNode
+  title: React.ReactNode;
   /** Optional longer explanation. Supports ReactNode for formatting. */
-  description?: React.ReactNode
+  description?: React.ReactNode;
   /** Confirm button label. Defaults to "Eliminar". */
-  confirmLabel?: string
+  confirmLabel?: string;
   /** Cancel button label. Defaults to "Cancelar". */
-  cancelLabel?: string
+  cancelLabel?: string;
   /**
    * Visual variant of the confirm button.
    * Defaults to "destructive" since this dialog is mainly for delete flows.
    * Use "default" for non-destructive but still-needs-confirm actions.
    */
-  confirmVariant?: ConfirmButtonVariant
-}
+  confirmVariant?: ConfirmButtonVariant;
+};
 
 /**
  * ConfirmDialog — shared confirmation dialog for destructive or irreversible
@@ -71,30 +69,28 @@ export function ConfirmDialog({
   onConfirm,
   title,
   description,
-  confirmLabel = "Eliminar",
-  cancelLabel = "Cancelar",
-  confirmVariant = "destructive",
+  confirmLabel = 'Eliminar',
+  cancelLabel = 'Cancelar',
+  confirmVariant = 'destructive',
 }: ConfirmDialogProps) {
-  const [loading, setLoading] = React.useState(false)
+  const [loading, setLoading] = React.useState(false);
 
   const handleConfirm = React.useCallback(async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      await onConfirm()
-      onOpenChange(false)
+      await onConfirm();
+      onOpenChange(false);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [onConfirm, onOpenChange])
+  }, [onConfirm, onOpenChange]);
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
-          {description ? (
-            <AlertDialogDescription>{description}</AlertDialogDescription>
-          ) : null}
+          {description ? <AlertDialogDescription>{description}</AlertDialogDescription> : null}
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={loading}>{cancelLabel}</AlertDialogCancel>
@@ -104,14 +100,14 @@ export function ConfirmDialog({
             onClick={(event) => {
               // Prevent AlertDialog from auto-closing before the async work
               // completes. We close it manually in `handleConfirm`.
-              event.preventDefault()
-              void handleConfirm()
+              event.preventDefault();
+              void handleConfirm();
             }}
           >
-            {loading ? "Procesando…" : confirmLabel}
+            {loading ? 'Procesando…' : confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  )
+  );
 }

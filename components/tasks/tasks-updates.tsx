@@ -30,8 +30,16 @@ export function UpdatesList({
 }) {
   if (loading) {
     return (
-      <div className={variant === 'sheet' ? 'flex items-center justify-center py-6' : 'flex items-center justify-center py-4'}>
-        <Loader2 className={`${variant === 'sheet' ? 'h-5 w-5' : 'h-4 w-4'} animate-spin text-[var(--text)]/30`} />
+      <div
+        className={
+          variant === 'sheet'
+            ? 'flex items-center justify-center py-6'
+            : 'flex items-center justify-center py-4'
+        }
+      >
+        <Loader2
+          className={`${variant === 'sheet' ? 'h-5 w-5' : 'h-4 w-4'} animate-spin text-[var(--text)]/30`}
+        />
       </div>
     );
   }
@@ -66,7 +74,9 @@ export function UpdatesList({
               >
                 {tc.label}
               </span>
-              <span className="text-[10px] text-[var(--text)]/40">{u.usuario?.nombre ?? 'Sistema'}</span>
+              <span className="text-[10px] text-[var(--text)]/40">
+                {u.usuario?.nombre ?? 'Sistema'}
+              </span>
               <span className="text-[10px] text-[var(--text)]/30 ml-auto">
                 {isEmbedded ? formatDateTime(u.created_at) : formatDate(u.created_at)}
               </span>

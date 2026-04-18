@@ -58,7 +58,14 @@ export function formatAuditTimestamp(value: string) {
   if (!match) return value;
 
   const [, year, month, day, hour, minute, second] = match;
-  const date = new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
+  const date = new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second)
+  );
 
   return date.toLocaleString('en-US', {
     year: 'numeric',

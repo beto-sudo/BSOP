@@ -173,7 +173,7 @@ describe('walkTiptapImages', () => {
           { type: 'paragraph', attrs: { src: 'should-ignore' } },
         ],
       },
-      visit,
+      visit
     );
     expect(visit).not.toHaveBeenCalled();
   });
@@ -185,7 +185,7 @@ describe('walkTiptapImages', () => {
         type: 'doc',
         content: [null, undefined, { type: 'image' }, { content: 'not an array' }],
       },
-      visit,
+      visit
     );
     expect(visit).toHaveBeenCalledTimes(1);
   });
@@ -309,12 +309,12 @@ describe('getAdjuntoSignedUrl', () => {
   });
 
   it('calls createSignedUrl with the extracted path', async () => {
-    const createSignedUrl = vi.fn<
-      (path: string, expiresIn: number) => Promise<CreateSignedUrlResult>
-    >().mockResolvedValue({
-      data: { signedUrl: 'signed://foo' },
-      error: null,
-    });
+    const createSignedUrl = vi
+      .fn<(path: string, expiresIn: number) => Promise<CreateSignedUrlResult>>()
+      .mockResolvedValue({
+        data: { signedUrl: 'signed://foo' },
+        error: null,
+      });
     const { client, from } = makeSupabaseMock({
       createSignedUrl,
       createSignedUrls: vi.fn(),
@@ -323,7 +323,7 @@ describe('getAdjuntoSignedUrl', () => {
     const result = await getAdjuntoSignedUrl(
       client,
       'https://x.supabase.co/storage/v1/object/public/adjuntos/dilesa/a.pdf',
-      120,
+      120
     );
 
     expect(from).toHaveBeenCalledWith('adjuntos');
@@ -332,12 +332,12 @@ describe('getAdjuntoSignedUrl', () => {
   });
 
   it('defaults expiresIn to 3600s', async () => {
-    const createSignedUrl = vi.fn<
-      (path: string, expiresIn: number) => Promise<CreateSignedUrlResult>
-    >().mockResolvedValue({
-      data: { signedUrl: 'signed://x' },
-      error: null,
-    });
+    const createSignedUrl = vi
+      .fn<(path: string, expiresIn: number) => Promise<CreateSignedUrlResult>>()
+      .mockResolvedValue({
+        data: { signedUrl: 'signed://x' },
+        error: null,
+      });
     const { client } = makeSupabaseMock({
       createSignedUrl,
       createSignedUrls: vi.fn(),
@@ -347,12 +347,12 @@ describe('getAdjuntoSignedUrl', () => {
   });
 
   it('returns empty string when the API returns an error', async () => {
-    const createSignedUrl = vi.fn<
-      (path: string, expiresIn: number) => Promise<CreateSignedUrlResult>
-    >().mockResolvedValue({
-      data: null,
-      error: { message: 'boom' },
-    });
+    const createSignedUrl = vi
+      .fn<(path: string, expiresIn: number) => Promise<CreateSignedUrlResult>>()
+      .mockResolvedValue({
+        data: null,
+        error: { message: 'boom' },
+      });
     const { client } = makeSupabaseMock({
       createSignedUrl,
       createSignedUrls: vi.fn(),
@@ -361,12 +361,12 @@ describe('getAdjuntoSignedUrl', () => {
   });
 
   it('returns empty string when data is present but signedUrl is missing', async () => {
-    const createSignedUrl = vi.fn<
-      (path: string, expiresIn: number) => Promise<CreateSignedUrlResult>
-    >().mockResolvedValue({
-      data: null,
-      error: null,
-    });
+    const createSignedUrl = vi
+      .fn<(path: string, expiresIn: number) => Promise<CreateSignedUrlResult>>()
+      .mockResolvedValue({
+        data: null,
+        error: null,
+      });
     const { client } = makeSupabaseMock({
       createSignedUrl,
       createSignedUrls: vi.fn(),
@@ -375,18 +375,17 @@ describe('getAdjuntoSignedUrl', () => {
   });
 
   it('extracts path from a stale signed URL and re-signs it', async () => {
-    const createSignedUrl = vi.fn<
-      (path: string, expiresIn: number) => Promise<CreateSignedUrlResult>
-    >().mockResolvedValue({
-      data: { signedUrl: 'signed://fresh' },
-      error: null,
-    });
+    const createSignedUrl = vi
+      .fn<(path: string, expiresIn: number) => Promise<CreateSignedUrlResult>>()
+      .mockResolvedValue({
+        data: { signedUrl: 'signed://fresh' },
+        error: null,
+      });
     const { client } = makeSupabaseMock({
       createSignedUrl,
       createSignedUrls: vi.fn(),
     });
-    const staleUrl =
-      'https://x.supabase.co/storage/v1/object/sign/adjuntos/dilesa/a.pdf?token=OLD';
+    const staleUrl = 'https://x.supabase.co/storage/v1/object/sign/adjuntos/dilesa/a.pdf?token=OLD';
     const result = await getAdjuntoSignedUrl(client, staleUrl);
     expect(createSignedUrl).toHaveBeenCalledWith('dilesa/a.pdf', 3600);
     expect(result).toBe('signed://fresh');
@@ -419,12 +418,12 @@ describe('getAdjuntoSignedUrls', () => {
   });
 
   it('dedupes identical paths in one request', async () => {
-    const createSignedUrls = vi.fn<
-      (paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>
-    >().mockResolvedValue({
-      data: [{ path: 'a.png', signedUrl: 'signed://a' }],
-      error: null,
-    });
+    const createSignedUrls = vi
+      .fn<(paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>>()
+      .mockResolvedValue({
+        data: [{ path: 'a.png', signedUrl: 'signed://a' }],
+        error: null,
+      });
     const { client } = makeSupabaseMock({
       createSignedUrl: vi.fn(),
       createSignedUrls,
@@ -438,15 +437,15 @@ describe('getAdjuntoSignedUrls', () => {
   });
 
   it('extracts paths from mixed URL forms before calling the API', async () => {
-    const createSignedUrls = vi.fn<
-      (paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>
-    >().mockResolvedValue({
-      data: [
-        { path: 'a.png', signedUrl: 'signed://a' },
-        { path: 'b.png', signedUrl: 'signed://b' },
-      ],
-      error: null,
-    });
+    const createSignedUrls = vi
+      .fn<(paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>>()
+      .mockResolvedValue({
+        data: [
+          { path: 'a.png', signedUrl: 'signed://a' },
+          { path: 'b.png', signedUrl: 'signed://b' },
+        ],
+        error: null,
+      });
     const { client } = makeSupabaseMock({
       createSignedUrl: vi.fn(),
       createSignedUrls,
@@ -459,12 +458,12 @@ describe('getAdjuntoSignedUrls', () => {
   });
 
   it('returns an empty map when the API errors', async () => {
-    const createSignedUrls = vi.fn<
-      (paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>
-    >().mockResolvedValue({
-      data: null,
-      error: { message: 'oops' },
-    });
+    const createSignedUrls = vi
+      .fn<(paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>>()
+      .mockResolvedValue({
+        data: null,
+        error: { message: 'oops' },
+      });
     const { client } = makeSupabaseMock({
       createSignedUrl: vi.fn(),
       createSignedUrls,
@@ -474,16 +473,16 @@ describe('getAdjuntoSignedUrls', () => {
   });
 
   it('skips entries without a signedUrl in the response', async () => {
-    const createSignedUrls = vi.fn<
-      (paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>
-    >().mockResolvedValue({
-      data: [
-        { path: 'a.png', signedUrl: 'signed://a' },
-        { path: 'b.png', signedUrl: '' },
-        { path: null, signedUrl: 'signed://orphan' },
-      ],
-      error: null,
-    });
+    const createSignedUrls = vi
+      .fn<(paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>>()
+      .mockResolvedValue({
+        data: [
+          { path: 'a.png', signedUrl: 'signed://a' },
+          { path: 'b.png', signedUrl: '' },
+          { path: null, signedUrl: 'signed://orphan' },
+        ],
+        error: null,
+      });
     const { client } = makeSupabaseMock({
       createSignedUrl: vi.fn(),
       createSignedUrls,
@@ -494,12 +493,12 @@ describe('getAdjuntoSignedUrls', () => {
   });
 
   it('forwards expiresIn (default 3600s)', async () => {
-    const createSignedUrls = vi.fn<
-      (paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>
-    >().mockResolvedValue({
-      data: [{ path: 'a.png', signedUrl: 'signed://a' }],
-      error: null,
-    });
+    const createSignedUrls = vi
+      .fn<(paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>>()
+      .mockResolvedValue({
+        data: [{ path: 'a.png', signedUrl: 'signed://a' }],
+        error: null,
+      });
     const { client } = makeSupabaseMock({
       createSignedUrl: vi.fn(),
       createSignedUrls,
@@ -526,15 +525,15 @@ describe('rewriteTiptapImagesToSigned', () => {
   });
 
   it('calls the batch API exactly once for a tree with multiple images', async () => {
-    const createSignedUrls = vi.fn<
-      (paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>
-    >().mockResolvedValue({
-      data: [
-        { path: 'a.png', signedUrl: 'signed://a' },
-        { path: 'b.png', signedUrl: 'signed://b' },
-      ],
-      error: null,
-    });
+    const createSignedUrls = vi
+      .fn<(paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>>()
+      .mockResolvedValue({
+        data: [
+          { path: 'a.png', signedUrl: 'signed://a' },
+          { path: 'b.png', signedUrl: 'signed://b' },
+        ],
+        error: null,
+      });
     const { client } = makeSupabaseMock({
       createSignedUrl: vi.fn(),
       createSignedUrls,
@@ -551,15 +550,15 @@ describe('rewriteTiptapImagesToSigned', () => {
   });
 
   it('replaces image srcs with signed URLs', async () => {
-    const createSignedUrls = vi.fn<
-      (paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>
-    >().mockResolvedValue({
-      data: [
-        { path: 'a.png', signedUrl: 'signed://a' },
-        { path: 'b.png', signedUrl: 'signed://b' },
-      ],
-      error: null,
-    });
+    const createSignedUrls = vi
+      .fn<(paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>>()
+      .mockResolvedValue({
+        data: [
+          { path: 'a.png', signedUrl: 'signed://a' },
+          { path: 'b.png', signedUrl: 'signed://b' },
+        ],
+        error: null,
+      });
     const { client } = makeSupabaseMock({
       createSignedUrl: vi.fn(),
       createSignedUrls,
@@ -580,12 +579,12 @@ describe('rewriteTiptapImagesToSigned', () => {
   });
 
   it('does not mutate the original tree', async () => {
-    const createSignedUrls = vi.fn<
-      (paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>
-    >().mockResolvedValue({
-      data: [{ path: 'a.png', signedUrl: 'signed://a' }],
-      error: null,
-    });
+    const createSignedUrls = vi
+      .fn<(paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>>()
+      .mockResolvedValue({
+        data: [{ path: 'a.png', signedUrl: 'signed://a' }],
+        error: null,
+      });
     const { client } = makeSupabaseMock({
       createSignedUrl: vi.fn(),
       createSignedUrls,
@@ -600,12 +599,12 @@ describe('rewriteTiptapImagesToSigned', () => {
   });
 
   it('leaves src untouched if the batch API returns no signed URL for it', async () => {
-    const createSignedUrls = vi.fn<
-      (paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>
-    >().mockResolvedValue({
-      data: null,
-      error: { message: 'nope' },
-    });
+    const createSignedUrls = vi
+      .fn<(paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>>()
+      .mockResolvedValue({
+        data: null,
+        error: { message: 'nope' },
+      });
     const { client } = makeSupabaseMock({
       createSignedUrl: vi.fn(),
       createSignedUrls,
@@ -646,15 +645,15 @@ describe('rewriteHtmlImagesToSigned', () => {
   });
 
   it('calls the batch API exactly once even with multiple imgs', async () => {
-    const createSignedUrls = vi.fn<
-      (paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>
-    >().mockResolvedValue({
-      data: [
-        { path: 'a.png', signedUrl: 'signed://a' },
-        { path: 'b.png', signedUrl: 'signed://b' },
-      ],
-      error: null,
-    });
+    const createSignedUrls = vi
+      .fn<(paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>>()
+      .mockResolvedValue({
+        data: [
+          { path: 'a.png', signedUrl: 'signed://a' },
+          { path: 'b.png', signedUrl: 'signed://b' },
+        ],
+        error: null,
+      });
     const { client } = makeSupabaseMock({
       createSignedUrl: vi.fn(),
       createSignedUrls,
@@ -665,12 +664,12 @@ describe('rewriteHtmlImagesToSigned', () => {
   });
 
   it('rewrites img srcs to signed URLs (double-quoted)', async () => {
-    const createSignedUrls = vi.fn<
-      (paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>
-    >().mockResolvedValue({
-      data: [{ path: 'a.png', signedUrl: 'signed://a' }],
-      error: null,
-    });
+    const createSignedUrls = vi
+      .fn<(paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>>()
+      .mockResolvedValue({
+        data: [{ path: 'a.png', signedUrl: 'signed://a' }],
+        error: null,
+      });
     const { client } = makeSupabaseMock({
       createSignedUrl: vi.fn(),
       createSignedUrls,
@@ -683,12 +682,12 @@ describe('rewriteHtmlImagesToSigned', () => {
   });
 
   it('rewrites single-quoted srcs (coerced to double quotes on output)', async () => {
-    const createSignedUrls = vi.fn<
-      (paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>
-    >().mockResolvedValue({
-      data: [{ path: 'a.png', signedUrl: 'signed://a' }],
-      error: null,
-    });
+    const createSignedUrls = vi
+      .fn<(paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>>()
+      .mockResolvedValue({
+        data: [{ path: 'a.png', signedUrl: 'signed://a' }],
+        error: null,
+      });
     const { client } = makeSupabaseMock({
       createSignedUrl: vi.fn(),
       createSignedUrls,
@@ -699,12 +698,12 @@ describe('rewriteHtmlImagesToSigned', () => {
   });
 
   it('leaves src untouched when the API returns no URL for it', async () => {
-    const createSignedUrls = vi.fn<
-      (paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>
-    >().mockResolvedValue({
-      data: [],
-      error: null,
-    });
+    const createSignedUrls = vi
+      .fn<(paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>>()
+      .mockResolvedValue({
+        data: [],
+        error: null,
+      });
     const { client } = makeSupabaseMock({
       createSignedUrl: vi.fn(),
       createSignedUrls,

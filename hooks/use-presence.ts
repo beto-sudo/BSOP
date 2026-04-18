@@ -45,8 +45,7 @@ const TWO_MINUTES_MS = 2 * 60 * 1000;
 
 function isOnline(user: PresenceUser): boolean {
   return (
-    user.status !== 'offline' &&
-    Date.now() - new Date(user.last_seen_at).getTime() < TWO_MINUTES_MS
+    user.status !== 'offline' && Date.now() - new Date(user.last_seen_at).getTime() < TWO_MINUTES_MS
   );
 }
 
@@ -75,9 +74,9 @@ export function usePresence() {
     }
 
     const supabase = createSupabaseBrowserClient();
-    // eslint-disable-next-line prefer-const
+
     let heartbeat: ReturnType<typeof setInterval> | null = null;
-    // eslint-disable-next-line prefer-const
+
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
     const upsert = async (status: 'active' | 'idle' | 'offline') => {
@@ -94,7 +93,7 @@ export function usePresence() {
           last_seen_at: new Date().toISOString(),
           status,
         },
-        { onConflict: 'user_id' },
+        { onConflict: 'user_id' }
       );
     };
 
@@ -186,7 +185,7 @@ export function usePresence() {
                 return [...prev, record];
               });
             }
-          },
+          }
         )
         .subscribe();
     };
@@ -201,7 +200,6 @@ export function usePresence() {
       if (channel) void supabase.removeChannel(channel);
       void upsert('offline');
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSkipped]);
 
   // Update path + module in DB whenever the route changes
@@ -211,20 +209,32 @@ export function usePresence() {
 
     const supabase = createSupabaseBrowserClient();
     const now = new Date().toISOString();
+    // eslint-disable-next-line @next/next/no-assign-module-variable -- local const inside an effect, not a module-level reassignment
     const module = resolveModuleName(pathname);
 
     void supabase
       .from('user_presence')
-      .update({ current_path: pathname, current_module: module, last_seen_at: now, status: 'active' })
+      .update({
+        current_path: pathname,
+        current_module: module,
+        last_seen_at: now,
+        status: 'active',
+      })
       .eq('user_id', meta.userId);
 
     setCurrentUser((prev) =>
       prev
-        ? { ...prev, current_path: pathname, current_module: module, last_seen_at: now, status: 'active' }
-        : null,
+        ? {
+            ...prev,
+            current_path: pathname,
+            current_module: module,
+            last_seen_at: now,
+            status: 'active',
+          }
+        : null
     );
-  // isSkipped intentionally omitted — the main effect handles cleanup when it changes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // isSkipped intentionally omitted — the main effect handles cleanup when it changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   return { onlineUsers, currentUser, isLoading };

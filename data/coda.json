@@ -51,34 +51,19 @@
           "name": "Asignada",
           "columnCount": 84,
           "healthScore": 6,
-          "findings": [
-            "wide-table",
-            "formula-heavy",
-            "action-heavy",
-            "lookup-heavy"
-          ]
+          "findings": ["wide-table", "formula-heavy", "action-heavy", "lookup-heavy"]
         },
         {
           "name": "Avalúo Cerrado",
           "columnCount": 84,
           "healthScore": 6,
-          "findings": [
-            "wide-table",
-            "formula-heavy",
-            "action-heavy",
-            "lookup-heavy"
-          ]
+          "findings": ["wide-table", "formula-heavy", "action-heavy", "lookup-heavy"]
         },
         {
           "name": "Comisión Pagada",
           "columnCount": 84,
           "healthScore": 6,
-          "findings": [
-            "wide-table",
-            "formula-heavy",
-            "action-heavy",
-            "lookup-heavy"
-          ]
+          "findings": ["wide-table", "formula-heavy", "action-heavy", "lookup-heavy"]
         }
       ],
       "modules": [
@@ -196,47 +181,31 @@
           "name": "Personal",
           "columnCount": 59,
           "healthScore": 4,
-          "findings": [
-            "wide-table",
-            "attachment-heavy",
-            "action-heavy"
-          ]
+          "findings": ["wide-table", "attachment-heavy", "action-heavy"]
         },
         {
           "name": "Alta Personal Autos del Norte S.A. de C.V.",
           "columnCount": 47,
           "healthScore": 3,
-          "findings": [
-            "wide-table",
-            "attachment-heavy"
-          ]
+          "findings": ["wide-table", "attachment-heavy"]
         },
         {
           "name": "Baja Personal Autos del Norte S.A. de C.V.",
           "columnCount": 47,
           "healthScore": 3,
-          "findings": [
-            "wide-table",
-            "attachment-heavy"
-          ]
+          "findings": ["wide-table", "attachment-heavy"]
         },
         {
           "name": "Consulta Personal Autos del Norte S.A. de C.V.",
           "columnCount": 47,
           "healthScore": 3,
-          "findings": [
-            "wide-table",
-            "attachment-heavy"
-          ]
+          "findings": ["wide-table", "attachment-heavy"]
         },
         {
           "name": "Ex-Empleados",
           "columnCount": 48,
           "healthScore": 3,
-          "findings": [
-            "wide-table",
-            "attachment-heavy"
-          ]
+          "findings": ["wide-table", "attachment-heavy"]
         }
       ],
       "modules": [
@@ -354,37 +323,25 @@
           "name": "Avanzadas",
           "columnCount": 75,
           "healthScore": 4,
-          "findings": [
-            "wide-table",
-            "formula-heavy"
-          ]
+          "findings": ["wide-table", "formula-heavy"]
         },
         {
           "name": "Facturas Compra Unidades",
           "columnCount": 92,
           "healthScore": 4,
-          "findings": [
-            "wide-table",
-            "formula-heavy"
-          ]
+          "findings": ["wide-table", "formula-heavy"]
         },
         {
           "name": "Facturas Venta Unidades",
           "columnCount": 74,
           "healthScore": 4,
-          "findings": [
-            "wide-table",
-            "attachment-heavy",
-            "action-heavy"
-          ]
+          "findings": ["wide-table", "attachment-heavy", "action-heavy"]
         },
         {
           "name": "Carga Factura Unidades",
           "columnCount": 63,
           "healthScore": 2,
-          "findings": [
-            "wide-table"
-          ]
+          "findings": ["wide-table"]
         }
       ],
       "modules": [
@@ -490,36 +447,25 @@
           "name": "Cortes de Caja",
           "columnCount": 48,
           "healthScore": 5,
-          "findings": [
-            "wide-table",
-            "formula-heavy",
-            "action-heavy"
-          ]
+          "findings": ["wide-table", "formula-heavy", "action-heavy"]
         },
         {
           "name": "Pedidos Waitry",
           "columnCount": 42,
           "healthScore": 4,
-          "findings": [
-            "wide-table",
-            "formula-heavy"
-          ]
+          "findings": ["wide-table", "formula-heavy"]
         },
         {
           "name": "Archivo Pedidos Waitry",
           "columnCount": 42,
           "healthScore": 2,
-          "findings": [
-            "wide-table"
-          ]
+          "findings": ["wide-table"]
         },
         {
           "name": "Requisiciones de Compra",
           "columnCount": 17,
           "healthScore": 1,
-          "findings": [
-            "action-heavy"
-          ]
+          "findings": ["action-heavy"]
         },
         {
           "name": "Ajuste Inventario",
@@ -631,17 +577,13 @@
           "name": "Tipo de Ingreso",
           "columnCount": 29,
           "healthScore": 2,
-          "findings": [
-            "formula-heavy"
-          ]
+          "findings": ["formula-heavy"]
         },
         {
           "name": "Movimientos Banamex",
           "columnCount": 11,
           "healthScore": 1,
-          "findings": [
-            "action-heavy"
-          ]
+          "findings": ["action-heavy"]
         },
         {
           "name": "50/30/20 Budget",

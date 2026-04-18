@@ -76,7 +76,7 @@ async function fetchAllRows(tableId: string): Promise<CodaRow[]> {
     if (pageToken) qs.set('pageToken', pageToken);
 
     const data = await codaGet<{ items: CodaRow[]; nextPageToken?: string }>(
-      `/docs/${CODA_DOC_ID}/tables/${tableId}/rows?${qs}`,
+      `/docs/${CODA_DOC_ID}/tables/${tableId}/rows?${qs}`
     );
     rows.push(...data.items);
     pageToken = data.nextPageToken;
@@ -155,10 +155,16 @@ function markdownToHtml(md: string): string {
   for (const line of lines) {
     const listMatch = line.match(/^[\s]*[-*+]\s+(.+)$/);
     if (listMatch) {
-      if (!inList) { result.push('<ul>'); inList = true; }
+      if (!inList) {
+        result.push('<ul>');
+        inList = true;
+      }
       result.push(`<li>${listMatch[1]}</li>`);
     } else {
-      if (inList) { result.push('</ul>'); inList = false; }
+      if (inList) {
+        result.push('</ul>');
+        inList = false;
+      }
       if (line.trim() === '') {
         result.push('');
       } else if (!line.startsWith('<h')) {
@@ -235,7 +241,10 @@ async function main() {
   for (const row of rows) {
     const v = row.values;
     const titulo = str(v[COL_TITULO]);
-    if (!titulo) { skipped++; continue; }
+    if (!titulo) {
+      skipped++;
+      continue;
+    }
 
     const tipo = stripBackticks(v[COL_TIPO]);
     const fechaHora = parseDate(v[COL_FECHA]);
@@ -250,7 +259,10 @@ async function main() {
     console.log(`     Tipo: ${tipo ?? '—'} | Estado: ${estado} | Fecha: ${fechaHora ?? '—'}`);
     console.log(`     Asistentes: ${asistentesNames.length} | Tareas: ${tareasNames.length}`);
 
-    if (DRY_RUN) { created++; continue; }
+    if (DRY_RUN) {
+      created++;
+      continue;
+    }
 
     // Insert junta
     const { data: juntaData, error: jErr } = await supabase

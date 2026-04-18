@@ -34,7 +34,11 @@ export default async function HealthPage({
     <RequireAccess empresa="familia">
       <ContentShell>
         <div className="mb-6">
-          <HealthRangeSelector initialPreset={data.range.preset} initialFrom={data.range.requestedFrom} initialTo={data.range.requestedTo} />
+          <HealthRangeSelector
+            initialPreset={data.range.preset}
+            initialFrom={data.range.requestedFrom}
+            initialTo={data.range.requestedTo}
+          />
         </div>
 
         <HealthDashboardView {...data} />

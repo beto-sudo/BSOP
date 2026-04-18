@@ -3,7 +3,8 @@ import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 
 const TRIP_SLUG = 'baja-etapa-1';
-const TSV_PATH = '/Users/Beto/.openclaw/workspace/travel/2026-02-baja-etapa-1/04-bookings/gastos.tsv';
+const TSV_PATH =
+  '/Users/Beto/.openclaw/workspace/travel/2026-02-baja-etapa-1/04-bookings/gastos.tsv';
 const ENV_PATH = path.join(process.cwd(), '.env.local');
 
 function loadEnvFile(filePath: string) {
@@ -15,7 +16,10 @@ function loadEnvFile(filePath: string) {
     if (eqIndex === -1) continue;
     const key = line.slice(0, eqIndex).trim();
     let value = line.slice(eqIndex + 1).trim();
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
       value = value.slice(1, -1);
     }
     if (!(key in process.env)) process.env[key] = value;
@@ -71,7 +75,9 @@ function parseTsv(tsv: string): RawExpense[] {
     const currency = (monedaOriginal?.trim() || 'MXN') as 'MXN' | 'USD';
     const exchangeRate = currency === 'USD' ? parseNumber(tipoCambioRef || '17.5') || 17.5 : 1;
     const amount = parseNumber(montoOriginal);
-    const baseAmount = parseNumber(montoBase) || Number((currency === 'USD' ? amount * exchangeRate : amount).toFixed(2));
+    const baseAmount =
+      parseNumber(montoBase) ||
+      Number((currency === 'USD' ? amount * exchangeRate : amount).toFixed(2));
 
     return {
       expense_date: fecha.trim(),
@@ -84,7 +90,10 @@ function parseTsv(tsv: string): RawExpense[] {
       base_amount: baseAmount,
       payer_name: pago.trim() as 'Beto' | 'Memo' | 'Cuate',
       notes: notas?.trim() ? notas.trim() : null,
-      participants: (participantes || '').split('|').map((item) => item.trim()).filter(Boolean),
+      participants: (participantes || '')
+        .split('|')
+        .map((item) => item.trim())
+        .filter(Boolean),
     };
   });
 }
@@ -96,7 +105,9 @@ async function main() {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Faltan NEXT_PUBLIC_SUPABASE_URL y/o NEXT_PUBLIC_SUPABASE_ANON_KEY en .env.local');
+    throw new Error(
+      'Faltan NEXT_PUBLIC_SUPABASE_URL y/o NEXT_PUBLIC_SUPABASE_ANON_KEY en .env.local'
+    );
   }
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -117,8 +128,12 @@ async function main() {
 
   if (fetchParticipantsError) throw fetchParticipantsError;
 
-  const existingParticipantMap = new Map((existingParticipants ?? []).map((item) => [item.name, item.id]));
-  const missingParticipants = participantSeed.filter((participant) => !existingParticipantMap.has(participant.name));
+  const existingParticipantMap = new Map(
+    (existingParticipants ?? []).map((item) => [item.name, item.id])
+  );
+  const missingParticipants = participantSeed.filter(
+    (participant) => !existingParticipantMap.has(participant.name)
+  );
 
   if (missingParticipants.length) {
     const { error: insertParticipantsError } = await supabase.from('trip_participants').insert(
@@ -126,7 +141,7 @@ async function main() {
         trip_slug: TRIP_SLUG,
         name: participant.name,
         emoji: participant.emoji,
-      })),
+      }))
     );
 
     if (insertParticipantsError) throw insertParticipantsError;
@@ -150,10 +165,16 @@ async function main() {
 
   const existingExpenseIds = (existingExpenses ?? []).map((item) => item.id);
   if (existingExpenseIds.length) {
-    const { error: deleteSplitsError } = await supabase.from('expense_splits').delete().in('expense_id', existingExpenseIds);
+    const { error: deleteSplitsError } = await supabase
+      .from('expense_splits')
+      .delete()
+      .in('expense_id', existingExpenseIds);
     if (deleteSplitsError) throw deleteSplitsError;
 
-    const { error: deleteExpensesError } = await supabase.from('trip_expenses').delete().eq('trip_slug', TRIP_SLUG);
+    const { error: deleteExpensesError } = await supabase
+      .from('trip_expenses')
+      .delete()
+      .eq('trip_slug', TRIP_SLUG);
     if (deleteExpensesError) throw deleteExpensesError;
   }
 

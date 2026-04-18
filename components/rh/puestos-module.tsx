@@ -685,9 +685,7 @@ export function PuestosModule({
                       </TableCell>
                     )}
                     <TableCell>
-                      <span className="text-sm text-[var(--text)]/70">
-                        {p.esquema_pago ?? '—'}
-                      </span>
+                      <span className="text-sm text-[var(--text)]/70">{p.esquema_pago ?? '—'}</span>
                     </TableCell>
                     <TableCell>
                       <span

@@ -10,22 +10,36 @@ const supabase = createClient(
 const orderId = '16862115';
 
 const { data: pedido } = await supabase
-  .schema('rdb').from('waitry_pedidos').select('*').eq('order_id', orderId).single();
+  .schema('rdb')
+  .from('waitry_pedidos')
+  .select('*')
+  .eq('order_id', orderId)
+  .single();
 console.log('=== PEDIDO ===');
 console.log(JSON.stringify(pedido, null, 2));
 
 const { data: productos } = await supabase
-  .schema('rdb').from('waitry_productos').select('*').eq('order_id', orderId);
+  .schema('rdb')
+  .from('waitry_productos')
+  .select('*')
+  .eq('order_id', orderId);
 console.log('\n=== PRODUCTOS ===');
 console.log(JSON.stringify(productos, null, 2));
 
 const { data: pagos } = await supabase
-  .schema('rdb').from('waitry_pagos').select('*').eq('order_id', orderId);
+  .schema('rdb')
+  .from('waitry_pagos')
+  .select('*')
+  .eq('order_id', orderId);
 console.log('\n=== PAGOS ===');
 console.log(JSON.stringify(pagos, null, 2));
 
 const { data: inbound } = await supabase
-  .schema('rdb').from('waitry_inbound').select('*').textSearch('payload', orderId).limit(20);
+  .schema('rdb')
+  .from('waitry_inbound')
+  .select('*')
+  .textSearch('payload', orderId)
+  .limit(20);
 console.log('\n=== INBOUND (' + (inbound?.length ?? 0) + ' rows) ===');
 if (inbound) {
   for (const row of inbound) {

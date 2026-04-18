@@ -8,7 +8,12 @@ import type { ChartConfig } from './types';
 
 export function TrendCard({ config, onExpand }: { config: ChartConfig; onExpand: () => void }) {
   const stats = getStats(config.data);
-  const latestLabel = stats?.latest == null ? '—' : (config.formatter ? config.formatter(stats.latest) : formatMetricValue(stats.latest, config.unit === 'hr' ? 1 : 0));
+  const latestLabel =
+    stats?.latest == null
+      ? '—'
+      : config.formatter
+        ? config.formatter(stats.latest)
+        : formatMetricValue(stats.latest, config.unit === 'hr' ? 1 : 0);
   const tone = TONES[config.key];
   const Icon = config.icon;
 
@@ -22,15 +27,21 @@ export function TrendCard({ config, onExpand }: { config: ChartConfig; onExpand:
             </div>
             <div>
               <h2 className="text-lg font-semibold">{config.title}</h2>
-              <p className="mt-1 text-xs text-[var(--muted-foreground)] dark:text-white/45">Click to expand</p>
+              <p className="mt-1 text-xs text-[var(--muted-foreground)] dark:text-white/45">
+                Click to expand
+              </p>
             </div>
           </div>
         </div>
         {config.data.length ? (
           <>
             <div className="mb-4 flex items-end gap-2">
-              <div className="text-2xl font-semibold text-[var(--text)] dark:text-white">{latestLabel}</div>
-              <div className="pb-1 text-sm text-[var(--muted-foreground)] dark:text-white/45">{config.unit}</div>
+              <div className="text-2xl font-semibold text-[var(--text)] dark:text-white">
+                {latestLabel}
+              </div>
+              <div className="pb-1 text-sm text-[var(--muted-foreground)] dark:text-white/45">
+                {config.unit}
+              </div>
             </div>
             <TrendSvg config={config} />
           </>

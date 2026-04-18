@@ -21,19 +21,29 @@ test.describe('RH › Empleados', () => {
   // ── Page structure ────────────────────────────────────────────────────────
 
   test('page renders without crash', async ({ page }) => {
-    await expect(page.locator('[data-nextjs-dialog]')).not.toBeVisible({ timeout: 3000 }).catch(() => {});
+    await expect(page.locator('[data-nextjs-dialog]'))
+      .not.toBeVisible({ timeout: 3000 })
+      .catch(() => {});
     const bodyText = await page.evaluate(() => document.body.innerText.trim());
     expect(bodyText.length).toBeGreaterThan(0);
   });
 
   test('has a search input', async ({ page }) => {
-    await page.locator('[class*="skeleton"]').first().waitFor({ state: 'hidden', timeout: 6000 }).catch(() => {});
+    await page
+      .locator('[class*="skeleton"]')
+      .first()
+      .waitFor({ state: 'hidden', timeout: 6000 })
+      .catch(() => {});
     const input = page.locator('input[placeholder]').first();
     await expect(input).toBeVisible({ timeout: 5000 });
   });
 
   test('has a refresh button', async ({ page }) => {
-    await page.locator('[class*="skeleton"]').first().waitFor({ state: 'hidden', timeout: 6000 }).catch(() => {});
+    await page
+      .locator('[class*="skeleton"]')
+      .first()
+      .waitFor({ state: 'hidden', timeout: 6000 })
+      .catch(() => {});
     const iconButtons = page.locator('button').filter({ has: page.locator('svg') });
     await expect(iconButtons.first()).toBeVisible({ timeout: 5000 });
   });
@@ -41,9 +51,12 @@ test.describe('RH › Empleados', () => {
   test('has a "Nuevo empleado" / create button', async ({ page }) => {
     await page.waitForTimeout(2000);
     // The + button or a button with Plus icon
-    const createBtn = page.locator('button').filter({ has: page.locator('svg') }).filter({
-      hasText: /nuevo|agregar|add|crear/i,
-    });
+    const createBtn = page
+      .locator('button')
+      .filter({ has: page.locator('svg') })
+      .filter({
+        hasText: /nuevo|agregar|add|crear/i,
+      });
     const iconOnlyPlusBtn = page.locator('button').filter({ has: page.locator('svg') });
 
     // At least one button with an SVG should exist
@@ -55,10 +68,7 @@ test.describe('RH › Empleados', () => {
     const table = page.locator('table');
     const denied = page.getByText('Acceso restringido');
 
-    const [tableCount, deniedCount] = await Promise.all([
-      table.count(),
-      denied.count(),
-    ]);
+    const [tableCount, deniedCount] = await Promise.all([table.count(), denied.count()]);
     expect(tableCount + deniedCount).toBeGreaterThan(0);
   });
 
@@ -74,7 +84,9 @@ test.describe('RH › Empleados', () => {
     await page.waitForTimeout(600);
     const rows = await page.locator('table tbody tr').count();
     // Could be 0 (filtered out) or a "no results" message
-    const noResults = await page.getByText(/sin resultados|no hay|no employees|0 empleados/i).count();
+    const noResults = await page
+      .getByText(/sin resultados|no hay|no employees|0 empleados/i)
+      .count();
     expect(rows === 0 || noResults > 0 || rows >= 0).toBeTruthy();
   });
 

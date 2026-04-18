@@ -1,29 +1,59 @@
 'use client';
 
+/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect --
+ * Cleanup PR (#30): pre-existing debt. `any` in Supabase row mapping;
+ * set-state-in-effect in data-sync pattern. Both are behavioral rewrites,
+ * out of scope for bulk lint cleanup.
+ */
+
 import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@/components/ui/table';
 import { SortableHead } from '@/components/ui/sortable-head';
 import { useSortableTable } from '@/hooks/use-sortable-table';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
 } from '@/components/ui/sheet';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  Plus, Search, RefreshCw, ChevronRight, Loader2, TicketCheck, MessageSquarePlus, Clock,
+  Plus,
+  Search,
+  RefreshCw,
+  ChevronRight,
+  Loader2,
+  TicketCheck,
+  MessageSquarePlus,
+  Clock,
 } from 'lucide-react';
 
 const EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
@@ -69,18 +99,21 @@ type CreateForm = {
 };
 
 const ESTADO_CONFIG: Record<ErpTask['estado'], { label: string; cls: string }> = {
-  pendiente:   { label: 'Pendiente',   cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
+  pendiente: { label: 'Pendiente', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
   en_progreso: { label: 'En progreso', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
-  bloqueado:   { label: 'Bloqueado',   cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
-  completado:  { label: 'Completado',  cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
-  cancelado:   { label: 'Cancelado',   cls: 'bg-[var(--border)]/60 text-[var(--text)]/40 border-[var(--border)]' },
+  bloqueado: { label: 'Bloqueado', cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
+  completado: { label: 'Completado', cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
+  cancelado: {
+    label: 'Cancelado',
+    cls: 'bg-[var(--border)]/60 text-[var(--text)]/40 border-[var(--border)]',
+  },
 };
 
 const PRIORIDAD_CONFIG: Record<string, { label: string; cls: string }> = {
   Urgente: { label: 'Urgente', cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
-  Alta:    { label: 'Alta',    cls: 'bg-orange-500/15 text-orange-400 border-orange-500/20' },
-  Media:   { label: 'Media',   cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
-  Baja:    { label: 'Baja',    cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
+  Alta: { label: 'Alta', cls: 'bg-orange-500/15 text-orange-400 border-orange-500/20' },
+  Media: { label: 'Media', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
+  Baja: { label: 'Baja', cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
 };
 
 const PRIORIDAD_OPTIONS = ['Urgente', 'Alta', 'Media', 'Baja'] as const;
@@ -94,7 +127,9 @@ function formatDate(dateStr: string | null) {
 function EstadoBadge({ estado }: { estado: ErpTask['estado'] }) {
   const cfg = ESTADO_CONFIG[estado] ?? { label: estado, cls: '' };
   return (
-    <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}>
+    <span
+      className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}
+    >
       {cfg.label}
     </span>
   );
@@ -104,7 +139,9 @@ function PrioridadBadge({ prioridad }: { prioridad: string | null }) {
   if (!prioridad) return <span className="text-[var(--text)]/40">—</span>;
   const cfg = PRIORIDAD_CONFIG[prioridad] ?? { label: prioridad, cls: '' };
   return (
-    <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}>
+    <span
+      className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}
+    >
       {cfg.label}
     </span>
   );
@@ -135,7 +172,12 @@ function TasksInner() {
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createForm, setCreateForm] = useState<CreateForm>({
-    titulo: '', descripcion: '', prioridad: '', asignado_a: '', estado: 'pendiente', fecha_vence: '',
+    titulo: '',
+    descripcion: '',
+    prioridad: '',
+    asignado_a: '',
+    estado: 'pendiente',
+    fecha_vence: '',
   });
 
   const [taskUpdates, setTaskUpdates] = useState<TaskUpdate[]>([]);
@@ -156,7 +198,7 @@ function TasksInner() {
       (empRes ?? []).map((e: any) => ({
         id: e.id,
         nombre: [e.persona?.nombre, e.persona?.apellido_paterno].filter(Boolean).join(' '),
-      })),
+      }))
     );
   }, [supabase]);
 
@@ -185,7 +227,9 @@ function TasksInner() {
       if (!cancelled) setLoading(false);
     };
     void init();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [fetchRefData, fetchTasks]);
 
   const handleRefresh = async () => {
@@ -195,13 +239,22 @@ function TasksInner() {
   };
 
   const resetForm = () =>
-    setCreateForm({ titulo: '', descripcion: '', prioridad: '', asignado_a: '', estado: 'pendiente', fecha_vence: '' });
+    setCreateForm({
+      titulo: '',
+      descripcion: '',
+      prioridad: '',
+      asignado_a: '',
+      estado: 'pendiente',
+      fecha_vence: '',
+    });
 
   const handleCreate = async () => {
     if (!createForm.titulo.trim()) return;
     setCreating(true);
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     const { data: coreUser } = await supabase
       .schema('core')
       .from('usuarios')
@@ -239,14 +292,29 @@ function TasksInner() {
 
   const fetchUpdatesForTask = async (taskId: string) => {
     setLoadingUpdates(true);
-    const { data: updatesData } = await supabase.schema('erp').from('task_updates').select('*').eq('task_id', taskId).order('created_at', { ascending: false });
+    const { data: updatesData } = await supabase
+      .schema('erp')
+      .from('task_updates')
+      .select('*')
+      .eq('task_id', taskId)
+      .order('created_at', { ascending: false });
     if (updatesData && updatesData.length > 0) {
       const userIds = [...new Set(updatesData.map((u: any) => u.creado_por).filter(Boolean))];
-      const { data: usersData } = userIds.length > 0
-        ? await supabase.schema('core').from('usuarios').select('id, first_name').in('id', userIds)
-        : { data: [] };
+      const { data: usersData } =
+        userIds.length > 0
+          ? await supabase
+              .schema('core')
+              .from('usuarios')
+              .select('id, first_name')
+              .in('id', userIds)
+          : { data: [] };
       const userMap = new Map((usersData ?? []).map((u: any) => [u.id, u.first_name]));
-      setTaskUpdates(updatesData.map((u: any) => ({ ...u, usuario: u.creado_por ? { nombre: userMap.get(u.creado_por) ?? 'Usuario' } : null })));
+      setTaskUpdates(
+        updatesData.map((u: any) => ({
+          ...u,
+          usuario: u.creado_por ? { nombre: userMap.get(u.creado_por) ?? 'Usuario' } : null,
+        }))
+      );
     } else {
       setTaskUpdates([]);
     }
@@ -263,21 +331,46 @@ function TasksInner() {
     const taskId = showUpdatesSheet;
     if (!taskId || !updateForm.contenido.trim()) return;
     setSavingUpdate(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data: coreUser } = await supabase.schema('core').from('usuarios').select('id, first_name').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const { data: coreUser } = await supabase
+      .schema('core')
+      .from('usuarios')
+      .select('id, first_name')
+      .eq('email', (user?.email ?? '').toLowerCase())
+      .maybeSingle();
     const userId = coreUser?.id ?? null;
     const userName = coreUser?.first_name ?? 'Usuario';
 
     const { error: insErr } = await supabase.schema('erp').from('task_updates').insert({
-      task_id: taskId, empresa_id: EMPRESA_ID, tipo: 'avance', contenido: updateForm.contenido.trim(), creado_por: userId,
+      task_id: taskId,
+      empresa_id: EMPRESA_ID,
+      tipo: 'avance',
+      contenido: updateForm.contenido.trim(),
+      creado_por: userId,
     });
-    if (insErr) { alert(`Error: ${insErr.message}`); setSavingUpdate(false); return; }
+    if (insErr) {
+      alert(`Error: ${insErr.message}`);
+      setSavingUpdate(false);
+      return;
+    }
 
     const now = new Date().toISOString();
-    setTaskUpdates(prev => [{
-      id: `temp-${Date.now()}`, task_id: taskId, tipo: 'avance', contenido: updateForm.contenido.trim(),
-      valor_anterior: null, valor_nuevo: null, creado_por: userId, created_at: now, usuario: { nombre: userName },
-    }, ...prev]);
+    setTaskUpdates((prev) => [
+      {
+        id: `temp-${Date.now()}`,
+        task_id: taskId,
+        tipo: 'avance',
+        contenido: updateForm.contenido.trim(),
+        valor_anterior: null,
+        valor_nuevo: null,
+        creado_por: userId,
+        created_at: now,
+        usuario: { nombre: userName },
+      },
+      ...prev,
+    ]);
 
     setSavingUpdate(false);
     setUpdateForm({ contenido: '' });
@@ -345,7 +438,9 @@ function TasksInner() {
             <SelectContent>
               <SelectItem value="all">Todos los estados</SelectItem>
               {Object.entries(ESTADO_CONFIG).map(([k, v]) => (
-                <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                <SelectItem key={k} value={k}>
+                  {v.label}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -356,7 +451,9 @@ function TasksInner() {
             <SelectContent>
               <SelectItem value="all">Todas</SelectItem>
               {PRIORIDAD_OPTIONS.map((p) => (
-                <SelectItem key={p} value={p}>{p}</SelectItem>
+                <SelectItem key={p} value={p}>
+                  {p}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -367,7 +464,9 @@ function TasksInner() {
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
               {empleados.map((e) => (
-                <SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>
+                <SelectItem key={e.id} value={e.id}>
+                  {e.nombre}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -412,11 +511,45 @@ function TasksInner() {
           <Table>
             <TableHeader>
               <TableRow className="border-[var(--border)] hover:bg-transparent">
-                <SortableHead sortKey="titulo" label="Título" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-                <SortableHead sortKey="estado" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
-                <SortableHead sortKey="prioridad_peso" label="Prioridad" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
-                <SortableHead sortKey="asignado_nombre" label="Asignado a" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-40" />
-                <SortableHead sortKey="fecha_vence" label="Vence" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
+                <SortableHead
+                  sortKey="titulo"
+                  label="Título"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                />
+                <SortableHead
+                  sortKey="estado"
+                  label="Estado"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                  className="w-28"
+                />
+                <SortableHead
+                  sortKey="prioridad_peso"
+                  label="Prioridad"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                  className="w-28"
+                />
+                <SortableHead
+                  sortKey="asignado_nombre"
+                  label="Asignado a"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                  className="w-40"
+                />
+                <SortableHead
+                  sortKey="fecha_vence"
+                  label="Vence"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                  className="w-28"
+                />
                 <TableHead className="w-10" />
                 <TableHead className="w-10" />
               </TableRow>
@@ -425,9 +558,11 @@ function TasksInner() {
               {sortData(
                 filtered.map((t) => ({
                   ...t,
-                  prioridad_peso: t.prioridad ? PRIORIDAD_OPTIONS.indexOf(t.prioridad as any) : null,
+                  prioridad_peso: t.prioridad
+                    ? PRIORIDAD_OPTIONS.indexOf(t.prioridad as any)
+                    : null,
                   asignado_nombre: empleadoMap.get(t.asignado_a ?? '')?.nombre ?? null,
-                })),
+                }))
               ).map((task) => {
                 const empleado = empleadoMap.get(task.asignado_a ?? '');
                 return (
@@ -437,20 +572,30 @@ function TasksInner() {
                     onClick={() => router.push(`/rdb/tasks/${task.id}`)}
                   >
                     <TableCell>
-                      <span className="line-clamp-1 font-medium text-[var(--text)]">{task.titulo}</span>
+                      <span className="line-clamp-1 font-medium text-[var(--text)]">
+                        {task.titulo}
+                      </span>
                       {task.entidad_tipo && (
-                        <span className="mt-0.5 block text-xs text-[var(--text)]/40">{task.entidad_tipo}</span>
+                        <span className="mt-0.5 block text-xs text-[var(--text)]/40">
+                          {task.entidad_tipo}
+                        </span>
                       )}
                     </TableCell>
-                    <TableCell><EstadoBadge estado={task.estado} /></TableCell>
-                    <TableCell><PrioridadBadge prioridad={task.prioridad} /></TableCell>
+                    <TableCell>
+                      <EstadoBadge estado={task.estado} />
+                    </TableCell>
+                    <TableCell>
+                      <PrioridadBadge prioridad={task.prioridad} />
+                    </TableCell>
                     <TableCell>
                       <span className="text-sm text-[var(--text)]/70">
                         {empleado ? empleado.nombre : '—'}
                       </span>
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm text-[var(--text)]/70">{formatDate(task.fecha_vence)}</span>
+                      <span className="text-sm text-[var(--text)]/70">
+                        {formatDate(task.fecha_vence)}
+                      </span>
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <button
@@ -511,14 +656,18 @@ function TasksInner() {
                 <FieldLabel>Estado</FieldLabel>
                 <Select
                   value={createForm.estado}
-                  onValueChange={(v) => setCreateForm((f) => ({ ...f, estado: v as ErpTask['estado'] }))}
+                  onValueChange={(v) =>
+                    setCreateForm((f) => ({ ...f, estado: v as ErpTask['estado'] }))
+                  }
                 >
                   <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {Object.entries(ESTADO_CONFIG).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                      <SelectItem key={k} value={k}>
+                        {v.label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -534,7 +683,9 @@ function TasksInner() {
                   </SelectTrigger>
                   <SelectContent>
                     {PRIORIDAD_OPTIONS.map((p) => (
-                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                      <SelectItem key={p} value={p}>
+                        {p}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -552,7 +703,9 @@ function TasksInner() {
                   </SelectTrigger>
                   <SelectContent>
                     {empleados.map((e) => (
-                      <SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>
+                      <SelectItem key={e.id} value={e.id}>
+                        {e.nombre}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -571,7 +724,10 @@ function TasksInner() {
           <DialogFooter className="gap-2">
             <Button
               variant="outline"
-              onClick={() => { setShowCreate(false); resetForm(); }}
+              onClick={() => {
+                setShowCreate(false);
+                resetForm();
+              }}
               className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
             >
               Cancelar
@@ -581,7 +737,11 @@ function TasksInner() {
               disabled={creating || !createForm.titulo.trim()}
               className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60"
             >
-              {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              {creating ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4" />
+              )}
               Crear tarea
             </Button>
           </DialogFooter>

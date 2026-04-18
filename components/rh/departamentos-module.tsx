@@ -40,13 +40,7 @@ import {
 } from '@/components/ui/table';
 import { SortableHead } from '@/components/ui/sortable-head';
 import { useSortableTable } from '@/hooks/use-sortable-table';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetFooter,
-} from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet';
 import {
   Dialog,
   DialogContent,
@@ -190,9 +184,7 @@ export function DepartamentosModule({
       const deptQuery = supabase
         .schema('erp')
         .from('departamentos')
-        .select(
-          'id, empresa_id, nombre, codigo, padre_id, activo, padre:padre_id(nombre)'
-        )
+        .select('id, empresa_id, nombre, codigo, padre_id, activo, padre:padre_id(nombre)')
         .in('empresa_id', ids)
         .is('deleted_at', null)
         .order('nombre');
@@ -526,9 +518,7 @@ export function DepartamentosModule({
                     </span>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm text-[var(--text)]/70">
-                      {d.padre?.nombre ?? '—'}
-                    </span>
+                    <span className="text-sm text-[var(--text)]/70">{d.padre?.nombre ?? '—'}</span>
                   </TableCell>
                   {showEmpleadosCount && (
                     <TableCell>
@@ -578,9 +568,7 @@ export function DepartamentosModule({
             className="w-full max-w-md border-[var(--border)] bg-[var(--card)] text-[var(--text)]"
           >
             <SheetHeader>
-              <SheetTitle>
-                {editingId ? 'Editar departamento' : 'Nuevo departamento'}
-              </SheetTitle>
+              <SheetTitle>{editingId ? 'Editar departamento' : 'Nuevo departamento'}</SheetTitle>
             </SheetHeader>
             {FormBody}
             <SheetFooter className="gap-2">{FormActions}</SheetFooter>
@@ -590,9 +578,7 @@ export function DepartamentosModule({
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
           <DialogContent className="max-w-md rounded-3xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
             <DialogHeader>
-              <DialogTitle>
-                {editingId ? 'Editar departamento' : 'Nuevo departamento'}
-              </DialogTitle>
+              <DialogTitle>{editingId ? 'Editar departamento' : 'Nuevo departamento'}</DialogTitle>
             </DialogHeader>
             {FormBody}
             <DialogFooter className="gap-2">{FormActions}</DialogFooter>

@@ -9,21 +9,23 @@ import type { Json } from '@/types/supabase';
 // defend against malformed individual rows with runtime type guards.
 // The payload wrapper is optional (some clients POST the `data` object
 // at the root; others nest under `data`).
-const HealthIngestEnvelopeSchema = z.object({
-  data: z
-    .object({
-      metrics: z.array(z.unknown()).optional(),
-      workouts: z.array(z.unknown()).optional(),
-      ecg: z.array(z.unknown()).optional(),
-      medications: z.array(z.unknown()).optional(),
-    })
-    .passthrough()
-    .optional(),
-  metrics: z.array(z.unknown()).optional(),
-  workouts: z.array(z.unknown()).optional(),
-  ecg: z.array(z.unknown()).optional(),
-  medications: z.array(z.unknown()).optional(),
-}).passthrough();
+const HealthIngestEnvelopeSchema = z
+  .object({
+    data: z
+      .object({
+        metrics: z.array(z.unknown()).optional(),
+        workouts: z.array(z.unknown()).optional(),
+        ecg: z.array(z.unknown()).optional(),
+        medications: z.array(z.unknown()).optional(),
+      })
+      .passthrough()
+      .optional(),
+    metrics: z.array(z.unknown()).optional(),
+    workouts: z.array(z.unknown()).optional(),
+    ecg: z.array(z.unknown()).optional(),
+    medications: z.array(z.unknown()).optional(),
+  })
+  .passthrough();
 
 // Hard limit on raw payload size. Apple Health Auto Export usually sends
 // under 1 MB per batch. 5 MB gives ample headroom while rejecting
@@ -111,7 +113,7 @@ const METRIC_FIELD_MAP: Record<string, string[]> = {
   'Mindful Minutes': ['qty'],
   'Six Minute Walking Test Distance': ['qty'],
   'Breathing Disturbances': ['qty'],
-  'Height': ['qty'],
+  Height: ['qty'],
   test: ['qty'],
 };
 
@@ -144,7 +146,13 @@ function parseDate(value: unknown) {
 }
 
 function normalizeMetricRecords(metrics: unknown[]) {
-  const records: Array<{ metric_name: string; date: string; value: number; unit: string | null; source: string | null }> = [];
+  const records: Array<{
+    metric_name: string;
+    date: string;
+    value: number;
+    unit: string | null;
+    source: string | null;
+  }> = [];
 
   metrics.forEach((metricEntry) => {
     if (!metricEntry || typeof metricEntry !== 'object') return;
@@ -154,7 +162,10 @@ function normalizeMetricRecords(metrics: unknown[]) {
     const normalizedName = metricName ? (METRIC_NAME_NORMALIZE[metricName] ?? metricName) : null;
     const unit = typeof entry.units === 'string' ? entry.units : null;
     const data = Array.isArray(entry.data) ? entry.data : [];
-    const fields = normalizedName ? (METRIC_FIELD_MAP[normalizedName] ?? (metricName ? METRIC_FIELD_MAP[metricName] : undefined) ?? ['qty']) : ['qty'];
+    const fields = normalizedName
+      ? (METRIC_FIELD_MAP[normalizedName] ??
+        (metricName ? METRIC_FIELD_MAP[metricName] : undefined) ?? ['qty'])
+      : ['qty'];
 
     if (!normalizedName) return;
 
@@ -166,16 +177,33 @@ function normalizeMetricRecords(metrics: unknown[]) {
       const row = sample as Record<string, unknown>;
       const date = parseDate(row.date ?? row.startDate ?? row.sleepStart ?? row.start);
       if (!date) return;
-      const sampleSource = typeof row.source === 'string' ? row.source : (typeof entry.source === 'string' ? entry.source : 'Health Auto Export');
+      const sampleSource =
+        typeof row.source === 'string'
+          ? row.source
+          : typeof entry.source === 'string'
+            ? entry.source
+            : 'Health Auto Export';
 
       if (isBloodPressure) {
         const systolic = parseNumber(row.systolic);
         const diastolic = parseNumber(row.diastolic);
         if (systolic != null) {
-          records.push({ metric_name: 'Blood Pressure Systolic', date, value: systolic, unit: 'mmHg', source: sampleSource });
+          records.push({
+            metric_name: 'Blood Pressure Systolic',
+            date,
+            value: systolic,
+            unit: 'mmHg',
+            source: sampleSource,
+          });
         }
         if (diastolic != null) {
-          records.push({ metric_name: 'Blood Pressure Diastolic', date, value: diastolic, unit: 'mmHg', source: sampleSource });
+          records.push({
+            metric_name: 'Blood Pressure Diastolic',
+            date,
+            value: diastolic,
+            unit: 'mmHg',
+            source: sampleSource,
+          });
         }
         return;
       }
@@ -218,27 +246,59 @@ function normalizeWorkouts(workouts: unknown[]) {
     if (!name || !start_time) return [];
 
     const durationSeconds = parseNumber(row.duration);
-    const distance = row.distance && typeof row.distance === 'object' ? (row.distance as Record<string, unknown>) : null;
-    const totalEnergy = row.totalEnergy && typeof row.totalEnergy === 'object' ? (row.totalEnergy as Record<string, unknown>) : null;
-    const activeEnergy = row.activeEnergyBurned && typeof row.activeEnergyBurned === 'object' ? (row.activeEnergyBurned as Record<string, unknown>) : null;
-    const avgHeartRate = row.avgHeartRate && typeof row.avgHeartRate === 'object' ? (row.avgHeartRate as Record<string, unknown>) : null;
-    const maxHeartRate = row.maxHeartRate && typeof row.maxHeartRate === 'object' ? (row.maxHeartRate as Record<string, unknown>) : null;
-    const heartRate = row.heartRate && typeof row.heartRate === 'object' ? (row.heartRate as Record<string, unknown>) : null;
+    const distance =
+      row.distance && typeof row.distance === 'object'
+        ? (row.distance as Record<string, unknown>)
+        : null;
+    const totalEnergy =
+      row.totalEnergy && typeof row.totalEnergy === 'object'
+        ? (row.totalEnergy as Record<string, unknown>)
+        : null;
+    const activeEnergy =
+      row.activeEnergyBurned && typeof row.activeEnergyBurned === 'object'
+        ? (row.activeEnergyBurned as Record<string, unknown>)
+        : null;
+    const avgHeartRate =
+      row.avgHeartRate && typeof row.avgHeartRate === 'object'
+        ? (row.avgHeartRate as Record<string, unknown>)
+        : null;
+    const maxHeartRate =
+      row.maxHeartRate && typeof row.maxHeartRate === 'object'
+        ? (row.maxHeartRate as Record<string, unknown>)
+        : null;
+    const heartRate =
+      row.heartRate && typeof row.heartRate === 'object'
+        ? (row.heartRate as Record<string, unknown>)
+        : null;
 
     const energyQty = parseNumber(totalEnergy?.qty) ?? parseNumber(activeEnergy?.qty);
 
-    return [{
-      name,
-      start_time,
-      end_time: parseDate(row.end),
-      duration_minutes: durationSeconds == null ? null : durationSeconds / 60,
-      distance_km: toKilometers(parseNumber(distance?.qty), distance?.units),
-      energy_kcal: toKilocalories(energyQty, totalEnergy?.units ?? activeEnergy?.units),
-      heart_rate_avg: parseNumber(avgHeartRate?.qty) ?? parseNumber(heartRate?.avg && typeof heartRate.avg === 'object' ? (heartRate.avg as Record<string, unknown>).qty : null),
-      heart_rate_max: parseNumber(maxHeartRate?.qty) ?? parseNumber(heartRate?.max && typeof heartRate.max === 'object' ? (heartRate.max as Record<string, unknown>).qty : null),
-      source: typeof row.source === 'string' ? row.source : 'Health Auto Export',
-      raw_json: row as Json,
-    }];
+    return [
+      {
+        name,
+        start_time,
+        end_time: parseDate(row.end),
+        duration_minutes: durationSeconds == null ? null : durationSeconds / 60,
+        distance_km: toKilometers(parseNumber(distance?.qty), distance?.units),
+        energy_kcal: toKilocalories(energyQty, totalEnergy?.units ?? activeEnergy?.units),
+        heart_rate_avg:
+          parseNumber(avgHeartRate?.qty) ??
+          parseNumber(
+            heartRate?.avg && typeof heartRate.avg === 'object'
+              ? (heartRate.avg as Record<string, unknown>).qty
+              : null
+          ),
+        heart_rate_max:
+          parseNumber(maxHeartRate?.qty) ??
+          parseNumber(
+            heartRate?.max && typeof heartRate.max === 'object'
+              ? (heartRate.max as Record<string, unknown>).qty
+              : null
+          ),
+        source: typeof row.source === 'string' ? row.source : 'Health Auto Export',
+        raw_json: row as Json,
+      },
+    ];
   });
 }
 
@@ -249,12 +309,14 @@ function normalizeEcg(ecg: unknown[]) {
     const date = parseDate(row.start ?? row.date);
     if (!date) return [];
 
-    return [{
-      date,
-      classification: typeof row.classification === 'string' ? row.classification : null,
-      heart_rate: parseNumber(row.averageHeartRate),
-      raw_json: row as Json,
-    }];
+    return [
+      {
+        date,
+        classification: typeof row.classification === 'string' ? row.classification : null,
+        heart_rate: parseNumber(row.averageHeartRate),
+        raw_json: row as Json,
+      },
+    ];
   });
 }
 
@@ -265,12 +327,19 @@ function normalizeMedications(medications: unknown[]) {
     const date = parseDate(row.scheduledDate ?? row.start);
     if (!date) return [];
 
-    return [{
-      date,
-      name: typeof row.displayText === 'string' ? row.displayText : typeof row.nickname === 'string' ? row.nickname : null,
-      dose: row.dosage == null ? null : String(row.dosage),
-      raw_json: row as Json,
-    }];
+    return [
+      {
+        date,
+        name:
+          typeof row.displayText === 'string'
+            ? row.displayText
+            : typeof row.nickname === 'string'
+              ? row.nickname
+              : null,
+        dose: row.dosage == null ? null : String(row.dosage),
+        raw_json: row as Json,
+      },
+    ];
   });
 }
 
@@ -290,7 +359,10 @@ export async function POST(request: NextRequest) {
 
   const supabase = getSupabaseAdminClient();
   if (!supabase) {
-    return NextResponse.json({ error: 'Supabase admin client is not configured.' }, { status: 503 });
+    return NextResponse.json(
+      { error: 'Supabase admin client is not configured.' },
+      { status: 503 }
+    );
   }
 
   const rawBody = await request.text();
@@ -303,7 +375,7 @@ export async function POST(request: NextRequest) {
         maxBytes: MAX_PAYLOAD_BYTES,
         receivedBytes: payloadSizeBytes,
       },
-      { status: 413 },
+      { status: 413 }
     );
   }
 
@@ -324,7 +396,7 @@ export async function POST(request: NextRequest) {
           message: i.message,
         })),
       },
-      { status: 400 },
+      { status: 400 }
     );
   }
 

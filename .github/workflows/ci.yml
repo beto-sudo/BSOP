@@ -35,10 +35,8 @@ jobs:
       - name: Vitest — unit tests
         run: npm run test:run
 
-      # ESLint and Prettier `--check` are intentionally OUT of CI for now.
-      # The codebase has never been bulk-linted/formatted, so running either
-      # against the whole tree would produce hundreds of legacy errors and
-      # block every unrelated PR. Both are enforced on NEW / changed code via
-      # the Husky + lint-staged pre-commit hook (see package.json "lint-staged").
-      # A future dedicated cleanup PR will run a one-time mass lint+format and
-      # re-enable these checks in CI.
+      - name: ESLint
+        run: npm run lint
+
+      - name: Prettier — check
+        run: npm run format:check
