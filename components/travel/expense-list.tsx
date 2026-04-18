@@ -1,6 +1,6 @@
 'use client';
 
-import { Surface } from '@/components/ui';
+import { Surface } from '@/components/ui/surface';
 import type { Expense } from './types';
 import { money } from './utils';
 

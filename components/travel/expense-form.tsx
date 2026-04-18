@@ -2,7 +2,7 @@
 
 import type { FormEvent } from 'react';
 import { Loader2, Plus } from 'lucide-react';
-import { Surface } from '@/components/ui';
+import { Surface } from '@/components/ui/surface';
 import { categories, type Participant } from './types';
 
 type ExpenseDraft = {

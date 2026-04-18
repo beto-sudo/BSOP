@@ -1,7 +1,7 @@
 'use client';
 
 import { Calculator, Copy, Share2, Wallet } from 'lucide-react';
-import { Surface } from '@/components/ui';
+import { Surface } from '@/components/ui/surface';
 import type { Settlement } from './types';
 import { money } from './utils';
 

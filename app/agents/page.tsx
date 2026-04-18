@@ -12,7 +12,10 @@ import {
 } from 'lucide-react';
 
 import agents from '@/data/agents.json';
-import { ActionLink, SectionHeading, Shell, Surface } from '@/components/ui';
+import { ActionLink } from '@/components/ui/action-link';
+import { SectionHeading } from '@/components/ui/section-heading';
+import { Shell } from '@/components/ui/shell';
+import { Surface } from '@/components/ui/surface';
 import { RequireAccess } from '@/components/require-access';
 
 type UsageSummary = {

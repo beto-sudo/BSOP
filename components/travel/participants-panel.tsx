@@ -2,7 +2,7 @@
 
 import type { FormEvent } from 'react';
 import { Plus, Users } from 'lucide-react';
-import { Surface } from '@/components/ui';
+import { Surface } from '@/components/ui/surface';
 import type { ExpenseParticipantPreset, Participant } from './types';
 
 type ParticipantsPanelProps = {

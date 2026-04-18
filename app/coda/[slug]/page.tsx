@@ -2,7 +2,9 @@ import { RequireAccess } from '@/components/require-access';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowUpRight, Blocks, Columns3, Network, ShieldAlert, Sparkles, TableProperties } from 'lucide-react';
-import { SectionHeading, Shell, Surface } from '@/components/ui';
+import { SectionHeading } from '@/components/ui/section-heading';
+import { Shell } from '@/components/ui/shell';
+import { Surface } from '@/components/ui/surface';
 import { codaData, formatAuditTimestamp, formatInt, getHealthColor } from '@/data/coda';
 
 export function generateStaticParams() {
