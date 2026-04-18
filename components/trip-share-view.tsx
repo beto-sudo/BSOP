@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowUpRight, Calendar, CheckCircle2, MapPin, Route, Users, Wallet } from 'lucide-react';
-import { Surface } from '@/components/ui';
+import { Surface } from '@/components/ui/surface';
 import { TravelExpenseTracker } from '@/components/travel-expense-tracker';
 import { type TravelTrip } from '@/data/site';
 

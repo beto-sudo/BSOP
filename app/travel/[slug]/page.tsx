@@ -1,7 +1,8 @@
 import { RequireAccess } from '@/components/require-access';
 import { notFound } from 'next/navigation';
 import { getTripBySlug } from '@/data/site';
-import { SectionHeading, Shell } from '@/components/ui';
+import { SectionHeading } from '@/components/ui/section-heading';
+import { Shell } from '@/components/ui/shell';
 import { TripDetailView } from '@/components/trip-detail-view';
 
 export default async function TripDetail({ params }: { params: Promise<{ slug: string }> }) {

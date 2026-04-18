@@ -1,7 +1,10 @@
 import { RequireAccess } from '@/components/require-access';
 import { ArrowUpRight, MapPin, Route, Users, Wallet } from 'lucide-react';
 import { travelTrips } from '@/data/site';
-import { ActionLink, SectionHeading, Shell, Surface } from '@/components/ui';
+import { ActionLink } from '@/components/ui/action-link';
+import { SectionHeading } from '@/components/ui/section-heading';
+import { Shell } from '@/components/ui/shell';
+import { Surface } from '@/components/ui/surface';
 
 export default function TravelPage() {
   return (

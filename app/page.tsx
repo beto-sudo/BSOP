@@ -1,6 +1,7 @@
 'use client';
 
-import { Shell, Surface } from '@/components/ui';
+import { Shell } from '@/components/ui/shell';
+import { Surface } from '@/components/ui/surface';
 import { ArrowRight, Boxes, Settings, ShieldCheck, Wallet } from 'lucide-react';
 import Link from 'next/link';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';

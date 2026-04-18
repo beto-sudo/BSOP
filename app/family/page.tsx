@@ -1,4 +1,4 @@
-import { PlaceholderSection } from '@/components/ui';
+import { PlaceholderSection } from '@/components/ui/placeholder-section';
 import { RequireAccess } from '@/components/require-access';
 
 export default function FamilyPage() {
