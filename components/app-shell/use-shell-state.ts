@@ -62,14 +62,22 @@ export function useShellState({
     });
 
     const syncUser = async () => {
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser();
-      if (!authUser) {
+      try {
+        const {
+          data: { user: authUser },
+          error,
+        } = await supabase.auth.getUser();
+        if (error || !authUser) {
+          // Stale / missing refresh token → treat as signed out. onAuthStateChange
+          // will fire a SIGNED_OUT event shortly after and we'll settle to null.
+          setUser(null);
+          return;
+        }
+        setUser(pickUser(authUser));
+      } catch {
+        // Network blip or unexpected auth failure — fail silent, banner-less.
         setUser(null);
-        return;
       }
-      setUser(pickUser(authUser));
     };
 
     void syncUser();
