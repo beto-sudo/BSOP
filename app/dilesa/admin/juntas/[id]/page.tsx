@@ -4,6 +4,11 @@ import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
+import {
+  getAdjuntoSignedUrl,
+  rewriteHtmlImagesToSigned,
+  normalizeHtmlImagesToPaths,
+} from '@/lib/adjuntos';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -341,8 +346,12 @@ function JuntaDetailInner() {
       const path = `juntas/${id}/${filename}`;
       const { error: uploadErr } = await supabase.storage.from('adjuntos').upload(path, file, { upsert: false });
       if (uploadErr) { alert(`Error al subir imagen: ${uploadErr.message}`); return; }
-      const { data: urlData } = supabase.storage.from('adjuntos').getPublicUrl(path);
-      editor.chain().focus().setImage({ src: urlData.publicUrl }).run();
+      // Bucket is private. Use a signed URL for in-editor display so the user
+      // sees the image immediately, but the save path (handleSave, autoSave,
+      // flushSave) normalizes <img src> back to the bare object path so the
+      // DB never holds a soon-to-expire signed URL.
+      const signedForEditor = await getAdjuntoSignedUrl(supabase, path, 6 * 3600);
+      editor.chain().focus().setImage({ src: signedForEditor || path }).run();
     } finally {
       setUploadingImage(false);
     }
@@ -412,18 +421,25 @@ function JuntaDetailInner() {
   useEffect(() => { void fetchAll(); }, [fetchAll]);
   useEffect(() => {
     if (editor && junta?.descripcion) {
-      // Always set content when editor becomes ready or junta data changes
+      // Always set content when editor becomes ready or junta data changes.
+      // Rewrite any stored <img src> (bare path or legacy public URL) to a
+      // signed URL so the private bucket renders inside the editor.
       const currentContent = editor.getHTML();
       if (currentContent === '' || currentContent === '<p></p>') {
-        editor.commands.setContent(junta.descripcion);
+        void (async () => {
+          const hydrated = await rewriteHtmlImagesToSigned(supabase, junta.descripcion, 6 * 3600);
+          editor.commands.setContent(hydrated);
+        })();
       }
     }
-  }, [editor, junta]);
+  }, [editor, junta, supabase]);
 
   const handleSave = async () => {
     if (!junta) return;
     setSaving(true);
-    const notesHtml = editor?.getHTML() ?? null;
+    // Normalize signed URLs back to bare paths so the DB never holds a
+    // soon-to-expire URL — getAdjuntoPath handles legacy rows too.
+    const notesHtml = normalizeHtmlImagesToPaths(editor?.getHTML() ?? null) || null;
     const { error: err } = await supabase.schema('erp').from('juntas').update({
       titulo: titulo.trim(), fecha_hora: fechaHora,
       lugar: lugar.trim() || null, estado, tipo: tipo || null,
@@ -453,8 +469,9 @@ function JuntaDetailInner() {
         const currentHtml = editor.getHTML();
         if (currentHtml === lastSavedHtmlRef.current) return;
         setAutoSaveStatus('saving');
+        const persisted = normalizeHtmlImagesToPaths(currentHtml) || null;
         const { error: err } = await supabase.schema('erp').from('juntas').update({
-          descripcion: currentHtml && currentHtml !== '<p></p>' ? currentHtml : null,
+          descripcion: persisted && persisted !== '<p></p>' ? persisted : null,
         }).eq('id', junta.id);
         if (!err) {
           lastSavedHtmlRef.current = currentHtml;
@@ -484,9 +501,10 @@ function JuntaDetailInner() {
     const flushSave = () => {
       const html = editor.getHTML();
       if (html !== lastSavedHtmlRef.current && html !== '<p></p>') {
-        // Fire-and-forget save
+        // Fire-and-forget save — normalize image URLs to bare paths first.
+        const persisted = normalizeHtmlImagesToPaths(html);
         supabase.schema('erp').from('juntas').update({
-          descripcion: html,
+          descripcion: persisted || null,
         }).eq('id', juntaId).then(() => { lastSavedHtmlRef.current = html; });
       }
     };
