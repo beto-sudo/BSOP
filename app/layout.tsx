@@ -1,6 +1,6 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { AppShell } from '@/components/app-shell';
+import { AppShell } from '@/components/app-shell/app-shell';
 import { Providers } from '@/components/providers';
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
