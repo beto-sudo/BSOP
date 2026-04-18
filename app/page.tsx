@@ -1,6 +1,6 @@
 'use client';
 
-import { Shell } from '@/components/ui/shell';
+import { ContentShell } from '@/components/ui/content-shell';
 import { Surface } from '@/components/ui/surface';
 import { ArrowRight, Boxes, Settings, ShieldCheck, Wallet } from 'lucide-react';
 import Link from 'next/link';
@@ -29,7 +29,7 @@ export default function HomePage() {
   }, []);
 
   return (
-    <Shell>
+    <ContentShell>
       <section className="grid gap-6">
         <Surface className="p-8 sm:p-12">
           <div className="inline-flex items-center gap-2 rounded-full border border-[var(--accent)]/25 bg-[var(--accent)]/12 px-3 py-1 text-xs font-medium text-[var(--accent-soft)]">
@@ -99,6 +99,6 @@ export default function HomePage() {
           </div>
         </Surface>
       </section>
-    </Shell>
+    </ContentShell>
   );
 }

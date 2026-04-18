@@ -2,7 +2,7 @@ import { RequireAccess } from '@/components/require-access';
 import { notFound } from 'next/navigation';
 import { getTripBySlug } from '@/data/site';
 import { SectionHeading } from '@/components/ui/section-heading';
-import { Shell } from '@/components/ui/shell';
+import { ContentShell } from '@/components/ui/content-shell';
 import { TripDetailView } from '@/components/trip-detail-view';
 
 export default async function TripDetail({ params }: { params: Promise<{ slug: string }> }) {
@@ -13,10 +13,10 @@ export default async function TripDetail({ params }: { params: Promise<{ slug: s
 
   return (
     <RequireAccess empresa="familia">
-      <Shell>
+      <ContentShell>
         <SectionHeading eyebrow="Detalle de viaje" title={trip.name} copy={trip.summary} />
         <TripDetailView trip={trip} />
-      </Shell>
+      </ContentShell>
     </RequireAccess>
   );
 }
