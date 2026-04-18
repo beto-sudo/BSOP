@@ -1,7 +1,7 @@
 import { RequireAccess } from '@/components/require-access';
-import { HealthRangeSelector } from '@/components/health-range-selector';
+import { HealthRangeSelector } from '@/components/health/health-range-selector';
 import { Shell } from '@/components/ui';
-import { HealthDashboardView } from '@/components/health-dashboard-view';
+import { HealthDashboardView } from '@/components/health/health-dashboard-view';
 import { getHealthDashboardData, type HealthRangePreset } from '@/lib/health';
 
 function resolveRangeParams(searchParams?: Record<string, string | string[] | undefined>) {
