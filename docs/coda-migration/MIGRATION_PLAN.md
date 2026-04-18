@@ -23,7 +23,9 @@
 Cada módulo sigue estas 6 fases. Cada una es una PR individual:
 
 ### Fase 1 — Deep audit del módulo
+
 **Output**: `docs/coda-migration/<doc>/<modulo>.md` con:
+
 - Tablas fuente (las que contienen datos reales)
 - Schema de columnas (tipos, relaciones)
 - Row count por tabla
@@ -35,7 +37,9 @@ Cada módulo sigue estas 6 fases. Cada una es una PR individual:
 **Duración**: 1 sesión. Sin código.
 
 ### Fase 2 — Schema design + ADR
+
 **Output**:
+
 - Migration SQL en `supabase/migrations/YYYYMMDDHHMMSS_<modulo>.sql`
 - ADR en `docs/adr/NNNN-<modulo>-schema.md`
 - RLS policies con helpers (`core.fn_has_empresa()`, `core.fn_is_admin()`)
@@ -44,7 +48,9 @@ Cada módulo sigue estas 6 fases. Cada una es una PR individual:
 **Si la tabla ya existe** en BSOP con estructura correcta: skip esta fase.
 
 ### Fase 3 — Sync unidireccional Coda → BSOP (bridge)
+
 **Output**: `supabase/functions/coda-sync-<modulo>/` — edge function que:
+
 - Se conecta a Coda API con `CODA_API_KEY`
 - Lee rows de la tabla fuente de Coda
 - Upserta en Supabase (idempotente, dedup por `coda_id`)
@@ -54,7 +60,9 @@ Cada módulo sigue estas 6 fases. Cada una es una PR individual:
 Durante esta fase, **Coda sigue siendo source-of-truth**. BSOP es **read-only**.
 
 ### Fase 4 — UI BSOP (read-only primero)
+
 **Output**: componente módulo siguiendo el patrón EmpleadosModule/TasksModule
+
 - `components/<area>/<modulo>-module.tsx` con scope=`'empresa'` | `'user-empresas'`
 - Pages por empresa bajo `app/<empresa>/<area>/<modulo>/page.tsx`
 - Navegación en `app-shell/nav-config.ts`
@@ -62,7 +70,9 @@ Durante esta fase, **Coda sigue siendo source-of-truth**. BSOP es **read-only**.
 **Criterio de aceptación**: usuarios pueden ver todos los datos migrados y validar que son correctos.
 
 ### Fase 5 — Write-path en BSOP + dual-write
+
 **Output**: mutations en BSOP que escriben a Supabase Y también push a Coda (durante transición)
+
 - Feature flag `COMPAT_CODA_WRITE_<modulo>=true` (default: true)
 - Cuando flag está activa: BSOP mutation → Supabase + POST a Coda API
 - Cuando flag está inactiva: solo Supabase
@@ -70,7 +80,9 @@ Durante esta fase, **Coda sigue siendo source-of-truth**. BSOP es **read-only**.
 Esto mantiene Coda "vivo" temporalmente para stakeholders que lo siguen consultando.
 
 ### Fase 6 — Cutover
+
 **Checklist por tabla**:
+
 1. [ ] Sync diff: `SELECT count(*) FROM bsop.X` == rows en Coda.X ± 0
 2. [ ] Stakeholders notificados (mínimo 72h aviso)
 3. [ ] Apagar cron Coda → BSOP (Fase 3)
@@ -88,44 +100,44 @@ Esto mantiene Coda "vivo" temporalmente para stakeholders que lo siguen consulta
 
 Ya tienen datos migrados y UI inicial. Pulir y cerrar gaps:
 
-| Módulo | Empresas | Gap |
-|---|---|---|
-| Empleados / Puestos / Departamentos | DILESA, RDB | Ya completo. Faltan compensaciones UI. |
-| Tasks + Juntas | DILESA, RDB | Ya completo. Faltan KPIs operativos. |
-| Cortes de Caja (RDB) | RDB | Ya completo. Falta conteo denominaciones UI. |
-| Requisiciones + OCs | RDB (+ DILESA futuro) | Ya completo. Falta flujo de recepciones. |
-| Productos + Inventario | RDB | Ya completo. Falta UI de ajustes manuales + reportes. |
+| Módulo                              | Empresas              | Gap                                                   |
+| ----------------------------------- | --------------------- | ----------------------------------------------------- |
+| Empleados / Puestos / Departamentos | DILESA, RDB           | Ya completo. Faltan compensaciones UI.                |
+| Tasks + Juntas                      | DILESA, RDB           | Ya completo. Faltan KPIs operativos.                  |
+| Cortes de Caja (RDB)                | RDB                   | Ya completo. Falta conteo denominaciones UI.          |
+| Requisiciones + OCs                 | RDB (+ DILESA futuro) | Ya completo. Falta flujo de recepciones.              |
+| Productos + Inventario              | RDB                   | Ya completo. Falta UI de ajustes manuales + reportes. |
 
 **Duración estimada**: 2-3 sprints paralelos de 1-2 agents c/u.
 
 ### Tier 2 — Módulos con estructura lista (tablas 0 rows)
 
-| Módulo | Empresa | Priority | Razón |
-|---|---|---|---|
-| **Citas (ANSA)** | ANSA | alta | Usado a diario en servicio + ventas |
-| **Cuentas + Movimientos bancarios** | DILESA, ANSA, SR | alta | Control financiero, reglas duras CLAUDE.md |
-| **Gastos** | DILESA, ANSA, SR, RDB | alta | Control financiero |
-| **Facturas + Pagos provisionales** | SR Group | media | Fiscal, time-sensitive |
-| **Clientes** | DILESA, ANSA | media | Prerequisito para ventas |
-| **Recepciones de OC** | RDB, DILESA | media | Cierra el ciclo de compras |
-| **Activos + Mantenimiento** | ANSA, SR Group | media | Resguardos automotriz |
-| **Turnos** | RDB | baja | Se puede hardcodear por ahora |
-| **Aprobaciones** | Cross-empresa | baja | Hasta que haya workflow que lo requiera |
-| **Conteo denominaciones** | RDB | baja | Feature nueva, no urgente |
+| Módulo                              | Empresa               | Priority | Razón                                      |
+| ----------------------------------- | --------------------- | -------- | ------------------------------------------ |
+| **Citas (ANSA)**                    | ANSA                  | alta     | Usado a diario en servicio + ventas        |
+| **Cuentas + Movimientos bancarios** | DILESA, ANSA, SR      | alta     | Control financiero, reglas duras CLAUDE.md |
+| **Gastos**                          | DILESA, ANSA, SR, RDB | alta     | Control financiero                         |
+| **Facturas + Pagos provisionales**  | SR Group              | media    | Fiscal, time-sensitive                     |
+| **Clientes**                        | DILESA, ANSA          | media    | Prerequisito para ventas                   |
+| **Recepciones de OC**               | RDB, DILESA           | media    | Cierra el ciclo de compras                 |
+| **Activos + Mantenimiento**         | ANSA, SR Group        | media    | Resguardos automotriz                      |
+| **Turnos**                          | RDB                   | baja     | Se puede hardcodear por ahora              |
+| **Aprobaciones**                    | Cross-empresa         | baja     | Hasta que haya workflow que lo requiera    |
+| **Conteo denominaciones**           | RDB                   | baja     | Feature nueva, no urgente                  |
 
 ### Tier 3 — Módulos complejos (schema nuevo, data grande)
 
-| Módulo | Doc origen | Complejidad | Notas |
-|---|---|---|---|
-| **DILESA Inmobiliario** (proyectos, lotes, ventas, contratos, cobranza) | DILESA Proyectos + Ventas | alta | Schema ya existe, falta UI + migración |
-| **DILESA Urbanización** (19 sub-módulos civil) | DILESA Urbanización | MUY alta | Repensar: agruparlo como "avances de obra por partida" más que 19 tablas |
-| **DILESA RUV** (DTUs, INFONAVIT) | DILESA Proyectos/RUV | alta | Dependencia externa (RUV portal), posible scraping |
-| **DILESA Maquinaria** (equipos, acarreos, combustible, horas) | DILESA Maquinaria | media | Buen candidato para re-modelar con "recurso + asignación + uso" |
-| **DILESA Construcción** (contratos, contratistas, supervisión, prototipos) | DILESA Construcción | media | Overlap con Proveedores |
-| **DILESA Presupuestos** | DILESA Presupuestos | media | Partidas + Gastos — ya hay tabla gastos |
-| **ANSA Automotriz** (vehículos, ventas autos, taller, refacciones) | ANSA + ANSA Ventas | alta | Schema ya existe, falta UI; refacciones tiene overlap con Inventario |
-| **ANSA Competencias + KPIs** | ANSA RH | baja | Nice-to-have, extiende RH |
-| **SR Group Fiscal completo** (declaraciones, budget, flujo, estado de resultados) | SR Group | alta | Muchas tablas relacionadas, oportunidad de unificar |
+| Módulo                                                                            | Doc origen                | Complejidad | Notas                                                                    |
+| --------------------------------------------------------------------------------- | ------------------------- | ----------- | ------------------------------------------------------------------------ |
+| **DILESA Inmobiliario** (proyectos, lotes, ventas, contratos, cobranza)           | DILESA Proyectos + Ventas | alta        | Schema ya existe, falta UI + migración                                   |
+| **DILESA Urbanización** (19 sub-módulos civil)                                    | DILESA Urbanización       | MUY alta    | Repensar: agruparlo como "avances de obra por partida" más que 19 tablas |
+| **DILESA RUV** (DTUs, INFONAVIT)                                                  | DILESA Proyectos/RUV      | alta        | Dependencia externa (RUV portal), posible scraping                       |
+| **DILESA Maquinaria** (equipos, acarreos, combustible, horas)                     | DILESA Maquinaria         | media       | Buen candidato para re-modelar con "recurso + asignación + uso"          |
+| **DILESA Construcción** (contratos, contratistas, supervisión, prototipos)        | DILESA Construcción       | media       | Overlap con Proveedores                                                  |
+| **DILESA Presupuestos**                                                           | DILESA Presupuestos       | media       | Partidas + Gastos — ya hay tabla gastos                                  |
+| **ANSA Automotriz** (vehículos, ventas autos, taller, refacciones)                | ANSA + ANSA Ventas        | alta        | Schema ya existe, falta UI; refacciones tiene overlap con Inventario     |
+| **ANSA Competencias + KPIs**                                                      | ANSA RH                   | baja        | Nice-to-have, extiende RH                                                |
+| **SR Group Fiscal completo** (declaraciones, budget, flujo, estado de resultados) | SR Group                  | alta        | Muchas tablas relacionadas, oportunidad de unificar                      |
 
 ### Tier 4 — Data personal SR
 
@@ -138,6 +150,7 @@ El doc SR Group tiene info personal/familiar (recibos Casa SR, budget 50/30/20).
 Considerando: torneo activo esta semana, 1 operador activo (Beto + Claude), necesidad de no romper producción, ciclos de ~1-2 semanas por módulo grande.
 
 ### Abril-Mayo 2026 (4 semanas)
+
 - ✅ Frente 1.1: bulk lint + format (en progreso)
 - **Semana 1**: Frente 2 Sprint A (RDB operativos: playtomic, cortes, ventas) + INVENTORY.md de módulos Tier 2
 - **Semana 2**: Postgres upgrade (madrugada) + Tier 2: Citas ANSA (Fases 1-3)
@@ -145,16 +158,19 @@ Considerando: torneo activo esta semana, 1 operador activo (Beto + Claude), nece
 - **Semana 4**: Cuentas bancarias (Fases 3-6) + Frente 2 Sprint B (juntas × 3 → JuntasModule)
 
 ### Junio 2026 (4 semanas)
+
 - Gastos cross-empresa (Fases 1-6)
 - Tier 2: Clientes + Recepciones
 - Frente 2 Sprints C y D (documentos × 3, acceso-client)
 
 ### Julio-Agosto 2026
+
 - Tier 3: DILESA Inmobiliario (empezando por Proyectos + Lotes)
 - SR Group Fiscal (declaraciones + pagos provisionales)
 - ANSA Automotriz (empezando por vehículos + ventas)
 
 ### Septiembre+
+
 - DILESA Urbanización (rediseñado, no 1-a-1)
 - DILESA RUV
 - ANSA Competencias/KPIs
@@ -181,21 +197,27 @@ Considerando: torneo activo esta semana, 1 operador activo (Beto + Claude), nece
 Estos se construyen **una sola vez** y los usan todos los módulos:
 
 ### `scripts/coda-diff.ts`
+
 CLI: `npx tsx scripts/coda-diff.ts <doc> <tabla-coda> <tabla-supabase>` → reporta row count diff + sample de diferencias.
 
 ### `lib/coda-client.ts`
+
 Wrapper tipado del REST API de Coda con retry + rate-limit handling.
 
 ### `supabase/functions/coda-sync-*`
+
 Template reusable: recibe `{ docId, tableId, targetSchema, targetTable, mapping }` y hace el upsert. Fases 3/5.
 
 ### Vista `/settings/coda-migration` (dashboard)
+
 - Lista de módulos con status (tier, fase actual, last sync, row diff)
 - Health alerts si un sync falla
 - Log de cutovers
 
 ### `core.audit_log` (ya existe, 0 rows)
+
 Activar escritura en todas las migraciones Tier 2+. Schema:
+
 ```
 (id, empresa_id, user_id, table_name, record_id, action, old_values, new_values, ip, user_agent, created_at)
 ```
@@ -204,14 +226,14 @@ Activar escritura en todas las migraciones Tier 2+. Schema:
 
 ## Riesgos conocidos
 
-| Riesgo | Mitigación |
-|---|---|
-| Datos inconsistentes en Coda (Tablas "god" con 175+ columnas) | Deep audit (Fase 1) identifica campos clave vs basura; migrar solo lo útil |
-| Flujos manuales que dependen de automations de Coda | Documentar en Fase 1; reimplementar como cron + edge function |
-| Stakeholders que resisten el cambio | Dual-write (Fase 5) mantiene Coda funcional hasta confianza total |
-| Migrations grandes (e.g., 10k+ rows) pueden tumbar Supabase | Migrar en batches de 500 con pauses; correr en horarios de bajo tráfico |
-| Coda API rate limit (100 req/min default) | Retry con backoff; correr sync en off-peak |
-| Pérdida de fórmulas/KPIs | Deep audit las enumera; decidir caso por caso si se traducen o se redistribuyen |
+| Riesgo                                                        | Mitigación                                                                      |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Datos inconsistentes en Coda (Tablas "god" con 175+ columnas) | Deep audit (Fase 1) identifica campos clave vs basura; migrar solo lo útil      |
+| Flujos manuales que dependen de automations de Coda           | Documentar en Fase 1; reimplementar como cron + edge function                   |
+| Stakeholders que resisten el cambio                           | Dual-write (Fase 5) mantiene Coda funcional hasta confianza total               |
+| Migrations grandes (e.g., 10k+ rows) pueden tumbar Supabase   | Migrar en batches de 500 con pauses; correr en horarios de bajo tráfico         |
+| Coda API rate limit (100 req/min default)                     | Retry con backoff; correr sync en off-peak                                      |
+| Pérdida de fórmulas/KPIs                                      | Deep audit las enumera; decidir caso por caso si se traducen o se redistribuyen |
 
 ---
 

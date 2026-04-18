@@ -1,11 +1,18 @@
-# Build output
+# Build output (including nested .next/ inside git worktrees)
 .next/
+**/.next/
 dist/
 build/
 out/
 
 # Dependencies
 node_modules/
+
+# Git worktrees created by agents — never format checked-out copies of the repo.
+.claude/worktrees/
+
+# Untracked ad-hoc scratch folder.
+tmp/
 
 # Coverage / test artifacts
 coverage/
@@ -23,6 +30,13 @@ yarn.lock
 
 # Archived legacy content — do not reformat
 docs/archive/
+
+# One-off migration / rescue / backfill scripts — kept outside archive/ as
+# historical references, untracked in git. Mirrored here to match eslint ignore.
+scripts/migrate_*.ts
+scripts/rescue_*.ts
+scripts/fix_*.mjs
+scripts/backfill_*.js
 
 # Env & credentials
 .env*

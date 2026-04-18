@@ -21,42 +21,42 @@
 
 ## 1. Ranking por volumen de data real (top 30 tablas con >500 rows)
 
-| Rows | Doc | Tabla fuente | Estado BSOP |
-|---:|---|---|---|
-| **18,644** | DILESA | Tareas Construcción Terminadas | ❌ (relacionada a `erp.tasks` pero es historial de construcción) |
-| **8,372** | DILESA | Cargas Combustible | ❌ |
-| **6,968** | DILESA | Horas Máquina | ❌ |
-| **4,921** | DILESA | Acarreos | ❌ |
-| **4,749** | ANSA | Citas | ⚠️ `erp.citas` (0 rows) |
-| **4,539** | ANSA | Citas del Día Servicio | same |
-| **3,496** | SR Group | Gastos | ⚠️ `erp.gastos` |
-| **2,995** | RDB | Detalle Conteo | ❌ (audits físicos inventario) |
-| **2,953** | RDB | Productos del Pedido | ✅ `rdb.waitry_productos` (15,214) |
-| **2,610** | SR Group | Movimientos AMEX | ⚠️ `erp.movimientos_bancarios` |
-| **2,421** | SR Group | Movimientos Banamex | same |
-| **2,115** | DILESA | Lotes | ⚠️ `erp.lotes` |
-| **1,929** | ANSA-Ventas | Cliente | ⚠️ `erp.clientes` |
-| **1,748** | DILESA | Plantilla Tareas Construcción | ❌ |
-| **1,706** | ANSA-Ventas | Facturas Compra Unidades | ⚠️ `erp.vehiculos` + `erp.facturas` |
-| **1,611** | RDB | Pedidos Waitry | ✅ `rdb.waitry_pedidos` (10,746) |
-| **1,590** | DILESA | Inventario (inmobiliario) | ⚠️ `erp.lotes` |
-| **1,541** | ANSA-Ventas | Facturas Venta Unidades | ⚠️ `erp.ventas_autos` + `erp.facturas` |
-| **1,523** | SR Group | Movimientos IBC | ⚠️ `erp.movimientos_bancarios` |
-| **1,462** | ANSA-Ventas | Avanzadas (ventas planificadas) | ⚠️ `erp.ventas_autos` |
-| **1,449** | RDB | Pagos Waitry | ✅ `rdb.waitry_pagos` |
-| **1,443** | ANSA-Ventas | Programación de Entrega | ⚠️ `erp.ventas_autos` |
-| **1,411** | DILESA | Clientes DILESA | ⚠️ `erp.clientes` |
-| **1,372** | DILESA | Construcción por Lote | ❌ |
-| **1,249** | DILESA | Tareas | ✅ `erp.tasks` (1,253) — **match casi perfecto** |
-| **1,240** | DILESA | Urbanización por Lote | ❌ |
-| **1,132** | DILESA | CUV (RUV) | ❌ |
-| **1,079** | DILESA | Escrituración Total | ⚠️ `erp.documentos` (60) — parcial |
-| **1,060** | DILESA | Depósitos Clientes | ❌ (pagos inmobiliarios) |
-| **918** | RDB | Entradas inventario | ✅ `erp.movimientos_inventario` (14,895) |
-| **796** | SR Group | Registros Pendientes Banamex | ⚠️ `erp.conciliaciones` |
-| **719** | DILESA | Juntas | ✅ `erp.juntas` (720) — **match perfecto** |
-| **698** | RDB | Detalle Requisición | ✅ |
-| **517** | SR Group | Facturas | ⚠️ `erp.facturas` |
+|       Rows | Doc         | Tabla fuente                    | Estado BSOP                                                      |
+| ---------: | ----------- | ------------------------------- | ---------------------------------------------------------------- |
+| **18,644** | DILESA      | Tareas Construcción Terminadas  | ❌ (relacionada a `erp.tasks` pero es historial de construcción) |
+|  **8,372** | DILESA      | Cargas Combustible              | ❌                                                               |
+|  **6,968** | DILESA      | Horas Máquina                   | ❌                                                               |
+|  **4,921** | DILESA      | Acarreos                        | ❌                                                               |
+|  **4,749** | ANSA        | Citas                           | ⚠️ `erp.citas` (0 rows)                                          |
+|  **4,539** | ANSA        | Citas del Día Servicio          | same                                                             |
+|  **3,496** | SR Group    | Gastos                          | ⚠️ `erp.gastos`                                                  |
+|  **2,995** | RDB         | Detalle Conteo                  | ❌ (audits físicos inventario)                                   |
+|  **2,953** | RDB         | Productos del Pedido            | ✅ `rdb.waitry_productos` (15,214)                               |
+|  **2,610** | SR Group    | Movimientos AMEX                | ⚠️ `erp.movimientos_bancarios`                                   |
+|  **2,421** | SR Group    | Movimientos Banamex             | same                                                             |
+|  **2,115** | DILESA      | Lotes                           | ⚠️ `erp.lotes`                                                   |
+|  **1,929** | ANSA-Ventas | Cliente                         | ⚠️ `erp.clientes`                                                |
+|  **1,748** | DILESA      | Plantilla Tareas Construcción   | ❌                                                               |
+|  **1,706** | ANSA-Ventas | Facturas Compra Unidades        | ⚠️ `erp.vehiculos` + `erp.facturas`                              |
+|  **1,611** | RDB         | Pedidos Waitry                  | ✅ `rdb.waitry_pedidos` (10,746)                                 |
+|  **1,590** | DILESA      | Inventario (inmobiliario)       | ⚠️ `erp.lotes`                                                   |
+|  **1,541** | ANSA-Ventas | Facturas Venta Unidades         | ⚠️ `erp.ventas_autos` + `erp.facturas`                           |
+|  **1,523** | SR Group    | Movimientos IBC                 | ⚠️ `erp.movimientos_bancarios`                                   |
+|  **1,462** | ANSA-Ventas | Avanzadas (ventas planificadas) | ⚠️ `erp.ventas_autos`                                            |
+|  **1,449** | RDB         | Pagos Waitry                    | ✅ `rdb.waitry_pagos`                                            |
+|  **1,443** | ANSA-Ventas | Programación de Entrega         | ⚠️ `erp.ventas_autos`                                            |
+|  **1,411** | DILESA      | Clientes DILESA                 | ⚠️ `erp.clientes`                                                |
+|  **1,372** | DILESA      | Construcción por Lote           | ❌                                                               |
+|  **1,249** | DILESA      | Tareas                          | ✅ `erp.tasks` (1,253) — **match casi perfecto**                 |
+|  **1,240** | DILESA      | Urbanización por Lote           | ❌                                                               |
+|  **1,132** | DILESA      | CUV (RUV)                       | ❌                                                               |
+|  **1,079** | DILESA      | Escrituración Total             | ⚠️ `erp.documentos` (60) — parcial                               |
+|  **1,060** | DILESA      | Depósitos Clientes              | ❌ (pagos inmobiliarios)                                         |
+|    **918** | RDB         | Entradas inventario             | ✅ `erp.movimientos_inventario` (14,895)                         |
+|    **796** | SR Group    | Registros Pendientes Banamex    | ⚠️ `erp.conciliaciones`                                          |
+|    **719** | DILESA      | Juntas                          | ✅ `erp.juntas` (720) — **match perfecto**                       |
+|    **698** | RDB         | Detalle Requisición             | ✅                                                               |
+|    **517** | SR Group    | Facturas                        | ⚠️ `erp.facturas`                                                |
 
 ---
 
@@ -64,21 +64,21 @@
 
 ### ✅ Ya en BSOP con datos (RDB prácticamente completo)
 
-| Módulo BSOP | Origen Coda | Rows BSOP | Estado |
-|---|---|---:|---|
-| Empleados/Puestos/Depts | DILESA + RDB | 212/53/8 | ✅ funcional |
-| Tasks | DILESA + RDB | 1,253 | ✅ funcional, pegado a Coda DILESA (1,249) |
-| Juntas | DILESA | 720 | ✅ pegado a Coda DILESA (719) |
-| Cortes de caja | RDB | 433 | ✅ funcional |
-| Movimientos caja | RDB | 409 | ✅ funcional |
-| Productos | RDB | 310 | ✅ funcional |
-| Inventario + movimientos | RDB | 283 + 14,895 | ✅ funcional |
-| Requisiciones | RDB | 188 | ✅ funcional |
-| OCs | RDB | 160 | ✅ funcional |
-| Proveedores | RDB + DILESA | 48 | ✅ funcional |
-| Documentos (escrituras) | DILESA parcial | 60 | ⚠️ falta 1,019 de Escrituración Total |
-| Waitry POS | RDB | 10,746 pedidos | ✅ funcional (cron sync) |
-| Playtomic | RDB | 1,442 bookings | ✅ funcional (cron sync) |
+| Módulo BSOP              | Origen Coda    |      Rows BSOP | Estado                                     |
+| ------------------------ | -------------- | -------------: | ------------------------------------------ |
+| Empleados/Puestos/Depts  | DILESA + RDB   |       212/53/8 | ✅ funcional                               |
+| Tasks                    | DILESA + RDB   |          1,253 | ✅ funcional, pegado a Coda DILESA (1,249) |
+| Juntas                   | DILESA         |            720 | ✅ pegado a Coda DILESA (719)              |
+| Cortes de caja           | RDB            |            433 | ✅ funcional                               |
+| Movimientos caja         | RDB            |            409 | ✅ funcional                               |
+| Productos                | RDB            |            310 | ✅ funcional                               |
+| Inventario + movimientos | RDB            |   283 + 14,895 | ✅ funcional                               |
+| Requisiciones            | RDB            |            188 | ✅ funcional                               |
+| OCs                      | RDB            |            160 | ✅ funcional                               |
+| Proveedores              | RDB + DILESA   |             48 | ✅ funcional                               |
+| Documentos (escrituras)  | DILESA parcial |             60 | ⚠️ falta 1,019 de Escrituración Total      |
+| Waitry POS               | RDB            | 10,746 pedidos | ✅ funcional (cron sync)                   |
+| Playtomic                | RDB            | 1,442 bookings | ✅ funcional (cron sync)                   |
 
 **Insight**: RDB está **casi 100% migrado**. Solo faltan: Carga Física / Cierres (audits 247+235 rows) y el reporte de conteo (2,995 rows que son detail de carga física).
 
@@ -86,45 +86,45 @@
 
 Ordenado por **uso real en Coda** + **leverage cross-empresa**:
 
-| Módulo | Empresas que lo usan | Rows Coda | Prioridad | Razón |
-|---|---|---:|---|---|
-| **Gastos** 🔁 | SR + DILESA + ANSA + RDB | 3,496 (SR) + desglose 81 | **alta** | 4 empresas, volumen alto, control financiero |
-| **Movimientos bancarios** 🔁 | SR (AMEX+Banamex+IBC) + ANSA (BBVA) + DILESA | 6,554 SR + 569 ANSA + ? DILESA | **alta** | Cross-empresa, volumen altísimo |
-| **Cuentas bancarias** 🔁 | Base de Movimientos bancarios | ~10 cuentas | **alta** | Prerequisito para movimientos |
-| **Citas** | ANSA (servicio + ventas) + DILESA (visitas obra futuro) | 4,749 + 4,539 + 150 | **alta** | ANSA lo usa A DIARIO |
-| **Facturas** 🔁 | SR (fiscal) + ANSA (compra/venta autos) + DILESA futuro | 517 SR + 1,706 compra + 1,541 venta | **alta** | Fiscal + operativo |
-| **Clientes** 🔁 | DILESA + ANSA Ventas | 1,411 + 1,929 | **alta** | Prerequisito para ventas inmobiliaria y autos |
-| **Conciliaciones bancarias** 🔁 | SR (Registros Pendientes) | 796+331+193+85 = 1,405 | media | Depende de Movimientos |
-| **Pagos provisionales** | SR (fiscal ISR) | 219 | media | Time-sensitive |
-| **Recepciones de OC** 🔁 | RDB + DILESA + ANSA futuro | ~cantidad de OCs | media | Cierra ciclo de compras |
-| **Lotes (inmobiliario)** | DILESA | 2,115 | media | Grande pero DILESA-exclusivo |
-| **Proyectos** | DILESA | ~50 proyectos | media | Prerequisito para Lotes/Ventas |
-| **Ventas inmobiliarias** | DILESA | ~1,000 (deducido) | media | Depende de Lotes + Clientes |
-| **Ventas autos** | ANSA Ventas | 1,541 venta + 1,462 avanzadas | media | ANSA-exclusivo |
-| **Vehículos (inventario autos)** | ANSA Ventas | 1,706 VINs | media | ANSA-exclusivo |
-| **Turnos** 🔁 | RDB + ANSA + DILESA | catálogo | baja | Se puede hardcodear |
-| **Activos** 🔁 | ANSA (resguardos) + SR | varios | baja | Nice-to-have |
-| **Conteo denominaciones** | RDB | 0 en Coda | baja | Feature nueva |
+| Módulo                           | Empresas que lo usan                                    |                           Rows Coda | Prioridad | Razón                                         |
+| -------------------------------- | ------------------------------------------------------- | ----------------------------------: | --------- | --------------------------------------------- |
+| **Gastos** 🔁                    | SR + DILESA + ANSA + RDB                                |            3,496 (SR) + desglose 81 | **alta**  | 4 empresas, volumen alto, control financiero  |
+| **Movimientos bancarios** 🔁     | SR (AMEX+Banamex+IBC) + ANSA (BBVA) + DILESA            |      6,554 SR + 569 ANSA + ? DILESA | **alta**  | Cross-empresa, volumen altísimo               |
+| **Cuentas bancarias** 🔁         | Base de Movimientos bancarios                           |                         ~10 cuentas | **alta**  | Prerequisito para movimientos                 |
+| **Citas**                        | ANSA (servicio + ventas) + DILESA (visitas obra futuro) |                 4,749 + 4,539 + 150 | **alta**  | ANSA lo usa A DIARIO                          |
+| **Facturas** 🔁                  | SR (fiscal) + ANSA (compra/venta autos) + DILESA futuro | 517 SR + 1,706 compra + 1,541 venta | **alta**  | Fiscal + operativo                            |
+| **Clientes** 🔁                  | DILESA + ANSA Ventas                                    |                       1,411 + 1,929 | **alta**  | Prerequisito para ventas inmobiliaria y autos |
+| **Conciliaciones bancarias** 🔁  | SR (Registros Pendientes)                               |              796+331+193+85 = 1,405 | media     | Depende de Movimientos                        |
+| **Pagos provisionales**          | SR (fiscal ISR)                                         |                                 219 | media     | Time-sensitive                                |
+| **Recepciones de OC** 🔁         | RDB + DILESA + ANSA futuro                              |                    ~cantidad de OCs | media     | Cierra ciclo de compras                       |
+| **Lotes (inmobiliario)**         | DILESA                                                  |                               2,115 | media     | Grande pero DILESA-exclusivo                  |
+| **Proyectos**                    | DILESA                                                  |                       ~50 proyectos | media     | Prerequisito para Lotes/Ventas                |
+| **Ventas inmobiliarias**         | DILESA                                                  |                   ~1,000 (deducido) | media     | Depende de Lotes + Clientes                   |
+| **Ventas autos**                 | ANSA Ventas                                             |       1,541 venta + 1,462 avanzadas | media     | ANSA-exclusivo                                |
+| **Vehículos (inventario autos)** | ANSA Ventas                                             |                          1,706 VINs | media     | ANSA-exclusivo                                |
+| **Turnos** 🔁                    | RDB + ANSA + DILESA                                     |                            catálogo | baja      | Se puede hardcodear                           |
+| **Activos** 🔁                   | ANSA (resguardos) + SR                                  |                              varios | baja      | Nice-to-have                                  |
+| **Conteo denominaciones**        | RDB                                                     |                           0 en Coda | baja      | Feature nueva                                 |
 
 ### ❌ Schema NO existe en BSOP — diseñar nuevo
 
-| Módulo Coda | Empresas | Rows Coda | Vale la pena? | Comentario |
-|---|---|---:|---|---|
-| **Cargas Combustible** | DILESA Maquinaria | 8,372 | sí | Alto uso. Reddiseñable como "movimientos de activo" |
-| **Horas Máquina** | DILESA Maquinaria | 6,968 | sí | Alto uso. Same pattern |
-| **Acarreos** | DILESA Maquinaria | 4,921 | sí | Alto uso. Same pattern |
-| **Tareas Construcción Terminadas** | DILESA | 18,644 | sí | Historia de construcción; tal vez fundir con `erp.tasks` |
-| **Plantilla Tareas Construcción** | DILESA | 1,748 | sí | Templates; podría ser `erp.task_templates` |
-| **Construcción por Lote** | DILESA | 1,372 | sí | Avance de obra |
-| **Urbanización por Lote** | DILESA | 1,240 | sí | Avance urbanización |
-| **Depósitos Clientes** | DILESA | 1,060 | sí | Pagos inmobiliarios (ligado a cobranza) |
-| **CUV** (RUV) | DILESA | 1,132 | sí | Clave Única de Vivienda |
-| **Documentos RUV** | DILESA | 169 | sí | INFONAVIT trámites |
-| **Urgencias RUV** | DILESA | 256 | sí | same |
-| **Sueldos y Salarios** | SR Group | 162 | sí | Fiscal personal |
-| **Tablas ISR** | SR Group | 989 | **NO** | Catálogo SAT, reference data — usar servicio externo |
-| **Activos financieros SR** | SR Group | <50 | baja | Inversiones personales |
-| **Urbanización** (19 sub-módulos) | DILESA | cada uno bajo 1k | **NO replicar** | Rediseñar como "avances por partida" |
+| Módulo Coda                        | Empresas          |        Rows Coda | Vale la pena?   | Comentario                                               |
+| ---------------------------------- | ----------------- | ---------------: | --------------- | -------------------------------------------------------- |
+| **Cargas Combustible**             | DILESA Maquinaria |            8,372 | sí              | Alto uso. Reddiseñable como "movimientos de activo"      |
+| **Horas Máquina**                  | DILESA Maquinaria |            6,968 | sí              | Alto uso. Same pattern                                   |
+| **Acarreos**                       | DILESA Maquinaria |            4,921 | sí              | Alto uso. Same pattern                                   |
+| **Tareas Construcción Terminadas** | DILESA            |           18,644 | sí              | Historia de construcción; tal vez fundir con `erp.tasks` |
+| **Plantilla Tareas Construcción**  | DILESA            |            1,748 | sí              | Templates; podría ser `erp.task_templates`               |
+| **Construcción por Lote**          | DILESA            |            1,372 | sí              | Avance de obra                                           |
+| **Urbanización por Lote**          | DILESA            |            1,240 | sí              | Avance urbanización                                      |
+| **Depósitos Clientes**             | DILESA            |            1,060 | sí              | Pagos inmobiliarios (ligado a cobranza)                  |
+| **CUV** (RUV)                      | DILESA            |            1,132 | sí              | Clave Única de Vivienda                                  |
+| **Documentos RUV**                 | DILESA            |              169 | sí              | INFONAVIT trámites                                       |
+| **Urgencias RUV**                  | DILESA            |              256 | sí              | same                                                     |
+| **Sueldos y Salarios**             | SR Group          |              162 | sí              | Fiscal personal                                          |
+| **Tablas ISR**                     | SR Group          |              989 | **NO**          | Catálogo SAT, reference data — usar servicio externo     |
+| **Activos financieros SR**         | SR Group          |              <50 | baja            | Inversiones personales                                   |
+| **Urbanización** (19 sub-módulos)  | DILESA            | cada uno bajo 1k | **NO replicar** | Rediseñar como "avances por partida"                     |
 
 ### ∅ Views/formularios muertos — NO migrar
 
@@ -232,21 +232,21 @@ Completar el ciclo de venta DILESA.
 
 Esto es donde **ganamos leverage real**. Un solo módulo BSOP sirve a múltiples empresas:
 
-| Módulo | Empresas servidas | Leverage |
-|---|---|---:|
-| Gastos | 4 (DILESA, ANSA, SR, RDB) | 4x |
-| Facturas | 3+ (SR fiscal, ANSA autos, DILESA futuro) | 3x |
-| Movimientos bancarios | 4 | 4x |
-| Conciliaciones | 4 | 4x |
-| Cuentas bancarias | 4 | 4x |
-| Clientes | 3 (DILESA, ANSA, RDB futuro) | 3x |
-| Citas | 2+ (ANSA, DILESA futuro) | 2x |
-| Empleados/RH | 4 (todas) | 4x — ya hecho ✅ |
-| Tasks | 4 (todas) | 4x — ya hecho ✅ |
-| Juntas | 4 (todas) | 4x — ya hecho ✅ |
-| Proveedores | 3 (DILESA, RDB, ANSA futuro) | 3x — ya hecho ✅ |
-| Documentos | 4 (todas — escrituras, contratos, facturas, recibos) | 4x — ya hecho ✅ |
-| Activos | 3 (ANSA, SR, DILESA maquinaria) | 3x |
+| Módulo                | Empresas servidas                                    |         Leverage |
+| --------------------- | ---------------------------------------------------- | ---------------: |
+| Gastos                | 4 (DILESA, ANSA, SR, RDB)                            |               4x |
+| Facturas              | 3+ (SR fiscal, ANSA autos, DILESA futuro)            |               3x |
+| Movimientos bancarios | 4                                                    |               4x |
+| Conciliaciones        | 4                                                    |               4x |
+| Cuentas bancarias     | 4                                                    |               4x |
+| Clientes              | 3 (DILESA, ANSA, RDB futuro)                         |               3x |
+| Citas                 | 2+ (ANSA, DILESA futuro)                             |               2x |
+| Empleados/RH          | 4 (todas)                                            | 4x — ya hecho ✅ |
+| Tasks                 | 4 (todas)                                            | 4x — ya hecho ✅ |
+| Juntas                | 4 (todas)                                            | 4x — ya hecho ✅ |
+| Proveedores           | 3 (DILESA, RDB, ANSA futuro)                         | 3x — ya hecho ✅ |
+| Documentos            | 4 (todas — escrituras, contratos, facturas, recibos) | 4x — ya hecho ✅ |
+| Activos               | 3 (ANSA, SR, DILESA maquinaria)                      |               3x |
 
 **Insight**: los siguientes 5-6 módulos que salgan (Gastos, Bancos, Citas, Facturas, Clientes, Conciliaciones) resuelven **muchísimo** para las 4 empresas de un solo golpe.
 
@@ -265,6 +265,7 @@ ANSA-Ventas es el doc más grande en densidad de uso (8k+ rows activos). Complej
 Los 19 sub-módulos de urbanización (excavación sanitaria, línea agua, pozo visita, transformador, carpeta asfáltica, etc.) son el "god module" de DILESA. No tiene sentido crear 19 tablas en BSOP.
 
 **Propuesta de rediseño** (para cuando toquemos esto):
+
 ```
 erp.obra_partidas (id, nombre, categoria, unidad, costo_estandar)
 erp.obra_avances (id, lote_id, partida_id, fecha, cantidad, costo_real, responsable, evidencia_url)
