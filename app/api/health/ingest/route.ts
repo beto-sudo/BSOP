@@ -452,13 +452,21 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown ingestion error';
+    const err = error as { message?: unknown; code?: unknown; details?: unknown; hint?: unknown };
+    const parts = [
+      typeof err?.message === 'string' && err.message ? err.message : null,
+      typeof err?.code === 'string' && err.code ? `code=${err.code}` : null,
+      typeof err?.details === 'string' && err.details ? `details=${err.details}` : null,
+      typeof err?.hint === 'string' && err.hint ? `hint=${err.hint}` : null,
+    ].filter(Boolean);
+    const message = parts.length ? parts.join(' | ') : 'Unknown ingestion error';
+    console.error('[health/ingest] failed', { message, error });
     await supabase.from('health_ingest_log').insert({
       payload_size_bytes: payloadSizeBytes,
       metrics_count: metrics.length,
       workouts_count: workouts.length,
       source_ip: sourceIp,
-      status: `error: ${message}`,
+      status: `error: ${message}`.slice(0, 1000),
     });
 
     return NextResponse.json({ error: message }, { status: 500 });
