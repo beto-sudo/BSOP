@@ -716,10 +716,7 @@ export function TasksModule({
     return true;
   });
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Render
-  // ───────────────────────────────────────────────────────────────────────────
-
+  // ── Render ────────────────────────────────────────────────────────────────
   const updatesSheetTask = useMemo(
     () => (showUpdatesSheet ? (tasks.find((t) => t.id === showUpdatesSheet) ?? null) : null),
     [showUpdatesSheet, tasks]
