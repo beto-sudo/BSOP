@@ -145,6 +145,12 @@ function parseDate(value: unknown) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+function dedupeByKey<T>(rows: T[], keyOf: (row: T) => string): T[] {
+  const map = new Map<string, T>();
+  for (const row of rows) map.set(keyOf(row), row);
+  return Array.from(map.values());
+}
+
 function normalizeMetricRecords(metrics: unknown[]) {
   const records: Array<{
     metric_name: string;
@@ -402,10 +408,18 @@ export async function POST(request: NextRequest) {
 
   const payload = envelopeParsed.data;
   const data = payload.data ?? payload;
-  const metrics = normalizeMetricRecords(Array.isArray(data.metrics) ? data.metrics : []);
-  const workouts = normalizeWorkouts(Array.isArray(data.workouts) ? data.workouts : []);
+  const metricsRaw = normalizeMetricRecords(Array.isArray(data.metrics) ? data.metrics : []);
+  const workoutsRaw = normalizeWorkouts(Array.isArray(data.workouts) ? data.workouts : []);
   const ecg = normalizeEcg(Array.isArray(data.ecg) ? data.ecg : []);
   const medications = normalizeMedications(Array.isArray(data.medications) ? data.medications : []);
+
+  // Postgres upsert cannot resolve ON CONFLICT twice for the same row within a
+  // single statement. Apple Health Auto Export (without Summarize Data) often
+  // emits multiple samples whose (metric_name, date, source) collapse to the
+  // same conflict key after normalization — so we dedupe in-memory first,
+  // keeping the last occurrence.
+  const metrics = dedupeByKey(metricsRaw, (r) => `${r.metric_name}|${r.date}|${r.source}`);
+  const workouts = dedupeByKey(workoutsRaw, (r) => `${r.name}|${r.start_time}|${r.source}`);
 
   const sourceIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
 
