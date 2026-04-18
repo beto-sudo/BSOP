@@ -1,6 +1,6 @@
 import { RequireAccess } from '@/components/require-access';
 import { HealthRangeSelector } from '@/components/health-range-selector';
-import { Shell } from '@/components/ui';
+import { Shell } from '@/components/ui/shell';
 import { HealthDashboardView } from '@/components/health-dashboard-view';
 import { getHealthDashboardData, type HealthRangePreset } from '@/lib/health';
 

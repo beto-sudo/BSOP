@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { Activity, BedDouble, Footprints, HeartPulse, MoonStar, Waves, Weight, X } from 'lucide-react';
-import { SectionHeading, Surface } from '@/components/ui';
+import { SectionHeading } from '@/components/ui/section-heading';
+import { Surface } from '@/components/ui/surface';
 import { formatDurationHours, formatMetricValue, type HealthDashboardRange, type HealthMetricRow, type HealthWorkoutRow } from '@/lib/health';
 
 type Point = { date: string; value: number };

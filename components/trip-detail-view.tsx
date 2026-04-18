@@ -1,5 +1,5 @@
 import { ArrowUpRight, Calendar, CheckCircle2, Link2, MapPin, Route, Users, Wallet } from 'lucide-react';
-import { Surface } from '@/components/ui';
+import { Surface } from '@/components/ui/surface';
 import { type TravelTrip } from '@/data/site';
 import { TravelExpenseTracker } from '@/components/travel-expense-tracker';
 

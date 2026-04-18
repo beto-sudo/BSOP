@@ -3,7 +3,8 @@
 import { notFound } from 'next/navigation';
 import { useParams } from 'next/navigation';
 import councilData from '@/data/rnd-council.json';
-import { Shell, Surface } from '@/components/ui';
+import { Shell } from '@/components/ui/shell';
+import { Surface } from '@/components/ui/surface';
 import { useLocale } from '@/lib/i18n';
 import { RequireAccess } from '@/components/require-access';
 
