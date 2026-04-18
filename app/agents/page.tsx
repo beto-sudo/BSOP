@@ -14,7 +14,7 @@ import {
 import agents from '@/data/agents.json';
 import { ActionLink } from '@/components/ui/action-link';
 import { SectionHeading } from '@/components/ui/section-heading';
-import { Shell } from '@/components/ui/shell';
+import { ContentShell } from '@/components/ui/content-shell';
 import { Surface } from '@/components/ui/surface';
 import { RequireAccess } from '@/components/require-access';
 
@@ -157,7 +157,7 @@ export default function AgentsPage() {
 
   return (
     <RequireAccess adminOnly>
-    <Shell>
+    <ContentShell>
       <SectionHeading
         eyebrow="Agents"
         title="Agent Operations Center"
@@ -400,7 +400,7 @@ export default function AgentsPage() {
           </div>
         </Surface>
       </section>
-    </Shell>
+    </ContentShell>
     </RequireAccess>
   );
 }

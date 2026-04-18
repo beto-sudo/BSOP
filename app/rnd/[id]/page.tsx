@@ -3,7 +3,7 @@
 import { notFound } from 'next/navigation';
 import { useParams } from 'next/navigation';
 import councilData from '@/data/rnd-council.json';
-import { Shell } from '@/components/ui/shell';
+import { ContentShell } from '@/components/ui/content-shell';
 import { Surface } from '@/components/ui/surface';
 import { useLocale } from '@/lib/i18n';
 import { RequireAccess } from '@/components/require-access';
@@ -118,7 +118,7 @@ export default function RndMemoDetailPage() {
 
   return (
     <RequireAccess adminOnly>
-    <Shell>
+    <ContentShell>
       <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <Surface className="overflow-hidden border-amber-300/15 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(255,255,255,0.02))] p-6 sm:p-8">
           <div className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-200/80">{t('rnd.detail.eyebrow')}</div>
@@ -298,7 +298,7 @@ export default function RndMemoDetailPage() {
           </div>
         </Surface>
       </section>
-    </Shell>
+    </ContentShell>
     </RequireAccess>
   );
 }

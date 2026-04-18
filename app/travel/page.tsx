@@ -3,13 +3,13 @@ import { ArrowUpRight, MapPin, Route, Users, Wallet } from 'lucide-react';
 import { travelTrips } from '@/data/site';
 import { ActionLink } from '@/components/ui/action-link';
 import { SectionHeading } from '@/components/ui/section-heading';
-import { Shell } from '@/components/ui/shell';
+import { ContentShell } from '@/components/ui/content-shell';
 import { Surface } from '@/components/ui/surface';
 
 export default function TravelPage() {
   return (
     <RequireAccess empresa="familia">
-    <Shell>
+    <ContentShell>
       <SectionHeading
         eyebrow="Viajes"
         title="Viajes reales con logística, presupuesto y operación compartida"
@@ -79,7 +79,7 @@ export default function TravelPage() {
           </Surface>
         ))}
       </div>
-    </Shell>
+    </ContentShell>
     </RequireAccess>
   );
 }

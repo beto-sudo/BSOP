@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import councilData from '@/data/rnd-council.json';
 import { SectionHeading } from '@/components/ui/section-heading';
-import { Shell } from '@/components/ui/shell';
+import { ContentShell } from '@/components/ui/content-shell';
 import { Surface } from '@/components/ui/surface';
 import { useLocale } from '@/lib/i18n';
 import { RequireAccess } from '@/components/require-access';
@@ -120,7 +120,7 @@ export default function RndCouncilPage() {
 
   return (
     <RequireAccess adminOnly>
-    <Shell>
+    <ContentShell>
       <section className="relative overflow-hidden rounded-[2rem] border border-amber-300/15 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(255,255,255,0.02))] p-6 sm:p-8">
         <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.15),transparent_55%)]" />
         <div className="relative grid gap-8 xl:grid-cols-[1.15fr_0.85fr]">
@@ -352,7 +352,7 @@ export default function RndCouncilPage() {
           </Surface>
         </div>
       </section>
-    </Shell>
+    </ContentShell>
     </RequireAccess>
   );
 }

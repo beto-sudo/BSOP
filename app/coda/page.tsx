@@ -17,7 +17,7 @@ import {
   Waypoints,
 } from 'lucide-react';
 import { SectionHeading } from '@/components/ui/section-heading';
-import { Shell } from '@/components/ui/shell';
+import { ContentShell } from '@/components/ui/content-shell';
 import { Surface } from '@/components/ui/surface';
 import { codaData, formatAuditTimestamp, formatInt, getHealthColor } from '@/data/coda';
 
@@ -27,7 +27,7 @@ const totalDocuments = codaData.documents.length;
 export default function CodaPage() {
   return (
     <RequireAccess empresa="coda">
-    <Shell>
+    <ContentShell>
       <SectionHeading
         eyebrow="Coda Architect"
         title="Five audited Coda systems, organized into one executive layer"
@@ -149,7 +149,7 @@ export default function CodaPage() {
           })}
         </div>
       </section>
-    </Shell>
+    </ContentShell>
     </RequireAccess>
   );
 }

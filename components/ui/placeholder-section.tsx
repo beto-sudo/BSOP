@@ -1,5 +1,5 @@
 import { Hammer } from 'lucide-react';
-import { Shell } from '@/components/ui/shell';
+import { ContentShell } from '@/components/ui/content-shell';
 import { Surface } from '@/components/ui/surface';
 
 export function PlaceholderSection({
@@ -12,7 +12,7 @@ export function PlaceholderSection({
   description: string;
 }) {
   return (
-    <Shell>
+    <ContentShell>
       <Surface className="overflow-hidden p-8 sm:p-10">
         <div className="inline-flex items-center gap-2 rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/12 px-3 py-1 text-xs font-medium text-[var(--accent-soft)]">
           <Hammer className="h-4 w-4" />
@@ -30,6 +30,6 @@ export function PlaceholderSection({
           </div>
         </div>
       </Surface>
-    </Shell>
+    </ContentShell>
   );
 }
