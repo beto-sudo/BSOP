@@ -52,7 +52,7 @@ export function getAdjuntoPath(urlOrPath: string | null | undefined): string | n
 export async function getAdjuntoSignedUrl(
   supabase: SupabaseClient,
   urlOrPath: string | null | undefined,
-  expiresInSeconds = 3600,
+  expiresInSeconds = 3600
 ): Promise<string> {
   const path = getAdjuntoPath(urlOrPath);
   if (!path) return '';
@@ -73,7 +73,7 @@ export async function getAdjuntoSignedUrl(
 export async function getAdjuntoSignedUrls(
   supabase: SupabaseClient,
   urlsOrPaths: Array<string | null | undefined>,
-  expiresInSeconds = 3600,
+  expiresInSeconds = 3600
 ): Promise<Map<string, string>> {
   const pathByIndex = urlsOrPaths.map(getAdjuntoPath);
   const uniquePaths = Array.from(new Set(pathByIndex.filter((p): p is string => Boolean(p))));
@@ -106,7 +106,7 @@ export async function getAdjuntoSignedUrls(
  */
 export function walkTiptapImages(
   node: unknown,
-  visit: (imageNode: { attrs?: Record<string, unknown> }) => void,
+  visit: (imageNode: { attrs?: Record<string, unknown> }) => void
 ): void {
   if (!node || typeof node !== 'object') return;
   const n = node as { type?: string; content?: unknown[]; attrs?: Record<string, unknown> };
@@ -124,7 +124,7 @@ export function walkTiptapImages(
 export async function rewriteTiptapImagesToSigned(
   supabase: SupabaseClient,
   tree: unknown,
-  expiresInSeconds = 3600,
+  expiresInSeconds = 3600
 ): Promise<unknown> {
   if (!tree) return tree;
   const clone = JSON.parse(JSON.stringify(tree));
@@ -182,17 +182,14 @@ function extractImgSrcs(html: string): string[] {
   return out;
 }
 
-function replaceImgSrcs(
-  html: string,
-  transform: (src: string) => string,
-): string {
+function replaceImgSrcs(html: string, transform: (src: string) => string): string {
   return html.replace(
     /(<img\b[^>]*?\bsrc\s*=\s*)(?:"([^"]*)"|'([^']*)')/gi,
     (_full, prefix, dq, sq) => {
       const src = dq ?? sq ?? '';
       const next = transform(src);
       return `${prefix}"${next.replace(/"/g, '&quot;')}"`;
-    },
+    }
   );
 }
 
@@ -203,7 +200,7 @@ function replaceImgSrcs(
 export async function rewriteHtmlImagesToSigned(
   supabase: SupabaseClient,
   html: string | null | undefined,
-  expiresInSeconds = 3600,
+  expiresInSeconds = 3600
 ): Promise<string> {
   if (!html) return '';
   const srcs = extractImgSrcs(html);

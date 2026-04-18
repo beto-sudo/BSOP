@@ -48,16 +48,23 @@ export function useTravelExpenses({
 
     setLoading(true);
 
-    const [{ data: participantRows }, { data: expenseRows }, { data: tokenRows }] = await Promise.all([
-      supabase.from('trip_participants').select('id,name,emoji').eq('trip_slug', tripSlug).order('created_at'),
-      supabase
-        .from('trip_expenses')
-        .select('id,concept,category,amount,currency,exchange_rate,base_currency,base_amount,paid_by,notes,expense_date,expense_splits(participant_id)')
-        .eq('trip_slug', tripSlug)
-        .order('expense_date', { ascending: false })
-        .order('created_at', { ascending: false }),
-      supabase.from('trip_share_tokens').select('token').eq('trip_slug', tripSlug).maybeSingle(),
-    ]);
+    const [{ data: participantRows }, { data: expenseRows }, { data: tokenRows }] =
+      await Promise.all([
+        supabase
+          .from('trip_participants')
+          .select('id,name,emoji')
+          .eq('trip_slug', tripSlug)
+          .order('created_at'),
+        supabase
+          .from('trip_expenses')
+          .select(
+            'id,concept,category,amount,currency,exchange_rate,base_currency,base_amount,paid_by,notes,expense_date,expense_splits(participant_id)'
+          )
+          .eq('trip_slug', tripSlug)
+          .order('expense_date', { ascending: false })
+          .order('created_at', { ascending: false }),
+        supabase.from('trip_share_tokens').select('token').eq('trip_slug', tripSlug).maybeSingle(),
+      ]);
 
     const nextParticipants = (participantRows ?? []) as Participant[];
     setParticipants(nextParticipants);
@@ -78,7 +85,7 @@ export function useTravelExpenses({
   const summary = useMemo(() => buildSettlement(participants, expenses), [participants, expenses]);
   const totalGeneral = useMemo(
     () => expenses.reduce((sum, expense) => sum + Number(expense.base_amount), 0),
-    [expenses],
+    [expenses]
   );
 
   async function ensurePresetParticipants() {
@@ -108,7 +115,8 @@ export function useTravelExpenses({
 
   async function addExpense(e: FormEvent) {
     e.preventDefault();
-    if (!supabase || !expenseDraft.concept.trim() || !expenseDraft.amount || !expenseDraft.paidBy) return;
+    if (!supabase || !expenseDraft.concept.trim() || !expenseDraft.amount || !expenseDraft.paidBy)
+      return;
 
     const amount = Number(expenseDraft.amount);
     const exchangeRate = Number(expenseDraft.exchangeRate) || 1;
@@ -136,12 +144,16 @@ export function useTravelExpenses({
       .select('id')
       .single();
 
-    if (expense?.id && sharingParticipants.length && sharingParticipants.length !== participants.length) {
+    if (
+      expense?.id &&
+      sharingParticipants.length &&
+      sharingParticipants.length !== participants.length
+    ) {
       await supabase.from('expense_splits').insert(
         sharingParticipants.map((participantId) => ({
           expense_id: expense.id,
           participant_id: participantId,
-        })),
+        }))
       );
     }
 
@@ -163,7 +175,11 @@ export function useTravelExpenses({
   async function generateShareLink() {
     if (!supabase || typeof window === 'undefined') return;
     setSaving(true);
-    const existing = await supabase.from('trip_share_tokens').select('token').eq('trip_slug', tripSlug).maybeSingle();
+    const existing = await supabase
+      .from('trip_share_tokens')
+      .select('token')
+      .eq('trip_slug', tripSlug)
+      .maybeSingle();
     const token = existing.data?.token ?? hexToken();
 
     if (!existing.data?.token) {

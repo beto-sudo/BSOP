@@ -48,10 +48,20 @@ export function summarizeWindow(rows: HealthMetricRow[], days: number, endOffset
 }
 
 export function formatDateLabel(date: string) {
-  return new Date(`${date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return new Date(`${date}T00:00:00`).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
 }
 
-export function buildLinePath(trend: Point[], min: number, range: number, width = 320, height = 180, padding = 14) {
+export function buildLinePath(
+  trend: Point[],
+  min: number,
+  range: number,
+  width = 320,
+  height = 180,
+  padding = 14
+) {
   return trend
     .map((point, index) => {
       const x = (index / Math.max(trend.length - 1, 1)) * (width - padding * 2) + padding;

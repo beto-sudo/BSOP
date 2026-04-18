@@ -1,5 +1,10 @@
 'use client';
 
+/* eslint-disable @typescript-eslint/no-explicit-any --
+ * Cleanup PR (#30): pre-existing `any` on Supabase row mapping for meeting
+ * data. Proper typing requires schema refactor — out of scope for lint cleanup.
+ */
+
 import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -17,7 +22,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -105,38 +114,44 @@ type TaskUpdate = {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ESTADO_JUNTA: Record<Junta['estado'], { label: string; cls: string }> = {
-  programada:  { label: 'Programada',  cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
-  en_curso:    { label: 'En curso',    cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
-  completada:  { label: 'Completada',  cls: 'bg-[var(--border)]/60 text-[var(--text)]/50 border-[var(--border)]' },
-  cancelada:   { label: 'Cancelada',   cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
+  programada: { label: 'Programada', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
+  en_curso: { label: 'En curso', cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
+  completada: {
+    label: 'Completada',
+    cls: 'bg-[var(--border)]/60 text-[var(--text)]/50 border-[var(--border)]',
+  },
+  cancelada: { label: 'Cancelada', cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
 };
 
 const ESTADO_TASK: Record<string, { label: string; cls: string }> = {
-  pendiente:   { label: 'Pendiente',   cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
+  pendiente: { label: 'Pendiente', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
   en_progreso: { label: 'En progreso', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
-  bloqueado:   { label: 'Bloqueado',   cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
-  completado:  { label: 'Completado',  cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
-  cancelado:   { label: 'Cancelado',   cls: 'bg-[var(--border)]/60 text-[var(--text)]/40 border-[var(--border)]' },
+  bloqueado: { label: 'Bloqueado', cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
+  completado: { label: 'Completado', cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
+  cancelado: {
+    label: 'Cancelado',
+    cls: 'bg-[var(--border)]/60 text-[var(--text)]/40 border-[var(--border)]',
+  },
 };
 
 const PRIORIDAD_OPTIONS = ['Urgente', 'Alta', 'Media', 'Baja'] as const;
 
 const TIPO_CONFIG: Record<string, string> = {
-  operativa:                    '⚙️ Operativa',
-  directiva:                    '🏛️ Directiva',
-  seguimiento:                  '📊 Seguimiento',
-  emergencia:                   '🚨 Emergencia',
-  Consejo:                      '🏢 Consejo',
-  'Comite Ejecutivo':           '👔 Comité Ejecutivo',
-  Ventas:                       '💰 Ventas',
-  'Atención PosVenta':          '🔧 Atención PosVenta',
-  Administración:               '📁 Administración',
-  Mercadotecnia:                '📣 Mercadotecnia',
-  Construcción:                 '🏗️ Construcción',
-  'Compras y Admon. Inventario':'📦 Compras y Admon. Inventario',
-  Maquinaria:                   '🚜 Maquinaria',
-  Proyectos:                    '🗂️ Proyectos',
-  'Rincón del Bosque':          '🌲 Rincón del Bosque',
+  operativa: '⚙️ Operativa',
+  directiva: '🏛️ Directiva',
+  seguimiento: '📊 Seguimiento',
+  emergencia: '🚨 Emergencia',
+  Consejo: '🏢 Consejo',
+  'Comite Ejecutivo': '👔 Comité Ejecutivo',
+  Ventas: '💰 Ventas',
+  'Atención PosVenta': '🔧 Atención PosVenta',
+  Administración: '📁 Administración',
+  Mercadotecnia: '📣 Mercadotecnia',
+  Construcción: '🏗️ Construcción',
+  'Compras y Admon. Inventario': '📦 Compras y Admon. Inventario',
+  Maquinaria: '🚜 Maquinaria',
+  Proyectos: '🗂️ Proyectos',
+  'Rincón del Bosque': '🌲 Rincón del Bosque',
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -192,20 +207,57 @@ function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
 
   return (
     <div className="flex flex-wrap items-center gap-0.5 rounded-t-xl border border-[var(--border)] bg-[var(--card)] p-1.5">
-      {btn(editor.isActive('bold'), () => editor.chain().focus().toggleBold().run(), 'Negrita', <Bold className="h-3.5 w-3.5" />)}
-      {btn(editor.isActive('italic'), () => editor.chain().focus().toggleItalic().run(), 'Cursiva', <Italic className="h-3.5 w-3.5" />)}
-      {btn(editor.isActive('underline'), () => editor.chain().focus().toggleUnderline().run(), 'Subrayado', <UnderlineIcon className="h-3.5 w-3.5" />)}
+      {btn(
+        editor.isActive('bold'),
+        () => editor.chain().focus().toggleBold().run(),
+        'Negrita',
+        <Bold className="h-3.5 w-3.5" />
+      )}
+      {btn(
+        editor.isActive('italic'),
+        () => editor.chain().focus().toggleItalic().run(),
+        'Cursiva',
+        <Italic className="h-3.5 w-3.5" />
+      )}
+      {btn(
+        editor.isActive('underline'),
+        () => editor.chain().focus().toggleUnderline().run(),
+        'Subrayado',
+        <UnderlineIcon className="h-3.5 w-3.5" />
+      )}
       <div className="mx-1 h-5 w-px bg-[var(--border)]" />
-      {btn(editor.isActive('heading', { level: 2 }), () => editor.chain().focus().toggleHeading({ level: 2 }).run(), 'Encabezado 2', <Heading2 className="h-3.5 w-3.5" />)}
-      {btn(editor.isActive('heading', { level: 3 }), () => editor.chain().focus().toggleHeading({ level: 3 }).run(), 'Encabezado 3', <Heading3 className="h-3.5 w-3.5" />)}
+      {btn(
+        editor.isActive('heading', { level: 2 }),
+        () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
+        'Encabezado 2',
+        <Heading2 className="h-3.5 w-3.5" />
+      )}
+      {btn(
+        editor.isActive('heading', { level: 3 }),
+        () => editor.chain().focus().toggleHeading({ level: 3 }).run(),
+        'Encabezado 3',
+        <Heading3 className="h-3.5 w-3.5" />
+      )}
       <div className="mx-1 h-5 w-px bg-[var(--border)]" />
-      {btn(editor.isActive('bulletList'), () => editor.chain().focus().toggleBulletList().run(), 'Lista con viñetas', <List className="h-3.5 w-3.5" />)}
-      {btn(editor.isActive('orderedList'), () => editor.chain().focus().toggleOrderedList().run(), 'Lista numerada', <ListOrdered className="h-3.5 w-3.5" />)}
+      {btn(
+        editor.isActive('bulletList'),
+        () => editor.chain().focus().toggleBulletList().run(),
+        'Lista con viñetas',
+        <List className="h-3.5 w-3.5" />
+      )}
+      {btn(
+        editor.isActive('orderedList'),
+        () => editor.chain().focus().toggleOrderedList().run(),
+        'Lista numerada',
+        <ListOrdered className="h-3.5 w-3.5" />
+      )}
       <div className="mx-1 h-5 w-px bg-[var(--border)]" />
       <button
         type="button"
         title="Insertar tabla"
-        onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+        onClick={() =>
+          editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+        }
         className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-sm text-[var(--text)]/60 hover:bg-[var(--panel)] hover:text-[var(--text)] transition"
       >
         <Table2 className="h-3.5 w-3.5" />
@@ -334,14 +386,29 @@ function JuntaDetailInner() {
 
     const taskIds = (tasksData ?? []).map((t: any) => t.id);
     if (taskIds.length > 0) {
-      const { data: updatesData } = await supabase.schema('erp').from('task_updates').select('*').in('task_id', taskIds).order('created_at', { ascending: false });
+      const { data: updatesData } = await supabase
+        .schema('erp')
+        .from('task_updates')
+        .select('*')
+        .in('task_id', taskIds)
+        .order('created_at', { ascending: false });
       if (updatesData && updatesData.length > 0) {
         const userIds = [...new Set(updatesData.map((u: any) => u.creado_por).filter(Boolean))];
-        const { data: usersData } = userIds.length > 0
-          ? await supabase.schema('core').from('usuarios').select('id, first_name').in('id', userIds)
-          : { data: [] };
+        const { data: usersData } =
+          userIds.length > 0
+            ? await supabase
+                .schema('core')
+                .from('usuarios')
+                .select('id, first_name')
+                .in('id', userIds)
+            : { data: [] };
         const userMap = new Map((usersData ?? []).map((u: any) => [u.id, u.first_name]));
-        setTaskUpdates(updatesData.map((u: any) => ({ ...u, usuario: u.creado_por ? { nombre: userMap.get(u.creado_por) ?? 'Usuario' } : null })));
+        setTaskUpdates(
+          updatesData.map((u: any) => ({
+            ...u,
+            usuario: u.creado_por ? { nombre: userMap.get(u.creado_por) ?? 'Usuario' } : null,
+          }))
+        );
       } else {
         setTaskUpdates([]);
       }
@@ -437,19 +504,28 @@ function JuntaDetailInner() {
         const currentHtml = editor.getHTML();
         if (currentHtml === lastSavedHtmlRef.current) return;
         setAutoSaveStatus('saving');
-        const { error: err } = await supabase.schema('erp').from('juntas').update({
-          descripcion: currentHtml && currentHtml !== '<p></p>' ? currentHtml : null,
-        }).eq('id', junta.id);
+        const { error: err } = await supabase
+          .schema('erp')
+          .from('juntas')
+          .update({
+            descripcion: currentHtml && currentHtml !== '<p></p>' ? currentHtml : null,
+          })
+          .eq('id', junta.id);
         if (!err) {
           lastSavedHtmlRef.current = currentHtml;
           setAutoSaveStatus('saved');
           setTimeout(() => setAutoSaveStatus('idle'), 2000);
-        } else { setAutoSaveStatus('idle'); }
+        } else {
+          setAutoSaveStatus('idle');
+        }
       }, 3000);
     };
     editor.on('update', handleUpdate);
     lastSavedHtmlRef.current = editor.getHTML();
-    return () => { editor.off('update', handleUpdate); if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current); };
+    return () => {
+      editor.off('update', handleUpdate);
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
   }, [editor, junta, estado, supabase]);
 
   // Emergency save on tab hide / page unload
@@ -460,24 +536,44 @@ function JuntaDetailInner() {
     const flushSave = () => {
       const html = editor.getHTML();
       if (html !== lastSavedHtmlRef.current && html !== '<p></p>') {
-        supabase.schema('erp').from('juntas').update({ descripcion: html }).eq('id', juntaId).then(() => { lastSavedHtmlRef.current = html; });
+        supabase
+          .schema('erp')
+          .from('juntas')
+          .update({ descripcion: html })
+          .eq('id', juntaId)
+          .then(() => {
+            lastSavedHtmlRef.current = html;
+          });
       }
     };
-    const handleVisChange = () => { if (document.visibilityState === 'hidden') flushSave(); };
+    const handleVisChange = () => {
+      if (document.visibilityState === 'hidden') flushSave();
+    };
     const handleBeforeUnload = () => flushSave();
     document.addEventListener('visibilitychange', handleVisChange);
     window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => { document.removeEventListener('visibilitychange', handleVisChange); window.removeEventListener('beforeunload', handleBeforeUnload); };
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
   }, [editor, junta, estado, supabase]);
 
   // Live polling: refresh notes, tasks & attendance every 10s when active
   const isEditingRef = useRef(false);
   useEffect(() => {
     if (editor) {
-      const onFocus = () => { isEditingRef.current = true; };
-      const onBlur = () => { isEditingRef.current = false; };
-      editor.on('focus', onFocus); editor.on('blur', onBlur);
-      return () => { editor.off('focus', onFocus); editor.off('blur', onBlur); };
+      const onFocus = () => {
+        isEditingRef.current = true;
+      };
+      const onBlur = () => {
+        isEditingRef.current = false;
+      };
+      editor.on('focus', onFocus);
+      editor.on('blur', onBlur);
+      return () => {
+        editor.off('focus', onFocus);
+        editor.off('blur', onBlur);
+      };
     }
   }, [editor]);
 
@@ -488,7 +584,12 @@ function JuntaDetailInner() {
     const poll = async () => {
       try {
         if (!isEditingRef.current && editor) {
-          const { data: fresh } = await supabase.schema('erp').from('juntas').select('descripcion').eq('id', juntaId).maybeSingle();
+          const { data: fresh } = await supabase
+            .schema('erp')
+            .from('juntas')
+            .select('descripcion')
+            .eq('id', juntaId)
+            .maybeSingle();
           if (fresh) {
             const remoteHtml = fresh.descripcion ?? '';
             const localHtml = editor.getHTML();
@@ -498,27 +599,54 @@ function JuntaDetailInner() {
             }
           }
         }
-        const { data: tasksData } = await supabase.schema('erp').from('tasks').select('id, titulo, estado, asignado_a, fecha_vence').eq('entidad_tipo', 'junta').eq('entidad_id', juntaId).order('created_at');
+        const { data: tasksData } = await supabase
+          .schema('erp')
+          .from('tasks')
+          .select('id, titulo, estado, asignado_a, fecha_vence')
+          .eq('entidad_tipo', 'junta')
+          .eq('entidad_id', juntaId)
+          .order('created_at');
         if (tasksData) {
           setTasks(tasksData as JuntaTask[]);
           const tIds = tasksData.map((t: any) => t.id);
           if (tIds.length > 0) {
-            const { data: updData } = await supabase.schema('erp').from('task_updates')
-              .select('*').in('task_id', tIds).order('created_at', { ascending: false });
+            const { data: updData } = await supabase
+              .schema('erp')
+              .from('task_updates')
+              .select('*')
+              .in('task_id', tIds)
+              .order('created_at', { ascending: false });
             if (updData) {
               const uIds = [...new Set(updData.map((u: any) => u.creado_por).filter(Boolean))];
-              const { data: uData } = uIds.length > 0
-                ? await supabase.schema('core').from('usuarios').select('id, first_name').in('id', uIds)
-                : { data: [] };
+              const { data: uData } =
+                uIds.length > 0
+                  ? await supabase
+                      .schema('core')
+                      .from('usuarios')
+                      .select('id, first_name')
+                      .in('id', uIds)
+                  : { data: [] };
               const uMap = new Map((uData ?? []).map((u: any) => [u.id, u.first_name]));
-              setTaskUpdates(updData.map((u: any) => ({ ...u, usuario: u.creado_por ? { nombre: uMap.get(u.creado_por) ?? 'Usuario' } : null })));
+              setTaskUpdates(
+                updData.map((u: any) => ({
+                  ...u,
+                  usuario: u.creado_por ? { nombre: uMap.get(u.creado_por) ?? 'Usuario' } : null,
+                }))
+              );
             }
           }
         }
-        const { data: asistData } = await supabase.schema('erp').from('juntas_asistencia').select('*, persona:persona_id(nombre, apellido_paterno)').eq('junta_id', juntaId).order('created_at');
+        const { data: asistData } = await supabase
+          .schema('erp')
+          .from('juntas_asistencia')
+          .select('*, persona:persona_id(nombre, apellido_paterno)')
+          .eq('junta_id', juntaId)
+          .order('created_at');
         if (asistData) setAsistencia(asistData as Asistencia[]);
         setLastPoll(new Date().toLocaleTimeString());
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     };
     const interval = setInterval(poll, 10000);
     void poll();
@@ -534,17 +662,11 @@ function JuntaDetailInner() {
       .update({ asistio: next })
       .eq('id', asistId);
 
-    setAsistencia((prev) =>
-      prev.map((a) => (a.id === asistId ? { ...a, asistio: next } : a))
-    );
+    setAsistencia((prev) => prev.map((a) => (a.id === asistId ? { ...a, asistio: next } : a)));
   };
 
   const handleRemoveParticipant = async (asistId: string) => {
-    await supabase
-      .schema('erp')
-      .from('juntas_asistencia')
-      .delete()
-      .eq('id', asistId);
+    await supabase.schema('erp').from('juntas_asistencia').delete().eq('id', asistId);
 
     setAsistencia((prev) => prev.filter((a) => a.id !== asistId));
   };
@@ -580,7 +702,9 @@ function JuntaDetailInner() {
     if (!taskForm.titulo.trim() || !junta) return;
     setAddingTask(true);
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     const { data: coreUser } = await supabase
       .schema('core')
       .from('usuarios')
@@ -614,7 +738,14 @@ function JuntaDetailInner() {
     }
 
     setTasks((prev) => [...prev, newTask as JuntaTask]);
-    setTaskForm({ titulo: '', descripcion: '', asignado_a: '', prioridad: '', estado: 'pendiente', fecha_vence: '' });
+    setTaskForm({
+      titulo: '',
+      descripcion: '',
+      asignado_a: '',
+      prioridad: '',
+      estado: 'pendiente',
+      fecha_vence: '',
+    });
     setShowAddTask(false);
   };
 
@@ -639,8 +770,8 @@ function JuntaDetailInner() {
         result.emailsSent > 0
           ? ` Minuta enviada a ${result.emailsSent} participante(s).`
           : result.warning
-          ? ` (${result.warning})`
-          : '';
+            ? ` (${result.warning})`
+            : '';
       alert(`Junta terminada.${emailMsg}`);
     } finally {
       setTerminating(false);
@@ -651,24 +782,55 @@ function JuntaDetailInner() {
     const taskId = showAddUpdate;
     if (!taskId || !updateForm.contenido.trim() || !junta) return;
     setSavingUpdate(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data: coreUser } = await supabase.schema('core').from('usuarios').select('id, first_name').eq('email', (user?.email ?? '').toLowerCase()).maybeSingle();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const { data: coreUser } = await supabase
+      .schema('core')
+      .from('usuarios')
+      .select('id, first_name')
+      .eq('email', (user?.email ?? '').toLowerCase())
+      .maybeSingle();
     const userId = coreUser?.id ?? null;
     const userName = coreUser?.first_name ?? 'Usuario';
 
     const inserts: any[] = [];
-    inserts.push({ task_id: taskId, empresa_id: junta.empresa_id, tipo: 'avance', contenido: updateForm.contenido.trim(), creado_por: userId });
+    inserts.push({
+      task_id: taskId,
+      empresa_id: junta.empresa_id,
+      tipo: 'avance',
+      contenido: updateForm.contenido.trim(),
+      creado_por: userId,
+    });
 
-    const task = tasks.find(t => t.id === taskId);
+    const task = tasks.find((t) => t.id === taskId);
     if (updateForm.nuevoEstado && task && updateForm.nuevoEstado !== task.estado) {
-      inserts.push({ task_id: taskId, empresa_id: junta.empresa_id, tipo: 'cambio_estado', valor_anterior: task.estado, valor_nuevo: updateForm.nuevoEstado, creado_por: userId });
+      inserts.push({
+        task_id: taskId,
+        empresa_id: junta.empresa_id,
+        tipo: 'cambio_estado',
+        valor_anterior: task.estado,
+        valor_nuevo: updateForm.nuevoEstado,
+        creado_por: userId,
+      });
     }
     if (updateForm.nuevaFecha && task && updateForm.nuevaFecha !== (task.fecha_vence ?? '')) {
-      inserts.push({ task_id: taskId, empresa_id: junta.empresa_id, tipo: 'cambio_fecha', valor_anterior: task.fecha_vence ?? '', valor_nuevo: updateForm.nuevaFecha, creado_por: userId });
+      inserts.push({
+        task_id: taskId,
+        empresa_id: junta.empresa_id,
+        tipo: 'cambio_fecha',
+        valor_anterior: task.fecha_vence ?? '',
+        valor_nuevo: updateForm.nuevaFecha,
+        creado_por: userId,
+      });
     }
 
     const { error: insErr } = await supabase.schema('erp').from('task_updates').insert(inserts);
-    if (insErr) { alert(`Error: ${insErr.message}`); setSavingUpdate(false); return; }
+    if (insErr) {
+      alert(`Error: ${insErr.message}`);
+      setSavingUpdate(false);
+      return;
+    }
 
     const taskPatch: any = {};
     if (updateForm.nuevoEstado && task && updateForm.nuevoEstado !== task.estado) {
@@ -681,7 +843,7 @@ function JuntaDetailInner() {
     }
     if (Object.keys(taskPatch).length > 0) {
       await supabase.schema('erp').from('tasks').update(taskPatch).eq('id', taskId);
-      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...taskPatch } : t));
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, ...taskPatch } : t)));
     }
 
     const now = new Date().toISOString();
@@ -696,7 +858,7 @@ function JuntaDetailInner() {
       created_at: now,
       usuario: { nombre: userName },
     }));
-    setTaskUpdates(prev => [...newUpdates, ...prev]);
+    setTaskUpdates((prev) => [...newUpdates, ...prev]);
 
     setSavingUpdate(false);
     setShowAddUpdate(null);
@@ -719,11 +881,7 @@ function JuntaDetailInner() {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
         <p className="text-red-400">{error ?? 'Junta no encontrada'}</p>
-        <Button
-          variant="outline"
-          onClick={() => router.back()}
-          className="mt-4 rounded-xl"
-        >
+        <Button variant="outline" onClick={() => router.back()} className="mt-4 rounded-xl">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Volver
         </Button>
@@ -749,10 +907,18 @@ function JuntaDetailInner() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-[var(--text)] line-clamp-1">{junta.titulo}</h1>
+            <h1 className="text-xl font-bold tracking-tight text-[var(--text)] line-clamp-1">
+              {junta.titulo}
+            </h1>
             <p className="text-xs text-[var(--text)]/50 mt-0.5">
               {new Date(junta.fecha_hora).toLocaleString('es-MX', {
-                weekday: 'long', day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true,
+                weekday: 'long',
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true,
               })}
             </p>
           </div>
@@ -762,12 +928,12 @@ function JuntaDetailInner() {
             <Button
               variant="outline"
               onClick={() => {
-              if (asistencia.length === 0) {
-                alert('Debes agregar al menos 1 participante antes de terminar la junta.');
-                return;
-              }
-              setShowTerminarDialog(true);
-            }}
+                if (asistencia.length === 0) {
+                  alert('Debes agregar al menos 1 participante antes de terminar la junta.');
+                  return;
+                }
+                setShowTerminarDialog(true);
+              }}
               disabled={terminating}
               className="gap-1.5 rounded-xl border-green-500/40 text-green-500 hover:bg-green-500/10 hover:border-green-500/60"
             >
@@ -831,7 +997,9 @@ function JuntaDetailInner() {
               </SelectTrigger>
               <SelectContent>
                 {Object.entries(ESTADO_JUNTA).map(([k, v]) => (
-                  <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                  <SelectItem key={k} value={k}>
+                    {v.label}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -844,7 +1012,9 @@ function JuntaDetailInner() {
               </SelectTrigger>
               <SelectContent>
                 {Object.entries(TIPO_CONFIG).map(([k, v]) => (
-                  <SelectItem key={k} value={k}>{v}</SelectItem>
+                  <SelectItem key={k} value={k}>
+                    {v}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -894,12 +1064,16 @@ function JuntaDetailInner() {
         </div>
         <p className="mt-2 text-[10px] text-[var(--text)]/40">
           {estado !== 'completada' && estado !== 'cancelada'
-              ? autoSaveStatus === 'saving' ? '⏳ Guardando notas...'
-                : autoSaveStatus === 'saved' ? '✅ Notas guardadas'
+            ? autoSaveStatus === 'saving'
+              ? '⏳ Guardando notas...'
+              : autoSaveStatus === 'saved'
+                ? '✅ Notas guardadas'
                 : 'Las notas se auto-guardan mientras escribes'
-              : 'Las notas se guardan al presionar "Guardar cambios"'}
+            : 'Las notas se guardan al presionar "Guardar cambios"'}
         </p>
-        {lastPoll && estado !== 'completada' && estado !== 'cancelada' && <span className="text-[10px] text-[var(--text)]/30">• Sync: {lastPoll}</span>}
+        {lastPoll && estado !== 'completada' && estado !== 'cancelada' && (
+          <span className="text-[10px] text-[var(--text)]/30">• Sync: {lastPoll}</span>
+        )}
       </div>
 
       {/* ── Actualizaciones de tareas ─────────────────────────── */}
@@ -911,54 +1085,86 @@ function JuntaDetailInner() {
               <Clock className="mb-2 h-8 w-8 text-[var(--text)]/20" />
               <p className="text-sm text-[var(--text)]/50">No hay actualizaciones registradas</p>
             </div>
-          ) : (() => {
-            const grouped = new Map<string, TaskUpdate[]>();
-            for (const u of taskUpdates) {
-              const arr = grouped.get(u.task_id) ?? [];
-              arr.push(u);
-              grouped.set(u.task_id, arr);
-            }
-            return (
-              <div className="space-y-4">
-                {Array.from(grouped.entries()).map(([taskId, updates]) => {
-                  const task = tasks.find(t => t.id === taskId);
-                  if (!task) return null;
-                  return (
-                    <div key={taskId} className="space-y-2">
-                      <p className="text-xs font-semibold text-[var(--text)]/50 uppercase tracking-wide">{task.titulo}</p>
-                      {updates.map(u => {
-                        const tipoCfg: Record<string, { label: string; cls: string }> = {
-                          avance: { label: 'Avance', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
-                          cambio_estado: { label: 'Estado', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
-                          cambio_fecha: { label: 'Fecha', cls: 'bg-purple-500/15 text-purple-400 border-purple-500/20' },
-                          nota: { label: 'Nota', cls: 'bg-[var(--border)]/60 text-[var(--text)]/60 border-[var(--border)]' },
-                          cambio_responsable: { label: 'Responsable', cls: 'bg-teal-500/15 text-teal-400 border-teal-500/20' },
-                        };
-                        const tc = tipoCfg[u.tipo] ?? { label: u.tipo, cls: '' };
-                        return (
-                          <div key={u.id} className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2.5">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[10px] font-medium ${tc.cls}`}>{tc.label}</span>
-                              <span className="text-[10px] text-[var(--text)]/40">{u.usuario?.nombre ?? 'Sistema'}</span>
-                              <span className="text-[10px] text-[var(--text)]/30 ml-auto">{formatDate(u.created_at)}</span>
+          ) : (
+            (() => {
+              const grouped = new Map<string, TaskUpdate[]>();
+              for (const u of taskUpdates) {
+                const arr = grouped.get(u.task_id) ?? [];
+                arr.push(u);
+                grouped.set(u.task_id, arr);
+              }
+              return (
+                <div className="space-y-4">
+                  {Array.from(grouped.entries()).map(([taskId, updates]) => {
+                    const task = tasks.find((t) => t.id === taskId);
+                    if (!task) return null;
+                    return (
+                      <div key={taskId} className="space-y-2">
+                        <p className="text-xs font-semibold text-[var(--text)]/50 uppercase tracking-wide">
+                          {task.titulo}
+                        </p>
+                        {updates.map((u) => {
+                          const tipoCfg: Record<string, { label: string; cls: string }> = {
+                            avance: {
+                              label: 'Avance',
+                              cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
+                            },
+                            cambio_estado: {
+                              label: 'Estado',
+                              cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
+                            },
+                            cambio_fecha: {
+                              label: 'Fecha',
+                              cls: 'bg-purple-500/15 text-purple-400 border-purple-500/20',
+                            },
+                            nota: {
+                              label: 'Nota',
+                              cls: 'bg-[var(--border)]/60 text-[var(--text)]/60 border-[var(--border)]',
+                            },
+                            cambio_responsable: {
+                              label: 'Responsable',
+                              cls: 'bg-teal-500/15 text-teal-400 border-teal-500/20',
+                            },
+                          };
+                          const tc = tipoCfg[u.tipo] ?? { label: u.tipo, cls: '' };
+                          return (
+                            <div
+                              key={u.id}
+                              className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2.5"
+                            >
+                              <div className="flex items-center gap-2 mb-1">
+                                <span
+                                  className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[10px] font-medium ${tc.cls}`}
+                                >
+                                  {tc.label}
+                                </span>
+                                <span className="text-[10px] text-[var(--text)]/40">
+                                  {u.usuario?.nombre ?? 'Sistema'}
+                                </span>
+                                <span className="text-[10px] text-[var(--text)]/30 ml-auto">
+                                  {formatDate(u.created_at)}
+                                </span>
+                              </div>
+                              {u.contenido && (
+                                <p className="text-sm text-[var(--text)]/80">{u.contenido}</p>
+                              )}
+                              {u.valor_anterior != null && u.valor_nuevo != null && (
+                                <p className="text-xs text-[var(--text)]/50">
+                                  {u.tipo === 'cambio_estado'
+                                    ? `${ESTADO_TASK[u.valor_anterior]?.label ?? u.valor_anterior} → ${ESTADO_TASK[u.valor_nuevo]?.label ?? u.valor_nuevo}`
+                                    : `${u.valor_anterior || '—'} → ${u.valor_nuevo || '—'}`}
+                                </p>
+                              )}
                             </div>
-                            {u.contenido && <p className="text-sm text-[var(--text)]/80">{u.contenido}</p>}
-                            {u.valor_anterior != null && u.valor_nuevo != null && (
-                              <p className="text-xs text-[var(--text)]/50">
-                                {u.tipo === 'cambio_estado'
-                                  ? `${ESTADO_TASK[u.valor_anterior]?.label ?? u.valor_anterior} → ${ESTADO_TASK[u.valor_nuevo]?.label ?? u.valor_nuevo}`
-                                  : `${u.valor_anterior || '—'} → ${u.valor_nuevo || '—'}`}
-                              </p>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()
+          )}
         </div>
       )}
 
@@ -1003,17 +1209,25 @@ function JuntaDetailInner() {
                   <button
                     type="button"
                     onClick={() => handleToggleAsistio(a.id, a.asistio)}
-                    title={a.asistio === null ? 'Sin confirmar' : a.asistio ? 'Asistió' : 'No asistió'}
+                    title={
+                      a.asistio === null ? 'Sin confirmar' : a.asistio ? 'Asistió' : 'No asistió'
+                    }
                     className={[
                       'inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs transition',
                       a.asistio === true
                         ? 'border-green-500/50 bg-green-500/15 text-green-400'
                         : a.asistio === false
-                        ? 'border-red-500/50 bg-red-500/15 text-red-400'
-                        : 'border-[var(--border)] bg-[var(--card)] text-[var(--text)]/40',
+                          ? 'border-red-500/50 bg-red-500/15 text-red-400'
+                          : 'border-[var(--border)] bg-[var(--card)] text-[var(--text)]/40',
                     ].join(' ')}
                   >
-                    {a.asistio === true ? <Check className="h-3 w-3" /> : a.asistio === false ? <X className="h-3 w-3" /> : '?'}
+                    {a.asistio === true ? (
+                      <Check className="h-3 w-3" />
+                    ) : a.asistio === false ? (
+                      <X className="h-3 w-3" />
+                    ) : (
+                      '?'
+                    )}
                   </button>
 
                   <button
@@ -1038,7 +1252,9 @@ function JuntaDetailInner() {
               </SelectTrigger>
               <SelectContent>
                 {availablePersonas.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.nombre}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -1048,12 +1264,19 @@ function JuntaDetailInner() {
               disabled={addingPersona || !selectedPersonaId}
               className="rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60"
             >
-              {addingPersona ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+              {addingPersona ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4" />
+              )}
             </Button>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => { setShowAddPersona(false); setSelectedPersonaId(''); }}
+              onClick={() => {
+                setShowAddPersona(false);
+                setSelectedPersonaId('');
+              }}
               className="rounded-xl border-[var(--border)] text-[var(--text)]"
             >
               <X className="h-4 w-4" />
@@ -1065,7 +1288,12 @@ function JuntaDetailInner() {
       {/* Tasks */}
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
         <div className="flex items-center justify-between mb-3">
-          <SectionTitle>Tareas de esta junta {tasks.length > 0 && <span className="text-[var(--text)]/40 font-normal">({tasks.length})</span>}</SectionTitle>
+          <SectionTitle>
+            Tareas de esta junta{' '}
+            {tasks.length > 0 && (
+              <span className="text-[var(--text)]/40 font-normal">({tasks.length})</span>
+            )}
+          </SectionTitle>
           <Button
             variant="outline"
             size="sm"
@@ -1082,83 +1310,132 @@ function JuntaDetailInner() {
             <TicketCheck className="mb-2 h-8 w-8 text-[var(--text)]/20" />
             <p className="text-sm text-[var(--text)]/50">No hay tareas asociadas a esta junta</p>
           </div>
-        ) : (() => {
-          const openTasks = tasks.filter(t => t.estado !== 'completado' && t.estado !== 'cancelado');
-          const closedTasks = tasks.filter(t => t.estado === 'completado' || t.estado === 'cancelado');
-          const renderTask = (task: JuntaTask) => {
-            const cfg = ESTADO_TASK[task.estado] ?? { label: task.estado, cls: '' };
-            const asignado = empleadoMap.get(task.asignado_a ?? '');
-            return (
-              <div
-                key={task.id}
-                className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2.5"
-              >
-                {task.estado !== 'completado' && task.estado !== 'cancelado' ? (
-                  <button
-                    type="button"
-                    title="Completar tarea"
-                    disabled={completingTask === task.id}
-                    onClick={async () => {
-                      setCompletingTask(task.id);
-                      const { error: err } = await supabase.schema('erp').from('tasks').update({ estado: 'completado', porcentaje_avance: 100 }).eq('id', task.id);
-                      setCompletingTask(null);
-                      if (err) { alert(`Error: ${err.message}`); return; }
-                      setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, estado: 'completado' } : t));
-                    }}
-                    className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-green-500/30 bg-green-500/10 text-green-400 transition hover:bg-green-500/20 disabled:opacity-50"
+        ) : (
+          (() => {
+            const openTasks = tasks.filter(
+              (t) => t.estado !== 'completado' && t.estado !== 'cancelado'
+            );
+            const closedTasks = tasks.filter(
+              (t) => t.estado === 'completado' || t.estado === 'cancelado'
+            );
+            const renderTask = (task: JuntaTask) => {
+              const cfg = ESTADO_TASK[task.estado] ?? { label: task.estado, cls: '' };
+              const asignado = empleadoMap.get(task.asignado_a ?? '');
+              return (
+                <div
+                  key={task.id}
+                  className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2.5"
+                >
+                  {task.estado !== 'completado' && task.estado !== 'cancelado' ? (
+                    <button
+                      type="button"
+                      title="Completar tarea"
+                      disabled={completingTask === task.id}
+                      onClick={async () => {
+                        setCompletingTask(task.id);
+                        const { error: err } = await supabase
+                          .schema('erp')
+                          .from('tasks')
+                          .update({ estado: 'completado', porcentaje_avance: 100 })
+                          .eq('id', task.id);
+                        setCompletingTask(null);
+                        if (err) {
+                          alert(`Error: ${err.message}`);
+                          return;
+                        }
+                        setTasks((prev) =>
+                          prev.map((t) => (t.id === task.id ? { ...t, estado: 'completado' } : t))
+                        );
+                      }}
+                      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-green-500/30 bg-green-500/10 text-green-400 transition hover:bg-green-500/20 disabled:opacity-50"
+                    >
+                      {completingTask === task.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Check className="h-3 w-3" />
+                      )}
+                    </button>
+                  ) : (
+                    <TicketCheck className="h-4 w-4 shrink-0 text-green-400/60" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <span
+                      className={`text-sm font-medium line-clamp-1 ${task.estado === 'completado' ? 'text-[var(--text)]/40 line-through' : 'text-[var(--text)]'}`}
+                    >
+                      {task.titulo}
+                    </span>
+                    {asignado && (
+                      <span className="block text-xs text-[var(--text)]/50">{asignado.nombre}</span>
+                    )}
+                  </div>
+                  <span
+                    className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}
                   >
-                    {completingTask === task.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-                  </button>
-                ) : (
-                  <TicketCheck className="h-4 w-4 shrink-0 text-green-400/60" />
-                )}
-                <div className="flex-1 min-w-0">
-                  <span className={`text-sm font-medium line-clamp-1 ${task.estado === 'completado' ? 'text-[var(--text)]/40 line-through' : 'text-[var(--text)]'}`}>{task.titulo}</span>
-                  {asignado && (
-                    <span className="block text-xs text-[var(--text)]/50">{asignado.nombre}</span>
+                    {cfg.label}
+                  </span>
+                  {task.fecha_vence && (
+                    <span className="text-xs text-[var(--text)]/40 shrink-0">
+                      {formatDate(task.fecha_vence)}
+                    </span>
+                  )}
+                  {task.estado !== 'completado' && task.estado !== 'cancelado' && (
+                    <button
+                      type="button"
+                      title="Agregar avance"
+                      onClick={() => {
+                        setShowAddUpdate(task.id);
+                        setUpdateForm({ contenido: '', nuevoEstado: '', nuevaFecha: '' });
+                      }}
+                      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 text-[var(--accent)] transition hover:bg-[var(--accent)]/20"
+                    >
+                      <MessageSquarePlus className="h-3 w-3" />
+                    </button>
                   )}
                 </div>
-                <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}>
-                  {cfg.label}
-                </span>
-                {task.fecha_vence && (
-                  <span className="text-xs text-[var(--text)]/40 shrink-0">{formatDate(task.fecha_vence)}</span>
+              );
+            };
+            return (
+              <div className="space-y-4">
+                {openTasks.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-[var(--text)]/50 uppercase tracking-wide">
+                      Pendientes ({openTasks.length})
+                    </p>
+                    {openTasks.map(renderTask)}
+                  </div>
                 )}
-                {task.estado !== 'completado' && task.estado !== 'cancelado' && (
-                  <button type="button" title="Agregar avance" onClick={() => { setShowAddUpdate(task.id); setUpdateForm({ contenido: '', nuevoEstado: '', nuevaFecha: '' }); }}
-                    className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 text-[var(--accent)] transition hover:bg-[var(--accent)]/20">
-                    <MessageSquarePlus className="h-3 w-3" />
-                  </button>
+                {closedTasks.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-[var(--text)]/50 uppercase tracking-wide">
+                      Completadas ({closedTasks.length})
+                    </p>
+                    {closedTasks.map(renderTask)}
+                  </div>
                 )}
               </div>
             );
-          };
-          return (
-            <div className="space-y-4">
-              {openTasks.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold text-[var(--text)]/50 uppercase tracking-wide">Pendientes ({openTasks.length})</p>
-                  {openTasks.map(renderTask)}
-                </div>
-              )}
-              {closedTasks.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold text-[var(--text)]/50 uppercase tracking-wide">Completadas ({closedTasks.length})</p>
-                  {closedTasks.map(renderTask)}
-                </div>
-              )}
-            </div>
-          );
-        })()}
+          })()
+        )}
       </div>
 
       {/* Sheet: Agregar avance */}
-      <Sheet open={!!showAddUpdate} onOpenChange={(open) => { if (!open) { setShowAddUpdate(null); setUpdateForm({ contenido: '', nuevoEstado: '', nuevaFecha: '' }); } }}>
-        <SheetContent side="right" className="w-full sm:max-w-lg border-[var(--border)] bg-[var(--card)] text-[var(--text)] overflow-y-auto">
+      <Sheet
+        open={!!showAddUpdate}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowAddUpdate(null);
+            setUpdateForm({ contenido: '', nuevoEstado: '', nuevaFecha: '' });
+          }
+        }}
+      >
+        <SheetContent
+          side="right"
+          className="w-full sm:max-w-lg border-[var(--border)] bg-[var(--card)] text-[var(--text)] overflow-y-auto"
+        >
           <SheetHeader className="pb-2">
             <SheetTitle className="text-[var(--text)] text-lg">Agregar avance</SheetTitle>
             <SheetDescription className="text-[var(--text)]/50">
-              {showAddUpdate ? (tasks.find(t => t.id === showAddUpdate)?.titulo ?? '') : ''}
+              {showAddUpdate ? (tasks.find((t) => t.id === showAddUpdate)?.titulo ?? '') : ''}
             </SheetDescription>
           </SheetHeader>
           <div className="space-y-5 py-4">
@@ -1167,20 +1444,25 @@ function JuntaDetailInner() {
               <Textarea
                 placeholder="Describe el avance o actualización..."
                 value={updateForm.contenido}
-                onChange={(e) => setUpdateForm(f => ({ ...f, contenido: e.target.value }))}
+                onChange={(e) => setUpdateForm((f) => ({ ...f, contenido: e.target.value }))}
                 className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)] min-h-[100px]"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <FieldLabel>Cambiar estado</FieldLabel>
-                <Select value={updateForm.nuevoEstado} onValueChange={(v) => setUpdateForm(f => ({ ...f, nuevoEstado: v ?? '' }))}>
+                <Select
+                  value={updateForm.nuevoEstado}
+                  onValueChange={(v) => setUpdateForm((f) => ({ ...f, nuevoEstado: v ?? '' }))}
+                >
                   <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
                     <SelectValue placeholder="Sin cambio" />
                   </SelectTrigger>
                   <SelectContent>
                     {Object.entries(ESTADO_TASK).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                      <SelectItem key={k} value={k}>
+                        {v.label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -1190,18 +1472,33 @@ function JuntaDetailInner() {
                 <Input
                   type="date"
                   value={updateForm.nuevaFecha}
-                  onChange={(e) => setUpdateForm(f => ({ ...f, nuevaFecha: e.target.value }))}
+                  onChange={(e) => setUpdateForm((f) => ({ ...f, nuevaFecha: e.target.value }))}
                   className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
                 />
               </div>
             </div>
           </div>
           <div className="flex items-center gap-2 pt-4 border-t border-[var(--border)]">
-            <Button variant="outline" onClick={() => { setShowAddUpdate(null); setUpdateForm({ contenido: '', nuevoEstado: '', nuevaFecha: '' }); }}
-              className="flex-1 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">Cancelar</Button>
-            <Button onClick={handleSaveUpdate} disabled={savingUpdate || !updateForm.contenido.trim()}
-              className="flex-1 gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60">
-              {savingUpdate ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquarePlus className="h-4 w-4" />}
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowAddUpdate(null);
+                setUpdateForm({ contenido: '', nuevoEstado: '', nuevaFecha: '' });
+              }}
+              className="flex-1 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSaveUpdate}
+              disabled={savingUpdate || !updateForm.contenido.trim()}
+              className="flex-1 gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60"
+            >
+              {savingUpdate ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <MessageSquarePlus className="h-4 w-4" />
+              )}
               Guardar avance
             </Button>
           </div>
@@ -1231,14 +1528,18 @@ function JuntaDetailInner() {
                 <FieldLabel>Estado</FieldLabel>
                 <Select
                   value={taskForm.estado}
-                  onValueChange={(v) => setTaskForm((f) => ({ ...f, estado: v as JuntaTask['estado'] }))}
+                  onValueChange={(v) =>
+                    setTaskForm((f) => ({ ...f, estado: v as JuntaTask['estado'] }))
+                  }
                 >
                   <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {Object.entries(ESTADO_TASK).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                      <SelectItem key={k} value={k}>
+                        {v.label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -1254,7 +1555,9 @@ function JuntaDetailInner() {
                   </SelectTrigger>
                   <SelectContent>
                     {PRIORIDAD_OPTIONS.map((p) => (
-                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                      <SelectItem key={p} value={p}>
+                        {p}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -1273,7 +1576,9 @@ function JuntaDetailInner() {
                   </SelectTrigger>
                   <SelectContent>
                     {empleados.map((e) => (
-                      <SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>
+                      <SelectItem key={e.id} value={e.id}>
+                        {e.nombre}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -1303,7 +1608,11 @@ function JuntaDetailInner() {
               disabled={addingTask || !taskForm.titulo.trim()}
               className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60"
             >
-              {addingTask ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              {addingTask ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4" />
+              )}
               Crear tarea
             </Button>
           </DialogFooter>
@@ -1317,7 +1626,8 @@ function JuntaDetailInner() {
             <DialogTitle className="text-[var(--text)]">Terminar junta</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-[var(--text)]/70 pb-2">
-            Esta acción marcará la junta como <strong>completada</strong> y enviará la minuta por correo a los participantes que tienen email registrado. ¿Continuar?
+            Esta acción marcará la junta como <strong>completada</strong> y enviará la minuta por
+            correo a los participantes que tienen email registrado. ¿Continuar?
           </p>
           <DialogFooter className="gap-2">
             <Button
@@ -1333,7 +1643,11 @@ function JuntaDetailInner() {
               disabled={terminating}
               className="gap-1.5 rounded-xl bg-green-600 text-white hover:bg-green-700 disabled:opacity-60"
             >
-              {terminating ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+              {terminating ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4" />
+              )}
               Sí, terminar
             </Button>
           </DialogFooter>

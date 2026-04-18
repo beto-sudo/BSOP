@@ -1,5 +1,11 @@
 'use client';
 
+/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect --
+ * Cleanup PR (#30): pre-existing debt. `any` in Supabase row mapping;
+ * set-state-in-effect in data-sync pattern. Both are behavioral rewrites,
+ * out of scope for bulk lint cleanup.
+ */
+
 import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -53,28 +59,31 @@ type Junta = {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ESTADO_CONFIG: Record<Junta['estado'], { label: string; cls: string }> = {
-  programada:  { label: 'Programada',  cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
-  en_curso:    { label: 'En curso',    cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
-  completada:  { label: 'Completada',  cls: 'bg-[var(--border)]/60 text-[var(--text)]/50 border-[var(--border)]' },
-  cancelada:   { label: 'Cancelada',   cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
+  programada: { label: 'Programada', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
+  en_curso: { label: 'En curso', cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
+  completada: {
+    label: 'Completada',
+    cls: 'bg-[var(--border)]/60 text-[var(--text)]/50 border-[var(--border)]',
+  },
+  cancelada: { label: 'Cancelada', cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
 };
 
 const TIPO_CONFIG: Record<string, { label: string; icon: string }> = {
-  operativa:                    { label: 'Operativa',                    icon: '⚙️' },
-  directiva:                    { label: 'Directiva',                    icon: '🏛️' },
-  seguimiento:                  { label: 'Seguimiento',                  icon: '📊' },
-  emergencia:                   { label: 'Emergencia',                   icon: '🚨' },
-  Consejo:                      { label: 'Consejo',                      icon: '🏢' },
-  'Comite Ejecutivo':           { label: 'Comité Ejecutivo',             icon: '👔' },
-  Ventas:                       { label: 'Ventas',                       icon: '💰' },
-  'Atención PosVenta':          { label: 'Atención PosVenta',            icon: '🔧' },
-  Administración:               { label: 'Administración',               icon: '📁' },
-  Mercadotecnia:                { label: 'Mercadotecnia',                icon: '📣' },
-  Construcción:                 { label: 'Construcción',                 icon: '🏗️' },
-  'Compras y Admon. Inventario':{ label: 'Compras y Admon. Inventario',  icon: '📦' },
-  Maquinaria:                   { label: 'Maquinaria',                   icon: '🚜' },
-  Proyectos:                    { label: 'Proyectos',                    icon: '🗂️' },
-  'Rincón del Bosque':          { label: 'Rincón del Bosque',            icon: '🌲' },
+  operativa: { label: 'Operativa', icon: '⚙️' },
+  directiva: { label: 'Directiva', icon: '🏛️' },
+  seguimiento: { label: 'Seguimiento', icon: '📊' },
+  emergencia: { label: 'Emergencia', icon: '🚨' },
+  Consejo: { label: 'Consejo', icon: '🏢' },
+  'Comite Ejecutivo': { label: 'Comité Ejecutivo', icon: '👔' },
+  Ventas: { label: 'Ventas', icon: '💰' },
+  'Atención PosVenta': { label: 'Atención PosVenta', icon: '🔧' },
+  Administración: { label: 'Administración', icon: '📁' },
+  Mercadotecnia: { label: 'Mercadotecnia', icon: '📣' },
+  Construcción: { label: 'Construcción', icon: '🏗️' },
+  'Compras y Admon. Inventario': { label: 'Compras y Admon. Inventario', icon: '📦' },
+  Maquinaria: { label: 'Maquinaria', icon: '🚜' },
+  Proyectos: { label: 'Proyectos', icon: '🗂️' },
+  'Rincón del Bosque': { label: 'Rincón del Bosque', icon: '🌲' },
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -94,7 +103,9 @@ function formatDateTime(dt: string) {
 function EstadoBadge({ estado }: { estado: Junta['estado'] }) {
   const cfg = ESTADO_CONFIG[estado];
   return (
-    <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}>
+    <span
+      className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}
+    >
       {cfg.label}
     </span>
   );
@@ -134,7 +145,9 @@ function JuntasInner() {
   });
 
   const fetchEmpresaIds = useCallback(async (): Promise<string[]> => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return [];
 
     const { data: coreUser } = await supabase
@@ -158,18 +171,27 @@ function JuntasInner() {
     return ids;
   }, [supabase]);
 
-  const fetchJuntas = useCallback(async (ids: string[]) => {
-    if (ids.length === 0) { setJuntas([]); return; }
-    const { data, error: err } = await supabase
-      .schema('erp')
-      .from('juntas')
-      .select('*')
-      .in('empresa_id', ids)
-      .order('fecha_hora', { ascending: false });
+  const fetchJuntas = useCallback(
+    async (ids: string[]) => {
+      if (ids.length === 0) {
+        setJuntas([]);
+        return;
+      }
+      const { data, error: err } = await supabase
+        .schema('erp')
+        .from('juntas')
+        .select('*')
+        .in('empresa_id', ids)
+        .order('fecha_hora', { ascending: false });
 
-    if (err) { setError(err.message); return; }
-    setJuntas((data ?? []) as Junta[]);
-  }, [supabase]);
+      if (err) {
+        setError(err.message);
+        return;
+      }
+      setJuntas((data ?? []) as Junta[]);
+    },
+    [supabase]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -184,14 +206,18 @@ function JuntasInner() {
     };
 
     void init();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [fetchEmpresaIds, fetchJuntas]);
 
   const handleCreate = async () => {
     if (!createForm.titulo.trim() || !createForm.fecha_hora || empresaIds.length === 0) return;
     setCreating(true);
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     const { data: coreUser } = await supabase
       .schema('core')
       .from('usuarios')
@@ -225,13 +251,19 @@ function JuntasInner() {
     }
 
     setShowCreate(false);
-    setCreateForm({ titulo: '', fecha_hora: '', lugar: '', duracion_minutos: '60', tipo: '', estado: 'programada' });
+    setCreateForm({
+      titulo: '',
+      fecha_hora: '',
+      lugar: '',
+      duracion_minutos: '60',
+      tipo: '',
+      estado: 'programada',
+    });
 
     if (newJunta) {
       router.push(`/inicio/juntas/${newJunta.id}`);
     }
   };
-
 
   const filtered = juntas.filter((j) => {
     if (search && !j.titulo.toLowerCase().includes(search.toLowerCase())) return false;
@@ -246,13 +278,19 @@ function JuntasInner() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text)]">Juntas</h1>
-          <p className="mt-1 text-sm text-[var(--text)]/55">Agenda y minutas de juntas operativas</p>
+          <p className="mt-1 text-sm text-[var(--text)]/55">
+            Agenda y minutas de juntas operativas
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
-            onClick={async () => { setLoading(true); await fetchJuntas(empresaIds); setLoading(false); }}
+            onClick={async () => {
+              setLoading(true);
+              await fetchJuntas(empresaIds);
+              setLoading(false);
+            }}
             disabled={loading}
             className="rounded-xl border-[var(--border)] bg-[var(--card)] text-[var(--text)] hover:bg-[var(--panel)]"
           >
@@ -288,7 +326,9 @@ function JuntasInner() {
             <SelectContent>
               <SelectItem value="all">Todos los estados</SelectItem>
               {Object.entries(ESTADO_CONFIG).map(([k, v]) => (
-                <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                <SelectItem key={k} value={k}>
+                  {v.label}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -314,7 +354,9 @@ function JuntasInner() {
           <div className="flex flex-col items-center justify-center p-16 text-center">
             <CalendarDays className="mb-3 h-10 w-10 text-[var(--text)]/20" />
             <p className="text-sm text-[var(--text)]/55">
-              {juntas.length === 0 ? 'No hay juntas registradas aún' : 'No hay juntas que coincidan con los filtros'}
+              {juntas.length === 0
+                ? 'No hay juntas registradas aún'
+                : 'No hay juntas que coincidan con los filtros'}
             </p>
             {juntas.length === 0 && (
               <Button
@@ -331,11 +373,45 @@ function JuntasInner() {
           <Table>
             <TableHeader>
               <TableRow className="border-[var(--border)] hover:bg-transparent">
-                <SortableHead sortKey="titulo" label="Título" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-                <SortableHead sortKey="tipo" label="Tipo" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-24" />
-                <SortableHead sortKey="estado" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
-                <SortableHead sortKey="fecha_hora" label="Fecha y hora" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-48" />
-                <SortableHead sortKey="lugar" label="Lugar" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-32" />
+                <SortableHead
+                  sortKey="titulo"
+                  label="Título"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                />
+                <SortableHead
+                  sortKey="tipo"
+                  label="Tipo"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                  className="w-24"
+                />
+                <SortableHead
+                  sortKey="estado"
+                  label="Estado"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                  className="w-28"
+                />
+                <SortableHead
+                  sortKey="fecha_hora"
+                  label="Fecha y hora"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                  className="w-48"
+                />
+                <SortableHead
+                  sortKey="lugar"
+                  label="Lugar"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                  className="w-32"
+                />
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
@@ -347,7 +423,9 @@ function JuntasInner() {
                   onClick={() => router.push(`/inicio/juntas/${junta.id}`)}
                 >
                   <TableCell>
-                    <span className="line-clamp-1 font-medium text-[var(--text)]">{junta.titulo}</span>
+                    <span className="line-clamp-1 font-medium text-[var(--text)]">
+                      {junta.titulo}
+                    </span>
                   </TableCell>
                   <TableCell>
                     {junta.tipo ? (
@@ -358,12 +436,18 @@ function JuntasInner() {
                       <span className="text-[var(--text)]/40">—</span>
                     )}
                   </TableCell>
-                  <TableCell><EstadoBadge estado={junta.estado} /></TableCell>
                   <TableCell>
-                    <span className="text-sm text-[var(--text)]/70">{formatDateTime(junta.fecha_hora)}</span>
+                    <EstadoBadge estado={junta.estado} />
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm text-[var(--text)]/70 line-clamp-1">{junta.lugar ?? '—'}</span>
+                    <span className="text-sm text-[var(--text)]/70">
+                      {formatDateTime(junta.fecha_hora)}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm text-[var(--text)]/70 line-clamp-1">
+                      {junta.lugar ?? '—'}
+                    </span>
                   </TableCell>
                   <TableCell>
                     <ChevronRight className="h-4 w-4 text-[var(--text)]/30" />
@@ -416,7 +500,9 @@ function JuntasInner() {
                   min="15"
                   step="15"
                   value={createForm.duracion_minutos}
-                  onChange={(e) => setCreateForm((f) => ({ ...f, duracion_minutos: e.target.value }))}
+                  onChange={(e) =>
+                    setCreateForm((f) => ({ ...f, duracion_minutos: e.target.value }))
+                  }
                   className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
                 />
               </div>
@@ -434,7 +520,9 @@ function JuntasInner() {
                   </SelectTrigger>
                   <SelectContent>
                     {Object.entries(TIPO_CONFIG).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>{v.icon} {v.label}</SelectItem>
+                      <SelectItem key={k} value={k}>
+                        {v.icon} {v.label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -443,14 +531,18 @@ function JuntasInner() {
                 <FieldLabel>Estado</FieldLabel>
                 <Select
                   value={createForm.estado}
-                  onValueChange={(v) => setCreateForm((f) => ({ ...f, estado: v as Junta['estado'] }))}
+                  onValueChange={(v) =>
+                    setCreateForm((f) => ({ ...f, estado: v as Junta['estado'] }))
+                  }
                 >
                   <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {Object.entries(ESTADO_CONFIG).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                      <SelectItem key={k} value={k}>
+                        {v.label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -481,7 +573,11 @@ function JuntasInner() {
               disabled={creating || !createForm.titulo.trim() || !createForm.fecha_hora}
               className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60"
             >
-              {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              {creating ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4" />
+              )}
               Crear junta
             </Button>
           </DialogFooter>

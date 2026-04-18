@@ -3,7 +3,8 @@ import path from 'node:path';
 
 const SUPABASE_URL = 'https://ybklderteyhuugzfmxbi.supabase.co';
 const ENV_PATH = '/Users/Beto/BSOP/.env.local';
-const CSV_PATH = '/Users/Beto/.openclaw/media/inbound/Entradas_2---d87faa3a-359b-4741-8e3a-8e41af9ba153.csv';
+const CSV_PATH =
+  '/Users/Beto/.openclaw/media/inbound/Entradas_2---d87faa3a-359b-4741-8e3a-8e41af9ba153.csv';
 const BATCH_SIZE = 200;
 
 function parseEnv(content) {
@@ -15,7 +16,10 @@ function parseEnv(content) {
     if (eq === -1) continue;
     const key = line.slice(0, eq).trim();
     let value = line.slice(eq + 1).trim();
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
       value = value.slice(1, -1);
     }
     env[key] = value;
@@ -89,13 +93,17 @@ function parseQuantity(value) {
 }
 
 function parseCsvDate(value) {
-  const match = String(value).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4}),\s*(\d{1,2}):(\d{2})\s*([AP]M)$/i);
+  const match = String(value)
+    .trim()
+    .match(/^(\d{1,2})\/(\d{1,2})\/(\d{4}),\s*(\d{1,2}):(\d{2})\s*([AP]M)$/i);
   if (!match) throw new Error(`Fecha inválida: ${value}`);
   let [, month, day, year, hour, minute, meridiem] = match;
   let h = Number(hour);
   if (meridiem.toUpperCase() === 'PM' && h !== 12) h += 12;
   if (meridiem.toUpperCase() === 'AM' && h === 12) h = 0;
-  const iso = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), h, Number(minute), 0)).toISOString();
+  const iso = new Date(
+    Date.UTC(Number(year), Number(month) - 1, Number(day), h, Number(minute), 0)
+  ).toISOString();
   return iso;
 }
 

@@ -35,7 +35,7 @@ export async function abrirCaja(input: AbrirCajaInput): Promise<{ id: string }> 
 
   if (existing) {
     throw new Error(
-      'Ya existe un turno abierto para esta caja. Ciérralo antes de abrir uno nuevo.',
+      'Ya existe un turno abierto para esta caja. Ciérralo antes de abrir uno nuevo.'
     );
   }
 
@@ -121,7 +121,10 @@ export async function cerrarCaja(input: CerrarCajaInput): Promise<void> {
     const { error: denomErr } = await supabase
       .schema('erp')
       .from('corte_conteo_denominaciones')
-      .upsert(rows.map((r) => ({ ...r, empresa_id: RDB_EMPRESA_ID })), { onConflict: 'corte_id,denominacion' });
+      .upsert(
+        rows.map((r) => ({ ...r, empresa_id: RDB_EMPRESA_ID })),
+        { onConflict: 'corte_id,denominacion' }
+      );
     if (denomErr) throw new Error(denomErr.message);
   }
 

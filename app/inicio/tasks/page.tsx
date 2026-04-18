@@ -6,11 +6,7 @@ import { TasksModule } from '@/components/tasks/tasks-module';
 export default function Page() {
   return (
     <RequireAccess empresa="rdb">
-      <TasksModule
-        scope="user-empresas"
-        empresaSlug=""
-        title="Tareas"
-      />
+      <TasksModule scope="user-empresas" empresaSlug="" title="Tareas" />
     </RequireAccess>
   );
 }

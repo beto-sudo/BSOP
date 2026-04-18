@@ -94,17 +94,17 @@ const TZ = 'America/Matamoros';
 
 function formatDate(ts: string | null) {
   if (!ts) return '—';
-  
+
   if (/^\d{4}-\d{2}-\d{2}$/.test(ts)) {
     const [yyyy, mm, dd] = ts.split('-');
     return `${dd}/${mm}/${yyyy}`;
   }
-  
+
   const cleanTs = ts.replace(' ', 'T');
   const d = new Date(cleanTs);
-  
+
   if (isNaN(d.getTime())) return ts;
-  
+
   return d.toLocaleString('es-MX', {
     timeZone: 'America/Matamoros',
     year: 'numeric',
@@ -128,9 +128,7 @@ function todayRange(): { from: string; to: string } {
   return { from: today, to: today };
 }
 
-function statusVariant(
-  status: string | null,
-): 'default' | 'secondary' | 'destructive' | 'outline' {
+function statusVariant(status: string | null): 'default' | 'secondary' | 'destructive' | 'outline' {
   switch (status?.toLowerCase()) {
     case 'completed':
     case 'completado':
@@ -204,10 +202,19 @@ function OrderDetail({
   const pagos = pedido.pagos ?? [];
 
   return (
-    <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Sheet
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <SheetContent className="sm:max-w-[600px]">
         {/* Membrete solo para impresión */}
-        <img src="/membrete-rdb.jpg" alt="Membrete Rincón del Bosque" className="hidden print:block w-full object-contain mb-6" />
+        <img
+          src="/membrete-rdb.jpg"
+          alt="Membrete Rincón del Bosque"
+          className="hidden print:block w-full object-contain mb-6"
+        />
         <SheetHeader>
           <SheetTitle>Pedido #{pedido.order_id ?? pedido.id}</SheetTitle>
           <SheetDescription>{formatDate(pedido.timestamp)}</SheetDescription>
@@ -227,9 +234,7 @@ function OrderDetail({
           <div className="mt-6 space-y-6 pb-6">
             {/* Status + total */}
             <div className="flex items-center justify-between">
-              <Badge variant={statusVariant(pedido.status)}>
-                {pedido.status ?? 'Sin estado'}
-              </Badge>
+              <Badge variant={statusVariant(pedido.status)}>{pedido.status ?? 'Sin estado'}</Badge>
               <span className="text-lg font-semibold">{formatCurrency(pedido.total_amount)}</span>
             </div>
 
@@ -260,18 +265,34 @@ function OrderDetail({
               )}
             </div>
             {(() => {
-              const realDiscount = (pedido.total_amount ?? 0) - (pedido.total_discount ?? (pedido.total_amount ?? 0));
+              const realDiscount =
+                (pedido.total_amount ?? 0) - (pedido.total_discount ?? pedido.total_amount ?? 0);
               const hasDiscount = realDiscount > 0.01;
               const hasService = (pedido.service_charge ?? 0) > 0;
               const hasTax = (pedido.tax ?? 0) > 0;
-              
+
               if (!hasDiscount && !hasService && !hasTax) return null;
-              
+
               return (
                 <div className="bg-muted/30 rounded-lg p-3 mt-4 space-y-1 text-sm">
-                  {hasDiscount && <div className="flex justify-between text-destructive"><span>Descuento</span><span>-{formatCurrency(realDiscount)}</span></div>}
-                  {hasService && <div className="flex justify-between"><span>Servicio</span><span>{formatCurrency(pedido.service_charge)}</span></div>}
-                  {hasTax && <div className="flex justify-between text-muted-foreground"><span>Impuestos</span><span>{pedido.tax}%</span></div>}
+                  {hasDiscount && (
+                    <div className="flex justify-between text-destructive">
+                      <span>Descuento</span>
+                      <span>-{formatCurrency(realDiscount)}</span>
+                    </div>
+                  )}
+                  {hasService && (
+                    <div className="flex justify-between">
+                      <span>Servicio</span>
+                      <span>{formatCurrency(pedido.service_charge)}</span>
+                    </div>
+                  )}
+                  {hasTax && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Impuestos</span>
+                      <span>{pedido.tax}%</span>
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -299,7 +320,8 @@ function OrderDetail({
                     const nombre = item.product_name ?? item.nombre ?? item.name ?? 'Producto';
                     const qty = item.cantidad ?? item.quantity ?? 1;
                     const price = item.unit_price ?? item.precio ?? item.price;
-                    const sub = item.total_price ?? item.subtotal ?? (price != null ? price * qty : null);
+                    const sub =
+                      item.total_price ?? item.subtotal ?? (price != null ? price * qty : null);
                     return (
                       <div
                         key={String(item.id)}
@@ -388,34 +410,41 @@ export default function VentasPage() {
     const formatter = new Intl.DateTimeFormat('sv-SE', { timeZone: TZ });
     if (preset === 'hoy') {
       const t = formatter.format(today);
-      setDateFrom(t); setDateTo(t);
+      setDateFrom(t);
+      setDateTo(t);
     } else if (preset === 'ayer') {
       const ayer = new Date(today.toLocaleString('en-US', { timeZone: TZ }));
       ayer.setDate(ayer.getDate() - 1);
       const t = formatter.format(ayer);
-      setDateFrom(t); setDateTo(t);
+      setDateFrom(t);
+      setDateTo(t);
     } else if (preset === 'semana') {
       const d = new Date(today.toLocaleString('en-US', { timeZone: TZ }));
       const day = d.getDay();
       const diff = d.getDate() - day + (day === 0 ? -6 : 1);
       const monday = new Date(d.setDate(diff));
-      setDateFrom(formatter.format(monday)); setDateTo(formatter.format(today));
+      setDateFrom(formatter.format(monday));
+      setDateTo(formatter.format(today));
     } else if (preset === '7dias') {
       const d = new Date(today.toLocaleString('en-US', { timeZone: TZ }));
       d.setDate(d.getDate() - 7);
-      setDateFrom(formatter.format(d)); setDateTo(formatter.format(today));
+      setDateFrom(formatter.format(d));
+      setDateTo(formatter.format(today));
     } else if (preset === 'mes') {
       const d = new Date(today.toLocaleString('en-US', { timeZone: TZ }));
       const first = new Date(d.getFullYear(), d.getMonth(), 1);
-      setDateFrom(formatter.format(first)); setDateTo(formatter.format(today));
+      setDateFrom(formatter.format(first));
+      setDateTo(formatter.format(today));
     } else if (preset === '30dias') {
       const d = new Date(today.toLocaleString('en-US', { timeZone: TZ }));
       d.setDate(d.getDate() - 30);
-      setDateFrom(formatter.format(d)); setDateTo(formatter.format(today));
+      setDateFrom(formatter.format(d));
+      setDateTo(formatter.format(today));
     } else if (preset === 'ano') {
       const d = new Date(today.toLocaleString('en-US', { timeZone: TZ }));
       const first = new Date(d.getFullYear(), 0, 1);
-      setDateFrom(formatter.format(first)); setDateTo(formatter.format(today));
+      setDateFrom(formatter.format(first));
+      setDateTo(formatter.format(today));
     }
   };
   const [selected, setSelected] = useState<Pedido | null>(null);
@@ -468,9 +497,8 @@ export default function VentasPage() {
         .schema('rdb')
         .from('waitry_pedidos')
         .select('*')
-        .order('timestamp', { ascending: false }).limit(10000)
-        ;
-
+        .order('timestamp', { ascending: false })
+        .limit(10000);
       if (corteFilter !== 'all') {
         query = query.eq('corte_id', corteFilter);
       } else {
@@ -515,18 +543,13 @@ export default function VentasPage() {
           .select('*')
           .eq('order_id', orderId)
           .limit(50),
-        supabase
-          .schema('rdb')
-          .from('waitry_pagos')
-          .select('*')
-          .eq('order_id', orderId)
-          .limit(20),
+        supabase.schema('rdb').from('waitry_pagos').select('*').eq('order_id', orderId).limit(20),
       ]);
 
       setSelected((prev) =>
         prev?.id === pedido.id
           ? { ...prev, items: itemsRes.data ?? [], pagos: pagosRes.data ?? [] }
-          : prev,
+          : prev
       );
     } catch {
       // non-fatal
@@ -540,215 +563,255 @@ export default function VentasPage() {
     if (!search) return true;
     const q = search.toLowerCase();
     return (
-      String(p.order_id ?? '').toLowerCase().includes(q) ||
+      String(p.order_id ?? '')
+        .toLowerCase()
+        .includes(q) ||
       String(p.id).toLowerCase().includes(q) ||
       (p.status ?? '').toLowerCase().includes(q)
     );
   });
 
-  const selectedCorte = corteFilter !== 'all' ? cortes.find(c => c.id === corteFilter) : null;
+  const selectedCorte = corteFilter !== 'all' ? cortes.find((c) => c.id === corteFilter) : null;
 
   return (
     <RequireAccess empresa="rdb" modulo="rdb.ventas">
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Ventas
-          {selectedCorte && (
-            <span className="ml-2 text-base font-normal text-muted-foreground">
-              — {selectedCorte.corte_nombre ?? selectedCorte.caja_nombre ?? 'Corte'}
-            </span>
-          )}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {selectedCorte
-            ? `Pedidos del corte ${selectedCorte.corte_nombre ?? selectedCorte.caja_nombre ?? ''}`
-            : 'Pedidos registrados en Waitry'}
-        </p>
-      </div>
-
-      {/* Summary stats */}
-      {!loading && !error && <SummaryBar pedidos={filtered} />}
-
-      {/* Filters */}
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="relative min-w-52">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por folio o estado…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? 'all')}>
-          <SelectTrigger className="w-44">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUS_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={corteFilter} onValueChange={(v) => setCorteFilter(v ?? 'all')}>
-          <SelectTrigger className="w-52">
-            <SelectValue placeholder="Todos los cortes" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los cortes</SelectItem>
-            {cortes.map((corte) => {
-              const label = corte.corte_nombre
-                ? `${corte.corte_nombre}`
-                : `${corte.caja_nombre ?? 'Corte'} ${formatDate(corte.hora_inicio)}`;
-              const estado = corte.estado?.toLowerCase() === 'abierto' ? ' 🟢' : '';
-  return (
-                <SelectItem key={corte.id} value={corte.id}>
-                  {label}{estado}
-                </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
-
-        <div className="flex items-center gap-2">
-          <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <Input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => { setDateFrom(e.target.value); setPresetKey('custom'); }}
-            className="w-36"
-            aria-label="Fecha desde"
-          />
-          <span className="text-muted-foreground">—</span>
-          <Input
-            type="date"
-            value={dateTo}
-            onChange={(e) => { setDateTo(e.target.value); setPresetKey('custom'); }}
-            className="w-36"
-            aria-label="Fecha hasta"
-          />
-        </div>
-        <Select value={presetKey} onValueChange={handlePreset}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Rango..." />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="hoy">Hoy</SelectItem>
-            <SelectItem value="ayer">Ayer</SelectItem>
-            <SelectItem value="semana">Esta semana</SelectItem>
-            <SelectItem value="7dias">Últimos 7 días</SelectItem>
-            <SelectItem value="mes">Este mes</SelectItem>
-            <SelectItem value="30dias">Últimos 30 días</SelectItem>
-            <SelectItem value="ano">Este año</SelectItem>
-            <SelectItem value="custom" className="hidden">Personalizado</SelectItem>
-          </SelectContent>
-        </Select>
-
-
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => void fetchPedidos()}
-          aria-label="Actualizar"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-        </Button>
-
-        <span className="text-sm text-muted-foreground">
-          {loading
-            ? 'Cargando…'
-            : `${filtered.length} pedido${filtered.length !== 1 ? 's' : ''}`}
-        </span>
-      </div>
-
-      {/* Error */}
-      {error ? (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
-      ) : null}
-
-      {/* Table */}
-      <div className="rounded-xl border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <SortableHead sortKey="order_id" label="Folio" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              <SortableHead sortKey="timestamp" label="Fecha/Hora" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              <SortableHead sortKey="place_name" label="Área" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              <SortableHead sortKey="table_name" label="Mesa" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              <SortableHead sortKey="total_amount" label="Total" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="text-right" />
-              <SortableHead sortKey="status" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              Array.from({ length: 8 }).map((_, i) => (
-                <TableRow key={i}>
-                  {Array.from({ length: 4 }).map((__, j) => (
-                    <TableCell key={j}>
-                      <Skeleton className="h-4 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : filtered.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={4}
-                  className="py-12 text-center text-muted-foreground"
-                >
-                  No se encontraron pedidos para el rango seleccionado.
-                </TableCell>
-              </TableRow>
-            ) : (
-              sortData(filtered).map((pedido) => (
-                <TableRow
-                  key={String(pedido.id)}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => void openDetail(pedido)}
-                >
-                  <TableCell className="font-mono text-xs font-medium">
-                    #{pedido.order_id ?? pedido.id}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {formatDate(pedido.timestamp)}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {pedido.layout_name || "-"}
-                  </TableCell>
-                  <TableCell className="text-sm font-medium">
-                    {pedido.table_name || "-"}
-                  </TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">
-                    {formatCurrency(pedido.total_amount)}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={statusVariant(pedido.status)}>
-                      {pedido.status ?? '—'}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Ventas
+            {selectedCorte && (
+              <span className="ml-2 text-base font-normal text-muted-foreground">
+                — {selectedCorte.corte_nombre ?? selectedCorte.caja_nombre ?? 'Corte'}
+              </span>
             )}
-          </TableBody>
-        </Table>
-      </div>
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {selectedCorte
+              ? `Pedidos del corte ${selectedCorte.corte_nombre ?? selectedCorte.caja_nombre ?? ''}`
+              : 'Pedidos registrados en Waitry'}
+          </p>
+        </div>
 
-      {/* Order detail drawer */}
-      <OrderDetail
-        pedido={selected}
-        loadingDetail={loadingDetail}
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-      />
-    </div>
+        {/* Summary stats */}
+        {!loading && !error && <SummaryBar pedidos={filtered} />}
+
+        {/* Filters */}
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="relative min-w-52">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por folio o estado…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? 'all')}>
+            <SelectTrigger className="w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={corteFilter} onValueChange={(v) => setCorteFilter(v ?? 'all')}>
+            <SelectTrigger className="w-52">
+              <SelectValue placeholder="Todos los cortes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los cortes</SelectItem>
+              {cortes.map((corte) => {
+                const label = corte.corte_nombre
+                  ? `${corte.corte_nombre}`
+                  : `${corte.caja_nombre ?? 'Corte'} ${formatDate(corte.hora_inicio)}`;
+                const estado = corte.estado?.toLowerCase() === 'abierto' ? ' 🟢' : '';
+                return (
+                  <SelectItem key={corte.id} value={corte.id}>
+                    {label}
+                    {estado}
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => {
+                setDateFrom(e.target.value);
+                setPresetKey('custom');
+              }}
+              className="w-36"
+              aria-label="Fecha desde"
+            />
+            <span className="text-muted-foreground">—</span>
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => {
+                setDateTo(e.target.value);
+                setPresetKey('custom');
+              }}
+              className="w-36"
+              aria-label="Fecha hasta"
+            />
+          </div>
+          <Select value={presetKey} onValueChange={handlePreset}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Rango..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="hoy">Hoy</SelectItem>
+              <SelectItem value="ayer">Ayer</SelectItem>
+              <SelectItem value="semana">Esta semana</SelectItem>
+              <SelectItem value="7dias">Últimos 7 días</SelectItem>
+              <SelectItem value="mes">Este mes</SelectItem>
+              <SelectItem value="30dias">Últimos 30 días</SelectItem>
+              <SelectItem value="ano">Este año</SelectItem>
+              <SelectItem value="custom" className="hidden">
+                Personalizado
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => void fetchPedidos()}
+            aria-label="Actualizar"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+
+          <span className="text-sm text-muted-foreground">
+            {loading ? 'Cargando…' : `${filtered.length} pedido${filtered.length !== 1 ? 's' : ''}`}
+          </span>
+        </div>
+
+        {/* Error */}
+        {error ? (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        ) : null}
+
+        {/* Table */}
+        <div className="rounded-xl border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <SortableHead
+                  sortKey="order_id"
+                  label="Folio"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                />
+                <SortableHead
+                  sortKey="timestamp"
+                  label="Fecha/Hora"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                />
+                <SortableHead
+                  sortKey="place_name"
+                  label="Área"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                />
+                <SortableHead
+                  sortKey="table_name"
+                  label="Mesa"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                />
+                <SortableHead
+                  sortKey="total_amount"
+                  label="Total"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                  className="text-right"
+                />
+                <SortableHead
+                  sortKey="status"
+                  label="Estado"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                Array.from({ length: 8 }).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array.from({ length: 4 }).map((__, j) => (
+                      <TableCell key={j}>
+                        <Skeleton className="h-4 w-full" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="py-12 text-center text-muted-foreground">
+                    No se encontraron pedidos para el rango seleccionado.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                sortData(filtered).map((pedido) => (
+                  <TableRow
+                    key={String(pedido.id)}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => void openDetail(pedido)}
+                  >
+                    <TableCell className="font-mono text-xs font-medium">
+                      #{pedido.order_id ?? pedido.id}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {formatDate(pedido.timestamp)}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {pedido.layout_name || '-'}
+                    </TableCell>
+                    <TableCell className="text-sm font-medium">
+                      {pedido.table_name || '-'}
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">
+                      {formatCurrency(pedido.total_amount)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={statusVariant(pedido.status)}>{pedido.status ?? '—'}</Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* Order detail drawer */}
+        <OrderDetail
+          pedido={selected}
+          loadingDetail={loadingDetail}
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+        />
+      </div>
     </RequireAccess>
   );
 }

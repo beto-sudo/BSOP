@@ -15,7 +15,13 @@ function hexToken() {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-export function TripActions({ tripSlug, showShare = false }: { tripSlug: string; showShare?: boolean }) {
+export function TripActions({
+  tripSlug,
+  showShare = false,
+}: {
+  tripSlug: string;
+  showShare?: boolean;
+}) {
   const supabase = getSupabaseClient();
   const [shareUrl, setShareUrl] = useState('');
   const [copyState, setCopyState] = useState('');
@@ -26,7 +32,11 @@ export function TripActions({ tripSlug, showShare = false }: { tripSlug: string;
 
     setLoading(true);
 
-    const existing = await supabase.from('trip_share_tokens').select('token').eq('trip_slug', tripSlug).maybeSingle();
+    const existing = await supabase
+      .from('trip_share_tokens')
+      .select('token')
+      .eq('trip_slug', tripSlug)
+      .maybeSingle();
     const token = existing.data?.token ?? hexToken();
 
     if (!existing.data?.token) {
@@ -47,19 +57,32 @@ export function TripActions({ tripSlug, showShare = false }: { tripSlug: string;
   return (
     <div className="trip-actions flex flex-wrap gap-3 print:hidden">
       {showShare ? (
-        <button type="button" onClick={handleShare} disabled={loading || !supabase} className={buttonClassName()}>
+        <button
+          type="button"
+          onClick={handleShare}
+          disabled={loading || !supabase}
+          className={buttonClassName()}
+        >
           <Share2 className="h-4 w-4" />
           Compartir
         </button>
       ) : null}
-      <button type="button" onClick={handlePrint} className={buttonClassName(showShare ? 'secondary' : 'primary')}>
+      <button
+        type="button"
+        onClick={handlePrint}
+        className={buttonClassName(showShare ? 'secondary' : 'primary')}
+      >
         <Printer className="h-4 w-4" />
         Exportar PDF
       </button>
       {shareUrl ? (
         <div className="w-full rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">
           <div className="break-all">{shareUrl}</div>
-          <button type="button" onClick={() => navigator.clipboard.writeText(shareUrl)} className="mt-2 inline-flex items-center gap-2 text-xs text-emerald-100/90">
+          <button
+            type="button"
+            onClick={() => navigator.clipboard.writeText(shareUrl)}
+            className="mt-2 inline-flex items-center gap-2 text-xs text-emerald-100/90"
+          >
             <Copy className="h-3.5 w-3.5" />
             {copyState || 'Copiar link'}
           </button>

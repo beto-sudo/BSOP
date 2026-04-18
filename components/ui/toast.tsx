@@ -1,10 +1,10 @@
-"use client"
+'use client';
 
-import * as React from "react"
-import { Toast as ToastPrimitive } from "@base-ui/react/toast"
-import { XIcon } from "lucide-react"
+import * as React from 'react';
+import { Toast as ToastPrimitive } from '@base-ui/react/toast';
+import { XIcon } from 'lucide-react';
 
-import { cn } from "@/lib/utils"
+import { cn } from '@/lib/utils';
 
 /**
  * Toast — shadcn-style wrapper over @base-ui/react/toast.
@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils"
  * Provider is mounted once in components/providers.tsx via <ToastProvider>.
  */
 
-type ToastType = "default" | "success" | "error" | "warning" | "info"
+type ToastType = 'default' | 'success' | 'error' | 'warning' | 'info';
 
 /**
  * ToastProvider — mount once at the root of the app (inside `<Providers>`).
@@ -41,7 +41,7 @@ function ToastProvider({ children }: { children: React.ReactNode }) {
       {children}
       <ToastViewport />
     </ToastPrimitive.Provider>
-  )
+  );
 }
 
 /**
@@ -54,50 +54,47 @@ function ToastViewport() {
       <ToastPrimitive.Viewport
         data-slot="toast-viewport"
         className={cn(
-          "fixed right-4 bottom-4 z-[100] flex max-h-screen w-full max-w-sm flex-col-reverse gap-2 outline-none sm:right-6 sm:bottom-6"
+          'fixed right-4 bottom-4 z-[100] flex max-h-screen w-full max-w-sm flex-col-reverse gap-2 outline-none sm:right-6 sm:bottom-6'
         )}
       >
         <ToastList />
       </ToastPrimitive.Viewport>
     </ToastPrimitive.Portal>
-  )
+  );
 }
 
 function ToastList() {
-  const { toasts } = ToastPrimitive.useToastManager()
+  const { toasts } = ToastPrimitive.useToastManager();
   return (
     <>
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} />
       ))}
     </>
-  )
+  );
 }
 
 function ToastItem({
   toast,
 }: {
-  toast: ReturnType<typeof ToastPrimitive.useToastManager>["toasts"][number]
+  toast: ReturnType<typeof ToastPrimitive.useToastManager>['toasts'][number];
 }) {
-  const type = (toast.type as ToastType | undefined) ?? "default"
+  const type = (toast.type as ToastType | undefined) ?? 'default';
   return (
     <ToastPrimitive.Root
       toast={toast}
       data-slot="toast"
       data-type={type}
       className={cn(
-        "pointer-events-auto relative isolate z-50 flex w-full items-start gap-3 rounded-lg bg-popover p-3 pr-8 text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-none duration-100 data-[starting-style]:translate-x-4 data-[starting-style]:opacity-0 data-[ending-style]:translate-x-4 data-[ending-style]:opacity-0",
-        "data-[type=success]:ring-[color:var(--color-chart-2,theme(colors.emerald.500/30))]",
-        "data-[type=error]:ring-destructive/30 data-[type=error]:bg-destructive/5",
-        "data-[type=warning]:ring-amber-500/30",
-        "data-[type=info]:ring-sky-500/30"
+        'pointer-events-auto relative isolate z-50 flex w-full items-start gap-3 rounded-lg bg-popover p-3 pr-8 text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-none duration-100 data-[starting-style]:translate-x-4 data-[starting-style]:opacity-0 data-[ending-style]:translate-x-4 data-[ending-style]:opacity-0',
+        'data-[type=success]:ring-[color:var(--color-chart-2,theme(colors.emerald.500/30))]',
+        'data-[type=error]:ring-destructive/30 data-[type=error]:bg-destructive/5',
+        'data-[type=warning]:ring-amber-500/30',
+        'data-[type=info]:ring-sky-500/30'
       )}
     >
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <ToastPrimitive.Title
-          data-slot="toast-title"
-          className="font-medium text-foreground"
-        />
+        <ToastPrimitive.Title data-slot="toast-title" className="font-medium text-foreground" />
         <ToastPrimitive.Description
           data-slot="toast-description"
           className="text-sm text-muted-foreground"
@@ -117,7 +114,7 @@ function ToastItem({
         <XIcon className="size-3.5" />
       </ToastPrimitive.Close>
     </ToastPrimitive.Root>
-  )
+  );
 }
 
 /**
@@ -125,7 +122,7 @@ function ToastItem({
  * Thin re-export so consumers don't need to know about @base-ui/react.
  */
 function useToast() {
-  return ToastPrimitive.useToastManager()
+  return ToastPrimitive.useToastManager();
 }
 
-export { ToastProvider, ToastViewport, useToast }
+export { ToastProvider, ToastViewport, useToast };

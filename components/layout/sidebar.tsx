@@ -58,7 +58,13 @@ function SidebarLogo() {
   return (
     <div className="flex h-16 items-center border-b px-4">
       <Link href="/" className="flex items-center gap-2">
-        <Image src="/logos/rdb.jpg" alt="RDB" width={32} height={32} className="h-8 w-8 object-contain rounded-md" />
+        <Image
+          src="/logos/rdb.jpg"
+          alt="RDB"
+          width={32}
+          height={32}
+          className="h-8 w-8 object-contain rounded-md"
+        />
         <div>
           <div className="text-sm font-semibold leading-none">Rincón del Bosque</div>
           <div className="text-xs text-muted-foreground">RDB Operations</div>
@@ -75,7 +81,9 @@ export function RdbSidebar() {
       <SidebarLogo />
       <NavLinks />
       <Separator />
-      <div className="px-4 py-3 text-[10px] text-muted-foreground">RDB · Restaurante Del Bosque</div>
+      <div className="px-4 py-3 text-[10px] text-muted-foreground">
+        RDB · Restaurante Del Bosque
+      </div>
     </aside>
   );
 }
@@ -103,7 +111,9 @@ export function RdbMobileNav() {
           <SidebarLogo />
           <NavLinks onNavigate={() => setOpen(false)} />
           <Separator />
-          <div className="px-4 py-3 text-[10px] text-muted-foreground">RDB · Restaurante Del Bosque</div>
+          <div className="px-4 py-3 text-[10px] text-muted-foreground">
+            RDB · Restaurante Del Bosque
+          </div>
         </SheetContent>
       </Sheet>
     </>

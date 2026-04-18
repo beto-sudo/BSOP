@@ -426,9 +426,7 @@
       "assistantMessages": 19,
       "toolCalls": 29,
       "toolResults": 29,
-      "files": [
-        "6b252e36-e431-4811-bb49-1eacfd701d5d.jsonl"
-      ],
+      "files": ["6b252e36-e431-4811-bb49-1eacfd701d5d.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -467,9 +465,7 @@
       "assistantMessages": 46,
       "toolCalls": 60,
       "toolResults": 60,
-      "files": [
-        "9c24cd42-9262-49a9-a566-5ceb39c797da.jsonl"
-      ],
+      "files": ["9c24cd42-9262-49a9-a566-5ceb39c797da.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -536,9 +532,7 @@
       "assistantMessages": 112,
       "toolCalls": 125,
       "toolResults": 124,
-      "files": [
-        "aa97dee7-31fe-4702-abb3-431e772beabc.jsonl"
-      ],
+      "files": ["aa97dee7-31fe-4702-abb3-431e772beabc.jsonl"],
       "models": [
         {
           "model": "claude-opus-4-6",
@@ -577,9 +571,7 @@
       "assistantMessages": 9,
       "toolCalls": 14,
       "toolResults": 14,
-      "files": [
-        "dc0f3877-f87b-4126-8cc2-cef02ea3af28.jsonl"
-      ],
+      "files": ["dc0f3877-f87b-4126-8cc2-cef02ea3af28.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -618,9 +610,7 @@
       "assistantMessages": 24,
       "toolCalls": 34,
       "toolResults": 34,
-      "files": [
-        "15e6f874-8f36-46cb-aaab-7bea94e6490d.jsonl"
-      ],
+      "files": ["15e6f874-8f36-46cb-aaab-7bea94e6490d.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -659,9 +649,7 @@
       "assistantMessages": 10,
       "toolCalls": 11,
       "toolResults": 11,
-      "files": [
-        "e95f352b-1155-4d1d-8fde-68c2ded65a5b.jsonl"
-      ],
+      "files": ["e95f352b-1155-4d1d-8fde-68c2ded65a5b.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -700,9 +688,7 @@
       "assistantMessages": 8,
       "toolCalls": 11,
       "toolResults": 11,
-      "files": [
-        "ad04e7f3-dd97-40f9-9472-7abf6df26509.jsonl"
-      ],
+      "files": ["ad04e7f3-dd97-40f9-9472-7abf6df26509.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -741,9 +727,7 @@
       "assistantMessages": 11,
       "toolCalls": 11,
       "toolResults": 11,
-      "files": [
-        "68c4e494-0c83-4619-b258-f0976cfc4283.jsonl"
-      ],
+      "files": ["68c4e494-0c83-4619-b258-f0976cfc4283.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -782,9 +766,7 @@
       "assistantMessages": 42,
       "toolCalls": 44,
       "toolResults": 44,
-      "files": [
-        "4c6df842-7212-4a3f-9e38-aea5289824cb.jsonl"
-      ],
+      "files": ["4c6df842-7212-4a3f-9e38-aea5289824cb.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -823,9 +805,7 @@
       "assistantMessages": 14,
       "toolCalls": 29,
       "toolResults": 29,
-      "files": [
-        "03fe17c4-9ae3-4161-a04f-da2e2bc609b1.jsonl"
-      ],
+      "files": ["03fe17c4-9ae3-4161-a04f-da2e2bc609b1.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -864,9 +844,7 @@
       "assistantMessages": 3,
       "toolCalls": 2,
       "toolResults": 2,
-      "files": [
-        "30a92192-aac7-419f-b99d-619d283c2e6b.jsonl"
-      ],
+      "files": ["30a92192-aac7-419f-b99d-619d283c2e6b.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -905,9 +883,7 @@
       "assistantMessages": 6,
       "toolCalls": 10,
       "toolResults": 10,
-      "files": [
-        "dccec380-1ab6-40dc-b485-21a3ae50e2f8.jsonl"
-      ],
+      "files": ["dccec380-1ab6-40dc-b485-21a3ae50e2f8.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -946,9 +922,7 @@
       "assistantMessages": 15,
       "toolCalls": 22,
       "toolResults": 22,
-      "files": [
-        "ed0b0de2-1a0d-4218-bba7-cf638f54eab5.jsonl"
-      ],
+      "files": ["ed0b0de2-1a0d-4218-bba7-cf638f54eab5.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -987,9 +961,7 @@
       "assistantMessages": 22,
       "toolCalls": 27,
       "toolResults": 27,
-      "files": [
-        "64e09ca4-b9ee-46d9-a663-bfef9addbd92.jsonl.deleted.2026-03-23T14-27-07.336Z"
-      ],
+      "files": ["64e09ca4-b9ee-46d9-a663-bfef9addbd92.jsonl.deleted.2026-03-23T14-27-07.336Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -1028,9 +1000,7 @@
       "assistantMessages": 11,
       "toolCalls": 45,
       "toolResults": 45,
-      "files": [
-        "6104b733-d658-41f5-a0b1-1f832c3ab521.jsonl.deleted.2026-03-23T13-36-25.895Z"
-      ],
+      "files": ["6104b733-d658-41f5-a0b1-1f832c3ab521.jsonl.deleted.2026-03-23T13-36-25.895Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -1069,9 +1039,7 @@
       "assistantMessages": 8,
       "toolCalls": 21,
       "toolResults": 21,
-      "files": [
-        "7ea8af4d-bee6-44e0-8c9d-51ac4964904f.jsonl"
-      ],
+      "files": ["7ea8af4d-bee6-44e0-8c9d-51ac4964904f.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -1110,9 +1078,7 @@
       "assistantMessages": 194,
       "toolCalls": 141,
       "toolResults": 141,
-      "files": [
-        "525128a5-0ae5-40cd-8da9-38914c254ffc.jsonl.reset.2026-03-23T19-26-52.714Z"
-      ],
+      "files": ["525128a5-0ae5-40cd-8da9-38914c254ffc.jsonl.reset.2026-03-23T19-26-52.714Z"],
       "models": [
         {
           "model": "claude-opus-4-6",
@@ -1165,9 +1131,7 @@
       "assistantMessages": 11,
       "toolCalls": 46,
       "toolResults": 46,
-      "files": [
-        "a560a39e-6299-473c-b8ff-97fab24979e2.jsonl.deleted.2026-03-23T07-01-11.137Z"
-      ],
+      "files": ["a560a39e-6299-473c-b8ff-97fab24979e2.jsonl.deleted.2026-03-23T07-01-11.137Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -1206,9 +1170,7 @@
       "assistantMessages": 14,
       "toolCalls": 38,
       "toolResults": 38,
-      "files": [
-        "feef3b2b-0f73-4381-8f5a-549bd0cf5ee0.jsonl.deleted.2026-03-23T06-54-11.138Z"
-      ],
+      "files": ["feef3b2b-0f73-4381-8f5a-549bd0cf5ee0.jsonl.deleted.2026-03-23T06-54-11.138Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -1247,9 +1209,7 @@
       "assistantMessages": 36,
       "toolCalls": 37,
       "toolResults": 37,
-      "files": [
-        "61b5b212-502b-4e35-ae87-f3028570a921.jsonl.deleted.2026-03-23T06-49-11.107Z"
-      ],
+      "files": ["61b5b212-502b-4e35-ae87-f3028570a921.jsonl.deleted.2026-03-23T06-49-11.107Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -1290,9 +1250,7 @@
       "assistantMessages": 19,
       "toolCalls": 29,
       "toolResults": 29,
-      "files": [
-        "6b252e36-e431-4811-bb49-1eacfd701d5d.jsonl"
-      ],
+      "files": ["6b252e36-e431-4811-bb49-1eacfd701d5d.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -1331,9 +1289,7 @@
       "assistantMessages": 46,
       "toolCalls": 60,
       "toolResults": 60,
-      "files": [
-        "9c24cd42-9262-49a9-a566-5ceb39c797da.jsonl"
-      ],
+      "files": ["9c24cd42-9262-49a9-a566-5ceb39c797da.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -1400,9 +1356,7 @@
       "assistantMessages": 112,
       "toolCalls": 125,
       "toolResults": 124,
-      "files": [
-        "aa97dee7-31fe-4702-abb3-431e772beabc.jsonl"
-      ],
+      "files": ["aa97dee7-31fe-4702-abb3-431e772beabc.jsonl"],
       "models": [
         {
           "model": "claude-opus-4-6",
@@ -1441,9 +1395,7 @@
       "assistantMessages": 9,
       "toolCalls": 14,
       "toolResults": 14,
-      "files": [
-        "dc0f3877-f87b-4126-8cc2-cef02ea3af28.jsonl"
-      ],
+      "files": ["dc0f3877-f87b-4126-8cc2-cef02ea3af28.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -1482,9 +1434,7 @@
       "assistantMessages": 24,
       "toolCalls": 34,
       "toolResults": 34,
-      "files": [
-        "15e6f874-8f36-46cb-aaab-7bea94e6490d.jsonl"
-      ],
+      "files": ["15e6f874-8f36-46cb-aaab-7bea94e6490d.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -1523,9 +1473,7 @@
       "assistantMessages": 10,
       "toolCalls": 11,
       "toolResults": 11,
-      "files": [
-        "e95f352b-1155-4d1d-8fde-68c2ded65a5b.jsonl"
-      ],
+      "files": ["e95f352b-1155-4d1d-8fde-68c2ded65a5b.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -1564,9 +1512,7 @@
       "assistantMessages": 8,
       "toolCalls": 11,
       "toolResults": 11,
-      "files": [
-        "ad04e7f3-dd97-40f9-9472-7abf6df26509.jsonl"
-      ],
+      "files": ["ad04e7f3-dd97-40f9-9472-7abf6df26509.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -1605,9 +1551,7 @@
       "assistantMessages": 11,
       "toolCalls": 11,
       "toolResults": 11,
-      "files": [
-        "68c4e494-0c83-4619-b258-f0976cfc4283.jsonl"
-      ],
+      "files": ["68c4e494-0c83-4619-b258-f0976cfc4283.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -1646,9 +1590,7 @@
       "assistantMessages": 42,
       "toolCalls": 44,
       "toolResults": 44,
-      "files": [
-        "4c6df842-7212-4a3f-9e38-aea5289824cb.jsonl"
-      ],
+      "files": ["4c6df842-7212-4a3f-9e38-aea5289824cb.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -1687,9 +1629,7 @@
       "assistantMessages": 14,
       "toolCalls": 29,
       "toolResults": 29,
-      "files": [
-        "03fe17c4-9ae3-4161-a04f-da2e2bc609b1.jsonl"
-      ],
+      "files": ["03fe17c4-9ae3-4161-a04f-da2e2bc609b1.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -1728,9 +1668,7 @@
       "assistantMessages": 3,
       "toolCalls": 2,
       "toolResults": 2,
-      "files": [
-        "30a92192-aac7-419f-b99d-619d283c2e6b.jsonl"
-      ],
+      "files": ["30a92192-aac7-419f-b99d-619d283c2e6b.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -1769,9 +1707,7 @@
       "assistantMessages": 6,
       "toolCalls": 10,
       "toolResults": 10,
-      "files": [
-        "dccec380-1ab6-40dc-b485-21a3ae50e2f8.jsonl"
-      ],
+      "files": ["dccec380-1ab6-40dc-b485-21a3ae50e2f8.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -1810,9 +1746,7 @@
       "assistantMessages": 15,
       "toolCalls": 22,
       "toolResults": 22,
-      "files": [
-        "ed0b0de2-1a0d-4218-bba7-cf638f54eab5.jsonl"
-      ],
+      "files": ["ed0b0de2-1a0d-4218-bba7-cf638f54eab5.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -1851,9 +1785,7 @@
       "assistantMessages": 22,
       "toolCalls": 27,
       "toolResults": 27,
-      "files": [
-        "64e09ca4-b9ee-46d9-a663-bfef9addbd92.jsonl.deleted.2026-03-23T14-27-07.336Z"
-      ],
+      "files": ["64e09ca4-b9ee-46d9-a663-bfef9addbd92.jsonl.deleted.2026-03-23T14-27-07.336Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -1892,9 +1824,7 @@
       "assistantMessages": 11,
       "toolCalls": 45,
       "toolResults": 45,
-      "files": [
-        "6104b733-d658-41f5-a0b1-1f832c3ab521.jsonl.deleted.2026-03-23T13-36-25.895Z"
-      ],
+      "files": ["6104b733-d658-41f5-a0b1-1f832c3ab521.jsonl.deleted.2026-03-23T13-36-25.895Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -1933,9 +1863,7 @@
       "assistantMessages": 8,
       "toolCalls": 21,
       "toolResults": 21,
-      "files": [
-        "7ea8af4d-bee6-44e0-8c9d-51ac4964904f.jsonl"
-      ],
+      "files": ["7ea8af4d-bee6-44e0-8c9d-51ac4964904f.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -1974,9 +1902,7 @@
       "assistantMessages": 194,
       "toolCalls": 141,
       "toolResults": 141,
-      "files": [
-        "525128a5-0ae5-40cd-8da9-38914c254ffc.jsonl.reset.2026-03-23T19-26-52.714Z"
-      ],
+      "files": ["525128a5-0ae5-40cd-8da9-38914c254ffc.jsonl.reset.2026-03-23T19-26-52.714Z"],
       "models": [
         {
           "model": "claude-opus-4-6",
@@ -2029,9 +1955,7 @@
       "assistantMessages": 11,
       "toolCalls": 46,
       "toolResults": 46,
-      "files": [
-        "a560a39e-6299-473c-b8ff-97fab24979e2.jsonl.deleted.2026-03-23T07-01-11.137Z"
-      ],
+      "files": ["a560a39e-6299-473c-b8ff-97fab24979e2.jsonl.deleted.2026-03-23T07-01-11.137Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -2070,9 +1994,7 @@
       "assistantMessages": 14,
       "toolCalls": 38,
       "toolResults": 38,
-      "files": [
-        "feef3b2b-0f73-4381-8f5a-549bd0cf5ee0.jsonl.deleted.2026-03-23T06-54-11.138Z"
-      ],
+      "files": ["feef3b2b-0f73-4381-8f5a-549bd0cf5ee0.jsonl.deleted.2026-03-23T06-54-11.138Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -2111,9 +2033,7 @@
       "assistantMessages": 36,
       "toolCalls": 37,
       "toolResults": 37,
-      "files": [
-        "61b5b212-502b-4e35-ae87-f3028570a921.jsonl.deleted.2026-03-23T06-49-11.107Z"
-      ],
+      "files": ["61b5b212-502b-4e35-ae87-f3028570a921.jsonl.deleted.2026-03-23T06-49-11.107Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -2152,9 +2072,7 @@
       "assistantMessages": 18,
       "toolCalls": 28,
       "toolResults": 28,
-      "files": [
-        "3b1d64e2-cebf-4452-916c-528b23818b75.jsonl.deleted.2026-03-23T06-28-11.068Z"
-      ],
+      "files": ["3b1d64e2-cebf-4452-916c-528b23818b75.jsonl.deleted.2026-03-23T06-28-11.068Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -2193,9 +2111,7 @@
       "assistantMessages": 36,
       "toolCalls": 34,
       "toolResults": 33,
-      "files": [
-        "186e664c-c8de-4ee8-a837-ae422a8e6a3d.jsonl.deleted.2026-03-23T06-27-11.079Z"
-      ],
+      "files": ["186e664c-c8de-4ee8-a837-ae422a8e6a3d.jsonl.deleted.2026-03-23T06-27-11.079Z"],
       "models": [
         {
           "model": "gemini-3.1-pro-preview",
@@ -2262,9 +2178,7 @@
       "assistantMessages": 47,
       "toolCalls": 57,
       "toolResults": 57,
-      "files": [
-        "6d367ae0-ff1e-4287-84a5-81cd8f1f390c.jsonl.deleted.2026-03-23T04-34-36.073Z"
-      ],
+      "files": ["6d367ae0-ff1e-4287-84a5-81cd8f1f390c.jsonl.deleted.2026-03-23T04-34-36.073Z"],
       "models": [
         {
           "model": "gemini-3.1-pro-preview",
@@ -2317,9 +2231,7 @@
       "assistantMessages": 14,
       "toolCalls": 18,
       "toolResults": 18,
-      "files": [
-        "f2466fbc-5f5b-435b-a1b8-bf9cc086c997.jsonl.deleted.2026-03-23T04-24-36.058Z"
-      ],
+      "files": ["f2466fbc-5f5b-435b-a1b8-bf9cc086c997.jsonl.deleted.2026-03-23T04-24-36.058Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -2358,9 +2270,7 @@
       "assistantMessages": 9,
       "toolCalls": 28,
       "toolResults": 28,
-      "files": [
-        "c9bb1059-a705-4b89-bf52-e9a6790b84f7.jsonl.deleted.2026-03-23T03-21-51.882Z"
-      ],
+      "files": ["c9bb1059-a705-4b89-bf52-e9a6790b84f7.jsonl.deleted.2026-03-23T03-21-51.882Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -2399,9 +2309,7 @@
       "assistantMessages": 126,
       "toolCalls": 94,
       "toolResults": 94,
-      "files": [
-        "3a162b54-fb2e-4a91-a208-55c4014e69c3.jsonl.reset.2026-03-23T09-11-07.949Z"
-      ],
+      "files": ["3a162b54-fb2e-4a91-a208-55c4014e69c3.jsonl.reset.2026-03-23T09-11-07.949Z"],
       "models": [
         {
           "model": "claude-opus-4-6",
@@ -2454,9 +2362,7 @@
       "assistantMessages": 14,
       "toolCalls": 62,
       "toolResults": 62,
-      "files": [
-        "35244869-2eff-4233-86fb-d7a8f3ccacd4.jsonl.deleted.2026-03-23T03-01-51.872Z"
-      ],
+      "files": ["35244869-2eff-4233-86fb-d7a8f3ccacd4.jsonl.deleted.2026-03-23T03-01-51.872Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -2495,9 +2401,7 @@
       "assistantMessages": 5,
       "toolCalls": 8,
       "toolResults": 8,
-      "files": [
-        "cae1364f-1c74-4080-acd5-91ef0b917b2e.jsonl"
-      ],
+      "files": ["cae1364f-1c74-4080-acd5-91ef0b917b2e.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -2536,9 +2440,7 @@
       "assistantMessages": 80,
       "toolCalls": 48,
       "toolResults": 48,
-      "files": [
-        "6a15300b-1d06-434a-852b-b40a0ab75c05.jsonl.reset.2026-03-23T02-18-03.610Z"
-      ],
+      "files": ["6a15300b-1d06-434a-852b-b40a0ab75c05.jsonl.reset.2026-03-23T02-18-03.610Z"],
       "models": [
         {
           "model": "claude-opus-4-6",
@@ -2599,9 +2501,7 @@
       "assistantMessages": 114,
       "toolCalls": 97,
       "toolResults": 97,
-      "files": [
-        "fd8baf16-6a8c-482b-a609-5b843d9e3f45.jsonl.reset.2026-03-22T23-37-10.303Z"
-      ],
+      "files": ["fd8baf16-6a8c-482b-a609-5b843d9e3f45.jsonl.reset.2026-03-22T23-37-10.303Z"],
       "models": [
         {
           "model": "claude-opus-4-6",
@@ -2676,9 +2576,7 @@
       "assistantMessages": 11,
       "toolCalls": 26,
       "toolResults": 26,
-      "files": [
-        "a93ddbc2-f7e7-48f8-ac10-85e8e36d5548.jsonl.deleted.2026-03-23T12-02-26.943Z"
-      ],
+      "files": ["a93ddbc2-f7e7-48f8-ac10-85e8e36d5548.jsonl.deleted.2026-03-23T12-02-26.943Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -2717,9 +2615,7 @@
       "assistantMessages": 5,
       "toolCalls": 18,
       "toolResults": 18,
-      "files": [
-        "92243bf0-2a65-4bb7-bb47-62b241c348df.jsonl"
-      ],
+      "files": ["92243bf0-2a65-4bb7-bb47-62b241c348df.jsonl"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -2758,9 +2654,7 @@
       "assistantMessages": 89,
       "toolCalls": 47,
       "toolResults": 47,
-      "files": [
-        "1dfefba7-e3ad-447d-8f1a-effaad3182d9.jsonl.reset.2026-03-22T21-27-49.532Z"
-      ],
+      "files": ["1dfefba7-e3ad-447d-8f1a-effaad3182d9.jsonl.reset.2026-03-22T21-27-49.532Z"],
       "models": [
         {
           "model": "claude-opus-4-6",
@@ -2821,9 +2715,7 @@
       "assistantMessages": 101,
       "toolCalls": 72,
       "toolResults": 72,
-      "files": [
-        "01c64d57-ea46-4526-b1ea-86318082958b.jsonl.reset.2026-03-22T09-07-16.866Z"
-      ],
+      "files": ["01c64d57-ea46-4526-b1ea-86318082958b.jsonl.reset.2026-03-22T09-07-16.866Z"],
       "models": [
         {
           "model": "claude-opus-4-6",
@@ -2876,9 +2768,7 @@
       "assistantMessages": 3,
       "toolCalls": 0,
       "toolResults": 0,
-      "files": [
-        "561bfb50-6a41-4c83-b8b9-70027a7edab1.jsonl.reset.2026-03-22T00-41-43.225Z"
-      ],
+      "files": ["561bfb50-6a41-4c83-b8b9-70027a7edab1.jsonl.reset.2026-03-22T00-41-43.225Z"],
       "models": [],
       "providers": [],
       "formattedCost": "$0.0000"
@@ -2901,9 +2791,7 @@
       "assistantMessages": 9,
       "toolCalls": 9,
       "toolResults": 9,
-      "files": [
-        "388edc33-aadf-460a-ae31-bd9fdb41c10b.jsonl.deleted.2026-03-23T00-31-45.279Z"
-      ],
+      "files": ["388edc33-aadf-460a-ae31-bd9fdb41c10b.jsonl.deleted.2026-03-23T00-31-45.279Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -2942,9 +2830,7 @@
       "assistantMessages": 12,
       "toolCalls": 0,
       "toolResults": 8,
-      "files": [
-        "c87eb069-4a80-4974-8dbe-b1a1ecee0a22.jsonl.reset.2026-03-22T00-34-33.276Z"
-      ],
+      "files": ["c87eb069-4a80-4974-8dbe-b1a1ecee0a22.jsonl.reset.2026-03-22T00-34-33.276Z"],
       "models": [],
       "providers": [],
       "formattedCost": "$0.0000"
@@ -2967,9 +2853,7 @@
       "assistantMessages": 7,
       "toolCalls": 0,
       "toolResults": 5,
-      "files": [
-        "829fce68-c2e1-457b-8f05-8589c73e0c97.jsonl.reset.2026-03-22T00-22-16.774Z"
-      ],
+      "files": ["829fce68-c2e1-457b-8f05-8589c73e0c97.jsonl.reset.2026-03-22T00-22-16.774Z"],
       "models": [],
       "providers": [],
       "formattedCost": "$0.0000"
@@ -2992,9 +2876,7 @@
       "assistantMessages": 6,
       "toolCalls": 0,
       "toolResults": 6,
-      "files": [
-        "96ba3658-b40c-47c3-96d3-0ad9a4528c69.jsonl.reset.2026-03-22T00-21-10.904Z"
-      ],
+      "files": ["96ba3658-b40c-47c3-96d3-0ad9a4528c69.jsonl.reset.2026-03-22T00-21-10.904Z"],
       "models": [],
       "providers": [],
       "formattedCost": "$0.0000"
@@ -3017,9 +2899,7 @@
       "assistantMessages": 7,
       "toolCalls": 0,
       "toolResults": 4,
-      "files": [
-        "c9d32386-13d0-44f9-ad3d-b5c73bbcd9f4.jsonl.reset.2026-03-22T00-19-38.884Z"
-      ],
+      "files": ["c9d32386-13d0-44f9-ad3d-b5c73bbcd9f4.jsonl.reset.2026-03-22T00-19-38.884Z"],
       "models": [],
       "providers": [],
       "formattedCost": "$0.0000"
@@ -3042,9 +2922,7 @@
       "assistantMessages": 5,
       "toolCalls": 0,
       "toolResults": 3,
-      "files": [
-        "7c6227f1-9ac1-44f3-8c78-7940211c9f1a.jsonl.reset.2026-03-22T00-15-50.562Z"
-      ],
+      "files": ["7c6227f1-9ac1-44f3-8c78-7940211c9f1a.jsonl.reset.2026-03-22T00-15-50.562Z"],
       "models": [],
       "providers": [],
       "formattedCost": "$0.0000"
@@ -3067,9 +2945,7 @@
       "assistantMessages": 4,
       "toolCalls": 0,
       "toolResults": 2,
-      "files": [
-        "3a2c635b-9d25-4619-be01-5e03f6ad78ce.jsonl.reset.2026-03-22T00-02-57.338Z"
-      ],
+      "files": ["3a2c635b-9d25-4619-be01-5e03f6ad78ce.jsonl.reset.2026-03-22T00-02-57.338Z"],
       "models": [],
       "providers": [],
       "formattedCost": "$0.0000"
@@ -3092,9 +2968,7 @@
       "assistantMessages": 3,
       "toolCalls": 0,
       "toolResults": 0,
-      "files": [
-        "4999da07-eff5-46c0-aae8-aa876e6ab007.jsonl.reset.2026-03-22T00-01-30.433Z"
-      ],
+      "files": ["4999da07-eff5-46c0-aae8-aa876e6ab007.jsonl.reset.2026-03-22T00-01-30.433Z"],
       "models": [],
       "providers": [],
       "formattedCost": "$0.0000"
@@ -3117,9 +2991,7 @@
       "assistantMessages": 2,
       "toolCalls": 0,
       "toolResults": 0,
-      "files": [
-        "78f49bf1-a139-46d0-8cb9-015862dbc7fe.jsonl.reset.2026-03-22T00-00-18.371Z"
-      ],
+      "files": ["78f49bf1-a139-46d0-8cb9-015862dbc7fe.jsonl.reset.2026-03-22T00-00-18.371Z"],
       "models": [],
       "providers": [],
       "formattedCost": "$0.0000"
@@ -3142,9 +3014,7 @@
       "assistantMessages": 2,
       "toolCalls": 0,
       "toolResults": 0,
-      "files": [
-        "8534e3c2-0040-4485-8a1e-12173ca231bd.jsonl.reset.2026-03-21T23-59-09.985Z"
-      ],
+      "files": ["8534e3c2-0040-4485-8a1e-12173ca231bd.jsonl.reset.2026-03-21T23-59-09.985Z"],
       "models": [],
       "providers": [],
       "formattedCost": "$0.0000"
@@ -3167,9 +3037,7 @@
       "assistantMessages": 9,
       "toolCalls": 0,
       "toolResults": 1,
-      "files": [
-        "88fb37ad-014f-4368-bf11-6694528c42bc.jsonl.reset.2026-03-21T23-58-36.158Z"
-      ],
+      "files": ["88fb37ad-014f-4368-bf11-6694528c42bc.jsonl.reset.2026-03-21T23-58-36.158Z"],
       "models": [],
       "providers": [],
       "formattedCost": "$0.0000"
@@ -3192,9 +3060,7 @@
       "assistantMessages": 4,
       "toolCalls": 0,
       "toolResults": 0,
-      "files": [
-        "d7ce931a-019d-4d0d-9a26-5974a7e5cbd6.jsonl.reset.2026-03-21T23-52-16.931Z"
-      ],
+      "files": ["d7ce931a-019d-4d0d-9a26-5974a7e5cbd6.jsonl.reset.2026-03-21T23-52-16.931Z"],
       "models": [],
       "providers": [],
       "formattedCost": "$0.0000"
@@ -3259,9 +3125,7 @@
       "assistantMessages": 196,
       "toolCalls": 119,
       "toolResults": 173,
-      "files": [
-        "e5a12d14-0f1c-416a-b6b3-e6afaab2441c.jsonl.reset.2026-03-21T23-34-31.816Z"
-      ],
+      "files": ["e5a12d14-0f1c-416a-b6b3-e6afaab2441c.jsonl.reset.2026-03-21T23-34-31.816Z"],
       "models": [
         {
           "model": "claude-opus-4-6",
@@ -3314,9 +3178,7 @@
       "assistantMessages": 22,
       "toolCalls": 27,
       "toolResults": 27,
-      "files": [
-        "094ff964-19e6-4647-9120-994357b28dea.jsonl.reset.2026-03-21T22-12-46.957Z"
-      ],
+      "files": ["094ff964-19e6-4647-9120-994357b28dea.jsonl.reset.2026-03-21T22-12-46.957Z"],
       "models": [
         {
           "model": "claude-opus-4-6",
@@ -3369,9 +3231,7 @@
       "assistantMessages": 26,
       "toolCalls": 26,
       "toolResults": 26,
-      "files": [
-        "e2690cb4-856e-4bbc-9f83-c8729b003e07.jsonl.reset.2026-03-21T21-59-41.661Z"
-      ],
+      "files": ["e2690cb4-856e-4bbc-9f83-c8729b003e07.jsonl.reset.2026-03-21T21-59-41.661Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -3424,9 +3284,7 @@
       "assistantMessages": 16,
       "toolCalls": 10,
       "toolResults": 10,
-      "files": [
-        "e5d0bb24-848c-4559-9d4e-ea15eb4ccf86.jsonl.reset.2026-03-21T21-38-43.409Z"
-      ],
+      "files": ["e5d0bb24-848c-4559-9d4e-ea15eb4ccf86.jsonl.reset.2026-03-21T21-38-43.409Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -3465,9 +3323,7 @@
       "assistantMessages": 10,
       "toolCalls": 16,
       "toolResults": 16,
-      "files": [
-        "9b89c6b2-24da-46cc-98f2-d2e68c1765c5.jsonl.deleted.2026-03-22T18-08-38.174Z"
-      ],
+      "files": ["9b89c6b2-24da-46cc-98f2-d2e68c1765c5.jsonl.deleted.2026-03-22T18-08-38.174Z"],
       "models": [
         {
           "model": "gemini-3.1-pro-preview",
@@ -3506,9 +3362,7 @@
       "assistantMessages": 1,
       "toolCalls": 0,
       "toolResults": 0,
-      "files": [
-        "a8d54bca-dafc-4435-abb9-4dc9eb37a097.jsonl.deleted.2026-03-22T17-53-38.038Z"
-      ],
+      "files": ["a8d54bca-dafc-4435-abb9-4dc9eb37a097.jsonl.deleted.2026-03-22T17-53-38.038Z"],
       "models": [
         {
           "model": "gemini-3.1-pro-preview",
@@ -3547,9 +3401,7 @@
       "assistantMessages": 11,
       "toolCalls": 21,
       "toolResults": 21,
-      "files": [
-        "00e284c6-ac31-41ff-b147-881451930434.jsonl.deleted.2026-03-22T12-03-34.633Z"
-      ],
+      "files": ["00e284c6-ac31-41ff-b147-881451930434.jsonl.deleted.2026-03-22T12-03-34.633Z"],
       "models": [
         {
           "model": "claude-sonnet-4-6",
@@ -3588,9 +3440,7 @@
       "assistantMessages": 209,
       "toolCalls": 146,
       "toolResults": 145,
-      "files": [
-        "83816004-68bc-4e6e-bc0f-dbf18c2d13e7.jsonl.reset.2026-03-21T21-23-33.578Z"
-      ],
+      "files": ["83816004-68bc-4e6e-bc0f-dbf18c2d13e7.jsonl.reset.2026-03-21T21-23-33.578Z"],
       "models": [
         {
           "model": "claude-opus-4-6",
@@ -3671,9 +3521,7 @@
       "assistantMessages": 291,
       "toolCalls": 188,
       "toolResults": 188,
-      "files": [
-        "bbb55961-6181-469e-929d-c75c37c4e643.jsonl.reset.2026-03-21T09-24-51.165Z"
-      ],
+      "files": ["bbb55961-6181-469e-929d-c75c37c4e643.jsonl.reset.2026-03-21T09-24-51.165Z"],
       "models": [
         {
           "model": "claude-opus-4-6",
@@ -3754,9 +3602,7 @@
       "assistantMessages": 121,
       "toolCalls": 92,
       "toolResults": 90,
-      "files": [
-        "5d25c4b7-ec15-449b-b673-a58ed758074e.jsonl.reset.2026-03-20T09-00-56.291Z"
-      ],
+      "files": ["5d25c4b7-ec15-449b-b673-a58ed758074e.jsonl.reset.2026-03-20T09-00-56.291Z"],
       "models": [
         {
           "model": "claude-opus-4-6",
@@ -3851,9 +3697,7 @@
       "assistantMessages": 130,
       "toolCalls": 102,
       "toolResults": 102,
-      "files": [
-        "00d9ee67-e4aa-4d45-b092-12292ff89d76.jsonl.reset.2026-03-19T09-16-26.845Z"
-      ],
+      "files": ["00d9ee67-e4aa-4d45-b092-12292ff89d76.jsonl.reset.2026-03-19T09-16-26.845Z"],
       "models": [
         {
           "model": "claude-opus-4-6",
@@ -3920,9 +3764,7 @@
       "assistantMessages": 124,
       "toolCalls": 102,
       "toolResults": 102,
-      "files": [
-        "534982a9-7dd3-46f0-ba06-84200020b9f7.jsonl.reset.2026-03-18T22-40-46.733Z"
-      ],
+      "files": ["534982a9-7dd3-46f0-ba06-84200020b9f7.jsonl.reset.2026-03-18T22-40-46.733Z"],
       "models": [
         {
           "model": "claude-opus-4-6",
@@ -3989,9 +3831,7 @@
       "assistantMessages": 23,
       "toolCalls": 18,
       "toolResults": 18,
-      "files": [
-        "e5aa0f30-09c9-4bf4-abaf-b64a58a81585.jsonl.reset.2026-03-18T09-11-09.338Z"
-      ],
+      "files": ["e5aa0f30-09c9-4bf4-abaf-b64a58a81585.jsonl.reset.2026-03-18T09-11-09.338Z"],
       "models": [
         {
           "model": "claude-opus-4-6",
@@ -4044,9 +3884,7 @@
       "assistantMessages": 5,
       "toolCalls": 14,
       "toolResults": 14,
-      "files": [
-        "cfe2e450-affa-416c-bd88-2f6df4f5e8a7.jsonl"
-      ],
+      "files": ["cfe2e450-affa-416c-bd88-2f6df4f5e8a7.jsonl"],
       "models": [
         {
           "model": "claude-opus-4-6",
@@ -4085,9 +3923,7 @@
       "assistantMessages": 312,
       "toolCalls": 249,
       "toolResults": 246,
-      "files": [
-        "431333b3-851a-48f6-b9ce-31e83dc1ddac.jsonl.reset.2026-03-18T02-31-01.685Z"
-      ],
+      "files": ["431333b3-851a-48f6-b9ce-31e83dc1ddac.jsonl.reset.2026-03-18T02-31-01.685Z"],
       "models": [
         {
           "model": "claude-opus-4-6",
@@ -4176,15 +4012,13 @@
       "cacheReadTokens": 998728,
       "cacheWriteTokens": 200655,
       "totalTokens": 1317466,
-      "cost": 2e-06,
+      "cost": 2e-6,
       "messages": 45,
       "userMessages": 10,
       "assistantMessages": 35,
       "toolCalls": 37,
       "toolResults": 37,
-      "files": [
-        "f91cc42d-b88c-4b4c-aa23-49e6fe38875a.jsonl.reset.2026-03-17T10-06-33.009Z"
-      ],
+      "files": ["f91cc42d-b88c-4b4c-aa23-49e6fe38875a.jsonl.reset.2026-03-17T10-06-33.009Z"],
       "models": [
         {
           "model": "claude-opus-4-6",
@@ -4192,7 +4026,7 @@
           "provider": "anthropic",
           "messages": 31,
           "tokens": 1093892,
-          "cost": 2e-06
+          "cost": 2e-6
         },
         {
           "model": "kimi-k2.5",
@@ -4208,7 +4042,7 @@
           "provider": "anthropic",
           "messages": 31,
           "tokens": 1093892,
-          "cost": 2e-06
+          "cost": 2e-6
         },
         {
           "provider": "other",
@@ -4231,15 +4065,13 @@
       "cacheReadTokens": 13114793,
       "cacheWriteTokens": 2982258,
       "totalTokens": 16157902,
-      "cost": 6e-06,
+      "cost": 6e-6,
       "messages": 196,
       "userMessages": 40,
       "assistantMessages": 156,
       "toolCalls": 117,
       "toolResults": 117,
-      "files": [
-        "057f920b-af78-437d-b436-c682e7545a26.jsonl.reset.2026-03-17T00-21-01.465Z"
-      ],
+      "files": ["057f920b-af78-437d-b436-c682e7545a26.jsonl.reset.2026-03-17T00-21-01.465Z"],
       "models": [
         {
           "model": "claude-opus-4-6",
@@ -4247,7 +4079,7 @@
           "provider": "anthropic",
           "messages": 154,
           "tokens": 16157902,
-          "cost": 6e-06
+          "cost": 6e-6
         }
       ],
       "providers": [
@@ -4255,7 +4087,7 @@
           "provider": "anthropic",
           "messages": 154,
           "tokens": 16157902,
-          "cost": 6e-06
+          "cost": 6e-6
         }
       ],
       "formattedCost": "$0.0000"
@@ -4278,9 +4110,7 @@
       "assistantMessages": 41,
       "toolCalls": 66,
       "toolResults": 66,
-      "files": [
-        "360b0398-dfa4-4888-ab03-ed79e6f06e05.jsonl.reset.2026-03-16T21-48-17.587Z"
-      ],
+      "files": ["360b0398-dfa4-4888-ab03-ed79e6f06e05.jsonl.reset.2026-03-16T21-48-17.587Z"],
       "models": [
         {
           "model": "gemini-3.1-pro-preview",
@@ -4296,7 +4126,7 @@
           "provider": "anthropic",
           "messages": 28,
           "tokens": 1057167,
-          "cost": 1e-06
+          "cost": 1e-6
         },
         {
           "model": "gpt-5.4",
@@ -4318,7 +4148,7 @@
           "provider": "anthropic",
           "messages": 28,
           "tokens": 1057167,
-          "cost": 1e-06
+          "cost": 1e-6
         },
         {
           "provider": "openai",
@@ -4347,9 +4177,7 @@
       "assistantMessages": 88,
       "toolCalls": 35,
       "toolResults": 35,
-      "files": [
-        "f2a14dff-da0a-45d0-8233-60055656e243.jsonl.reset.2026-03-16T20-44-48.766Z"
-      ],
+      "files": ["f2a14dff-da0a-45d0-8233-60055656e243.jsonl.reset.2026-03-16T20-44-48.766Z"],
       "models": [
         {
           "model": "gemini-3.1-pro-preview",
@@ -4438,9 +4266,7 @@
       "assistantMessages": 86,
       "toolCalls": 58,
       "toolResults": 58,
-      "files": [
-        "bbd76625-779a-49df-8eef-69d4f1f28825.jsonl.reset.2026-03-16T18-12-40.743Z"
-      ],
+      "files": ["bbd76625-779a-49df-8eef-69d4f1f28825.jsonl.reset.2026-03-16T18-12-40.743Z"],
       "models": [
         {
           "model": "gemini-3.1-pro-preview",
@@ -4507,9 +4333,7 @@
       "assistantMessages": 112,
       "toolCalls": 100,
       "toolResults": 100,
-      "files": [
-        "9c275880-6e17-4a3b-89a3-27947038b1a6.jsonl.reset.2026-03-16T10-12-09.538Z"
-      ],
+      "files": ["9c275880-6e17-4a3b-89a3-27947038b1a6.jsonl.reset.2026-03-16T10-12-09.538Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -4548,9 +4372,7 @@
       "assistantMessages": 118,
       "toolCalls": 114,
       "toolResults": 114,
-      "files": [
-        "b8b3ad30-865d-405c-acb1-ad743fd8c1da.jsonl.reset.2026-03-15T18-05-00.273Z"
-      ],
+      "files": ["b8b3ad30-865d-405c-acb1-ad743fd8c1da.jsonl.reset.2026-03-15T18-05-00.273Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -4589,9 +4411,7 @@
       "assistantMessages": 115,
       "toolCalls": 87,
       "toolResults": 87,
-      "files": [
-        "b889283d-6c7d-46b9-955d-218326abf905.jsonl.reset.2026-03-15T09-14-42.693Z"
-      ],
+      "files": ["b889283d-6c7d-46b9-955d-218326abf905.jsonl.reset.2026-03-15T09-14-42.693Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -4630,9 +4450,7 @@
       "assistantMessages": 49,
       "toolCalls": 71,
       "toolResults": 71,
-      "files": [
-        "1b01b64e-dcf5-4fb1-aa04-8a8f0a22d2bd.jsonl.reset.2026-03-14T09-52-43.701Z"
-      ],
+      "files": ["1b01b64e-dcf5-4fb1-aa04-8a8f0a22d2bd.jsonl.reset.2026-03-14T09-52-43.701Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -4671,9 +4489,7 @@
       "assistantMessages": 166,
       "toolCalls": 134,
       "toolResults": 134,
-      "files": [
-        "e5315164-2b33-4a30-a0d5-7e93cd9d92f8.jsonl.reset.2026-03-14T01-44-51.503Z"
-      ],
+      "files": ["e5315164-2b33-4a30-a0d5-7e93cd9d92f8.jsonl.reset.2026-03-14T01-44-51.503Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -4726,9 +4542,7 @@
       "assistantMessages": 109,
       "toolCalls": 84,
       "toolResults": 83,
-      "files": [
-        "6e1a17ec-b1ec-4a38-b501-84a3c3bb3d0d.jsonl.reset.2026-03-13T10-04-35.921Z"
-      ],
+      "files": ["6e1a17ec-b1ec-4a38-b501-84a3c3bb3d0d.jsonl.reset.2026-03-13T10-04-35.921Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -4781,9 +4595,7 @@
       "assistantMessages": 116,
       "toolCalls": 80,
       "toolResults": 80,
-      "files": [
-        "d1203057-1da6-4dbb-9530-0844ef34a358.jsonl.reset.2026-03-12T10-31-45.409Z"
-      ],
+      "files": ["d1203057-1da6-4dbb-9530-0844ef34a358.jsonl.reset.2026-03-12T10-31-45.409Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -4836,9 +4648,7 @@
       "assistantMessages": 312,
       "toolCalls": 296,
       "toolResults": 296,
-      "files": [
-        "ada66327-530e-4a1f-8011-8af86771ca4d.jsonl.reset.2026-03-11T10-12-58.371Z"
-      ],
+      "files": ["ada66327-530e-4a1f-8011-8af86771ca4d.jsonl.reset.2026-03-11T10-12-58.371Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -4891,9 +4701,7 @@
       "assistantMessages": 57,
       "toolCalls": 28,
       "toolResults": 28,
-      "files": [
-        "4f33eb9c-0a18-4ab1-b062-deef9c0d0f4e.jsonl.reset.2026-03-10T10-38-43.981Z"
-      ],
+      "files": ["4f33eb9c-0a18-4ab1-b062-deef9c0d0f4e.jsonl.reset.2026-03-10T10-38-43.981Z"],
       "models": [
         {
           "model": "gpt-5.4",
@@ -4954,9 +4762,7 @@
       "assistantMessages": 70,
       "toolCalls": 17,
       "toolResults": 16,
-      "files": [
-        "4b27a39e-b848-4ef2-83bf-d7ceb2bc0cef.jsonl.reset.2026-03-09T10-55-43.510Z"
-      ],
+      "files": ["4b27a39e-b848-4ef2-83bf-d7ceb2bc0cef.jsonl.reset.2026-03-09T10-55-43.510Z"],
       "models": [
         {
           "model": "gpt-5.3-codex",
@@ -5009,9 +4815,7 @@
       "assistantMessages": 83,
       "toolCalls": 30,
       "toolResults": 30,
-      "files": [
-        "f7e54e7e-2f95-4f62-9da2-a57f56ce754b.jsonl.reset.2026-02-23T06-13-44.363Z"
-      ],
+      "files": ["f7e54e7e-2f95-4f62-9da2-a57f56ce754b.jsonl.reset.2026-02-23T06-13-44.363Z"],
       "models": [
         {
           "model": "kimi-k2.5",
@@ -51462,7 +51266,7 @@
       "cacheReadTokens": 0,
       "cacheCreationTokens": 126751,
       "totalTokens": 126946,
-      "cost": 1e-06,
+      "cost": 1e-6,
       "formattedCost": "$0.0000",
       "durationMs": 0,
       "status": "ok",
@@ -51678,7 +51482,7 @@
       "cacheReadTokens": 0,
       "cacheCreationTokens": 116154,
       "totalTokens": 116332,
-      "cost": 1e-06,
+      "cost": 1e-6,
       "formattedCost": "$0.0000",
       "durationMs": 0,
       "status": "ok",
@@ -53478,7 +53282,7 @@
       "cacheReadTokens": 54849,
       "cacheCreationTokens": 4065,
       "totalTokens": 66890,
-      "cost": 1e-06,
+      "cost": 1e-6,
       "formattedCost": "$0.0000",
       "durationMs": 0,
       "status": "ok",

@@ -23,7 +23,13 @@ export async function GET(request: Request) {
       return jsonResponse({ days, rows: [], grouped: [], error: result.error.message }, 500);
     }
 
-    const groupedMap = new Map<string, { date: string; models: { model: string; label: string; cost: number; messages: number; tokens: number }[] }>();
+    const groupedMap = new Map<
+      string,
+      {
+        date: string;
+        models: { model: string; label: string; cost: number; messages: number; tokens: number }[];
+      }
+    >();
     for (const row of result.data ?? []) {
       const entry = groupedMap.get(row.date) ?? { date: row.date, models: [] };
       entry.models.push({
@@ -39,6 +45,14 @@ export async function GET(request: Request) {
     const grouped = Array.from(groupedMap.values());
     return jsonResponse({ days, rows: result.data ?? [], grouped });
   } catch (error) {
-    return jsonResponse({ days, rows: [], grouped: [], error: error instanceof Error ? error.message : 'Unknown error' }, 500);
+    return jsonResponse(
+      {
+        days,
+        rows: [],
+        grouped: [],
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+      500
+    );
   }
 }

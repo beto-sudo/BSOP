@@ -1,4 +1,5 @@
 # Auditoría Supabase — BSOP Project
+
 **Fecha:** 2026-04-17 · **Proyecto:** `ybklderteyhuugzfmxbi` (us-east-1, Postgres 17.4.1) · **Tamaño DB:** 170 MB
 
 > Complemento de [`AUDIT_2026-04-16.md`](./AUDIT_2026-04-16.md) (foco repo / código).
@@ -10,12 +11,12 @@
 
 El proyecto aloja **tres cargas de trabajo bien diferenciadas** más un residual histórico:
 
-| Dominio | Schemas | Rol | Estado |
-|---|---|---|---|
-| **BSOP ERP operativo** | `core`, `erp` | Empresas, empleados, tareas, inventario, compras, cortes de caja, documentos | **Activo** — corazón de la app actual |
-| **BSOP POS / Waitry** | `rdb` | Ingestión Waitry (pedidos, pagos, productos), conciliación con cortes, inventario derivado | **Activo** — hot path, `rdb.waitry_inbound` es la tabla más grande (55 MB) |
-| **Playtomic (padel)** | `playtomic` | Bookings, players, resources, sync log | **Activo** — sync programado vía edge function |
-| **Residual / histórico** | `public` | Mezcla: `trip_*` (Splitwise), `health_*` (Apple Health), `usage_*` (tracking AI), `profile`, `user_presence` | **Mixto** — ver §4 |
+| Dominio                  | Schemas       | Rol                                                                                                          | Estado                                                                     |
+| ------------------------ | ------------- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| **BSOP ERP operativo**   | `core`, `erp` | Empresas, empleados, tareas, inventario, compras, cortes de caja, documentos                                 | **Activo** — corazón de la app actual                                      |
+| **BSOP POS / Waitry**    | `rdb`         | Ingestión Waitry (pedidos, pagos, productos), conciliación con cortes, inventario derivado                   | **Activo** — hot path, `rdb.waitry_inbound` es la tabla más grande (55 MB) |
+| **Playtomic (padel)**    | `playtomic`   | Bookings, players, resources, sync log                                                                       | **Activo** — sync programado vía edge function                             |
+| **Residual / histórico** | `public`      | Mezcla: `trip_*` (Splitwise), `health_*` (Apple Health), `usage_*` (tracking AI), `profile`, `user_presence` | **Mixto** — ver §4                                                         |
 
 Hay **5 usuarios en `auth.users`** (3 activos últimos 7 días). La DB tiene **90 migraciones** aplicadas y **3 edge functions** activas: `waitry-webhook`, `sync-cortes`, `playtomic-sync`.
 
@@ -36,24 +37,24 @@ Durante la migración `rdb → erp` del 2026-04-14 se rompió sin avisar el pipe
 
 ### 2.1 Tablas y rows (por schema)
 
-| Schema | Tablas | Rows totales | Notas |
-|--------|-------:|-------------:|------|
-| `public` | 15 | ~100 K | Salud, usage AI, trip_*, profile, user_presence |
-| `core` | 8 | ~116 | RBAC + audit_log (0 rows) |
-| `erp` | 46 | ~19 K | Operativa multi-empresa |
-| `rdb` | 11 | ~47 K | Waitry raw + archivos post-migración |
-| `playtomic` | 5 | ~6.7 K | Sync canchas |
-| `dilesa` | 0 | 0 | Schema vacío — datos absorbidos en `erp` con `empresa_id` |
+| Schema      | Tablas | Rows totales | Notas                                                     |
+| ----------- | -----: | -----------: | --------------------------------------------------------- |
+| `public`    |     15 |       ~100 K | Salud, usage AI, trip\_\*, profile, user_presence         |
+| `core`      |      8 |         ~116 | RBAC + audit_log (0 rows)                                 |
+| `erp`       |     46 |        ~19 K | Operativa multi-empresa                                   |
+| `rdb`       |     11 |        ~47 K | Waitry raw + archivos post-migración                      |
+| `playtomic` |      5 |       ~6.7 K | Sync canchas                                              |
+| `dilesa`    |      0 |            0 | Schema vacío — datos absorbidos en `erp` con `empresa_id` |
 
 **Total: 85 tablas, ~173 K rows.**
 
 ### 2.2 Edge functions
 
-| Función | Versión | Status | En repo |
-|---------|---------|--------|---------|
-| `waitry-webhook` | v18 | ACTIVE | ✅ (exportada 2026-04-17) |
-| `sync-cortes` | v5 | ACTIVE | ✅ (exportada 2026-04-17) |
-| `playtomic-sync` | v2 | ACTIVE | ✅ |
+| Función          | Versión | Status | En repo                   |
+| ---------------- | ------- | ------ | ------------------------- |
+| `waitry-webhook` | v18     | ACTIVE | ✅ (exportada 2026-04-17) |
+| `sync-cortes`    | v5      | ACTIVE | ✅ (exportada 2026-04-17) |
+| `playtomic-sync` | v2      | ACTIVE | ✅                        |
 
 ### 2.3 Extensiones activas
 
@@ -63,11 +64,11 @@ No hay extensiones de performance críticas faltantes — `pg_trgm` y `btree_gin
 
 ### 2.4 Migraciones (línea temporal)
 
-| Categoría | Count |
-|-----------|------:|
-| Total aplicadas | 90 |
-| Placeholders vacíos (`*_placeholder.sql`) | 13 |
-| Archivos en `supabase/migrations_archive_pre_fix/` | 6 |
+| Categoría                                          | Count |
+| -------------------------------------------------- | ----: |
+| Total aplicadas                                    |    90 |
+| Placeholders vacíos (`*_placeholder.sql`)          |    13 |
+| Archivos en `supabase/migrations_archive_pre_fix/` |     6 |
 
 - `2026-03-25` → `2026-04-08`: base + 13 placeholders que deberían squashearse.
 - `2026-04-09`: burst de 30 migraciones consolidando RDB.
@@ -123,32 +124,32 @@ No hay extensiones de performance críticas faltantes — `pg_trgm` y `btree_gin
 
 ### Borrables con confianza alta
 
-| Objeto | Schema | Filas | Tamaño | Razón |
-|---|---|---|---|---|
-| `trip_participants` | public | 0 | 32 kB | Experimento Splitwise, nunca tuvo datos, policies abiertas a `anon` |
-| `trip_expenses` | public | 0 | 32 kB | ídem |
-| `expense_splits` | public | 0 | 72 kB | ídem |
-| `trip_share_tokens` | public | 0 | 64 kB | ídem |
-| `health_workouts` | public | 0 | 6.6 MB | Apple Health, sin inserts históricos |
-| `health_ecg` | public | 0 | 24 kB | ídem |
-| `health_medications` | public | 0 | 24 kB | ídem |
-| `usage_summary` | public | 0 | 24 kB | Vista/tabla de resumen AI, nunca se pobló |
-| `requisiciones_archive_2026_04_17` | rdb | 185 | 88 kB | Migración promovida a `erp` |
-| `ordenes_compra_archive_2026_04_17` | rdb | 156 | 88 kB | ídem |
-| `proveedores_archive_2026_04_17` | rdb | 61 | 64 kB | ídem |
-| `corte_conteo_denominaciones_archive_2026_04_17` | rdb | 0 | 64 kB | ídem |
-| `supabase/migrations_archive_pre_fix/` | — | — | — | Migraciones archivadas en el repo |
+| Objeto                                           | Schema | Filas | Tamaño | Razón                                                               |
+| ------------------------------------------------ | ------ | ----- | ------ | ------------------------------------------------------------------- |
+| `trip_participants`                              | public | 0     | 32 kB  | Experimento Splitwise, nunca tuvo datos, policies abiertas a `anon` |
+| `trip_expenses`                                  | public | 0     | 32 kB  | ídem                                                                |
+| `expense_splits`                                 | public | 0     | 72 kB  | ídem                                                                |
+| `trip_share_tokens`                              | public | 0     | 64 kB  | ídem                                                                |
+| `health_workouts`                                | public | 0     | 6.6 MB | Apple Health, sin inserts históricos                                |
+| `health_ecg`                                     | public | 0     | 24 kB  | ídem                                                                |
+| `health_medications`                             | public | 0     | 24 kB  | ídem                                                                |
+| `usage_summary`                                  | public | 0     | 24 kB  | Vista/tabla de resumen AI, nunca se pobló                           |
+| `requisiciones_archive_2026_04_17`               | rdb    | 185   | 88 kB  | Migración promovida a `erp`                                         |
+| `ordenes_compra_archive_2026_04_17`              | rdb    | 156   | 88 kB  | ídem                                                                |
+| `proveedores_archive_2026_04_17`                 | rdb    | 61    | 64 kB  | ídem                                                                |
+| `corte_conteo_denominaciones_archive_2026_04_17` | rdb    | 0     | 64 kB  | ídem                                                                |
+| `supabase/migrations_archive_pre_fix/`           | —      | —     | —      | Migraciones archivadas en el repo                                   |
 
 **Recomendación de proceso:** renombra primero con sufijo `_deprecated_2026_04` y espera 2–4 semanas antes de `DROP`. Así capturas cualquier dependencia escondida en la app o reportes.
 
 ### Revisar antes de actuar
 
-| Objeto | Por qué dudar |
-|---|---|
-| `public.health_metrics` (99,587 filas, 38 MB) | Tiene datos históricos y 107 filas en `health_ingest_log`. ¿Sigue sirviendo? Si el ingest activo es cero, archivar/exportar antes de bajar |
-| `public.usage_daily`, `usage_by_model`, `usage_by_provider`, `usage_daily_models`, `usage_messages` | Datos recientes de marzo, pero no parece conectado a BSOP. Confirmar si son del tracking de Claude en otra app |
-| `public.profile`, `public.user_presence` | Parecen activas (5 perfiles, presencia multi-user) pero están en `public` en lugar de `core`. Mover a `core.profiles` / `core.user_presence` si quieres orden |
-| `erp.*` tablas con 0 filas (ventas_autos, taller_servicio, ventas_inmobiliarias, facturas, cobranza, contratos, cuentas_bancarias, gastos, etc.) | Son el "esqueleto" del ERP multi-giro. No borrar si planeas usarlas. Documentar claramente cuáles son placeholders en `SCHEMA_REF.md` |
+| Objeto                                                                                                                                           | Por qué dudar                                                                                                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `public.health_metrics` (99,587 filas, 38 MB)                                                                                                    | Tiene datos históricos y 107 filas en `health_ingest_log`. ¿Sigue sirviendo? Si el ingest activo es cero, archivar/exportar antes de bajar                    |
+| `public.usage_daily`, `usage_by_model`, `usage_by_provider`, `usage_daily_models`, `usage_messages`                                              | Datos recientes de marzo, pero no parece conectado a BSOP. Confirmar si son del tracking de Claude en otra app                                                |
+| `public.profile`, `public.user_presence`                                                                                                         | Parecen activas (5 perfiles, presencia multi-user) pero están en `public` en lugar de `core`. Mover a `core.profiles` / `core.user_presence` si quieres orden |
+| `erp.*` tablas con 0 filas (ventas_autos, taller_servicio, ventas_inmobiliarias, facturas, cobranza, contratos, cuentas_bancarias, gastos, etc.) | Son el "esqueleto" del ERP multi-giro. No borrar si planeas usarlas. Documentar claramente cuáles son placeholders en `SCHEMA_REF.md`                         |
 
 ---
 
@@ -186,14 +187,14 @@ No hay extensiones de performance críticas faltantes — `pg_trgm` y `btree_gin
 
 ## 6. Métricas de referencia
 
-| Métrica | Hoy | Meta Fase DB-1 | Meta Fase DB-4 |
-|---------|----:|---------------:|---------------:|
-| Advisors ERROR | 16 | 0 | 0 |
-| Advisors WARN | 204 | ~180 | <50 |
-| Advisors INFO | 192 | 192 | <90 |
-| Placeholders | 13 | 13 | 0 |
-| Edge fns fuera del repo | ~~2~~ **0** ✅ | 0 | 0 |
-| Tablas 0-row sin plan | ~25 | ~25 | <10 |
+| Métrica                 |            Hoy | Meta Fase DB-1 | Meta Fase DB-4 |
+| ----------------------- | -------------: | -------------: | -------------: |
+| Advisors ERROR          |             16 |              0 |              0 |
+| Advisors WARN           |            204 |           ~180 |            <50 |
+| Advisors INFO           |            192 |            192 |            <90 |
+| Placeholders            |             13 |             13 |              0 |
+| Edge fns fuera del repo | ~~2~~ **0** ✅ |              0 |              0 |
+| Tablas 0-row sin plan   |            ~25 |            ~25 |            <10 |
 
 ---
 

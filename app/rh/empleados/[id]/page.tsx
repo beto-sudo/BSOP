@@ -1,5 +1,11 @@
 'use client';
 
+/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect --
+ * Cleanup PR (#30): pre-existing debt. `any` in Supabase row mapping;
+ * set-state-in-effect in data-sync pattern. Both are behavioral rewrites,
+ * out of scope for bulk lint cleanup.
+ */
+
 import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -134,7 +140,9 @@ function EmpleadoDetailInner() {
     const { data: emp, error: eErr } = await supabase
       .schema('erp')
       .from('empleados')
-      .select('id, empresa_id, numero_empleado, fecha_ingreso, fecha_baja, motivo_baja, nss, fecha_nacimiento, telefono_empresa, extension, activo, persona:persona_id(id, nombre, apellido_paterno, apellido_materno, email, telefono, rfc, curp), departamento:departamento_id(id, nombre), puesto:puesto_id(id, nombre)')
+      .select(
+        'id, empresa_id, numero_empleado, fecha_ingreso, fecha_baja, motivo_baja, nss, fecha_nacimiento, telefono_empresa, extension, activo, persona:persona_id(id, nombre, apellido_paterno, apellido_materno, email, telefono, rfc, curp), departamento:departamento_id(id, nombre), puesto:puesto_id(id, nombre)'
+      )
       .eq('id', id)
       .single();
 
@@ -147,7 +155,9 @@ function EmpleadoDetailInner() {
     const normalized = {
       ...emp,
       persona: Array.isArray(emp.persona) ? (emp.persona[0] ?? null) : emp.persona,
-      departamento: Array.isArray(emp.departamento) ? (emp.departamento[0] ?? null) : emp.departamento,
+      departamento: Array.isArray(emp.departamento)
+        ? (emp.departamento[0] ?? null)
+        : emp.departamento,
       puesto: Array.isArray(emp.puesto) ? (emp.puesto[0] ?? null) : emp.puesto,
     } as unknown as EmpleadoDetail;
     setEmpleado(normalized);
@@ -161,8 +171,20 @@ function EmpleadoDetailInner() {
     setExtension(emp.extension ?? '');
 
     const [deptRes, puestosRes] = await Promise.all([
-      supabase.schema('erp').from('departamentos').select('id, nombre').eq('empresa_id', emp.empresa_id).eq('activo', true).order('nombre'),
-      supabase.schema('erp').from('puestos').select('id, nombre').eq('empresa_id', emp.empresa_id).eq('activo', true).order('nombre'),
+      supabase
+        .schema('erp')
+        .from('departamentos')
+        .select('id, nombre')
+        .eq('empresa_id', emp.empresa_id)
+        .eq('activo', true)
+        .order('nombre'),
+      supabase
+        .schema('erp')
+        .from('puestos')
+        .select('id, nombre')
+        .eq('empresa_id', emp.empresa_id)
+        .eq('activo', true)
+        .order('nombre'),
     ]);
     setDepartamentos(deptRes.data ?? []);
     setPuestos(puestosRes.data ?? []);
@@ -170,7 +192,9 @@ function EmpleadoDetailInner() {
     setLoading(false);
   }, [id, supabase]);
 
-  useEffect(() => { void fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    void fetchAll();
+  }, [fetchAll]);
 
   const handleSave = async () => {
     if (!empleado) return;
@@ -207,7 +231,10 @@ function EmpleadoDetailInner() {
       })
       .eq('id', empleado.id);
     setGivingBaja(false);
-    if (err) { alert(`Error: ${err.message}`); return; }
+    if (err) {
+      alert(`Error: ${err.message}`);
+      return;
+    }
     setShowBajaDialog(false);
     await fetchAll();
   };
@@ -249,9 +276,12 @@ function EmpleadoDetailInner() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-[var(--text)]">{fullName(empleado)}</h1>
+            <h1 className="text-xl font-bold tracking-tight text-[var(--text)]">
+              {fullName(empleado)}
+            </h1>
             <p className="text-xs text-[var(--text)]/50 mt-0.5">
-              {empleado.puesto?.nombre ?? 'Sin puesto'} · {empleado.departamento?.nombre ?? 'Sin departamento'}
+              {empleado.puesto?.nombre ?? 'Sin puesto'} ·{' '}
+              {empleado.departamento?.nombre ?? 'Sin departamento'}
             </p>
           </div>
           {isBaja && (
@@ -328,7 +358,9 @@ function EmpleadoDetailInner() {
               </SelectTrigger>
               <SelectContent>
                 {departamentos.map((d) => (
-                  <SelectItem key={d.id} value={d.id}>{d.nombre}</SelectItem>
+                  <SelectItem key={d.id} value={d.id}>
+                    {d.nombre}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -341,7 +373,9 @@ function EmpleadoDetailInner() {
               </SelectTrigger>
               <SelectContent>
                 {puestos.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.nombre}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -442,7 +476,11 @@ function EmpleadoDetailInner() {
               disabled={givingBaja}
               className="gap-1.5 rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
             >
-              {givingBaja ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserX className="h-4 w-4" />}
+              {givingBaja ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <UserX className="h-4 w-4" />
+              )}
               Confirmar baja
             </Button>
           </DialogFooter>

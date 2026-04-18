@@ -31,15 +31,11 @@ test.describe('Login page', () => {
 
   test('shows unauthorized banner when ?error=unauthorized', async ({ page }) => {
     await page.goto('/login?error=unauthorized');
-    await expect(
-      page.getByText(/this google account is not authorized/i)
-    ).toBeVisible();
+    await expect(page.getByText(/this google account is not authorized/i)).toBeVisible();
   });
 
   test('does NOT show unauthorized banner on clean visit', async ({ page }) => {
-    await expect(
-      page.getByText(/this google account is not authorized/i)
-    ).not.toBeVisible();
+    await expect(page.getByText(/this google account is not authorized/i)).not.toBeVisible();
   });
 });
 

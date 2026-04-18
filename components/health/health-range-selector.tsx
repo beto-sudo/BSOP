@@ -85,7 +85,10 @@ export function HealthRangeSelector({
             <CalendarDays className="h-4 w-4" />
             Date range
           </div>
-          <p className="mt-2 text-sm text-[var(--muted-foreground)] dark:text-white/55">Vitals stay anchored to today by default. Trends can expand to a wider window or a custom range.</p>
+          <p className="mt-2 text-sm text-[var(--muted-foreground)] dark:text-white/55">
+            Vitals stay anchored to today by default. Trends can expand to a wider window or a
+            custom range.
+          </p>
         </div>
 
         <div className="flex flex-col gap-3 lg:items-end">
@@ -96,11 +99,20 @@ export function HealthRangeSelector({
               className="min-w-[220px] appearance-none rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 pr-10 text-sm font-medium text-[var(--text)] outline-none transition focus:border-[var(--accent-soft)] dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-white dark:focus:border-amber-300/40"
             >
               {PRESET_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value} className="bg-white text-[var(--text)] dark:bg-neutral-900 dark:text-white">
+                <option
+                  key={option.value}
+                  value={option.value}
+                  className="bg-white text-[var(--text)] dark:bg-neutral-900 dark:text-white"
+                >
                   {option.label}
                 </option>
               ))}
-              <option value="custom" className="bg-white text-[var(--text)] dark:bg-neutral-900 dark:text-white">Custom Range</option>
+              <option
+                value="custom"
+                className="bg-white text-[var(--text)] dark:bg-neutral-900 dark:text-white"
+              >
+                Custom Range
+              </option>
             </select>
             <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted-foreground)] dark:text-white/55" />
           </div>
@@ -114,7 +126,9 @@ export function HealthRangeSelector({
                 onChange={(event) => setFrom(event.target.value)}
                 className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-sm text-[var(--text)] outline-none transition focus:border-[var(--accent-soft)] dark:border-white/10 dark:bg-black/20 dark:text-white dark:focus:border-amber-300/35"
               />
-              <span className="hidden text-[var(--muted-foreground)] sm:inline dark:text-white/35">→</span>
+              <span className="hidden text-[var(--muted-foreground)] sm:inline dark:text-white/35">
+                →
+              </span>
               <input
                 type="date"
                 value={to}

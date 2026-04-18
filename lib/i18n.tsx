@@ -1,5 +1,10 @@
 'use client';
 
+/* eslint-disable react-hooks/set-state-in-effect --
+ * Cleanup PR (#30): i18n provider syncs locale from localStorage in an
+ * effect. Rewriting changes render semantics — out of scope for lint cleanup.
+ */
+
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import en from './locales/en.json';
 import es from './locales/es.json';
@@ -46,7 +51,9 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     return translate(dicts[locale], key, vars);
   }
 
-  return <LocaleContext.Provider value={{ locale, setLocale, t }}>{children}</LocaleContext.Provider>;
+  return (
+    <LocaleContext.Provider value={{ locale, setLocale, t }}>{children}</LocaleContext.Provider>
+  );
 }
 
 export function useLocale() {

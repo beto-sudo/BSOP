@@ -21,6 +21,9 @@ export async function GET(request: Request) {
 
     return jsonResponse({ days, rows: (result.data ?? []).slice().reverse() });
   } catch (error) {
-    return jsonResponse({ days, rows: [], error: error instanceof Error ? error.message : 'Unknown error' }, 500);
+    return jsonResponse(
+      { days, rows: [], error: error instanceof Error ? error.message : 'Unknown error' },
+      500
+    );
   }
 }

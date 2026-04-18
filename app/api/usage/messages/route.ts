@@ -1,4 +1,13 @@
-import { getClientOrError, jsonResponse, type UsageMessageRow, type UsageMessageTotals } from '../_lib';
+/* eslint-disable @typescript-eslint/no-explicit-any --
+ * Cleanup PR (#30): pre-existing `any` on Supabase RPC response shape;
+ * proper typing requires generating RPC types. Out of scope for bulk lint cleanup.
+ */
+import {
+  getClientOrError,
+  jsonResponse,
+  type UsageMessageRow,
+  type UsageMessageTotals,
+} from '../_lib';
 
 type FilterOptions = {
   model: string;
@@ -49,41 +58,50 @@ export async function GET(request: Request) {
       .select('*', { count: 'exact' })
       .order('timestamp', { ascending: false })
       .range((page - 1) * limit, page * limit - 1),
-    filterOptions,
+    filterOptions
   );
 
   const totalsQuery = applyFilters(
     supabase
       .from('usage_messages')
       .select('input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cost'),
-    filterOptions,
+    filterOptions
   );
 
   try {
     const [result, totalsResult] = await Promise.all([pagedQuery, totalsQuery]);
 
     const typedRows = (result.data ?? []) as UsageMessageRow[];
-    const typedTotalsRows = (totalsResult.data ?? []) as Pick<UsageMessageRow, 'input_tokens' | 'output_tokens' | 'cache_read_tokens' | 'cache_creation_tokens' | 'cost'>[];
+    const typedTotalsRows = (totalsResult.data ?? []) as Pick<
+      UsageMessageRow,
+      'input_tokens' | 'output_tokens' | 'cache_read_tokens' | 'cache_creation_tokens' | 'cost'
+    >[];
     const error = result.error || totalsResult.error;
     if (error) {
-      return jsonResponse({ page, limit, total: 0, totalPages: 1, rows: [], totals: null, error: error.message }, 500);
+      return jsonResponse(
+        { page, limit, total: 0, totalPages: 1, rows: [], totals: null, error: error.message },
+        500
+      );
     }
 
-    const totals = typedTotalsRows.reduce<UsageMessageTotals>((acc, row) => ({
-      count: acc.count + 1,
-      input_tokens: acc.input_tokens + row.input_tokens,
-      output_tokens: acc.output_tokens + row.output_tokens,
-      cache_read_tokens: acc.cache_read_tokens + row.cache_read_tokens,
-      cache_creation_tokens: acc.cache_creation_tokens + row.cache_creation_tokens,
-      cost: acc.cost + row.cost,
-    }), {
-      count: 0,
-      input_tokens: 0,
-      output_tokens: 0,
-      cache_read_tokens: 0,
-      cache_creation_tokens: 0,
-      cost: 0,
-    });
+    const totals = typedTotalsRows.reduce<UsageMessageTotals>(
+      (acc, row) => ({
+        count: acc.count + 1,
+        input_tokens: acc.input_tokens + row.input_tokens,
+        output_tokens: acc.output_tokens + row.output_tokens,
+        cache_read_tokens: acc.cache_read_tokens + row.cache_read_tokens,
+        cache_creation_tokens: acc.cache_creation_tokens + row.cache_creation_tokens,
+        cost: acc.cost + row.cost,
+      }),
+      {
+        count: 0,
+        input_tokens: 0,
+        output_tokens: 0,
+        cache_read_tokens: 0,
+        cache_creation_tokens: 0,
+        cost: 0,
+      }
+    );
 
     return jsonResponse({
       page,
@@ -94,6 +112,17 @@ export async function GET(request: Request) {
       totals,
     });
   } catch (error) {
-    return jsonResponse({ page, limit, total: 0, totalPages: 1, rows: [], totals: null, error: error instanceof Error ? error.message : 'Unknown error' }, 500);
+    return jsonResponse(
+      {
+        page,
+        limit,
+        total: 0,
+        totalPages: 1,
+        rows: [],
+        totals: null,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+      500
+    );
   }
 }

@@ -21,11 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { SortableHead } from '@/components/ui/sortable-head';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -145,11 +141,45 @@ function SimpleTable({
     <Table>
       <TableHeader>
         <TableRow className="border-[var(--border)] hover:bg-transparent">
-          <SortableHead sortKey="titulo" label="Título" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-          <SortableHead sortKey="estado" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
-          <SortableHead sortKey="prioridad_peso" label="Prioridad" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
-          <SortableHead sortKey="asignado_nombre" label="Asignado a" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-40" />
-          <SortableHead sortKey="fecha_vence" label="Vence" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="w-28" />
+          <SortableHead
+            sortKey="titulo"
+            label="Título"
+            currentSort={sortKey}
+            currentDir={sortDir}
+            onSort={onSort}
+          />
+          <SortableHead
+            sortKey="estado"
+            label="Estado"
+            currentSort={sortKey}
+            currentDir={sortDir}
+            onSort={onSort}
+            className="w-28"
+          />
+          <SortableHead
+            sortKey="prioridad_peso"
+            label="Prioridad"
+            currentSort={sortKey}
+            currentDir={sortDir}
+            onSort={onSort}
+            className="w-28"
+          />
+          <SortableHead
+            sortKey="asignado_nombre"
+            label="Asignado a"
+            currentSort={sortKey}
+            currentDir={sortDir}
+            onSort={onSort}
+            className="w-40"
+          />
+          <SortableHead
+            sortKey="fecha_vence"
+            label="Vence"
+            currentSort={sortKey}
+            currentDir={sortDir}
+            onSort={onSort}
+            className="w-28"
+          />
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -160,7 +190,7 @@ function SimpleTable({
               ? (PRIORIDAD_OPTIONS as readonly string[]).indexOf(t.prioridad)
               : null,
             asignado_nombre: empleadoMap.get(t.asignado_a ?? '')?.nombre ?? null,
-          })),
+          }))
         ).map((task) => {
           const empleado = empleadoMap.get(task.asignado_a ?? '');
           return (
@@ -172,7 +202,9 @@ function SimpleTable({
               <TableCell>
                 <span className="line-clamp-1 font-medium text-[var(--text)]">{task.titulo}</span>
                 {task.entidad_tipo && (
-                  <span className="mt-0.5 block text-xs text-[var(--text)]/40">{task.entidad_tipo}</span>
+                  <span className="mt-0.5 block text-xs text-[var(--text)]/40">
+                    {task.entidad_tipo}
+                  </span>
                 )}
               </TableCell>
               <TableCell>
@@ -182,10 +214,14 @@ function SimpleTable({
                 <PrioridadBadge prioridad={task.prioridad} />
               </TableCell>
               <TableCell>
-                <span className="text-sm text-[var(--text)]/70">{empleado ? empleado.nombre : '—'}</span>
+                <span className="text-sm text-[var(--text)]/70">
+                  {empleado ? empleado.nombre : '—'}
+                </span>
               </TableCell>
               <TableCell>
-                <span className="text-sm text-[var(--text)]/70">{formatDate(task.fecha_vence)}</span>
+                <span className="text-sm text-[var(--text)]/70">
+                  {formatDate(task.fecha_vence)}
+                </span>
               </TableCell>
             </TableRow>
           );
@@ -221,13 +257,62 @@ function RichTable({
       <TableHeader>
         <TableRow className="border-[var(--border)] hover:bg-transparent">
           {canEditInline && <TableHead className="w-10 min-w-[40px]" />}
-          <SortableHead sortKey="titulo" label="Tarea" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[140px] max-w-[220px]" />
-          <SortableHead sortKey="prioridad" label="Prioridad" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[100px]" />
-          <SortableHead sortKey="estado" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[90px]" />
-          <SortableHead sortKey="porcentaje_avance" label="Avance" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[90px]" />
-          <SortableHead sortKey="asignado_nombre" label="Responsable" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[120px]" />
-          <SortableHead sortKey="fecha_compromiso" label="Compromiso" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[95px]" />
-          <SortableHead sortKey="created_at" label="Días" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="min-w-[55px]" />
+          <SortableHead
+            sortKey="titulo"
+            label="Tarea"
+            currentSort={sortKey}
+            currentDir={sortDir}
+            onSort={onSort}
+            className="min-w-[140px] max-w-[220px]"
+          />
+          <SortableHead
+            sortKey="prioridad"
+            label="Prioridad"
+            currentSort={sortKey}
+            currentDir={sortDir}
+            onSort={onSort}
+            className="min-w-[100px]"
+          />
+          <SortableHead
+            sortKey="estado"
+            label="Estado"
+            currentSort={sortKey}
+            currentDir={sortDir}
+            onSort={onSort}
+            className="min-w-[90px]"
+          />
+          <SortableHead
+            sortKey="porcentaje_avance"
+            label="Avance"
+            currentSort={sortKey}
+            currentDir={sortDir}
+            onSort={onSort}
+            className="min-w-[90px]"
+          />
+          <SortableHead
+            sortKey="asignado_nombre"
+            label="Responsable"
+            currentSort={sortKey}
+            currentDir={sortDir}
+            onSort={onSort}
+            className="min-w-[120px]"
+          />
+          <SortableHead
+            sortKey="fecha_compromiso"
+            label="Compromiso"
+            currentSort={sortKey}
+            currentDir={sortDir}
+            onSort={onSort}
+            className="min-w-[95px]"
+          />
+          <SortableHead
+            sortKey="created_at"
+            label="Días"
+            currentSort={sortKey}
+            currentDir={sortDir}
+            onSort={onSort}
+            className="min-w-[55px]"
+          />
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -235,7 +320,7 @@ function RichTable({
           tasks.map((t) => ({
             ...t,
             asignado_nombre: empleadoMap.get(t.asignado_a ?? '')?.nombre ?? null,
-          })),
+          }))
         ).map((task) => {
           const empleado = empleadoMap.get(task.asignado_a ?? '');
           return (
@@ -335,7 +420,10 @@ function RichTable({
                         <div className="flex items-center justify-between text-xs text-[var(--text)]/60">
                           <span>Avance</span>
                           <span className="font-medium text-[var(--text)]">
-                            {inlineAvance?.taskId === task.id ? inlineAvance.value : (task.porcentaje_avance ?? 0)}%
+                            {inlineAvance?.taskId === task.id
+                              ? inlineAvance.value
+                              : (task.porcentaje_avance ?? 0)}
+                            %
                           </span>
                         </div>
                         <input
@@ -344,13 +432,15 @@ function RichTable({
                           max={100}
                           step={5}
                           value={
-                            inlineAvance?.taskId === task.id ? inlineAvance.value : (task.porcentaje_avance ?? 0)
+                            inlineAvance?.taskId === task.id
+                              ? inlineAvance.value
+                              : (task.porcentaje_avance ?? 0)
                           }
                           onChange={(e) =>
                             setInlineAvance?.(
                               inlineAvance && inlineAvance.taskId === task.id
                                 ? { ...inlineAvance, value: Number(e.target.value) }
-                                : { taskId: task.id, value: Number(e.target.value) },
+                                : { taskId: task.id, value: Number(e.target.value) }
                             )
                           }
                           className="w-full accent-[var(--accent)]"
@@ -369,12 +459,16 @@ function RichTable({
                 </span>
               </TableCell>
               <TableCell>
-                <span className="text-xs text-[var(--text)]/60">{formatDate(task.fecha_compromiso)}</span>
+                <span className="text-xs text-[var(--text)]/60">
+                  {formatDate(task.fecha_compromiso)}
+                </span>
               </TableCell>
               <TableCell>
                 <span className="text-xs text-[var(--text)]/60">
                   {(() => {
-                    const days = Math.floor((Date.now() - new Date(task.created_at).getTime()) / 86400000);
+                    const days = Math.floor(
+                      (Date.now() - new Date(task.created_at).getTime()) / 86400000
+                    );
                     return days === 0 ? 'Hoy' : `${days}d`;
                   })()}
                 </span>

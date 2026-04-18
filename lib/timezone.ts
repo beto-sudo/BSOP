@@ -48,7 +48,7 @@ export function zonedDateTimeToUtcIso(dateInput: string, timeInput: string, time
       zoned.day,
       zoned.hour,
       zoned.minute,
-      zoned.second,
+      zoned.second
     );
 
     const delta = target - observed;

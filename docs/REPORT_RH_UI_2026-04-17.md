@@ -10,11 +10,11 @@
 
 ### 1.1 Componentes compartidos (nuevos)
 
-| Archivo | Propósito |
-|---------|-----------|
-| `components/shared/row-actions.tsx` | Kebab menu canónico con Editar + Toggle Activo/Inactivo + Eliminar. Slots opcionales; se colapsa solo si la acción no aplica. |
-| `components/shared/confirm-dialog.tsx` | Wrapper sobre `AlertDialog` de shadcn. Soporta `onConfirm` async con estado de loading automático. |
-| `components/ui/toast.tsx` | Wrapper sobre `@base-ui/react/toast`. Expone `useToast()` y `ToastProvider`. |
+| Archivo                                | Propósito                                                                                                                     |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `components/shared/row-actions.tsx`    | Kebab menu canónico con Editar + Toggle Activo/Inactivo + Eliminar. Slots opcionales; se colapsa solo si la acción no aplica. |
+| `components/shared/confirm-dialog.tsx` | Wrapper sobre `AlertDialog` de shadcn. Soporta `onConfirm` async con estado de loading automático.                            |
+| `components/ui/toast.tsx`              | Wrapper sobre `@base-ui/react/toast`. Expone `useToast()` y `ToastProvider`.                                                  |
 
 `ToastProvider` ya está montado en `components/providers.tsx` envolviendo a `PermissionsProvider`.
 
@@ -69,7 +69,7 @@ Types regenerados en `types/supabase.ts`. `npx tsc --noEmit` pasa en verde (0 er
 ### 2.2 Fricciones residuales detectadas en la sesión
 
 1. **`types/supabase.ts` mantenido a mano después del MCP.** `mcp__supabase__generate_typescript_types` solo devuelve `public`. El archivo actual (5.798 líneas, todos los schemas) debe venir de otro pipeline. Riesgo: drift silencioso entre DB y types cuando se añaden columnas.
-2. **`SCHEMA_REF.md` incompleto.** Solo documenta tablas de `rdb` (cortes, movimientos). `erp.*`, `core.*`, `dilesa.*` no están. La instrucción del CLAUDE.md (*"Siempre referir a SCHEMA_REF.md para nombres exactos"*) no se cumple hoy.
+2. **`SCHEMA_REF.md` incompleto.** Solo documenta tablas de `rdb` (cortes, movimientos). `erp.*`, `core.*`, `dilesa.*` no están. La instrucción del CLAUDE.md (_"Siempre referir a SCHEMA_REF.md para nombres exactos"_) no se cumple hoy.
 3. **Duplicación RH × 3 empresas.** Las 9 pantallas son casi idénticas salvo `EMPRESA_ID` y el prefijo de ruta. Ya extrajimos los componentes compartidos, pero las páginas siguen siendo copia-pega.
 4. **Soft-delete inconsistente.** Presente en `erp.empleados`, `erp.personas`, `erp.documentos`, y ahora `erp.departamentos`/`erp.puestos`. Ausente en muchas tablas operativas (`rdb.*`, `dilesa.*` alto volumen). No hay convención forzada a nivel de DB.
 5. **Componentes grandes (>700 líneas) con `'use client'` aplicado por defecto.** Ya listado en `AUDIT_2026-04-16.md` como deuda, pero las 9 pantallas RH son ejemplos vivos.
@@ -96,19 +96,17 @@ Correr `db:check` en CI tras migraciones para detectar drift. Eventual: pre-comm
 Generar automáticamente desde `information_schema` vía un script `scripts/gen-schema-ref.ts` que dumpée tablas × columnas × comentarios. Debe ser output determinístico (ordenado alfabético) para revisar diffs en PRs.
 
 **3.3 Convención soft-delete.**
-Agregar a `CONTRIBUTING.md`: *"Toda tabla de dominio debe incluir `deleted_at timestamptz` + índice parcial sobre `(empresa_id) WHERE deleted_at IS NULL`."* + checklist en el template de PR para migraciones.
+Agregar a `CONTRIBUTING.md`: _"Toda tabla de dominio debe incluir `deleted_at timestamptz` + índice parcial sobre `(empresa_id) WHERE deleted_at IS NULL`."_ + checklist en el template de PR para migraciones.
 
 ### P1 — Escalabilidad de UI RH
 
-**3.4 Factorizar las pantallas RH en una **page factory****.
+**3.4 Factorizar las pantallas RH en una **page factory\*\*\*\*.
 Crear `app/_rh/departamentos-page.tsx`, `puestos-page.tsx`, `empleados-page.tsx` como componentes parametrizados por `{ empresaId, basePath }`, y que las 9 rutas actuales los renderen:
 
 ```tsx
 // app/dilesa/rh/departamentos/page.tsx
 import DepartamentosPage from '@/app/_rh/departamentos-page';
-export default () => (
-  <DepartamentosPage empresaId="f5942ed4-..." basePath="/dilesa/rh" />
-);
+export default () => <DepartamentosPage empresaId="f5942ed4-..." basePath="/dilesa/rh" />;
 ```
 
 Reduce ~1800 líneas a ~600 y hace que el próximo fix se aplique en un solo archivo.
@@ -156,10 +154,10 @@ Tabla `core.audit_log(table, row_id, action, actor_id, before, after, at)` alime
 
 ## 4. Tareas pendientes en el tracker
 
-| # | Status | Subject |
-|---|--------|---------|
-| 8 | completed | Aplicar patrón a 9 pantallas RH |
-| 9 | pending | Documentar estándar en ARCHITECTURE.md + smoke test |
+| #   | Status    | Subject                                             |
+| --- | --------- | --------------------------------------------------- |
+| 8   | completed | Aplicar patrón a 9 pantallas RH                     |
+| 9   | pending   | Documentar estándar en ARCHITECTURE.md + smoke test |
 
 La parte de documentación de #9 ya quedó hecha en este mismo archivo y en `ARCHITECTURE.md § UI Standards`. Falta **solo el smoke test de Playwright** (punto 3.13).
 
@@ -174,6 +172,7 @@ La parte de documentación de #9 ya quedó hecha en este mismo archivo y en `ARC
 - `ARCHITECTURE.md` incluye sección UI Standards.
 
 Sources:
+
 - [ARCHITECTURE.md](computer:///sessions/determined-zen-davinci/mnt/BSOP/ARCHITECTURE.md)
 - [row-actions.tsx](computer:///sessions/determined-zen-davinci/mnt/BSOP/components/shared/row-actions.tsx)
 - [confirm-dialog.tsx](computer:///sessions/determined-zen-davinci/mnt/BSOP/components/shared/confirm-dialog.tsx)

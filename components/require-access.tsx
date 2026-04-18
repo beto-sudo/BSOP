@@ -1,5 +1,11 @@
 'use client';
 
+/* eslint-disable react-hooks/refs --
+ * Cleanup PR (#30): pre-existing pattern reads a ref during render to cache
+ * the access decision across re-renders. Migrating off refs-during-render
+ * requires a render-flow refactor — out of scope for lint cleanup.
+ */
+
 import { usePermissions } from '@/components/providers';
 import { canAccessEmpresa, canAccessModulo } from '@/lib/permissions';
 import { useRef, type ReactNode } from 'react';
@@ -24,7 +30,8 @@ function AccessDenied() {
         Acceso restringido
       </h2>
       <p className="mt-2 text-sm dark:text-white/55 text-[var(--text)]/55">
-        No tienes permisos para acceder a esta sección. Contacta al administrador si necesitas acceso.
+        No tienes permisos para acceder a esta sección. Contacta al administrador si necesitas
+        acceso.
       </p>
     </div>
   );
@@ -77,7 +84,10 @@ export function RequireAccess({
   }
 
   // Admin bypass
-  if (permissions.isAdmin) { hadAccessRef.current = true; return <>{children}</>; }
+  if (permissions.isAdmin) {
+    hadAccessRef.current = true;
+    return <>{children}</>;
+  }
 
   // Admin-only check
   if (adminOnly) return <AccessDenied />;

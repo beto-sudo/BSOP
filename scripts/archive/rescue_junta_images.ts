@@ -25,8 +25,12 @@ const BUCKET = 'adjuntos';
 const IMG_TAG_RE = /<img\s[^>]*src=["']([^"']+)["'][^>]*>/gi;
 
 const MIME_MAP: Record<string, string> = {
-  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
-  '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
   '.bmp': 'image/bmp',
 };
 
@@ -40,7 +44,9 @@ function guessFilename(url: string, index: number): string {
     const parsed = new URL(url);
     const basename = path.basename(parsed.pathname);
     if (basename && basename !== '/' && basename.includes('.')) return basename;
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return `image_${index}.jpg`;
 }
 
@@ -152,9 +158,7 @@ async function main() {
         continue;
       }
 
-      const { data: publicUrlData } = supabase.storage
-        .from(BUCKET)
-        .getPublicUrl(storagePath);
+      const { data: publicUrlData } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
 
       const newUrl = publicUrlData.publicUrl;
       updatedHtml = updatedHtml.split(src).join(newUrl);

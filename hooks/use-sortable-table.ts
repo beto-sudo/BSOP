@@ -47,7 +47,7 @@ export function useSortableTable<_T = unknown>(defaultKey: string, defaultDir: S
         return sortDir === 'asc' ? cmp : -cmp;
       });
     },
-    [sortKey, sortDir],
+    [sortKey, sortDir]
   );
 
   return { sortKey, sortDir, onSort, sortData };

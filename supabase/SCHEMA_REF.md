@@ -1,11 +1,12 @@
 # BSOP Supabase Schema Reference
 
-
 ### cajas
+
 - id (uuid)
 - nombre (text)
 
 ### cortes
+
 - id (uuid)
 - fecha_operativa (date)
 - caja_nombre (text)
@@ -24,6 +25,7 @@
 - observaciones (text)
 
 ### movimientos
+
 - id (uuid)
 - corte_id (uuid)
 - fecha_hora (timestamp with time zone)
@@ -34,8 +36,10 @@
 - c_corte_desc (text)
 
 ### v_cortes_productos
+
 Schema: `rdb` · Created 2026-04-17 · `security_invoker = true`.
 Per-product sales aggregates per corte (Waitry POS). Source: `rdb.waitry_productos` ⋈ `rdb.waitry_pedidos` (order_id), grouped by corte × product. Excludes `status = 'order_canceled'` and `corte_id IS NULL`.
+
 - corte_id (uuid)
 - product_id (text)
 - producto_nombre (text)
@@ -43,6 +47,7 @@ Per-product sales aggregates per corte (Waitry POS). Source: `rdb.waitry_product
 - importe_total (numeric)
 
 ### v_cortes_productos_30d
+
 - corte_id (uuid)
 - producto_nombre (text)
 - cantidad_vendida (numeric)
@@ -50,6 +55,7 @@ Per-product sales aggregates per corte (Waitry POS). Source: `rdb.waitry_product
 - pk (text)
 
 ### v_cortes_totales
+
 - corte_id (uuid)
 - caja_id (uuid)
 - caja_nombre (text)
@@ -67,6 +73,7 @@ Per-product sales aggregates per corte (Waitry POS). Source: `rdb.waitry_product
 - efectivo_esperado (numeric)
 
 ### v_cortes_totales_30d
+
 - corte_id (uuid)
 - corte_nombre (text)
 - caja_nombre (text)
@@ -84,6 +91,7 @@ Per-product sales aggregates per corte (Waitry POS). Source: `rdb.waitry_product
 - efectivo_esperado (numeric)
 
 ### inventario_movimientos
+
 - id (uuid)
 - producto_id (uuid)
 - tipo (text)
@@ -96,6 +104,7 @@ Per-product sales aggregates per corte (Waitry POS). Source: `rdb.waitry_product
 - created_at (timestamp with time zone)
 
 ### ordenes_compra
+
 - id (uuid)
 - folio (text)
 - requisicion_id (uuid)
@@ -111,6 +120,7 @@ Per-product sales aggregates per corte (Waitry POS). Source: `rdb.waitry_product
 - updated_at (timestamp with time zone)
 
 ### ordenes_compra_items
+
 - id (uuid)
 - orden_id (uuid)
 - producto_id (uuid)
@@ -121,6 +131,7 @@ Per-product sales aggregates per corte (Waitry POS). Source: `rdb.waitry_product
 - subtotal (numeric)
 
 ### productos
+
 - id (uuid)
 - waitry_item_id (bigint)
 - nombre (text)
@@ -134,6 +145,7 @@ Per-product sales aggregates per corte (Waitry POS). Source: `rdb.waitry_product
 - updated_at (timestamp with time zone)
 
 ### proveedores
+
 - id (uuid)
 - nombre (text)
 - contacto (text)
@@ -147,6 +159,7 @@ Per-product sales aggregates per corte (Waitry POS). Source: `rdb.waitry_product
 - updated_at (timestamp with time zone)
 
 ### requisiciones
+
 - id (uuid)
 - folio (text)
 - estatus (text)
@@ -159,6 +172,7 @@ Per-product sales aggregates per corte (Waitry POS). Source: `rdb.waitry_product
 - updated_at (timestamp with time zone)
 
 ### requisiciones_items
+
 - id (uuid)
 - requisicion_id (uuid)
 - producto_id (uuid)
@@ -168,6 +182,7 @@ Per-product sales aggregates per corte (Waitry POS). Source: `rdb.waitry_product
 - notas (text)
 
 ### v_stock_actual
+
 - id (uuid)
 - waitry_item_id (bigint)
 - nombre (text)
@@ -179,6 +194,7 @@ Per-product sales aggregates per corte (Waitry POS). Source: `rdb.waitry_product
 - bajo_minimo (boolean)
 
 ### duplicate_candidates
+
 - id (uuid)
 - order_id_a (text)
 - order_id_b (text)
@@ -190,6 +206,7 @@ Per-product sales aggregates per corte (Waitry POS). Source: `rdb.waitry_product
 - resolution (text)
 
 ### inbound
+
 - id (uuid)
 - order_id (text)
 - event (text)
@@ -202,6 +219,7 @@ Per-product sales aggregates per corte (Waitry POS). Source: `rdb.waitry_product
 - created_at (timestamp with time zone)
 
 ### pagos
+
 - id (uuid)
 - order_id (text)
 - payment_id (text)
@@ -212,6 +230,7 @@ Per-product sales aggregates per corte (Waitry POS). Source: `rdb.waitry_product
 - created_at (timestamp with time zone)
 
 ### pedidos
+
 - id (uuid)
 - order_id (text)
 - status (text)
@@ -233,6 +252,7 @@ Per-product sales aggregates per corte (Waitry POS). Source: `rdb.waitry_product
 - updated_at (timestamp with time zone)
 
 ### productos
+
 - id (uuid)
 - order_id (text)
 - product_id (text)
@@ -245,12 +265,14 @@ Per-product sales aggregates per corte (Waitry POS). Source: `rdb.waitry_product
 - created_at (timestamp with time zone)
 
 ### v_pagos_30d
+
 - order_id (text)
 - payment_method (text)
 - amount (numeric)
 - pk (text)
 
 ### v_pedidos_30d
+
 - id (uuid)
 - order_id (text)
 - status (text)
@@ -272,6 +294,7 @@ Per-product sales aggregates per corte (Waitry POS). Source: `rdb.waitry_product
 - updated_at (timestamp with time zone)
 
 ### v_pending_duplicates
+
 - id (uuid)
 - detected_at (timestamp with time zone)
 - similarity_score (numeric)
@@ -294,6 +317,7 @@ Per-product sales aggregates per corte (Waitry POS). Source: `rdb.waitry_product
 - seconds_apart (numeric)
 
 ### v_productos_30d
+
 - order_id (text)
 - product_name (text)
 - unit_price (numeric)
@@ -301,6 +325,7 @@ Per-product sales aggregates per corte (Waitry POS). Source: `rdb.waitry_product
 - pk (text)
 
 ### erp.tasks
+
 - id (uuid)
 - empresa_id (uuid)
 - titulo (text)
@@ -320,6 +345,7 @@ Per-product sales aggregates per corte (Waitry POS). Source: `rdb.waitry_product
 - updated_at (timestamptz)
 
 ### erp.task_updates
+
 - id (uuid)
 - task_id (uuid, FK erp.tasks, CASCADE)
 - empresa_id (uuid, FK core.empresas)
@@ -331,6 +357,7 @@ Per-product sales aggregates per corte (Waitry POS). Source: `rdb.waitry_product
 - created_at (timestamptz)
 
 ### erp.task_comentarios
+
 - id (uuid)
 - empresa_id (uuid)
 - task_id (uuid, FK erp.tasks)

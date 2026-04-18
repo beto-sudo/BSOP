@@ -30,11 +30,12 @@ export function SortableHead({
     >
       <span className="inline-flex items-center gap-1">
         {label}
-        {active && (
-          currentDir === 'asc'
-            ? <ChevronUp className="h-3.5 w-3.5" />
-            : <ChevronDown className="h-3.5 w-3.5" />
-        )}
+        {active &&
+          (currentDir === 'asc' ? (
+            <ChevronUp className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronDown className="h-3.5 w-3.5" />
+          ))}
       </span>
     </TableHead>
   );

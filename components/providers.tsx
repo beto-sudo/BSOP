@@ -14,11 +14,7 @@ import {
   type ReactNode,
 } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import {
-  fetchUserPermissions,
-  type UserPermissions,
-  type AccessLevel,
-} from '@/lib/permissions';
+import { fetchUserPermissions, type UserPermissions, type AccessLevel } from '@/lib/permissions';
 
 // ── Permissions Context ────────────────────────────────────────────────────
 
@@ -90,7 +86,7 @@ function PermissionsProvider({ children }: { children: ReactNode }) {
         setPermissions(perms);
       }
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auth state changes
@@ -164,7 +160,7 @@ function PermissionsProvider({ children }: { children: ReactNode }) {
         }
       })();
     },
-    [realPermissions.isAdmin, fetchImpersonatePerms],
+    [realPermissions.isAdmin, fetchImpersonatePerms]
   );
 
   const stopImpersonate = useCallback(() => {
@@ -174,12 +170,10 @@ function PermissionsProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(
     () => ({ permissions, refreshPermissions, impersonating, startImpersonate, stopImpersonate }),
-    [permissions, refreshPermissions, impersonating, startImpersonate, stopImpersonate],
+    [permissions, refreshPermissions, impersonating, startImpersonate, stopImpersonate]
   );
 
-  return (
-    <PermissionsContext.Provider value={value}>{children}</PermissionsContext.Provider>
-  );
+  return <PermissionsContext.Provider value={value}>{children}</PermissionsContext.Provider>;
 }
 
 // ── Root Providers ─────────────────────────────────────────────────────────

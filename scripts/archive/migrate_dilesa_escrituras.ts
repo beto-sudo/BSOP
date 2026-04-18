@@ -68,7 +68,7 @@ async function codaGet<T>(path: string): Promise<T> {
 
 async function fetchColumns(tableId: string): Promise<Map<string, string>> {
   const data = await codaGet<{ items: CodaColumn[] }>(
-    `/docs/${CODA_DOC_ID}/tables/${tableId}/columns`,
+    `/docs/${CODA_DOC_ID}/tables/${tableId}/columns`
   );
   const map = new Map<string, string>();
   for (const col of data.items) {
@@ -116,16 +116,12 @@ function getString(raw: unknown): string | null {
 
 function normalizeNotaria(s: string | null): string {
   if (!s) return '';
-  return s
-    .trim()
-    .replace(/\.+$/, '')
-    .replace(/\s+/g, ' ')
-    .toLowerCase();
+  return s.trim().replace(/\.+$/, '').replace(/\s+/g, ' ').toLowerCase();
 }
 
 function mapRow(
   row: CodaRow,
-  colMap: Map<string, string>,
+  colMap: Map<string, string>
 ): {
   empresa_id: string;
   titulo: string;
@@ -150,21 +146,21 @@ function mapRow(
 
   if (!titulo) return null;
 
-  const contenido =
-    getString(get('contenido')) ??
-    getString(get('descripcion')) ??
-    null;
+  const contenido = getString(get('contenido')) ?? getString(get('descripcion')) ?? null;
 
   const pdfEscritura = getString(get('pdf escritura'));
   const imagenPlano = getString(get('imagen plano'));
   const complementos = getString(get('complementos'));
 
-  const notas = [
-    contenido,
-    pdfEscritura ? `PDF Escritura: ${pdfEscritura}` : null,
-    imagenPlano ? `Imagen Plano: ${imagenPlano}` : null,
-    complementos ? `Complementos: ${complementos}` : null,
-  ].filter(Boolean).join('\n\n') || null;
+  const notas =
+    [
+      contenido,
+      pdfEscritura ? `PDF Escritura: ${pdfEscritura}` : null,
+      imagenPlano ? `Imagen Plano: ${imagenPlano}` : null,
+      complementos ? `Complementos: ${complementos}` : null,
+    ]
+      .filter(Boolean)
+      .join('\n\n') || null;
 
   return {
     empresa_id: DILESA_EMPRESA_ID,
@@ -176,10 +172,7 @@ function mapRow(
       getString(get('no. escritura')) ??
       getString(get('numero escritura')) ??
       null,
-    tipo:
-      getString(get('tipo')) ??
-      getString(get('tipo de escritura')) ??
-      null,
+    tipo: getString(get('tipo')) ?? getString(get('tipo de escritura')) ?? null,
     fecha_emision:
       parseDate(get('fecha') as string) ??
       parseDate(get('fecha escritura') as string) ??
@@ -192,10 +185,7 @@ function mapRow(
       parseDate(get('vigencia') as string) ??
       null,
     notaria:
-      getString(get('notaría')) ??
-      getString(get('notaria')) ??
-      getString(get('notario')) ??
-      null,
+      getString(get('notaría')) ?? getString(get('notaria')) ?? getString(get('notario')) ?? null,
     notas,
   };
 }
@@ -253,7 +243,9 @@ async function main() {
 
   if (notariasErr) {
     console.warn(`⚠️  No se pudo cargar catálogo de notarías: ${notariasErr.message}`);
-    console.warn('   notario_proveedor_id quedará NULL. Ejecuta migrate_dilesa_notarias.ts primero.');
+    console.warn(
+      '   notario_proveedor_id quedará NULL. Ejecuta migrate_dilesa_notarias.ts primero.'
+    );
   }
 
   // Mapa: nombreNormalizado → proveedor_id
@@ -325,7 +317,9 @@ async function main() {
     process.stdout.write(`   Inserted ${inserted} | Updated ${updated} / ${mapped.length}\r`);
   }
 
-  console.log(`\n\n🎉 Done — inserted ${inserted}, updated ${updated} documentos in erp.documentos`);
+  console.log(
+    `\n\n🎉 Done — inserted ${inserted}, updated ${updated} documentos in erp.documentos`
+  );
   console.log(`   Vinculados a notario_proveedor_id: ${linkedNotarios} / ${mapped.length}`);
 }
 

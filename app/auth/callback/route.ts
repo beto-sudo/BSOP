@@ -7,7 +7,11 @@ export async function GET(request: Request) {
   const code = searchParams.get('code');
   const next = searchParams.get('next') ?? '/';
 
-  console.log('[auth/callback] hit', { code: code ? code.slice(0, 8) + '...' : null, next, origin });
+  console.log('[auth/callback] hit', {
+    code: code ? code.slice(0, 8) + '...' : null,
+    next,
+    origin,
+  });
 
   if (code) {
     const cookieStore = await cookies();
@@ -20,7 +24,12 @@ export async function GET(request: Request) {
             return cookieStore.getAll();
           },
           setAll(cookiesToSet) {
-            console.log('[auth/callback] setAll called with', cookiesToSet.length, 'cookies:', cookiesToSet.map(c => c.name));
+            console.log(
+              '[auth/callback] setAll called with',
+              cookiesToSet.length,
+              'cookies:',
+              cookiesToSet.map((c) => c.name)
+            );
             try {
               cookiesToSet.forEach(({ name, value, options }) => {
                 cookieStore.set(name, value, options);
@@ -33,7 +42,7 @@ export async function GET(request: Request) {
         },
       }
     );
-    
+
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) {
       console.error('[auth/callback] exchange error:', error.message);

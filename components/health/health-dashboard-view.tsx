@@ -36,27 +36,91 @@ export function HealthDashboardView({
   const [selectedChart, setSelectedChart] = useState<MetricKey | null>(null);
 
   const latestVitals = useMemo(() => {
-    const map = new Map<string, typeof vitals[number]>();
+    const map = new Map<string, (typeof vitals)[number]>();
     vitals.forEach((row) => {
       if (!map.has(row.metric_name)) map.set(row.metric_name, row);
     });
     return map;
   }, [vitals]);
 
-  const heartTrend = useMemo(() => groupDailyAverage(restingHrDaily).slice(-range.trendDays), [restingHrDaily, range.trendDays]);
-  const bpSystolicTrend = useMemo(() => groupDailyAverage(bpSystolic).slice(-range.trendDays), [bpSystolic, range.trendDays]);
-  const bpDiastolicTrend = useMemo(() => groupDailyAverage(bpDiastolic).slice(-range.trendDays), [bpDiastolic, range.trendDays]);
-  const weightTrend = useMemo(() => groupDailyAverage(weightDaily).slice(-range.trendDays), [weightDaily, range.trendDays]);
-  const stepsTrend = useMemo(() => groupDailyAverage(stepsDaily).slice(-range.trendDays), [stepsDaily, range.trendDays]);
-  const spo2Trend = useMemo(() => groupDailyAverage(spo2Daily).slice(-range.trendDays), [spo2Daily, range.trendDays]);
-  const hrvTrend = useMemo(() => groupDailyAverage(hrvDaily).slice(-range.trendDays), [hrvDaily, range.trendDays]);
-  const sleepTrend = useMemo(() => groupDailyAverage(sleepDaily).slice(-range.trendDays), [sleepDaily, range.trendDays]);
+  const heartTrend = useMemo(
+    () => groupDailyAverage(restingHrDaily).slice(-range.trendDays),
+    [restingHrDaily, range.trendDays]
+  );
+  const bpSystolicTrend = useMemo(
+    () => groupDailyAverage(bpSystolic).slice(-range.trendDays),
+    [bpSystolic, range.trendDays]
+  );
+  const bpDiastolicTrend = useMemo(
+    () => groupDailyAverage(bpDiastolic).slice(-range.trendDays),
+    [bpDiastolic, range.trendDays]
+  );
+  const weightTrend = useMemo(
+    () => groupDailyAverage(weightDaily).slice(-range.trendDays),
+    [weightDaily, range.trendDays]
+  );
+  const stepsTrend = useMemo(
+    () => groupDailyAverage(stepsDaily).slice(-range.trendDays),
+    [stepsDaily, range.trendDays]
+  );
+  const spo2Trend = useMemo(
+    () => groupDailyAverage(spo2Daily).slice(-range.trendDays),
+    [spo2Daily, range.trendDays]
+  );
+  const hrvTrend = useMemo(
+    () => groupDailyAverage(hrvDaily).slice(-range.trendDays),
+    [hrvDaily, range.trendDays]
+  );
+  const sleepTrend = useMemo(
+    () => groupDailyAverage(sleepDaily).slice(-range.trendDays),
+    [sleepDaily, range.trendDays]
+  );
 
-  const sleep7dAverage = useMemo(() => summarizeWindow(summaryMetrics.filter((row) => row.metric_name === 'Sleep Analysis'), 7, 0), [summaryMetrics]);
-  const sleep30dAverage = useMemo(() => summarizeWindow(summaryMetrics.filter((row) => row.metric_name === 'Sleep Analysis'), Math.min(30, range.trendDays), 0), [summaryMetrics, range.trendDays]);
-  const weight7dAverage = useMemo(() => summarizeWindow(summaryMetrics.filter((row) => row.metric_name === 'Body Mass'), 7, 0), [summaryMetrics]);
-  const hr7dAverage = useMemo(() => summarizeWindow(summaryMetrics.filter((row) => row.metric_name === 'Resting Heart Rate'), 7, 0), [summaryMetrics]);
-  const steps7dAverage = useMemo(() => summarizeWindow(summaryMetrics.filter((row) => row.metric_name === 'Step Count'), 7, 0), [summaryMetrics]);
+  const sleep7dAverage = useMemo(
+    () =>
+      summarizeWindow(
+        summaryMetrics.filter((row) => row.metric_name === 'Sleep Analysis'),
+        7,
+        0
+      ),
+    [summaryMetrics]
+  );
+  const sleep30dAverage = useMemo(
+    () =>
+      summarizeWindow(
+        summaryMetrics.filter((row) => row.metric_name === 'Sleep Analysis'),
+        Math.min(30, range.trendDays),
+        0
+      ),
+    [summaryMetrics, range.trendDays]
+  );
+  const weight7dAverage = useMemo(
+    () =>
+      summarizeWindow(
+        summaryMetrics.filter((row) => row.metric_name === 'Body Mass'),
+        7,
+        0
+      ),
+    [summaryMetrics]
+  );
+  const hr7dAverage = useMemo(
+    () =>
+      summarizeWindow(
+        summaryMetrics.filter((row) => row.metric_name === 'Resting Heart Rate'),
+        7,
+        0
+      ),
+    [summaryMetrics]
+  );
+  const steps7dAverage = useMemo(
+    () =>
+      summarizeWindow(
+        summaryMetrics.filter((row) => row.metric_name === 'Step Count'),
+        7,
+        0
+      ),
+    [summaryMetrics]
+  );
 
   const workoutSummary = useMemo(() => {
     const total = workouts.length;
@@ -85,7 +149,10 @@ export function HealthDashboardView({
       label: 'Sleep',
       value: latestSleep ? formatDurationHours(latestSleep.value) : '—',
       unit: 'hr',
-      helper: latestSleep && sleep7dAverage != null ? `${(latestSleep.value - sleep7dAverage) >= 0 ? '+' : ''}${formatDurationHours(latestSleep.value - sleep7dAverage)}h vs 7d avg` : 'Waiting for sleep data',
+      helper:
+        latestSleep && sleep7dAverage != null
+          ? `${latestSleep.value - sleep7dAverage >= 0 ? '+' : ''}${formatDurationHours(latestSleep.value - sleep7dAverage)}h vs 7d avg`
+          : 'Waiting for sleep data',
       tone: TONES.sleep.icon,
       icon: MoonStar,
     },
@@ -94,16 +161,29 @@ export function HealthDashboardView({
       label: 'Resting HR',
       value: latestHr ? formatMetricValue(latestHr.value) : '—',
       unit: 'bpm',
-      helper: latestHr && hr7dAverage != null ? `${latestHr.value >= hr7dAverage ? '+' : ''}${formatMetricValue(latestHr.value - hr7dAverage)} vs 7d avg` : 'Waiting for HR data',
+      helper:
+        latestHr && hr7dAverage != null
+          ? `${latestHr.value >= hr7dAverage ? '+' : ''}${formatMetricValue(latestHr.value - hr7dAverage)} vs 7d avg`
+          : 'Waiting for HR data',
       tone: TONES.hr.icon,
       icon: HeartPulse,
     },
     {
       key: 'bp',
       label: 'Blood Pressure',
-      value: latestBpSys && latestBpDia ? `${formatMetricValue(latestBpSys.value)}/${formatMetricValue(latestBpDia.value)}` : '—',
+      value:
+        latestBpSys && latestBpDia
+          ? `${formatMetricValue(latestBpSys.value)}/${formatMetricValue(latestBpDia.value)}`
+          : '—',
       unit: 'mmHg',
-      helper: latestBpSys ? new Date(latestBpSys.date).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Waiting for BP data',
+      helper: latestBpSys
+        ? new Date(latestBpSys.date).toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+          })
+        : 'Waiting for BP data',
       tone: TONES.bp.icon,
       icon: HeartPulse,
     },
@@ -112,7 +192,9 @@ export function HealthDashboardView({
       label: 'SpO2',
       value: latestSpo2 ? formatMetricValue(latestSpo2.value) : '—',
       unit: '%',
-      helper: latestSpo2 ? `Latest reading ${new Date(latestSpo2.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : 'Waiting for SpO2 data',
+      helper: latestSpo2
+        ? `Latest reading ${new Date(latestSpo2.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+        : 'Waiting for SpO2 data',
       tone: TONES.spo2.icon,
       icon: Waves,
     },
@@ -121,7 +203,10 @@ export function HealthDashboardView({
       label: 'Weight',
       value: latestWeight ? formatMetricValue(latestWeight.value, 1) : '—',
       unit: latestWeight?.unit ?? '',
-      helper: latestWeight && weight7dAverage != null ? `${latestWeight.value >= weight7dAverage ? '+' : ''}${formatMetricValue(latestWeight.value - weight7dAverage, 1)} vs 7d avg` : 'Waiting for weight data',
+      helper:
+        latestWeight && weight7dAverage != null
+          ? `${latestWeight.value >= weight7dAverage ? '+' : ''}${formatMetricValue(latestWeight.value - weight7dAverage, 1)} vs 7d avg`
+          : 'Waiting for weight data',
       tone: TONES.weight.icon,
       icon: Weight,
     },
@@ -130,7 +215,10 @@ export function HealthDashboardView({
       label: 'Steps',
       value: latestSteps ? formatMetricValue(latestSteps.value) : '—',
       unit: '',
-      helper: latestSteps && steps7dAverage != null ? `${latestSteps.value >= steps7dAverage ? '+' : ''}${formatMetricValue(latestSteps.value - steps7dAverage)} vs 7d avg` : 'Waiting for steps data',
+      helper:
+        latestSteps && steps7dAverage != null
+          ? `${latestSteps.value >= steps7dAverage ? '+' : ''}${formatMetricValue(latestSteps.value - steps7dAverage)} vs 7d avg`
+          : 'Waiting for steps data',
       tone: TONES.steps.icon,
       icon: Footprints,
     },
@@ -145,7 +233,8 @@ export function HealthDashboardView({
       icon: HeartPulse,
       data: heartTrend,
       emptyTitle: 'No heart trend yet',
-      emptyCopy: 'As soon as resting heart rate data is ingested, the selected trend window will render here.',
+      emptyCopy:
+        'As soon as resting heart rate data is ingested, the selected trend window will render here.',
     },
     {
       key: 'bp',
@@ -159,7 +248,8 @@ export function HealthDashboardView({
       primaryLabel: 'Systolic',
       secondaryLabel: 'Diastolic',
       emptyTitle: 'No blood pressure data yet',
-      emptyCopy: 'Blood pressure readings will render here once systolic and diastolic exports arrive in this range.',
+      emptyCopy:
+        'Blood pressure readings will render here once systolic and diastolic exports arrive in this range.',
     },
     {
       key: 'weight',
@@ -169,7 +259,8 @@ export function HealthDashboardView({
       icon: Weight,
       data: weightTrend,
       emptyTitle: 'No weight data yet',
-      emptyCopy: 'If Body Mass is exported, a line trend will appear here automatically for the selected window.',
+      emptyCopy:
+        'If Body Mass is exported, a line trend will appear here automatically for the selected window.',
       formatter: (value) => formatMetricValue(value, 1),
     },
     {
@@ -180,7 +271,8 @@ export function HealthDashboardView({
       icon: Footprints,
       data: stepsTrend,
       emptyTitle: 'No steps trend yet',
-      emptyCopy: 'Daily step count averages will appear here as soon as step data is available in this window.',
+      emptyCopy:
+        'Daily step count averages will appear here as soon as step data is available in this window.',
     },
     {
       key: 'spo2',
@@ -200,7 +292,8 @@ export function HealthDashboardView({
       icon: Activity,
       data: hrvTrend,
       emptyTitle: 'No HRV data yet',
-      emptyCopy: 'Heart rate variability readings will show here once they arrive in the selected range.',
+      emptyCopy:
+        'Heart rate variability readings will show here once they arrive in the selected range.',
     },
   ];
 
@@ -211,7 +304,13 @@ export function HealthDashboardView({
     good: sleepTrend.filter((point) => point.value >= 7 && point.value < 8).length,
     long: sleepTrend.filter((point) => point.value >= 8).length,
   };
-  const sleepConsistency = sleepTrend.length ? Math.round((sleepTrend.filter((point) => point.value >= 7 && point.value <= 8.5).length / sleepTrend.length) * 100) : 0;
+  const sleepConsistency = sleepTrend.length
+    ? Math.round(
+        (sleepTrend.filter((point) => point.value >= 7 && point.value <= 8.5).length /
+          sleepTrend.length) *
+          100
+      )
+    : 0;
 
   return (
     <>
@@ -227,13 +326,22 @@ export function HealthDashboardView({
         <div className="mb-4 flex items-center justify-between gap-4">
           <div>
             <h2 className="text-xl font-semibold text-[var(--text)] dark:text-white">Trends</h2>
-            <p className="mt-2 text-sm text-[var(--muted-foreground)] dark:text-white/55">{range.trendLabel} across the signals that matter most. All charts open fullscreen on click.</p>
+            <p className="mt-2 text-sm text-[var(--muted-foreground)] dark:text-white/55">
+              {range.trendLabel} across the signals that matter most. All charts open fullscreen on
+              click.
+            </p>
           </div>
-          <div className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-1 text-xs font-medium text-[var(--muted-foreground)] dark:border-white/10 dark:bg-white/5 dark:text-white/70">{range.trendLabel}</div>
+          <div className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-1 text-xs font-medium text-[var(--muted-foreground)] dark:border-white/10 dark:bg-white/5 dark:text-white/70">
+            {range.trendLabel}
+          </div>
         </div>
         <div className="grid gap-6 xl:grid-cols-2">
           {chartConfigs.map((config) => (
-            <TrendCard key={config.key} config={config} onExpand={() => setSelectedChart(config.key)} />
+            <TrendCard
+              key={config.key}
+              config={config}
+              onExpand={() => setSelectedChart(config.key)}
+            />
           ))}
         </div>
       </section>
@@ -247,9 +355,17 @@ export function HealthDashboardView({
         sleepBuckets={sleepBuckets}
       />
 
-      <WorkoutsSection workouts={workouts} workoutSummary={workoutSummary} rangeLabel={range.trendLabel} />
+      <WorkoutsSection
+        workouts={workouts}
+        workoutSummary={workoutSummary}
+        rangeLabel={range.trendLabel}
+      />
 
-      <ChartModal config={selectedConfig} onClose={() => setSelectedChart(null)} rangeLabel={range.trendLabel} />
+      <ChartModal
+        config={selectedConfig}
+        onClose={() => setSelectedChart(null)}
+        rangeLabel={range.trendLabel}
+      />
     </>
   );
 }

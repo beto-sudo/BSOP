@@ -60,7 +60,9 @@ function assertEnv(name, value) {
   if (!value) throw new Error(`Missing env var ${name}`);
 }
 
-['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'CODA_API_KEY', 'CODA_DOC_ID'].forEach((name) => assertEnv(name, process.env[name]));
+['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'CODA_API_KEY', 'CODA_DOC_ID'].forEach((name) =>
+  assertEnv(name, process.env[name])
+);
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -218,7 +220,10 @@ function paymentCells(payment) {
     { column: CODA.pagos.pk, value: pk },
     { column: CODA.pagos.idPedido, value: String(payment.order_id) },
     { column: CODA.pagos.gateway, value: payment.gateway ?? 'Waitry' },
-    { column: CODA.pagos.methodType, value: payment.metodo ?? payment.method ?? payment.type ?? '' },
+    {
+      column: CODA.pagos.methodType,
+      value: payment.metodo ?? payment.method ?? payment.type ?? '',
+    },
     { column: CODA.pagos.amount, value: normalizeNumber(payment.monto ?? payment.amount) },
     { column: CODA.pagos.status, value: payment.status ?? '' },
     { column: CODA.pagos.createdAt, value: payment.created_at ?? null },

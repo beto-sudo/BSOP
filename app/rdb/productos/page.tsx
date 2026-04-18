@@ -64,7 +64,7 @@ export default function ProductosPage() {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [search, setSearch] = useState('');
   const [categoriaFilter, setCategoriaFilter] = useState('all');
   const [activoFilter, setActivoFilter] = useState('all');
@@ -94,7 +94,9 @@ export default function ProductosPage() {
       const { data, error: err } = await supabase
         .schema('erp')
         .from('productos')
-        .select('id, codigo, nombre, descripcion, tipo, activo, unidad, inventariable, created_at, updated_at, productos_precios(precio_venta)')
+        .select(
+          'id, codigo, nombre, descripcion, tipo, activo, unidad, inventariable, created_at, updated_at, productos_precios(precio_venta)'
+        )
         .eq('empresa_id', RDB_EMPRESA_ID)
         .order('nombre');
       if (err) throw err;
@@ -150,7 +152,7 @@ export default function ProductosPage() {
         .eq('id', selectedProducto.id);
 
       if (err) throw err;
-      
+
       setDrawerOpen(false);
       void fetchProductos();
     } catch (e) {
@@ -186,15 +188,12 @@ export default function ProductosPage() {
 
       const precioNum = parseFloat(newPrecio) || 0;
       if (newProd && precioNum > 0) {
-        await supabase
-          .schema('erp')
-          .from('productos_precios')
-          .insert({
-            empresa_id: RDB_EMPRESA_ID,
-            producto_id: newProd.id,
-            precio_venta: precioNum,
-            vigente: true,
-          });
+        await supabase.schema('erp').from('productos_precios').insert({
+          empresa_id: RDB_EMPRESA_ID,
+          producto_id: newProd.id,
+          precio_venta: precioNum,
+          vigente: true,
+        });
       }
 
       setCreateDrawerOpen(false);
@@ -212,13 +211,14 @@ export default function ProductosPage() {
   };
 
   const categorias = Array.from(
-    new Set(productos.map((p) => p.categoria).filter((c): c is string => !!c)),
+    new Set(productos.map((p) => p.categoria).filter((c): c is string => !!c))
   ).sort();
 
   const filtered = productos.filter((p) => {
     if (activoFilter !== 'all' && String(p.activo) !== activoFilter) return false;
     if (categoriaFilter !== 'all' && p.categoria !== categoriaFilter) return false;
-    if (inventariableFilter !== 'all' && String(p.inventariable ?? true) !== inventariableFilter) return false;
+    if (inventariableFilter !== 'all' && String(p.inventariable ?? true) !== inventariableFilter)
+      return false;
     if (!search) return true;
     const q = search.toLowerCase();
     return (
@@ -231,306 +231,375 @@ export default function ProductosPage() {
   const { sortKey, sortDir, onSort, sortData } = useSortableTable<Producto>('nombre', 'asc');
   return (
     <RequireAccess empresa="rdb" modulo="rdb.productos">
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Productos</h1>
-          <p className="text-sm text-muted-foreground">Catálogo de productos y servicios</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-sm text-muted-foreground">
-             Total: <span className="font-semibold text-foreground">{filtered.length}</span>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Productos</h1>
+            <p className="text-sm text-muted-foreground">Catálogo de productos y servicios</p>
           </div>
-          <Button onClick={() => setCreateDrawerOpen(true)}>+ Nuevo Producto</Button>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="relative min-w-52">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nombre o categoría…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
+          <div className="flex items-center gap-4">
+            <div className="text-sm text-muted-foreground">
+              Total: <span className="font-semibold text-foreground">{filtered.length}</span>
+            </div>
+            <Button onClick={() => setCreateDrawerOpen(true)}>+ Nuevo Producto</Button>
+          </div>
         </div>
 
-        <Select value={categoriaFilter} onValueChange={(v) => setCategoriaFilter(v ?? 'all')}>
-          <SelectTrigger className="w-44">
-            <SelectValue placeholder="Categoría" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas las categorías</SelectItem>
-            {categorias.map((cat) => (
-              <SelectItem key={cat} value={cat}>
-                {cat}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* Filters */}
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="relative min-w-52">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nombre o categoría…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
 
-        <Select value={inventariableFilter} onValueChange={(v) => setInventariableFilter(v ?? 'all')}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Tipo" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los tipos</SelectItem>
-            <SelectItem value="true">Inventariable</SelectItem>
-            <SelectItem value="false">Servicio / Varios</SelectItem>
-          </SelectContent>
-        </Select>
+          <Select value={categoriaFilter} onValueChange={(v) => setCategoriaFilter(v ?? 'all')}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Categoría" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las categorías</SelectItem>
+              {categorias.map((cat) => (
+                <SelectItem key={cat} value={cat}>
+                  {cat}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        <Select value={activoFilter} onValueChange={(v) => setActivoFilter(v ?? 'all')}>
-          <SelectTrigger className="w-36">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos (Activos)</SelectItem>
-            <SelectItem value="true">Solo Activos</SelectItem>
-            <SelectItem value="false">Solo Inactivos</SelectItem>
-          </SelectContent>
-        </Select>
+          <Select
+            value={inventariableFilter}
+            onValueChange={(v) => setInventariableFilter(v ?? 'all')}
+          >
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los tipos</SelectItem>
+              <SelectItem value="true">Inventariable</SelectItem>
+              <SelectItem value="false">Servicio / Varios</SelectItem>
+            </SelectContent>
+          </Select>
 
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => void fetchProductos()}
-          aria-label="Actualizar"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-        </Button>
-      </div>
+          <Select value={activoFilter} onValueChange={(v) => setActivoFilter(v ?? 'all')}>
+            <SelectTrigger className="w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos (Activos)</SelectItem>
+              <SelectItem value="true">Solo Activos</SelectItem>
+              <SelectItem value="false">Solo Inactivos</SelectItem>
+            </SelectContent>
+          </Select>
 
-      {/* Error */}
-      {error && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {error}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => void fetchProductos()}
+            aria-label="Actualizar"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
-      )}
 
-      {/* Table */}
-      <div className="rounded-xl border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <SortableHead sortKey="nombre" label="Nombre" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              <SortableHead sortKey="tipo" label="Tipo" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              <SortableHead sortKey="categoria" label="Categoría" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              <SortableHead sortKey="precio" label="Precio" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="text-right" />
-              <SortableHead sortKey="activo" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              <TableHead></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              Array.from({ length: 8 }).map((_, i) => (
-                <TableRow key={i}>
-                  {Array.from({ length: 7 }).map((__, j) => (
-                    <TableCell key={j}>
-                      <Skeleton className="h-4 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : filtered.length === 0 ? (
+        {/* Error */}
+        {error && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        )}
+
+        {/* Table */}
+        <div className="rounded-xl border bg-card">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
-                  No se encontraron productos.
-                </TableCell>
+                <SortableHead
+                  sortKey="nombre"
+                  label="Nombre"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                />
+                <SortableHead
+                  sortKey="tipo"
+                  label="Tipo"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                />
+                <SortableHead
+                  sortKey="categoria"
+                  label="Categoría"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                />
+                <SortableHead
+                  sortKey="precio"
+                  label="Precio"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                  className="text-right"
+                />
+                <SortableHead
+                  sortKey="activo"
+                  label="Estado"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                />
+                <TableHead></TableHead>
               </TableRow>
-            ) : (
-              sortData(filtered).map((p) => (
-                <TableRow key={p.id} className="cursor-pointer hover:bg-muted/50" onClick={() => openDrawer(p)}>
-                  <TableCell>
-                    <div className="font-medium">{p.nombre}</div>
-                    {p.descripcion && (
-                      <div className="text-xs text-muted-foreground">{p.descripcion}</div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                     {p.inventariable ?? true ? (
-                        <Badge variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50">Producto</Badge>
-                     ) : (
-                        <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">Servicio</Badge>
-                     )}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {p.categoria ?? '—'}
-                  </TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">
-                    {formatCurrency(p.precio)}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={p.activo ? 'default' : 'secondary'}>
-                      {p.activo ? 'Activo' : 'Inactivo'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={(e) => { e.stopPropagation(); openDrawer(p); }}>
-                       <Settings2 className="h-4 w-4" />
-                    </Button>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                Array.from({ length: 8 }).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array.from({ length: 7 }).map((__, j) => (
+                      <TableCell key={j}>
+                        <Skeleton className="h-4 w-full" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
+                    No se encontraron productos.
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              ) : (
+                sortData(filtered).map((p) => (
+                  <TableRow
+                    key={p.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => openDrawer(p)}
+                  >
+                    <TableCell>
+                      <div className="font-medium">{p.nombre}</div>
+                      {p.descripcion && (
+                        <div className="text-xs text-muted-foreground">{p.descripcion}</div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {(p.inventariable ?? true) ? (
+                        <Badge
+                          variant="outline"
+                          className="text-emerald-600 border-emerald-200 bg-emerald-50"
+                        >
+                          Producto
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant="outline"
+                          className="text-blue-600 border-blue-200 bg-blue-50"
+                        >
+                          Servicio
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {p.categoria ?? '—'}
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">
+                      {formatCurrency(p.precio)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={p.activo ? 'default' : 'secondary'}>
+                        {p.activo ? 'Activo' : 'Inactivo'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openDrawer(p);
+                        }}
+                      >
+                        <Settings2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
 
-      {/* Detail/Config Drawer */}
-      <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
-        <SheetContent className="sm:max-w-[600px] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Configurar Producto</SheetTitle>
-            <SheetDescription>
-              Ajusta las reglas de inventario, agrupaciones y categorías.
-            </SheetDescription>
-          </SheetHeader>
-          
-          {selectedProducto && (
-            <div className="mt-8 space-y-6">
-              
-              <div className="rounded-lg border bg-muted/30 p-4">
-                 <div className="font-semibold text-lg">{selectedProducto.nombre}</div>
-                 <div className="text-sm text-muted-foreground mt-1">
-                    Precio: {formatCurrency(selectedProducto.precio)} • {selectedProducto.unidad || 'pieza'}
-                 </div>
-              </div>
+        {/* Detail/Config Drawer */}
+        <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+          <SheetContent className="sm:max-w-[600px] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Configurar Producto</SheetTitle>
+              <SheetDescription>
+                Ajusta las reglas de inventario, agrupaciones y categorías.
+              </SheetDescription>
+            </SheetHeader>
 
-              <div className="space-y-4">
-                 
-                 {/* Inventariable Toggle */}
-                 <div className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
+            {selectedProducto && (
+              <div className="mt-8 space-y-6">
+                <div className="rounded-lg border bg-muted/30 p-4">
+                  <div className="font-semibold text-lg">{selectedProducto.nombre}</div>
+                  <div className="text-sm text-muted-foreground mt-1">
+                    Precio: {formatCurrency(selectedProducto.precio)} •{' '}
+                    {selectedProducto.unidad || 'pieza'}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Inventariable Toggle */}
+                  <div className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
                     <div className="space-y-0.5">
-                       <label className="text-base font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Es inventariable</label>
-                       <p className="text-sm text-muted-foreground">
-                          Actívalo para llevar control de stock y kardex en RDB.
-                          Apágalo para servicios, rentas, cortesías.
-                       </p>
+                      <label className="text-base font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        Es inventariable
+                      </label>
+                      <p className="text-sm text-muted-foreground">
+                        Actívalo para llevar control de stock y kardex en RDB. Apágalo para
+                        servicios, rentas, cortesías.
+                      </p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        className="sr-only peer" 
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
                         checked={formInventariable}
-                        onChange={(e) => setFormInventariable(e.target.checked)} 
+                        onChange={(e) => setFormInventariable(e.target.checked)}
                       />
                       <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ring rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                     </label>
-                 </div>
+                  </div>
 
-                 {/* Tipo / Categoría */}
-                 <div className="space-y-2">
-                    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Tipo</label>
-                    <Select value={formCategoria || 'producto'} onValueChange={(v) => setFormCategoria(v ?? 'producto')}>
-                       <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar tipo..." />
-                       </SelectTrigger>
-                       <SelectContent>
-                          <SelectItem value="producto">Producto</SelectItem>
-                          <SelectItem value="servicio">Servicio</SelectItem>
-                          <SelectItem value="insumo">Insumo</SelectItem>
-                          <SelectItem value="refaccion">Refacción</SelectItem>
-                       </SelectContent>
+                  {/* Tipo / Categoría */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      Tipo
+                    </label>
+                    <Select
+                      value={formCategoria || 'producto'}
+                      onValueChange={(v) => setFormCategoria(v ?? 'producto')}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar tipo..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="producto">Producto</SelectItem>
+                        <SelectItem value="servicio">Servicio</SelectItem>
+                        <SelectItem value="insumo">Insumo</SelectItem>
+                        <SelectItem value="refaccion">Refacción</SelectItem>
+                      </SelectContent>
                     </Select>
-                 </div>
+                  </div>
+                </div>
 
+                <div className="flex justify-end pt-6 border-t">
+                  <Button onClick={handleSave} disabled={saving} className="gap-2">
+                    {saving ? (
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+                    Guardar Configuración
+                  </Button>
+                </div>
+              </div>
+            )}
+          </SheetContent>
+        </Sheet>
+
+        {/* Create Producto Drawer */}
+        <Sheet open={createDrawerOpen} onOpenChange={setCreateDrawerOpen}>
+          <SheetContent className="sm:max-w-[600px] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Nuevo Producto</SheetTitle>
+              <SheetDescription>
+                Da de alta un producto o insumo manualmente (ej. para Órdenes de Compra o almacén
+                interno).
+              </SheetDescription>
+            </SheetHeader>
+
+            <div className="mt-8 space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium leading-none">Nombre</label>
+                  <Input
+                    value={newNombre}
+                    onChange={(e) => setNewNombre(e.target.value)}
+                    placeholder="Ej. Servilletas de barra"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium leading-none">Precio (Opcional)</label>
+                  <Input
+                    type="number"
+                    value={newPrecio}
+                    onChange={(e) => setNewPrecio(e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium leading-none">Tipo</label>
+                  <Select
+                    value={newCategoria || 'producto'}
+                    onValueChange={(v) => setNewCategoria(v ?? 'producto')}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar tipo..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="producto">Producto</SelectItem>
+                      <SelectItem value="servicio">Servicio</SelectItem>
+                      <SelectItem value="insumo">Insumo</SelectItem>
+                      <SelectItem value="refaccion">Refacción</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Inventariable Toggle */}
+                <div className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
+                  <div className="space-y-0.5">
+                    <label className="text-base font-medium leading-none">Es inventariable</label>
+                    <p className="text-sm text-muted-foreground">
+                      Actívalo si lo contarás en stock.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={newInventariable}
+                      onChange={(e) => setNewInventariable(e.target.checked)}
+                    />
+                    <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ring rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                  </label>
+                </div>
               </div>
 
               <div className="flex justify-end pt-6 border-t">
-                 <Button onClick={handleSave} disabled={saving} className="gap-2">
-                    {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    Guardar Configuración
-                 </Button>
-              </div>
-
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
-
-      {/* Create Producto Drawer */}
-      <Sheet open={createDrawerOpen} onOpenChange={setCreateDrawerOpen}>
-        <SheetContent className="sm:max-w-[600px] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Nuevo Producto</SheetTitle>
-            <SheetDescription>
-              Da de alta un producto o insumo manualmente (ej. para Órdenes de Compra o almacén interno).
-            </SheetDescription>
-          </SheetHeader>
-          
-          <div className="mt-8 space-y-6">
-            <div className="space-y-4">
-              
-              <div className="space-y-2">
-                <label className="text-sm font-medium leading-none">Nombre</label>
-                <Input 
-                  value={newNombre} 
-                  onChange={(e) => setNewNombre(e.target.value)} 
-                  placeholder="Ej. Servilletas de barra" 
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium leading-none">Precio (Opcional)</label>
-                <Input 
-                  type="number"
-                  value={newPrecio} 
-                  onChange={(e) => setNewPrecio(e.target.value)} 
-                  placeholder="0" 
-                />
-              </div>
-
-              <div className="space-y-2">
-                 <label className="text-sm font-medium leading-none">Tipo</label>
-                 <Select value={newCategoria || 'producto'} onValueChange={(v) => setNewCategoria(v ?? 'producto')}>
-                    <SelectTrigger>
-                       <SelectValue placeholder="Seleccionar tipo..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                       <SelectItem value="producto">Producto</SelectItem>
-                       <SelectItem value="servicio">Servicio</SelectItem>
-                       <SelectItem value="insumo">Insumo</SelectItem>
-                       <SelectItem value="refaccion">Refacción</SelectItem>
-                    </SelectContent>
-                 </Select>
-              </div>
-
-              {/* Inventariable Toggle */}
-              <div className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
-                 <div className="space-y-0.5">
-                    <label className="text-base font-medium leading-none">Es inventariable</label>
-                    <p className="text-sm text-muted-foreground">
-                       Actívalo si lo contarás en stock.
-                    </p>
-                 </div>
-                 <label className="relative inline-flex items-center cursor-pointer">
-                   <input 
-                     type="checkbox" 
-                     className="sr-only peer" 
-                     checked={newInventariable}
-                     onChange={(e) => setNewInventariable(e.target.checked)} 
-                   />
-                   <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ring rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                 </label>
-              </div>
-
-            </div>
-
-            <div className="flex justify-end pt-6 border-t">
-               <Button onClick={handleCreate} disabled={creating} className="gap-2">
-                  {creating ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                <Button onClick={handleCreate} disabled={creating} className="gap-2">
+                  {creating ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
                   Crear Producto
-               </Button>
+                </Button>
+              </div>
             </div>
-          </div>
-        </SheetContent>
-      </Sheet>
-
-    </div>
+          </SheetContent>
+        </Sheet>
+      </div>
     </RequireAccess>
   );
 }

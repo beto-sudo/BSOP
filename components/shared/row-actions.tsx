@@ -1,29 +1,29 @@
-"use client"
+'use client';
 
-import * as React from "react"
-import { MoreHorizontal, Pencil, Power, PowerOff, Trash2 } from "lucide-react"
+import * as React from 'react';
+import { MoreHorizontal, Pencil, Power, PowerOff, Trash2 } from 'lucide-react';
 
-import { Button } from "@/components/ui/button"
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { ConfirmDialog } from "@/components/shared/confirm-dialog"
+} from '@/components/ui/dropdown-menu';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 
 /**
  * Declarative shape for the Edit action. If omitted, the menu item is hidden.
  */
 type EditAction = {
   /** Click handler. Called with no args. */
-  onClick: () => void
+  onClick: () => void;
   /** Label override. Defaults to "Editar". */
-  label?: string
+  label?: string;
   /** Disable the action (still visible, but grayed out). */
-  disabled?: boolean
-}
+  disabled?: boolean;
+};
 
 /**
  * Declarative shape for the Activo/Inactivo toggle. If omitted, hidden.
@@ -31,14 +31,14 @@ type EditAction = {
  */
 type ToggleAction = {
   /** Current state of the row. Drives label + icon. */
-  activo: boolean
+  activo: boolean;
   /** Called when the user clicks the menu item. Can be async. */
-  onClick: () => void | Promise<void>
+  onClick: () => void | Promise<void>;
   /** Override the "Desactivar" / "Activar" defaults. */
-  activateLabel?: string
-  deactivateLabel?: string
-  disabled?: boolean
-}
+  activateLabel?: string;
+  deactivateLabel?: string;
+  disabled?: boolean;
+};
 
 /**
  * Declarative shape for the soft-delete action. If omitted, hidden.
@@ -47,34 +47,34 @@ type ToggleAction = {
  */
 type DeleteAction = {
   /** Called only after the user confirms. Can be async. */
-  onConfirm: () => void | Promise<void>
+  onConfirm: () => void | Promise<void>;
   /** Menu item label. Defaults to "Eliminar". */
-  label?: string
+  label?: string;
   /** Dialog title. Defaults to "¿Eliminar registro?". */
-  confirmTitle?: React.ReactNode
+  confirmTitle?: React.ReactNode;
   /**
    * Dialog description. Defaults to a generic soft-delete explanation.
    * Keep it specific — e.g. name the entity and its consequences.
    */
-  confirmDescription?: React.ReactNode
+  confirmDescription?: React.ReactNode;
   /** Confirm button label. Defaults to "Eliminar". */
-  confirmLabel?: string
-  disabled?: boolean
-}
+  confirmLabel?: string;
+  disabled?: boolean;
+};
 
 export type RowActionsProps = {
-  onEdit?: EditAction
-  onToggle?: ToggleAction
-  onDelete?: DeleteAction
+  onEdit?: EditAction;
+  onToggle?: ToggleAction;
+  onDelete?: DeleteAction;
   /**
    * Custom aria-label for the trigger button. Defaults to "Acciones".
    * Pass something specific for screen-reader context, e.g.
    *   aria-label={`Acciones para ${row.nombre}`}
    */
-  ariaLabel?: string
+  ariaLabel?: string;
   /** Optional extra menu items rendered above the delete separator. */
-  children?: React.ReactNode
-}
+  children?: React.ReactNode;
+};
 
 /**
  * RowActions — BSOP standard row-level action menu.
@@ -112,21 +112,21 @@ export function RowActions({
   onEdit,
   onToggle,
   onDelete,
-  ariaLabel = "Acciones",
+  ariaLabel = 'Acciones',
   children,
 }: RowActionsProps) {
-  const [confirmOpen, setConfirmOpen] = React.useState(false)
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
 
   const hasAnyAction =
-    Boolean(onEdit) || Boolean(onToggle) || Boolean(onDelete) || Boolean(children)
+    Boolean(onEdit) || Boolean(onToggle) || Boolean(onDelete) || Boolean(children);
 
-  if (!hasAnyAction) return null
+  if (!hasAnyAction) return null;
 
   const toggleLabel = onToggle
     ? onToggle.activo
-      ? (onToggle.deactivateLabel ?? "Desactivar")
-      : (onToggle.activateLabel ?? "Activar")
-    : null
+      ? (onToggle.deactivateLabel ?? 'Desactivar')
+      : (onToggle.activateLabel ?? 'Activar')
+    : null;
 
   return (
     <>
@@ -149,12 +149,12 @@ export function RowActions({
             <DropdownMenuItem
               disabled={onEdit.disabled}
               onClick={(e) => {
-                e.stopPropagation()
-                onEdit.onClick()
+                e.stopPropagation();
+                onEdit.onClick();
               }}
             >
               <Pencil />
-              {onEdit.label ?? "Editar"}
+              {onEdit.label ?? 'Editar'}
             </DropdownMenuItem>
           )}
 
@@ -162,8 +162,8 @@ export function RowActions({
             <DropdownMenuItem
               disabled={onToggle.disabled}
               onClick={(e) => {
-                e.stopPropagation()
-                void onToggle.onClick()
+                e.stopPropagation();
+                void onToggle.onClick();
               }}
             >
               {onToggle.activo ? <PowerOff /> : <Power />}
@@ -173,21 +173,19 @@ export function RowActions({
 
           {children}
 
-          {onDelete && (onEdit || onToggle || children) && (
-            <DropdownMenuSeparator />
-          )}
+          {onDelete && (onEdit || onToggle || children) && <DropdownMenuSeparator />}
 
           {onDelete && (
             <DropdownMenuItem
               variant="destructive"
               disabled={onDelete.disabled}
               onClick={(e) => {
-                e.stopPropagation()
-                setConfirmOpen(true)
+                e.stopPropagation();
+                setConfirmOpen(true);
               }}
             >
               <Trash2 />
-              {onDelete.label ?? "Eliminar"}
+              {onDelete.label ?? 'Eliminar'}
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>
@@ -198,14 +196,14 @@ export function RowActions({
           open={confirmOpen}
           onOpenChange={setConfirmOpen}
           onConfirm={onDelete.onConfirm}
-          title={onDelete.confirmTitle ?? "¿Eliminar registro?"}
+          title={onDelete.confirmTitle ?? '¿Eliminar registro?'}
           description={
             onDelete.confirmDescription ??
-            "Esta acción marcará el registro como eliminado. Se preserva el historial para auditoría."
+            'Esta acción marcará el registro como eliminado. Se preserva el historial para auditoría.'
           }
-          confirmLabel={onDelete.confirmLabel ?? "Eliminar"}
+          confirmLabel={onDelete.confirmLabel ?? 'Eliminar'}
         />
       )}
     </>
-  )
+  );
 }

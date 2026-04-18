@@ -41,7 +41,14 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import {
   CalendarDays,
   CheckCircle2,
@@ -57,12 +64,7 @@ import {
   Check,
 } from 'lucide-react';
 
-type RequisicionStatus =
-  | 'borrador'
-  | 'pendiente'
-  | 'autorizada'
-  | 'convertida_oc'
-  | 'cancelada';
+type RequisicionStatus = 'borrador' | 'pendiente' | 'autorizada' | 'convertida_oc' | 'cancelada';
 
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline';
 
@@ -97,7 +99,6 @@ type DraftItem = {
   unidad: string;
   descripcion: string;
 };
-
 
 const STATUS_LABELS: Record<RequisicionStatus, string> = {
   borrador: 'Borrador',
@@ -229,13 +230,13 @@ function StatusBadge({ status }: { status: RequisicionStatus }) {
 
 function SummaryBar({ requisiciones }: { requisiciones: Requisicion[] }) {
   const pendientes = requisiciones.filter(
-    (req) => normalizeStatus(req.estatus) === 'pendiente',
+    (req) => normalizeStatus(req.estatus) === 'pendiente'
   ).length;
   const autorizadas = requisiciones.filter(
-    (req) => normalizeStatus(req.estatus) === 'autorizada',
+    (req) => normalizeStatus(req.estatus) === 'autorizada'
   ).length;
   const borradores = requisiciones.filter(
-    (req) => normalizeStatus(req.estatus) === 'borrador',
+    (req) => normalizeStatus(req.estatus) === 'borrador'
   ).length;
 
   return (
@@ -320,13 +321,17 @@ function ExistingRequestSheet({
       <SheetContent className="sm:max-w-[700px] flex min-h-0 flex-col overflow-hidden p-6 print:p-0">
         {/* Membrete y encabezado solo para impresión */}
         <div className="hidden print:block mb-8">
-          <img src="/membrete-rdb.jpg" alt="Membrete Rincón del Bosque" className="w-full object-contain mb-6 max-h-32" />
+          <img
+            src="/membrete-rdb.jpg"
+            alt="Membrete Rincón del Bosque"
+            className="w-full object-contain mb-6 max-h-32"
+          />
           <div className="text-center mb-4">
-             <h2 className="text-xl font-bold uppercase tracking-widest">Requisición Interna</h2>
-             <p className="text-lg font-semibold mt-1">Folio: {requisicion.folio || 'S/N'}</p>
-             {requisicion.oc_folio && (
-               <p className="text-sm mt-1 text-gray-600">Orden de Compra: {requisicion.oc_folio}</p>
-             )}
+            <h2 className="text-xl font-bold uppercase tracking-widest">Requisición Interna</h2>
+            <p className="text-lg font-semibold mt-1">Folio: {requisicion.folio || 'S/N'}</p>
+            {requisicion.oc_folio && (
+              <p className="text-sm mt-1 text-gray-600">Orden de Compra: {requisicion.oc_folio}</p>
+            )}
           </div>
         </div>
 
@@ -344,9 +349,7 @@ function ExistingRequestSheet({
           <div className="mt-6 space-y-6 pb-6 print:space-y-4 print:mt-0 print:pb-0">
             <div className="flex items-center justify-between gap-4 print:hidden">
               <StatusBadge status={status} />
-              <span className="text-sm text-muted-foreground">
-                {safeCountLabel(items.length)}
-              </span>
+              <span className="text-sm text-muted-foreground">{safeCountLabel(items.length)}</span>
             </div>
 
             <div className="grid gap-4 rounded-xl border bg-muted/20 p-4 text-sm sm:grid-cols-2 print:border-none print:bg-transparent print:p-0 print:grid-cols-2 print:text-xs print:mb-4">
@@ -371,7 +374,9 @@ function ExistingRequestSheet({
                   Aprobado por
                 </span>
                 <span className="font-medium text-foreground print:text-black">
-                  {requisicion.aprobado_por_nombre?.trim() || requisicion.aprobado_por?.trim() || 'Pendiente'}
+                  {requisicion.aprobado_por_nombre?.trim() ||
+                    requisicion.aprobado_por?.trim() ||
+                    'Pendiente'}
                 </span>
               </div>
               {requisicion.oc_folio && (
@@ -410,8 +415,12 @@ function ExistingRequestSheet({
                     <TableHeader>
                       <TableRow className="print:border-b-black print:bg-gray-100">
                         <TableHead className="print:text-black print:font-bold">Artículo</TableHead>
-                        <TableHead className="w-32 text-right print:text-black print:font-bold">Cantidad</TableHead>
-                        <TableHead className="w-28 print:text-black print:font-bold">Unidad</TableHead>
+                        <TableHead className="w-32 text-right print:text-black print:font-bold">
+                          Cantidad
+                        </TableHead>
+                        <TableHead className="w-28 print:text-black print:font-bold">
+                          Unidad
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -438,12 +447,12 @@ function ExistingRequestSheet({
 
             {/* Espacio para firmas en impresión */}
             <div className="hidden print:grid grid-cols-2 gap-8 mt-16 pt-8 text-center text-sm">
-               <div>
-                  <div className="w-48 mx-auto border-t border-black pt-2">Firma Solicitante</div>
-               </div>
-               <div>
-                  <div className="w-48 mx-auto border-t border-black pt-2">Firma Autorización</div>
-               </div>
+              <div>
+                <div className="w-48 mx-auto border-t border-black pt-2">Firma Solicitante</div>
+              </div>
+              <div>
+                <div className="w-48 mx-auto border-t border-black pt-2">Firma Autorización</div>
+              </div>
             </div>
 
             {actionError && (
@@ -456,7 +465,11 @@ function ExistingRequestSheet({
               <div className="flex flex-wrap justify-end gap-3">
                 {status === 'pendiente' && (
                   <>
-                    <Button variant="outline" onClick={() => onEdit(requisicion)} disabled={isPending || loadingItems}>
+                    <Button
+                      variant="outline"
+                      onClick={() => onEdit(requisicion)}
+                      disabled={isPending || loadingItems}
+                    >
                       Editar
                     </Button>
                     <Button onClick={handleAprobar} disabled={isPending}>
@@ -495,7 +508,12 @@ function NewRequestSheet({
   open: boolean;
   onClose: () => void;
   draftItems: DraftItem[];
-  catalogoProductos: { id: string; nombre: string; unidad: string | null; categoria: string | null }[];
+  catalogoProductos: {
+    id: string;
+    nombre: string;
+    unidad: string | null;
+    categoria: string | null;
+  }[];
   userName: string;
   editingRequisicion: Requisicion | null;
   onDraftItemChange: (id: string, field: keyof DraftItem, value: string) => void;
@@ -507,9 +525,9 @@ function NewRequestSheet({
   const [saveError, setSaveError] = useState<string | null>(null);
   const isEditing = Boolean(editingRequisicion?.id);
   const printableItems = draftItems.filter((item) =>
-    [item.producto, item.descripcion, item.cantidad, item.unidad].some(
-      (value) => Boolean(value?.trim()),
-    ),
+    [item.producto, item.descripcion, item.cantidad, item.unidad].some((value) =>
+      Boolean(value?.trim())
+    )
   );
 
   const handleGuardar = () => {
@@ -542,21 +560,31 @@ function NewRequestSheet({
         setSaveError(err instanceof Error ? err.message : 'Error al guardar la requisición');
       }
     });
-  }
+  };
 
   return (
     <Sheet open={open} onOpenChange={(value) => !value && onClose()}>
       <SheetContent className="sm:max-w-[700px] flex min-h-0 flex-col overflow-hidden p-6 print:p-0">
         <div className="hidden print:block mb-8">
-          <img src="/membrete-rdb.jpg" alt="Membrete Rincón del Bosque" className="w-full object-contain mb-6 max-h-32" />
+          <img
+            src="/membrete-rdb.jpg"
+            alt="Membrete Rincón del Bosque"
+            className="w-full object-contain mb-6 max-h-32"
+          />
           <div className="text-center mb-4">
             <h2 className="text-xl font-bold uppercase tracking-widest">Requisición Interna</h2>
-            <p className="text-lg font-semibold mt-1">Folio: {editingRequisicion?.folio || 'REQ-BORRADOR'}</p>
+            <p className="text-lg font-semibold mt-1">
+              Folio: {editingRequisicion?.folio || 'REQ-BORRADOR'}
+            </p>
           </div>
         </div>
 
         <SheetHeader className="print:hidden">
-          <SheetTitle>{isEditing ? `Editar ${editingRequisicion?.folio || 'requisición'}` : 'Nueva Requisición'}</SheetTitle>
+          <SheetTitle>
+            {isEditing
+              ? `Editar ${editingRequisicion?.folio || 'requisición'}`
+              : 'Nueva Requisición'}
+          </SheetTitle>
           <SheetDescription>
             {isEditing
               ? 'Ajusta productos o cantidades antes de autorizar la requisición.'
@@ -577,7 +605,9 @@ function NewRequestSheet({
                   <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Vista previa
                   </div>
-                  <div className="mt-1 text-lg font-semibold">{editingRequisicion?.folio || 'REQ-BORRADOR'}</div>
+                  <div className="mt-1 text-lg font-semibold">
+                    {editingRequisicion?.folio || 'REQ-BORRADOR'}
+                  </div>
                   <p className="text-sm text-muted-foreground">
                     {isEditing
                       ? 'Ajusta la requisición antes de autorizarla.'
@@ -608,12 +638,18 @@ function NewRequestSheet({
             <div className="hidden print:block space-y-3">
               <div className="grid gap-4 text-sm grid-cols-2 mb-4">
                 <div>
-                  <span className="block text-xs uppercase tracking-wider text-black/70">Solicitante</span>
+                  <span className="block text-xs uppercase tracking-wider text-black/70">
+                    Solicitante
+                  </span>
                   <span className="font-medium text-black">{userName || 'Sistema'}</span>
                 </div>
                 <div>
-                  <span className="block text-xs uppercase tracking-wider text-black/70">Fecha</span>
-                  <span className="font-medium text-black">{formatDate(new Date().toISOString())}</span>
+                  <span className="block text-xs uppercase tracking-wider text-black/70">
+                    Fecha
+                  </span>
+                  <span className="font-medium text-black">
+                    {formatDate(new Date().toISOString())}
+                  </span>
                 </div>
               </div>
 
@@ -622,7 +658,9 @@ function NewRequestSheet({
                   <TableHeader>
                     <TableRow className="border-b-black bg-gray-100">
                       <TableHead className="text-black font-bold">Artículo</TableHead>
-                      <TableHead className="w-32 text-right text-black font-bold">Cantidad</TableHead>
+                      <TableHead className="w-32 text-right text-black font-bold">
+                        Cantidad
+                      </TableHead>
                       <TableHead className="w-28 text-black font-bold">Unidad</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -659,7 +697,8 @@ function NewRequestSheet({
                 <div>
                   <div className="text-sm font-semibold">Artículos solicitados</div>
                   <p className="text-sm text-muted-foreground">
-                    El flujo de búsqueda/guardado puede conectarse después, pero la experiencia ya queda definida.
+                    El flujo de búsqueda/guardado puede conectarse después, pero la experiencia ya
+                    queda definida.
                   </p>
                 </div>
                 <Button variant="outline" onClick={onAddDraftItem}>
@@ -690,52 +729,61 @@ function NewRequestSheet({
                           Producto
                         </label>
                         <Popover>
-                           <PopoverTrigger
-                              render={
-                                <Button
-                                  variant="outline"
-                                  role="combobox"
-                                  className="w-full justify-between font-normal"
-                                />
-                              }
-                           >
-                              <span className="truncate">{item.producto || "Buscar o escribir producto..."}</span>
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                           </PopoverTrigger>
-                           <PopoverContent className="w-[420px] p-0" align="start">
-                              <Command>
-                                <CommandInput 
-                                   placeholder="Buscar producto..." 
-                                   onValueChange={(val) => {
-                                      // Allow free text if it doesn't match
-                                      onDraftItemChange(item.id, 'producto', val);
-                                      onDraftItemChange(item.id, 'producto_id', '');
-                                   }}
-                                />
-                                <CommandList className="max-h-64">
-                                  <CommandEmpty>No hay resultados. Escribe para usar como texto libre.</CommandEmpty>
-                                  <CommandGroup>
-                                    {catalogoProductos.map((p) => (
-                                      <CommandItem
-                                        key={p.id}
-                                        value={p.nombre}
-                                        onSelect={() => {
-                                          onDraftItemChange(item.id, 'producto_id', p.id);
-                                          onDraftItemChange(item.id, 'producto', p.nombre);
-                                          if (p.unidad) onDraftItemChange(item.id, 'unidad', p.unidad);
-                                        }}
-                                      >
-                                        <Check className={`mr-2 h-4 w-4 shrink-0 ${item.producto_id === p.id ? 'opacity-100' : 'opacity-0'}`} />
-                                        <span className="truncate">{p.nombre}</span>
-                                        {p.categoria && (
-                                          <span className="ml-auto text-xs text-muted-foreground shrink-0">{p.categoria}</span>
-                                        )}
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                </CommandList>
-                              </Command>
-                           </PopoverContent>
+                          <PopoverTrigger
+                            render={
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                className="w-full justify-between font-normal"
+                              />
+                            }
+                          >
+                            <span className="truncate">
+                              {item.producto || 'Buscar o escribir producto...'}
+                            </span>
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[420px] p-0" align="start">
+                            <Command>
+                              <CommandInput
+                                placeholder="Buscar producto..."
+                                onValueChange={(val) => {
+                                  // Allow free text if it doesn't match
+                                  onDraftItemChange(item.id, 'producto', val);
+                                  onDraftItemChange(item.id, 'producto_id', '');
+                                }}
+                              />
+                              <CommandList className="max-h-64">
+                                <CommandEmpty>
+                                  No hay resultados. Escribe para usar como texto libre.
+                                </CommandEmpty>
+                                <CommandGroup>
+                                  {catalogoProductos.map((p) => (
+                                    <CommandItem
+                                      key={p.id}
+                                      value={p.nombre}
+                                      onSelect={() => {
+                                        onDraftItemChange(item.id, 'producto_id', p.id);
+                                        onDraftItemChange(item.id, 'producto', p.nombre);
+                                        if (p.unidad)
+                                          onDraftItemChange(item.id, 'unidad', p.unidad);
+                                      }}
+                                    >
+                                      <Check
+                                        className={`mr-2 h-4 w-4 shrink-0 ${item.producto_id === p.id ? 'opacity-100' : 'opacity-0'}`}
+                                      />
+                                      <span className="truncate">{p.nombre}</span>
+                                      {p.categoria && (
+                                        <span className="ml-auto text-xs text-muted-foreground shrink-0">
+                                          {p.categoria}
+                                        </span>
+                                      )}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
                         </Popover>
                       </div>
 
@@ -818,7 +866,9 @@ function todayRange(): { from: string; to: string } {
 
 export default function RequisicionesPage() {
   const [requisiciones, setRequisiciones] = useState<Requisicion[]>([]);
-  const [catalogoProductos, setCatalogoProductos] = useState<{ id: string; nombre: string; unidad: string | null; categoria: string | null }[]>([]);
+  const [catalogoProductos, setCatalogoProductos] = useState<
+    { id: string; nombre: string; unidad: string | null; categoria: string | null }[]
+  >([]);
   const [currentUserData, setCurrentUserData] = useState<{ id: string; name: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingItems, setLoadingItems] = useState(false);
@@ -838,34 +888,41 @@ export default function RequisicionesPage() {
     const formatter = new Intl.DateTimeFormat('sv-SE', { timeZone: TZ });
     if (preset === 'hoy') {
       const t = formatter.format(today);
-      setDateFrom(t); setDateTo(t);
+      setDateFrom(t);
+      setDateTo(t);
     } else if (preset === 'ayer') {
       const ayer = new Date(today.toLocaleString('en-US', { timeZone: TZ }));
       ayer.setDate(ayer.getDate() - 1);
       const t = formatter.format(ayer);
-      setDateFrom(t); setDateTo(t);
+      setDateFrom(t);
+      setDateTo(t);
     } else if (preset === 'semana') {
       const d = new Date(today.toLocaleString('en-US', { timeZone: TZ }));
       const day = d.getDay();
       const diff = d.getDate() - day + (day === 0 ? -6 : 1);
       const monday = new Date(d.setDate(diff));
-      setDateFrom(formatter.format(monday)); setDateTo(formatter.format(today));
+      setDateFrom(formatter.format(monday));
+      setDateTo(formatter.format(today));
     } else if (preset === '7dias') {
       const d = new Date(today.toLocaleString('en-US', { timeZone: TZ }));
       d.setDate(d.getDate() - 7);
-      setDateFrom(formatter.format(d)); setDateTo(formatter.format(today));
+      setDateFrom(formatter.format(d));
+      setDateTo(formatter.format(today));
     } else if (preset === 'mes') {
       const d = new Date(today.toLocaleString('en-US', { timeZone: TZ }));
       const first = new Date(d.getFullYear(), d.getMonth(), 1);
-      setDateFrom(formatter.format(first)); setDateTo(formatter.format(today));
+      setDateFrom(formatter.format(first));
+      setDateTo(formatter.format(today));
     } else if (preset === '30dias') {
       const d = new Date(today.toLocaleString('en-US', { timeZone: TZ }));
       d.setDate(d.getDate() - 30);
-      setDateFrom(formatter.format(d)); setDateTo(formatter.format(today));
+      setDateFrom(formatter.format(d));
+      setDateTo(formatter.format(today));
     } else if (preset === 'ano') {
       const d = new Date(today.toLocaleString('en-US', { timeZone: TZ }));
       const first = new Date(d.getFullYear(), 0, 1);
-      setDateFrom(formatter.format(first)); setDateTo(formatter.format(today));
+      setDateFrom(formatter.format(first));
+      setDateTo(formatter.format(today));
     }
   };
   const [selected, setSelected] = useState<Requisicion | null>(null);
@@ -964,8 +1021,8 @@ export default function RequisicionesPage() {
         new Set(
           requisicionesData
             .flatMap((req) => [req.solicitado_por, req.aprobado_por])
-            .filter((value): value is string => Boolean(value)),
-        ),
+            .filter((value): value is string => Boolean(value))
+        )
       );
 
       const userNameMap = new Map<string, string>();
@@ -976,12 +1033,11 @@ export default function RequisicionesPage() {
           .select('id, first_name, email')
           .in('id', userIds);
 
-        (userRows ?? []).forEach((row: { id: string; first_name: string | null; email: string | null }) => {
-          userNameMap.set(
-            row.id,
-            row.first_name?.trim() || row.email?.split('@')[0] || row.id,
-          );
-        });
+        (userRows ?? []).forEach(
+          (row: { id: string; first_name: string | null; email: string | null }) => {
+            userNameMap.set(row.id, row.first_name?.trim() || row.email?.split('@')[0] || row.id);
+          }
+        );
       }
 
       if (currentUserId) {
@@ -999,10 +1055,7 @@ export default function RequisicionesPage() {
           .in('requisicion_id', requisicionIds);
 
         (itemRows ?? []).forEach((row: { requisicion_id: string }) => {
-          itemCountMap.set(
-            row.requisicion_id,
-            (itemCountMap.get(row.requisicion_id) ?? 0) + 1,
-          );
+          itemCountMap.set(row.requisicion_id, (itemCountMap.get(row.requisicion_id) ?? 0) + 1);
         });
       }
 
@@ -1010,15 +1063,14 @@ export default function RequisicionesPage() {
         requisicionesData.map((req) => ({
           ...req,
           solicitado_por_nombre: req.solicitado_por
-            ? userNameMap.get(req.solicitado_por) ?? req.solicitado_por
+            ? (userNameMap.get(req.solicitado_por) ?? req.solicitado_por)
             : null,
           aprobado_por_nombre: req.aprobado_por
-            ? userNameMap.get(req.aprobado_por) ?? req.aprobado_por
+            ? (userNameMap.get(req.aprobado_por) ?? req.aprobado_por)
             : null,
           item_count: itemCountMap.get(req.id) ?? 0,
-        })),
+        }))
       );
-
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error al cargar requisiciones');
     } finally {
@@ -1063,7 +1115,7 @@ export default function RequisicionesPage() {
               items: (itemsResult.data ?? []) as RequisicionItem[],
               oc_folio: ocResult.data?.codigo ?? null,
             }
-          : prev,
+          : prev
       );
     } catch {
       setSelected((prev) => (prev?.id === requisicion.id ? { ...prev, items: [] } : prev));
@@ -1081,7 +1133,9 @@ export default function RequisicionesPage() {
       const q = search.toLowerCase();
       return (
         (req.folio ?? '').toLowerCase().includes(q) ||
-        requesterName(req.solicitado_por_nombre ?? req.solicitado_por).toLowerCase().includes(q) ||
+        requesterName(req.solicitado_por_nombre ?? req.solicitado_por)
+          .toLowerCase()
+          .includes(q) ||
         STATUS_LABELS[normalizedStatus].toLowerCase().includes(q)
       );
     });
@@ -1089,7 +1143,7 @@ export default function RequisicionesPage() {
 
   const handleDraftItemChange = (id: string, field: keyof DraftItem, value: string) => {
     setDraftItems((current) =>
-      current.map((item) => (item.id === id ? { ...item, [field]: value } : item)),
+      current.map((item) => (item.id === id ? { ...item, [field]: value } : item))
     );
   };
 
@@ -1125,7 +1179,7 @@ export default function RequisicionesPage() {
             unidad: item.unidad?.trim() || '',
             descripcion: item.descripcion?.trim() || '',
           }))
-        : MOCK_DRAFT_ITEMS,
+        : MOCK_DRAFT_ITEMS
     );
     setDetailOpen(false);
     setNewOpen(true);
@@ -1133,7 +1187,7 @@ export default function RequisicionesPage() {
 
   const handleRemoveDraftItem = (id: string) => {
     setDraftItems((current) =>
-      current.length === 1 ? current : current.filter((item) => item.id !== id),
+      current.length === 1 ? current : current.filter((item) => item.id !== id)
     );
   };
 
@@ -1145,192 +1199,239 @@ export default function RequisicionesPage() {
     </TableRow>
   );
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable<Requisicion>('fecha_solicitud', 'desc');
+  const { sortKey, sortDir, onSort, sortData } = useSortableTable<Requisicion>(
+    'fecha_solicitud',
+    'desc'
+  );
   return (
     <RequireAccess empresa="rdb" modulo="rdb.requisiciones">
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Requisiciones</h1>
-          <p className="text-sm text-muted-foreground">
-            Solicitudes de compra internas para abastecer áreas operativas.
-          </p>
-        </div>
-        <Button
-          onClick={() => {
-            resetDraft();
-            setNewOpen(true);
-            setDetailOpen(false);
-          }}
-        >
-          <FilePlus2 className="mr-2 h-4 w-4" />
-          Nueva Requisición
-        </Button>
-      </div>
-
-      {!loading && !error ? <SummaryBar requisiciones={filtered} /> : null}
-
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="relative min-w-52">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar folio, solicitante o estado..."
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            className="pl-9"
-          />
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Requisiciones</h1>
+            <p className="text-sm text-muted-foreground">
+              Solicitudes de compra internas para abastecer áreas operativas.
+            </p>
+          </div>
+          <Button
+            onClick={() => {
+              resetDraft();
+              setNewOpen(true);
+              setDetailOpen(false);
+            }}
+          >
+            <FilePlus2 className="mr-2 h-4 w-4" />
+            Nueva Requisición
+          </Button>
         </div>
 
-        <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value ?? 'all')}>
-          <SelectTrigger className="w-48">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUS_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
+        {!loading && !error ? <SummaryBar requisiciones={filtered} /> : null}
+
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="relative min-w-52">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar folio, solicitante o estado..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value ?? 'all')}>
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(event) => {
+                setDateFrom(event.target.value);
+                setPresetKey('custom');
+              }}
+              className="w-36"
+              aria-label="Fecha desde"
+            />
+            <span className="text-muted-foreground">—</span>
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(event) => {
+                setDateTo(event.target.value);
+                setPresetKey('custom');
+              }}
+              className="w-36"
+              aria-label="Fecha hasta"
+            />
+          </div>
+          <Select value={presetKey} onValueChange={handlePreset}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Rango..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="hoy">Hoy</SelectItem>
+              <SelectItem value="ayer">Ayer</SelectItem>
+              <SelectItem value="semana">Esta semana</SelectItem>
+              <SelectItem value="7dias">Últimos 7 días</SelectItem>
+              <SelectItem value="mes">Este mes</SelectItem>
+              <SelectItem value="30dias">Últimos 30 días</SelectItem>
+              <SelectItem value="ano">Este año</SelectItem>
+              <SelectItem value="custom" className="hidden">
+                Personalizado
               </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            </SelectContent>
+          </Select>
 
-        <div className="flex items-center gap-2">
-          <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <Input
-            type="date"
-            value={dateFrom}
-            onChange={(event) => { setDateFrom(event.target.value); setPresetKey('custom'); }}
-            className="w-36"
-            aria-label="Fecha desde"
-          />
-          <span className="text-muted-foreground">—</span>
-          <Input
-            type="date"
-            value={dateTo}
-            onChange={(event) => { setDateTo(event.target.value); setPresetKey('custom'); }}
-            className="w-36"
-            aria-label="Fecha hasta"
-          />
-        </div>
-        <Select value={presetKey} onValueChange={handlePreset}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Rango..." />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="hoy">Hoy</SelectItem>
-            <SelectItem value="ayer">Ayer</SelectItem>
-            <SelectItem value="semana">Esta semana</SelectItem>
-            <SelectItem value="7dias">Últimos 7 días</SelectItem>
-            <SelectItem value="mes">Este mes</SelectItem>
-            <SelectItem value="30dias">Últimos 30 días</SelectItem>
-            <SelectItem value="ano">Este año</SelectItem>
-            <SelectItem value="custom" className="hidden">Personalizado</SelectItem>
-          </SelectContent>
-        </Select>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => void fetchRequisiciones()}
+            aria-label="Actualizar"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
 
-
-        <Button variant="outline" size="icon" onClick={() => void fetchRequisiciones()} aria-label="Actualizar">
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-        </Button>
-
-        <span className="text-sm text-muted-foreground">
-          {loading
-            ? 'Cargando…'
-            : `${filtered.length} requisición${filtered.length === 1 ? '' : 'es'}`}
-        </span>
-      </div>
-
-      {error ? (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
-      ) : null}
-
-      <div className="rounded-xl border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <SortableHead sortKey="folio" label="Folio" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              <SortableHead sortKey="fecha_solicitud" label="Fecha Solicitud" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              <SortableHead sortKey="solicitado_por_nombre" label="Solicitante" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              <SortableHead sortKey="estatus" label="Estatus" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              <SortableHead sortKey="item_count" label="Ítems" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+          <span className="text-sm text-muted-foreground">
             {loading
-              ? Array.from({ length: 6 }).map((_, rowIndex) => (
-                  <TableRow key={rowIndex}>
-                    {Array.from({ length: 5 }).map((__, cellIndex) => (
-                      <TableCell key={cellIndex}>
-                        <Skeleton className="h-4 w-full" />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              : filtered.length === 0
-                ? emptyState
-                : sortData(filtered).map((req) => {
-                    const normalizedStatus = normalizeStatus(req.estatus);
-                    const items = req.items ?? [];
-  return (
-                      <TableRow
-                        key={req.id}
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => void openDetail(req)}
-                      >
-                        <TableCell className="font-mono text-xs font-medium">
-                          {req.folio || '—'}
+              ? 'Cargando…'
+              : `${filtered.length} requisición${filtered.length === 1 ? '' : 'es'}`}
+          </span>
+        </div>
+
+        {error ? (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        ) : null}
+
+        <div className="rounded-xl border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <SortableHead
+                  sortKey="folio"
+                  label="Folio"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                />
+                <SortableHead
+                  sortKey="fecha_solicitud"
+                  label="Fecha Solicitud"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                />
+                <SortableHead
+                  sortKey="solicitado_por_nombre"
+                  label="Solicitante"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                />
+                <SortableHead
+                  sortKey="estatus"
+                  label="Estatus"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                />
+                <SortableHead
+                  sortKey="item_count"
+                  label="Ítems"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading
+                ? Array.from({ length: 6 }).map((_, rowIndex) => (
+                    <TableRow key={rowIndex}>
+                      {Array.from({ length: 5 }).map((__, cellIndex) => (
+                        <TableCell key={cellIndex}>
+                          <Skeleton className="h-4 w-full" />
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {formatDate(req.fecha_solicitud)}
-                        </TableCell>
-                        <TableCell className="text-sm">{requesterName(req.solicitado_por_nombre ?? req.solicitado_por)}</TableCell>
-                        <TableCell>
-                          <StatusBadge status={normalizedStatus} />
-                        </TableCell>
-                        <TableCell className="max-w-64 text-sm text-muted-foreground">
-                          {items.length > 0
-                            ? summarizeItems(items)
-                            : (req.item_count ?? 0) > 0
-                              ? safeCountLabel(req.item_count ?? 0)
-                              : 'Sin artículos'}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-          </TableBody>
-        </Table>
+                      ))}
+                    </TableRow>
+                  ))
+                : filtered.length === 0
+                  ? emptyState
+                  : sortData(filtered).map((req) => {
+                      const normalizedStatus = normalizeStatus(req.estatus);
+                      const items = req.items ?? [];
+                      return (
+                        <TableRow
+                          key={req.id}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => void openDetail(req)}
+                        >
+                          <TableCell className="font-mono text-xs font-medium">
+                            {req.folio || '—'}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {formatDate(req.fecha_solicitud)}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {requesterName(req.solicitado_por_nombre ?? req.solicitado_por)}
+                          </TableCell>
+                          <TableCell>
+                            <StatusBadge status={normalizedStatus} />
+                          </TableCell>
+                          <TableCell className="max-w-64 text-sm text-muted-foreground">
+                            {items.length > 0
+                              ? summarizeItems(items)
+                              : (req.item_count ?? 0) > 0
+                                ? safeCountLabel(req.item_count ?? 0)
+                                : 'Sin artículos'}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+            </TableBody>
+          </Table>
+        </div>
+
+        <ExistingRequestSheet
+          requisicion={selected}
+          loadingItems={loadingItems}
+          open={detailOpen}
+          onClose={() => setDetailOpen(false)}
+          onAction={() => void fetchRequisiciones()}
+          onEdit={openEditDraft}
+        />
+
+        <NewRequestSheet
+          open={newOpen}
+          onClose={() => {
+            setNewOpen(false);
+            resetDraft();
+          }}
+          draftItems={draftItems}
+          catalogoProductos={catalogoProductos}
+          userName={currentUserData?.name || ''}
+          editingRequisicion={editingRequisicion}
+          onDraftItemChange={handleDraftItemChange}
+          onAddDraftItem={handleAddDraftItem}
+          onRemoveDraftItem={handleRemoveDraftItem}
+          onSaved={() => {
+            void fetchRequisiciones();
+            resetDraft();
+          }}
+        />
       </div>
-
-      <ExistingRequestSheet
-        requisicion={selected}
-        loadingItems={loadingItems}
-        open={detailOpen}
-        onClose={() => setDetailOpen(false)}
-        onAction={() => void fetchRequisiciones()}
-        onEdit={openEditDraft}
-      />
-
-      <NewRequestSheet
-        open={newOpen}
-        onClose={() => {
-          setNewOpen(false);
-          resetDraft();
-        }}
-        draftItems={draftItems}
-        catalogoProductos={catalogoProductos}
-        userName={currentUserData?.name || ''}
-        editingRequisicion={editingRequisicion}
-        onDraftItemChange={handleDraftItemChange}
-        onAddDraftItem={handleAddDraftItem}
-        onRemoveDraftItem={handleRemoveDraftItem}
-        onSaved={() => {
-          void fetchRequisiciones();
-          resetDraft();
-        }}
-      />
-    </div>
     </RequireAccess>
   );
 }

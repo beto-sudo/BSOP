@@ -46,40 +46,37 @@ setup('create authenticated session', async ({ page, request }) => {
   if (missingVars.length) {
     console.warn(
       `\n[auth-setup] Missing env vars: ${missingVars.join(', ')}\n` +
-      `  Auth tests will be SKIPPED. To enable them:\n` +
-      `  1. Copy .env.test.local.example → .env.test.local\n` +
-      `  2. Fill in the test credentials\n` +
-      `  3. Ensure the test user has email+password auth in Supabase\n`
+        `  Auth tests will be SKIPPED. To enable them:\n` +
+        `  1. Copy .env.test.local.example → .env.test.local\n` +
+        `  2. Fill in the test credentials\n` +
+        `  3. Ensure the test user has email+password auth in Supabase\n`
     );
     fs.writeFileSync(AUTH_FILE, JSON.stringify({ cookies: [], origins: [] }, null, 2));
     return;
   }
 
   // ── Sign in via Supabase password grant ──────────────────────────────────
-  const tokenRes = await request.post(
-    `${supabaseUrl}/auth/v1/token?grant_type=password`,
-    {
-      headers: {
-        apikey: anonKey!,
-        'Content-Type': 'application/json',
-      },
-      data: { email, password },
-    }
-  );
+  const tokenRes = await request.post(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+    headers: {
+      apikey: anonKey!,
+      'Content-Type': 'application/json',
+    },
+    data: { email, password },
+  });
 
   if (!tokenRes.ok()) {
     const body = await tokenRes.text().catch(() => '');
     console.warn(
       `\n[auth-setup] Supabase sign-in failed (HTTP ${tokenRes.status()}).\n` +
-      `  Response: ${body.slice(0, 200)}\n` +
-      `  Check TEST_USER_EMAIL / TEST_USER_PASSWORD and that email+password\n` +
-      `  provider is enabled in Supabase Authentication settings.\n`
+        `  Response: ${body.slice(0, 200)}\n` +
+        `  Check TEST_USER_EMAIL / TEST_USER_PASSWORD and that email+password\n` +
+        `  provider is enabled in Supabase Authentication settings.\n`
     );
     fs.writeFileSync(AUTH_FILE, JSON.stringify({ cookies: [], origins: [] }, null, 2));
     return;
   }
 
-  const session = await tokenRes.json() as {
+  const session = (await tokenRes.json()) as {
     access_token?: string;
     refresh_token?: string;
     expires_in?: number;

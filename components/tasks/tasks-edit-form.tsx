@@ -119,10 +119,7 @@ function SimpleEditDialog({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <FieldLabel>Estado</FieldLabel>
-              <Select
-                value={value.estado}
-                onValueChange={(v) => set({ estado: v as TaskEstado })}
-              >
+              <Select value={value.estado} onValueChange={(v) => set({ estado: v as TaskEstado })}>
                 <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
                   <SelectValue />
                 </SelectTrigger>
@@ -137,10 +134,7 @@ function SimpleEditDialog({
             </div>
             <div>
               <FieldLabel>Prioridad</FieldLabel>
-              <Select
-                value={value.prioridad}
-                onValueChange={(v) => set({ prioridad: v ?? '' })}
-              >
+              <Select value={value.prioridad} onValueChange={(v) => set({ prioridad: v ?? '' })}>
                 <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
                   <SelectValue placeholder="Sin prioridad" />
                 </SelectTrigger>
@@ -157,10 +151,7 @@ function SimpleEditDialog({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <FieldLabel>Asignado a</FieldLabel>
-              <Select
-                value={value.asignado_a}
-                onValueChange={(v) => set({ asignado_a: v ?? '' })}
-              >
+              <Select value={value.asignado_a} onValueChange={(v) => set({ asignado_a: v ?? '' })}>
                 <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
                   <SelectValue placeholder="Sin asignar" />
                 </SelectTrigger>
@@ -292,10 +283,7 @@ function RichEditSheet({
             </div>
             <div>
               <FieldLabel>Prioridad</FieldLabel>
-              <Select
-                value={value.prioridad}
-                onValueChange={(v) => set({ prioridad: v ?? '' })}
-              >
+              <Select value={value.prioridad} onValueChange={(v) => set({ prioridad: v ?? '' })}>
                 <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
                   <SelectValue placeholder="Sin prioridad" />
                 </SelectTrigger>
@@ -391,7 +379,9 @@ function RichEditSheet({
                 )}
                 {selectedTask.siguiente_accion && (
                   <div className="col-span-2">
-                    <span className="font-semibold text-[var(--text)]/40 block">Siguiente Acción</span>
+                    <span className="font-semibold text-[var(--text)]/40 block">
+                      Siguiente Acción
+                    </span>
                     {selectedTask.siguiente_accion}
                   </div>
                 )}
@@ -434,7 +424,11 @@ function RichEditSheet({
               disabled={deleting}
               className="rounded-xl border-red-500/30 text-red-400 hover:bg-red-500/10"
             >
-              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              {deleting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
             </Button>
           )}
           <div className="flex-1" />

@@ -32,14 +32,25 @@ export function SleepSection({
           </div>
           <div>
             <h2 className="text-lg font-semibold">Sleep Analysis</h2>
-            <p className="mt-1 text-sm text-[var(--muted-foreground)] dark:text-white/45">Dedicated view for sleep duration and consistency.</p>
+            <p className="mt-1 text-sm text-[var(--muted-foreground)] dark:text-white/45">
+              Dedicated view for sleep duration and consistency.
+            </p>
           </div>
         </div>
 
         <div className="mb-6 grid gap-3 md:grid-cols-4">
-          <StatPill label="Last night" value={`${latestSleep ? formatDurationHours(latestSleep.value) : '—'} hr`} />
-          <StatPill label="7d avg" value={`${sleep7dAverage == null ? '—' : formatDurationHours(sleep7dAverage)} hr`} />
-          <StatPill label="30d avg" value={`${sleep30dAverage == null ? '—' : formatDurationHours(sleep30dAverage)} hr`} />
+          <StatPill
+            label="Last night"
+            value={`${latestSleep ? formatDurationHours(latestSleep.value) : '—'} hr`}
+          />
+          <StatPill
+            label="7d avg"
+            value={`${sleep7dAverage == null ? '—' : formatDurationHours(sleep7dAverage)} hr`}
+          />
+          <StatPill
+            label="30d avg"
+            value={`${sleep30dAverage == null ? '—' : formatDurationHours(sleep30dAverage)} hr`}
+          />
           <StatPill label="Consistency" value={`${sleepConsistency || 0}% in target`} />
         </div>
 
@@ -52,7 +63,8 @@ export function SleepSection({
             icon: MoonStar,
             data: sleepTrend,
             emptyTitle: 'No sleep data yet',
-            emptyCopy: 'Sleep Analysis rows will render here automatically when they are present in the selected date range.',
+            emptyCopy:
+              'Sleep Analysis rows will render here automatically when they are present in the selected date range.',
             formatter: (value) => formatMetricValue(value, 1),
           }}
         />
@@ -64,12 +76,18 @@ export function SleepSection({
           <h2 className="text-lg font-semibold">7d average + duration mix</h2>
         </div>
         <div className="rounded-3xl border border-indigo-200 bg-indigo-50 p-5 dark:border-indigo-400/15 dark:bg-indigo-400/8">
-          <div className="text-xs uppercase tracking-[0.22em] text-indigo-700/70 dark:text-white/35">Average sleep</div>
+          <div className="text-xs uppercase tracking-[0.22em] text-indigo-700/70 dark:text-white/35">
+            Average sleep
+          </div>
           <div className="mt-3 flex items-end gap-2">
-            <div className="text-4xl font-semibold text-[var(--text)] dark:text-white">{sleep7dAverage == null ? '—' : formatDurationHours(sleep7dAverage)}</div>
+            <div className="text-4xl font-semibold text-[var(--text)] dark:text-white">
+              {sleep7dAverage == null ? '—' : formatDurationHours(sleep7dAverage)}
+            </div>
             <div className="pb-1 text-sm text-[var(--muted-foreground)] dark:text-white/45">hr</div>
           </div>
-          <p className="mt-3 text-sm text-[var(--muted-foreground)] dark:text-white/55">Useful anchor for the hero card and a quick sense of recovery baseline.</p>
+          <p className="mt-3 text-sm text-[var(--muted-foreground)] dark:text-white/55">
+            Useful anchor for the hero card and a quick sense of recovery baseline.
+          </p>
         </div>
         <div className="mt-5 space-y-3">
           {[
@@ -87,7 +105,10 @@ export function SleepSection({
                   <span>{count} nights</span>
                 </div>
                 <div className="h-2 rounded-full bg-slate-200 dark:bg-white/8">
-                  <div className="h-2 rounded-full bg-gradient-to-r from-indigo-400 to-violet-400" style={{ width }} />
+                  <div
+                    className="h-2 rounded-full bg-gradient-to-r from-indigo-400 to-violet-400"
+                    style={{ width }}
+                  />
                 </div>
               </div>
             );

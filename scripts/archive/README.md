@@ -6,14 +6,14 @@ so they do not drag `any`-casts or old API shapes into the active type-check.
 
 ## Contents
 
-| script                         | purpose                                                        | ran on       |
-| ------------------------------ | -------------------------------------------------------------- | ------------ |
-| `migrate_dilesa_hr.ts`         | Imported DILESA HR (personas + empleados + puestos) from Coda  | one-shot     |
-| `migrate_dilesa_tasks.ts`      | Imported DILESA tasks from Coda into `erp.tasks`               | one-shot     |
-| `migrate_dilesa_juntas.ts`     | Imported DILESA juntas (meetings + attendance) from Coda       | one-shot     |
-| `migrate_dilesa_escrituras.ts` | Imported DILESA escrituras (notarial acts) from Coda           | one-shot     |
-| `migrate_dilesa_notarias.ts`   | Imported DILESA notarías catalog from Coda                     | one-shot     |
-| `rescue_junta_images.ts`       | Re-uploaded image attachments for juntas lost during migration | one-shot     |
+| script                         | purpose                                                        | ran on   |
+| ------------------------------ | -------------------------------------------------------------- | -------- |
+| `migrate_dilesa_hr.ts`         | Imported DILESA HR (personas + empleados + puestos) from Coda  | one-shot |
+| `migrate_dilesa_tasks.ts`      | Imported DILESA tasks from Coda into `erp.tasks`               | one-shot |
+| `migrate_dilesa_juntas.ts`     | Imported DILESA juntas (meetings + attendance) from Coda       | one-shot |
+| `migrate_dilesa_escrituras.ts` | Imported DILESA escrituras (notarial acts) from Coda           | one-shot |
+| `migrate_dilesa_notarias.ts`   | Imported DILESA notarías catalog from Coda                     | one-shot |
+| `rescue_junta_images.ts`       | Re-uploaded image attachments for juntas lost during migration | one-shot |
 
 ## Why archived
 

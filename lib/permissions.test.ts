@@ -181,7 +181,7 @@ function makeSupabaseMock(
   script: Script,
   getUserResult: { data: { user: { email: string } | null } } = {
     data: { user: null },
-  },
+  }
 ) {
   const build = (schemaName: string) => ({
     from(tableName: string) {
@@ -199,8 +199,7 @@ function makeSupabaseMock(
         eq: () => chain,
         maybeSingle: () => Promise.resolve(singleResult),
         // Make the chain awaitable directly (for queries without maybeSingle).
-        then: (onFulfilled, onRejected) =>
-          Promise.resolve(result).then(onFulfilled, onRejected),
+        then: (onFulfilled, onRejected) => Promise.resolve(result).then(onFulfilled, onRejected),
       };
       return chain;
     },
@@ -221,7 +220,7 @@ describe('fetchPermissionsForUserId', () => {
     });
     const perms = await fetchPermissionsForUserId(
       supabase as unknown as Parameters<typeof fetchPermissionsForUserId>[0],
-      'u-missing',
+      'u-missing'
     );
     expect(perms).toEqual({
       isAdmin: false,
@@ -245,7 +244,7 @@ describe('fetchPermissionsForUserId', () => {
     });
     const perms = await fetchPermissionsForUserId(
       supabase as unknown as Parameters<typeof fetchPermissionsForUserId>[0],
-      'u1',
+      'u1'
     );
     expect(perms.email).toBe(null); // by-id fetcher returns the generic empty
     expect(perms.isAdmin).toBe(false);
@@ -264,7 +263,7 @@ describe('fetchPermissionsForUserId', () => {
     });
     const perms = await fetchPermissionsForUserId(
       supabase as unknown as Parameters<typeof fetchPermissionsForUserId>[0],
-      'u-admin',
+      'u-admin'
     );
     expect(perms.isAdmin).toBe(true);
     expect(perms.email).toBe('boss@bsop.test');
@@ -337,7 +336,7 @@ describe('fetchPermissionsForUserId', () => {
 
     const perms = await fetchPermissionsForUserId(
       supabase as unknown as Parameters<typeof fetchPermissionsForUserId>[0],
-      'u1',
+      'u1'
     );
 
     expect(perms.isAdmin).toBe(false);
@@ -405,7 +404,7 @@ describe('fetchPermissionsForUserId', () => {
 
     const perms = await fetchPermissionsForUserId(
       supabase as unknown as Parameters<typeof fetchPermissionsForUserId>[0],
-      'u1',
+      'u1'
     );
 
     expect(perms.modulos.get('rdb.ventas')).toEqual({ read: true, write: false });
@@ -437,7 +436,7 @@ describe('fetchPermissionsForUserId', () => {
 
     const perms = await fetchPermissionsForUserId(
       supabase as unknown as Parameters<typeof fetchPermissionsForUserId>[0],
-      'u1',
+      'u1'
     );
     expect(perms.modulos.get('x.y')).toEqual({ read: false, write: false });
   });
@@ -447,7 +446,7 @@ describe('fetchUserPermissions', () => {
   it('returns empty when there is no authenticated user', async () => {
     const supabase = makeSupabaseMock({}, { data: { user: null } });
     const perms = await fetchUserPermissions(
-      supabase as unknown as Parameters<typeof fetchUserPermissions>[0],
+      supabase as unknown as Parameters<typeof fetchUserPermissions>[0]
     );
     expect(perms.email).toBe(null);
     expect(perms.isAdmin).toBe(false);
@@ -460,10 +459,10 @@ describe('fetchUserPermissions', () => {
           single: { id: 'u1', rol: 'user', activo: false },
         },
       },
-      { data: { user: { email: 'Beta@BSOP.TEST' } } },
+      { data: { user: { email: 'Beta@BSOP.TEST' } } }
     );
     const perms = await fetchUserPermissions(
-      supabase as unknown as Parameters<typeof fetchUserPermissions>[0],
+      supabase as unknown as Parameters<typeof fetchUserPermissions>[0]
     );
     // email is preserved (lowercased) and the rest is the empty shape.
     expect(perms.email).toBe('beta@bsop.test');
@@ -477,10 +476,10 @@ describe('fetchUserPermissions', () => {
       {
         'core.usuarios': { single: { id: 'u1', rol: 'admin', activo: true } },
       },
-      { data: { user: { email: 'Boss@BSOP.Test' } } },
+      { data: { user: { email: 'Boss@BSOP.Test' } } }
     );
     const perms = await fetchUserPermissions(
-      supabase as unknown as Parameters<typeof fetchUserPermissions>[0],
+      supabase as unknown as Parameters<typeof fetchUserPermissions>[0]
     );
     expect(perms.isAdmin).toBe(true);
     expect(perms.email).toBe('boss@bsop.test');
@@ -489,10 +488,10 @@ describe('fetchUserPermissions', () => {
   it('returns empty when there is no core.usuarios row for the email', async () => {
     const supabase = makeSupabaseMock(
       { 'core.usuarios': { single: null } },
-      { data: { user: { email: 'ghost@bsop.test' } } },
+      { data: { user: { email: 'ghost@bsop.test' } } }
     );
     const perms = await fetchUserPermissions(
-      supabase as unknown as Parameters<typeof fetchUserPermissions>[0],
+      supabase as unknown as Parameters<typeof fetchUserPermissions>[0]
     );
     // ...email still populated because the function returns { ...empty, email }.
     expect(perms.email).toBe('ghost@bsop.test');
@@ -521,11 +520,11 @@ describe('fetchUserPermissions', () => {
         'core.permisos_usuario_excepcion': { data: [] },
         'core.empresas': { data: [{ id: 'e-rdb', slug: 'rdb' }] },
       },
-      { data: { user: { email: 'alice@bsop.test' } } },
+      { data: { user: { email: 'alice@bsop.test' } } }
     );
 
     const perms = await fetchUserPermissions(
-      supabase as unknown as Parameters<typeof fetchUserPermissions>[0],
+      supabase as unknown as Parameters<typeof fetchUserPermissions>[0]
     );
 
     expect(perms.isAdmin).toBe(false);
@@ -586,11 +585,11 @@ describe('fetchUserPermissions', () => {
         },
         'core.empresas': { data: [{ id: 'e-rdb', slug: 'rdb' }] },
       },
-      { data: { user: { email: 'alice@bsop.test' } } },
+      { data: { user: { email: 'alice@bsop.test' } } }
     );
 
     const perms = await fetchUserPermissions(
-      supabase as unknown as Parameters<typeof fetchUserPermissions>[0],
+      supabase as unknown as Parameters<typeof fetchUserPermissions>[0]
     );
 
     expect(perms.modulos.get('rdb.ventas')).toEqual({ read: true, write: false });

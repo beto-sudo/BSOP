@@ -23,7 +23,9 @@ test.describe('RDB › Ventas', () => {
 
   test('page renders without crash', async ({ page }) => {
     // No Next.js error overlay
-    await expect(page.locator('[data-nextjs-dialog]')).not.toBeVisible({ timeout: 3000 }).catch(() => {});
+    await expect(page.locator('[data-nextjs-dialog]'))
+      .not.toBeVisible({ timeout: 3000 })
+      .catch(() => {});
     // Body has content
     const bodyText = await page.evaluate(() => document.body.innerText.trim());
     expect(bodyText.length).toBeGreaterThan(0);
@@ -31,13 +33,21 @@ test.describe('RDB › Ventas', () => {
 
   test('has a search input', async ({ page }) => {
     // Wait for skeletons to finish
-    await page.locator('[class*="skeleton"], [data-slot="skeleton"]').first().waitFor({ state: 'hidden', timeout: 6000 }).catch(() => {});
+    await page
+      .locator('[class*="skeleton"], [data-slot="skeleton"]')
+      .first()
+      .waitFor({ state: 'hidden', timeout: 6000 })
+      .catch(() => {});
     const input = page.locator('input[placeholder]').first();
     await expect(input).toBeVisible({ timeout: 5000 });
   });
 
   test('has a refresh button', async ({ page }) => {
-    await page.locator('[class*="skeleton"]').first().waitFor({ state: 'hidden', timeout: 6000 }).catch(() => {});
+    await page
+      .locator('[class*="skeleton"]')
+      .first()
+      .waitFor({ state: 'hidden', timeout: 6000 })
+      .catch(() => {});
     // RefreshCw icon — Playwright finds it via SVG path or parent button
     // We look for any button that contains an SVG (icon button)
     const iconButtons = page.locator('button').filter({ has: page.locator('svg') });
@@ -49,10 +59,7 @@ test.describe('RDB › Ventas', () => {
     const table = page.locator('table');
     const denied = page.getByText('Acceso restringido');
 
-    const [tableCount, deniedCount] = await Promise.all([
-      table.count(),
-      denied.count(),
-    ]);
+    const [tableCount, deniedCount] = await Promise.all([table.count(), denied.count()]);
 
     expect(tableCount + deniedCount).toBeGreaterThan(0);
   });

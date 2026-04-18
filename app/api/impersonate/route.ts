@@ -25,15 +25,19 @@ export async function GET(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() { return cookieStore.getAll(); },
+        getAll() {
+          return cookieStore.getAll();
+        },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
         },
       },
-    },
+    }
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user?.email) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
@@ -87,7 +91,10 @@ export async function GET(req: NextRequest) {
         .select('empresa_id, rol_id')
         .eq('usuario_id', targetUser.id),
       admin.schema('core').from('modulos').select('id, slug'),
-      admin.schema('core').from('permisos_rol').select('rol_id, modulo_id, acceso_lectura, acceso_escritura'),
+      admin
+        .schema('core')
+        .from('permisos_rol')
+        .select('rol_id, modulo_id, acceso_lectura, acceso_escritura'),
       admin
         .schema('core')
         .from('permisos_usuario_excepcion')

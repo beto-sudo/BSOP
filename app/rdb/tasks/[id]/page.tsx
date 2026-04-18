@@ -1,23 +1,29 @@
 'use client';
 
+/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect --
+ * Cleanup PR (#30): pre-existing debt. `any` in Supabase row mapping;
+ * set-state-in-effect in data-sync pattern. Both are behavioral rewrites,
+ * out of scope for bulk lint cleanup.
+ */
+
 import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
-import {
-  Sheet, SheetContent, SheetHeader, SheetTitle,
-} from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
-import {
-  ArrowLeft, Loader2, Save, Pencil, X, Check, AlertTriangle, Plus,
-} from 'lucide-react';
+import { ArrowLeft, Loader2, Save, Pencil, X, Check, AlertTriangle, Plus } from 'lucide-react';
 
 const EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
 
@@ -53,28 +59,37 @@ type TaskUpdate = {
 };
 
 const ESTADO_CONFIG: Record<ErpTask['estado'], { label: string; cls: string }> = {
-  pendiente:   { label: 'Pendiente',   cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
+  pendiente: { label: 'Pendiente', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
   en_progreso: { label: 'En progreso', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
-  bloqueado:   { label: 'Bloqueado',   cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
-  completado:  { label: 'Completado',  cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
-  cancelado:   { label: 'Cancelado',   cls: 'bg-[var(--border)]/60 text-[var(--text)]/40 border-[var(--border)]' },
+  bloqueado: { label: 'Bloqueado', cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
+  completado: { label: 'Completado', cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
+  cancelado: {
+    label: 'Cancelado',
+    cls: 'bg-[var(--border)]/60 text-[var(--text)]/40 border-[var(--border)]',
+  },
 };
 
 const PRIORIDAD_CONFIG: Record<string, { label: string; cls: string }> = {
   Urgente: { label: 'Urgente', cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
-  Alta:    { label: 'Alta',    cls: 'bg-orange-500/15 text-orange-400 border-orange-500/20' },
-  Media:   { label: 'Media',   cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
-  Baja:    { label: 'Baja',    cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
+  Alta: { label: 'Alta', cls: 'bg-orange-500/15 text-orange-400 border-orange-500/20' },
+  Media: { label: 'Media', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
+  Baja: { label: 'Baja', cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
 };
 
 const PRIORIDAD_OPTIONS = ['Urgente', 'Alta', 'Media', 'Baja'] as const;
 
 const TIPO_UPDATE_CONFIG: Record<string, { label: string; cls: string }> = {
-  avance:             { label: 'Avance',      cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
-  cambio_estado:      { label: 'Estado',      cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
-  cambio_fecha:       { label: 'Fecha',       cls: 'bg-purple-500/15 text-purple-400 border-purple-500/20' },
-  nota:               { label: 'Nota',        cls: 'bg-[var(--border)]/60 text-[var(--text)]/60 border-[var(--border)]' },
-  cambio_responsable: { label: 'Responsable', cls: 'bg-teal-500/15 text-teal-400 border-teal-500/20' },
+  avance: { label: 'Avance', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
+  cambio_estado: { label: 'Estado', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
+  cambio_fecha: { label: 'Fecha', cls: 'bg-purple-500/15 text-purple-400 border-purple-500/20' },
+  nota: {
+    label: 'Nota',
+    cls: 'bg-[var(--border)]/60 text-[var(--text)]/60 border-[var(--border)]',
+  },
+  cambio_responsable: {
+    label: 'Responsable',
+    cls: 'bg-teal-500/15 text-teal-400 border-teal-500/20',
+  },
 };
 
 function formatDate(dateStr: string | null) {
@@ -87,7 +102,11 @@ function formatDateTime(dateStr: string | null) {
   if (!dateStr) return '—';
   const d = new Date(dateStr);
   return d.toLocaleString('es-MX', {
-    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   });
 }
 
@@ -142,12 +161,14 @@ function TaskDetailInner() {
       (empRes ?? []).map((e: any) => ({
         id: e.id,
         nombre: [e.persona?.nombre, e.persona?.apellido_paterno].filter(Boolean).join(' '),
-      })),
+      }))
     );
   }, [supabase]);
 
   const fetchCurrentUser = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user?.email) return;
     const { data: coreUser } = await supabase
       .schema('core')
@@ -184,15 +205,20 @@ function TaskDetailInner() {
 
     if (updatesData && updatesData.length > 0) {
       const userIds = [...new Set(updatesData.map((u: any) => u.creado_por).filter(Boolean))];
-      const { data: usersData } = userIds.length > 0
-        ? await supabase.schema('core').from('usuarios').select('id, first_name').in('id', userIds)
-        : { data: [] };
+      const { data: usersData } =
+        userIds.length > 0
+          ? await supabase
+              .schema('core')
+              .from('usuarios')
+              .select('id, first_name')
+              .in('id', userIds)
+          : { data: [] };
       const userMap = new Map((usersData ?? []).map((u: any) => [u.id, u.first_name]));
       setTaskUpdates(
         updatesData.map((u: any) => ({
           ...u,
           usuario: u.creado_por ? { nombre: userMap.get(u.creado_por) ?? 'Usuario' } : null,
-        })),
+        }))
       );
     } else {
       setTaskUpdates([]);
@@ -211,7 +237,9 @@ function TaskDetailInner() {
       if (!cancelled) setLoading(false);
     };
     void init();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [fetchRefData, fetchTask, fetchUpdates, fetchCurrentUser]);
 
   useEffect(() => {
@@ -236,7 +264,7 @@ function TaskDetailInner() {
       setSaving(false);
       if (!err && data) setTask(data as ErpTask);
     },
-    [supabase, task],
+    [supabase, task]
   );
 
   const saveTitulo = async () => {
@@ -383,7 +411,9 @@ function TaskDetailInner() {
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
-                <span className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-xs font-semibold ${estadoCfg.cls}`}>
+                <span
+                  className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-xs font-semibold ${estadoCfg.cls}`}
+                >
                   {estadoCfg.label}
                 </span>
                 {task.entidad_tipo && (
@@ -394,7 +424,10 @@ function TaskDetailInner() {
               </div>
               {!editingTitulo && (
                 <button
-                  onClick={() => { setTituloVal(task.titulo); setEditingTitulo(true); }}
+                  onClick={() => {
+                    setTituloVal(task.titulo);
+                    setEditingTitulo(true);
+                  }}
                   className="shrink-0 rounded-lg p-1.5 text-[var(--text)]/30 transition hover:bg-[var(--panel)] hover:text-[var(--text)]"
                 >
                   <Pencil className="h-3.5 w-3.5" />
@@ -414,15 +447,26 @@ function TaskDetailInner() {
                   }}
                   className="flex-1 rounded-xl border-[var(--border)] bg-[var(--panel)] text-lg font-semibold text-[var(--text)]"
                 />
-                <Button size="sm" onClick={saveTitulo} className="rounded-xl bg-[var(--accent)] text-white">
+                <Button
+                  size="sm"
+                  onClick={saveTitulo}
+                  className="rounded-xl bg-[var(--accent)] text-white"
+                >
                   <Check className="h-4 w-4" />
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => setEditingTitulo(false)} className="rounded-xl border-[var(--border)]">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setEditingTitulo(false)}
+                  className="rounded-xl border-[var(--border)]"
+                >
                   <X className="h-4 w-4" />
                 </Button>
               </div>
             ) : (
-              <h1 className="text-xl font-semibold text-[var(--text)] leading-snug">{task.titulo}</h1>
+              <h1 className="text-xl font-semibold text-[var(--text)] leading-snug">
+                {task.titulo}
+              </h1>
             )}
           </div>
 
@@ -432,7 +476,10 @@ function TaskDetailInner() {
               <FieldLabel>Descripción</FieldLabel>
               {!editingDesc && (
                 <button
-                  onClick={() => { setDescVal(task.descripcion ?? ''); setEditingDesc(true); }}
+                  onClick={() => {
+                    setDescVal(task.descripcion ?? '');
+                    setEditingDesc(true);
+                  }}
                   className="rounded-lg p-1.5 text-[var(--text)]/30 transition hover:bg-[var(--panel)] hover:text-[var(--text)]"
                 >
                   <Pencil className="h-3.5 w-3.5" />
@@ -451,11 +498,20 @@ function TaskDetailInner() {
                   className="resize-none rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
                 />
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={saveDesc} className="gap-1.5 rounded-xl bg-[var(--accent)] text-white">
+                  <Button
+                    size="sm"
+                    onClick={saveDesc}
+                    className="gap-1.5 rounded-xl bg-[var(--accent)] text-white"
+                  >
                     <Save className="h-3.5 w-3.5" />
                     Guardar
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => setEditingDesc(false)} className="rounded-xl border-[var(--border)]">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setEditingDesc(false)}
+                    className="rounded-xl border-[var(--border)]"
+                  >
                     Cancelar
                   </Button>
                 </div>
@@ -466,7 +522,10 @@ function TaskDetailInner() {
               </p>
             ) : (
               <button
-                onClick={() => { setDescVal(''); setEditingDesc(true); }}
+                onClick={() => {
+                  setDescVal('');
+                  setEditingDesc(true);
+                }}
                 className="text-sm italic text-[var(--text)]/35 hover:text-[var(--text)]/55 transition-colors"
               >
                 Sin descripción. Haz clic para agregar.
@@ -501,9 +560,14 @@ function TaskDetailInner() {
                 {taskUpdates.map((u) => {
                   const tc = TIPO_UPDATE_CONFIG[u.tipo] ?? { label: u.tipo, cls: '' };
                   return (
-                    <div key={u.id} className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2.5">
+                    <div
+                      key={u.id}
+                      className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2.5"
+                    >
                       <div className="mb-1.5 flex items-center gap-2 flex-wrap">
-                        <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[10px] font-medium ${tc.cls}`}>
+                        <span
+                          className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[10px] font-medium ${tc.cls}`}
+                        >
                           {tc.label}
                         </span>
                         <span className="text-[10px] text-[var(--text)]/40">
@@ -514,7 +578,9 @@ function TaskDetailInner() {
                         </span>
                       </div>
                       {u.contenido && (
-                        <p className="whitespace-pre-wrap text-sm text-[var(--text)]/80">{u.contenido}</p>
+                        <p className="whitespace-pre-wrap text-sm text-[var(--text)]/80">
+                          {u.contenido}
+                        </p>
                       )}
                       {u.valor_anterior != null && u.valor_nuevo != null && (
                         <p className="text-xs text-[var(--text)]/50 mt-1">
@@ -542,14 +608,18 @@ function TaskDetailInner() {
             >
               <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
                 <SelectValue>
-                  <span className={`inline-flex items-center gap-1.5 ${estadoCfg.cls.includes('text-') ? estadoCfg.cls.split(' ').find((c: string) => c.startsWith('text-')) : ''}`}>
+                  <span
+                    className={`inline-flex items-center gap-1.5 ${estadoCfg.cls.includes('text-') ? estadoCfg.cls.split(' ').find((c: string) => c.startsWith('text-')) : ''}`}
+                  >
                     {estadoCfg.label}
                   </span>
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {Object.entries(ESTADO_CONFIG).map(([k, v]) => (
-                  <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                  <SelectItem key={k} value={k}>
+                    {v.label}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -566,7 +636,9 @@ function TaskDetailInner() {
                 <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
                   <SelectValue placeholder="Sin prioridad">
                     {task.prioridad ? (
-                      <span className={`inline-flex items-center gap-1.5 ${PRIORIDAD_CONFIG[task.prioridad]?.cls.split(' ').find((c: string) => c.startsWith('text-')) ?? ''}`}>
+                      <span
+                        className={`inline-flex items-center gap-1.5 ${PRIORIDAD_CONFIG[task.prioridad]?.cls.split(' ').find((c: string) => c.startsWith('text-')) ?? ''}`}
+                      >
                         {task.prioridad}
                       </span>
                     ) : (
@@ -577,7 +649,9 @@ function TaskDetailInner() {
                 <SelectContent>
                   <SelectItem value="">Sin prioridad</SelectItem>
                   {PRIORIDAD_OPTIONS.map((p) => (
-                    <SelectItem key={p} value={p}>{p}</SelectItem>
+                    <SelectItem key={p} value={p}>
+                      {p}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -593,15 +667,19 @@ function TaskDetailInner() {
               >
                 <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
                   <SelectValue placeholder="Sin asignar">
-                    {asignado
-                      ? asignado.nombre
-                      : <span className="text-[var(--text)]/40">Sin asignar</span>}
+                    {asignado ? (
+                      asignado.nombre
+                    ) : (
+                      <span className="text-[var(--text)]/40">Sin asignar</span>
+                    )}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">Sin asignar</SelectItem>
                   {empleados.map((e) => (
-                    <SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>
+                    <SelectItem key={e.id} value={e.id}>
+                      {e.nombre}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -631,7 +709,9 @@ function TaskDetailInner() {
                         style={{ width: `${task.porcentaje_avance}%` }}
                       />
                     </div>
-                    <span className="text-xs font-medium text-[var(--text)]/60">{task.porcentaje_avance}%</span>
+                    <span className="text-xs font-medium text-[var(--text)]/60">
+                      {task.porcentaje_avance}%
+                    </span>
                   </div>
                 </div>
               </>
@@ -685,7 +765,9 @@ function TaskDetailInner() {
                 <SelectContent>
                   <SelectItem value="">Sin cambio</SelectItem>
                   {Object.entries(ESTADO_CONFIG).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                    <SelectItem key={k} value={k}>
+                      {v.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -703,10 +785,17 @@ function TaskDetailInner() {
 
             <Button
               onClick={handleSendUpdate}
-              disabled={sendingUpdate || (!updateForm.contenido.trim() && !updateForm.nuevoEstado && !updateForm.nuevaFecha)}
+              disabled={
+                sendingUpdate ||
+                (!updateForm.contenido.trim() && !updateForm.nuevoEstado && !updateForm.nuevaFecha)
+              }
               className="w-full gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60"
             >
-              {sendingUpdate ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {sendingUpdate ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
               Guardar avance
             </Button>
           </div>

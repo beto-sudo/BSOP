@@ -25,13 +25,23 @@ export function HeroVitals({ heroCards }: { heroCards: HeroCard[] }) {
                   <div className={`rounded-2xl border p-3 ${card.tone}`}>
                     <Icon className="h-5 w-5" />
                   </div>
-                  <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted-foreground)] dark:text-white/35">{card.label}</div>
+                  <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted-foreground)] dark:text-white/35">
+                    {card.label}
+                  </div>
                 </div>
                 <div className="mt-6 flex items-end gap-2">
-                  <div className="text-3xl font-semibold text-[var(--text)] dark:text-white">{card.value}</div>
-                  {card.unit ? <div className="pb-1 text-sm text-[var(--muted-foreground)] dark:text-white/45">{card.unit}</div> : null}
+                  <div className="text-3xl font-semibold text-[var(--text)] dark:text-white">
+                    {card.value}
+                  </div>
+                  {card.unit ? (
+                    <div className="pb-1 text-sm text-[var(--muted-foreground)] dark:text-white/45">
+                      {card.unit}
+                    </div>
+                  ) : null}
                 </div>
-                <div className="mt-3 text-sm text-[var(--muted-foreground)] dark:text-white/55">{card.helper}</div>
+                <div className="mt-3 text-sm text-[var(--muted-foreground)] dark:text-white/55">
+                  {card.helper}
+                </div>
               </Surface>
             );
           })}

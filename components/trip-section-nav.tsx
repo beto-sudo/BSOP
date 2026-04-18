@@ -32,7 +32,7 @@ export function TripSectionNav({ items }: { items: TripSectionNavItem[] }) {
       {
         rootMargin: '-120px 0px -55% 0px',
         threshold: [0.2, 0.4, 0.6],
-      },
+      }
     );
 
     sections.forEach((section) => observer.observe(section));

@@ -17,9 +17,7 @@ export function skipIfNoAuth(testInfo: TestInfo) {
       origins?: Array<{ localStorage?: unknown[] }>;
     };
     const hasCookies = (state.cookies?.length ?? 0) > 0;
-    const hasStorage = (state.origins ?? []).some(
-      (o) => (o.localStorage?.length ?? 0) > 0
-    );
+    const hasStorage = (state.origins ?? []).some((o) => (o.localStorage?.length ?? 0) > 0);
     hasAuth = hasCookies || hasStorage;
   } catch {
     /* file doesn't exist yet */

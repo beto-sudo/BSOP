@@ -1,5 +1,10 @@
 'use client';
 
+/* eslint-disable react-hooks/set-state-in-effect --
+ * Cleanup PR (#30): pre-existing data-sync pattern flagged by the new React
+ * hook rule. Rewriting changes render semantics — out of scope for lint cleanup.
+ */
+
 import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
@@ -37,7 +42,14 @@ import {
 } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -104,10 +116,7 @@ const TIPO_OPTIONS: { value: TipoUI; label: string; desc: string }[] = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function mapTipoToDb(
-  tipo: TipoUI,
-  cantidad: number,
-): { tipoDB: string; cantidadSigned: number } {
+function mapTipoToDb(tipo: TipoUI, cantidad: number): { tipoDB: string; cantidadSigned: number } {
   const abs = Math.abs(cantidad);
   switch (tipo) {
     case 'ajuste_positivo':
@@ -197,9 +206,7 @@ function SummaryBar({ items }: { items: StockItem[] }) {
           <TrendingUp className="h-3.5 w-3.5" />
           Valor Inventario
         </div>
-        <div className="mt-1 text-2xl font-semibold tabular-nums">
-          {formatCurrency(totalValue)}
-        </div>
+        <div className="mt-1 text-2xl font-semibold tabular-nums">{formatCurrency(totalValue)}</div>
       </div>
     </div>
   );
@@ -226,7 +233,9 @@ function StockDetailDrawer({
       supabase
         .schema('erp')
         .from('movimientos_inventario')
-        .select('id, producto_id, tipo_movimiento, cantidad, costo_unitario, referencia_tipo, notas, created_at')
+        .select(
+          'id, producto_id, tipo_movimiento, cantidad, costo_unitario, referencia_tipo, notas, created_at'
+        )
         .eq('empresa_id', RDB_EMPRESA_ID)
         .eq('producto_id', item.id)
         .order('created_at', { ascending: false })
@@ -244,10 +253,19 @@ function StockDetailDrawer({
 
   if (!item) return null;
   return (
-    <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Sheet
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <SheetContent className="sm:max-w-[600px]">
         {/* Membrete solo para impresión */}
-        <img src="/membrete-rdb.jpg" alt="Membrete Rincón del Bosque" className="hidden print:block w-full object-contain mb-6" />
+        <img
+          src="/membrete-rdb.jpg"
+          alt="Membrete Rincón del Bosque"
+          className="hidden print:block w-full object-contain mb-6"
+        />
         <SheetHeader>
           <SheetTitle>{item.nombre}</SheetTitle>
           <SheetDescription>
@@ -282,7 +300,9 @@ function StockDetailDrawer({
               </div>
               <div className="rounded-lg border bg-muted/40 px-3 py-2.5">
                 <div className="text-xs text-muted-foreground">Stock Actual</div>
-                <div className={`mt-1 text-lg font-semibold tabular-nums${item.bajo_minimo ? ' text-amber-500' : ''}`}>
+                <div
+                  className={`mt-1 text-lg font-semibold tabular-nums${item.bajo_minimo ? ' text-amber-500' : ''}`}
+                >
                   {item.stock_actual}
                 </div>
               </div>
@@ -340,11 +360,29 @@ function StockDetailDrawer({
                             {formatDate(mov.created_at).split(',')[0]}
                           </TableCell>
                           <TableCell className="text-sm">
-                            <div className="font-medium">{tipoLabel(mov.tipo_movimiento, mov.cantidad)}</div>
-                            {mov.notas && <div className="text-xs text-muted-foreground truncate max-w-[120px]">{mov.notas}</div>}
+                            <div className="font-medium">
+                              {tipoLabel(mov.tipo_movimiento, mov.cantidad)}
+                            </div>
+                            {mov.notas && (
+                              <div className="text-xs text-muted-foreground truncate max-w-[120px]">
+                                {mov.notas}
+                              </div>
+                            )}
                           </TableCell>
-                          <TableCell className={["text-right font-medium tabular-nums", mov.tipo_movimiento === 'entrada' || (mov.tipo_movimiento === 'ajuste' && mov.cantidad >= 0) ? 'text-emerald-600' : 'text-destructive'].join(" ")}>
-                            {mov.tipo_movimiento === 'entrada' || (mov.tipo_movimiento === 'ajuste' && mov.cantidad >= 0) ? '+' : '−'}{Math.abs(mov.cantidad)}
+                          <TableCell
+                            className={[
+                              'text-right font-medium tabular-nums',
+                              mov.tipo_movimiento === 'entrada' ||
+                              (mov.tipo_movimiento === 'ajuste' && mov.cantidad >= 0)
+                                ? 'text-emerald-600'
+                                : 'text-destructive',
+                            ].join(' ')}
+                          >
+                            {mov.tipo_movimiento === 'entrada' ||
+                            (mov.tipo_movimiento === 'ajuste' && mov.cantidad >= 0)
+                              ? '+'
+                              : '−'}
+                            {Math.abs(mov.cantidad)}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -431,9 +469,7 @@ function RegistrarMovimientoDialog({
       onSuccess();
       onClose();
     } catch (e: unknown) {
-      setFormError(
-        e instanceof Error ? e.message : 'Error al registrar movimiento',
-      );
+      setFormError(e instanceof Error ? e.message : 'Error al registrar movimiento');
     } finally {
       setSaving(false);
     }
@@ -442,7 +478,12 @@ function RegistrarMovimientoDialog({
   const tipoSeleccionado = TIPO_OPTIONS.find((t) => t.value === tipo);
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Registrar Movimiento</DialogTitle>
@@ -456,15 +497,20 @@ function RegistrarMovimientoDialog({
             <Popover open={productoPopoverOpen} onOpenChange={setProductoPopoverOpen}>
               <PopoverTrigger
                 render={
-                  <Button variant="outline" role="combobox"
+                  <Button
+                    variant="outline"
+                    role="combobox"
                     aria-expanded={productoPopoverOpen}
-                    className="w-full justify-between font-normal" />
+                    className="w-full justify-between font-normal"
+                  />
                 }
               >
                 <span className="truncate">
-                  {productoId
-                    ? productos.find(p => p.id === productoId)?.nombre ?? 'Seleccionar…'
-                    : <span className="text-muted-foreground">Seleccionar producto…</span>}
+                  {productoId ? (
+                    (productos.find((p) => p.id === productoId)?.nombre ?? 'Seleccionar…')
+                  ) : (
+                    <span className="text-muted-foreground">Seleccionar producto…</span>
+                  )}
                 </span>
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </PopoverTrigger>
@@ -476,14 +522,29 @@ function RegistrarMovimientoDialog({
                     <CommandGroup>
                       {productos
                         .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
-                        .map(p => (
-                          <CommandItem key={p.id} value={p.nombre}
-                            onSelect={() => { setProductoId(p.id); setProductoPopoverOpen(false); }}
+                        .map((p) => (
+                          <CommandItem
+                            key={p.id}
+                            value={p.nombre}
+                            onSelect={() => {
+                              setProductoId(p.id);
+                              setProductoPopoverOpen(false);
+                            }}
                           >
-                            <Check className={`mr-2 h-4 w-4 shrink-0 ${productoId === p.id ? 'opacity-100' : 'opacity-0'}`} />
+                            <Check
+                              className={`mr-2 h-4 w-4 shrink-0 ${productoId === p.id ? 'opacity-100' : 'opacity-0'}`}
+                            />
                             <span className="truncate">{p.nombre}</span>
-                            {p.bajo_minimo && <span className="ml-auto text-xs text-amber-500 shrink-0">⚠ bajo mínimo</span>}
-                            {p.categoria && !p.bajo_minimo && <span className="ml-auto text-xs text-muted-foreground shrink-0">{p.categoria}</span>}
+                            {p.bajo_minimo && (
+                              <span className="ml-auto text-xs text-amber-500 shrink-0">
+                                ⚠ bajo mínimo
+                              </span>
+                            )}
+                            {p.categoria && !p.bajo_minimo && (
+                              <span className="ml-auto text-xs text-muted-foreground shrink-0">
+                                {p.categoria}
+                              </span>
+                            )}
                           </CommandItem>
                         ))}
                     </CommandGroup>
@@ -529,8 +590,7 @@ function RegistrarMovimientoDialog({
           {/* Notas */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">
-              Notas / Motivo{' '}
-              <span className="font-normal text-muted-foreground">(opcional)</span>
+              Notas / Motivo <span className="font-normal text-muted-foreground">(opcional)</span>
             </label>
             <textarea
               className="w-full min-h-[80px] resize-none rounded-lg border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -547,12 +607,7 @@ function RegistrarMovimientoDialog({
           )}
 
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={saving}
-            >
+            <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
               Cancelar
             </Button>
             <Button type="submit" disabled={saving}>
@@ -640,7 +695,9 @@ export default function InventarioPage() {
       const { data, error } = await supabase
         .schema('erp')
         .from('movimientos_inventario')
-        .select('id, producto_id, tipo_movimiento, cantidad, costo_unitario, referencia_tipo, notas, created_at, productos(nombre)')
+        .select(
+          'id, producto_id, tipo_movimiento, cantidad, costo_unitario, referencia_tipo, notas, created_at, productos(nombre)'
+        )
         .eq('empresa_id', RDB_EMPRESA_ID)
         .order('created_at', { ascending: false })
         .limit(300);
@@ -648,9 +705,7 @@ export default function InventarioPage() {
       setMovimientos((data ?? []) as unknown as MovimientoRow[]);
       setKardexLoaded(true);
     } catch (e: unknown) {
-      setErrorMovimientos(
-        e instanceof Error ? e.message : 'Error al cargar movimientos',
-      );
+      setErrorMovimientos(e instanceof Error ? e.message : 'Error al cargar movimientos');
     } finally {
       setLoadingMovimientos(false);
     }
@@ -684,18 +739,32 @@ export default function InventarioPage() {
   };
 
   const fechaLabel = fechaCorte
-    ? new Date(fechaCorte + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })
+    ? new Date(fechaCorte + 'T12:00:00').toLocaleDateString('es-MX', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+      })
     : null;
 
   const handlePrintLista = (stock: StockItem[]) => {
     const totalValor = stock.reduce((s, i) => s + Math.max(0, Number(i.valor_inventario) || 0), 0);
-    const fecha = fechaLabel ?? new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
+    const fecha =
+      fechaLabel ??
+      new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
 
     // Solo productos con stock > 0 (excluir ceros y negativos del impreso — para contabilidad)
-    const stockPositivo = stock.filter(i => Number(i.stock_actual) > 0);
+    const stockPositivo = stock.filter((i) => Number(i.stock_actual) > 0);
 
     // Agrupar por categoría para el resumen final
-    const catOrder = ['Licores','Bebidas','Alimentos','Consumibles','Artículos','Deportes','Propinas'];
+    const catOrder = [
+      'Licores',
+      'Bebidas',
+      'Alimentos',
+      'Consumibles',
+      'Artículos',
+      'Deportes',
+      'Propinas',
+    ];
     const catMap: Record<string, { count: number; valor: number }> = {};
     for (const item of stockPositivo) {
       const cat = item.categoria ?? 'Sin categoría';
@@ -704,24 +773,31 @@ export default function InventarioPage() {
       catMap[cat].valor += Number(item.valor_inventario) || 0;
     }
     const catEntries = [
-      ...catOrder.filter(c => catMap[c]).map(c => [c, catMap[c]] as [string, {count:number;valor:number}]),
+      ...catOrder
+        .filter((c) => catMap[c])
+        .map((c) => [c, catMap[c]] as [string, { count: number; valor: number }]),
       ...Object.entries(catMap).filter(([c]) => !catOrder.includes(c)),
     ];
 
-    const catRows = catEntries.map(([cat, s]) => `
+    const catRows = catEntries
+      .map(
+        ([cat, s]) => `
       <tr>
         <td>${cat}</td>
         <td class="num">${s.count}</td>
         <td class="num">$${s.valor.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
       </tr>
-    `).join('');
+    `
+      )
+      .join('');
 
-    const rows = stockPositivo.map((item) => {
-      const sinStock = item.stock_actual <= 0;
-      const bajoMin = item.bajo_minimo;
-      const estadoText = sinStock ? 'Sin stock' : bajoMin ? 'Bajo mínimo' : '✓';
-      const estadoClass = sinStock ? 'estado-sin-stock' : bajoMin ? 'estado-bajo' : 'estado-ok';
-      return `
+    const rows = stockPositivo
+      .map((item) => {
+        const sinStock = item.stock_actual <= 0;
+        const bajoMin = item.bajo_minimo;
+        const estadoText = sinStock ? 'Sin stock' : bajoMin ? 'Bajo mínimo' : '✓';
+        const estadoClass = sinStock ? 'estado-sin-stock' : bajoMin ? 'estado-bajo' : 'estado-ok';
+        return `
       <tr>
         <td>${item.nombre}</td>
         <td>${item.categoria ?? '—'}</td>
@@ -731,7 +807,9 @@ export default function InventarioPage() {
         <td class="num">${item.valor_inventario != null ? '$' + Number(item.valor_inventario).toLocaleString('es-MX', { minimumFractionDigits: 2 }) : '—'}</td>
         <td class="nowrap ${estadoClass}">${estadoText}</td>
       </tr>
-    `}).join('');
+    `;
+      })
+      .join('');
 
     const html = `<!DOCTYPE html>
 <html lang="es">
@@ -836,7 +914,9 @@ export default function InventarioPage() {
     win.document.write(html);
     win.document.close();
     win.focus();
-    setTimeout(() => { win.print(); }, 400);
+    setTimeout(() => {
+      win.print();
+    }, 400);
   };
 
   const handleSuccess = () => {
@@ -852,10 +932,7 @@ export default function InventarioPage() {
     if (clasificacionFiltro && i.clasificacion !== clasificacionFiltro) return false;
     if (!search) return true;
     const q = search.toLowerCase();
-    return (
-      i.nombre.toLowerCase().includes(q) ||
-      (i.categoria ?? '').toLowerCase().includes(q)
-    );
+    return i.nombre.toLowerCase().includes(q) || (i.categoria ?? '').toLowerCase().includes(q);
   });
 
   const filteredMovimientos = movimientos.filter((m) => {
@@ -872,437 +949,508 @@ export default function InventarioPage() {
 
   return (
     <RequireAccess empresa="rdb" modulo="rdb.inventario">
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Inventario</h1>
-          <p className="text-sm text-muted-foreground">Control de stock y movimientos</p>
-        </div>
-        <Button className="shrink-0 gap-2" onClick={() => setDialogOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Registrar Movimiento
-        </Button>
-      </div>
-
-      {/* Summary (stock tab only) */}
-      {tab === 'stock' && !loadingStock && !errorStock && (
-        <SummaryBar items={filteredStock} />
-      )}
-
-      {/* KPI cards por categoría */}
-      {tab === 'stock' && !loadingStock && !errorStock && (() => {
-        const cats = ['Alimentos','Bebidas','Licores','Artículos','Deportes','Consumibles','Propinas'];
-        type CatStat = { count: number; valor: number };
-        const stats = cats.reduce<Record<string,CatStat>>((acc, c) => {
-          acc[c] = { count: 0, valor: 0 };
-          return acc;
-        }, {});
-        for (const item of filteredStock) {
-          const c = item.categoria ?? 'Otros';
-          if (!stats[c]) stats[c] = { count: 0, valor: 0 };
-          stats[c].count++;
-          stats[c].valor += Number(item.valor_inventario) || 0;
-        }
-        const sorted = Object.entries(stats)
-          .filter(([, s]) => s.count > 0)
-          .sort((a, b) => b[1].valor - a[1].valor);
-        if (sorted.length === 0) return null;
-  return (
-          <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
-            {sorted.map(([cat, s]) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setCategoriaFiltro(categoriaFiltro === cat ? '' : cat)}
-                className={[
-                  'rounded-lg border px-3 py-2 text-left transition-colors hover:bg-muted/60',
-                  categoriaFiltro === cat ? 'border-primary bg-primary/10' : 'bg-card',
-                ].join(' ')}
-              >
-                <div className="text-xs font-medium text-muted-foreground truncate">{cat}</div>
-                <div className="mt-0.5 text-sm font-semibold tabular-nums">
-                  {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }).format(s.valor)}
-                </div>
-                <div className="text-xs text-muted-foreground">{s.count} prod.</div>
-              </button>
-            ))}
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Inventario</h1>
+            <p className="text-sm text-muted-foreground">Control de stock y movimientos</p>
           </div>
-        );
-      })()}
+          <Button className="shrink-0 gap-2" onClick={() => setDialogOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Registrar Movimiento
+          </Button>
+        </div>
 
-      {/* Tab toggle */}
-      <div className="flex w-fit gap-1 rounded-lg border bg-muted/30 p-1">
-        <button
-          type="button"
-          onClick={() => handleTabChange('stock')}
-          className={[
-            'flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-            tab === 'stock'
-              ? 'bg-background text-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground',
-          ].join(' ')}
-        >
-          <Boxes className="h-4 w-4" />
-          Stock Actual
-        </button>
-        <button
-          type="button"
-          onClick={() => handleTabChange('movimientos')}
-          className={[
-            'flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-            tab === 'movimientos'
-              ? 'bg-background text-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground',
-          ].join(' ')}
-        >
-          <ClipboardList className="h-4 w-4" />
-          Movimientos
-        </button>
-      </div>
+        {/* Summary (stock tab only) */}
+        {tab === 'stock' && !loadingStock && !errorStock && <SummaryBar items={filteredStock} />}
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative min-w-52">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder={
-              tab === 'stock' ? 'Buscar producto…' : 'Buscar producto o nota…'
+        {/* KPI cards por categoría */}
+        {tab === 'stock' &&
+          !loadingStock &&
+          !errorStock &&
+          (() => {
+            const cats = [
+              'Alimentos',
+              'Bebidas',
+              'Licores',
+              'Artículos',
+              'Deportes',
+              'Consumibles',
+              'Propinas',
+            ];
+            type CatStat = { count: number; valor: number };
+            const stats = cats.reduce<Record<string, CatStat>>((acc, c) => {
+              acc[c] = { count: 0, valor: 0 };
+              return acc;
+            }, {});
+            for (const item of filteredStock) {
+              const c = item.categoria ?? 'Otros';
+              if (!stats[c]) stats[c] = { count: 0, valor: 0 };
+              stats[c].count++;
+              stats[c].valor += Number(item.valor_inventario) || 0;
             }
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
+            const sorted = Object.entries(stats)
+              .filter(([, s]) => s.count > 0)
+              .sort((a, b) => b[1].valor - a[1].valor);
+            if (sorted.length === 0) return null;
+            return (
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+                {sorted.map(([cat, s]) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setCategoriaFiltro(categoriaFiltro === cat ? '' : cat)}
+                    className={[
+                      'rounded-lg border px-3 py-2 text-left transition-colors hover:bg-muted/60',
+                      categoriaFiltro === cat ? 'border-primary bg-primary/10' : 'bg-card',
+                    ].join(' ')}
+                  >
+                    <div className="text-xs font-medium text-muted-foreground truncate">{cat}</div>
+                    <div className="mt-0.5 text-sm font-semibold tabular-nums">
+                      {new Intl.NumberFormat('es-MX', {
+                        style: 'currency',
+                        currency: 'MXN',
+                        maximumFractionDigits: 0,
+                      }).format(s.valor)}
+                    </div>
+                    <div className="text-xs text-muted-foreground">{s.count} prod.</div>
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
+
+        {/* Tab toggle */}
+        <div className="flex w-fit gap-1 rounded-lg border bg-muted/30 p-1">
+          <button
+            type="button"
+            onClick={() => handleTabChange('stock')}
+            className={[
+              'flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+              tab === 'stock'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground',
+            ].join(' ')}
+          >
+            <Boxes className="h-4 w-4" />
+            Stock Actual
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTabChange('movimientos')}
+            className={[
+              'flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+              tab === 'movimientos'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground',
+            ].join(' ')}
+          >
+            <ClipboardList className="h-4 w-4" />
+            Movimientos
+          </button>
         </div>
 
-        {tab === 'stock' && (
-          <Button
-            variant={showServicios ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setShowServicios((v) => !v)}
-            className="gap-2"
-          >
-            <Boxes className="h-3.5 w-3.5" />
-            Ver no inventariables
-          </Button>
-        )}
-        
-        {tab === 'stock' && (
-          <Button
-            variant={showBajoMinimo ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setShowBajoMinimo((v) => !v)}
-            className="gap-2"
-          >
-            <AlertTriangle className="h-3.5 w-3.5" />
-            Solo bajo mínimo
-          </Button>
-        )}
-
-        {tab === 'stock' && (
-          <Select value={categoriaFiltro} onValueChange={(v) => setCategoriaFiltro(v ?? '')}>
-            <SelectTrigger className="w-40 h-8 text-sm">
-              <SelectValue placeholder="Categoría" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">Todas</SelectItem>
-              {['Alimentos','Bebidas','Licores','Artículos','Deportes','Consumibles','Propinas'].map(c => (
-                <SelectItem key={c} value={c}>{c}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-
-        {tab === 'stock' && (
-          <Select value={clasificacionFiltro} onValueChange={(v) => setClasificacionFiltro(v ?? '')}>
-            <SelectTrigger className="w-40 h-8 text-sm">
-              <SelectValue placeholder="Clasificación" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">Todas</SelectItem>
-              {['inventariable','consumible','merchandising','activo_fijo'].map(c => (
-                <SelectItem key={c} value={c}>{c}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-
-        {tab === 'stock' && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Al corte:</span>
-            <input
-              type="date"
-              max={new Date().toISOString().split('T')[0]}
-              value={fechaCorte ?? ''}
-              onChange={(e) => {
-                if (!e.target.value) {
-                  setFechaCorte(null);
-                  void fetchStock();
-                } else {
-                  setFechaCorte(e.target.value);
-                  void fetchStockHistorico(e.target.value);
-                }
-              }}
-              className="rounded-md border border-input bg-transparent px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative min-w-52">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder={tab === 'stock' ? 'Buscar producto…' : 'Buscar producto o nota…'}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
             />
-            {fechaCorte && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => { setFechaCorte(null); void fetchStock(); }}
-                className="text-xs h-7 px-2"
-              >
-                × Hoy
-              </Button>
-            )}
+          </div>
+
+          {tab === 'stock' && (
+            <Button
+              variant={showServicios ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setShowServicios((v) => !v)}
+              className="gap-2"
+            >
+              <Boxes className="h-3.5 w-3.5" />
+              Ver no inventariables
+            </Button>
+          )}
+
+          {tab === 'stock' && (
+            <Button
+              variant={showBajoMinimo ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setShowBajoMinimo((v) => !v)}
+              className="gap-2"
+            >
+              <AlertTriangle className="h-3.5 w-3.5" />
+              Solo bajo mínimo
+            </Button>
+          )}
+
+          {tab === 'stock' && (
+            <Select value={categoriaFiltro} onValueChange={(v) => setCategoriaFiltro(v ?? '')}>
+              <SelectTrigger className="w-40 h-8 text-sm">
+                <SelectValue placeholder="Categoría" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todas</SelectItem>
+                {[
+                  'Alimentos',
+                  'Bebidas',
+                  'Licores',
+                  'Artículos',
+                  'Deportes',
+                  'Consumibles',
+                  'Propinas',
+                ].map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {tab === 'stock' && (
+            <Select
+              value={clasificacionFiltro}
+              onValueChange={(v) => setClasificacionFiltro(v ?? '')}
+            >
+              <SelectTrigger className="w-40 h-8 text-sm">
+                <SelectValue placeholder="Clasificación" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todas</SelectItem>
+                {['inventariable', 'consumible', 'merchandising', 'activo_fijo'].map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {tab === 'stock' && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Al corte:</span>
+              <input
+                type="date"
+                max={new Date().toISOString().split('T')[0]}
+                value={fechaCorte ?? ''}
+                onChange={(e) => {
+                  if (!e.target.value) {
+                    setFechaCorte(null);
+                    void fetchStock();
+                  } else {
+                    setFechaCorte(e.target.value);
+                    void fetchStockHistorico(e.target.value);
+                  }
+                }}
+                className="rounded-md border border-input bg-transparent px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+              {fechaCorte && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setFechaCorte(null);
+                    void fetchStock();
+                  }}
+                  className="text-xs h-7 px-2"
+                >
+                  × Hoy
+                </Button>
+              )}
+            </div>
+          )}
+
+          <Button variant="outline" size="icon" onClick={handleRefresh} aria-label="Actualizar">
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </Button>
+
+          {tab === 'stock' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePrintLista(filteredStock)}
+              className="gap-2"
+            >
+              <Printer className="h-3.5 w-3.5" />
+              Imprimir lista
+            </Button>
+          )}
+
+          <span className="text-sm text-muted-foreground">
+            {isLoading
+              ? 'Cargando…'
+              : tab === 'stock'
+                ? `${filteredStock.length} producto${filteredStock.length !== 1 ? 's' : ''}`
+                : `${filteredMovimientos.length} movimiento${filteredMovimientos.length !== 1 ? 's' : ''}`}
+          </span>
+        </div>
+
+        {/* Error */}
+        {currentError && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {currentError}
           </div>
         )}
 
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={handleRefresh}
-          aria-label="Actualizar"
-        >
-          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-        </Button>
-
-        {tab === 'stock' && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handlePrintLista(filteredStock)}
-            className="gap-2"
-          >
-            <Printer className="h-3.5 w-3.5" />
-            Imprimir lista
-          </Button>
+        {/* Historical date banner */}
+        {fechaCorte && tab === 'stock' && (
+          <div className="flex items-center gap-2 rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-2 text-sm text-blue-600 dark:text-blue-400">
+            <span>📅</span>
+            <span>Inventario al cierre del {fechaLabel} — solo movimientos hasta esa fecha</span>
+          </div>
         )}
 
-        <span className="text-sm text-muted-foreground">
-          {isLoading
-            ? 'Cargando…'
-            : tab === 'stock'
-            ? `${filteredStock.length} producto${filteredStock.length !== 1 ? 's' : ''}`
-            : `${filteredMovimientos.length} movimiento${filteredMovimientos.length !== 1 ? 's' : ''}`}
-        </span>
-      </div>
-
-      {/* Error */}
-      {currentError && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {currentError}
-        </div>
-      )}
-
-      {/* Historical date banner */}
-      {fechaCorte && tab === 'stock' && (
-        <div className="flex items-center gap-2 rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-2 text-sm text-blue-600 dark:text-blue-400">
-          <span>📅</span>
-          <span>Inventario al cierre del {fechaLabel} — solo movimientos hasta esa fecha</span>
-        </div>
-      )}
-
-      {/* ── Stock Table ────────────────────────────────────────────────────── */}
-      {tab === 'stock' && (
-        <div className="rounded-xl border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <SortableHead sortKey="nombre" label="Producto" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-                <SortableHead sortKey="clasificacion" label="Clasif." currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-                <SortableHead sortKey="categoria" label="Categoría" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-                <SortableHead sortKey="stock_actual" label="Stock Actual" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="text-right" />
-                <SortableHead sortKey="stock_minimo" label="Mínimo" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="text-right" />
-                <SortableHead sortKey="ultimo_costo" label="Último Costo" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="text-right" />
-                <SortableHead sortKey="valor_inventario" label="Valor Total" currentSort={sortKey} currentDir={sortDir} onSort={onSort} className="text-right" />
-                <SortableHead sortKey="bajo_minimo" label="Estado" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loadingStock ? (
-                Array.from({ length: 8 }).map((_, i) => (
-                  <TableRow key={i}>
-                    {Array.from({ length: 8 }).map((__, j) => (
-                      <TableCell key={j}>
-                        <Skeleton className="h-4 w-full" />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              ) : filteredStock.length === 0 ? (
+        {/* ── Stock Table ────────────────────────────────────────────────────── */}
+        {tab === 'stock' && (
+          <div className="rounded-xl border bg-card">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell
-                    colSpan={8}
-                    className="py-12 text-center text-muted-foreground"
-                  >
-                    No se encontraron productos.
-                  </TableCell>
+                  <SortableHead
+                    sortKey="nombre"
+                    label="Producto"
+                    currentSort={sortKey}
+                    currentDir={sortDir}
+                    onSort={onSort}
+                  />
+                  <SortableHead
+                    sortKey="clasificacion"
+                    label="Clasif."
+                    currentSort={sortKey}
+                    currentDir={sortDir}
+                    onSort={onSort}
+                  />
+                  <SortableHead
+                    sortKey="categoria"
+                    label="Categoría"
+                    currentSort={sortKey}
+                    currentDir={sortDir}
+                    onSort={onSort}
+                  />
+                  <SortableHead
+                    sortKey="stock_actual"
+                    label="Stock Actual"
+                    currentSort={sortKey}
+                    currentDir={sortDir}
+                    onSort={onSort}
+                    className="text-right"
+                  />
+                  <SortableHead
+                    sortKey="stock_minimo"
+                    label="Mínimo"
+                    currentSort={sortKey}
+                    currentDir={sortDir}
+                    onSort={onSort}
+                    className="text-right"
+                  />
+                  <SortableHead
+                    sortKey="ultimo_costo"
+                    label="Último Costo"
+                    currentSort={sortKey}
+                    currentDir={sortDir}
+                    onSort={onSort}
+                    className="text-right"
+                  />
+                  <SortableHead
+                    sortKey="valor_inventario"
+                    label="Valor Total"
+                    currentSort={sortKey}
+                    currentDir={sortDir}
+                    onSort={onSort}
+                    className="text-right"
+                  />
+                  <SortableHead
+                    sortKey="bajo_minimo"
+                    label="Estado"
+                    currentSort={sortKey}
+                    currentDir={sortDir}
+                    onSort={onSort}
+                  />
                 </TableRow>
-              ) : (
-                sortData(filteredStock).map((item) => (
-                  <TableRow
-                    key={item.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => {
-                      setSelectedItem(item);
-                      setDrawerOpen(true);
-                    }}
-                  >
-                    <TableCell>
-                      <span className="font-medium">{item.nombre}</span>
+              </TableHeader>
+              <TableBody>
+                {loadingStock ? (
+                  Array.from({ length: 8 }).map((_, i) => (
+                    <TableRow key={i}>
+                      {Array.from({ length: 8 }).map((__, j) => (
+                        <TableCell key={j}>
+                          <Skeleton className="h-4 w-full" />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : filteredStock.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
+                      No se encontraron productos.
                     </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-xs font-normal">
-                        {item.clasificacion ?? '—'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {item.categoria ?? '—'}
-                    </TableCell>
-                    <TableCell
-                      className={[
-                        'text-right font-semibold tabular-nums',
-                        item.stock_actual <= 0
-                          ? 'text-destructive'
-                          : item.bajo_minimo
-                          ? 'text-amber-500'
-                          : '',
-                      ].join(' ')}
+                  </TableRow>
+                ) : (
+                  sortData(filteredStock).map((item) => (
+                    <TableRow
+                      key={item.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => {
+                        setSelectedItem(item);
+                        setDrawerOpen(true);
+                      }}
                     >
-                      {item.stock_actual} {item.unidad ?? 'pzs'}
-                    </TableCell>
-                    <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
-                      {item.stock_minimo ?? '—'} {item.unidad ?? 'pzs'}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatCurrency(item.costo_unitario ?? item.ultimo_costo)}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums">
-                      {formatCurrency(item.valor_inventario)}
-                    </TableCell>
-                    <TableCell>
-                      {item.stock_actual <= 0 ? (
-                        <Badge variant="destructive">Sin stock</Badge>
-                      ) : item.bajo_minimo ? (
-                        <Badge
-                          variant="outline"
-                          className="border-amber-500/50 text-amber-500"
-                        >
-                          Bajo mínimo
-                        </Badge>
-                      ) : (
-                        <Badge variant="default">OK</Badge>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-
-      {/* ── Movimientos Table (Kardex) ─────────────────────────────────────── */}
-      {tab === 'movimientos' && (
-        <div className="rounded-xl border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Producto</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead className="text-right">Cantidad</TableHead>
-                <TableHead className="text-right">Costo Unit.</TableHead>
-                <TableHead>Detalle / Referencia</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loadingMovimientos ? (
-                Array.from({ length: 8 }).map((_, i) => (
-                  <TableRow key={i}>
-                    {Array.from({ length: 6 }).map((__, j) => (
-                      <TableCell key={j}>
-                        <Skeleton className="h-4 w-full" />
+                      <TableCell>
+                        <span className="font-medium">{item.nombre}</span>
                       </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              ) : filteredMovimientos.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="py-12 text-center text-muted-foreground"
-                  >
-                    No se encontraron movimientos.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredMovimientos.map((mov) => (
-                  <TableRow key={mov.id}>
-                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                      {formatDate(mov.created_at)}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {mov.productos?.nombre ?? '—'}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1.5">
-                        {mov.tipo_movimiento === 'entrada' ||
-                        (mov.tipo_movimiento === 'ajuste' && mov.cantidad >= 0) ? (
-                          <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs font-normal">
+                          {item.clasificacion ?? '—'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {item.categoria ?? '—'}
+                      </TableCell>
+                      <TableCell
+                        className={[
+                          'text-right font-semibold tabular-nums',
+                          item.stock_actual <= 0
+                            ? 'text-destructive'
+                            : item.bajo_minimo
+                              ? 'text-amber-500'
+                              : '',
+                        ].join(' ')}
+                      >
+                        {item.stock_actual} {item.unidad ?? 'pzs'}
+                      </TableCell>
+                      <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
+                        {item.stock_minimo ?? '—'} {item.unidad ?? 'pzs'}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrency(item.costo_unitario ?? item.ultimo_costo)}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold tabular-nums">
+                        {formatCurrency(item.valor_inventario)}
+                      </TableCell>
+                      <TableCell>
+                        {item.stock_actual <= 0 ? (
+                          <Badge variant="destructive">Sin stock</Badge>
+                        ) : item.bajo_minimo ? (
+                          <Badge variant="outline" className="border-amber-500/50 text-amber-500">
+                            Bajo mínimo
+                          </Badge>
                         ) : (
-                          <TrendingDown className="h-3.5 w-3.5 text-destructive" />
+                          <Badge variant="default">OK</Badge>
                         )}
-                        <Badge
-                          variant="outline"
-                          className={tipoColorClass(mov.tipo_movimiento, mov.cantidad)}
-                        >
-                          {tipoLabel(mov.tipo_movimiento, mov.cantidad)}
-                        </Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell
-                      className={[
-                        'text-right font-semibold tabular-nums',
-                        mov.tipo_movimiento === 'entrada' || (mov.tipo_movimiento === 'ajuste' && mov.cantidad >= 0)
-                          ? 'text-emerald-600 dark:text-emerald-400'
-                          : 'text-destructive',
-                      ].join(' ')}
-                    >
-                      {mov.tipo_movimiento === 'entrada' || (mov.tipo_movimiento === 'ajuste' && mov.cantidad >= 0) ? '+' : '\u2212'}
-                      {Math.abs(mov.cantidad)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-sm">
-                      {formatCurrency(mov.costo_unitario)}
-                    </TableCell>
-                    <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">
-                      <div className="font-medium text-foreground">{mov.referencia_tipo === 'orden_compra' ? 'OC' : 'Manual'}</div>
-                      <div className="truncate">{mov.notas ?? '—'}</div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
+        {/* ── Movimientos Table (Kardex) ─────────────────────────────────────── */}
+        {tab === 'movimientos' && (
+          <div className="rounded-xl border bg-card">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Producto</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead className="text-right">Cantidad</TableHead>
+                  <TableHead className="text-right">Costo Unit.</TableHead>
+                  <TableHead>Detalle / Referencia</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loadingMovimientos ? (
+                  Array.from({ length: 8 }).map((_, i) => (
+                    <TableRow key={i}>
+                      {Array.from({ length: 6 }).map((__, j) => (
+                        <TableCell key={j}>
+                          <Skeleton className="h-4 w-full" />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : filteredMovimientos.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">
+                      No se encontraron movimientos.
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+                ) : (
+                  filteredMovimientos.map((mov) => (
+                    <TableRow key={mov.id}>
+                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                        {formatDate(mov.created_at)}
+                      </TableCell>
+                      <TableCell className="font-medium">{mov.productos?.nombre ?? '—'}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5">
+                          {mov.tipo_movimiento === 'entrada' ||
+                          (mov.tipo_movimiento === 'ajuste' && mov.cantidad >= 0) ? (
+                            <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                          ) : (
+                            <TrendingDown className="h-3.5 w-3.5 text-destructive" />
+                          )}
+                          <Badge
+                            variant="outline"
+                            className={tipoColorClass(mov.tipo_movimiento, mov.cantidad)}
+                          >
+                            {tipoLabel(mov.tipo_movimiento, mov.cantidad)}
+                          </Badge>
+                        </div>
+                      </TableCell>
+                      <TableCell
+                        className={[
+                          'text-right font-semibold tabular-nums',
+                          mov.tipo_movimiento === 'entrada' ||
+                          (mov.tipo_movimiento === 'ajuste' && mov.cantidad >= 0)
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : 'text-destructive',
+                        ].join(' ')}
+                      >
+                        {mov.tipo_movimiento === 'entrada' ||
+                        (mov.tipo_movimiento === 'ajuste' && mov.cantidad >= 0)
+                          ? '+'
+                          : '\u2212'}
+                        {Math.abs(mov.cantidad)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-sm">
+                        {formatCurrency(mov.costo_unitario)}
+                      </TableCell>
+                      <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">
+                        <div className="font-medium text-foreground">
+                          {mov.referencia_tipo === 'orden_compra' ? 'OC' : 'Manual'}
+                        </div>
+                        <div className="truncate">{mov.notas ?? '—'}</div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        )}
 
-      {/* Stock detail drawer */}
-      <StockDetailDrawer
-        item={selectedItem}
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-      />
+        {/* Stock detail drawer */}
+        <StockDetailDrawer
+          item={selectedItem}
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+        />
 
-      {/* Registrar movimiento dialog */}
-      <RegistrarMovimientoDialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        productos={items}
-        onSuccess={handleSuccess}
-      />
-    </div>
+        {/* Registrar movimiento dialog */}
+        <RegistrarMovimientoDialog
+          open={dialogOpen}
+          onClose={() => setDialogOpen(false)}
+          productos={items}
+          onSuccess={handleSuccess}
+        />
+      </div>
     </RequireAccess>
   );
 }

@@ -23,15 +23,15 @@ export default async function AccesoPage() {
           return cookieStore.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options),
-          );
+          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
         },
       },
-    },
+    }
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const currentEmail = user?.email?.toLowerCase() ?? '';
 
   const admin = getSupabaseAdminClient();
@@ -90,11 +90,12 @@ export default async function AccesoPage() {
       .schema('core')
       .from('permisos_rol')
       .select('rol_id, modulo_id, acceso_lectura, acceso_escritura'),
-    admin.schema('core').from('usuarios').select('id, email, first_name, activo, welcome_sent_at').order('email'),
     admin
       .schema('core')
-      .from('usuarios_empresas')
-      .select('usuario_id, empresa_id, rol_id'),
+      .from('usuarios')
+      .select('id, email, first_name, activo, welcome_sent_at')
+      .order('email'),
+    admin.schema('core').from('usuarios_empresas').select('usuario_id, empresa_id, rol_id'),
     admin
       .schema('core')
       .from('permisos_usuario_excepcion')

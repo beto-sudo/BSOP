@@ -72,9 +72,7 @@ const limiters = {
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-export type RateLimitCheck =
-  | { ok: true }
-  | { ok: false; response: NextResponse };
+export type RateLimitCheck = { ok: true } | { ok: false; response: NextResponse };
 
 /**
  * Pull a stable identifier out of the request: authorization bearer / x-api-key
@@ -95,10 +93,7 @@ export function extractIdentifier(req: NextRequest): string {
   return `ip:${ip ?? 'unknown'}`;
 }
 
-async function runCheck(
-  limiter: Ratelimit | null,
-  identifier: string,
-): Promise<RateLimitCheck> {
+async function runCheck(limiter: Ratelimit | null, identifier: string): Promise<RateLimitCheck> {
   if (!limiter) {
     // Fail-open: if Redis env vars aren't set (e.g. a dev running without
     // the Vercel integration attached), log once and let the request through.
@@ -131,7 +126,7 @@ async function runCheck(
           'X-RateLimit-Remaining': String(remaining),
           'X-RateLimit-Reset': String(Math.ceil(reset / 1000)),
         },
-      },
+      }
     ),
   };
 }

@@ -34,9 +34,9 @@ const DRY_RUN = process.env.DRY_RUN === '1';
 const CODA_DOC_ID = 'ZNxWl_DI2D';
 const TABLE_IDS = {
   departamentos: 'grid-HPYcb1MLYH',
-  puestos:       'grid-CwSifc7FKQ',
-  personal:      'grid-rCQIDVP9Qq',
-  juntas:        'grid-9m184aI_C3',
+  puestos: 'grid-CwSifc7FKQ',
+  personal: 'grid-rCQIDVP9Qq',
+  juntas: 'grid-9m184aI_C3',
 } as const;
 
 // ─── Coda API helpers ─────────────────────────────────────────────────────────
@@ -65,7 +65,7 @@ async function codaGet<T>(path: string): Promise<T> {
 
 async function fetchColumns(tableId: string): Promise<Map<string, string>> {
   const data = await codaGet<{ items: CodaColumn[] }>(
-    `/docs/${CODA_DOC_ID}/tables/${tableId}/columns`,
+    `/docs/${CODA_DOC_ID}/tables/${tableId}/columns`
   );
   const map = new Map<string, string>();
   for (const col of data.items) {
@@ -84,7 +84,7 @@ async function fetchAllRows(tableId: string): Promise<CodaRow[]> {
     if (pageToken) qs.set('pageToken', pageToken);
 
     const data = await codaGet<{ items: CodaRow[]; nextPageToken?: string }>(
-      `/docs/${CODA_DOC_ID}/tables/${tableId}/rows?${qs}`,
+      `/docs/${CODA_DOC_ID}/tables/${tableId}/rows?${qs}`
     );
     rows.push(...data.items);
     pageToken = data.nextPageToken;
@@ -198,7 +198,10 @@ async function main() {
           .insert(payload)
           .select('id')
           .single();
-        if (insErr) { console.error(`  ✗ ${nombre}: ${insErr.message}`); continue; }
+        if (insErr) {
+          console.error(`  ✗ ${nombre}: ${insErr.message}`);
+          continue;
+        }
         deptNameToId.set(nombre.toLowerCase(), ins.id);
         console.log(`  + created: ${nombre}`);
       }
@@ -216,7 +219,11 @@ async function main() {
     const padreId = deptNameToId.get(padreName.toLowerCase());
     const selfId = deptNameToId.get(nombre.toLowerCase());
     if (padreId && selfId) {
-      await supabase.schema('erp' as any).from('departamentos').update({ padre_id: padreId }).eq('id', selfId);
+      await supabase
+        .schema('erp' as any)
+        .from('departamentos')
+        .update({ padre_id: padreId })
+        .eq('id', selfId);
     }
   }
 
@@ -232,15 +239,36 @@ async function main() {
     // Real Coda column names (DILESA): "Puesto", "Objetivo del Puesto", "Perfil del Puesto",
     // "Requisitos del Puesto", "Esquema de Pago", "Reporta a:".
     // Generic fallbacks kept for other docs.
-    const nombre = str(pick(row.values, puestosCols, 'puesto', 'nombre', 'name', row.name)) ?? row.name;
+    const nombre =
+      str(pick(row.values, puestosCols, 'puesto', 'nombre', 'name', row.name)) ?? row.name;
     const nivel = str(pick(row.values, puestosCols, 'nivel', 'level'));
     const deptName = str(pick(row.values, puestosCols, 'departamento', 'area', 'área'));
-    const objetivo = str(pick(row.values, puestosCols, 'objetivo del puesto', 'objetivo', 'descripción', 'descripcion'));
-    const perfil = str(pick(row.values, puestosCols, 'perfil del puesto', 'perfil', 'perfil requerido'));
-    const requisitos = str(pick(row.values, puestosCols, 'requisitos del puesto', 'requisitos', 'requerimientos'));
-    const esquema_pago = str(pick(row.values, puestosCols, 'esquema de pago', 'esquema_pago', 'tipo pago'));
-    const sueldo_min_raw = pick(row.values, puestosCols, 'sueldo mínimo', 'sueldo minimo', 'salario mínimo');
-    const sueldo_max_raw = pick(row.values, puestosCols, 'sueldo máximo', 'sueldo maximo', 'salario máximo');
+    const objetivo = str(
+      pick(row.values, puestosCols, 'objetivo del puesto', 'objetivo', 'descripción', 'descripcion')
+    );
+    const perfil = str(
+      pick(row.values, puestosCols, 'perfil del puesto', 'perfil', 'perfil requerido')
+    );
+    const requisitos = str(
+      pick(row.values, puestosCols, 'requisitos del puesto', 'requisitos', 'requerimientos')
+    );
+    const esquema_pago = str(
+      pick(row.values, puestosCols, 'esquema de pago', 'esquema_pago', 'tipo pago')
+    );
+    const sueldo_min_raw = pick(
+      row.values,
+      puestosCols,
+      'sueldo mínimo',
+      'sueldo minimo',
+      'salario mínimo'
+    );
+    const sueldo_max_raw = pick(
+      row.values,
+      puestosCols,
+      'sueldo máximo',
+      'sueldo maximo',
+      'salario máximo'
+    );
 
     const departamento_id = deptName ? (deptNameToId.get(deptName.toLowerCase()) ?? null) : null;
 
@@ -272,7 +300,11 @@ async function main() {
       .maybeSingle();
 
     if (existing) {
-      await supabase.schema('erp' as any).from('puestos').update(payload).eq('id', existing.id);
+      await supabase
+        .schema('erp' as any)
+        .from('puestos')
+        .update(payload)
+        .eq('id', existing.id);
       puestoNameToId.set(nombre.toLowerCase(), existing.id);
       console.log(`  ✓ updated: ${nombre}`);
     } else {
@@ -282,7 +314,10 @@ async function main() {
         .insert(payload)
         .select('id')
         .single();
-      if (insErr) { console.error(`  ✗ ${nombre}: ${insErr.message}`); continue; }
+      if (insErr) {
+        console.error(`  ✗ ${nombre}: ${insErr.message}`);
+        continue;
+      }
       puestoNameToId.set(nombre.toLowerCase(), ins.id);
       console.log(`  + created: ${nombre}`);
     }
@@ -290,13 +325,20 @@ async function main() {
 
   // Second pass: set reporta_a (hierarchy between puestos)
   for (const row of puestosRows) {
-    const nombre = str(pick(row.values, puestosCols, 'puesto', 'nombre', 'name', row.name)) ?? row.name;
-    const reportaNombre = str(pick(row.values, puestosCols, 'reporta a:', 'reporta a', 'reporta_a', 'superior'));
+    const nombre =
+      str(pick(row.values, puestosCols, 'puesto', 'nombre', 'name', row.name)) ?? row.name;
+    const reportaNombre = str(
+      pick(row.values, puestosCols, 'reporta a:', 'reporta a', 'reporta_a', 'superior')
+    );
     if (!reportaNombre || DRY_RUN) continue;
     const reportaId = puestoNameToId.get(reportaNombre.toLowerCase());
     const selfId = puestoNameToId.get(nombre.toLowerCase());
     if (reportaId && selfId) {
-      await supabase.schema('erp' as any).from('puestos').update({ reporta_a: reportaId }).eq('id', selfId);
+      await supabase
+        .schema('erp' as any)
+        .from('puestos')
+        .update({ reporta_a: reportaId })
+        .eq('id', selfId);
     }
   }
 
@@ -326,35 +368,81 @@ async function main() {
       console.log(`  ⚠ skipped (empty nombre): row ${row.id}`);
       continue;
     }
-    const apellido_paterno = str(pick(v, personalCols, 'apellido paterno', 'apellido_paterno', 'primer apellido'));
-    const apellido_materno = str(pick(v, personalCols, 'apellido materno', 'apellido_materno', 'segundo apellido'));
+    const apellido_paterno = str(
+      pick(v, personalCols, 'apellido paterno', 'apellido_paterno', 'primer apellido')
+    );
+    const apellido_materno = str(
+      pick(v, personalCols, 'apellido materno', 'apellido_materno', 'segundo apellido')
+    );
 
     // Prefer corporate email for ERP identity; fall back to personal
-    const emailEmpresa = str(pick(v, personalCols, 'email empresa', 'correo empresa', 'correo_empresa'));
-    const emailPersonal = str(pick(v, personalCols, 'email personal', 'email', 'correo', 'correo electrónico'));
+    const emailEmpresa = str(
+      pick(v, personalCols, 'email empresa', 'correo empresa', 'correo_empresa')
+    );
+    const emailPersonal = str(
+      pick(v, personalCols, 'email personal', 'email', 'correo', 'correo electrónico')
+    );
     const email = emailEmpresa ?? emailPersonal;
 
-    const telefono = str(pick(v, personalCols, 'telefono celular', 'teléfono celular', 'teléfono', 'telefono', 'celular', 'móvil'));
+    const telefono = str(
+      pick(
+        v,
+        personalCols,
+        'telefono celular',
+        'teléfono celular',
+        'teléfono',
+        'telefono',
+        'celular',
+        'móvil'
+      )
+    );
     const rfc = str(pick(v, personalCols, 'rfc'));
     const curp = str(pick(v, personalCols, 'curp'));
     // "#Seguro Social" is the NSS column (lowercased: "#seguro social")
     const nss = str(pick(v, personalCols, '#seguro social', 'nss', 'número seguro social', 'imss'));
-    const fecha_nacimiento = dateStr(pick(v, personalCols, 'fecha de nacimiento', 'fecha nacimiento', 'fecha_nacimiento', 'nacimiento'));
-    const fecha_ingreso = dateStr(pick(v, personalCols, 'fecha ingreso', 'fecha_ingreso', 'ingreso'));
+    const fecha_nacimiento = dateStr(
+      pick(
+        v,
+        personalCols,
+        'fecha de nacimiento',
+        'fecha nacimiento',
+        'fecha_nacimiento',
+        'nacimiento'
+      )
+    );
+    const fecha_ingreso = dateStr(
+      pick(v, personalCols, 'fecha ingreso', 'fecha_ingreso', 'ingreso')
+    );
     const fecha_baja = dateStr(pick(v, personalCols, 'fecha baja', 'fecha_baja', 'baja'));
-    const motivo_baja = str(pick(v, personalCols, 'razón por la baja', 'razon por la baja', 'motivo_baja', 'motivo baja'));
-    const numero_empleado = str(pick(v, personalCols, 'número empleado', 'numero_empleado', 'no. empleado', 'clave'));
+    const motivo_baja = str(
+      pick(v, personalCols, 'razón por la baja', 'razon por la baja', 'motivo_baja', 'motivo baja')
+    );
+    const numero_empleado = str(
+      pick(v, personalCols, 'número empleado', 'numero_empleado', 'no. empleado', 'clave')
+    );
     const deptName = str(pick(v, personalCols, 'departamento', 'área', 'area'));
     const puestoRaw = str(pick(v, personalCols, 'puesto', 'cargo', 'posición'));
     const telefono_empresa = str(pick(v, personalCols, 'teléfono empresa', 'telefono_empresa'));
-    const extension_val = str(pick(v, personalCols, 'extension empresa', 'extensión', 'extension', 'ext'));
+    const extension_val = str(
+      pick(v, personalCols, 'extension empresa', 'extensión', 'extension', 'ext')
+    );
 
     // ── Tipo detection ─────────────────────────────────────────────────────────
     // "Pertenece a:" column holds "Accionista" | "Empleado" (or empty → default empleado).
     // Fallback: check if Puesto text contains "Accionista" (covers rows with no Pertenece a: set).
-    const perteneceA = str(pick(v, personalCols, 'pertenece a:', 'pertenece a', 'pertenece a :', 'tipo persona', 'categoria'));
+    const perteneceA = str(
+      pick(
+        v,
+        personalCols,
+        'pertenece a:',
+        'pertenece a',
+        'pertenece a :',
+        'tipo persona',
+        'categoria'
+      )
+    );
     const esAccionista =
-      (perteneceA?.toLowerCase() === 'accionista') ||
+      perteneceA?.toLowerCase() === 'accionista' ||
       (!perteneceA && (puestoRaw?.toLowerCase().includes('accionista') ?? false));
     const tipo = esAccionista ? 'accionista' : 'empleado';
 
@@ -376,7 +464,9 @@ async function main() {
     const activo = !fecha_baja;
 
     if (DRY_RUN) {
-      console.log(`  [DRY] persona (${tipo}): ${nombre} ${apellido_paterno ?? ''} (${email ?? 'no email'}) dept=${deptName ?? '-'} puesto=${puestoRaw ?? '-'}`);
+      console.log(
+        `  [DRY] persona (${tipo}): ${nombre} ${apellido_paterno ?? ''} (${email ?? 'no email'}) dept=${deptName ?? '-'} puesto=${puestoRaw ?? '-'}`
+      );
       continue;
     }
 
@@ -394,21 +484,40 @@ async function main() {
 
       if (existing) {
         personaId = existing.id;
-        await supabase.schema('erp' as any).from('personas').update({
-          nombre, apellido_paterno, apellido_materno, telefono, rfc, curp, tipo,
-        }).eq('id', personaId);
+        await supabase
+          .schema('erp' as any)
+          .from('personas')
+          .update({
+            nombre,
+            apellido_paterno,
+            apellido_materno,
+            telefono,
+            rfc,
+            curp,
+            tipo,
+          })
+          .eq('id', personaId);
       } else {
         const { data: ins, error: insErr } = await supabase
           .schema('erp' as any)
           .from('personas')
           .insert({
             empresa_id: DILESA_EMPRESA_ID,
-            nombre, apellido_paterno, apellido_materno,
+            nombre,
+            apellido_paterno,
+            apellido_materno,
             email: email.toLowerCase(),
-            telefono, rfc, curp, tipo,
+            telefono,
+            rfc,
+            curp,
+            tipo,
           })
-          .select('id').single();
-        if (insErr) { console.error(`  ✗ persona ${nombre}: ${insErr.message}`); continue; }
+          .select('id')
+          .single();
+        if (insErr) {
+          console.error(`  ✗ persona ${nombre}: ${insErr.message}`);
+          continue;
+        }
         personaId = ins.id;
       }
     } else {
@@ -423,18 +532,31 @@ async function main() {
 
       if (existing) {
         personaId = existing.id;
-        await supabase.schema('erp' as any).from('personas').update({ tipo }).eq('id', personaId);
+        await supabase
+          .schema('erp' as any)
+          .from('personas')
+          .update({ tipo })
+          .eq('id', personaId);
       } else {
         const { data: ins, error: insErr } = await supabase
           .schema('erp' as any)
           .from('personas')
           .insert({
             empresa_id: DILESA_EMPRESA_ID,
-            nombre, apellido_paterno, apellido_materno,
-            telefono, rfc, curp, tipo,
+            nombre,
+            apellido_paterno,
+            apellido_materno,
+            telefono,
+            rfc,
+            curp,
+            tipo,
           })
-          .select('id').single();
-        if (insErr) { console.error(`  ✗ persona ${nombre}: ${insErr.message}`); continue; }
+          .select('id')
+          .single();
+        if (insErr) {
+          console.error(`  ✗ persona ${nombre}: ${insErr.message}`);
+          continue;
+        }
         personaId = ins.id;
       }
     }
@@ -465,11 +587,21 @@ async function main() {
     };
 
     if (existingEmp) {
-      await supabase.schema('erp' as any).from('empleados').update(empPayload).eq('id', existingEmp.id);
+      await supabase
+        .schema('erp' as any)
+        .from('empleados')
+        .update(empPayload)
+        .eq('id', existingEmp.id);
       console.log(`  ✓ updated (${tipo}): ${nombre} ${apellido_paterno ?? ''}`);
     } else {
-      const { error: insErr } = await supabase.schema('erp' as any).from('empleados').insert(empPayload);
-      if (insErr) { console.error(`  ✗ empleado ${nombre}: ${insErr.message}`); continue; }
+      const { error: insErr } = await supabase
+        .schema('erp' as any)
+        .from('empleados')
+        .insert(empPayload);
+      if (insErr) {
+        console.error(`  ✗ empleado ${nombre}: ${insErr.message}`);
+        continue;
+      }
       console.log(`  + created (${tipo}): ${nombre} ${apellido_paterno ?? ''}`);
     }
   }
@@ -483,16 +615,24 @@ async function main() {
   for (const row of juntasRows) {
     const v = row.values;
 
-    const titulo = str(pick(v, juntasCols, 'nombre de junta', 'título', 'titulo', 'name', 'nombre', row.name)) ?? row.name;
-    const tipo = str(pick(v, juntasCols, 'tipo de junta', 'tipo', 'type', 'categoría', 'categoria'));
+    const titulo =
+      str(pick(v, juntasCols, 'nombre de junta', 'título', 'titulo', 'name', 'nombre', row.name)) ??
+      row.name;
+    const tipo = str(
+      pick(v, juntasCols, 'tipo de junta', 'tipo', 'type', 'categoría', 'categoria')
+    );
     const lugar = str(pick(v, juntasCols, 'lugar', 'location', 'sala'));
-    const descripcion = str(pick(v, juntasCols, 'temas', 'descripción', 'descripcion', 'notas', 'minuta', 'agenda'));
-    const fecha_hora = tsStr(pick(v, juntasCols, 'fecha de junta', 'fecha', 'fecha y hora', 'fecha_hora', 'date', 'inicio'));
+    const descripcion = str(
+      pick(v, juntasCols, 'temas', 'descripción', 'descripcion', 'notas', 'minuta', 'agenda')
+    );
+    const fecha_hora = tsStr(
+      pick(v, juntasCols, 'fecha de junta', 'fecha', 'fecha y hora', 'fecha_hora', 'date', 'inicio')
+    );
     const duracion_raw = pick(v, juntasCols, 'duración', 'duracion', 'duration');
     const duracion_minutos = duracion_raw ? parseInt(String(duracion_raw)) || 60 : 60;
     const estadoRaw = str(pick(v, juntasCols, 'estado', 'status', 'estatus'));
-    const estado = (['programada', 'en_curso', 'completada', 'cancelada'].includes(estadoRaw ?? ''))
-      ? estadoRaw as string
+    const estado = ['programada', 'en_curso', 'completada', 'cancelada'].includes(estadoRaw ?? '')
+      ? (estadoRaw as string)
       : 'completada'; // historic records default to completada
 
     if (!fecha_hora) {
@@ -529,8 +669,14 @@ async function main() {
     if (existing) {
       console.log(`  ✓ exists: ${titulo}`);
     } else {
-      const { error: insErr } = await supabase.schema('erp' as any).from('juntas').insert(payload);
-      if (insErr) { console.error(`  ✗ junta ${titulo}: ${insErr.message}`); continue; }
+      const { error: insErr } = await supabase
+        .schema('erp' as any)
+        .from('juntas')
+        .insert(payload);
+      if (insErr) {
+        console.error(`  ✗ junta ${titulo}: ${insErr.message}`);
+        continue;
+      }
       console.log(`  + created: ${titulo} (${fecha_hora})`);
     }
   }
