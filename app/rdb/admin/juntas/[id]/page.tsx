@@ -347,7 +347,10 @@ function JuntaDetailInner() {
     setTipo(juntaData.tipo ?? '');
 
     if (editor && juntaData.descripcion) {
-      editor.commands.setContent(juntaData.descripcion);
+      // Rewrite bare paths / legacy public URLs to signed URLs so the private
+      // adjuntos bucket renders inside the editor.
+      const hydrated = await rewriteHtmlImagesToSigned(supabase, juntaData.descripcion, 6 * 3600);
+      editor.commands.setContent(hydrated);
     }
 
     const { data: asistData } = await supabase
