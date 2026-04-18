@@ -3,6 +3,7 @@
 import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useState } from 'react';
 import * as tus from 'tus-js-client';
+import { getAdjuntoPath, getAdjuntoSignedUrls } from '@/lib/adjuntos';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -237,11 +238,13 @@ function AdjuntosSection({
         }
       } catch (ex: any) { err = ex?.message ?? 'Error'; }
       if (err) { alert(`Error: ${err}`); break; }
-      const { data: urlData } = supabase.storage.from('adjuntos').getPublicUrl(path);
+      // Bucket is private. Store ONLY the object path — UI generates short-lived
+      // signed URLs on render (see lib/adjuntos.ts). Legacy rows with full URLs
+      // still render correctly because getAdjuntoPath() normalizes both forms.
       const { data: cu } = await supabase.schema('core').from('usuarios').select('id').eq('email', (await supabase.auth.getUser()).data.user?.email?.toLowerCase() ?? '').maybeSingle();
       await supabase.schema('erp').from('adjuntos').insert({
         empresa_id: empresaId, entidad_tipo: 'documento', entidad_id: documentoId,
-        uploaded_by: cu?.id ?? null, nombre: file.name, url: urlData.publicUrl,
+        uploaded_by: cu?.id ?? null, nombre: file.name, url: path,
         tipo_mime: file.type || null, tamano_bytes: file.size, rol: uploadRole,
       });
     }
@@ -786,11 +789,19 @@ function DocumentosInner() {
   const fetchAdjuntosBulk = useCallback(async (docIds: string[]) => {
     if (docIds.length === 0) { setAdjuntosPorDoc({}); return; }
     const { data } = await supabase.schema('erp').from('adjuntos').select('id, nombre, url, tipo_mime, tamano_bytes, created_at, entidad_id, rol').eq('entidad_tipo', 'documento').in('entidad_id', docIds).order('created_at', { ascending: false });
+
+    // Bucket is private — enrich each row with a short-lived signed URL so
+    // the existing `a.url` read sites don't need to change. Legacy rows with
+    // full public URLs are normalized to their path by getAdjuntoSignedUrls.
+    const signedMap = await getAdjuntoSignedUrls(supabase, (data ?? []).map((a: { url: string }) => a.url));
+
     const map: Record<string, Adjunto[]> = {};
     for (const a of data ?? []) {
       const key = a.entidad_id as string;
       if (!map[key]) map[key] = [];
-      map[key].push({ id: a.id, nombre: a.nombre, url: a.url, tipo_mime: a.tipo_mime, tamano_bytes: a.tamano_bytes, rol: a.rol ?? 'anexo', created_at: a.created_at });
+      const path = getAdjuntoPath(a.url);
+      const signedUrl = path ? signedMap.get(path) : null;
+      map[key].push({ id: a.id, nombre: a.nombre, url: signedUrl ?? a.url, tipo_mime: a.tipo_mime, tamano_bytes: a.tamano_bytes, rol: a.rol ?? 'anexo', created_at: a.created_at });
     }
     setAdjuntosPorDoc(map);
   }, [supabase]);
