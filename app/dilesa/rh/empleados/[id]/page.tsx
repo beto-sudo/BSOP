@@ -11,6 +11,8 @@ import { usePermissions } from '@/components/providers';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
+import { composeFullName, titleCase } from '@/lib/name-case';
+import { EmpleadoAdjuntos } from '@/components/rh/empleado-adjuntos';
 import {
   Dialog,
   DialogContent,
@@ -32,7 +34,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, Save, Loader2, UserX, Pencil, X } from 'lucide-react';
 
-const EMPRESA_ID = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479';
 const EMPRESA_SLUG = 'dilesa';
 
 type Persona = {
@@ -83,9 +84,13 @@ type Puesto = { id: string; nombre: string };
 
 function fullName(emp: EmpleadoDetail) {
   if (!emp.persona) return '—';
-  return [emp.persona.nombre, emp.persona.apellido_paterno, emp.persona.apellido_materno]
-    .filter(Boolean)
-    .join(' ');
+  return (
+    composeFullName(
+      emp.persona.nombre,
+      emp.persona.apellido_paterno,
+      emp.persona.apellido_materno
+    ) || '—'
+  );
 }
 
 function formatDate(d: string | null) {
@@ -190,6 +195,17 @@ function EmpleadoDetailInner() {
   const [extensionVal, setExtensionVal] = useState('');
   const [emailEmpresa, setEmailEmpresa] = useState('');
 
+  // Campos de persona (se guardan en erp.personas, no en erp.empleados).
+  // Se mantienen separados en el UI para que Nombre/Ap.Paterno/Ap.Materno
+  // queden siempre en campos distintos y el nombre completo se compone.
+  const [pNombre, setPNombre] = useState('');
+  const [pApellidoPaterno, setPApellidoPaterno] = useState('');
+  const [pApellidoMaterno, setPApellidoMaterno] = useState('');
+  const [pEmail, setPEmail] = useState('');
+  const [pTelefono, setPTelefono] = useState('');
+  const [pRfc, setPRfc] = useState('');
+  const [pCurp, setPCurp] = useState('');
+
   const [showBajaDialog, setShowBajaDialog] = useState(false);
   const [motivoBaja, setMotivoBaja] = useState('');
   const [fechaBaja, setFechaBaja] = useState(new Date().toISOString().split('T')[0]);
@@ -230,6 +246,15 @@ function EmpleadoDetailInner() {
     setExtensionVal(emp.extension ?? '');
     setEmailEmpresa(emp.email_empresa ?? '');
 
+    const p = normalized.persona;
+    setPNombre(p?.nombre ?? '');
+    setPApellidoPaterno(p?.apellido_paterno ?? '');
+    setPApellidoMaterno(p?.apellido_materno ?? '');
+    setPEmail(p?.email ?? '');
+    setPTelefono(p?.telefono ?? '');
+    setPRfc(p?.rfc ?? '');
+    setPCurp(p?.curp ?? '');
+
     const [deptRes, puestosRes, compRes] = await Promise.all([
       supabase
         .schema('erp')
@@ -268,6 +293,8 @@ function EmpleadoDetailInner() {
   const handleSave = async () => {
     if (!empleado) return;
     setSaving(true);
+
+    // 1) Empleado fields
     const { error: err } = await supabase
       .schema('erp')
       .from('empleados')
@@ -283,9 +310,36 @@ function EmpleadoDetailInner() {
         email_empresa: emailEmpresa.trim() || null,
       })
       .eq('id', empleado.id);
+
+    // 2) Persona fields — aplicamos title-case a nombre/apellidos para
+    //    mantener consistencia (entradas antiguas vienen en MAYÚSCULAS).
+    let personaErr: string | null = null;
+    if (empleado.persona?.id) {
+      const nombreClean = titleCase(pNombre);
+      if (!nombreClean) {
+        setSaving(false);
+        alert('El nombre no puede quedar vacío.');
+        return;
+      }
+      const { error: pErr } = await supabase
+        .schema('erp')
+        .from('personas')
+        .update({
+          nombre: nombreClean,
+          apellido_paterno: titleCase(pApellidoPaterno) || null,
+          apellido_materno: titleCase(pApellidoMaterno) || null,
+          email: pEmail.trim().toLowerCase() || null,
+          telefono: pTelefono.trim() || null,
+          rfc: pRfc.trim().toUpperCase() || null,
+          curp: pCurp.trim().toUpperCase() || null,
+        })
+        .eq('id', empleado.persona.id);
+      if (pErr) personaErr = pErr.message;
+    }
+
     setSaving(false);
-    if (err) {
-      alert(`Error al guardar: ${err.message}`);
+    if (err || personaErr) {
+      alert(`Error al guardar: ${err?.message ?? personaErr}`);
       return;
     }
     setEditing(false);
@@ -353,7 +407,7 @@ function EmpleadoDetailInner() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent)]/15 text-2xl font-bold text-[var(--accent)]">
-            {(persona?.nombre?.[0] ?? '?').toUpperCase()}
+            {(titleCase(persona?.nombre ?? '').charAt(0) || '?').toUpperCase()}
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-tight text-[var(--text)]">
@@ -433,19 +487,106 @@ function EmpleadoDetailInner() {
       {/* Personal info */}
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
         <SectionTitle>Datos personales</SectionTitle>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <InfoRow label="Nombre completo" value={fullName(empleado)} />
-          <InfoRow label="Email personal" value={persona?.email ?? null} />
-          <InfoRow label="Teléfono personal" value={persona?.telefono ?? null} />
-          <InfoRow label="RFC" value={persona?.rfc ?? null} />
-          <InfoRow label="CURP" value={persona?.curp ?? null} />
-          <InfoRow label="NSS" value={persona?.nss ?? empleado.nss ?? null} />
-          <InfoRow
-            label="Fecha de nacimiento"
-            value={formatDate(birthDate)}
-            sub={calcAge(birthDate)}
-          />
-        </div>
+        {editing ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <FieldLabel>Nombre(s)</FieldLabel>
+              <Input
+                value={pNombre}
+                onChange={(e) => setPNombre(e.target.value)}
+                onBlur={(e) => setPNombre(titleCase(e.target.value))}
+                placeholder="Juan Carlos"
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
+            </div>
+            <div>
+              <FieldLabel>Apellido paterno</FieldLabel>
+              <Input
+                value={pApellidoPaterno}
+                onChange={(e) => setPApellidoPaterno(e.target.value)}
+                onBlur={(e) => setPApellidoPaterno(titleCase(e.target.value))}
+                placeholder="Pérez"
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
+            </div>
+            <div>
+              <FieldLabel>Apellido materno</FieldLabel>
+              <Input
+                value={pApellidoMaterno}
+                onChange={(e) => setPApellidoMaterno(e.target.value)}
+                onBlur={(e) => setPApellidoMaterno(titleCase(e.target.value))}
+                placeholder="González"
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
+            </div>
+            <div>
+              <FieldLabel>Email personal</FieldLabel>
+              <Input
+                value={pEmail}
+                onChange={(e) => setPEmail(e.target.value)}
+                placeholder="correo@dominio.com"
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
+            </div>
+            <div>
+              <FieldLabel>Teléfono personal</FieldLabel>
+              <Input
+                value={pTelefono}
+                onChange={(e) => setPTelefono(e.target.value)}
+                placeholder="(878) 000-0000"
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
+            </div>
+            <div>
+              <FieldLabel>RFC</FieldLabel>
+              <Input
+                value={pRfc}
+                onChange={(e) => setPRfc(e.target.value.toUpperCase())}
+                placeholder="XXXX000000XXX"
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)] font-mono"
+              />
+            </div>
+            <div>
+              <FieldLabel>CURP</FieldLabel>
+              <Input
+                value={pCurp}
+                onChange={(e) => setPCurp(e.target.value.toUpperCase())}
+                placeholder="XXXX000000XXXXXX00"
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)] font-mono"
+              />
+            </div>
+            <div>
+              <FieldLabel>Nombre completo (preview)</FieldLabel>
+              <p className="text-sm text-[var(--text)]/60 mt-2">
+                {composeFullName(pNombre, pApellidoPaterno, pApellidoMaterno) || '—'}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <InfoRow label="Nombre completo" value={fullName(empleado)} />
+            <InfoRow label="Email personal" value={persona?.email ?? null} />
+            <InfoRow label="Teléfono personal" value={persona?.telefono ?? null} />
+            <InfoRow label="RFC" value={persona?.rfc ?? null} />
+            <InfoRow label="CURP" value={persona?.curp ?? null} />
+            <InfoRow label="NSS" value={persona?.nss ?? empleado.nss ?? null} />
+            <InfoRow
+              label="Fecha de nacimiento"
+              value={formatDate(birthDate)}
+              sub={calcAge(birthDate)}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Documentos */}
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
+        <SectionTitle>Documentos</SectionTitle>
+        <EmpleadoAdjuntos
+          empleadoId={empleado.id}
+          empresaId={empleado.empresa_id}
+          readOnly={!isAdmin}
+        />
       </div>
 
       {/* Employment info */}
