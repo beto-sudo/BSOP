@@ -67,7 +67,7 @@ export async function importCodaImagesInHtml(
       });
       if (!res.ok) {
         failed += 1;
-         
+
         console.warn('[coda-paste-import] import-url failed for', src.slice(0, 80), res.status);
         continue;
       }
@@ -80,7 +80,7 @@ export async function importCodaImagesInHtml(
       }
     } catch (err) {
       failed += 1;
-       
+
       console.warn('[coda-paste-import] error', (err as Error).message);
     }
   }

@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { FieldLabel } from '@/components/ui/field-label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, Save, Loader2, UserX, Pencil, X } from 'lucide-react';
@@ -127,14 +128,6 @@ function calcSeniority(d: string | null): string | null {
 function formatCurrency(n: number | null): string {
   if (n === null || n === undefined) return '—';
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n);
-}
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50 mb-1.5">
-      {children}
-    </div>
-  );
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {

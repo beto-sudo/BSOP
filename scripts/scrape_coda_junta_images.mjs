@@ -133,7 +133,10 @@ async function main() {
   // Quick auth check: hit a cheap authenticated endpoint with the cookies.
   const authCheck = await context.newPage();
   try {
-    const res = await authCheck.goto('https://coda.io/account', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    const res = await authCheck.goto('https://coda.io/account', {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000,
+    });
     const status = res ? res.status() : 0;
     console.log(`→ auth check /account: HTTP ${status}`);
     if (status >= 400) {
@@ -154,7 +157,7 @@ async function main() {
         console.log(`  — skipped: ${target.titulo} (${result.reason})`);
       } else {
         console.log(
-          `  ✅ ${target.titulo}: ${result.imagesDownloaded} imgs, ${result.htmlLen} chars HTML${DRY_RUN ? ' [DRY]' : ''}`,
+          `  ✅ ${target.titulo}: ${result.imagesDownloaded} imgs, ${result.htmlLen} chars HTML${DRY_RUN ? ' [DRY]' : ''}`
         );
       }
       ok++;
@@ -233,7 +236,7 @@ async function processOne(context, supabase, junta) {
       for (let i = 0; i < maxScrolls; i++) {
         // Find a cell containing our exact title
         const all = Array.from(document.querySelectorAll('*')).filter(
-          (el) => el.children.length === 0 && (el.textContent || '').trim() === title.trim(),
+          (el) => el.children.length === 0 && (el.textContent || '').trim() === title.trim()
         );
         if (all.length > 0) {
           all[0].scrollIntoView({ block: 'center' });
@@ -255,7 +258,7 @@ async function processOne(context, supabase, junta) {
     // Click on the row to select, then trigger expand via keyboard (Shift+Space is Coda's shortcut).
     await page.evaluate((title) => {
       const cell = Array.from(document.querySelectorAll('*')).find(
-        (el) => el.children.length === 0 && (el.textContent || '').trim() === title.trim(),
+        (el) => el.children.length === 0 && (el.textContent || '').trim() === title.trim()
       );
       if (cell) cell.click();
     }, junta.titulo);
@@ -263,8 +266,13 @@ async function processOne(context, supabase, junta) {
     // Find the expand icon for the selected row. In Coda it's typically in the first column
     // with aria-label like "Expand row" or a small arrow icon.
     const expanded = await page.evaluate(() => {
-      const btn = document.querySelector('[aria-label*="Expand row" i], [aria-label*="Abrir fila" i]');
-      if (btn) { btn.click(); return true; }
+      const btn = document.querySelector(
+        '[aria-label*="Expand row" i], [aria-label*="Abrir fila" i]'
+      );
+      if (btn) {
+        btn.click();
+        return true;
+      }
       return false;
     });
     if (!expanded) {
@@ -275,10 +283,9 @@ async function processOne(context, supabase, junta) {
     await page.waitForSelector('[role="dialog"]', { timeout: 30000 });
     // Wait for "Calculating..." to disappear (Coda still processing formulas)
     try {
-      await page.waitForFunction(
-        () => !document.body.innerText.includes('Calculating'),
-        { timeout: 60000 },
-      );
+      await page.waitForFunction(() => !document.body.innerText.includes('Calculating'), {
+        timeout: 60000,
+      });
       console.log(`    (Calculating finished)`);
     } catch {
       console.log(`    (Calculating still visible after 60s — proceeding anyway)`);
@@ -287,7 +294,7 @@ async function processOne(context, supabase, junta) {
     try {
       await page.waitForFunction(
         () => !document.querySelector('[data-coda-ui-id="loading-indicator"]'),
-        { timeout: 30000 },
+        { timeout: 30000 }
       );
     } catch {}
     // Click "Show hidden columns" if present
@@ -318,9 +325,7 @@ async function processOne(context, supabase, junta) {
       if (!modal) return { html: '', images: [] };
       // Find the Temas container: look for a heading/label with "Temas" text then sibling content
       const labels = Array.from(modal.querySelectorAll('*')).filter(
-        (el) =>
-          el.children.length === 0 &&
-          /^Temas$/.test((el.textContent || '').trim()),
+        (el) => el.children.length === 0 && /^Temas$/.test((el.textContent || '').trim())
       );
       let container = null;
       for (const label of labels) {
@@ -399,7 +404,11 @@ async function processOne(context, supabase, junta) {
       // Replace the exact src string in the HTML
       const escapedSrc = img.src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       updatedHtml = updatedHtml.replace(new RegExp(escapedSrc, 'g'), proxyUrl);
-      mapping.push({ originalSrc: img.src.slice(0, 60), newProxyUrl: proxyUrl, sizeBytes: img.buffer.length });
+      mapping.push({
+        originalSrc: img.src.slice(0, 60),
+        newProxyUrl: proxyUrl,
+        sizeBytes: img.buffer.length,
+      });
     }
 
     // 5. Sanitize HTML (remove Coda-specific wrappers, keep text + images)

@@ -57,6 +57,7 @@ import {
 import { FilterCombobox } from '@/components/ui/filter-combobox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { FieldLabel } from '@/components/ui/field-label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { RowActions } from '@/components/shared/row-actions';
@@ -123,14 +124,6 @@ export type PuestosModuleProps = {
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50 mb-1.5">
-      {children}
-    </div>
-  );
-}
 
 const EMPTY_FORM = {
   nombre: '',

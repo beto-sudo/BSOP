@@ -30,8 +30,10 @@ import {
 import { FilterCombobox } from '@/components/ui/filter-combobox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { FieldLabel } from '@/components/ui/field-label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, Search, RefreshCw, Loader2, CalendarDays, ChevronRight } from 'lucide-react';
+import { JUNTA_ESTADO_CONFIG as ESTADO_CONFIG, type JuntaEstado } from '@/lib/status-tokens';
 
 const EMPRESA_ID = '41c0b58f-5483-439b-aaa6-17b9d995697f';
 
@@ -43,21 +45,11 @@ type Junta = {
   fecha_hora: string;
   duracion_minutos: number | null;
   lugar: string | null;
-  estado: 'programada' | 'en_curso' | 'completada' | 'cancelada';
+  estado: JuntaEstado;
   tipo: string | null;
   creado_por: string | null;
   created_at: string;
   updated_at: string | null;
-};
-
-const ESTADO_CONFIG: Record<Junta['estado'], { label: string; cls: string }> = {
-  programada: { label: 'Programada', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
-  en_curso: { label: 'En curso', cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
-  completada: {
-    label: 'Completada',
-    cls: 'bg-[var(--border)]/60 text-[var(--text)]/50 border-[var(--border)]',
-  },
-  cancelada: { label: 'Cancelada', cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
 };
 
 const TIPO_CONFIG: Record<string, { label: string; icon: string }> = {
@@ -98,14 +90,6 @@ function EstadoBadge({ estado }: { estado: Junta['estado'] }) {
     >
       {cfg.label}
     </span>
-  );
-}
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50 mb-1.5">
-      {children}
-    </div>
   );
 }
 

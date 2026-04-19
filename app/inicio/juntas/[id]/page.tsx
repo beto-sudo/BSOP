@@ -34,6 +34,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
+import { FieldLabel } from '@/components/ui/field-label';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import {
   Dialog,
   DialogContent,
@@ -167,14 +169,6 @@ function formatDate(s: string | null) {
   if (!s) return '—';
   const d = new Date(s.includes('T') ? s : `${s}T00:00:00`);
   return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50 mb-1.5">
-      {children}
-    </div>
-  );
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -682,12 +676,19 @@ function JuntaDetailInner() {
     setAsistencia((prev) => prev.map((a) => (a.id === asistId ? { ...a, asistio: next } : a)));
   };
 
-  const handleRemoveParticipant = async (asistId: string) => {
-    if (!window.confirm('¿Quitar a este participante de la junta?')) return;
+  const [pendingRemoveAsistId, setPendingRemoveAsistId] = useState<string | null>(null);
 
-    await supabase.schema('erp').from('juntas_asistencia').delete().eq('id', asistId);
+  const handleRemoveParticipant = (asistId: string) => {
+    setPendingRemoveAsistId(asistId);
+  };
 
-    setAsistencia((prev) => prev.filter((a) => a.id !== asistId));
+  const handleRemoveParticipantConfirm = async () => {
+    if (!pendingRemoveAsistId) return;
+
+    await supabase.schema('erp').from('juntas_asistencia').delete().eq('id', pendingRemoveAsistId);
+
+    setAsistencia((prev) => prev.filter((a) => a.id !== pendingRemoveAsistId));
+    setPendingRemoveAsistId(null);
   };
 
   const handleAddParticipant = async () => {
@@ -1676,6 +1677,17 @@ function JuntaDetailInner() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={pendingRemoveAsistId !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingRemoveAsistId(null);
+        }}
+        onConfirm={handleRemoveParticipantConfirm}
+        title="¿Quitar participante?"
+        description="Se eliminará la asistencia registrada para esta persona en la junta."
+        confirmLabel="Quitar"
+      />
     </div>
   );
 }
