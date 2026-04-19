@@ -40,3 +40,20 @@ jobs:
 
       - name: Prettier — check
         run: npm run format:check
+
+      # Verifica que supabase/SCHEMA_REF.md coincide con el schema real de la
+      # DB. Si alguien aplicó una migración sin regenerar el MD (o lo editó a
+      # mano), este step falla y pide correr `npm run schema:ref`.
+      # Requiere el secret SUPABASE_DB_URL (Settings → Secrets → Actions).
+      # Si el secret no está configurado, el step se salta con un warning
+      # en lugar de fallar, para no bloquear PRs hasta que esté listo.
+      - name: Schema reference — drift check
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::warning::SUPABASE_DB_URL secret no configurado — saltando schema:check."
+            echo "Agrégalo en Settings → Secrets and variables → Actions para habilitar el guard."
+            exit 0
+          fi
+          npm run schema:check
