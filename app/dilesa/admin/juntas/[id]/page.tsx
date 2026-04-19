@@ -14,6 +14,7 @@ import {
   rewriteHtmlImagesToSigned,
   normalizeHtmlImagesToPaths,
 } from '@/lib/adjuntos';
+import { htmlHasCodaImages, importCodaImagesInHtml } from '@/lib/coda-paste-import';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -187,6 +188,23 @@ function formatDate(s: string | null) {
   return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+/**
+ * Date + hora, usado en los comentarios de actualizaciones de tareas para
+ * tener contexto de cuándo se capturó cada nota ("18 abr 2026, 10:35").
+ */
+function formatDateTime(s: string | null) {
+  if (!s) return '—';
+  const d = new Date(s);
+  return d.toLocaleString('es-MX', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
     <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50 mb-1.5">
@@ -265,7 +283,9 @@ function EditorToolbar({
   editor,
   onInsertImage,
 }: {
-  editor: ReturnType<typeof useEditor>;
+  // Con `immediatelyRender: false` (requerido por Next SSR), `useEditor`
+  // puede devolver null en el primer render antes de hidratar.
+  editor: ReturnType<typeof useEditor> | null;
   onInsertImage: () => void;
 }) {
   if (!editor) return null;
@@ -386,6 +406,10 @@ function JuntaDetailInner() {
   const [isDireccion, setIsDireccion] = useState(false);
 
   const editor = useEditor({
+    // TipTap v3 exige `immediatelyRender: false` cuando corre bajo Next.js
+    // con SSR/RSC. Evita el hydration mismatch entre el HTML del server y
+    // el del cliente (el server no puede renderizar ProseMirror).
+    immediatelyRender: false,
     extensions: [
       StarterKit,
       Underline,
@@ -424,7 +448,7 @@ function JuntaDetailInner() {
         // 2) HTML paste with external Coda <img> URLs (Cmd+A + Cmd+C from Coda junta).
         //    Intercept only when we actually see Coda-hosted image references.
         const html = event.clipboardData?.getData('text/html') || '';
-        if (html && /(codahosted\.io|codaio\.imgix\.net|images-codaio\.imgix\.net)/.test(html)) {
+        if (htmlHasCodaImages(html)) {
           event.preventDefault();
           void handlePasteWithCodaImages(html);
           return true;
@@ -470,55 +494,9 @@ function JuntaDetailInner() {
     if (!editor) return;
     setUploadingImage(true);
     try {
-      // Extract each <img src="..."> that points at a Coda CDN.
-      const imgRe = /<img\b[^>]*?\bsrc\s*=\s*(?:"([^"]+)"|'([^']+)')/gi;
-      const srcs: string[] = [];
-      let m: RegExpExecArray | null;
-      const codaHostPattern = /(codahosted\.io|codaio\.imgix\.net|images-codaio\.imgix\.net)/;
-      while ((m = imgRe.exec(html)) !== null) {
-        const src = m[1] ?? m[2] ?? '';
-        if (src && codaHostPattern.test(src)) srcs.push(src);
-      }
-      const uniqueSrcs = Array.from(new Set(srcs));
-
-      const replacements = new Map<string, string>();
-      let imported = 0;
-      let failed = 0;
-      for (const src of uniqueSrcs) {
-        try {
-          const res = await fetch('/api/adjuntos/import-url', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: src, juntaId: id }),
-          });
-          if (!res.ok) {
-            failed += 1;
-            console.warn('[paste] import-url failed for', src.slice(0, 60), res.status);
-            continue;
-          }
-          const data = (await res.json()) as { ok?: boolean; url?: string };
-          if (data.ok && data.url) {
-            replacements.set(src, data.url);
-            imported += 1;
-          } else {
-            failed += 1;
-          }
-        } catch (err) {
-          failed += 1;
-          console.warn('[paste] import-url error', (err as Error).message);
-        }
-      }
-
-      // Apply replacements to the HTML so <img src="codahosted..."> → <img src="/api/adjuntos/...">
-      let rewritten = html;
-      for (const [from, to] of replacements) {
-        const escaped = from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        rewritten = rewritten.replace(new RegExp(escaped, 'g'), to);
-      }
-
+      const { html: rewritten, imported, failed } = await importCodaImagesInHtml(html, id);
       // Insert into the editor at the current cursor position.
       editor.chain().focus().insertContent(rewritten).run();
-
       if (failed > 0) {
         alert(
           `Imágenes importadas: ${imported}. Fallaron ${failed} — revisa la consola del navegador.`
@@ -1443,77 +1421,107 @@ function JuntaDetailInner() {
             </div>
           ) : (
             (() => {
+              // Agrupar actualizaciones por tarea y ordenar ASC dentro del
+              // grupo para que se lea como timeline (antigua → reciente).
+              // El fetch global las baja DESC, pero aquí una tarea a la vez
+              // luce más natural cronológicamente.
               const grouped = new Map<string, TaskUpdate[]>();
               for (const u of taskUpdates) {
                 const arr = grouped.get(u.task_id) ?? [];
                 arr.push(u);
                 grouped.set(u.task_id, arr);
               }
+              for (const arr of grouped.values()) {
+                arr.sort(
+                  (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                );
+              }
+              const tipoCfg: Record<string, { label: string; cls: string }> = {
+                avance: {
+                  label: 'Avance',
+                  cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
+                },
+                cambio_estado: {
+                  label: 'Estado',
+                  cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
+                },
+                cambio_fecha: {
+                  label: 'Fecha',
+                  cls: 'bg-purple-500/15 text-purple-400 border-purple-500/20',
+                },
+                nota: {
+                  label: 'Nota',
+                  cls: 'bg-[var(--border)]/60 text-[var(--text)]/60 border-[var(--border)]',
+                },
+                cambio_responsable: {
+                  label: 'Responsable',
+                  cls: 'bg-teal-500/15 text-teal-400 border-teal-500/20',
+                },
+              };
               return (
-                <div className="space-y-4">
+                <div className="divide-y divide-[var(--border)]">
                   {Array.from(grouped.entries()).map(([taskId, updates]) => {
                     const task = tasks.find((t) => t.id === taskId);
                     if (!task) return null;
+                    const estadoCfg = ESTADO_TASK[task.estado] ?? {
+                      label: task.estado,
+                      cls: '',
+                    };
+                    const asignado = empleadoMap.get(task.asignado_a ?? '');
                     return (
-                      <div key={taskId} className="space-y-2">
-                        <p className="text-xs font-semibold text-[var(--text)]/50 uppercase tracking-wide">
-                          {task.titulo}
-                        </p>
-                        {updates.map((u) => {
-                          const tipoCfg: Record<string, { label: string; cls: string }> = {
-                            avance: {
-                              label: 'Avance',
-                              cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
-                            },
-                            cambio_estado: {
-                              label: 'Estado',
-                              cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
-                            },
-                            cambio_fecha: {
-                              label: 'Fecha',
-                              cls: 'bg-purple-500/15 text-purple-400 border-purple-500/20',
-                            },
-                            nota: {
-                              label: 'Nota',
-                              cls: 'bg-[var(--border)]/60 text-[var(--text)]/60 border-[var(--border)]',
-                            },
-                            cambio_responsable: {
-                              label: 'Responsable',
-                              cls: 'bg-teal-500/15 text-teal-400 border-teal-500/20',
-                            },
-                          };
-                          const tc = tipoCfg[u.tipo] ?? { label: u.tipo, cls: '' };
-                          return (
-                            <div
-                              key={u.id}
-                              className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2.5"
-                            >
-                              <div className="flex items-center gap-2 mb-1">
-                                <span
-                                  className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[10px] font-medium ${tc.cls}`}
-                                >
-                                  {tc.label}
-                                </span>
-                                <span className="text-[10px] text-[var(--text)]/40">
-                                  {u.usuario?.nombre ?? 'Sistema'}
-                                </span>
-                                <span className="text-[10px] text-[var(--text)]/30 ml-auto">
-                                  {formatDate(u.created_at)}
-                                </span>
-                              </div>
-                              {u.contenido && (
-                                <p className="text-sm text-[var(--text)]/80">{u.contenido}</p>
-                              )}
-                              {u.valor_anterior != null && u.valor_nuevo != null && (
-                                <p className="text-xs text-[var(--text)]/50">
-                                  {u.tipo === 'cambio_estado'
-                                    ? `${ESTADO_TASK[u.valor_anterior]?.label ?? u.valor_anterior} → ${ESTADO_TASK[u.valor_nuevo]?.label ?? u.valor_nuevo}`
-                                    : `${u.valor_anterior || '—'} → ${u.valor_nuevo || '—'}`}
-                                </p>
-                              )}
-                            </div>
-                          );
-                        })}
+                      <div key={taskId} className="py-2.5 first:pt-0 last:pb-0">
+                        {/* Encabezado compacto: nombre + estado + meta en una
+                            sola línea. Si hay muchas tareas con movimiento
+                            la vista sigue siendo escaneable. */}
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mb-1.5">
+                          <span className="text-sm font-medium text-[var(--text)]">
+                            {task.titulo}
+                          </span>
+                          <span
+                            className={`inline-flex items-center rounded-md border px-1.5 py-px text-[10px] font-medium ${estadoCfg.cls}`}
+                          >
+                            {estadoCfg.label}
+                          </span>
+                          <span className="text-[10px] text-[var(--text)]/45">
+                            {asignado?.nombre ?? '—'}
+                            {task.fecha_vence && ` · vence ${formatDate(task.fecha_vence)}`}
+                            {` · ${updates.length} ${updates.length === 1 ? 'nota' : 'notas'}`}
+                          </span>
+                        </div>
+                        <ul className="space-y-1 pl-2 border-l-2 border-[var(--border)]">
+                          {updates.map((u) => {
+                            const tc = tipoCfg[u.tipo] ?? { label: u.tipo, cls: '' };
+                            const hasDelta = u.valor_anterior != null && u.valor_nuevo != null;
+                            return (
+                              <li key={u.id} className="text-xs leading-snug text-[var(--text)]/80">
+                                <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-[var(--text)]/45">
+                                  <span
+                                    className={`inline-flex items-center rounded border px-1.5 py-px font-medium ${tc.cls}`}
+                                  >
+                                    {tc.label}
+                                  </span>
+                                  <span className="text-[var(--text)]/65">
+                                    {u.usuario?.nombre ?? 'Sistema'}
+                                  </span>
+                                  <span>·</span>
+                                  <span>{formatDateTime(u.created_at)}</span>
+                                </div>
+                                {u.contenido && (
+                                  <p className="text-xs text-[var(--text)]/80 whitespace-pre-wrap">
+                                    {u.contenido}
+                                  </p>
+                                )}
+                                {hasDelta && (
+                                  <p className="text-[11px] text-[var(--text)]/50">
+                                    {u.tipo === 'cambio_estado'
+                                      ? `${ESTADO_TASK[u.valor_anterior!]?.label ?? u.valor_anterior} → ${ESTADO_TASK[u.valor_nuevo!]?.label ?? u.valor_nuevo}`
+                                      : `${u.valor_anterior || '—'} → ${u.valor_nuevo || '—'}`}
+                                  </p>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
                       </div>
                     );
                   })}
