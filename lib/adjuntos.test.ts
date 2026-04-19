@@ -257,11 +257,11 @@ describe('normalizeHtmlImagesToPaths', () => {
     expect(normalizeHtmlImagesToPaths('')).toBe('');
   });
 
-  it('rewrites a single double-quoted src', () => {
+  it('rewrites a single double-quoted src to the /api/adjuntos/ proxy URL', () => {
     const html =
       '<p>hi</p><img src="https://x.supabase.co/storage/v1/object/public/adjuntos/a/b.png" alt="x">';
     const out = normalizeHtmlImagesToPaths(html);
-    expect(out).toContain('src="a/b.png"');
+    expect(out).toContain('src="/api/adjuntos/a/b.png"');
     expect(out).not.toContain('/object/public/');
   });
 
@@ -269,7 +269,7 @@ describe('normalizeHtmlImagesToPaths', () => {
     const html =
       "<img src='https://x.supabase.co/storage/v1/object/sign/adjuntos/a/b.png?token=abc' />";
     const out = normalizeHtmlImagesToPaths(html);
-    expect(out).toContain('src="a/b.png"');
+    expect(out).toContain('src="/api/adjuntos/a/b.png"');
     expect(out).not.toContain('?token=');
   });
 
@@ -277,8 +277,8 @@ describe('normalizeHtmlImagesToPaths', () => {
     const html =
       '<p><img src="https://x.supabase.co/storage/v1/object/public/adjuntos/a.png"><img src="https://x.supabase.co/storage/v1/object/public/adjuntos/b.png"></p>';
     const out = normalizeHtmlImagesToPaths(html);
-    expect(out).toContain('src="a.png"');
-    expect(out).toContain('src="b.png"');
+    expect(out).toContain('src="/api/adjuntos/a.png"');
+    expect(out).toContain('src="/api/adjuntos/b.png"');
   });
 
   it('is a no-op on HTML with no images', () => {
@@ -286,10 +286,16 @@ describe('normalizeHtmlImagesToPaths', () => {
     expect(normalizeHtmlImagesToPaths(html)).toBe(html);
   });
 
-  it('leaves an already-bare-path src untouched', () => {
+  it('rewrites a bare-path src to the proxy URL', () => {
     const html = '<img src="a/b.png">';
     const out = normalizeHtmlImagesToPaths(html);
-    expect(out).toContain('src="a/b.png"');
+    expect(out).toContain('src="/api/adjuntos/a/b.png"');
+  });
+
+  it('is idempotent on already-proxied URLs', () => {
+    const html = '<img src="/api/adjuntos/a/b.png">';
+    const out = normalizeHtmlImagesToPaths(html);
+    expect(out).toContain('src="/api/adjuntos/a/b.png"');
   });
 });
 
@@ -621,6 +627,11 @@ describe('rewriteTiptapImagesToSigned', () => {
 // ─── rewriteHtmlImagesToSigned ───────────────────────────────────────────
 
 describe('rewriteHtmlImagesToSigned', () => {
+  // NOTE: The function kept its name for backward compatibility but the
+  // semantics changed. It now rewrites <img src> to the same-origin
+  // `/api/adjuntos/<path>` proxy URL instead of calling createSignedUrls().
+  // The `supabase` arg is accepted but unused — no API call happens.
+
   it('returns empty string for null / undefined / empty without calling the API', async () => {
     const createSignedUrls = vi.fn();
     const { client } = makeSupabaseMock({
@@ -644,72 +655,46 @@ describe('rewriteHtmlImagesToSigned', () => {
     expect(createSignedUrls).not.toHaveBeenCalled();
   });
 
-  it('calls the batch API exactly once even with multiple imgs', async () => {
-    const createSignedUrls = vi
-      .fn<(paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>>()
-      .mockResolvedValue({
-        data: [
-          { path: 'a.png', signedUrl: 'signed://a' },
-          { path: 'b.png', signedUrl: 'signed://b' },
-        ],
-        error: null,
-      });
+  it('never calls the Supabase API regardless of how many imgs', async () => {
+    const createSignedUrls = vi.fn();
     const { client } = makeSupabaseMock({
       createSignedUrl: vi.fn(),
       createSignedUrls,
     });
     const html = '<img src="a.png"><img src="b.png">';
     await rewriteHtmlImagesToSigned(client, html);
-    expect(createSignedUrls).toHaveBeenCalledTimes(1);
+    expect(createSignedUrls).not.toHaveBeenCalled();
   });
 
-  it('rewrites img srcs to signed URLs (double-quoted)', async () => {
-    const createSignedUrls = vi
-      .fn<(paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>>()
-      .mockResolvedValue({
-        data: [{ path: 'a.png', signedUrl: 'signed://a' }],
-        error: null,
-      });
+  it('rewrites img srcs to /api/adjuntos/ (double-quoted)', async () => {
     const { client } = makeSupabaseMock({
       createSignedUrl: vi.fn(),
-      createSignedUrls,
+      createSignedUrls: vi.fn(),
     });
     const html = '<img src="a.png" alt="x">';
     const out = await rewriteHtmlImagesToSigned(client, html);
-    expect(out).toContain('src="signed://a"');
+    expect(out).toContain('src="/api/adjuntos/a.png"');
     // Other attrs preserved.
     expect(out).toContain('alt="x"');
   });
 
   it('rewrites single-quoted srcs (coerced to double quotes on output)', async () => {
-    const createSignedUrls = vi
-      .fn<(paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>>()
-      .mockResolvedValue({
-        data: [{ path: 'a.png', signedUrl: 'signed://a' }],
-        error: null,
-      });
     const { client } = makeSupabaseMock({
       createSignedUrl: vi.fn(),
-      createSignedUrls,
+      createSignedUrls: vi.fn(),
     });
     const html = "<img src='a.png'>";
     const out = await rewriteHtmlImagesToSigned(client, html);
-    expect(out).toContain('src="signed://a"');
+    expect(out).toContain('src="/api/adjuntos/a.png"');
   });
 
-  it('leaves src untouched when the API returns no URL for it', async () => {
-    const createSignedUrls = vi
-      .fn<(paths: string[], expiresIn: number) => Promise<CreateSignedUrlsResult>>()
-      .mockResolvedValue({
-        data: [],
-        error: null,
-      });
+  it('rewrites a bare-path src to the proxy URL (no API lookup needed)', async () => {
     const { client } = makeSupabaseMock({
       createSignedUrl: vi.fn(),
-      createSignedUrls,
+      createSignedUrls: vi.fn(),
     });
     const html = '<img src="a.png">';
     const out = await rewriteHtmlImagesToSigned(client, html);
-    expect(out).toContain('src="a.png"');
+    expect(out).toContain('src="/api/adjuntos/a.png"');
   });
 });

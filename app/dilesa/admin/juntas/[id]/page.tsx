@@ -457,15 +457,13 @@ function JuntaDetailInner() {
         alert(`Error al subir imagen: ${uploadErr.message}`);
         return;
       }
-      // Bucket is private. Use a signed URL for in-editor display so the user
-      // sees the image immediately, but the save path (handleSave, autoSave,
-      // flushSave) normalizes <img src> back to the bare object path so the
-      // DB never holds a soon-to-expire signed URL.
-      const signedForEditor = await getAdjuntoSignedUrl(supabase, path, 6 * 3600);
+      // Use the same-origin proxy URL. It persists as-is in the DB and the
+      // browser authenticates via session cookie — no signed URL expiry,
+      // no rewrite race, no broken images on reload.
       editor
         .chain()
         .focus()
-        .setImage({ src: signedForEditor || path })
+        .setImage({ src: `/api/adjuntos/${path}` })
         .run();
     } finally {
       setUploadingImage(false);
