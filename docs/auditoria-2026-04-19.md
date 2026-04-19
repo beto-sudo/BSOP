@@ -96,41 +96,44 @@ Primera impresión. Lo ve todo el mundo.
 
 ---
 
-## MÓDULO: Inicio (`/inicio/*`)
+## MÓDULO: Inicio (`/inicio/*`) ✅ (pase 1 — 2026-04-19)
 
 ### `app/page.tsx` (landing de empresas)
 
 **P1:**
 
-- [ ] `text-white` hardcoded en greeting (rompe dark mode si var cambia) — [app/page.tsx:39](app/page.tsx:39)
+- [ ] `text-white` hardcoded en greeting (rompe dark mode si var cambia) — [app/page.tsx:39](app/page.tsx:39) — diferido para pase de tokens
 
 ### `app/inicio/juntas/page.tsx`
 
 **P0:**
 
-- [ ] Input de búsqueda sin `<label>` asociado — línea 315-320
-- [ ] `handleRemoveParticipant` destructivo sin confirm — línea 679-683
+- [x] Input de búsqueda con `aria-label="Buscar juntas"` + ícono con `aria-hidden` — [app/inicio/juntas/page.tsx:313](app/inicio/juntas/page.tsx:313)
+- [x] ~~`handleRemoveParticipant` en esta página~~ — El agente confundió rutas: está en `[id]/page.tsx`, ver abajo
+- [x] Error banner con `role="alert"` (bonus)
 
 **P1:**
 
-- [ ] `SortableHead` sin `aria-pressed` para estado sorted — línea 374-416
-- [ ] Campos `Título *` y `Fecha y hora *` con asterisco en texto plano (debería ser `<span aria-label="required">`)
-- [ ] Skeleton sin `aria-busy="true"` — línea 344-351
-- [ ] `ESTADO_CONFIG` con hardcoded colors — línea 62-69
+- [x] Skeleton con `role="status"` + `aria-live="polite"` + `aria-busy="true"` + sr-only "Cargando juntas…" — [app/inicio/juntas/page.tsx:345](app/inicio/juntas/page.tsx:345)
+- [ ] `SortableHead` sin `aria-pressed` — diferido (helper compartido, tocar una vez)
+- [ ] Asterisco required semántico — diferido (atado al refactor de `FieldLabel`)
+- [ ] `ESTADO_CONFIG` hardcoded colors — diferido (refactor cross-cutting)
 
 ### `app/inicio/juntas/[id]/page.tsx`
 
 **P0:**
 
-- [ ] Editor Tiptap sin `<label>` — línea 1047-1074
-- [ ] Delete participant sin confirm — línea 1244-1250
+- [x] Botón Trash2 participante con `aria-label="Quitar participante"` — [app/inicio/juntas/[id]/page.tsx:1246](app/inicio/juntas/[id]/page.tsx:1246)
+- [x] `handleRemoveParticipant` con confirmación (`window.confirm`) — [app/inicio/juntas/[id]/page.tsx:679](app/inicio/juntas/[id]/page.tsx:679)
+- [ ] Editor Tiptap sin label — el toolbar ya queda accesible con aria-label por botón; wrap-level label es overkill
 
 **P1:**
 
-- [ ] Editor toolbar sin `aria-pressed`/`aria-label` — línea 193-266
-- [ ] Botón "Terminar junta" en verde (confuso, es destructivo) — línea 938-953
-- [ ] Task updates section sin `aria-live`
-- [ ] Asistencia toggle solo con `title`, falta `aria-label` — línea 1220-1242
+- [x] Helper `btn()` de EditorToolbar con `aria-label` + `aria-pressed` — [app/inicio/juntas/[id]/page.tsx:193](app/inicio/juntas/[id]/page.tsx:193)
+- [x] Botón "Insertar tabla" con `aria-label` — [app/inicio/juntas/[id]/page.tsx:258](app/inicio/juntas/[id]/page.tsx:258)
+- [x] Toggle de asistencia con `aria-label` dinámico describiendo persona + estado + acción — [app/inicio/juntas/[id]/page.tsx:1228](app/inicio/juntas/[id]/page.tsx:1228)
+- [x] ~~"Terminar junta" en verde es destructivo~~ — Descartado: completar ≠ destruir, verde apropiado
+- [ ] Task updates section sin `aria-live` — diferido, requiere análisis del flujo
 
 ### `app/inicio/tasks/page.tsx`
 
