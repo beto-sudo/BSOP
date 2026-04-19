@@ -202,14 +202,14 @@ function JuntasInner() {
 
   const [asistenciaCounts, setAsistenciaCounts] = useState<Map<string, number>>(new Map());
   const [taskCounts, setTaskCounts] = useState<Map<string, number>>(new Map());
-  // "Avanzadas"  = # tareas de la junta con ≥1 registro en task_updates
-  //                (cuántas salen en la sección "Actualizaciones de tareas"
-  //                del detalle).
-  // "Terminadas" = subconjunto de avanzadas donde la tarea, además de tener
-  //                movimiento en la junta, quedó en estado 'completado'.
-  //                Incluye tanto cierres formales (cambio_estado →
-  //                completado) como tareas que ya estaban cerradas y
-  //                recibieron una nota/conclusión durante la junta.
+  // "Avanzadas"  = # tareas de la junta con ≥1 registro en task_updates —
+  //                las que aparecen en la sección "Actualizaciones de tareas"
+  //                del detalle.
+  // "Terminadas" = # tareas de la junta con estado='completado'. Se mide
+  //                directo de tasks.estado (no se exige un task_update
+  //                porque la migración desde Coda trajo 1100+ tareas
+  //                completadas sin updates históricos — exigir update
+  //                dejaba la columna en ceros).
   const [taskAvanzadasCounts, setTaskAvanzadasCounts] = useState<Map<string, number>>(new Map());
   const [taskTerminadasCounts, setTaskTerminadasCounts] = useState<Map<string, number>>(new Map());
   const [search, setSearch] = useState('');
@@ -251,7 +251,7 @@ function JuntasInner() {
       supabase
         .schema('erp')
         .from('task_updates')
-        .select('task_id, tipo, valor_nuevo, tasks!inner(entidad_id, entidad_tipo)')
+        .select('task_id, tasks!inner(entidad_id, entidad_tipo)')
         .eq('empresa_id', EMPRESA_ID)
         .eq('tasks.entidad_tipo', 'junta')
         .limit(50000),
@@ -268,60 +268,41 @@ function JuntasInner() {
     });
     setAsistenciaCounts(aCounts);
 
-    // Map task_id → junta_id + total de tareas por junta + set de tareas
-    // terminadas (estado actual = completado) para poder hacer el match con
-    // task_updates después.
+    // Map task_id → junta_id + total de tareas por junta + tally de
+    // terminadas (estado='completado') directamente desde erp.tasks.
     const taskToJunta = new Map<string, string>();
-    const completedTasks = new Set<string>();
     const tCounts = new Map<string, number>();
+    const teCounts = new Map<string, number>();
     (tRes.data ?? []).forEach(
       (t: { id: string; entidad_id: string | null; estado: string | null }) => {
         if (!t.entidad_id) return;
         taskToJunta.set(t.id, t.entidad_id);
         tCounts.set(t.entidad_id, (tCounts.get(t.entidad_id) ?? 0) + 1);
-        if (t.estado === 'completado') completedTasks.add(t.id);
+        if (t.estado === 'completado') {
+          teCounts.set(t.entidad_id, (teCounts.get(t.entidad_id) ?? 0) + 1);
+        }
       }
     );
     setTaskCounts(tCounts);
+    setTaskTerminadasCounts(teCounts);
 
-    // Avanzadas = # tareas distintas con updates en la junta.
-    // Terminadas = tareas con updates que además:
-    //   (a) están en estado 'completado' ahora mismo, O
-    //   (b) tuvieron un update `cambio_estado` con valor_nuevo='completado'
-    //       (incluso si después fueron reabiertas — el evento de terminación
-    //       en esta junta cuenta).
-    // Esto evita sub-contar cuando la migración desde Coda dejó la `estado`
-    // vacía o fuera del enum esperado y solo queda el rastro en task_updates.
-    // Uso Set<task_id> para no duplicar cuando una tarea tiene varios updates.
+    // Avanzadas = # tareas distintas con ≥1 task_update durante la junta
+    // (cruzan en la sección "Actualizaciones de tareas" del detalle). Uso
+    // Set<task_id> para no duplicar cuando una tarea tiene varios updates.
     const avanzadasPerJunta = new Map<string, Set<string>>();
-    const terminadasPerJunta = new Map<string, Set<string>>();
-    (uRes.data ?? []).forEach(
-      (u: { task_id: string; tipo: string | null; valor_nuevo: string | null }) => {
-        const juntaId = taskToJunta.get(u.task_id);
-        if (!juntaId) return;
-        let aSet = avanzadasPerJunta.get(juntaId);
-        if (!aSet) {
-          aSet = new Set<string>();
-          avanzadasPerJunta.set(juntaId, aSet);
-        }
-        aSet.add(u.task_id);
-        const completionEvent = u.tipo === 'cambio_estado' && u.valor_nuevo === 'completado';
-        if (completedTasks.has(u.task_id) || completionEvent) {
-          let tSet = terminadasPerJunta.get(juntaId);
-          if (!tSet) {
-            tSet = new Set<string>();
-            terminadasPerJunta.set(juntaId, tSet);
-          }
-          tSet.add(u.task_id);
-        }
+    (uRes.data ?? []).forEach((u: { task_id: string }) => {
+      const juntaId = taskToJunta.get(u.task_id);
+      if (!juntaId) return;
+      let aSet = avanzadasPerJunta.get(juntaId);
+      if (!aSet) {
+        aSet = new Set<string>();
+        avanzadasPerJunta.set(juntaId, aSet);
       }
-    );
+      aSet.add(u.task_id);
+    });
     const avCounts = new Map<string, number>();
     for (const [j, s] of avanzadasPerJunta) avCounts.set(j, s.size);
-    const teCounts = new Map<string, number>();
-    for (const [j, s] of terminadasPerJunta) teCounts.set(j, s.size);
     setTaskAvanzadasCounts(avCounts);
-    setTaskTerminadasCounts(teCounts);
   }, [supabase]);
 
   useEffect(() => {
@@ -402,7 +383,18 @@ function JuntasInner() {
   }, [juntas]);
 
   const filtered = juntas.filter((j) => {
-    if (search && !j.titulo.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search) {
+      const needle = search.toLowerCase();
+      // Busca en título + en el texto plano de la descripción (quitando
+      // tags HTML). Es la conducta previa a los refactors recientes —
+      // algunos titulos son fechas "2024-11-05 ..." y el contenido real
+      // vive en descripcion.
+      const haystack =
+        j.titulo.toLowerCase() +
+        '\n' +
+        (j.descripcion ? j.descripcion.replace(/<[^>]+>/g, ' ').toLowerCase() : '');
+      if (!haystack.includes(needle)) return false;
+    }
     if (filterEstado !== 'all' && j.estado !== filterEstado) return false;
     if (filterTipo !== 'all' && j.tipo !== filterTipo) return false;
     if (filterMonth !== 'all') {
