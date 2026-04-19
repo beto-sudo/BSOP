@@ -13,16 +13,22 @@ export function useSortableTable<_T = unknown>(defaultKey: string, defaultDir: S
   const [sortKey, setSortKey] = useState(defaultKey);
   const [sortDir, setSortDir] = useState<SortDir>(defaultDir);
 
-  const onSort = useCallback((key: string) => {
-    setSortKey((prev) => {
-      if (prev === key) {
+  // Bug previo: se llamaba `setSortDir` DENTRO del updater de `setSortKey`.
+  // En strict mode / React 19 los updaters se ejecutan dos veces, así que el
+  // toggle de dirección se cancelaba a sí mismo y los sorts no respondían al
+  // segundo clic. La forma correcta es leer `sortKey` como dependencia del
+  // callback y llamar los dos setters de forma paralela/independiente.
+  const onSort = useCallback(
+    (key: string) => {
+      if (sortKey === key) {
         setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-        return key;
+      } else {
+        setSortKey(key);
+        setSortDir('asc');
       }
-      setSortDir('asc');
-      return key;
-    });
-  }, []);
+    },
+    [sortKey]
+  );
 
   const sortData = useCallback(
     <T extends Record<string, unknown>>(data: T[]): T[] => {

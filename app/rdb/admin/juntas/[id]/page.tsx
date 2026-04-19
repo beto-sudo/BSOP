@@ -180,7 +180,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
+function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> | null }) {
   if (!editor) return null;
 
   const btn = (active: boolean, onClick: () => void, title: string, icon: React.ReactNode) => (
@@ -286,6 +286,9 @@ function JuntaDetailInner() {
   const [showTerminarDialog, setShowTerminarDialog] = useState(false);
 
   const editor = useEditor({
+    // TipTap v3 exige `immediatelyRender: false` para Next.js SSR/RSC; evita
+    // el hydration mismatch "SSR has been detected".
+    immediatelyRender: false,
     extensions: [
       StarterKit,
       Underline,

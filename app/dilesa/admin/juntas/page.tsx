@@ -202,6 +202,16 @@ function JuntasInner() {
 
   const [asistenciaCounts, setAsistenciaCounts] = useState<Map<string, number>>(new Map());
   const [taskCounts, setTaskCounts] = useState<Map<string, number>>(new Map());
+  // "Avanzadas"  = # tareas de la junta con ≥1 registro en task_updates
+  //                (cuántas salen en la sección "Actualizaciones de tareas"
+  //                del detalle).
+  // "Terminadas" = subconjunto de avanzadas donde la tarea, además de tener
+  //                movimiento en la junta, quedó en estado 'completado'.
+  //                Incluye tanto cierres formales (cambio_estado →
+  //                completado) como tareas que ya estaban cerradas y
+  //                recibieron una nota/conclusión durante la junta.
+  const [taskAvanzadasCounts, setTaskAvanzadasCounts] = useState<Map<string, number>>(new Map());
+  const [taskTerminadasCounts, setTaskTerminadasCounts] = useState<Map<string, number>>(new Map());
   const [search, setSearch] = useState('');
   const [filterEstado, setFilterEstado] = useState('all');
   const [filterTipo, setFilterTipo] = useState('all');
@@ -215,7 +225,7 @@ function JuntasInner() {
   const [tituloOverridden, setTituloOverridden] = useState(false);
 
   const fetchJuntas = useCallback(async () => {
-    const [jRes, aRes, tRes] = await Promise.all([
+    const [jRes, aRes, tRes, uRes] = await Promise.all([
       supabase
         .schema('erp')
         .from('juntas')
@@ -230,25 +240,88 @@ function JuntasInner() {
       supabase
         .schema('erp')
         .from('tasks')
-        .select('entidad_id')
+        .select('id, entidad_id, estado')
         .eq('empresa_id', EMPRESA_ID)
-        .eq('entidad_tipo', 'junta'),
+        .eq('entidad_tipo', 'junta')
+        .limit(50000),
+      // task_updates para todas las tareas de junta de la empresa. Se hace un
+      // !inner join con tasks para poder filtrar por entidad_tipo='junta' y
+      // obtener la junta_id sin un segundo round-trip. Límite alto para que
+      // no se corte con el default de 1000 filas de PostgREST.
+      supabase
+        .schema('erp')
+        .from('task_updates')
+        .select('task_id, tipo, valor_nuevo, tasks!inner(entidad_id, entidad_tipo)')
+        .eq('empresa_id', EMPRESA_ID)
+        .eq('tasks.entidad_tipo', 'junta')
+        .limit(50000),
     ]);
     if (jRes.error) {
       setError(jRes.error.message);
       return;
     }
     setJuntas((jRes.data ?? []) as Junta[]);
+
     const aCounts = new Map<string, number>();
     (aRes.data ?? []).forEach((a: { junta_id: string }) => {
       aCounts.set(a.junta_id, (aCounts.get(a.junta_id) ?? 0) + 1);
     });
     setAsistenciaCounts(aCounts);
+
+    // Map task_id → junta_id + total de tareas por junta + set de tareas
+    // terminadas (estado actual = completado) para poder hacer el match con
+    // task_updates después.
+    const taskToJunta = new Map<string, string>();
+    const completedTasks = new Set<string>();
     const tCounts = new Map<string, number>();
-    (tRes.data ?? []).forEach((t: { entidad_id: string | null }) => {
-      if (t.entidad_id) tCounts.set(t.entidad_id, (tCounts.get(t.entidad_id) ?? 0) + 1);
-    });
+    (tRes.data ?? []).forEach(
+      (t: { id: string; entidad_id: string | null; estado: string | null }) => {
+        if (!t.entidad_id) return;
+        taskToJunta.set(t.id, t.entidad_id);
+        tCounts.set(t.entidad_id, (tCounts.get(t.entidad_id) ?? 0) + 1);
+        if (t.estado === 'completado') completedTasks.add(t.id);
+      }
+    );
     setTaskCounts(tCounts);
+
+    // Avanzadas = # tareas distintas con updates en la junta.
+    // Terminadas = tareas con updates que además:
+    //   (a) están en estado 'completado' ahora mismo, O
+    //   (b) tuvieron un update `cambio_estado` con valor_nuevo='completado'
+    //       (incluso si después fueron reabiertas — el evento de terminación
+    //       en esta junta cuenta).
+    // Esto evita sub-contar cuando la migración desde Coda dejó la `estado`
+    // vacía o fuera del enum esperado y solo queda el rastro en task_updates.
+    // Uso Set<task_id> para no duplicar cuando una tarea tiene varios updates.
+    const avanzadasPerJunta = new Map<string, Set<string>>();
+    const terminadasPerJunta = new Map<string, Set<string>>();
+    (uRes.data ?? []).forEach(
+      (u: { task_id: string; tipo: string | null; valor_nuevo: string | null }) => {
+        const juntaId = taskToJunta.get(u.task_id);
+        if (!juntaId) return;
+        let aSet = avanzadasPerJunta.get(juntaId);
+        if (!aSet) {
+          aSet = new Set<string>();
+          avanzadasPerJunta.set(juntaId, aSet);
+        }
+        aSet.add(u.task_id);
+        const completionEvent = u.tipo === 'cambio_estado' && u.valor_nuevo === 'completado';
+        if (completedTasks.has(u.task_id) || completionEvent) {
+          let tSet = terminadasPerJunta.get(juntaId);
+          if (!tSet) {
+            tSet = new Set<string>();
+            terminadasPerJunta.set(juntaId, tSet);
+          }
+          tSet.add(u.task_id);
+        }
+      }
+    );
+    const avCounts = new Map<string, number>();
+    for (const [j, s] of avanzadasPerJunta) avCounts.set(j, s.size);
+    const teCounts = new Map<string, number>();
+    for (const [j, s] of terminadasPerJunta) teCounts.set(j, s.size);
+    setTaskAvanzadasCounts(avCounts);
+    setTaskTerminadasCounts(teCounts);
   }, [supabase]);
 
   useEffect(() => {
@@ -520,6 +593,22 @@ function JuntasInner() {
                   onSort={onSort}
                   className="w-16"
                 />
+                <SortableHead
+                  sortKey="avanzadas"
+                  label="Avanz."
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                  className="w-16"
+                />
+                <SortableHead
+                  sortKey="terminadas"
+                  label="Term."
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                  className="w-16"
+                />
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
@@ -529,6 +618,8 @@ function JuntasInner() {
                   ...j,
                   asistentes: asistenciaCounts.get(j.id) ?? 0,
                   tareas: taskCounts.get(j.id) ?? 0,
+                  avanzadas: taskAvanzadasCounts.get(j.id) ?? 0,
+                  terminadas: taskTerminadasCounts.get(j.id) ?? 0,
                 }))
               ).map((junta) => (
                 <TableRow
@@ -571,6 +662,30 @@ function JuntasInner() {
                     <span className="text-sm text-[var(--text)]/60">
                       {taskCounts.get(junta.id) ?? 0}
                     </span>
+                  </TableCell>
+                  <TableCell>
+                    {(() => {
+                      const n = taskAvanzadasCounts.get(junta.id) ?? 0;
+                      return (
+                        <span
+                          className={`text-sm ${n > 0 ? 'text-blue-400 font-medium' : 'text-[var(--text)]/30'}`}
+                        >
+                          {n}
+                        </span>
+                      );
+                    })()}
+                  </TableCell>
+                  <TableCell>
+                    {(() => {
+                      const n = taskTerminadasCounts.get(junta.id) ?? 0;
+                      return (
+                        <span
+                          className={`text-sm ${n > 0 ? 'text-green-400 font-medium' : 'text-[var(--text)]/30'}`}
+                        >
+                          {n}
+                        </span>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell>
                     <ChevronRight className="h-4 w-4 text-[var(--text)]/30" />
