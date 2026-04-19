@@ -15,17 +15,37 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 const PUBLIC_URL_MARKER = '/object/public/adjuntos/';
 const SIGNED_URL_MARKER = '/object/sign/adjuntos/';
 const AUTHENTICATED_URL_MARKER = '/object/authenticated/adjuntos/';
+// Same-origin proxy path served by app/api/adjuntos/[...path]/route.ts.
+// This is the preferred canonical format going forward because it avoids
+// signed-URL expiry + client-side rewrite races.
+const PROXY_PREFIX = '/api/adjuntos/';
 
 /**
- * Normalize a value that may be a bare path, a legacy public URL, or a
- * (stale) signed URL into the object path inside the `adjuntos` bucket.
+ * Builds the canonical same-origin URL for an adjunto from a bare object path.
+ * Pass the result straight to <img src="…"> or <a href="…">. Loads go through
+ * the cookie-authenticated proxy route, no signing needed.
+ */
+export function getAdjuntoProxyUrl(pathOrUrl: string | null | undefined): string {
+  const path = getAdjuntoPath(pathOrUrl);
+  return path ? `${PROXY_PREFIX}${path}` : '';
+}
+
+/**
+ * Normalize a value that may be a bare path, a legacy public URL, a (stale)
+ * signed URL, or an /api/adjuntos/ proxy URL into the object path inside
+ * the `adjuntos` bucket.
  */
 export function getAdjuntoPath(urlOrPath: string | null | undefined): string | null {
   if (!urlOrPath) return null;
   const value = String(urlOrPath).trim();
   if (!value) return null;
 
-  for (const marker of [PUBLIC_URL_MARKER, SIGNED_URL_MARKER, AUTHENTICATED_URL_MARKER]) {
+  for (const marker of [
+    PUBLIC_URL_MARKER,
+    SIGNED_URL_MARKER,
+    AUTHENTICATED_URL_MARKER,
+    PROXY_PREFIX,
+  ]) {
     const idx = value.indexOf(marker);
     if (idx >= 0) {
       // Strip the host prefix and any query string (signed URLs have `?token=…`).
@@ -172,16 +192,6 @@ export function normalizeTiptapImagesToPaths(tree: unknown): unknown {
 // BSOP's juntas descripcion stores HTML, not prosemirror JSON. These
 // helpers mutate the `src` attribute on every <img> tag.
 
-function extractImgSrcs(html: string): string[] {
-  const out: string[] = [];
-  const re = /<img\b[^>]*?\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)')/gi;
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(html)) !== null) {
-    out.push(match[1] ?? match[2] ?? '');
-  }
-  return out;
-}
-
 function replaceImgSrcs(html: string, transform: (src: string) => string): string {
   return html.replace(
     /(<img\b[^>]*?\bsrc\s*=\s*)(?:"([^"]*)"|'([^']*)')/gi,
@@ -194,31 +204,47 @@ function replaceImgSrcs(html: string, transform: (src: string) => string): strin
 }
 
 /**
- * Rewrites every `<img src="…">` in an HTML string to a signed URL.
- * Safe to call on HTML that has no adjuntos images (it's a no-op).
+ * Rewrites every `<img src="…">` in an HTML string to the same-origin
+ * `/api/adjuntos/<path>` proxy URL. This is a **synchronous** pure-string
+ * transform — no Supabase round-trip, no expiring tokens, no race
+ * conditions with TipTap setContent.
+ *
+ * Kept named `rewriteHtmlImagesToSigned` for backward compatibility with
+ * existing callers that await it. The `supabase` and `expiresInSeconds`
+ * args are accepted but unused; mark them as such to avoid misuse in
+ * future changes.
  */
 export async function rewriteHtmlImagesToSigned(
-  supabase: SupabaseClient,
+  _supabase: SupabaseClient,
   html: string | null | undefined,
-  expiresInSeconds = 3600
+  _expiresInSeconds = 3600
 ): Promise<string> {
+  return rewriteHtmlImagesToProxy(html);
+}
+
+/**
+ * Pure synchronous version. Replaces every <img src> with `/api/adjuntos/<path>`.
+ * Safe to call on HTML that has no adjuntos images (no-op when no <img>).
+ */
+export function rewriteHtmlImagesToProxy(html: string | null | undefined): string {
   if (!html) return '';
-  const srcs = extractImgSrcs(html);
-  if (srcs.length === 0) return html;
-  const signedMap = await getAdjuntoSignedUrls(supabase, srcs, expiresInSeconds);
   return replaceImgSrcs(html, (src) => {
     const path = getAdjuntoPath(src);
     if (!path) return src;
-    return signedMap.get(path) ?? src;
+    return `/api/adjuntos/${path}`;
   });
 }
 
 /**
- * Rewrites every `<img src="…">` in an HTML string to the bare object
- * path — call in the save path so the DB never holds soon-to-expire
- * signed URLs.
+ * Normalize every `<img src="…">` in an HTML string to the canonical
+ * `/api/adjuntos/<path>` form. Call this in the save path so the DB
+ * always holds the same format (no signed URLs, no legacy public URLs).
+ *
+ * Name kept for backward compatibility — despite "ToPaths", the output
+ * is now the proxy URL, not the bare path. Callers just need a value
+ * that the read side will correctly render; the proxy URL fits both
+ * roles and works in <img src> directly without any rewriter step.
  */
 export function normalizeHtmlImagesToPaths(html: string | null | undefined): string {
-  if (!html) return '';
-  return replaceImgSrcs(html, (src) => getAdjuntoPath(src) ?? src);
+  return rewriteHtmlImagesToProxy(html);
 }
