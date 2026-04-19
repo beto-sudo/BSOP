@@ -409,15 +409,25 @@ function JuntaDetailInner() {
         return true;
       },
       handlePaste(view, event) {
+        // 1) Single image blob (right-click → Copy image in Coda, or screenshot)
         const items = event.clipboardData?.items;
-        if (!items) return false;
-        for (const item of Array.from(items)) {
-          if (item.type.startsWith('image/')) {
-            event.preventDefault();
-            const file = item.getAsFile();
-            if (file) void handleImageUpload(file);
-            return true;
+        if (items) {
+          for (const item of Array.from(items)) {
+            if (item.type.startsWith('image/')) {
+              event.preventDefault();
+              const file = item.getAsFile();
+              if (file) void handleImageUpload(file);
+              return true;
+            }
           }
+        }
+        // 2) HTML paste with external Coda <img> URLs (Cmd+A + Cmd+C from Coda junta).
+        //    Intercept only when we actually see Coda-hosted image references.
+        const html = event.clipboardData?.getData('text/html') || '';
+        if (html && /(codahosted\.io|codaio\.imgix\.net|images-codaio\.imgix\.net)/.test(html)) {
+          event.preventDefault();
+          void handlePasteWithCodaImages(html);
+          return true;
         }
         return false;
       },
@@ -442,6 +452,82 @@ function JuntaDetailInner() {
   const [showAddUpdate, setShowAddUpdate] = useState<string | null>(null);
   const [updateForm, setUpdateForm] = useState({ contenido: '', nuevoEstado: '', nuevaFecha: '' });
   const [savingUpdate, setSavingUpdate] = useState(false);
+
+  /**
+   * Paste handler for HTML blobs that contain Coda-hosted image references.
+   * Triggered when the user does Cmd+A + Cmd+C on a Coda junta and pastes
+   * into this editor.
+   *
+   * For each <img src="codahosted.io/...">:
+   *   1. POST the URL to /api/adjuntos/import-url which downloads server-side
+   *      (avoids CORS) and stores in the private adjuntos bucket under this
+   *      junta's folder.
+   *   2. Replace the src with the returned /api/adjuntos/<path> proxy URL.
+   *
+   * After all images are imported, insert the rewritten HTML into the editor.
+   */
+  const handlePasteWithCodaImages = async (html: string) => {
+    if (!editor) return;
+    setUploadingImage(true);
+    try {
+      // Extract each <img src="..."> that points at a Coda CDN.
+      const imgRe = /<img\b[^>]*?\bsrc\s*=\s*(?:"([^"]+)"|'([^']+)')/gi;
+      const srcs: string[] = [];
+      let m: RegExpExecArray | null;
+      const codaHostPattern = /(codahosted\.io|codaio\.imgix\.net|images-codaio\.imgix\.net)/;
+      while ((m = imgRe.exec(html)) !== null) {
+        const src = m[1] ?? m[2] ?? '';
+        if (src && codaHostPattern.test(src)) srcs.push(src);
+      }
+      const uniqueSrcs = Array.from(new Set(srcs));
+
+      const replacements = new Map<string, string>();
+      let imported = 0;
+      let failed = 0;
+      for (const src of uniqueSrcs) {
+        try {
+          const res = await fetch('/api/adjuntos/import-url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: src, juntaId: id }),
+          });
+          if (!res.ok) {
+            failed += 1;
+            console.warn('[paste] import-url failed for', src.slice(0, 60), res.status);
+            continue;
+          }
+          const data = (await res.json()) as { ok?: boolean; url?: string };
+          if (data.ok && data.url) {
+            replacements.set(src, data.url);
+            imported += 1;
+          } else {
+            failed += 1;
+          }
+        } catch (err) {
+          failed += 1;
+          console.warn('[paste] import-url error', (err as Error).message);
+        }
+      }
+
+      // Apply replacements to the HTML so <img src="codahosted..."> → <img src="/api/adjuntos/...">
+      let rewritten = html;
+      for (const [from, to] of replacements) {
+        const escaped = from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        rewritten = rewritten.replace(new RegExp(escaped, 'g'), to);
+      }
+
+      // Insert into the editor at the current cursor position.
+      editor.chain().focus().insertContent(rewritten).run();
+
+      if (failed > 0) {
+        alert(
+          `Imágenes importadas: ${imported}. Fallaron ${failed} — revisa la consola del navegador.`
+        );
+      }
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   const handleImageUpload = async (file: File) => {
     if (!editor || uploadingImage) return;
