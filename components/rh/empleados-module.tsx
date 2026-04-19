@@ -49,14 +49,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { FilterCombobox } from '@/components/ui/filter-combobox';
+import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { FieldLabel } from '@/components/ui/field-label';
@@ -621,37 +615,31 @@ export function EmpleadosModule({
         </div>
         <div>
           <FieldLabel>Estado civil</FieldLabel>
-          <Select
+          <Combobox
             value={createForm.estado_civil}
-            onValueChange={(v) => setCreateForm((f) => ({ ...f, estado_civil: v ?? '' }))}
-          >
-            <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-              <SelectValue placeholder="Seleccionar…" />
-            </SelectTrigger>
-            <SelectContent>
-              {['Soltero/a', 'Casado/a', 'Unión libre', 'Divorciado/a', 'Viudo/a'].map((o) => (
-                <SelectItem key={o} value={o}>
-                  {o}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(v) => setCreateForm((f) => ({ ...f, estado_civil: v }))}
+            options={['Soltero/a', 'Casado/a', 'Unión libre', 'Divorciado/a', 'Viudo/a'].map(
+              (o) => ({ value: o, label: o })
+            )}
+            placeholder="Seleccionar…"
+            allowClear
+            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+          />
         </div>
         <div>
           <FieldLabel>Sexo</FieldLabel>
-          <Select
+          <Combobox
             value={createForm.sexo}
-            onValueChange={(v) => setCreateForm((f) => ({ ...f, sexo: v ?? '' }))}
-          >
-            <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-              <SelectValue placeholder="Seleccionar…" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="M">Masculino</SelectItem>
-              <SelectItem value="F">Femenino</SelectItem>
-              <SelectItem value="X">Otro / No especifica</SelectItem>
-            </SelectContent>
-          </Select>
+            onChange={(v) => setCreateForm((f) => ({ ...f, sexo: v }))}
+            options={[
+              { value: 'M', label: 'Masculino' },
+              { value: 'F', label: 'Femenino' },
+              { value: 'X', label: 'Otro / No especifica' },
+            ]}
+            placeholder="Seleccionar…"
+            allowClear
+            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+          />
         </div>
       </div>
 
@@ -760,39 +748,25 @@ export function EmpleadosModule({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <FieldLabel>Departamento</FieldLabel>
-          <Select
+          <Combobox
             value={createForm.departamento_id}
-            onValueChange={(v) => setCreateForm((f) => ({ ...f, departamento_id: v ?? '' }))}
-          >
-            <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-              <SelectValue placeholder="Sin departamento" />
-            </SelectTrigger>
-            <SelectContent>
-              {departamentos.map((d) => (
-                <SelectItem key={d.id} value={d.id}>
-                  {d.nombre}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(v) => setCreateForm((f) => ({ ...f, departamento_id: v }))}
+            options={departamentos.map((d) => ({ value: d.id, label: d.nombre }))}
+            placeholder="Sin departamento"
+            allowClear
+            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+          />
         </div>
         <div>
           <FieldLabel>Puesto</FieldLabel>
-          <Select
+          <Combobox
             value={createForm.puesto_id}
-            onValueChange={(v) => setCreateForm((f) => ({ ...f, puesto_id: v ?? '' }))}
-          >
-            <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-              <SelectValue placeholder="Sin puesto" />
-            </SelectTrigger>
-            <SelectContent>
-              {puestos.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.nombre}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(v) => setCreateForm((f) => ({ ...f, puesto_id: v }))}
+            options={puestos.map((p) => ({ value: p.id, label: p.nombre }))}
+            placeholder="Sin puesto"
+            allowClear
+            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+          />
         </div>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -818,22 +792,20 @@ export function EmpleadosModule({
 
       <div>
         <FieldLabel>Tipo de contrato</FieldLabel>
-        <Select
+        <Combobox
           value={createForm.tipo_contrato}
-          onValueChange={(v) => setCreateForm((f) => ({ ...f, tipo_contrato: v ?? 'prueba' }))}
-        >
-          <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-            <SelectValue placeholder="Seleccionar…" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="prueba">Periodo de prueba (default DILESA)</SelectItem>
-            <SelectItem value="indefinido">Tiempo indefinido / Planta</SelectItem>
-            <SelectItem value="determinado">Tiempo determinado</SelectItem>
-            <SelectItem value="obra">Obra determinada</SelectItem>
-            <SelectItem value="temporada">Temporada</SelectItem>
-            <SelectItem value="capacitacion_inicial">Capacitación inicial</SelectItem>
-          </SelectContent>
-        </Select>
+          onChange={(v) => setCreateForm((f) => ({ ...f, tipo_contrato: v || 'prueba' }))}
+          options={[
+            { value: 'prueba', label: 'Periodo de prueba (default DILESA)' },
+            { value: 'indefinido', label: 'Tiempo indefinido / Planta' },
+            { value: 'determinado', label: 'Tiempo determinado' },
+            { value: 'obra', label: 'Obra determinada' },
+            { value: 'temporada', label: 'Temporada' },
+            { value: 'capacitacion_inicial', label: 'Capacitación inicial' },
+          ]}
+          placeholder="Seleccionar…"
+          className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+        />
         {createForm.tipo_contrato === 'prueba' && (
           <p className="mt-1 text-[10px] text-[var(--text)]/40">
             Por defecto 30 días, prueba 1 de 3. Ajusta después en la ficha si es necesario.
