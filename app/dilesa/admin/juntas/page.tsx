@@ -133,12 +133,21 @@ function nowDatetimeLocal() {
 function generateTitulo(fechaHora: string, tipo: string) {
   if (!fechaHora || !tipo) return '';
   const d = new Date(fechaHora);
-  const fecha = d.toLocaleDateString('es-MX', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
+  // ISO-style date (YYYY-MM-DD) in local timezone — matches the historical
+  // format used across 700+ juntas ("2026-04-08, 9:05 AM - Comite Ejecutivo").
+  // Do NOT switch to toLocaleDateString('es-MX', ...) — that produces
+  // DD/MM/YYYY which is visually inconsistent and sorts poorly.
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const fecha = `${yyyy}-${mm}-${dd}`;
+  // en-US gives "9:05 AM" (no leading zero, uppercase AM/PM, no dots) which is
+  // what the legacy titles use.
+  const hora = d.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
   });
-  const hora = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
   return `${fecha}, ${hora} - ${tipo}`;
 }
 
