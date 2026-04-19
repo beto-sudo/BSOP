@@ -200,12 +200,27 @@ export function EmpleadosModule({
     apellido_materno: '',
     email: '',
     telefono: '',
+    telefono_casa: '',
     rfc: '',
+    curp: '',
+    nss: '',
+    fecha_nacimiento: '',
+    lugar_nacimiento: '',
+    nacionalidad: 'Mexicana',
+    estado_civil: '',
+    sexo: '',
+    domicilio: '',
+    contacto_emergencia_nombre: '',
+    contacto_emergencia_telefono: '',
+    contacto_emergencia_parentesco: '',
     // Campos de empleado.
     departamento_id: '',
     puesto_id: '',
     numero_empleado: '',
     fecha_ingreso: '',
+    tipo_contrato: 'prueba',
+    horario: '',
+    lugar_trabajo: '',
   });
 
   const fetchEmpresaIds = useCallback(async (): Promise<string[]> => {
@@ -351,7 +366,20 @@ export function EmpleadosModule({
           apellido_materno: apellidoMaterno || null,
           email: createForm.email.trim().toLowerCase() || null,
           telefono: createForm.telefono.trim() || null,
+          telefono_casa: createForm.telefono_casa.trim() || null,
           rfc: rfc || null,
+          curp: createForm.curp.trim().toUpperCase() || null,
+          nss: createForm.nss.trim() || null,
+          fecha_nacimiento: createForm.fecha_nacimiento || null,
+          lugar_nacimiento: titleCase(createForm.lugar_nacimiento) || null,
+          nacionalidad: titleCase(createForm.nacionalidad) || 'Mexicana',
+          estado_civil: createForm.estado_civil || null,
+          sexo: createForm.sexo || null,
+          domicilio: createForm.domicilio.trim() || null,
+          contacto_emergencia_nombre: titleCase(createForm.contacto_emergencia_nombre) || null,
+          contacto_emergencia_telefono: createForm.contacto_emergencia_telefono.trim() || null,
+          contacto_emergencia_parentesco:
+            titleCase(createForm.contacto_emergencia_parentesco) || null,
           tipo: 'empleado',
           activo: true,
         })
@@ -377,6 +405,11 @@ export function EmpleadosModule({
       puesto_id: createForm.puesto_id || null,
       numero_empleado: createForm.numero_empleado.trim() || null,
       fecha_ingreso: createForm.fecha_ingreso || null,
+      tipo_contrato: createForm.tipo_contrato || null,
+      periodo_prueba_dias: createForm.tipo_contrato === 'prueba' ? 30 : null,
+      periodo_prueba_numero: createForm.tipo_contrato === 'prueba' ? 1 : null,
+      horario: createForm.horario.trim() || null,
+      lugar_trabajo: createForm.lugar_trabajo.trim() || null,
       activo: true,
     };
     const { data: newEmp, error: err } = await supabase
@@ -397,11 +430,26 @@ export function EmpleadosModule({
       apellido_materno: '',
       email: '',
       telefono: '',
+      telefono_casa: '',
       rfc: '',
+      curp: '',
+      nss: '',
+      fecha_nacimiento: '',
+      lugar_nacimiento: '',
+      nacionalidad: 'Mexicana',
+      estado_civil: '',
+      sexo: '',
+      domicilio: '',
+      contacto_emergencia_nombre: '',
+      contacto_emergencia_telefono: '',
+      contacto_emergencia_parentesco: '',
       departamento_id: '',
       puesto_id: '',
       numero_empleado: '',
       fecha_ingreso: '',
+      tipo_contrato: 'prueba',
+      horario: '',
+      lugar_trabajo: '',
     });
     toast.add({ title: 'Empleado creado', type: 'success' });
     if (newEmp) router.push(detailHref(empresaSlug, newEmp.id as string));
@@ -529,17 +577,184 @@ export function EmpleadosModule({
         </div>
       </div>
 
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div>
+          <FieldLabel>Teléfono casa</FieldLabel>
+          <Input
+            placeholder="(878) 000-0000"
+            value={createForm.telefono_casa}
+            onChange={(e) => setCreateForm((f) => ({ ...f, telefono_casa: e.target.value }))}
+            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+          />
+        </div>
+        <div>
+          <FieldLabel>Fecha de nacimiento</FieldLabel>
+          <Input
+            type="date"
+            value={createForm.fecha_nacimiento}
+            onChange={(e) => setCreateForm((f) => ({ ...f, fecha_nacimiento: e.target.value }))}
+            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+          />
+        </div>
+        <div>
+          <FieldLabel>Lugar de nacimiento</FieldLabel>
+          <Input
+            placeholder="Piedras Negras, Coahuila"
+            value={createForm.lugar_nacimiento}
+            onChange={(e) => setCreateForm((f) => ({ ...f, lugar_nacimiento: e.target.value }))}
+            onBlur={(e) =>
+              setCreateForm((f) => ({ ...f, lugar_nacimiento: titleCase(e.target.value) }))
+            }
+            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div>
+          <FieldLabel>Nacionalidad</FieldLabel>
+          <Input
+            value={createForm.nacionalidad}
+            onChange={(e) => setCreateForm((f) => ({ ...f, nacionalidad: e.target.value }))}
+            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+          />
+        </div>
+        <div>
+          <FieldLabel>Estado civil</FieldLabel>
+          <Select
+            value={createForm.estado_civil}
+            onValueChange={(v) => setCreateForm((f) => ({ ...f, estado_civil: v ?? '' }))}
+          >
+            <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
+              <SelectValue placeholder="Seleccionar…" />
+            </SelectTrigger>
+            <SelectContent>
+              {['Soltero/a', 'Casado/a', 'Unión libre', 'Divorciado/a', 'Viudo/a'].map((o) => (
+                <SelectItem key={o} value={o}>
+                  {o}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <FieldLabel>Sexo</FieldLabel>
+          <Select
+            value={createForm.sexo}
+            onValueChange={(v) => setCreateForm((f) => ({ ...f, sexo: v ?? '' }))}
+          >
+            <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
+              <SelectValue placeholder="Seleccionar…" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="M">Masculino</SelectItem>
+              <SelectItem value="F">Femenino</SelectItem>
+              <SelectItem value="X">Otro / No especifica</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div>
+          <FieldLabel>RFC</FieldLabel>
+          <Input
+            placeholder="XXXX000000XXX"
+            value={createForm.rfc}
+            onChange={(e) => setCreateForm((f) => ({ ...f, rfc: e.target.value.toUpperCase() }))}
+            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)] font-mono"
+          />
+          <p className="mt-1 text-[10px] text-[var(--text)]/40">
+            Si ya existe una persona con este RFC, se reutiliza.
+          </p>
+        </div>
+        <div>
+          <FieldLabel>CURP</FieldLabel>
+          <Input
+            placeholder="XXXX000000XXXXXX00"
+            value={createForm.curp}
+            onChange={(e) => setCreateForm((f) => ({ ...f, curp: e.target.value.toUpperCase() }))}
+            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)] font-mono"
+          />
+        </div>
+        <div>
+          <FieldLabel>NSS</FieldLabel>
+          <Input
+            placeholder="00000000000"
+            value={createForm.nss}
+            onChange={(e) => setCreateForm((f) => ({ ...f, nss: e.target.value }))}
+            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)] font-mono"
+          />
+        </div>
+      </div>
+
       <div>
-        <FieldLabel>RFC</FieldLabel>
+        <FieldLabel>Domicilio</FieldLabel>
         <Input
-          placeholder="XXXX000000XXX"
-          value={createForm.rfc}
-          onChange={(e) => setCreateForm((f) => ({ ...f, rfc: e.target.value.toUpperCase() }))}
-          className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)] font-mono"
+          placeholder="Calle, número, colonia, C.P., ciudad, estado"
+          value={createForm.domicilio}
+          onChange={(e) => setCreateForm((f) => ({ ...f, domicilio: e.target.value }))}
+          className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
         />
-        <p className="mt-1 text-[10px] text-[var(--text)]/40">
-          Si ya existe una persona con este RFC, se reutilizará en lugar de duplicarla.
+      </div>
+
+      <div className="pt-3 border-t border-[var(--border)]">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/40 mb-2">
+          Contacto de emergencia
         </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <FieldLabel>Nombre</FieldLabel>
+            <Input
+              placeholder="Nombre completo"
+              value={createForm.contacto_emergencia_nombre}
+              onChange={(e) =>
+                setCreateForm((f) => ({ ...f, contacto_emergencia_nombre: e.target.value }))
+              }
+              onBlur={(e) =>
+                setCreateForm((f) => ({
+                  ...f,
+                  contacto_emergencia_nombre: titleCase(e.target.value),
+                }))
+              }
+              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+            />
+          </div>
+          <div>
+            <FieldLabel>Parentesco</FieldLabel>
+            <Input
+              placeholder="Esposa, madre…"
+              value={createForm.contacto_emergencia_parentesco}
+              onChange={(e) =>
+                setCreateForm((f) => ({
+                  ...f,
+                  contacto_emergencia_parentesco: e.target.value,
+                }))
+              }
+              onBlur={(e) =>
+                setCreateForm((f) => ({
+                  ...f,
+                  contacto_emergencia_parentesco: titleCase(e.target.value),
+                }))
+              }
+              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+            />
+          </div>
+          <div>
+            <FieldLabel>Teléfono</FieldLabel>
+            <Input
+              placeholder="(878) 000-0000"
+              value={createForm.contacto_emergencia_telefono}
+              onChange={(e) =>
+                setCreateForm((f) => ({
+                  ...f,
+                  contacto_emergencia_telefono: e.target.value,
+                }))
+              }
+              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+            />
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -599,6 +814,51 @@ export function EmpleadosModule({
             className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
           />
         </div>
+      </div>
+
+      <div>
+        <FieldLabel>Tipo de contrato</FieldLabel>
+        <Select
+          value={createForm.tipo_contrato}
+          onValueChange={(v) => setCreateForm((f) => ({ ...f, tipo_contrato: v ?? 'prueba' }))}
+        >
+          <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
+            <SelectValue placeholder="Seleccionar…" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="prueba">Periodo de prueba (default DILESA)</SelectItem>
+            <SelectItem value="indefinido">Tiempo indefinido / Planta</SelectItem>
+            <SelectItem value="determinado">Tiempo determinado</SelectItem>
+            <SelectItem value="obra">Obra determinada</SelectItem>
+            <SelectItem value="temporada">Temporada</SelectItem>
+            <SelectItem value="capacitacion_inicial">Capacitación inicial</SelectItem>
+          </SelectContent>
+        </Select>
+        {createForm.tipo_contrato === 'prueba' && (
+          <p className="mt-1 text-[10px] text-[var(--text)]/40">
+            Por defecto 30 días, prueba 1 de 3. Ajusta después en la ficha si es necesario.
+          </p>
+        )}
+      </div>
+
+      <div>
+        <FieldLabel>Horario y jornada</FieldLabel>
+        <Input
+          placeholder="Lun-Vie 8:00-17:00, 1h comida (48 h/sem)"
+          value={createForm.horario}
+          onChange={(e) => setCreateForm((f) => ({ ...f, horario: e.target.value }))}
+          className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+        />
+      </div>
+
+      <div>
+        <FieldLabel>Lugar(es) de trabajo</FieldLabel>
+        <Input
+          placeholder="Oficinas DILESA Piedras Negras"
+          value={createForm.lugar_trabajo}
+          onChange={(e) => setCreateForm((f) => ({ ...f, lugar_trabajo: e.target.value }))}
+          className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+        />
       </div>
     </div>
   );
