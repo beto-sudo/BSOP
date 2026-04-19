@@ -93,6 +93,8 @@ export function Sidebar({
 
   return (
     <aside
+      id="app-sidebar"
+      aria-label={t('header.navigation')}
       className={[
         'fixed inset-y-0 left-0 z-40 flex flex-col border-r border-[var(--border)] bg-[var(--sidebar)] transition-all duration-300 ease-out',
         collapsed ? 'w-16 md:w-16' : 'w-60',
@@ -125,6 +127,8 @@ export function Sidebar({
           onClick={() => setCollapsed((value) => !value)}
           className="absolute right-6 hidden h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--card)] dark:text-white/70 text-[var(--text)]/70 transition hover:border-[var(--accent)] dark:hover:text-white hover:text-[var(--text)] md:inline-flex"
           aria-label={collapsed ? t('header.expand_sidebar') : t('header.collapse_sidebar')}
+          aria-expanded={!collapsed}
+          aria-controls="app-sidebar"
         >
           {collapsed ? (
             <PanelLeftOpen className="h-4 w-4" />

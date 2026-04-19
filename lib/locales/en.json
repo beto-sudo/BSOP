@@ -12,6 +12,7 @@
 
   "header.no_events": "No upcoming events",
   "header.today": "Today",
+  "header.navigation": "Main navigation",
   "header.toggle_nav": "Toggle navigation",
   "header.close_nav": "Close navigation",
   "header.expand_sidebar": "Expand sidebar",

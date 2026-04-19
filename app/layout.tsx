@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" suppressHydrationWarning className={cn('font-sans', geist.variable)}>
+    <html lang="es-MX" suppressHydrationWarning className={cn('font-sans', geist.variable)}>
       <body>
         <Providers>
           <AppShell>{children}</AppShell>
