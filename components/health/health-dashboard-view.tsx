@@ -9,7 +9,6 @@ import {
   groupDailyAverage,
   groupDailySleep,
   groupDailyWeightConnect,
-  normalizeWeightToLb,
   summarizeDailyWindow,
   summarizeWindow,
 } from './helpers';
