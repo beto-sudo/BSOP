@@ -25,8 +25,15 @@ export function HeroVitals({ heroCards }: { heroCards: HeroCard[] }) {
                   <div className={`rounded-2xl border p-3 ${card.tone}`}>
                     <Icon className="h-5 w-5" />
                   </div>
-                  <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted-foreground)] dark:text-white/35">
-                    {card.label}
+                  <div className="flex items-center gap-2">
+                    {card.stale ? (
+                      <span className="rounded-full border border-amber-300/40 bg-amber-100/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700 dark:border-amber-300/25 dark:bg-amber-300/10 dark:text-amber-200">
+                        {card.staleLabel ?? 'Sin datos'}
+                      </span>
+                    ) : null}
+                    <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted-foreground)] dark:text-white/35">
+                      {card.label}
+                    </div>
                   </div>
                 </div>
                 <div className="mt-6 flex items-end gap-2">

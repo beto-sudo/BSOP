@@ -61,6 +61,8 @@ const SUMMARY_METRIC_NAMES = [
   'Blood Pressure Diastolic',
   ...SLEEP_ASLEEP_METRICS,
   'Body Mass',
+  'Body Fat Percentage',
+  'Body Mass Index',
 ];
 
 export function formatMetricValue(value: number | null | undefined, digits = 0) {
@@ -195,6 +197,8 @@ export async function getHealthDashboardData(rangeInput?: Partial<HealthDateRang
       restingHrDaily: [] as HealthMetricRow[],
       weightDaily: [] as HealthMetricRow[],
       sleepDaily: [] as HealthMetricRow[],
+      bodyFatDaily: [] as HealthMetricRow[],
+      bmiDaily: [] as HealthMetricRow[],
       workouts: [] as HealthWorkoutRow[],
       errors: ['Supabase service role key is not configured.'],
       range,
@@ -214,6 +218,8 @@ export async function getHealthDashboardData(rangeInput?: Partial<HealthDateRang
     restingHrResult,
     weightResult,
     sleepResult,
+    bodyFatResult,
+    bmiResult,
     workoutsResult,
   ] = await Promise.all([
     supabase
@@ -297,6 +303,22 @@ export async function getHealthDashboardData(rangeInput?: Partial<HealthDateRang
       .order('date', { ascending: true })
       .returns<HealthMetricRow[]>(),
     supabase
+      .from('health_metrics')
+      .select('id, metric_name, date, value, unit, source')
+      .eq('metric_name', 'Body Fat Percentage')
+      .gte('date', range.trendFromIso)
+      .lte('date', range.trendToIso)
+      .order('date', { ascending: true })
+      .returns<HealthMetricRow[]>(),
+    supabase
+      .from('health_metrics')
+      .select('id, metric_name, date, value, unit, source')
+      .eq('metric_name', 'Body Mass Index')
+      .gte('date', range.trendFromIso)
+      .lte('date', range.trendToIso)
+      .order('date', { ascending: true })
+      .returns<HealthMetricRow[]>(),
+    supabase
       .from('health_workouts')
       .select(
         'id, name, start_time, end_time, duration_minutes, distance_km, energy_kcal, heart_rate_avg, heart_rate_max, source'
@@ -318,6 +340,8 @@ export async function getHealthDashboardData(rangeInput?: Partial<HealthDateRang
     restingHrResult,
     weightResult,
     sleepResult,
+    bodyFatResult,
+    bmiResult,
     workoutsResult,
   ].flatMap((result) => (result.error ? [result.error.message] : []));
 
@@ -332,6 +356,8 @@ export async function getHealthDashboardData(rangeInput?: Partial<HealthDateRang
     restingHrDaily: restingHrResult.data ?? [],
     weightDaily: weightResult.data ?? [],
     sleepDaily: sleepResult.data ?? [],
+    bodyFatDaily: bodyFatResult.data ?? [],
+    bmiDaily: bmiResult.data ?? [],
     workouts: workoutsResult.data ?? [],
     errors,
     range,

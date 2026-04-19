@@ -3,7 +3,16 @@ import type { HealthDashboardRange, HealthMetricRow, HealthWorkoutRow } from '@/
 
 export type Point = { date: string; value: number };
 
-export type MetricKey = 'sleep' | 'hr' | 'bp' | 'weight' | 'steps' | 'spo2' | 'hrv';
+export type MetricKey =
+  | 'sleep'
+  | 'hr'
+  | 'bp'
+  | 'weight'
+  | 'steps'
+  | 'spo2'
+  | 'hrv'
+  | 'bodyfat'
+  | 'bmi';
 
 export type HeroCard = {
   key: string;
@@ -13,6 +22,8 @@ export type HeroCard = {
   helper: string;
   tone: string;
   icon: typeof HeartPulse;
+  stale?: boolean;
+  staleLabel?: string;
 };
 
 export type ChartConfig = {
@@ -42,6 +53,8 @@ export type HealthDashboardViewProps = {
   restingHrDaily: HealthMetricRow[];
   weightDaily: HealthMetricRow[];
   sleepDaily: HealthMetricRow[];
+  bodyFatDaily: HealthMetricRow[];
+  bmiDaily: HealthMetricRow[];
   workouts: HealthWorkoutRow[];
   errors: string[];
   range: HealthDashboardRange;

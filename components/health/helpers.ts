@@ -125,6 +125,80 @@ export function summarizeWindow(rows: HealthMetricRow[], days: number, endOffset
   return total / filtered.length;
 }
 
+/**
+ * Compute the delta between the most recent `currentDays` window and the
+ * immediately preceding `prevDays` window, on a precomputed daily series.
+ * Returns null when either window is empty. Matches the daily briefing
+ * pattern (7d vs prev 23d) so dashboards and briefings stay in sync.
+ */
+export function computePrevWindowDelta(
+  points: Point[],
+  currentDays: number,
+  prevDays: number
+): { current: number; previous: number; delta: number } | null {
+  const current = summarizeDailyWindow(points, currentDays, 0);
+  const previous = summarizeDailyWindow(points, prevDays, currentDays);
+  if (current == null || previous == null) return null;
+  return { current, previous, delta: current - previous };
+}
+
+/**
+ * Flag a metric as stale when its most recent sample is older than
+ * `maxDaysStale` days. Used to surface sync gaps on hero cards (e.g. Garmin
+ * scale disconnection manifests as Body Mass going stale).
+ */
+export function isStaleSince(latestIso: string | null | undefined, maxDaysStale: number) {
+  if (!latestIso) return { stale: true, daysAgo: null as number | null };
+  const latestMs = new Date(latestIso).getTime();
+  if (!Number.isFinite(latestMs)) return { stale: true, daysAgo: null as number | null };
+  const daysAgo = Math.floor((Date.now() - latestMs) / 86_400_000);
+  return { stale: daysAgo > maxDaysStale, daysAgo };
+}
+
+/**
+ * Group sleep-stage rows into per-stage daily totals, de-duplicated across
+ * Sleeptracker®/Apple Watch by taking the larger value per stage per day.
+ * Returns series keyed by stage name for breakdown charts.
+ */
+export function groupSleepStages(rows: HealthMetricRow[]) {
+  const stages = ['Sleep Core', 'Sleep Deep', 'Sleep REM', 'Sleep Awake'] as const;
+  type Stage = (typeof stages)[number];
+  const buckets = new Map<string, Record<Stage, { sleeptracker: number; other: number }>>();
+  rows.forEach((row) => {
+    const stage = row.metric_name as Stage;
+    if (!stages.includes(stage)) return;
+    const key = row.date.slice(0, 10);
+    const existing =
+      buckets.get(key) ??
+      (Object.fromEntries(stages.map((s) => [s, { sleeptracker: 0, other: 0 }])) as Record<
+        Stage,
+        { sleeptracker: number; other: number }
+      >);
+    const isSleeptracker = (row.source ?? '').toLowerCase().includes('sleeptracker');
+    if (isSleeptracker) existing[stage].sleeptracker += row.value;
+    else existing[stage].other += row.value;
+    buckets.set(key, existing);
+  });
+  const entries = Array.from(buckets.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  const averages: Record<Stage, number> = {
+    'Sleep Core': 0,
+    'Sleep Deep': 0,
+    'Sleep REM': 0,
+    'Sleep Awake': 0,
+  };
+  if (!entries.length) return averages;
+  entries.forEach(([, stageMap]) => {
+    stages.forEach((stage) => {
+      const b = stageMap[stage];
+      averages[stage] += Math.max(b.sleeptracker, b.other);
+    });
+  });
+  stages.forEach((stage) => {
+    averages[stage] = averages[stage] / entries.length;
+  });
+  return averages;
+}
+
 export function formatDateLabel(date: string) {
   return new Date(`${date}T00:00:00`).toLocaleDateString('en-US', {
     month: 'short',

@@ -56,4 +56,18 @@ export const TONES = {
     dot: '#6ee7b7',
     badge: 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200',
   },
+  bodyfat: {
+    icon: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/25 dark:bg-amber-400/12 dark:text-amber-200',
+    line: '#f59e0b',
+    lineSoft: 'rgba(245,158,11,0.35)',
+    dot: '#fbbf24',
+    badge: 'border-amber-400/20 bg-amber-400/10 text-amber-200',
+  },
+  bmi: {
+    icon: 'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700 dark:border-fuchsia-400/25 dark:bg-fuchsia-400/12 dark:text-fuchsia-200',
+    line: '#d946ef',
+    lineSoft: 'rgba(217,70,239,0.35)',
+    dot: '#e879f9',
+    badge: 'border-fuchsia-400/20 bg-fuchsia-400/10 text-fuchsia-200',
+  },
 } as const;
