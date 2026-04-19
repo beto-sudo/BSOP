@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { FilterCombobox } from '@/components/ui/filter-combobox';
 import {
   Sheet,
   SheetContent,
@@ -258,44 +259,41 @@ export default function ProductosPage() {
             />
           </div>
 
-          <Select value={categoriaFilter} onValueChange={(v) => setCategoriaFilter(v ?? 'all')}>
-            <SelectTrigger className="w-44">
-              <SelectValue placeholder="Categoría" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas las categorías</SelectItem>
-              {categorias.map((cat) => (
-                <SelectItem key={cat} value={cat}>
-                  {cat}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <FilterCombobox
+            value={categoriaFilter}
+            onChange={setCategoriaFilter}
+            options={categorias.map((cat) => ({ id: cat, label: cat }))}
+            placeholder="Categoría"
+            searchPlaceholder="Buscar categoría..."
+            clearLabel="Todas las categorías"
+            className="w-44"
+          />
 
-          <Select
+          <FilterCombobox
             value={inventariableFilter}
-            onValueChange={(v) => setInventariableFilter(v ?? 'all')}
-          >
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los tipos</SelectItem>
-              <SelectItem value="true">Inventariable</SelectItem>
-              <SelectItem value="false">Servicio / Varios</SelectItem>
-            </SelectContent>
-          </Select>
+            onChange={setInventariableFilter}
+            options={[
+              { id: 'true', label: 'Inventariable' },
+              { id: 'false', label: 'Servicio / Varios' },
+            ]}
+            placeholder="Tipo"
+            searchPlaceholder="Buscar tipo..."
+            clearLabel="Todos los tipos"
+            className="w-40"
+          />
 
-          <Select value={activoFilter} onValueChange={(v) => setActivoFilter(v ?? 'all')}>
-            <SelectTrigger className="w-36">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos (Activos)</SelectItem>
-              <SelectItem value="true">Solo Activos</SelectItem>
-              <SelectItem value="false">Solo Inactivos</SelectItem>
-            </SelectContent>
-          </Select>
+          <FilterCombobox
+            value={activoFilter}
+            onChange={setActivoFilter}
+            options={[
+              { id: 'true', label: 'Solo Activos' },
+              { id: 'false', label: 'Solo Inactivos' },
+            ]}
+            placeholder="Activos"
+            searchPlaceholder="Buscar..."
+            clearLabel="Todos (Activos)"
+            className="w-36"
+          />
 
           <Button
             variant="outline"

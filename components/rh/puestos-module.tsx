@@ -54,6 +54,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { FilterCombobox } from '@/components/ui/filter-combobox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -544,19 +545,15 @@ export function PuestosModule({
       {showDeptoFilter && (
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 mb-6">
           <div className="flex flex-wrap gap-3">
-            <Select value={filterDepto} onValueChange={(v) => setFilterDepto(v ?? 'all')}>
-              <SelectTrigger className="w-44 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                <SelectValue placeholder="Departamento" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los deptos</SelectItem>
-                {departamentos.map((d) => (
-                  <SelectItem key={d.id} value={d.nombre}>
-                    {d.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <FilterCombobox
+              value={filterDepto}
+              onChange={setFilterDepto}
+              options={departamentos.map((d) => ({ id: d.nombre, label: d.nombre }))}
+              placeholder="Departamento"
+              searchPlaceholder="Buscar departamento..."
+              clearLabel="Todos los deptos"
+              className="w-44"
+            />
           </div>
         </div>
       )}

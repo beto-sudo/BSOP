@@ -54,6 +54,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { FilterCombobox } from '@/components/ui/filter-combobox';
 import { useSortableTable } from '@/hooks/use-sortable-table';
 
 import type { Adjunto, Documento, NotariaOption } from './types';
@@ -423,19 +424,15 @@ export function DocumentosModule({
               className="pl-9 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
             />
           </div>
-          <Select value={filterTipo} onValueChange={(v) => setFilterTipo(v ?? 'all')}>
-            <SelectTrigger className="w-48 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-              <SelectValue placeholder="Tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los tipos</SelectItem>
-              {tiposPresentes.map((t) => (
-                <SelectItem key={t} value={t}>
-                  {t}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <FilterCombobox
+            value={filterTipo}
+            onChange={setFilterTipo}
+            options={tiposPresentes.map((t) => ({ id: t, label: t }))}
+            placeholder="Tipo"
+            searchPlaceholder="Buscar tipo..."
+            clearLabel="Todos los tipos"
+            className="w-48"
+          />
         </div>
       </div>
 

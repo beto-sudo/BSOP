@@ -14,13 +14,7 @@
 import { useMemo } from 'react';
 import { Search } from 'lucide-react';
 
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { FilterCombobox } from '@/components/ui/filter-combobox';
 import { Input } from '@/components/ui/input';
 
 import {
@@ -164,51 +158,36 @@ export function TasksFiltersBar({
           </>
         ) : (
           <>
-            <Select value={filterEstado} onValueChange={(v) => onFilterEstadoChange(v ?? 'all')}>
-              <SelectTrigger className="w-40 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                <SelectValue placeholder="Estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los estados</SelectItem>
-                {Object.entries(ESTADO_CONFIG).map(([k, v]) => (
-                  <SelectItem key={k} value={k}>
-                    {v.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
+            <FilterCombobox
+              value={filterEstado}
+              onChange={onFilterEstadoChange}
+              options={Object.entries(ESTADO_CONFIG).map(([k, v]) => ({
+                id: k,
+                label: v.label,
+              }))}
+              placeholder="Estado"
+              searchPlaceholder="Buscar estado..."
+              clearLabel="Todos los estados"
+              className="w-40"
+            />
+            <FilterCombobox
               value={filterPrioridad}
-              onValueChange={(v) => onFilterPrioridadChange(v ?? 'all')}
-            >
-              <SelectTrigger className="w-36 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                <SelectValue placeholder="Prioridad" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                {PRIORIDAD_OPTIONS.map((p) => (
-                  <SelectItem key={p} value={p}>
-                    {p}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
+              onChange={onFilterPrioridadChange}
+              options={PRIORIDAD_OPTIONS.map((p) => ({ id: p, label: p }))}
+              placeholder="Prioridad"
+              searchPlaceholder="Buscar prioridad..."
+              clearLabel="Todas"
+              className="w-36"
+            />
+            <FilterCombobox
               value={filterAsignado}
-              onValueChange={(v) => onFilterAsignadoChange(v ?? 'all')}
-            >
-              <SelectTrigger className="w-40 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                <SelectValue placeholder="Asignado a" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                {empleados.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onChange={onFilterAsignadoChange}
+              options={empleados.map((e) => ({ id: e.id, label: e.nombre }))}
+              placeholder="Asignado a"
+              searchPlaceholder="Buscar responsable..."
+              clearLabel="Todos"
+              className="w-40"
+            />
           </>
         )}
       </div>
