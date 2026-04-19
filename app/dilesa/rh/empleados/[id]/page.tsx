@@ -44,10 +44,19 @@ type Persona = {
   apellido_materno: string | null;
   email: string | null;
   telefono: string | null;
+  telefono_casa: string | null;
   rfc: string | null;
   curp: string | null;
   nss: string | null;
   fecha_nacimiento: string | null;
+  domicilio: string | null;
+  nacionalidad: string | null;
+  estado_civil: string | null;
+  sexo: string | null;
+  lugar_nacimiento: string | null;
+  contacto_emergencia_nombre: string | null;
+  contacto_emergencia_telefono: string | null;
+  contacto_emergencia_parentesco: string | null;
 };
 
 type EmpleadoDetail = {
@@ -62,11 +71,44 @@ type EmpleadoDetail = {
   telefono_empresa: string | null;
   extension: string | null;
   email_empresa: string | null;
+  tipo_contrato: string | null;
+  periodo_prueba_dias: number | null;
+  periodo_prueba_numero: number | null;
+  horario: string | null;
+  lugar_trabajo: string | null;
+  dia_pago: string | null;
+  funciones: string | null;
+  notas: string | null;
   activo: boolean;
   persona: Persona | null;
   departamento: { id: string; nombre: string } | null;
   puesto: { id: string; nombre: string } | null;
 };
+
+type Beneficiario = {
+  id: string;
+  nombre: string;
+  parentesco: string | null;
+  porcentaje: number | null;
+  telefono: string | null;
+  orden: number;
+};
+
+const TIPO_CONTRATO_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'prueba', label: 'Periodo de prueba (Art. 39-A)' },
+  { value: 'indefinido', label: 'Tiempo indefinido / Planta' },
+  { value: 'determinado', label: 'Tiempo determinado (Art. 37)' },
+  { value: 'obra', label: 'Obra determinada (Art. 37)' },
+  { value: 'temporada', label: 'Temporada' },
+  { value: 'capacitacion_inicial', label: 'Capacitación inicial (Art. 39-B)' },
+];
+
+const ESTADO_CIVIL_OPTIONS = ['Soltero/a', 'Casado/a', 'Unión libre', 'Divorciado/a', 'Viudo/a'];
+const SEXO_OPTIONS = [
+  { value: 'M', label: 'Masculino' },
+  { value: 'F', label: 'Femenino' },
+  { value: 'X', label: 'Otro / No especifica' },
+];
 
 type Compensacion = {
   id: string;
@@ -144,6 +186,179 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * BeneficiariosSection — CRUD simple para Art. 501 LFT.
+ * Los beneficiarios se guardan en `erp.empleado_beneficiarios` con nombre,
+ * parentesco, porcentaje y teléfono. No se valida que la suma de porcentajes
+ * sea 100 — el patrón debe declarar porcentajes equivalentes (la ley permite
+ * que se compartan en partes iguales si no se especifica).
+ */
+function BeneficiariosSection({
+  empleadoId,
+  empresaId,
+  beneficiarios,
+  canEdit,
+  onRefresh,
+}: {
+  empleadoId: string;
+  empresaId: string;
+  beneficiarios: Beneficiario[];
+  canEdit: boolean;
+  onRefresh: () => Promise<void> | void;
+}) {
+  const supabase = createSupabaseERPClient();
+  const [adding, setAdding] = useState(false);
+  const [nombre, setNombre] = useState('');
+  const [parentesco, setParentesco] = useState('');
+  const [telefono, setTelefono] = useState('');
+  const [porcentaje, setPorcentaje] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleAdd = async () => {
+    const nombreClean = titleCase(nombre);
+    if (!nombreClean) return;
+    setSaving(true);
+    const pct = porcentaje ? Number(porcentaje) : null;
+    const { error } = await supabase
+      .schema('erp')
+      .from('empleado_beneficiarios')
+      .insert({
+        empresa_id: empresaId,
+        empleado_id: empleadoId,
+        nombre: nombreClean,
+        parentesco: titleCase(parentesco) || null,
+        telefono: telefono.trim() || null,
+        porcentaje: pct,
+        orden: beneficiarios.length + 1,
+      });
+    setSaving(false);
+    if (error) {
+      alert(`Error: ${error.message}`);
+      return;
+    }
+    setNombre('');
+    setParentesco('');
+    setTelefono('');
+    setPorcentaje('');
+    setAdding(false);
+    await onRefresh();
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('¿Eliminar este beneficiario?')) return;
+    const { error } = await supabase
+      .schema('erp')
+      .from('empleado_beneficiarios')
+      .delete()
+      .eq('id', id);
+    if (error) {
+      alert(`Error: ${error.message}`);
+      return;
+    }
+    await onRefresh();
+  };
+
+  return (
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
+      <div className="flex items-center justify-between mb-3">
+        <SectionTitle>Beneficiarios (Art. 501 LFT)</SectionTitle>
+        {canEdit && !adding && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setAdding(true)}
+            className="gap-1.5 rounded-xl border-[var(--border)] text-[var(--text)]"
+          >
+            + Agregar
+          </Button>
+        )}
+      </div>
+      {beneficiarios.length === 0 && !adding ? (
+        <p className="text-xs text-[var(--text)]/40">
+          Sin beneficiarios registrados. El Art. 501 LFT permite designar a quién pagarle salarios y
+          prestaciones devengadas en caso de fallecimiento del trabajador.
+        </p>
+      ) : (
+        <ul className="divide-y divide-[var(--border)]">
+          {beneficiarios.map((b) => (
+            <li key={b.id} className="flex items-center gap-3 py-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-[var(--text)]">{b.nombre}</p>
+                <p className="text-xs text-[var(--text)]/50">
+                  {[b.parentesco, b.telefono, b.porcentaje != null ? `${b.porcentaje}%` : null]
+                    .filter(Boolean)
+                    .join(' · ') || '—'}
+                </p>
+              </div>
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => handleDelete(b.id)}
+                  className="p-1.5 rounded-lg hover:bg-red-500/10 text-[var(--text)]/30 hover:text-red-400"
+                  title="Eliminar"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {adding && (
+        <div className="mt-3 pt-3 border-t border-[var(--border)] grid grid-cols-1 gap-3 sm:grid-cols-4">
+          <Input
+            placeholder="Nombre completo"
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            onBlur={(e) => setNombre(titleCase(e.target.value))}
+            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+          />
+          <Input
+            placeholder="Parentesco"
+            value={parentesco}
+            onChange={(e) => setParentesco(e.target.value)}
+            onBlur={(e) => setParentesco(titleCase(e.target.value))}
+            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+          />
+          <Input
+            placeholder="Teléfono"
+            value={telefono}
+            onChange={(e) => setTelefono(e.target.value)}
+            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+          />
+          <div className="flex gap-2">
+            <Input
+              placeholder="% (opc.)"
+              type="number"
+              min="0"
+              max="100"
+              value={porcentaje}
+              onChange={(e) => setPorcentaje(e.target.value)}
+              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)] w-24"
+            />
+            <Button
+              onClick={handleAdd}
+              disabled={saving || !nombre.trim()}
+              size="sm"
+              className="rounded-xl bg-[var(--accent)] text-white"
+            >
+              {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : 'OK'}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setAdding(false)}
+              size="sm"
+              className="rounded-xl border-[var(--border)] text-[var(--text)]"
+            >
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function InfoRow({
   label,
   value,
@@ -205,8 +420,30 @@ function EmpleadoDetailInner() {
   const [pApellidoMaterno, setPApellidoMaterno] = useState('');
   const [pEmail, setPEmail] = useState('');
   const [pTelefono, setPTelefono] = useState('');
+  const [pTelefonoCasa, setPTelefonoCasa] = useState('');
   const [pRfc, setPRfc] = useState('');
   const [pCurp, setPCurp] = useState('');
+  const [pDomicilio, setPDomicilio] = useState('');
+  const [pNacionalidad, setPNacionalidad] = useState('Mexicana');
+  const [pEstadoCivil, setPEstadoCivil] = useState('');
+  const [pSexo, setPSexo] = useState('');
+  const [pLugarNac, setPLugarNac] = useState('');
+  const [pEmergNombre, setPEmergNombre] = useState('');
+  const [pEmergTelefono, setPEmergTelefono] = useState('');
+  const [pEmergParentesco, setPEmergParentesco] = useState('');
+
+  // Campos adicionales de empleado (LFT)
+  const [tipoContrato, setTipoContrato] = useState('');
+  const [periodoPruebaDias, setPeriodoPruebaDias] = useState('');
+  const [periodoPruebaNumero, setPeriodoPruebaNumero] = useState('');
+  const [horario, setHorario] = useState('');
+  const [lugarTrabajo, setLugarTrabajo] = useState('');
+  const [diaPago, setDiaPago] = useState('');
+  const [funciones, setFunciones] = useState('');
+  const [notas, setNotas] = useState('');
+
+  // Beneficiarios (Art. 501 LFT)
+  const [beneficiarios, setBeneficiarios] = useState<Beneficiario[]>([]);
 
   const [showBajaDialog, setShowBajaDialog] = useState(false);
   const [motivoBaja, setMotivoBaja] = useState('');
@@ -218,7 +455,17 @@ function EmpleadoDetailInner() {
       .schema('erp')
       .from('empleados')
       .select(
-        'id, empresa_id, numero_empleado, fecha_ingreso, fecha_baja, motivo_baja, nss, fecha_nacimiento, telefono_empresa, extension, email_empresa, activo, persona:persona_id(id, nombre, apellido_paterno, apellido_materno, email, telefono, rfc, curp, nss, fecha_nacimiento), departamento:departamento_id(id, nombre), puesto:puesto_id(id, nombre)'
+        `id, empresa_id, numero_empleado, fecha_ingreso, fecha_baja, motivo_baja,
+         nss, fecha_nacimiento, telefono_empresa, extension, email_empresa,
+         tipo_contrato, periodo_prueba_dias, periodo_prueba_numero, horario,
+         lugar_trabajo, dia_pago, funciones, notas, activo,
+         persona:persona_id(id, nombre, apellido_paterno, apellido_materno, email,
+           telefono, telefono_casa, rfc, curp, nss, fecha_nacimiento,
+           domicilio, nacionalidad, estado_civil, sexo, lugar_nacimiento,
+           contacto_emergencia_nombre, contacto_emergencia_telefono,
+           contacto_emergencia_parentesco),
+         departamento:departamento_id(id, nombre),
+         puesto:puesto_id(id, nombre)`
       )
       .eq('id', id)
       .single();
@@ -247,6 +494,14 @@ function EmpleadoDetailInner() {
     setTelefonoEmpresa(emp.telefono_empresa ?? '');
     setExtensionVal(emp.extension ?? '');
     setEmailEmpresa(emp.email_empresa ?? '');
+    setTipoContrato((emp as any).tipo_contrato ?? '');
+    setPeriodoPruebaDias((emp as any).periodo_prueba_dias?.toString() ?? '');
+    setPeriodoPruebaNumero((emp as any).periodo_prueba_numero?.toString() ?? '');
+    setHorario((emp as any).horario ?? '');
+    setLugarTrabajo((emp as any).lugar_trabajo ?? '');
+    setDiaPago((emp as any).dia_pago ?? '');
+    setFunciones((emp as any).funciones ?? '');
+    setNotas((emp as any).notas ?? '');
 
     const p = normalized.persona;
     setPNombre(p?.nombre ?? '');
@@ -254,10 +509,19 @@ function EmpleadoDetailInner() {
     setPApellidoMaterno(p?.apellido_materno ?? '');
     setPEmail(p?.email ?? '');
     setPTelefono(p?.telefono ?? '');
+    setPTelefonoCasa((p as any)?.telefono_casa ?? '');
     setPRfc(p?.rfc ?? '');
     setPCurp(p?.curp ?? '');
+    setPDomicilio((p as any)?.domicilio ?? '');
+    setPNacionalidad((p as any)?.nacionalidad ?? 'Mexicana');
+    setPEstadoCivil((p as any)?.estado_civil ?? '');
+    setPSexo((p as any)?.sexo ?? '');
+    setPLugarNac((p as any)?.lugar_nacimiento ?? '');
+    setPEmergNombre((p as any)?.contacto_emergencia_nombre ?? '');
+    setPEmergTelefono((p as any)?.contacto_emergencia_telefono ?? '');
+    setPEmergParentesco((p as any)?.contacto_emergencia_parentesco ?? '');
 
-    const [deptRes, puestosRes, compRes, fotoRes] = await Promise.all([
+    const [deptRes, puestosRes, compRes, fotoRes, benefRes] = await Promise.all([
       supabase
         .schema('erp')
         .from('departamentos')
@@ -291,12 +555,19 @@ function EmpleadoDetailInner() {
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle(),
+      supabase
+        .schema('erp')
+        .from('empleado_beneficiarios')
+        .select('id, nombre, parentesco, porcentaje, telefono, orden')
+        .eq('empleado_id', id)
+        .order('orden'),
     ]);
     setDepartamentos(deptRes.data ?? []);
     setPuestos(puestosRes.data ?? []);
     setCompensacion(compRes.data as Compensacion | null);
     const fotoPath = (fotoRes.data as { url?: string } | null)?.url ?? null;
     setPhotoUrl(fotoPath ? getAdjuntoProxyUrl(fotoPath) : null);
+    setBeneficiarios((benefRes.data ?? []) as Beneficiario[]);
     setLoading(false);
   }, [id, supabase]);
 
@@ -321,7 +592,15 @@ function EmpleadoDetailInner() {
         fecha_nacimiento: fechaNacimiento || null,
         telefono_empresa: telefonoEmpresa.trim() || null,
         extension: extensionVal.trim() || null,
-        email_empresa: emailEmpresa.trim() || null,
+        email_empresa: emailEmpresa.trim().toLowerCase() || null,
+        tipo_contrato: tipoContrato || null,
+        periodo_prueba_dias: periodoPruebaDias ? Number(periodoPruebaDias) : null,
+        periodo_prueba_numero: periodoPruebaNumero ? Number(periodoPruebaNumero) : null,
+        horario: horario.trim() || null,
+        lugar_trabajo: lugarTrabajo.trim() || null,
+        dia_pago: diaPago.trim() || null,
+        funciones: funciones.trim() || null,
+        notas: notas.trim() || null,
       })
       .eq('id', empleado.id);
 
@@ -344,8 +623,17 @@ function EmpleadoDetailInner() {
           apellido_materno: titleCase(pApellidoMaterno) || null,
           email: pEmail.trim().toLowerCase() || null,
           telefono: pTelefono.trim() || null,
+          telefono_casa: pTelefonoCasa.trim() || null,
           rfc: pRfc.trim().toUpperCase() || null,
           curp: pCurp.trim().toUpperCase() || null,
+          domicilio: pDomicilio.trim() || null,
+          nacionalidad: pNacionalidad.trim() || null,
+          estado_civil: pEstadoCivil || null,
+          sexo: pSexo || null,
+          lugar_nacimiento: pLugarNac.trim() || null,
+          contacto_emergencia_nombre: titleCase(pEmergNombre) || null,
+          contacto_emergencia_telefono: pEmergTelefono.trim() || null,
+          contacto_emergencia_parentesco: pEmergParentesco.trim() || null,
         })
         .eq('id', empleado.persona.id);
       if (pErr) personaErr = pErr.message;
@@ -521,7 +809,7 @@ function EmpleadoDetailInner() {
         {editing ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div>
-              <FieldLabel>Nombre(s)</FieldLabel>
+              <FieldLabel required>Nombre(s)</FieldLabel>
               <Input
                 value={pNombre}
                 onChange={(e) => setPNombre(e.target.value)}
@@ -551,22 +839,63 @@ function EmpleadoDetailInner() {
               />
             </div>
             <div>
-              <FieldLabel>Email personal</FieldLabel>
+              <FieldLabel>Fecha de nacimiento</FieldLabel>
               <Input
-                value={pEmail}
-                onChange={(e) => setPEmail(e.target.value)}
-                placeholder="correo@dominio.com"
+                type="date"
+                value={fechaNacimiento}
+                onChange={(e) => setFechaNacimiento(e.target.value)}
                 className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
               />
             </div>
             <div>
-              <FieldLabel>Teléfono personal</FieldLabel>
+              <FieldLabel>Lugar de nacimiento</FieldLabel>
               <Input
-                value={pTelefono}
-                onChange={(e) => setPTelefono(e.target.value)}
-                placeholder="(878) 000-0000"
+                value={pLugarNac}
+                onChange={(e) => setPLugarNac(e.target.value)}
+                onBlur={(e) => setPLugarNac(titleCase(e.target.value))}
+                placeholder="Piedras Negras, Coahuila"
                 className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
               />
+            </div>
+            <div>
+              <FieldLabel>Nacionalidad</FieldLabel>
+              <Input
+                value={pNacionalidad}
+                onChange={(e) => setPNacionalidad(e.target.value)}
+                onBlur={(e) => setPNacionalidad(titleCase(e.target.value))}
+                placeholder="Mexicana"
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
+            </div>
+            <div>
+              <FieldLabel>Estado civil</FieldLabel>
+              <Select value={pEstadoCivil} onValueChange={(v) => setPEstadoCivil(v ?? '')}>
+                <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
+                  <SelectValue placeholder="Seleccionar…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ESTADO_CIVIL_OPTIONS.map((o) => (
+                    <SelectItem key={o} value={o}>
+                      {o}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <FieldLabel>Sexo</FieldLabel>
+              <Select value={pSexo} onValueChange={(v) => setPSexo(v ?? '')}>
+                <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
+                  <SelectValue placeholder="Seleccionar…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SEXO_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <FieldLabel>RFC</FieldLabel>
@@ -587,28 +916,152 @@ function EmpleadoDetailInner() {
               />
             </div>
             <div>
-              <FieldLabel>Nombre completo (preview)</FieldLabel>
-              <p className="text-sm text-[var(--text)]/60 mt-2">
-                {composeFullName(pNombre, pApellidoPaterno, pApellidoMaterno) || '—'}
-              </p>
+              <FieldLabel>NSS</FieldLabel>
+              <Input
+                value={nss}
+                onChange={(e) => setNss(e.target.value)}
+                placeholder="00000000000"
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)] font-mono"
+              />
+            </div>
+            <div className="sm:col-span-2 lg:col-span-3">
+              <FieldLabel>Domicilio</FieldLabel>
+              <Input
+                value={pDomicilio}
+                onChange={(e) => setPDomicilio(e.target.value)}
+                placeholder="Calle, número, colonia, C.P., ciudad, estado"
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <InfoRow label="Nombre completo" value={fullName(empleado)} />
-            <InfoRow label="Email personal" value={persona?.email ?? null} />
-            <InfoRow label="Teléfono personal" value={persona?.telefono ?? null} />
-            <InfoRow label="RFC" value={persona?.rfc ?? null} />
-            <InfoRow label="CURP" value={persona?.curp ?? null} />
-            <InfoRow label="NSS" value={persona?.nss ?? empleado.nss ?? null} />
             <InfoRow
               label="Fecha de nacimiento"
               value={formatDate(birthDate)}
               sub={calcAge(birthDate)}
             />
+            <InfoRow label="Lugar de nacimiento" value={persona?.lugar_nacimiento ?? null} />
+            <InfoRow label="Nacionalidad" value={persona?.nacionalidad ?? null} />
+            <InfoRow label="Estado civil" value={persona?.estado_civil ?? null} />
+            <InfoRow
+              label="Sexo"
+              value={
+                persona?.sexo
+                  ? (SEXO_OPTIONS.find((o) => o.value === persona.sexo)?.label ?? persona.sexo)
+                  : null
+              }
+            />
+            <InfoRow label="RFC" value={persona?.rfc ?? null} />
+            <InfoRow label="CURP" value={persona?.curp ?? null} />
+            <InfoRow label="NSS" value={persona?.nss ?? empleado.nss ?? null} />
+            <div className="sm:col-span-2 lg:col-span-3">
+              <InfoRow label="Domicilio" value={persona?.domicilio ?? null} />
+            </div>
           </div>
         )}
       </div>
+
+      {/* Contacto */}
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
+        <SectionTitle>Contacto</SectionTitle>
+        {editing ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <FieldLabel>Email personal</FieldLabel>
+              <Input
+                value={pEmail}
+                onChange={(e) => setPEmail(e.target.value)}
+                placeholder="correo@dominio.com"
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
+            </div>
+            <div>
+              <FieldLabel>Teléfono celular</FieldLabel>
+              <Input
+                value={pTelefono}
+                onChange={(e) => setPTelefono(e.target.value)}
+                placeholder="(878) 000-0000"
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
+            </div>
+            <div>
+              <FieldLabel>Teléfono de casa</FieldLabel>
+              <Input
+                value={pTelefonoCasa}
+                onChange={(e) => setPTelefonoCasa(e.target.value)}
+                placeholder="(878) 000-0000"
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
+            </div>
+            <div className="pt-3 border-t border-[var(--border)] sm:col-span-2 lg:col-span-3">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/40 mb-2">
+                Contacto de emergencia
+              </p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div>
+                  <FieldLabel>Nombre</FieldLabel>
+                  <Input
+                    value={pEmergNombre}
+                    onChange={(e) => setPEmergNombre(e.target.value)}
+                    onBlur={(e) => setPEmergNombre(titleCase(e.target.value))}
+                    placeholder="Nombre completo"
+                    className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+                  />
+                </div>
+                <div>
+                  <FieldLabel>Parentesco</FieldLabel>
+                  <Input
+                    value={pEmergParentesco}
+                    onChange={(e) => setPEmergParentesco(e.target.value)}
+                    onBlur={(e) => setPEmergParentesco(titleCase(e.target.value))}
+                    placeholder="Esposa, madre, hermano…"
+                    className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+                  />
+                </div>
+                <div>
+                  <FieldLabel>Teléfono</FieldLabel>
+                  <Input
+                    value={pEmergTelefono}
+                    onChange={(e) => setPEmergTelefono(e.target.value)}
+                    placeholder="(878) 000-0000"
+                    className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <InfoRow label="Email personal" value={persona?.email ?? null} />
+            <InfoRow label="Teléfono celular" value={persona?.telefono ?? null} />
+            <InfoRow label="Teléfono de casa" value={persona?.telefono_casa ?? null} />
+            <div className="sm:col-span-2 lg:col-span-3 pt-3 border-t border-[var(--border)]">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/40 mb-2">
+                Contacto de emergencia
+              </p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <InfoRow label="Nombre" value={persona?.contacto_emergencia_nombre ?? null} />
+                <InfoRow
+                  label="Parentesco"
+                  value={persona?.contacto_emergencia_parentesco ?? null}
+                />
+                <InfoRow label="Teléfono" value={persona?.contacto_emergencia_telefono ?? null} />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Beneficiarios (Art. 501 LFT) */}
+      <BeneficiariosSection
+        empleadoId={empleado.id}
+        empresaId={empleado.empresa_id}
+        beneficiarios={beneficiarios}
+        canEdit={isAdmin}
+        onRefresh={fetchAll}
+      />
 
       {/* Documentos */}
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
@@ -701,21 +1154,83 @@ function EmpleadoDetailInner() {
               />
             </div>
             <div>
-              <FieldLabel>NSS</FieldLabel>
+              <FieldLabel>Tipo de contrato</FieldLabel>
+              <Select value={tipoContrato} onValueChange={(v) => setTipoContrato(v ?? '')}>
+                <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
+                  <SelectValue placeholder="Seleccionar…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIPO_CONTRATO_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {(tipoContrato === 'prueba' || tipoContrato === 'capacitacion_inicial') && (
+              <>
+                <div>
+                  <FieldLabel>Días de prueba</FieldLabel>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="180"
+                    value={periodoPruebaDias}
+                    onChange={(e) => setPeriodoPruebaDias(e.target.value)}
+                    placeholder="30"
+                    className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+                  />
+                </div>
+                <div>
+                  <FieldLabel>Número de prueba</FieldLabel>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="3"
+                    value={periodoPruebaNumero}
+                    onChange={(e) => setPeriodoPruebaNumero(e.target.value)}
+                    placeholder="1 / 2 / 3"
+                    className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+                  />
+                </div>
+              </>
+            )}
+            <div className="sm:col-span-2 lg:col-span-3">
+              <FieldLabel>Horario y jornada</FieldLabel>
               <Input
-                value={nss}
-                onChange={(e) => setNss(e.target.value)}
-                placeholder="000-00-0000-0"
+                value={horario}
+                onChange={(e) => setHorario(e.target.value)}
+                placeholder="Lun-Vie 8:00-17:00, 1h comida (48 h/sem)"
                 className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
               />
             </div>
-            <div>
-              <FieldLabel>Fecha de nacimiento</FieldLabel>
+            <div className="sm:col-span-2 lg:col-span-3">
+              <FieldLabel>Lugar(es) de trabajo</FieldLabel>
               <Input
-                type="date"
-                value={fechaNacimiento}
-                onChange={(e) => setFechaNacimiento(e.target.value)}
+                value={lugarTrabajo}
+                onChange={(e) => setLugarTrabajo(e.target.value)}
+                placeholder="Oficinas DILESA Piedras Negras / obra en turno"
                 className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <FieldLabel>Día y lugar de pago</FieldLabel>
+              <Input
+                value={diaPago}
+                onChange={(e) => setDiaPago(e.target.value)}
+                placeholder="Viernes quincenal, transferencia bancaria"
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
+            </div>
+            <div className="sm:col-span-2 lg:col-span-3">
+              <FieldLabel>Funciones (Art. 25-III LFT)</FieldLabel>
+              <textarea
+                value={funciones}
+                onChange={(e) => setFunciones(e.target.value)}
+                rows={3}
+                placeholder="Descripción detallada de las funciones del puesto…"
+                className="w-full rounded-xl border border-[var(--border)] bg-[var(--panel)] text-[var(--text)] p-2 text-sm"
               />
             </div>
           </div>
@@ -729,9 +1244,35 @@ function EmpleadoDetailInner() {
             />
             <InfoRow label="Departamento" value={empleado.departamento?.nombre ?? null} />
             <InfoRow label="Puesto" value={empleado.puesto?.nombre ?? null} />
+            <InfoRow
+              label="Tipo de contrato"
+              value={
+                empleado.tipo_contrato
+                  ? (TIPO_CONTRATO_OPTIONS.find((o) => o.value === empleado.tipo_contrato)?.label ??
+                    empleado.tipo_contrato)
+                  : null
+              }
+              sub={
+                empleado.tipo_contrato === 'prueba' && empleado.periodo_prueba_dias
+                  ? `${empleado.periodo_prueba_dias} días · prueba #${empleado.periodo_prueba_numero ?? 1}`
+                  : null
+              }
+            />
             <InfoRow label="Email empresa" value={empleado.email_empresa} />
             <InfoRow label="Teléfono empresa" value={empleado.telefono_empresa} />
             <InfoRow label="Extensión" value={empleado.extension} />
+            <div className="sm:col-span-2 lg:col-span-3">
+              <InfoRow label="Horario y jornada" value={empleado.horario ?? null} />
+            </div>
+            <div className="sm:col-span-2 lg:col-span-3">
+              <InfoRow label="Lugar(es) de trabajo" value={empleado.lugar_trabajo ?? null} />
+            </div>
+            <div className="sm:col-span-2">
+              <InfoRow label="Día y lugar de pago" value={empleado.dia_pago ?? null} />
+            </div>
+            <div className="sm:col-span-2 lg:col-span-3">
+              <InfoRow label="Funciones" value={empleado.funciones ?? null} />
+            </div>
           </div>
         )}
       </div>
@@ -784,6 +1325,30 @@ function EmpleadoDetailInner() {
           </div>
         </div>
       )}
+
+      {/* Notas */}
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
+        <SectionTitle>Notas / Anotaciones</SectionTitle>
+        {editing ? (
+          <textarea
+            value={notas}
+            onChange={(e) => setNotas(e.target.value)}
+            rows={5}
+            placeholder="Observaciones de HR, contexto personal relevante, compromisos, etc…"
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--panel)] text-[var(--text)] p-3 text-sm"
+          />
+        ) : empleado.notas ? (
+          <div
+            className="prose prose-sm max-w-none text-[var(--text)]/80"
+            // Contenido migrado desde Coda (HTML sanitizado por el script de
+            // migración). En nuevo texto capturado en BSOP se renderea igual
+            // — no se permite JS embebido porque entra por textarea.
+            dangerouslySetInnerHTML={{ __html: empleado.notas }}
+          />
+        ) : (
+          <p className="text-xs text-[var(--text)]/40">Sin notas registradas.</p>
+        )}
+      </div>
 
       {/* Baja dialog */}
       <Dialog open={showBajaDialog} onOpenChange={setShowBajaDialog}>

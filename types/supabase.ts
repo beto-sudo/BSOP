@@ -1,14 +1,3 @@
-// ==============================================================================
-// Auto-generated Supabase database types.
-// Last regenerated: 2026-04-16T21:50:16Z
-// Project ref: ybklderteyhuugzfmxbi
-// Schemas: public, core, erp, rdb, dilesa, playtomic
-//
-// DO NOT EDIT BY HAND. Regenerate via:
-//   - GitHub Actions: trigger 'DB Types' workflow manually
-//   - Local: npm run db:types (requiere supabase CLI + SUPABASE_ACCESS_TOKEN)
-// ==============================================================================
-
 export type Json =
   | string
   | number
@@ -371,7 +360,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      fn_current_empresa_ids: { Args: never; Returns: string[] }
+      fn_current_user_id: { Args: never; Returns: string }
+      fn_has_empresa: { Args: { p_empresa_id: string }; Returns: boolean }
+      fn_is_admin: { Args: never; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
@@ -1286,26 +1278,88 @@ export type Database = {
           },
         ]
       }
+      empleado_beneficiarios: {
+        Row: {
+          created_at: string
+          empleado_id: string
+          empresa_id: string
+          id: string
+          nombre: string
+          orden: number
+          parentesco: string | null
+          porcentaje: number | null
+          telefono: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          empleado_id: string
+          empresa_id: string
+          id?: string
+          nombre: string
+          orden?: number
+          parentesco?: string | null
+          porcentaje?: number | null
+          telefono?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          empleado_id?: string
+          empresa_id?: string
+          id?: string
+          nombre?: string
+          orden?: number
+          parentesco?: string | null
+          porcentaje?: number | null
+          telefono?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "empleado_beneficiarios_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "empleados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "empleado_beneficiarios_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "v_empleados_full"
+            referencedColumns: ["empleado_id"]
+          },
+        ]
+      }
       empleados: {
         Row: {
           activo: boolean
           created_at: string
           deleted_at: string | null
           departamento_id: string | null
+          dia_pago: string | null
           email_empresa: string | null
           empresa_id: string
           extension: string | null
           fecha_baja: string | null
           fecha_ingreso: string | null
           fecha_nacimiento: string | null
+          funciones: string | null
+          horario: string | null
           id: string
+          lugar_trabajo: string | null
           motivo_baja: string | null
+          notas: string | null
           nss: string | null
           numero_empleado: string | null
+          periodo_prueba_dias: number | null
+          periodo_prueba_numero: number | null
           persona_id: string
           puesto_id: string | null
           reemplaza_a: string | null
           telefono_empresa: string | null
+          tipo_contrato: string | null
           updated_at: string | null
         }
         Insert: {
@@ -1313,20 +1367,28 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           departamento_id?: string | null
+          dia_pago?: string | null
           email_empresa?: string | null
           empresa_id: string
           extension?: string | null
           fecha_baja?: string | null
           fecha_ingreso?: string | null
           fecha_nacimiento?: string | null
+          funciones?: string | null
+          horario?: string | null
           id?: string
+          lugar_trabajo?: string | null
           motivo_baja?: string | null
+          notas?: string | null
           nss?: string | null
           numero_empleado?: string | null
+          periodo_prueba_dias?: number | null
+          periodo_prueba_numero?: number | null
           persona_id: string
           puesto_id?: string | null
           reemplaza_a?: string | null
           telefono_empresa?: string | null
+          tipo_contrato?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -1334,20 +1396,28 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           departamento_id?: string | null
+          dia_pago?: string | null
           email_empresa?: string | null
           empresa_id?: string
           extension?: string | null
           fecha_baja?: string | null
           fecha_ingreso?: string | null
           fecha_nacimiento?: string | null
+          funciones?: string | null
+          horario?: string | null
           id?: string
+          lugar_trabajo?: string | null
           motivo_baja?: string | null
+          notas?: string | null
           nss?: string | null
           numero_empleado?: string | null
+          periodo_prueba_dias?: number | null
+          periodo_prueba_numero?: number | null
           persona_id?: string
           puesto_id?: string | null
           reemplaza_a?: string | null
           telefono_empresa?: string | null
+          tipo_contrato?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -1923,8 +1993,10 @@ export type Database = {
           id: string
           monto: number
           realizado_por: string | null
+          realizado_por_nombre: string | null
           referencia: string | null
           tipo: string
+          tipo_detalle: string | null
         }
         Insert: {
           concepto?: string | null
@@ -1934,8 +2006,10 @@ export type Database = {
           id?: string
           monto: number
           realizado_por?: string | null
+          realizado_por_nombre?: string | null
           referencia?: string | null
           tipo: string
+          tipo_detalle?: string | null
         }
         Update: {
           concepto?: string | null
@@ -1945,8 +2019,10 @@ export type Database = {
           id?: string
           monto?: number
           realizado_por?: string | null
+          realizado_por_nombre?: string | null
           referencia?: string | null
           tipo?: string
+          tipo_detalle?: string | null
         }
         Relationships: [
           {
@@ -2272,17 +2348,26 @@ export type Database = {
           activo: boolean
           apellido_materno: string | null
           apellido_paterno: string | null
+          contacto_emergencia_nombre: string | null
+          contacto_emergencia_parentesco: string | null
+          contacto_emergencia_telefono: string | null
           created_at: string
           curp: string | null
           deleted_at: string | null
+          domicilio: string | null
           email: string | null
           empresa_id: string
+          estado_civil: string | null
           fecha_nacimiento: string | null
           id: string
+          lugar_nacimiento: string | null
+          nacionalidad: string | null
           nombre: string
           nss: string | null
           rfc: string | null
+          sexo: string | null
           telefono: string | null
+          telefono_casa: string | null
           tipo: string
           updated_at: string | null
         }
@@ -2290,17 +2375,26 @@ export type Database = {
           activo?: boolean
           apellido_materno?: string | null
           apellido_paterno?: string | null
+          contacto_emergencia_nombre?: string | null
+          contacto_emergencia_parentesco?: string | null
+          contacto_emergencia_telefono?: string | null
           created_at?: string
           curp?: string | null
           deleted_at?: string | null
+          domicilio?: string | null
           email?: string | null
           empresa_id: string
+          estado_civil?: string | null
           fecha_nacimiento?: string | null
           id?: string
+          lugar_nacimiento?: string | null
+          nacionalidad?: string | null
           nombre: string
           nss?: string | null
           rfc?: string | null
+          sexo?: string | null
           telefono?: string | null
+          telefono_casa?: string | null
           tipo?: string
           updated_at?: string | null
         }
@@ -2308,17 +2402,26 @@ export type Database = {
           activo?: boolean
           apellido_materno?: string | null
           apellido_paterno?: string | null
+          contacto_emergencia_nombre?: string | null
+          contacto_emergencia_parentesco?: string | null
+          contacto_emergencia_telefono?: string | null
           created_at?: string
           curp?: string | null
           deleted_at?: string | null
+          domicilio?: string | null
           email?: string | null
           empresa_id?: string
+          estado_civil?: string | null
           fecha_nacimiento?: string | null
           id?: string
+          lugar_nacimiento?: string | null
+          nacionalidad?: string | null
           nombre?: string
           nss?: string | null
           rfc?: string | null
+          sexo?: string | null
           telefono?: string | null
+          telefono_casa?: string | null
           tipo?: string
           updated_at?: string | null
         }
@@ -3922,6 +4025,33 @@ export type Database = {
         }
         Relationships: []
       }
+      health_ingest_snapshot_2025_pre: {
+        Row: {
+          captured_at: string | null
+          first_date: string | null
+          last_date: string | null
+          metric_name: string
+          rows_2025: number | null
+          rows_total: number | null
+        }
+        Insert: {
+          captured_at?: string | null
+          first_date?: string | null
+          last_date?: string | null
+          metric_name: string
+          rows_2025?: number | null
+          rows_total?: number | null
+        }
+        Update: {
+          captured_at?: string | null
+          first_date?: string | null
+          last_date?: string | null
+          metric_name?: string
+          rows_2025?: number | null
+          rows_total?: number | null
+        }
+        Relationships: []
+      }
       health_medications: {
         Row: {
           date: string
@@ -4448,7 +4578,51 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_health_timeline_monthly: {
+        Args: { p_from: string }
+        Returns: {
+          avg_value: number
+          metric_name: string
+          month_start: string
+          sample_count: number
+        }[]
+      }
+      get_latest_health_metrics: {
+        Args: { p_names: string[] }
+        Returns: {
+          date: string
+          id: number
+          metric_name: string
+          source: string
+          unit: string
+          value: number
+        }[]
+      }
+      get_workout_cardiac_zones: {
+        Args: {
+          p_from: string
+          p_max_hr?: number
+          p_resting_hr?: number
+          p_to: string
+        }
+        Returns: {
+          avg_hr: number
+          distance_km: number
+          duration_minutes: number
+          end_time: string
+          energy_kcal: number
+          max_hr_observed: number
+          samples: number
+          start_time: string
+          workout_id: number
+          workout_name: string
+          z1_samples: number
+          z2_samples: number
+          z3_samples: number
+          z4_samples: number
+          z5_samples: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
@@ -4459,7 +4633,7 @@ export type Database = {
   }
   rdb: {
     Tables: {
-      corte_conteo_denominaciones_legacy: {
+      corte_conteo_denominaciones_archive_2026_04_17: {
         Row: {
           cantidad: number
           corte_id: string
@@ -4492,112 +4666,7 @@ export type Database = {
         }
         Relationships: []
       }
-      inv_ajustes: {
-        Row: {
-          cantidad: number
-          estado: string | null
-          fecha_ajuste: string | null
-          id: string
-          motivo: string | null
-          producto_id: string | null
-        }
-        Insert: {
-          cantidad: number
-          estado?: string | null
-          fecha_ajuste?: string | null
-          id?: string
-          motivo?: string | null
-          producto_id?: string | null
-        }
-        Update: {
-          cantidad?: number
-          estado?: string | null
-          fecha_ajuste?: string | null
-          id?: string
-          motivo?: string | null
-          producto_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "inv_ajustes_producto_id_fkey"
-            columns: ["producto_id"]
-            isOneToOne: false
-            referencedRelation: "inv_productos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inv_ajustes_producto_id_fkey"
-            columns: ["producto_id"]
-            isOneToOne: false
-            referencedRelation: "v_inv_stock_actual"
-            referencedColumns: ["producto_id"]
-          },
-        ]
-      }
-      inv_entradas: {
-        Row: {
-          cantidad: number
-          costo_unitario: number | null
-          fecha_entrada: string | null
-          id: string
-          producto_id: string | null
-          proveedor: string | null
-        }
-        Insert: {
-          cantidad: number
-          costo_unitario?: number | null
-          fecha_entrada?: string | null
-          id?: string
-          producto_id?: string | null
-          proveedor?: string | null
-        }
-        Update: {
-          cantidad?: number
-          costo_unitario?: number | null
-          fecha_entrada?: string | null
-          id?: string
-          producto_id?: string | null
-          proveedor?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "inv_entradas_producto_id_fkey"
-            columns: ["producto_id"]
-            isOneToOne: false
-            referencedRelation: "inv_productos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inv_entradas_producto_id_fkey"
-            columns: ["producto_id"]
-            isOneToOne: false
-            referencedRelation: "v_inv_stock_actual"
-            referencedColumns: ["producto_id"]
-          },
-        ]
-      }
-      inv_productos: {
-        Row: {
-          categoria: string | null
-          id: string
-          nombre: string
-          stock_inicial: number | null
-        }
-        Insert: {
-          categoria?: string | null
-          id: string
-          nombre: string
-          stock_inicial?: number | null
-        }
-        Update: {
-          categoria?: string | null
-          id?: string
-          nombre?: string
-          stock_inicial?: number | null
-        }
-        Relationships: []
-      }
-      ordenes_compra_legacy: {
+      ordenes_compra_archive_2026_04_17: {
         Row: {
           created_at: string | null
           estatus: string
@@ -4655,7 +4724,7 @@ export type Database = {
             foreignKeyName: "ordenes_compra_proveedor_id_fkey"
             columns: ["proveedor_id"]
             isOneToOne: false
-            referencedRelation: "proveedores_legacy"
+            referencedRelation: "proveedores_archive_2026_04_17"
             referencedColumns: ["id"]
           },
           {
@@ -4669,7 +4738,7 @@ export type Database = {
             foreignKeyName: "ordenes_compra_requisicion_id_fkey"
             columns: ["requisicion_id"]
             isOneToOne: false
-            referencedRelation: "requisiciones_legacy"
+            referencedRelation: "requisiciones_archive_2026_04_17"
             referencedColumns: ["id"]
           },
         ]
@@ -4698,7 +4767,7 @@ export type Database = {
         }
         Relationships: []
       }
-      proveedores_legacy: {
+      proveedores_archive_2026_04_17: {
         Row: {
           activo: boolean
           contacto: string | null
@@ -4740,7 +4809,7 @@ export type Database = {
         }
         Relationships: []
       }
-      requisiciones_legacy: {
+      requisiciones_archive_2026_04_17: {
         Row: {
           aprobado_por: string | null
           created_at: string | null
@@ -4890,13 +4959,6 @@ export type Database = {
             foreignKeyName: "waitry_pagos_order_fk"
             columns: ["order_id"]
             isOneToOne: false
-            referencedRelation: "v_waitry_pedidos_30d"
-            referencedColumns: ["order_id"]
-          },
-          {
-            foreignKeyName: "waitry_pagos_order_fk"
-            columns: ["order_id"]
-            isOneToOne: false
             referencedRelation: "v_waitry_pedidos_reversa_sospechosa"
             referencedColumns: ["order_id"]
           },
@@ -5035,13 +5097,6 @@ export type Database = {
             foreignKeyName: "waitry_productos_order_fk"
             columns: ["order_id"]
             isOneToOne: false
-            referencedRelation: "v_waitry_pedidos_30d"
-            referencedColumns: ["order_id"]
-          },
-          {
-            foreignKeyName: "waitry_productos_order_fk"
-            columns: ["order_id"]
-            isOneToOne: false
             referencedRelation: "v_waitry_pedidos_reversa_sospechosa"
             referencedColumns: ["order_id"]
           },
@@ -5147,7 +5202,7 @@ export type Database = {
             foreignKeyName: "ordenes_compra_proveedor_id_fkey"
             columns: ["proveedor_id"]
             isOneToOne: false
-            referencedRelation: "proveedores_legacy"
+            referencedRelation: "proveedores_archive_2026_04_17"
             referencedColumns: ["id"]
           },
           {
@@ -5161,7 +5216,7 @@ export type Database = {
             foreignKeyName: "ordenes_compra_requisicion_id_fkey"
             columns: ["requisicion_id"]
             isOneToOne: false
-            referencedRelation: "requisiciones_legacy"
+            referencedRelation: "requisiciones_archive_2026_04_17"
             referencedColumns: ["id"]
           },
         ]
@@ -5308,7 +5363,22 @@ export type Database = {
           product_id: string | null
           producto_nombre: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "waitry_pedidos_corte_id_fkey"
+            columns: ["corte_id"]
+            isOneToOne: false
+            referencedRelation: "v_cortes_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waitry_pedidos_corte_id_fkey"
+            columns: ["corte_id"]
+            isOneToOne: false
+            referencedRelation: "v_cortes_totales"
+            referencedColumns: ["corte_id"]
+          },
+        ]
       }
       v_cortes_totales: {
         Row: {
@@ -5328,19 +5398,6 @@ export type Database = {
           pedidos_count: number | null
           retiros: number | null
           total_ingresos: number | null
-        }
-        Relationships: []
-      }
-      v_inv_stock_actual: {
-        Row: {
-          ajustes: number | null
-          categoria: string | null
-          entradas: number | null
-          nombre: string | null
-          producto_id: string | null
-          salidas_ventas: number | null
-          stock_actual: number | null
-          stock_inicial: number | null
         }
         Relationships: []
       }
@@ -5374,107 +5431,6 @@ export type Database = {
           padre_nombre: string | null
           total_hijos: number | null
           unidad: string | null
-        }
-        Relationships: []
-      }
-      v_waitry_pagos_30d: {
-        Row: {
-          amount: number | null
-          created_at: string | null
-          currency: string | null
-          id: string | null
-          order_id: string | null
-          payment_id: string | null
-          payment_method: string | null
-          tip: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "waitry_pagos_order_fk"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "v_waitry_pedidos_30d"
-            referencedColumns: ["order_id"]
-          },
-          {
-            foreignKeyName: "waitry_pagos_order_fk"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "v_waitry_pedidos_reversa_sospechosa"
-            referencedColumns: ["order_id"]
-          },
-          {
-            foreignKeyName: "waitry_pagos_order_fk"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "waitry_pedidos"
-            referencedColumns: ["order_id"]
-          },
-        ]
-      }
-      v_waitry_pedidos_30d: {
-        Row: {
-          content_hash: string | null
-          created_at: string | null
-          external_delivery_id: string | null
-          id: string | null
-          last_action_at: string | null
-          layout_name: string | null
-          notes: string | null
-          order_id: string | null
-          paid: boolean | null
-          place_id: string | null
-          place_name: string | null
-          service_charge: number | null
-          status: string | null
-          table_name: string | null
-          tax: number | null
-          timestamp: string | null
-          total_amount: number | null
-          total_discount: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          content_hash?: string | null
-          created_at?: string | null
-          external_delivery_id?: string | null
-          id?: string | null
-          last_action_at?: string | null
-          layout_name?: string | null
-          notes?: string | null
-          order_id?: string | null
-          paid?: boolean | null
-          place_id?: string | null
-          place_name?: string | null
-          service_charge?: number | null
-          status?: string | null
-          table_name?: string | null
-          tax?: number | null
-          timestamp?: string | null
-          total_amount?: number | null
-          total_discount?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          content_hash?: string | null
-          created_at?: string | null
-          external_delivery_id?: string | null
-          id?: string | null
-          last_action_at?: string | null
-          layout_name?: string | null
-          notes?: string | null
-          order_id?: string | null
-          paid?: boolean | null
-          place_id?: string | null
-          place_name?: string | null
-          service_charge?: number | null
-          status?: string | null
-          table_name?: string | null
-          tax?: number | null
-          timestamp?: string | null
-          total_amount?: number | null
-          total_discount?: number | null
-          updated_at?: string | null
         }
         Relationships: []
       }
@@ -5558,43 +5514,6 @@ export type Database = {
         }
         Relationships: []
       }
-      v_waitry_productos_30d: {
-        Row: {
-          created_at: string | null
-          id: string | null
-          modifiers: Json | null
-          notes: string | null
-          order_id: string | null
-          product_id: string | null
-          product_name: string | null
-          quantity: number | null
-          total_price: number | null
-          unit_price: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "waitry_productos_order_fk"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "v_waitry_pedidos_30d"
-            referencedColumns: ["order_id"]
-          },
-          {
-            foreignKeyName: "waitry_productos_order_fk"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "v_waitry_pedidos_reversa_sospechosa"
-            referencedColumns: ["order_id"]
-          },
-          {
-            foreignKeyName: "waitry_productos_order_fk"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "waitry_pedidos"
-            referencedColumns: ["order_id"]
-          },
-        ]
-      }
     }
     Functions: {
       check_duplicates: { Args: { p_order_id: string }; Returns: number }
@@ -5647,6 +5566,24 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "cortes_caja"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      upsert_movimiento: {
+        Args: {
+          p_coda_id?: string
+          p_corte_nombre?: string
+          p_fecha_hora?: string
+          p_monto?: number
+          p_nota?: string
+          p_registrado_por?: string
+          p_tipo?: string
+        }
+        Returns: Database["erp"]["Tables"]["movimientos_caja"]["Row"]
+        SetofOptions: {
+          from: "*"
+          to: "movimientos_caja"
           isOneToOne: true
           isSetofReturn: false
         }
