@@ -237,20 +237,7 @@ export function ProgressBar({ value }: { value: number }) {
   );
 }
 
-export function FieldLabel({
-  children,
-  required,
-}: {
-  children: React.ReactNode;
-  required?: boolean;
-}) {
-  return (
-    <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50 mb-1.5">
-      {children}
-      {required && <span className="text-red-400 ml-0.5">*</span>}
-    </div>
-  );
-}
+export { FieldLabel } from '@/components/ui/field-label';
 
 // ─── Combobox — used by DILESA variant for filters and responsable picker ────
 

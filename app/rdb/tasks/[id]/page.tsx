@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
+import { FieldLabel } from '@/components/ui/field-label';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
@@ -58,16 +59,7 @@ type TaskUpdate = {
   usuario?: { nombre: string } | null;
 };
 
-const ESTADO_CONFIG: Record<ErpTask['estado'], { label: string; cls: string }> = {
-  pendiente: { label: 'Pendiente', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
-  en_progreso: { label: 'En progreso', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
-  bloqueado: { label: 'Bloqueado', cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
-  completado: { label: 'Completado', cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
-  cancelado: {
-    label: 'Cancelado',
-    cls: 'bg-[var(--border)]/60 text-[var(--text)]/40 border-[var(--border)]',
-  },
-};
+import { ESTADO_CONFIG } from '@/components/tasks/tasks-shared';
 
 const PRIORIDAD_CONFIG: Record<string, { label: string; cls: string }> = {
   Urgente: { label: 'Urgente', cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
@@ -108,14 +100,6 @@ function formatDateTime(dateStr: string | null) {
     hour: '2-digit',
     minute: '2-digit',
   });
-}
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50">
-      {children}
-    </div>
-  );
 }
 
 function TaskDetailInner() {

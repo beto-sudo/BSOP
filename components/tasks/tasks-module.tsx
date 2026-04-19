@@ -34,6 +34,7 @@ import { Plus, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import type { TablesInsert, TablesUpdate } from '@/types/supabase';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { useSortableTable } from '@/hooks/use-sortable-table';
 
 import { emptyTaskForm } from './tasks-shared';
@@ -489,9 +490,15 @@ export function TasksModule({
     await fetchTasks(empresaIds);
   };
 
-  const handleDelete = async () => {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const handleDelete = () => {
     if (!selectedTask || !canModifyTask(selectedTask)) return;
-    if (!confirm('¿Eliminar esta tarea? Esta acción no se puede deshacer.')) return;
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!selectedTask) return;
     setDeleting(true);
     const { error: err } = await supabase
       .schema('erp')
@@ -892,6 +899,15 @@ export function TasksModule({
           savingUpdate={savingUpdate}
         />
       )}
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        onConfirm={handleDeleteConfirm}
+        title="¿Eliminar esta tarea?"
+        description="Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+      />
     </div>
   );
 }

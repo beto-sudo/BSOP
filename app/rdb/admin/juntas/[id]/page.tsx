@@ -32,6 +32,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { FieldLabel } from '@/components/ui/field-label';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
@@ -162,14 +163,6 @@ function formatDate(s: string | null) {
   if (!s) return '—';
   const d = new Date(s.includes('T') ? s : `${s}T00:00:00`);
   return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50 mb-1.5">
-      {children}
-    </div>
-  );
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {

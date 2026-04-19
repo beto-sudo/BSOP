@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { FieldLabel } from '@/components/ui/field-label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, Save, Loader2, UserX } from 'lucide-react';
@@ -77,14 +78,6 @@ function formatDate(d: string | null) {
     month: 'long',
     year: 'numeric',
   });
-}
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50 mb-1.5">
-      {children}
-    </div>
-  );
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {

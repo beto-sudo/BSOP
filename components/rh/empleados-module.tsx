@@ -58,6 +58,7 @@ import {
 import { FilterCombobox } from '@/components/ui/filter-combobox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { FieldLabel } from '@/components/ui/field-label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RowActions } from '@/components/shared/row-actions';
 import { useToast } from '@/components/ui/toast';
@@ -143,14 +144,6 @@ function formatDate(d: string | null) {
     month: 'short',
     year: 'numeric',
   });
-}
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50 mb-1.5">
-      {children}
-    </div>
-  );
 }
 
 function detailHref(empresaSlug: string, id: string) {

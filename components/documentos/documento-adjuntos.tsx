@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 
 import type { Adjunto, AdjuntoRol } from './types';
 import { RESUMABLE_THRESHOLD, fmtBytes, uploadResumable } from './helpers';
@@ -48,6 +49,7 @@ export function AdjuntosSection({
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [uploadRole, setUploadRole] = useState<AdjuntoRol>('documento_principal');
+  const [pendingDelete, setPendingDelete] = useState<Adjunto | null>(null);
 
   const principal = adjuntos.filter((a) => a.rol === 'documento_principal');
   const imagenes = adjuntos.filter((a) => a.rol === 'imagen_referencia');
@@ -111,9 +113,14 @@ export function AdjuntosSection({
     onRefresh();
   };
 
-  const handleDelete = async (a: Adjunto) => {
-    if (!confirm(`¿Eliminar "${a.nombre}"?`)) return;
-    await supabase.schema('erp').from('adjuntos').delete().eq('id', a.id);
+  const handleDelete = (a: Adjunto) => {
+    setPendingDelete(a);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!pendingDelete) return;
+    await supabase.schema('erp').from('adjuntos').delete().eq('id', pendingDelete.id);
+    setPendingDelete(null);
     onRefresh();
   };
 
@@ -236,6 +243,17 @@ export function AdjuntosSection({
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        title="¿Eliminar este archivo?"
+        description={pendingDelete ? `Se eliminará "${pendingDelete.nombre}".` : undefined}
+        confirmLabel="Eliminar"
+      />
     </div>
   );
 }
