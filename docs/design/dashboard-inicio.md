@@ -10,16 +10,17 @@
 
 BSOP tiene estos tipos de usuario (según `core.usuarios.rol` + `core.usuarios_empresas`):
 
-| Perfil | Ejemplo | Qué le importa |
-|---|---|---|
-| **Admin global** | Beto | Todo, cross-empresa |
-| **Operativo RDB** | cajero, hostess, admin RDB | Turno actual, cortes del día, stock crítico, reservas |
-| **Financiero SR** | Beto (hat financiero), contador | Movimientos sin categorizar, gastos del mes, vencimientos fiscales |
-| **Operativo DILESA** | supervisor obra, admin DILESA | Avance lotes, entregas esta semana, RUV pendientes |
-| **Operativo ANSA** | asesor ventas, servicio | Citas del día, unidades disponibles, ventas del mes |
-| **Familia / Grupo SR** | miembros familiares | Salud, viajes, contenido personal |
+| Perfil                 | Ejemplo                         | Qué le importa                                                     |
+| ---------------------- | ------------------------------- | ------------------------------------------------------------------ |
+| **Admin global**       | Beto                            | Todo, cross-empresa                                                |
+| **Operativo RDB**      | cajero, hostess, admin RDB      | Turno actual, cortes del día, stock crítico, reservas              |
+| **Financiero SR**      | Beto (hat financiero), contador | Movimientos sin categorizar, gastos del mes, vencimientos fiscales |
+| **Operativo DILESA**   | supervisor obra, admin DILESA   | Avance lotes, entregas esta semana, RUV pendientes                 |
+| **Operativo ANSA**     | asesor ventas, servicio         | Citas del día, unidades disponibles, ventas del mes                |
+| **Familia / Grupo SR** | miembros familiares             | Salud, viajes, contenido personal                                  |
 
 El dashboard adapta lo que muestra según:
+
 1. Rol (admin vs usuario regular)
 2. Empresas asignadas en `core.usuarios_empresas`
 3. Módulos accesibles en `core.permisos_rol`
@@ -67,12 +68,12 @@ El dashboard adapta lo que muestra según:
 
 Siempre visibles, siempre priorizadas:
 
-| Tarjeta | Fuente | Ejemplo |
-|---|---|---|
-| **Saludo + fecha** | `core.usuarios.nombre` | "Buenos días, Beto · Martes 21 de abril" |
-| **Tareas del día** | `erp.tasks WHERE asignado_a = me AND fecha_vence <= today AND estado NOT IN (completado, cancelado)` | "3 tareas · 1 vencida ⚠️" |
-| **Juntas hoy** | `erp.juntas WHERE fecha_hora::date = today AND asistentes @> me` | "2 juntas · 09:00 y 14:00" |
-| **Acción ejecutiva** | depende de rol | Admin: "10 sin categorizar" · Cajero: "abrir caja" · Supervisor: "3 lotes en inspección" |
+| Tarjeta              | Fuente                                                                                               | Ejemplo                                                                                  |
+| -------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| **Saludo + fecha**   | `core.usuarios.nombre`                                                                               | "Buenos días, Beto · Martes 21 de abril"                                                 |
+| **Tareas del día**   | `erp.tasks WHERE asignado_a = me AND fecha_vence <= today AND estado NOT IN (completado, cancelado)` | "3 tareas · 1 vencida ⚠️"                                                                |
+| **Juntas hoy**       | `erp.juntas WHERE fecha_hora::date = today AND asistentes @> me`                                     | "2 juntas · 09:00 y 14:00"                                                               |
+| **Acción ejecutiva** | depende de rol                                                                                       | Admin: "10 sin categorizar" · Cajero: "abrir caja" · Supervisor: "3 lotes en inspección" |
 
 Cada tarjeta es clickeable → lleva a la sección correspondiente.
 
@@ -87,27 +88,32 @@ Estructura tipo inbox. Un tab por tipo. Cada tab muestra el **count** en el labe
 ```
 
 ### Tab: Tareas
+
 - Fuente: `erp.tasks` asignadas al usuario + sin cerrar
 - Columnas: estado badge · título · empresa · prioridad · fecha venc · [botón Completar]
 - Orden: vencidas primero, luego por fecha de vencimiento
 - Filtro rápido: "hoy" / "esta semana" / "todas"
 
 ### Tab: Juntas
+
 - Fuente: `erp.juntas_asistencia` próximas (next 7 days)
 - Columnas: fecha + hora · título · empresa · lugar · [botón Abrir]
 - Separador: "Hoy" · "Esta semana" · "Después"
 
 ### Tab: Aprobaciones (según rol)
+
 - Fuente: `erp.aprobaciones WHERE aprobador = me AND estado = 'pendiente'`
 - Columnas: entidad (OC, Requisición, Gasto, etc) · monto/total · solicitante · fecha
 - Quick action: [Aprobar] [Rechazar] [Ver detalle]
 
 ### Tab: Categorizar bancos (admin financiero)
+
 - Fuente: `erp.movimientos_bancarios WHERE categorizado = false AND empresa_id ∈ user_empresas`
 - Agrupado por cuenta
 - Quick action: selecciona categoría inline → marca categorizado
 
 ### Tab: Recepciones (admin compras)
+
 - Fuente: `erp.ordenes_compra WHERE estado = 'por_recibir' AND fecha_entrega <= today + 3`
 - Quick action: marcar recibida
 
@@ -133,6 +139,7 @@ Un card por empresa a la que el usuario tiene acceso. Cada card tiene 4-6 KPIs.
 ```
 
 Fuentes:
+
 - Ventas hoy: `rdb.waitry_pedidos WHERE fecha::date = today`
 - Corte: `erp.cortes_caja WHERE estado = 'abierto'`
 - Reservas: `playtomic.bookings WHERE starts_at::date = today`
@@ -220,20 +227,15 @@ async function getDashboard(userId: string) {
   const user = await getUserWithEmpresas(userId);
 
   return {
-    row1: await buildAtencionInmediata(user),   // siempre
+    row1: await buildAtencionInmediata(user), // siempre
     row2: {
-      tareas:       await fetchTasks(user),
-      juntas:       await fetchJuntas(user),
-      aprobaciones: hasPermission(user, 'aprobaciones.ver')
-                       ? await fetchAprobaciones(user) : null,
-      categorizar:  hasEmpresa(user, 'sr-group')
-                       ? await fetchPendientesCategorizar(user) : null,
-      recepciones:  hasPermission(user, 'compras.ver')
-                       ? await fetchRecepciones(user) : null,
+      tareas: await fetchTasks(user),
+      juntas: await fetchJuntas(user),
+      aprobaciones: hasPermission(user, 'aprobaciones.ver') ? await fetchAprobaciones(user) : null,
+      categorizar: hasEmpresa(user, 'sr-group') ? await fetchPendientesCategorizar(user) : null,
+      recepciones: hasPermission(user, 'compras.ver') ? await fetchRecepciones(user) : null,
     },
-    row3: await Promise.all(
-      user.empresas.map(e => buildEmpresaCard(e, user))
-    ),
+    row3: await Promise.all(user.empresas.map((e) => buildEmpresaCard(e, user))),
     row4: user.isAdmin ? await fetchActivity(user) : null,
   };
 }
@@ -241,17 +243,17 @@ async function getDashboard(userId: string) {
 
 ### Reglas de visibilidad
 
-| Componente | Visible si |
-|---|---|
-| Row 1 · Tareas hoy | tiene tareas asignadas (siempre, pero se oculta si 0) |
-| Row 1 · Juntas hoy | tiene juntas próximas |
-| Row 1 · Acción ejecutiva | `user.isAdmin` O tiene permisos específicos |
-| Row 2 · Aprobaciones | `permisos_rol.aprobaciones.ver = true` |
-| Row 2 · Categorizar | tiene acceso a SR Group + empresa financiera |
-| Row 2 · Recepciones | tiene acceso a compras |
-| Row 3 · RDB | user ∈ usuarios_empresas(rdb) |
-| Row 3 · DILESA | user ∈ usuarios_empresas(dilesa) |
-| Row 4 · Actividad | user.isAdmin |
+| Componente               | Visible si                                            |
+| ------------------------ | ----------------------------------------------------- |
+| Row 1 · Tareas hoy       | tiene tareas asignadas (siempre, pero se oculta si 0) |
+| Row 1 · Juntas hoy       | tiene juntas próximas                                 |
+| Row 1 · Acción ejecutiva | `user.isAdmin` O tiene permisos específicos           |
+| Row 2 · Aprobaciones     | `permisos_rol.aprobaciones.ver = true`                |
+| Row 2 · Categorizar      | tiene acceso a SR Group + empresa financiera          |
+| Row 2 · Recepciones      | tiene acceso a compras                                |
+| Row 3 · RDB              | user ∈ usuarios_empresas(rdb)                         |
+| Row 3 · DILESA           | user ∈ usuarios_empresas(dilesa)                      |
+| Row 4 · Actividad        | user.isAdmin                                          |
 
 ---
 
@@ -259,23 +261,24 @@ async function getDashboard(userId: string) {
 
 Antes de poder construir el dashboard 100% funcional:
 
-| KPI | Falta | Estado |
-|---|---|---|
-| Ventas hoy RDB | ✅ existe (`rdb.waitry_pedidos`) | ready |
-| Corte actual RDB | ✅ existe (`erp.cortes_caja`) | ready |
-| Reservas hoy Playtomic | ✅ existe (`playtomic.bookings`) | ready |
-| Stock crítico | ⚠️ necesita columna `min_stock` en `erp.productos` | schema change |
-| Lotes DILESA | ❌ `erp.lotes` está en 0 rows | migración pendiente |
-| Entregas DILESA | ❌ schema "entregas" no existe como tabla aparte | diseñar |
-| DTUs por vencer | ❌ RUV no migrado | muy lejos |
-| Citas ANSA hoy | ❌ `erp.citas` en 0 rows | migración pendiente |
-| Inventario vehículos | ❌ `erp.vehiculos` en 0 rows | migración pendiente |
-| Ventas mes ANSA | ❌ `erp.ventas_autos` en 0 rows | migración pendiente |
-| Cobranza pendiente | ❌ `erp.cobranza` en 0 rows | migración pendiente |
-| Sin categorizar SR | ❌ `erp.movimientos_bancarios` en 0 rows | ver `bancos-y-gastos.md` |
-| Gastos mes SR | ❌ `erp.gastos` en 0 rows | ver `bancos-y-gastos.md` |
+| KPI                    | Falta                                              | Estado                   |
+| ---------------------- | -------------------------------------------------- | ------------------------ |
+| Ventas hoy RDB         | ✅ existe (`rdb.waitry_pedidos`)                   | ready                    |
+| Corte actual RDB       | ✅ existe (`erp.cortes_caja`)                      | ready                    |
+| Reservas hoy Playtomic | ✅ existe (`playtomic.bookings`)                   | ready                    |
+| Stock crítico          | ⚠️ necesita columna `min_stock` en `erp.productos` | schema change            |
+| Lotes DILESA           | ❌ `erp.lotes` está en 0 rows                      | migración pendiente      |
+| Entregas DILESA        | ❌ schema "entregas" no existe como tabla aparte   | diseñar                  |
+| DTUs por vencer        | ❌ RUV no migrado                                  | muy lejos                |
+| Citas ANSA hoy         | ❌ `erp.citas` en 0 rows                           | migración pendiente      |
+| Inventario vehículos   | ❌ `erp.vehiculos` en 0 rows                       | migración pendiente      |
+| Ventas mes ANSA        | ❌ `erp.ventas_autos` en 0 rows                    | migración pendiente      |
+| Cobranza pendiente     | ❌ `erp.cobranza` en 0 rows                        | migración pendiente      |
+| Sin categorizar SR     | ❌ `erp.movimientos_bancarios` en 0 rows           | ver `bancos-y-gastos.md` |
+| Gastos mes SR          | ❌ `erp.gastos` en 0 rows                          | ver `bancos-y-gastos.md` |
 
 **Orden que propone el dashboard**:
+
 1. **MVP v1**: lo que YA hay — tareas, juntas, RDB ventas/corte/reservas, Familia salud/viajes
 2. **v2** (post-migración bancos/gastos): agregar KPIs SR Group + categorizar
 3. **v3** (post-migración ANSA citas): agregar card ANSA completo

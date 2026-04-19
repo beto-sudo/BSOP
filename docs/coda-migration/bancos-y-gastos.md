@@ -34,11 +34,11 @@ Columns:
 
 Tres tablas de movimientos con **el mismo flow manual**:
 
-| Tabla | Rows | Moneda | Particularidad |
-|---|---:|---|---|
-| Movimientos AMEX | 2,610 | USD → MXN | Emails de `americanexpress.com` |
-| Movimientos Banamex | 2,421 | MXN | Emails de Citibanamex |
-| Movimientos IBC | 1,523 | USD → MXN | Emails de Interamerican Bank |
+| Tabla               |  Rows | Moneda    | Particularidad                  |
+| ------------------- | ----: | --------- | ------------------------------- |
+| Movimientos AMEX    | 2,610 | USD → MXN | Emails de `americanexpress.com` |
+| Movimientos Banamex | 2,421 | MXN       | Emails de Citibanamex           |
+| Movimientos IBC     | 1,523 | USD → MXN | Emails de Interamerican Bank    |
 
 ```
 Schema común (Banamex — MXN):
@@ -59,6 +59,7 @@ Schema AMEX / IBC (USD):
 ```
 
 **Flow Coda actual**:
+
 1. Bank envía email → forward a Coda → nueva row (Monto=$0, Registrado=false)
 2. Beto abre "Registros Pendientes X" (view filtrada por Registrado=false)
 3. Lee descripción (el monto está EN EL TEXTO del email, ej. "$43.28"), lo captura en Monto
@@ -218,6 +219,7 @@ created_at/updated_at
 ### 5.1 Email → movimiento (AMEX/Banamex/IBC)
 
 **Nuevo**: endpoint `POST /api/bancos/email-webhook`
+
 - Configurar forwarding del email del banco a una dirección de Resend/Postmark inbound
 - Ese servicio hace POST al endpoint con el email parseado
 - Endpoint:
@@ -229,6 +231,7 @@ created_at/updated_at
   6. Si no → queda pendiente de revisión
 
 **Parsers por banco**:
+
 ```typescript
 // lib/bancos/parsers/amex.ts
 // lib/bancos/parsers/banamex.ts
@@ -241,6 +244,7 @@ Cada parser extrae `{ merchant, monto, moneda, autorizacion, fecha_operacion }` 
 ### 5.2 Export bancario → batch import (BBVA ANSA)
 
 **Nuevo**: UI de upload en `/<empresa>/bancos/<cuenta>/import`
+
 - CSV / OFX / PDF-parse
 - Dedup contra `movimientos_bancarios` (por fecha + monto + concepto hash)
 - Preview antes de importar
@@ -248,6 +252,7 @@ Cada parser extrae `{ merchant, monto, moneda, autorizacion, fecha_operacion }` 
 ### 5.3 Reglas de categorización automática
 
 **Nueva tabla** `erp.reglas_categorizacion`:
+
 ```sql
 id, empresa_id, cuenta_id | NULL, patron_regex, categoria_id, subcategoria_id, activa
 ```
@@ -307,24 +312,16 @@ Cross entre `movimientos_bancarios` × `gastos` × `facturas`. Detecta y propone
 ## 7. Orden de implementación
 
 **Semana A — Base**
+
 1. Migration: seed de `erp.cuentas_bancarias` con 6-10 cuentas reales
 2. Migration: `erp.categorias_gasto` + `erp.subcategorias_gasto` + seed inicial desde Coda (~25 categorías × 73 subcategorías)
 3. Script: `scripts/migrate_sr_gastos.ts` — copia `Gastos` de Coda → `erp.gastos` (3,496 rows)
 
-**Semana B — Ingesta bancaria**
-4. Endpoint: `POST /api/bancos/email-webhook` con parsers AMEX/Banamex/IBC
-5. Script: `scripts/migrate_sr_movimientos.ts` — copia históricos 6,554 rows
-6. UI read-only: `/sr-group/bancos` (ver saldos + movimientos)
+**Semana B — Ingesta bancaria** 4. Endpoint: `POST /api/bancos/email-webhook` con parsers AMEX/Banamex/IBC 5. Script: `scripts/migrate_sr_movimientos.ts` — copia históricos 6,554 rows 6. UI read-only: `/sr-group/bancos` (ver saldos + movimientos)
 
-**Semana C — Categorización + conciliación**
-7. `erp.reglas_categorizacion` + UI de config
-8. UI write: "categorizar pendiente" → crea gasto
-9. Algoritmo de conciliación automática
+**Semana C — Categorización + conciliación** 7. `erp.reglas_categorizacion` + UI de config 8. UI write: "categorizar pendiente" → crea gasto 9. Algoritmo de conciliación automática
 
-**Semana D — Cross-empresa**
-10. UI para ANSA (BBVA import via CSV/PDF)
-11. UI DILESA cuando decida migrar
-12. Cutover parcial: AMEX primero, luego Banamex, luego IBC (un banco por semana)
+**Semana D — Cross-empresa** 10. UI para ANSA (BBVA import via CSV/PDF) 11. UI DILESA cuando decida migrar 12. Cutover parcial: AMEX primero, luego Banamex, luego IBC (un banco por semana)
 
 **Duración total estimada**: 3-4 semanas con 1 operador + agents.
 
@@ -332,13 +329,13 @@ Cross entre `movimientos_bancarios` × `gastos` × `facturas`. Detecta y propone
 
 ## 8. Decisiones pendientes antes de empezar
 
-| Pregunta | Opciones | Mi sugerencia |
-|---|---|---|
-| ¿Seguir con emails forwarded o usar API bancaria (Plaid / Belvo)? | Plaid no cubre MX bien. Belvo sí pero tiene costo. | **Emails por ahora**, evaluar Belvo en 6 meses |
-| ¿Categorías globales o por empresa? | Global reutilizable vs custom | **Mixto**: seed global + override por empresa |
-| ¿Gasto vs movimiento: 1-a-1 o N-a-1? | Un movimiento puede dividirse en N gastos | **N-a-1** (un movimiento genera varios gastos si se divide) |
-| ¿Soft-delete o hard? | Audit requiere soft-delete | **Soft** (`deleted_at timestamptz`) |
-| ¿Currency store bruto o normalizado? | Separar `moneda+monto+TC` vs solo `monto_mxn` | **Ambos**: campos brutos + `monto_mxn` generated |
+| Pregunta                                                          | Opciones                                           | Mi sugerencia                                               |
+| ----------------------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------- |
+| ¿Seguir con emails forwarded o usar API bancaria (Plaid / Belvo)? | Plaid no cubre MX bien. Belvo sí pero tiene costo. | **Emails por ahora**, evaluar Belvo en 6 meses              |
+| ¿Categorías globales o por empresa?                               | Global reutilizable vs custom                      | **Mixto**: seed global + override por empresa               |
+| ¿Gasto vs movimiento: 1-a-1 o N-a-1?                              | Un movimiento puede dividirse en N gastos          | **N-a-1** (un movimiento genera varios gastos si se divide) |
+| ¿Soft-delete o hard?                                              | Audit requiere soft-delete                         | **Soft** (`deleted_at timestamptz`)                         |
+| ¿Currency store bruto o normalizado?                              | Separar `moneda+monto+TC` vs solo `monto_mxn`      | **Ambos**: campos brutos + `monto_mxn` generated            |
 
 ---
 
