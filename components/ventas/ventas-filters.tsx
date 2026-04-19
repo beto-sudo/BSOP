@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { FilterCombobox } from '@/components/ui/filter-combobox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, RefreshCw, CalendarDays } from 'lucide-react';
@@ -76,26 +77,21 @@ export function VentasFilters({
         </SelectContent>
       </Select>
 
-      <Select value={corteFilter} onValueChange={(v) => onCorteFilterChange(v ?? 'all')}>
-        <SelectTrigger className="w-52">
-          <SelectValue placeholder="Todos los cortes" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Todos los cortes</SelectItem>
-          {cortes.map((corte) => {
-            const label = corte.corte_nombre
-              ? `${corte.corte_nombre}`
-              : `${corte.caja_nombre ?? 'Corte'} ${formatDate(corte.hora_inicio)}`;
-            const estado = corte.estado?.toLowerCase() === 'abierto' ? ' 🟢' : '';
-            return (
-              <SelectItem key={corte.id} value={corte.id}>
-                {label}
-                {estado}
-              </SelectItem>
-            );
-          })}
-        </SelectContent>
-      </Select>
+      <FilterCombobox
+        value={corteFilter}
+        onChange={onCorteFilterChange}
+        options={cortes.map((corte) => {
+          const label = corte.corte_nombre
+            ? `${corte.corte_nombre}`
+            : `${corte.caja_nombre ?? 'Corte'} ${formatDate(corte.hora_inicio)}`;
+          const estado = corte.estado?.toLowerCase() === 'abierto' ? ' 🟢' : '';
+          return { id: corte.id, label: `${label}${estado}` };
+        })}
+        placeholder="Corte"
+        searchPlaceholder="Buscar corte..."
+        clearLabel="Todos los cortes"
+        className="w-52"
+      />
 
       <div className="flex items-center gap-2">
         <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />

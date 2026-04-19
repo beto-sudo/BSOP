@@ -34,6 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { FilterCombobox } from '@/components/ui/filter-combobox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -323,19 +324,18 @@ function JuntasInner() {
               className="pl-9 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
             />
           </div>
-          <Select value={filterEstado} onValueChange={(v) => setFilterEstado(v ?? 'all')}>
-            <SelectTrigger className="w-40 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los estados</SelectItem>
-              {Object.entries(ESTADO_CONFIG).map(([k, v]) => (
-                <SelectItem key={k} value={k}>
-                  {v.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <FilterCombobox
+            value={filterEstado}
+            onChange={setFilterEstado}
+            options={Object.entries(ESTADO_CONFIG).map(([k, v]) => ({
+              id: k,
+              label: v.label,
+            }))}
+            placeholder="Estado"
+            searchPlaceholder="Buscar estado..."
+            clearLabel="Todos los estados"
+            className="w-40"
+          />
         </div>
       </div>
 

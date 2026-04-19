@@ -41,6 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { FilterCombobox } from '@/components/ui/filter-combobox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -431,45 +432,36 @@ function TasksInner() {
               className="pl-9 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
             />
           </div>
-          <Select value={filterEstado} onValueChange={(v) => setFilterEstado(v ?? 'all')}>
-            <SelectTrigger className="w-40 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los estados</SelectItem>
-              {Object.entries(ESTADO_CONFIG).map(([k, v]) => (
-                <SelectItem key={k} value={k}>
-                  {v.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={filterPrioridad} onValueChange={(v) => setFilterPrioridad(v ?? 'all')}>
-            <SelectTrigger className="w-36 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-              <SelectValue placeholder="Prioridad" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas</SelectItem>
-              {PRIORIDAD_OPTIONS.map((p) => (
-                <SelectItem key={p} value={p}>
-                  {p}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={filterAsignado} onValueChange={(v) => setFilterAsignado(v ?? 'all')}>
-            <SelectTrigger className="w-40 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-              <SelectValue placeholder="Asignado a" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              {empleados.map((e) => (
-                <SelectItem key={e.id} value={e.id}>
-                  {e.nombre}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <FilterCombobox
+            value={filterEstado}
+            onChange={setFilterEstado}
+            options={Object.entries(ESTADO_CONFIG).map(([k, v]) => ({
+              id: k,
+              label: v.label,
+            }))}
+            placeholder="Estado"
+            searchPlaceholder="Buscar estado..."
+            clearLabel="Todos los estados"
+            className="w-40"
+          />
+          <FilterCombobox
+            value={filterPrioridad}
+            onChange={setFilterPrioridad}
+            options={PRIORIDAD_OPTIONS.map((p) => ({ id: p, label: p }))}
+            placeholder="Prioridad"
+            searchPlaceholder="Buscar prioridad..."
+            clearLabel="Todas"
+            className="w-36"
+          />
+          <FilterCombobox
+            value={filterAsignado}
+            onChange={setFilterAsignado}
+            options={empleados.map((e) => ({ id: e.id, label: e.nombre }))}
+            placeholder="Asignado a"
+            searchPlaceholder="Buscar responsable..."
+            clearLabel="Todos"
+            className="w-40"
+          />
         </div>
       </div>
 

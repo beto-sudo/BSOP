@@ -33,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { FilterCombobox, type FilterComboboxOption } from '@/components/ui/filter-combobox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -449,52 +450,46 @@ function JuntasInner() {
               className="pl-9 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
             />
           </div>
-          <Select value={filterEstado} onValueChange={(v) => setFilterEstado(v ?? 'all')}>
-            <SelectTrigger className="w-40 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los estados</SelectItem>
-              {Object.entries(ESTADO_CONFIG).map(([k, v]) => (
-                <SelectItem key={k} value={k}>
-                  {v.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={filterTipo} onValueChange={(v) => setFilterTipo(v ?? 'all')}>
-            <SelectTrigger className="w-40 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-              <SelectValue placeholder="Tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los tipos</SelectItem>
-              {TIPO_OPTIONS.map((t) => (
-                <SelectItem key={t.value} value={t.value}>
-                  {t.icon} {t.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={filterMonth} onValueChange={(v) => setFilterMonth(v ?? 'all')}>
-            <SelectTrigger className="w-40 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-              <SelectValue placeholder="Mes" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los meses</SelectItem>
-              {monthOptions.map((m) => {
-                const [y, mo] = m.split('-');
-                const label = new Date(Number(y), Number(mo) - 1).toLocaleDateString('es-MX', {
-                  month: 'long',
-                  year: 'numeric',
-                });
-                return (
-                  <SelectItem key={m} value={m}>
-                    {label.charAt(0).toUpperCase() + label.slice(1)}
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
+          <FilterCombobox
+            value={filterEstado}
+            onChange={setFilterEstado}
+            options={Object.entries(ESTADO_CONFIG).map(([k, v]) => ({
+              id: k,
+              label: v.label,
+            }))}
+            placeholder="Estado"
+            searchPlaceholder="Buscar estado..."
+            clearLabel="Todos los estados"
+            className="w-40"
+          />
+          <FilterCombobox
+            value={filterTipo}
+            onChange={setFilterTipo}
+            options={TIPO_OPTIONS.map((t) => ({
+              id: t.value,
+              label: `${t.icon} ${t.label}`,
+            }))}
+            placeholder="Tipo"
+            searchPlaceholder="Buscar tipo..."
+            clearLabel="Todos los tipos"
+            className="w-40"
+          />
+          <FilterCombobox
+            value={filterMonth}
+            onChange={setFilterMonth}
+            options={monthOptions.map<FilterComboboxOption>((m) => {
+              const [y, mo] = m.split('-');
+              const label = new Date(Number(y), Number(mo) - 1).toLocaleDateString('es-MX', {
+                month: 'long',
+                year: 'numeric',
+              });
+              return { id: m, label: label.charAt(0).toUpperCase() + label.slice(1) };
+            })}
+            placeholder="Mes"
+            searchPlaceholder="Buscar mes..."
+            clearLabel="Todos los meses"
+            className="w-40"
+          />
         </div>
       </div>
 

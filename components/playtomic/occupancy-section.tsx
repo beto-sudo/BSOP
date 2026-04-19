@@ -1,10 +1,4 @@
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { FilterCombobox } from '@/components/ui/filter-combobox';
 import { OccupancyHeatmap } from './occupancy-heatmap';
 import type { OccupancyRow, ResourceRow, SportFilter } from './types';
 
@@ -29,19 +23,17 @@ export function OccupancySection({
           </p>
         </div>
         <div className="w-full max-w-[220px]">
-          <Select
+          <FilterCombobox
             value={sportFilter}
-            onValueChange={(value) => onSportFilterChange(value as SportFilter)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Filtrar deporte" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los deportes</SelectItem>
-              <SelectItem value="PADEL">Solo padel</SelectItem>
-              <SelectItem value="TENNIS">Solo tennis</SelectItem>
-            </SelectContent>
-          </Select>
+            onChange={(value) => onSportFilterChange(value as SportFilter)}
+            options={[
+              { id: 'PADEL', label: 'Solo padel' },
+              { id: 'TENNIS', label: 'Solo tennis' },
+            ]}
+            placeholder="Deporte"
+            searchPlaceholder="Buscar deporte..."
+            clearLabel="Todos los deportes"
+          />
         </div>
       </div>
       <OccupancyHeatmap rows={filteredOccupancy} resources={resources} sportFilter={sportFilter} />
