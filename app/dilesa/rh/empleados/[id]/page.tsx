@@ -33,7 +33,7 @@ import { Button } from '@/components/ui/button';
 import { FieldLabel } from '@/components/ui/field-label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Save, Loader2, UserX, Pencil, X } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, UserX, Pencil, X, FileText, FileSignature } from 'lucide-react';
 
 const EMPRESA_SLUG = 'dilesa';
 
@@ -648,7 +648,7 @@ function EmpleadoDetailInner() {
     await fetchAll();
   };
 
-  const handleBaja = async () => {
+  const handleBaja = async (generarFiniquito = false) => {
     if (!empleado) return;
     setGivingBaja(true);
     const { error: err } = await supabase
@@ -666,6 +666,10 @@ function EmpleadoDetailInner() {
       return;
     }
     setShowBajaDialog(false);
+    if (generarFiniquito) {
+      router.push(`/${EMPRESA_SLUG}/rh/empleados/${empleado.id}/finiquito`);
+      return;
+    }
     await fetchAll();
   };
 
@@ -749,6 +753,26 @@ function EmpleadoDetailInner() {
         </div>
         {isAdmin && (
           <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              onClick={() => router.push(`/${EMPRESA_SLUG}/rh/empleados/${empleado.id}/contrato`)}
+              className="gap-1.5 rounded-xl border-[var(--border)] text-[var(--text)]"
+              title="Generar contrato individual de trabajo"
+            >
+              <FileText className="h-4 w-4" /> Contrato
+            </Button>
+            {isBaja && (
+              <Button
+                variant="outline"
+                onClick={() =>
+                  router.push(`/${EMPRESA_SLUG}/rh/empleados/${empleado.id}/finiquito`)
+                }
+                className="gap-1.5 rounded-xl border-[var(--border)] text-[var(--text)]"
+                title="Generar convenio de terminación y finiquito"
+              >
+                <FileSignature className="h-4 w-4" /> Finiquito
+              </Button>
+            )}
             {!isBaja && (
               <Button
                 variant="outline"
@@ -1385,16 +1409,29 @@ function EmpleadoDetailInner() {
               Cancelar
             </Button>
             <Button
-              onClick={handleBaja}
+              onClick={() => handleBaja(false)}
               disabled={givingBaja}
-              className="gap-1.5 rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+              variant="outline"
+              className="gap-1.5 rounded-xl border-red-500/40 text-red-500 hover:bg-red-500/10 disabled:opacity-60"
             >
               {givingBaja ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <UserX className="h-4 w-4" />
               )}{' '}
-              Confirmar baja
+              Solo dar de baja
+            </Button>
+            <Button
+              onClick={() => handleBaja(true)}
+              disabled={givingBaja}
+              className="gap-1.5 rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+            >
+              {givingBaja ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileSignature className="h-4 w-4" />
+              )}{' '}
+              Baja + generar finiquito
             </Button>
           </DialogFooter>
         </DialogContent>
