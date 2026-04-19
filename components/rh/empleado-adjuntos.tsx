@@ -193,90 +193,116 @@ export function EmpleadoAdjuntos({
       {orderedRoles.length === 0 ? (
         <p className="text-xs text-[var(--text)]/40">Sin documentos registrados todavía.</p>
       ) : (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {orderedRoles.map((rol) => {
+        // Lista vertical: cada documento ocupa una fila completa con el nombre
+        // del archivo visible sin truncar. Ocupa más espacio pero es mucho más
+        // escaneable — Beto explícitamente pidió ver los nombres directos.
+        <ul className="divide-y divide-[var(--border)] rounded-xl border border-[var(--border)] bg-[var(--panel)] overflow-hidden">
+          {orderedRoles.flatMap((rol) => {
             const items = byRol.get(rol) ?? [];
             const meta = EMPLEADO_ROLES.find((r) => r.id === rol);
             const label = meta?.label ?? ROLE_LABELS[rol] ?? rol;
             const icon = meta?.icon ?? '📎';
-            return (
-              <div
-                key={rol}
-                className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3"
-              >
-                <div className="flex items-center gap-1.5 mb-2">
-                  <span>{icon}</span>
-                  <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text)]/60">
-                    {label}
-                  </span>
-                  <span className="text-[10px] text-[var(--text)]/30">({items.length})</span>
-                </div>
-                <ul className="space-y-1">
-                  {items.map((a) => {
-                    const href = getAdjuntoProxyUrl(a.url);
-                    return (
-                      <li key={a.id} className="group flex items-center gap-2">
-                        {isImage(a) ? (
-                          <a
-                            href={href}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="shrink-0"
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={href}
-                              alt={a.nombre}
-                              className="h-10 w-10 rounded-lg border border-[var(--border)] object-cover"
-                            />
-                          </a>
-                        ) : null}
-                        <a
-                          href={href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 py-1.5 text-xs transition hover:bg-[var(--card)]/80 ${
-                            isPdf(a)
-                              ? 'text-red-400'
-                              : isImage(a)
-                                ? 'text-blue-400'
-                                : 'text-[var(--accent)]'
-                          }`}
-                          title={a.nombre}
-                        >
-                          {isPdf(a) ? (
-                            <FileText className="h-3.5 w-3.5 shrink-0" />
-                          ) : isImage(a) ? (
-                            <ImageIcon className="h-3.5 w-3.5 shrink-0" />
-                          ) : (
-                            <Paperclip className="h-3.5 w-3.5 shrink-0" />
-                          )}
-                          <span className="min-w-0 truncate">{a.nombre}</span>
-                          {a.tamano_bytes != null && (
-                            <span className="shrink-0 text-[var(--text)]/30">
-                              {formatSize(a.tamano_bytes)}
-                            </span>
-                          )}
-                          <Download className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-60 transition" />
-                        </a>
-                        {!readOnly && (
-                          <button
-                            type="button"
-                            onClick={() => setPendingDelete(a)}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg hover:bg-red-500/10 text-[var(--text)]/30 hover:text-red-400"
-                            title="Eliminar"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            );
+            return items.map((a, idx) => {
+              const href = getAdjuntoProxyUrl(a.url);
+              const img = isImage(a);
+              const pdf = isPdf(a);
+              return (
+                <li
+                  key={a.id}
+                  className="group flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--card)]/50 transition"
+                >
+                  {/* Etiqueta del rol, visible solo en el primer archivo del grupo
+                      para que el listado se lea como secciones visuales. */}
+                  <div className="flex w-40 shrink-0 items-center gap-1.5">
+                    {idx === 0 ? (
+                      <>
+                        <span className="text-base">{icon}</span>
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text)]/65">
+                          {label}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-[11px] text-[var(--text)]/30 pl-6">↳</span>
+                    )}
+                  </div>
+
+                  {/* Thumbnail de imagen (solo si es imagen) */}
+                  {img ? (
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0"
+                      title="Abrir"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={href}
+                        alt={a.nombre}
+                        className="h-12 w-12 rounded-lg border border-[var(--border)] object-cover"
+                      />
+                    </a>
+                  ) : (
+                    <div
+                      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] ${
+                        pdf
+                          ? 'bg-red-500/10 text-red-400'
+                          : 'bg-[var(--card)] text-[var(--text)]/40'
+                      }`}
+                    >
+                      {pdf ? <FileText className="h-5 w-5" /> : <Paperclip className="h-4 w-4" />}
+                    </div>
+                  )}
+
+                  {/* Nombre del archivo + metadata. Se permite wrap para que no
+                      se trunque — Beto pidió poder leer el nombre completo. */}
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="min-w-0 flex-1 hover:underline"
+                    title={`Abrir ${a.nombre}`}
+                  >
+                    <div className="text-sm text-[var(--text)] break-words leading-snug">
+                      {a.nombre}
+                    </div>
+                    <div className="mt-0.5 flex items-center gap-2 text-[10px] text-[var(--text)]/40">
+                      {a.tamano_bytes != null && <span>{formatSize(a.tamano_bytes)}</span>}
+                      <span>
+                        ·{' '}
+                        {new Date(a.created_at).toLocaleDateString('es-MX', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </span>
+                    </div>
+                  </a>
+
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--card)] px-2.5 py-1.5 text-[11px] text-[var(--text)]/70 transition hover:bg-[var(--accent)]/10 hover:text-[var(--accent)]"
+                  >
+                    <Download className="h-3 w-3" />
+                    Abrir
+                  </a>
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      onClick={() => setPendingDelete(a)}
+                      className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-red-500/10 text-[var(--text)]/30 hover:text-red-400"
+                      title="Eliminar"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </li>
+              );
+            });
           })}
-        </div>
+        </ul>
       )}
 
       {!readOnly && (
