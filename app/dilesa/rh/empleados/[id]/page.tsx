@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import { composeFullName, titleCase } from '@/lib/name-case';
+import { getAdjuntoProxyUrl } from '@/lib/adjuntos';
 import { EmpleadoAdjuntos } from '@/components/rh/empleado-adjuntos';
 import {
   Dialog,
@@ -180,6 +181,7 @@ function EmpleadoDetailInner() {
   const [compensacion, setCompensacion] = useState<Compensacion | null>(null);
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
   const [puestos, setPuestos] = useState<Puesto[]>([]);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -255,7 +257,7 @@ function EmpleadoDetailInner() {
     setPRfc(p?.rfc ?? '');
     setPCurp(p?.curp ?? '');
 
-    const [deptRes, puestosRes, compRes] = await Promise.all([
+    const [deptRes, puestosRes, compRes, fotoRes] = await Promise.all([
       supabase
         .schema('erp')
         .from('departamentos')
@@ -279,10 +281,22 @@ function EmpleadoDetailInner() {
         .eq('empleado_id', id)
         .eq('vigente', true)
         .maybeSingle(),
+      supabase
+        .schema('erp')
+        .from('adjuntos')
+        .select('url')
+        .eq('entidad_tipo', 'empleado')
+        .eq('entidad_id', id)
+        .eq('rol', 'foto')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
     setDepartamentos(deptRes.data ?? []);
     setPuestos(puestosRes.data ?? []);
     setCompensacion(compRes.data as Compensacion | null);
+    const fotoPath = (fotoRes.data as { url?: string } | null)?.url ?? null;
+    setPhotoUrl(fotoPath ? getAdjuntoProxyUrl(fotoPath) : null);
     setLoading(false);
   }, [id, supabase]);
 
@@ -406,9 +420,26 @@ function EmpleadoDetailInner() {
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent)]/15 text-2xl font-bold text-[var(--accent)]">
-            {(titleCase(persona?.nombre ?? '').charAt(0) || '?').toUpperCase()}
-          </div>
+          {photoUrl ? (
+            <a
+              href={photoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0"
+              title="Ver foto completa"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={photoUrl}
+                alt={fullName(empleado)}
+                className="h-20 w-20 rounded-2xl border border-[var(--border)] object-cover shadow-sm"
+              />
+            </a>
+          ) : (
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent)]/15 text-3xl font-bold text-[var(--accent)]">
+              {(titleCase(persona?.nombre ?? '').charAt(0) || '?').toUpperCase()}
+            </div>
+          )}
           <div>
             <h1 className="text-xl font-bold tracking-tight text-[var(--text)]">
               {fullName(empleado)}
