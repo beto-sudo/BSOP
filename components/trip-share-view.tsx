@@ -30,7 +30,7 @@ export function TripShareView({ trip }: { trip: TravelTrip }) {
   const restaurantGroups = Object.entries(groupRestaurants(trip));
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
+    <main className="min-h-screen bg-[#0a0a0f] text-white">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-5 sm:px-6 sm:py-8 lg:px-8">
         <div className="flex items-center justify-between gap-4">
           <Link
@@ -108,7 +108,7 @@ export function TripShareView({ trip }: { trip: TravelTrip }) {
                     <a
                       href={googleMapsHref(mapsQuery)}
                       target="_blank"
-                      rel="noreferrer"
+                      rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 self-start rounded-full border border-white/10 px-4 py-2 text-xs text-white/75 transition hover:border-amber-300/40 hover:text-white"
                     >
                       Ver en Maps <ArrowUpRight className="h-3.5 w-3.5" />
@@ -163,7 +163,7 @@ export function TripShareView({ trip }: { trip: TravelTrip }) {
                           key={label}
                           href={href}
                           target="_blank"
-                          rel="noreferrer"
+                          rel="noopener noreferrer"
                           className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white/75 transition hover:border-amber-300/40 hover:text-white"
                         >
                           {label} <ArrowUpRight className="h-4 w-4" />
@@ -229,7 +229,7 @@ export function TripShareView({ trip }: { trip: TravelTrip }) {
                         <a
                           href={restaurant.mapsHref}
                           target="_blank"
-                          rel="noreferrer"
+                          rel="noopener noreferrer"
                           className="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/10 px-3 py-2 text-xs text-white/70 transition hover:border-amber-300/40 hover:text-white"
                         >
                           Maps <ArrowUpRight className="h-3.5 w-3.5" />
@@ -280,7 +280,7 @@ export function TripShareView({ trip }: { trip: TravelTrip }) {
                         Estatus
                       </div>
                       <div className={`text-sm ${status.className}`}>
-                        {status.icon} {status.label}
+                        <span aria-hidden="true">{status.icon}</span> {status.label}
                       </div>
                     </div>
                     <div>
@@ -329,6 +329,6 @@ export function TripShareView({ trip }: { trip: TravelTrip }) {
           </ul>
         </Surface>
       </div>
-    </div>
+    </main>
   );
 }

@@ -43,7 +43,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const sectionLabelKey = useMemo(() => getSectionLabelKey(pathname), [pathname]);
   const sectionName = t(sectionLabelKey);
 
-  const displayName = user?.name ?? 'Adalberto Santos de los Santos';
+  const displayName = user?.name ?? '';
 
   const greeting = useMemo(() => {
     const date = now ?? new Date();
@@ -78,6 +78,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         }}
         className="fixed left-4 top-4 z-50 inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel)] dark:text-white text-[var(--text)] shadow-lg transition hover:border-[var(--accent)] md:hidden"
         aria-label={t('header.toggle_nav')}
+        aria-expanded={mobileOpen}
+        aria-controls="app-sidebar"
       >
         <Menu className="h-5 w-5" />
       </button>

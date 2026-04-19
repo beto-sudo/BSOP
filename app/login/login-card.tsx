@@ -17,23 +17,28 @@ export function LoginCard({ unauthorized }: { unauthorized: boolean }) {
           </div>
 
           <div className="mt-8 inline-flex items-center rounded-full border border-[var(--accent)]/25 bg-[var(--accent)]/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.24em] text-[var(--accent-soft)]">
-            Private access
+            Acceso privado
           </div>
 
-          <h1 className="mt-5 text-3xl font-semibold tracking-tight text-white">Welcome back</h1>
+          <h1 className="mt-5 text-3xl font-semibold tracking-tight text-white">
+            Bienvenido de vuelta
+          </h1>
           <p className="mt-3 max-w-sm text-sm leading-6 text-white/60">
-            Sign in with your Google account to enter BSOP and access your private operating
-            dashboard.
+            Entra con tu cuenta de Google para acceder a BSOP y a tu panel privado de operaciones.
           </p>
 
           {unauthorized ? (
-            <div className="mt-6 w-full rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-              This Google account is not authorized for BSOP.
+            <div
+              role="alert"
+              className="mt-6 w-full rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100"
+            >
+              Esta cuenta de Google no está autorizada para BSOP.
             </div>
           ) : null}
 
           <a
             href="/api/auth/google"
+            aria-label="Entrar con Google"
             className="mt-8 inline-flex w-full items-center justify-center gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-4 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -54,11 +59,11 @@ export function LoginCard({ unauthorized }: { unauthorized: boolean }) {
                 fill="#EA4335"
               />
             </svg>
-            Sign in with Google
+            Entrar con Google
           </a>
 
           <p className="mt-4 text-xs text-white/40">
-            Only approved accounts can access this workspace.
+            Solo las cuentas autorizadas pueden acceder a este espacio.
           </p>
         </div>
       </div>

@@ -194,6 +194,8 @@ function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
     <button
       type="button"
       title={title}
+      aria-label={title}
+      aria-pressed={active}
       onClick={onClick}
       className={[
         'inline-flex h-7 w-7 items-center justify-center rounded-lg text-sm transition',
@@ -256,6 +258,7 @@ function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
       <button
         type="button"
         title="Insertar tabla"
+        aria-label="Insertar tabla"
         onClick={() =>
           editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
         }
@@ -677,6 +680,8 @@ function JuntaDetailInner() {
   };
 
   const handleRemoveParticipant = async (asistId: string) => {
+    if (!window.confirm('¿Quitar a este participante de la junta?')) return;
+
     await supabase.schema('erp').from('juntas_asistencia').delete().eq('id', asistId);
 
     setAsistencia((prev) => prev.filter((a) => a.id !== asistId));
@@ -1223,6 +1228,9 @@ function JuntaDetailInner() {
                     title={
                       a.asistio === null ? 'Sin confirmar' : a.asistio ? 'Asistió' : 'No asistió'
                     }
+                    aria-label={`Asistencia de ${nombre}: ${
+                      a.asistio === null ? 'sin confirmar' : a.asistio ? 'asistió' : 'no asistió'
+                    }. Click para cambiar`}
                     className={[
                       'inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs transition',
                       a.asistio === true
@@ -1243,6 +1251,7 @@ function JuntaDetailInner() {
 
                   <button
                     type="button"
+                    aria-label="Quitar participante"
                     onClick={() => handleRemoveParticipant(a.id)}
                     className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[var(--text)]/30 hover:bg-red-500/10 hover:text-red-400 transition"
                   >

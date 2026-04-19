@@ -311,8 +311,12 @@ function JuntasInner() {
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
         <div className="flex flex-wrap gap-3">
           <div className="relative min-w-48 flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text)]/40" />
+            <Search
+              className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text)]/40"
+              aria-hidden="true"
+            />
             <Input
+              aria-label="Buscar juntas"
               placeholder="Buscar juntas..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -338,9 +342,16 @@ function JuntasInner() {
       {/* Table */}
       <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)]">
         {error ? (
-          <div className="flex items-center justify-center p-16 text-red-400">Error: {error}</div>
+          <div role="alert" className="flex items-center justify-center p-16 text-red-400">
+            Error: {error}
+          </div>
         ) : loading ? (
-          <div className="divide-y divide-[var(--border)]">
+          <div
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+            className="divide-y divide-[var(--border)]"
+          >
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="flex items-center gap-4 p-4">
                 <Skeleton className="h-4 w-64" />
@@ -349,6 +360,7 @@ function JuntasInner() {
                 <Skeleton className="h-4 w-32" />
               </div>
             ))}
+            <span className="sr-only">Cargando juntas…</span>
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-16 text-center">
