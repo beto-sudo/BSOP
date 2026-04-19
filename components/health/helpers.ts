@@ -25,6 +25,84 @@ export function groupDailyAverage(rows: HealthMetricRow[]) {
 }
 
 /**
+ * Sleep comes in as one row per stage/segment, from two devices (Sleeptracker®
+ * bed and Apple Watch). A plain average is nonsense — it ends up averaging
+ * 15-min stage slivers. Correct daily total is SUM per source per day, then
+ * GREATEST across sources (never double-count the two devices).
+ */
+export function groupDailySleep(rows: HealthMetricRow[]): Point[] {
+  const buckets = new Map<string, { sleeptracker: number; other: number }>();
+  rows.forEach((row) => {
+    const key = row.date.slice(0, 10);
+    const existing = buckets.get(key) ?? { sleeptracker: 0, other: 0 };
+    const isSleeptracker = (row.source ?? '').toLowerCase().includes('sleeptracker');
+    if (isSleeptracker) existing.sleeptracker += row.value;
+    else existing.other += row.value;
+    buckets.set(key, existing);
+  });
+  return Array.from(buckets.entries())
+    .map(([date, b]) => ({ date, value: Math.max(b.sleeptracker, b.other) }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * Body Mass arrives in lb from Garmin Connect and occasionally in kg from
+ * other sources. Normalize everything to lb before charting.
+ */
+export function normalizeWeightToLb(row: HealthMetricRow): number {
+  const unit = (row.unit ?? '').toLowerCase();
+  if (unit.startsWith('kg')) return row.value * 2.20462;
+  return row.value;
+}
+
+/**
+ * Daily weight series restricted to a primary source (Garmin Connect), with
+ * values normalized to lb. Averages multiple readings on the same day.
+ */
+export function groupDailyWeightConnect(rows: HealthMetricRow[]): Point[] {
+  const connect = rows.filter((row) => row.source === 'Connect');
+  const buckets = new Map<string, { total: number; count: number }>();
+  connect.forEach((row) => {
+    const key = row.date.slice(0, 10);
+    const existing = buckets.get(key) ?? { total: 0, count: 0 };
+    existing.total += normalizeWeightToLb(row);
+    existing.count += 1;
+    buckets.set(key, existing);
+  });
+  return Array.from(buckets.entries())
+    .map(([date, bucket]) => ({
+      date,
+      value: bucket.count ? bucket.total / bucket.count : 0,
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * Average a precomputed daily series over a rolling window. Use this when
+ * rows have already been collapsed (e.g. sleep totals, normalized weight) so
+ * raw-row averaging doesn't undo the collapse.
+ */
+export function summarizeDailyWindow(points: Point[], days: number, endOffsetDays: number) {
+  const end = new Date();
+  end.setHours(23, 59, 59, 999);
+  end.setDate(end.getDate() - endOffsetDays);
+
+  const start = new Date(end);
+  start.setDate(start.getDate() - (days - 1));
+  start.setHours(0, 0, 0, 0);
+
+  const filtered = points.filter((point) => {
+    if (point.value <= 0) return false;
+    const t = new Date(`${point.date}T12:00:00`).getTime();
+    return t >= start.getTime() && t <= end.getTime();
+  });
+
+  if (!filtered.length) return null;
+  const total = filtered.reduce((sum, point) => sum + point.value, 0);
+  return total / filtered.length;
+}
+
+/**
  * Average a metric over a rolling window that ends `endOffsetDays` ago and
  * spans `days` days. Returns null when no rows fall in the window.
  */

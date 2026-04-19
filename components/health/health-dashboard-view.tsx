@@ -5,7 +5,14 @@ import { Activity, Footprints, HeartPulse, MoonStar, Waves, Weight } from 'lucid
 import { Surface } from '@/components/ui/surface';
 import { formatDurationHours, formatMetricValue } from '@/lib/health';
 import { ChartModal } from './chart-modal';
-import { groupDailyAverage, summarizeWindow } from './helpers';
+import {
+  groupDailyAverage,
+  groupDailySleep,
+  groupDailyWeightConnect,
+  normalizeWeightToLb,
+  summarizeDailyWindow,
+  summarizeWindow,
+} from './helpers';
 import { HeroVitals } from './hero-vitals';
 import { SleepSection } from './sleep-section';
 import { TONES } from './tones';
@@ -55,9 +62,10 @@ export function HealthDashboardView({
     () => groupDailyAverage(bpDiastolic).slice(-range.trendDays),
     [bpDiastolic, range.trendDays]
   );
+  const weightDailyAll = useMemo(() => groupDailyWeightConnect(weightDaily), [weightDaily]);
   const weightTrend = useMemo(
-    () => groupDailyAverage(weightDaily).slice(-range.trendDays),
-    [weightDaily, range.trendDays]
+    () => weightDailyAll.slice(-range.trendDays),
+    [weightDailyAll, range.trendDays]
   );
   const stepsTrend = useMemo(
     () => groupDailyAverage(stepsDaily).slice(-range.trendDays),
@@ -71,37 +79,20 @@ export function HealthDashboardView({
     () => groupDailyAverage(hrvDaily).slice(-range.trendDays),
     [hrvDaily, range.trendDays]
   );
+  const sleepDailyAll = useMemo(() => groupDailySleep(sleepDaily), [sleepDaily]);
   const sleepTrend = useMemo(
-    () => groupDailyAverage(sleepDaily).slice(-range.trendDays),
-    [sleepDaily, range.trendDays]
+    () => sleepDailyAll.slice(-range.trendDays),
+    [sleepDailyAll, range.trendDays]
   );
 
-  const sleep7dAverage = useMemo(
-    () =>
-      summarizeWindow(
-        summaryMetrics.filter((row) => row.metric_name === 'Sleep Analysis'),
-        7,
-        0
-      ),
-    [summaryMetrics]
-  );
+  const sleep7dAverage = useMemo(() => summarizeDailyWindow(sleepDailyAll, 7, 0), [sleepDailyAll]);
   const sleep30dAverage = useMemo(
-    () =>
-      summarizeWindow(
-        summaryMetrics.filter((row) => row.metric_name === 'Sleep Analysis'),
-        Math.min(30, range.trendDays),
-        0
-      ),
-    [summaryMetrics, range.trendDays]
+    () => summarizeDailyWindow(sleepDailyAll, Math.min(30, range.trendDays), 0),
+    [sleepDailyAll, range.trendDays]
   );
   const weight7dAverage = useMemo(
-    () =>
-      summarizeWindow(
-        summaryMetrics.filter((row) => row.metric_name === 'Body Mass'),
-        7,
-        0
-      ),
-    [summaryMetrics]
+    () => summarizeDailyWindow(weightDailyAll, 7, 0),
+    [weightDailyAll]
   );
   const hr7dAverage = useMemo(
     () =>
@@ -135,11 +126,11 @@ export function HealthDashboardView({
     return { total, duration, energy, distance, mix };
   }, [workouts]);
 
-  const latestSleep = latestVitals.get('Sleep Analysis');
+  const latestSleepDaily = sleepDailyAll.at(-1) ?? null;
+  const latestWeightDaily = weightDailyAll.at(-1) ?? null;
   const latestHr = latestVitals.get('Resting Heart Rate');
   const latestSpo2 = latestVitals.get('Oxygen Saturation');
   const latestSteps = latestVitals.get('Step Count');
-  const latestWeight = latestVitals.get('Body Mass');
   const latestBpSys = latestVitals.get('Blood Pressure Systolic');
   const latestBpDia = latestVitals.get('Blood Pressure Diastolic');
 
@@ -147,11 +138,11 @@ export function HealthDashboardView({
     {
       key: 'sleep',
       label: 'Sleep',
-      value: latestSleep ? formatDurationHours(latestSleep.value) : '—',
+      value: latestSleepDaily ? formatDurationHours(latestSleepDaily.value) : '—',
       unit: 'hr',
       helper:
-        latestSleep && sleep7dAverage != null
-          ? `${latestSleep.value - sleep7dAverage >= 0 ? '+' : ''}${formatDurationHours(latestSleep.value - sleep7dAverage)}h vs 7d avg`
+        latestSleepDaily && sleep7dAverage != null
+          ? `${latestSleepDaily.value - sleep7dAverage >= 0 ? '+' : ''}${formatDurationHours(latestSleepDaily.value - sleep7dAverage)}h vs 7d avg`
           : 'Waiting for sleep data',
       tone: TONES.sleep.icon,
       icon: MoonStar,
@@ -201,11 +192,11 @@ export function HealthDashboardView({
     {
       key: 'weight',
       label: 'Weight',
-      value: latestWeight ? formatMetricValue(latestWeight.value, 1) : '—',
-      unit: latestWeight?.unit ?? '',
+      value: latestWeightDaily ? formatMetricValue(latestWeightDaily.value, 1) : '—',
+      unit: 'lb',
       helper:
-        latestWeight && weight7dAverage != null
-          ? `${latestWeight.value >= weight7dAverage ? '+' : ''}${formatMetricValue(latestWeight.value - weight7dAverage, 1)} vs 7d avg`
+        latestWeightDaily && weight7dAverage != null
+          ? `${latestWeightDaily.value >= weight7dAverage ? '+' : ''}${formatMetricValue(latestWeightDaily.value - weight7dAverage, 1)} vs 7d avg`
           : 'Waiting for weight data',
       tone: TONES.weight.icon,
       icon: Weight,
@@ -254,7 +245,7 @@ export function HealthDashboardView({
     {
       key: 'weight',
       title: 'Weight',
-      unit: latestWeight?.unit ?? 'kg',
+      unit: 'lb',
       tone: 'weight',
       icon: Weight,
       data: weightTrend,
@@ -347,7 +338,7 @@ export function HealthDashboardView({
       </section>
 
       <SleepSection
-        latestSleep={latestSleep}
+        latestSleep={latestSleepDaily}
         sleep7dAverage={sleep7dAverage}
         sleep30dAverage={sleep30dAverage}
         sleepConsistency={sleepConsistency}

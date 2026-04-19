@@ -1,6 +1,6 @@
 import { BedDouble, MoonStar } from 'lucide-react';
 import { Surface } from '@/components/ui/surface';
-import { formatDurationHours, formatMetricValue, type HealthMetricRow } from '@/lib/health';
+import { formatDurationHours, formatMetricValue } from '@/lib/health';
 import { StatPill } from './stat-pill';
 import { TONES } from './tones';
 import { TrendSvg } from './trend-svg';
@@ -16,7 +16,7 @@ export function SleepSection({
   sleepTrend,
   sleepBuckets,
 }: {
-  latestSleep: HealthMetricRow | undefined;
+  latestSleep: Point | null;
   sleep7dAverage: number | null;
   sleep30dAverage: number | null;
   sleepConsistency: number;

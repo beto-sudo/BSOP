@@ -75,6 +75,8 @@ const METRIC_NAME_NORMALIZE: Record<string, string> = {
   test: 'test',
 };
 
+// Sleep Analysis is split by stage at ingest time (see normalizeMetricRecords)
+// — never fan in through the generic `qty` path, so it's omitted here.
 const METRIC_FIELD_MAP: Record<string, string[]> = {
   'Heart Rate': ['Avg', 'qty'],
   'Resting Heart Rate': ['qty'],
@@ -85,7 +87,6 @@ const METRIC_FIELD_MAP: Record<string, string[]> = {
   'Step Count': ['qty'],
   'Apple Exercise Time': ['qty'],
   'Body Mass': ['qty'],
-  'Sleep Analysis': ['totalSleep', 'asleep', 'qty'],
   'Active Energy': ['qty'],
   'Basal Energy Burned': ['qty'],
   'Walking Heart Rate Average': ['qty'],
@@ -177,6 +178,10 @@ function normalizeMetricRecords(metrics: unknown[]) {
 
     // Special handling: blood_pressure comes as { systolic, diastolic } — split into two metrics
     const isBloodPressure = metricName === 'blood_pressure' || normalizedName === 'Blood Pressure';
+    // Sleep analysis data rows are one-per-stage — route each stage to its
+    // own metric so downstream consumers can sum actually-asleep stages
+    // (Core + Deep + REM) without double-counting In Bed / Awake.
+    const isSleepAnalysis = normalizedName === 'Sleep Analysis';
 
     data.forEach((sample) => {
       if (!sample || typeof sample !== 'object') return;
@@ -189,6 +194,20 @@ function normalizeMetricRecords(metrics: unknown[]) {
           : typeof entry.source === 'string'
             ? entry.source
             : 'Health Auto Export';
+
+      if (isSleepAnalysis) {
+        const stage = typeof row.value === 'string' ? row.value.trim() : null;
+        const qty = parseNumber(row.qty);
+        if (!stage || qty == null) return;
+        records.push({
+          metric_name: `Sleep ${stage}`,
+          date,
+          value: qty,
+          unit: unit ?? 'hr',
+          source: sampleSource,
+        });
+        return;
+      }
 
       if (isBloodPressure) {
         const systolic = parseNumber(row.systolic);

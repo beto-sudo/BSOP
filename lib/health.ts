@@ -50,6 +50,8 @@ export type HealthDashboardRange = {
   preset: HealthRangePreset;
 };
 
+const SLEEP_ASLEEP_METRICS = ['Sleep Core', 'Sleep Deep', 'Sleep REM'];
+
 const SUMMARY_METRIC_NAMES = [
   'Resting Heart Rate',
   'Heart Rate Variability',
@@ -57,7 +59,7 @@ const SUMMARY_METRIC_NAMES = [
   'Step Count',
   'Blood Pressure Systolic',
   'Blood Pressure Diastolic',
-  'Sleep Analysis',
+  ...SLEEP_ASLEEP_METRICS,
   'Body Mass',
 ];
 
@@ -289,7 +291,7 @@ export async function getHealthDashboardData(rangeInput?: Partial<HealthDateRang
     supabase
       .from('health_metrics')
       .select('id, metric_name, date, value, unit, source')
-      .eq('metric_name', 'Sleep Analysis')
+      .in('metric_name', SLEEP_ASLEEP_METRICS)
       .gte('date', range.trendFromIso)
       .lte('date', range.trendToIso)
       .order('date', { ascending: true })
