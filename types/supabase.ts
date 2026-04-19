@@ -86,6 +86,8 @@ export type Database = {
           domicilio_municipio: string | null
           domicilio_numero_ext: string | null
           domicilio_numero_int: string | null
+          escritura_constitutiva: Json | null
+          escritura_poder: Json | null
           estatus_sat: string | null
           fecha_inicio_operaciones: string | null
           header_url: string | null
@@ -98,6 +100,8 @@ export type Database = {
           razon_social: string | null
           regimen_capital: string | null
           regimen_fiscal: string | null
+          registro_patronal_imss: string | null
+          representante_legal: string | null
           rfc: string | null
           slug: string
         }
@@ -115,6 +119,8 @@ export type Database = {
           domicilio_municipio?: string | null
           domicilio_numero_ext?: string | null
           domicilio_numero_int?: string | null
+          escritura_constitutiva?: Json | null
+          escritura_poder?: Json | null
           estatus_sat?: string | null
           fecha_inicio_operaciones?: string | null
           header_url?: string | null
@@ -127,6 +133,8 @@ export type Database = {
           razon_social?: string | null
           regimen_capital?: string | null
           regimen_fiscal?: string | null
+          registro_patronal_imss?: string | null
+          representante_legal?: string | null
           rfc?: string | null
           slug: string
         }
@@ -144,6 +152,8 @@ export type Database = {
           domicilio_municipio?: string | null
           domicilio_numero_ext?: string | null
           domicilio_numero_int?: string | null
+          escritura_constitutiva?: Json | null
+          escritura_poder?: Json | null
           estatus_sat?: string | null
           fecha_inicio_operaciones?: string | null
           header_url?: string | null
@@ -156,6 +166,8 @@ export type Database = {
           razon_social?: string | null
           regimen_capital?: string | null
           regimen_fiscal?: string | null
+          registro_patronal_imss?: string | null
+          representante_legal?: string | null
           rfc?: string | null
           slug?: string
         }

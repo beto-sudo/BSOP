@@ -100,10 +100,9 @@ export function FiniquitoPrintable({
 
       <p>
         En la ciudad de Piedras Negras, Coahuila, a los <strong>{formatDateLarga(fechaHoy)}</strong>
-        , comparecen <strong>{patron.razonSocial}</strong>, representada por su{' '}
-        <strong>{patron.cargoRepresentante}</strong>, el señor(a){' '}
-        <strong>{patron.representanteLegal}</strong>, a quien en lo sucesivo se denominará{' '}
-        <strong>«EL PATRÓN»</strong>, y por la otra parte el señor(a){' '}
+        , comparecen <strong>{patron.razonSocial}</strong>, representada por su representante legal,
+        el señor(a) <strong>{patron.representanteLegal}</strong>, a quien en lo sucesivo se
+        denominará <strong>«EL PATRÓN»</strong>, y por la otra parte el señor(a){' '}
         <strong>{nombreCompleto}</strong>, a quien en lo sucesivo se denominará{' '}
         <strong>«EL TRABAJADOR»</strong>, para celebrar el presente convenio de terminación laboral
         y finiquito al tenor de las siguientes:
@@ -295,9 +294,7 @@ export function FiniquitoPrintable({
         <div>
           <div className="firma">
             <div className="mb-1">{patron.representanteLegal}</div>
-            <div className="text-[11px]">
-              {patron.cargoRepresentante} de {patron.razonSocial}
-            </div>
+            <div className="text-[11px]">{patron.razonSocial}</div>
             <div className="text-[11px] italic mt-0.5">EL PATRÓN</div>
           </div>
         </div>

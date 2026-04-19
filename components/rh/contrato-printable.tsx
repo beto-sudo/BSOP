@@ -1,20 +1,20 @@
 'use client';
 
 /**
- * ContratoPrintable — plantilla de contrato individual de trabajo conforme
- * al Art. 25 de la Ley Federal del Trabajo (México).
+ * ContratoPrintable — plantilla de Contrato Individual de Trabajo
+ * parametrizada desde el contrato que DILESA ya tiene en uso
+ * (Google Drive: Manuales/RH DILESA/CONTRATOS TRABAJO/CONTRATO NUEVO
+ * TRABAJO DILESA.docx). Adapta la estructura legal con la que
+ * Beto/abogado ya validaron y la enriquece con los datos capturados en
+ * BSOP del empleado.
  *
  * ⚠️  DISCLAIMER LEGAL:
- *   Esta plantilla es un borrador generado a partir de los requisitos
- *   mínimos del Art. 25 LFT. DEBE ser revisada y firmada por un abogado
- *   laboral antes de usarse con un empleado real. BSOP / Claude no
- *   sustituye asesoría profesional. DILESA asume la responsabilidad de
- *   la redacción final, cláusulas adicionales, y cumplimiento específico
- *   al caso (tipo de contrato, riesgo del trabajo, capacitación, etc.).
+ *   La redacción base fue proporcionada por DILESA. Este render solo
+ *   sustituye los placeholders del .docx con los datos del empleado.
+ *   Cualquier cambio estructural a las cláusulas debe revisarse por
+ *   abogado laboral antes de usarse en producción.
  *
- * El contenido está estructurado en secciones numeradas. El CSS
- * `@media print` en `contrato-print.css` (global) oculta el app-shell y
- * deja sólo esta plantilla para impresión.
+ * El CSS `@media print` oculta todo fuera del <article> al imprimir.
  */
 
 import { composeFullName } from '@/lib/name-case';
@@ -54,28 +54,59 @@ export interface ContratoEmpleado {
   sueldo_diario: number | null;
 
   // Beneficiarios
-  beneficiarios: Array<{ nombre: string; parentesco: string | null; porcentaje: number | null }>;
+  beneficiarios: Array<{
+    nombre: string;
+    parentesco: string | null;
+    porcentaje: number | null;
+  }>;
 }
 
 export interface ContratoPatron {
   razonSocial: string;
   rfc: string;
   domicilio: string;
+  registroPatronalImss: string;
   representanteLegal: string;
-  cargoRepresentante: string;
-  giro: string;
+  escrituraConstitutiva: {
+    numero: string;
+    fecha: string; // ISO o texto legible
+    notario: string;
+    notariaNumero: string;
+    distrito: string;
+  };
+  poderRepresentante: {
+    numero: string;
+    fecha: string; // ISO o texto legible
+    notario: string;
+    notariaNumero: string;
+    distrito: string;
+  };
 }
 
-// Patrón DILESA — valores por default. Si después necesitamos otro empresa
-// con datos distintos, parametrizamos desde la pg.
+/**
+ * Datos reales de DILESA extraídos del contrato vigente (dic-2025).
+ */
 export const PATRON_DILESA: ContratoPatron = {
-  razonSocial: 'Desarrollos Inmobiliarios de la Laguna, S.A. de C.V.',
-  rfc: 'DIL000000XXX', // ⚠️ REEMPLAZAR con RFC real de DILESA
+  razonSocial: 'DESARROLLO INMOBILIARIO LOS ENCINOS, S.A. DE C.V.',
+  rfc: 'DIE030904866',
   domicilio:
-    'Av. ________________________, Col. ________________, Piedras Negras, Coahuila, C.P. 26000',
-  representanteLegal: 'Adalberto Santos de los Santos',
-  cargoRepresentante: 'Administrador Único',
-  giro: 'Desarrollo inmobiliario y construcción',
+    'Calle Magnolias #2440, Fraccionamiento Lomas del Valle, C.P. 26093, Piedras Negras, Coahuila de Zaragoza, México',
+  registroPatronalImss: 'A3226708107',
+  representanteLegal: 'C. Norberto Gutiérrez Infante',
+  escrituraConstitutiva: {
+    numero: '167',
+    fecha: '4 de septiembre de 2003',
+    notario: 'Lic. Raúl P. García Elizondo',
+    notariaNumero: '16',
+    distrito: 'Saltillo',
+  },
+  poderRepresentante: {
+    numero: '580',
+    fecha: '8 de diciembre de 2025',
+    notario: 'Lic. Guillermo Nicolás López Elizondo',
+    notariaNumero: '25',
+    distrito: 'Río Grande',
+  },
 };
 
 function formatDateLarga(iso: string | null): string {
@@ -93,23 +124,30 @@ function blank(v: string | number | null | undefined, placeholder = '___________
   return String(v);
 }
 
-const TIPO_CONTRATO_TEXTO: Record<string, string> = {
-  indefinido: 'por tiempo indeterminado',
-  determinado: 'por tiempo determinado',
-  obra: 'por obra determinada',
-  temporada: 'por temporada',
-  capacitacion_inicial: 'de capacitación inicial',
-  prueba: 'sujeto a periodo de prueba',
+const TIPO_CONTRATO_TITULO: Record<string, string> = {
+  indefinido: 'POR TIEMPO INDETERMINADO',
+  determinado: 'POR TIEMPO DETERMINADO',
+  obra: 'POR OBRA DETERMINADA',
+  temporada: 'POR TEMPORADA',
+  capacitacion_inicial: 'DE CAPACITACIÓN INICIAL',
+  prueba: 'SUJETO A PERIODO DE PRUEBA',
 };
 
 export function ContratoPrintable({
   empleado,
   patron = PATRON_DILESA,
   fechaContrato,
+  vigenciaInicio,
+  vigenciaFin,
 }: {
   empleado: ContratoEmpleado;
   patron?: ContratoPatron;
+  /** Fecha en que se firma el contrato (default hoy). */
   fechaContrato?: string;
+  /** Fecha de inicio de vigencia (default = fecha_ingreso). */
+  vigenciaInicio?: string;
+  /** Fecha de fin (para contratos por tiempo determinado; default = 30 días después del inicio). */
+  vigenciaFin?: string;
 }) {
   const fechaHoy = fechaContrato ?? new Date().toISOString().split('T')[0];
   const nombreCompleto = composeFullName(
@@ -118,277 +156,359 @@ export function ContratoPrintable({
     empleado.apellido_materno
   );
 
-  const tipoTexto =
-    empleado.tipo_contrato && TIPO_CONTRATO_TEXTO[empleado.tipo_contrato]
-      ? TIPO_CONTRATO_TEXTO[empleado.tipo_contrato]
-      : 'por tiempo indeterminado';
+  const tipo = empleado.tipo_contrato ?? 'determinado';
+  const tituloTipo = TIPO_CONTRATO_TITULO[tipo] ?? 'POR TIEMPO DETERMINADO';
+  const esDeterminado = tipo === 'determinado' || tipo === 'obra' || tipo === 'temporada';
+  const esPrueba = tipo === 'prueba';
 
-  const esPrueba = empleado.tipo_contrato === 'prueba';
+  const inicio = vigenciaInicio ?? empleado.fecha_ingreso ?? fechaHoy;
+  // Por default, contratos de DILESA son de 1 mes (30 días).
+  const fin =
+    vigenciaFin ??
+    (() => {
+      const d = new Date(inicio);
+      d.setDate(d.getDate() + 30);
+      return d.toISOString().split('T')[0];
+    })();
+
+  const sueldoDiarioTexto =
+    empleado.sueldo_diario != null
+      ? `${formatMoneda(empleado.sueldo_diario)} (${numeroAMoneda(empleado.sueldo_diario)} Moneda Nacional)`
+      : '$ __________________ (__________________ Moneda Nacional)';
 
   return (
     <article className="contrato-print-root max-w-[800px] mx-auto p-10 text-[13px] leading-relaxed text-black bg-white">
       <style>{`
-        .contrato-print-root { font-family: 'Times New Roman', Times, serif; color: #000; }
-        .contrato-print-root h1 { text-align: center; font-size: 15px; font-weight: bold; margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .contrato-print-root h2 { font-size: 13px; font-weight: bold; margin: 14px 0 6px; text-transform: uppercase; }
+        .contrato-print-root { font-family: 'Times New Roman', Times, serif; color: #000; font-size: 12px; line-height: 1.55; }
+        .contrato-print-root h1 { text-align: center; font-size: 13px; font-weight: bold; margin: 0 0 10px; text-transform: uppercase; letter-spacing: 0.3px; }
+        .contrato-print-root .divider { text-align: center; letter-spacing: 2px; margin: 10px 0; font-weight: bold; }
         .contrato-print-root p { margin: 6px 0; text-align: justify; }
-        .contrato-print-root ol, .contrato-print-root ul { margin: 4px 0 4px 24px; padding: 0; }
+        .contrato-print-root .declara-title { font-weight: bold; margin-top: 8px; }
+        .contrato-print-root ul { margin: 4px 0 4px 24px; padding: 0; list-style: disc; }
+        .contrato-print-root ol { margin: 4px 0 4px 24px; padding: 0; }
         .contrato-print-root li { margin: 3px 0; text-align: justify; }
+        .contrato-print-root .clausula { margin: 10px 0; text-align: justify; }
+        .contrato-print-root .clausula strong { font-weight: bold; }
         .contrato-print-root .firmas { margin-top: 48px; display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
         .contrato-print-root .firma { border-top: 1px solid #000; padding-top: 4px; text-align: center; font-size: 11px; }
-        .contrato-print-root .datos-box { border: 1px solid #000; padding: 8px 10px; margin: 8px 0; font-size: 12px; }
         .contrato-print-root strong { font-weight: bold; }
+        .contrato-print-root em { font-style: italic; }
         @media print {
           body * { visibility: hidden !important; }
           .contrato-print-root, .contrato-print-root * { visibility: visible !important; }
-          .contrato-print-root { position: absolute; left: 0; top: 0; width: 100%; max-width: none; margin: 0; padding: 24mm 18mm; box-shadow: none; }
+          .contrato-print-root { position: absolute; left: 0; top: 0; width: 100%; max-width: none; margin: 0; padding: 22mm 18mm; box-shadow: none; }
           .no-print { display: none !important; }
         }
       `}</style>
 
-      <h1>Contrato individual de trabajo</h1>
-      <p className="text-center text-[11px]">
-        Celebrado al amparo de los artículos 24, 25, 35 y demás relativos de la Ley Federal del
-        Trabajo vigente en los Estados Unidos Mexicanos.
-      </p>
+      <h1>Contrato Individual de Trabajo {tituloTipo}</h1>
 
       <p>
-        En la ciudad de Piedras Negras, Coahuila de Zaragoza, a los{' '}
-        <strong>{formatDateLarga(fechaHoy)}</strong>, comparecen por una parte{' '}
-        <strong>{patron.razonSocial}</strong>, con Registro Federal de Contribuyentes{' '}
-        <strong>{patron.rfc}</strong>, con domicilio en <strong>{patron.domicilio}</strong>, cuyo
-        giro es <em>{patron.giro}</em>, representada en este acto por su{' '}
-        <strong>{patron.cargoRepresentante}</strong>, el señor(a){' '}
-        <strong>{patron.representanteLegal}</strong>, a quien en lo sucesivo se le denominará{' '}
-        <strong>«EL PATRÓN»</strong>; y por la otra parte el señor(a){' '}
-        <strong>{blank(nombreCompleto)}</strong>, a quien en lo sucesivo se le denominará{' '}
-        <strong>«EL TRABAJADOR»</strong>, al tenor de las siguientes declaraciones y cláusulas:
+        Que celebran por una parte <strong>{patron.razonSocial}</strong> a quien en lo sucesivo se
+        le denominará <strong>«EL PATRÓN»</strong> representada en este acto por el{' '}
+        <strong>{patron.representanteLegal}</strong>, representante legal de la sociedad y que más
+        adelante justifica su personalidad; y por la otra el C.{' '}
+        <strong>{blank(nombreCompleto)}</strong>, a quien en lo sucesivo se le denominará como{' '}
+        <strong>«EL TRABAJADOR»</strong>, y a ambos como <strong>«LAS PARTES»</strong> al tenor de
+        las siguientes declaraciones y cláusulas:
       </p>
 
-      <h2>Declaraciones</h2>
+      <div className="divider">— — — — D E C L A R A C I O N E S — — — —</div>
 
-      <p>
-        <strong>I. Declara EL TRABAJADOR:</strong>
+      <p className="declara-title">«EL PATRÓN» Manifiesta y Declara:</p>
+      <ul>
+        <li>
+          Que justifica su existencia y personalidad del representante legal, así como declara ser
+          una persona cuyo objeto es la de prestar servicios de personal tal y como lo justifica con
+          la Escritura Pública <strong>{patron.escrituraConstitutiva.numero}</strong> de fecha{' '}
+          {patron.escrituraConstitutiva.fecha}, pasada ante la fe del{' '}
+          {patron.escrituraConstitutiva.notario}, Notario Público{' '}
+          {patron.escrituraConstitutiva.notariaNumero} del Distrito Notarial de{' '}
+          {patron.escrituraConstitutiva.distrito}, misma. Compareciendo en este acto su
+          representante legal el <strong>{patron.representanteLegal}</strong> quien acredita poder
+          general para pleitos y cobranzas, actos de administración, especial laboral y cambiario o
+          bancario, mediante escritura pública <strong>{patron.poderRepresentante.numero}</strong>{' '}
+          con fecha {patron.poderRepresentante.fecha} pasada ante la fe del{' '}
+          {patron.poderRepresentante.notario}, notario público número{' '}
+          {patron.poderRepresentante.notariaNumero} del distrito notarial{' '}
+          {patron.poderRepresentante.distrito}.
+        </li>
+        <li>Que su domicilio está ubicado en {patron.domicilio}.</li>
+        <li>
+          Que su RFC es el <strong>{patron.rfc}</strong>.
+        </li>
+        <li>
+          Que su registro patronal ante el IMSS es el <strong>{patron.registroPatronalImss}</strong>
+          .
+        </li>
+      </ul>
+
+      <p className="declara-title">
+        «EL TRABAJADOR» por sus propios derechos Manifiesta y declara:
       </p>
-      <div className="datos-box">
-        <p>
-          <strong>Nombre completo:</strong> {blank(nombreCompleto)}
-        </p>
-        <p>
-          <strong>Nacionalidad:</strong> {blank(empleado.nacionalidad)} · <strong>Sexo:</strong>{' '}
-          {blank(empleado.sexo)} · <strong>Estado civil:</strong> {blank(empleado.estado_civil)}
-        </p>
-        <p>
-          <strong>Fecha de nacimiento:</strong> {formatDateLarga(empleado.fecha_nacimiento)} ·{' '}
-          <strong>Lugar:</strong> {blank(empleado.lugar_nacimiento)}
-        </p>
-        <p>
-          <strong>CURP:</strong> {blank(empleado.curp)} · <strong>RFC:</strong>{' '}
-          {blank(empleado.rfc)} · <strong>NSS:</strong> {blank(empleado.nss)}
-        </p>
-        <p>
-          <strong>Domicilio:</strong> {blank(empleado.domicilio)}
-        </p>
-        <p>
-          <strong>Teléfono:</strong> {blank(empleado.telefono)}
-        </p>
-        {empleado.numero_empleado && (
-          <p>
-            <strong>No. de empleado:</strong> {empleado.numero_empleado}
-          </p>
-        )}
-        <p className="mt-2 text-[11px]">
-          Declara bajo protesta de decir verdad que los datos asentados son correctos, que cuenta
-          con la capacidad física y mental para desempeñar el trabajo contratado, y que acepta
-          libremente las condiciones que se estipulan.
-        </p>
-      </div>
+      <ul>
+        <li>
+          Llamarse <strong>{blank(nombreCompleto)}</strong>, ser de nacionalidad{' '}
+          <strong>{blank(empleado.nacionalidad, 'Mexicana')}</strong>, sexo{' '}
+          <strong>{blank(empleado.sexo)}</strong>, estado civil{' '}
+          <strong>{blank(empleado.estado_civil)}</strong>.
+        </li>
+        <li>
+          Haber nacido el <strong>{formatDateLarga(empleado.fecha_nacimiento)}</strong> en{' '}
+          <strong>{blank(empleado.lugar_nacimiento)}</strong>.
+        </li>
+        <li>
+          Tener el RFC <strong>{blank(empleado.rfc)}</strong>, CURP{' '}
+          <strong>{blank(empleado.curp)}</strong>, el número de Seguridad Social{' '}
+          <strong>{blank(empleado.nss)}</strong>.
+        </li>
+        <li>
+          Que tiene su domicilio en <strong>{blank(empleado.domicilio)}</strong>.
+        </li>
+        <li>
+          Que desempeñará el puesto de{' '}
+          <strong>{blank((empleado.puesto ?? '').toUpperCase())}</strong>, que tiene los
+          Conocimientos, Habilidades, Capacidades y las Aptitudes necesarias para desarrollar el
+          trabajo origen de este contrato.
+        </li>
+        <li>
+          Estar de acuerdo en desempeñar su actividad conforme a las condiciones establecidas en
+          este contrato.
+        </li>
+        <li>Manifiesta que NO tiene crédito otorgado por INFONAVIT.</li>
+      </ul>
 
       <p>
-        <strong>II. Declara EL PATRÓN:</strong>
-      </p>
-      <p>
-        Ser una sociedad legalmente constituida conforme a las leyes mexicanas, contar con la
-        capacidad jurídica y administrativa para celebrar este contrato, y requerir los servicios
-        personales subordinados del TRABAJADOR para desempeñar el puesto y funciones que más
-        adelante se describen.
+        Por lo anterior, las partes han convenido celebrar el presente contrato al tenor de las
+        siguientes:
       </p>
 
-      <h2>Cláusulas</h2>
+      <div className="divider">— — — — C L Á U S U L A S — — — —</div>
 
-      <p>
-        <strong>PRIMERA. Objeto.</strong> EL TRABAJADOR se obliga a prestar a EL PATRÓN sus
-        servicios personales subordinados en el puesto de <strong>{blank(empleado.puesto)}</strong>
-        {empleado.departamento ? (
+      <p className="clausula">
+        <strong>PRIMERA.</strong> El presente contrato se celebra{' '}
+        {esDeterminado
+          ? 'por tiempo determinado'
+          : esPrueba
+            ? `sujeto a un periodo de prueba conforme al Art. 39-A LFT`
+            : 'por tiempo indeterminado'}
+        , con vigencia del <strong>{formatDateLarga(inicio)}</strong>
+        {esDeterminado || esPrueba ? (
           <>
-            , adscrito al departamento de <strong>{empleado.departamento}</strong>
+            {' '}
+            al <strong>{formatDateLarga(fin)}</strong>
           </>
         ) : null}
-        , desempeñando las siguientes funciones de manera enunciativa más no limitativa:
+        , para efectos de antigüedad se le reconoce en el presente contrato la fecha del{' '}
+        <strong>{formatDateLarga(empleado.fecha_ingreso)}</strong>, por así requerirlo el trabajo
+        objeto de este, el cual es para desarrollar el puesto de{' '}
+        <strong>{blank((empleado.puesto ?? '').toUpperCase())}</strong>.
+        {esPrueba && empleado.periodo_prueba_dias && (
+          <>
+            {' '}
+            Las partes convienen que este periodo de prueba tendrá una duración de{' '}
+            <strong>{empleado.periodo_prueba_dias} días naturales</strong> y es el número{' '}
+            <strong>{empleado.periodo_prueba_numero ?? 1}</strong> (de hasta 3 permitidos por
+            política interna de la empresa antes de otorgar planta).
+          </>
+        )}
       </p>
-      <div className="datos-box">
+
+      <p className="clausula">
+        <strong>SEGUNDA.</strong> «LAS PARTES» manifiestan y aceptan que el presente contrato
+        subsistirá por el tiempo necesario para la prestación del servicio señalada en la cláusula
+        que antecede siempre y cuando el trabajador acredite los Conocimientos, Habilidades,
+        Capacidades, Aptitudes y Actitudes necesarias para la realización de sus actividades de
+        manera positivas y además realice con eficiencia y eficacia sus funciones y actividades
+        definidas por «EL PATRÓN», para la prestación del servicio para el que fue contratado. En
+        caso contrario se aplicarán las disposiciones de la Ley Federal del Trabajo vigente.
+      </p>
+
+      <p className="clausula">
+        <strong>TERCERA.</strong> El presente contrato obliga a lo expresamente pactado conforme a
+        las disposiciones contenidas en el artículo 31 de la Ley Laboral, y la duración de este será
+        la señalada en la cláusula segunda, por lo que al concluirse dichos trabajos las partes
+        contratantes lo darán por terminado con apoyo en el numeral antes mencionado e igualmente en
+        los artículos 35, 36, 53 fracción III y demás relativos de la citada Ley Federal del
+        Trabajo.
+      </p>
+
+      <p className="clausula">
+        <strong>CUARTA.</strong> «EL TRABAJADOR» se obliga a prestar sus servicios como{' '}
+        <strong>{blank((empleado.puesto ?? '').toUpperCase())}</strong>, realizando las funciones y
+        actividades inherentes o necesarias para la prestación del trabajo que presta a «EL PATRÓN»
+        como lo es:{' '}
         {empleado.funciones ? (
-          empleado.funciones.split('\n').map((l, i) => (
-            <p key={i} className="mb-1">
-              {l}
-            </p>
-          ))
+          <em>{empleado.funciones}</em>
         ) : (
-          <p className="text-[11px] italic">
-            [Detallar funciones específicas del puesto — Art. 25-III LFT exige precisión máxima.]
-          </p>
+          <strong>{blank((empleado.puesto ?? '').toUpperCase())}</strong>
         )}
-      </div>
+        , siendo las actividades anteriores enunciativas mas no limitativas; al presente contrato se
+        anexa adenda del perfil de puesto con las actividades completas que se obliga «EL
+        TRABAJADOR» a prestar. Éste prestará sus servicios en{' '}
+        <strong>{blank(empleado.lugar_trabajo, 'el domicilio de «EL PATRÓN»')}</strong> o en
+        cualquier otro municipio del Estado de Coahuila de Zaragoza y/o en cualquier otra entidad de
+        la República Mexicana, previa notificación.
+      </p>
 
-      <p>
-        <strong>SEGUNDA. Duración.</strong> El presente contrato es <strong>{tipoTexto}</strong>{' '}
-        (Art. {empleado.tipo_contrato === 'prueba' ? '39-A' : '35'} LFT).
-        {esPrueba && (
+      <p className="clausula">
+        <strong>QUINTA.</strong> El horario de labores de «EL TRABAJADOR» será en base a un rol que
+        se determinará por la empresa y se le comunicará al trabajador dentro de las siguientes
+        jornadas: la <strong>Diurna</strong> que será de ocho horas, que podrá comprender de las
+        6:00 horas a 20:00 horas; la <strong>Jornada Nocturna</strong>, que será de siete horas,
+        comprenderá de 23:00 horas a las 6:00 horas; y la <strong>Jornada Mixta</strong> será de
+        siete horas y media, comprenderá parte de la jornada diurna y parte de la jornada nocturna
+        que no podrá exceder en ningún caso más de tres horas y media de la jornada nocturna. Dentro
+        de las siguientes jornadas se establecerán los horarios de trabajo.
+        {empleado.horario && (
           <>
             {' '}
-            Las partes convienen un periodo de prueba de{' '}
-            <strong>{blank(empleado.periodo_prueba_dias, '30')} días</strong> naturales contados a
-            partir de la fecha de inicio de labores. Es el periodo de prueba número{' '}
-            <strong>{blank(empleado.periodo_prueba_numero, '1')}</strong> (de hasta 3 permitidos por
-            la política interna de DILESA antes de otorgar planta). Durante este periodo, si a
-            juicio del patrón EL TRABAJADOR no acredita competencia para el puesto, la relación se
-            da por terminada sin responsabilidad para el patrón (Art. 39-A párrafo segundo). De
-            acreditarse competencia al término de este periodo, la relación se convertirá en{' '}
-            <strong>por tiempo indeterminado</strong>.
+            Para el presente contrato, el horario específico acordado es:{' '}
+            <strong>{empleado.horario}</strong>.
           </>
         )}
       </p>
 
-      <p>
-        <strong>TERCERA. Fecha de inicio.</strong> La prestación de servicios iniciará el día{' '}
-        <strong>{formatDateLarga(empleado.fecha_ingreso)}</strong>.
+      <p className="clausula">
+        <strong>SEXTA.</strong> «EL TRABAJADOR» tendrá derecho a un día de descanso semanal, el cual
+        se acuerda por «LAS PARTES» que será preferentemente el día domingo, conviniendo «EL
+        TRABAJADOR» con «EL PATRÓN» que en cualquier momento el mismo puede ser modificado de
+        acuerdo con las necesidades de «EL CLIENTE» al que se presta el servicio, pudiendo «EL
+        PATRÓN» establecer dicho horario bajo cualquiera de las modalidades señaladas en el artículo
+        59 de la Ley Federal del Trabajo, ya sea para implantar una labor semanaria de lunes a
+        viernes y obtener el reposo del sábado en la tarde; al establecerse estas jornadas las horas
+        trabajadas en exceso no se considerarán tiempo extra por ser complemento de la jornada
+        normal. Así mismo se podrá acordar cualquier otra modalidad equivalente. El trabajador
+        disfrutará de <strong>1 hora y media</strong> para la toma de sus alimentos.
       </p>
 
-      <p>
-        <strong>CUARTA. Lugar de trabajo.</strong> EL TRABAJADOR prestará sus servicios en{' '}
-        <strong>{blank(empleado.lugar_trabajo)}</strong> (Art. 25-IV LFT), pudiendo ser comisionado
-        temporalmente a otras instalaciones o proyectos de EL PATRÓN dentro de la misma zona
-        geográfica cuando las necesidades del servicio lo requieran.
+      <p className="clausula">
+        <strong>SÉPTIMA.</strong> «EL TRABAJADOR» disfrutará de un salario diario de{' '}
+        <strong>{sueldoDiarioTexto}</strong>, el cual le será cubierto{' '}
+        <strong>{blank(empleado.dia_pago, 'cada día jueves de cada decena')}</strong> en el
+        domicilio de «EL PATRÓN» o en su caso podrá ser por medio de depósito bancario a disposición
+        del trabajador a costo de la empresa, más la proporción correspondiente al séptimo día y día
+        de descanso obligatorio.
+      </p>
+      <p className="clausula">
+        «EL PATRÓN» hará por cuenta de «EL TRABAJADOR» las deducciones legales correspondientes,
+        particularmente las que se refieren a Impuesto sobre la Renta, y aportaciones de Seguridad
+        Social (IMSS, créditos de INFONAVIT, SAR y FONACOT), enterando las retenciones
+        correspondientes ante dichas instituciones, así como las retenciones extraordinarias
+        dictadas por una autoridad judicial en los términos de las legislaciones respectivas.
       </p>
 
-      <p>
-        <strong>QUINTA. Jornada y horario.</strong> La jornada es{' '}
-        <strong>{blank(empleado.horario)}</strong>. El tiempo destinado al alimento se cuenta como
-        tiempo de descanso cuando EL TRABAJADOR permanece en el centro de trabajo (Art. 63 LFT). Los
-        días de descanso obligatorios son los previstos en el Art. 74 LFT.
+      <p className="clausula">
+        <strong>OCTAVA.</strong> «EL TRABAJADOR» no podrá laborar tiempo extraordinario de trabajo,
+        sin previa autorización por escrito que «EL PATRÓN» le otorgue por conducto de sus
+        representantes. Cuando por causas extraordinarias, «EL TRABAJADOR» deberá de quedarse a
+        laborar el tiempo extra que se requiera conforme a lo que señala la Ley Federal del Trabajo.
       </p>
 
-      <p>
-        <strong>SEXTA. Salario.</strong> EL PATRÓN pagará a EL TRABAJADOR un salario mensual de{' '}
-        <strong>
-          {empleado.sueldo_mensual != null
-            ? formatMoneda(empleado.sueldo_mensual)
-            : '__________________'}
-        </strong>{' '}
-        M.N.
-        {empleado.sueldo_diario != null && (
-          <>
-            {' '}
-            (equivalente a <strong>{formatMoneda(empleado.sueldo_diario)}</strong> diarios).
-          </>
-        )}{' '}
-        El pago se realizará los{' '}
-        <strong>{blank(empleado.dia_pago, 'días viernes de cada quincena')}</strong>.
+      <p className="clausula">
+        <strong>NOVENA.</strong> «EL TRABAJADOR» tendrá derecho al pago de vacaciones y prima
+        vacacional proporcionales de acuerdo con el servicio prestado, al vencimiento del presente
+        contrato en los términos señalados en el artículo 76 de la Ley Federal del Trabajo.
       </p>
 
-      <p>
-        <strong>SÉPTIMA. Prestaciones.</strong> EL TRABAJADOR gozará de las prestaciones mínimas
-        previstas en la LFT: aguinaldo anual de cuando menos 15 días de salario (Art. 87),
-        vacaciones conforme a la tabla del Art. 76 (12 días el primer año con incrementos
-        escalonados), prima vacacional del 25% sobre el salario de vacaciones (Art. 80),
-        participación en las utilidades (PTU) conforme a la ley (Art. 117), y el alta ante el
-        Instituto Mexicano del Seguro Social, INFONAVIT y SAR.
+      <p className="clausula">
+        <strong>DÉCIMA.</strong> «EL TRABAJADOR» percibirá un aguinaldo proporcional anual de 15
+        días de salario, el cual se cubrirá al término de los servicios prestados a «EL PATRÓN»
+        durante dicho período.
       </p>
 
-      <p>
-        <strong>OCTAVA. Capacitación y adiestramiento.</strong> EL PATRÓN se obliga a proporcionar a
-        EL TRABAJADOR la capacitación y adiestramiento que requiera para el desempeño del puesto,
-        conforme a los planes y programas que al efecto se establezcan (Art. 25-VIII LFT).
+      <p className="clausula">
+        <strong>DÉCIMA PRIMERA.</strong> «EL TRABAJADOR» se obliga en términos de la fracción X del
+        artículo 134 de la Ley Federal del Trabajo, a someterse a los reconocimientos y exámenes
+        médicos que «EL PATRÓN» le indique.
       </p>
 
-      <p>
-        <strong>NOVENA. Confidencialidad.</strong> EL TRABAJADOR se obliga a guardar absoluta
-        reserva sobre la información, documentos, datos de clientes, proveedores, estrategias
-        comerciales y secretos industriales a los que tenga acceso con motivo de la relación de
-        trabajo, durante la vigencia de este contrato y después de su terminación.
+      <p className="clausula">
+        <strong>DÉCIMA SEGUNDA.</strong> «EL TRABAJADOR» se obliga a participar en los cursos de
+        capacitación y adiestramiento que «EL PATRÓN» establezca en los Planes de Capacitación y
+        Adiestramiento para el mejor conocimiento y desarrollo de sus aptitudes, mismos que podrán
+        impartirse dentro y/o fuera de la jornada de labores.
       </p>
 
-      <p>
-        <strong>DÉCIMA. Reglamento interior.</strong> EL TRABAJADOR declara conocer y aceptar el
-        Reglamento Interior de Trabajo de EL PATRÓN, comprometiéndose a su cumplimiento, así como a
-        todas las políticas internas que se le notifiquen en forma documentada.
+      <p className="clausula">
+        <strong>DÉCIMA TERCERA.</strong> «EL TRABAJADOR» se obliga a observar las medidas de
+        seguridad e higiene que determine «EL PATRÓN» o las autoridades del sector salud y respetar
+        las disposiciones del Reglamento Interior de Trabajo que rige en los establecimientos donde
+        se preste los servicios «EL PATRÓN».
       </p>
 
-      <p>
-        <strong>DÉCIMA PRIMERA. Causales de rescisión.</strong> Son causales de rescisión sin
-        responsabilidad para EL PATRÓN las previstas en el Art. 47 de la LFT. Sin limitación de las
-        anteriores, son consideradas faltas graves el abandono del trabajo por más de 3 días sin
-        causa justificada dentro de un periodo de 30 días, el incurrir en violencia verbal o física
-        contra compañeros o superiores, y el quebranto de la confidencialidad pactada en la cláusula
-        anterior.
+      <p className="clausula">
+        <strong>DÉCIMA CUARTA.</strong> «EL PATRÓN» entregará a «EL TRABAJADOR» las herramientas o
+        Kit de trabajo bajo vale de resguardo haciéndose responsable el trabajador bajo su custodia,
+        y «EL PATRÓN» repondrá el equipo o herramienta dañada por el uso normal del trabajo.
       </p>
 
-      <p>
-        <strong>DÉCIMA SEGUNDA. Designación de beneficiarios.</strong> De conformidad con el Art.
-        501 LFT, EL TRABAJADOR designa como beneficiarios de las prestaciones y salarios no cobrados
-        en caso de su fallecimiento a las siguientes personas:
-      </p>
-      <div className="datos-box">
-        {empleado.beneficiarios.length === 0 ? (
-          <p className="text-[11px] italic">
-            [Sin beneficiarios designados — capturar antes de firmar.]
-          </p>
-        ) : (
-          <ol>
-            {empleado.beneficiarios.map((b, i) => (
-              <li key={i}>
-                <strong>{b.nombre}</strong>
-                {b.parentesco ? ` (${b.parentesco})` : ''}
-                {b.porcentaje != null ? ` — ${b.porcentaje}%` : ''}
-              </li>
-            ))}
-          </ol>
-        )}
-      </div>
-
-      <p>
-        <strong>DÉCIMA TERCERA. Jurisdicción.</strong> Para la interpretación y cumplimiento de este
-        contrato, las partes se someten a la jurisdicción del Centro Federal de Conciliación y
-        Registro Laboral y de los Tribunales Laborales del Estado de Coahuila, renunciando a
-        cualquier otro fuero que por razón de domicilio actual o futuro pudiera corresponderles.
+      <p className="clausula">
+        <strong>DÉCIMA QUINTA.</strong> «EL TRABAJADOR» se obliga a no utilizar su teléfono celular
+        por cuestiones de seguridad. Así mismo, «EL TRABAJADOR» se compromete a otorgar un excelente
+        servicio al cliente de calidad.
       </p>
 
-      <p className="mt-4">
-        Leído y entendido el presente contrato por ambas partes, lo firman por duplicado a los{' '}
-        <strong>{formatDateLarga(fechaHoy)}</strong>, quedando un ejemplar en poder de cada parte
-        (Art. 24 LFT).
+      <p className="clausula">
+        <strong>DÉCIMA SEXTA.</strong> «EL TRABAJADOR» en este acto realiza la designación de
+        beneficiarios a los que refiere el artículo 501 de la Ley Federal del Trabajo, para efectos
+        del pago de los salarios y prestaciones devengadas y no cobradas a la muerte de los
+        trabajadores o las que se generen por su fallecimiento o desaparición derivada de un acto
+        delincuencial, siendo la(s) persona(s) beneficiaria(s):
+      </p>
+      {empleado.beneficiarios.length === 0 ? (
+        <ol>
+          <li>1.- __________________________________________________ ____%</li>
+          <li>2.- __________________________________________________ ____%</li>
+        </ol>
+      ) : (
+        <ol>
+          {empleado.beneficiarios.map((b, i) => (
+            <li key={i}>
+              {i + 1}.- <strong>{b.nombre}</strong>
+              {b.parentesco ? ` (${b.parentesco})` : ''}
+              {b.porcentaje != null ? ` — ${b.porcentaje}%` : ''}
+            </li>
+          ))}
+        </ol>
+      )}
+
+      <p className="clausula">
+        <strong>DÉCIMA SÉPTIMA.</strong> Lo no previsto por este contrato se regirá por las
+        disposiciones previstas en la Ley Federal del Trabajo, así como por el Reglamento Interior
+        de Trabajo que rige en los establecimientos donde preste los servicios «EL PATRÓN».
+      </p>
+
+      <p className="clausula">
+        «LAS PARTES» aceptan expresamente que, en caso de existir controversias legales en cualquier
+        materia entre ambas partes, se someterán a los tribunales del domicilio de «EL PATRÓN».
+      </p>
+
+      <p className="clausula" style={{ marginTop: 16 }}>
+        Leído que fue el presente contrato por quienes en él intervienen, lo ratifican en todas y
+        cada una de sus partes y lo suscriben a su más entera conformidad por duplicado, en la
+        ciudad de Piedras Negras, Coahuila de Zaragoza, México, el{' '}
+        <strong>{formatDateLarga(fechaHoy)}</strong>.
       </p>
 
       <div className="firmas">
         <div>
           <div className="firma">
-            <div className="mb-1">{patron.representanteLegal}</div>
-            <div className="text-[11px]">
-              {patron.cargoRepresentante} de {patron.razonSocial}
-            </div>
-            <div className="text-[11px] italic mt-0.5">EL PATRÓN</div>
+            <div className="mb-1">{nombreCompleto}</div>
+            <div className="text-[11px]">{empleado.rfc ?? ''}</div>
+            <div className="text-[11px] italic mt-0.5">«EL TRABAJADOR»</div>
           </div>
         </div>
         <div>
           <div className="firma">
-            <div className="mb-1">{nombreCompleto}</div>
-            <div className="text-[11px]">{empleado.rfc ?? ''}</div>
-            <div className="text-[11px] italic mt-0.5">EL TRABAJADOR</div>
+            <div className="mb-1">{patron.representanteLegal}</div>
+            <div className="text-[11px]">{patron.razonSocial}</div>
+            <div className="text-[11px] italic mt-0.5">«EL PATRÓN»</div>
           </div>
         </div>
       </div>
 
-      <div className="firmas mt-6">
+      <div className="firmas" style={{ marginTop: 32 }}>
         <div>
           <div className="firma">
             <div className="mb-1">__________________________</div>
@@ -405,12 +525,94 @@ export function ContratoPrintable({
 
       <div className="mt-8 text-[10px] text-gray-500 border-t pt-2 no-print">
         <p>
-          <strong>Nota legal:</strong> Documento generado por BSOP como borrador del contrato
-          individual de trabajo. Debe ser revisado por abogado laboral antes de firmarse. No
-          sustituye asesoría profesional. Versión basada en LFT vigente al{' '}
-          {formatDateLarga(fechaHoy)}.
+          <strong>Nota:</strong> Documento generado por BSOP a partir de la plantilla validada por
+          DILESA (CONTRATO NUEVO TRABAJO DILESA.docx). Verifica que los datos del empleado y del
+          patrón estén completos antes de imprimir. Generado el {formatDateLarga(fechaHoy)}.
         </p>
       </div>
     </article>
   );
+}
+
+/**
+ * Convierte número a letra para el salario (es-MX). Implementación chica
+ * suficiente para cantidades de sueldos (hasta ~99,999.99).
+ */
+function numeroAMoneda(n: number): string {
+  const entero = Math.floor(n);
+  const centavos = Math.round((n - entero) * 100);
+  const enteroTexto = numeroALetras(entero);
+  return `${enteroTexto} pesos ${String(centavos).padStart(2, '0')}/100`;
+}
+
+const UNIDADES = [
+  '',
+  'UNO',
+  'DOS',
+  'TRES',
+  'CUATRO',
+  'CINCO',
+  'SEIS',
+  'SIETE',
+  'OCHO',
+  'NUEVE',
+  'DIEZ',
+  'ONCE',
+  'DOCE',
+  'TRECE',
+  'CATORCE',
+  'QUINCE',
+  'DIECISÉIS',
+  'DIECISIETE',
+  'DIECIOCHO',
+  'DIECINUEVE',
+  'VEINTE',
+];
+const DECENAS = [
+  '',
+  '',
+  'VEINTI',
+  'TREINTA',
+  'CUARENTA',
+  'CINCUENTA',
+  'SESENTA',
+  'SETENTA',
+  'OCHENTA',
+  'NOVENTA',
+];
+const CENTENAS = [
+  '',
+  'CIENTO',
+  'DOSCIENTOS',
+  'TRESCIENTOS',
+  'CUATROCIENTOS',
+  'QUINIENTOS',
+  'SEISCIENTOS',
+  'SETECIENTOS',
+  'OCHOCIENTOS',
+  'NOVECIENTOS',
+];
+
+function numeroALetras(n: number): string {
+  if (n === 0) return 'CERO';
+  if (n === 100) return 'CIEN';
+  if (n <= 20) return UNIDADES[n];
+  if (n < 30) return `VEINTI${UNIDADES[n - 20].toLowerCase()}`.toUpperCase();
+  if (n < 100) {
+    const dec = Math.floor(n / 10);
+    const uni = n % 10;
+    return uni === 0 ? DECENAS[dec] : `${DECENAS[dec]} Y ${UNIDADES[uni]}`;
+  }
+  if (n < 1000) {
+    const cen = Math.floor(n / 100);
+    const resto = n % 100;
+    return resto === 0 ? CENTENAS[cen] : `${CENTENAS[cen]} ${numeroALetras(resto)}`;
+  }
+  if (n < 1_000_000) {
+    const miles = Math.floor(n / 1000);
+    const resto = n % 1000;
+    const milesTexto = miles === 1 ? 'MIL' : `${numeroALetras(miles)} MIL`;
+    return resto === 0 ? milesTexto : `${milesTexto} ${numeroALetras(resto)}`;
+  }
+  return String(n); // Fallback para números muy grandes (no esperados en sueldos)
 }

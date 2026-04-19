@@ -14,7 +14,12 @@ import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Printer } from 'lucide-react';
-import { ContratoPrintable, type ContratoEmpleado } from '@/components/rh/contrato-printable';
+import {
+  ContratoPrintable,
+  type ContratoEmpleado,
+  type ContratoPatron,
+  PATRON_DILESA,
+} from '@/components/rh/contrato-printable';
 
 function Inner() {
   const params = useParams();
@@ -23,6 +28,8 @@ function Inner() {
   const supabase = createSupabaseERPClient();
 
   const [data, setData] = useState<ContratoEmpleado | null>(null);
+  const [patron, setPatron] = useState<ContratoPatron>(PATRON_DILESA);
+  const [patronFromDb, setPatronFromDb] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,6 +54,61 @@ function Inner() {
       setError(eErr?.message ?? 'Empleado no encontrado');
       setLoading(false);
       return;
+    }
+
+    // Cargar la empresa (razón social, RFC, domicilio, representante,
+    // escrituras, registro patronal). Si faltan campos se usa PATRON_DILESA
+    // como fallback.
+    const { data: empresa } = await supabase
+      .schema('core')
+      .from('empresas')
+      .select(
+        `razon_social, rfc, registro_patronal_imss, representante_legal,
+         escritura_constitutiva, escritura_poder,
+         domicilio_calle, domicilio_numero_ext, domicilio_numero_int,
+         domicilio_colonia, domicilio_cp, domicilio_municipio, domicilio_estado`
+      )
+      .eq('id', (emp as any).empresa_id)
+      .maybeSingle();
+
+    if (empresa && (empresa as any).rfc) {
+      const e = empresa as any;
+      const domParts = [
+        e.domicilio_calle,
+        e.domicilio_numero_ext ? `#${e.domicilio_numero_ext}` : null,
+        e.domicilio_colonia ? `Col. ${e.domicilio_colonia}` : null,
+        e.domicilio_cp ? `C.P. ${e.domicilio_cp}` : null,
+        e.domicilio_municipio,
+        e.domicilio_estado,
+      ].filter(Boolean);
+      setPatron({
+        razonSocial: e.razon_social
+          ? `${e.razon_social}${/S\.A\.|SA DE CV/i.test(e.razon_social) ? '' : ', S.A. DE C.V.'}`
+          : PATRON_DILESA.razonSocial,
+        rfc: e.rfc,
+        domicilio: domParts.join(', '),
+        registroPatronalImss: e.registro_patronal_imss ?? '__________________',
+        representanteLegal: e.representante_legal ?? '__________________',
+        escrituraConstitutiva: e.escritura_constitutiva
+          ? {
+              numero: e.escritura_constitutiva.numero ?? '—',
+              fecha: e.escritura_constitutiva.fecha_texto ?? e.escritura_constitutiva.fecha ?? '—',
+              notario: e.escritura_constitutiva.notario ?? '—',
+              notariaNumero: e.escritura_constitutiva.notaria_numero ?? '—',
+              distrito: e.escritura_constitutiva.distrito ?? '—',
+            }
+          : PATRON_DILESA.escrituraConstitutiva,
+        poderRepresentante: e.escritura_poder
+          ? {
+              numero: e.escritura_poder.numero ?? '—',
+              fecha: e.escritura_poder.fecha_texto ?? e.escritura_poder.fecha ?? '—',
+              notario: e.escritura_poder.notario ?? '—',
+              notariaNumero: e.escritura_poder.notaria_numero ?? '—',
+              distrito: e.escritura_poder.distrito ?? '—',
+            }
+          : PATRON_DILESA.poderRepresentante,
+      });
+      setPatronFromDb(true);
     }
 
     const [compRes, benefRes] = await Promise.all([
@@ -146,8 +208,16 @@ function Inner() {
         </Button>
       </div>
 
+      {!patronFromDb && (
+        <div className="no-print rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-400">
+          ⚠️ No se encontraron datos fiscales de la empresa en BSOP. Se están usando los
+          placeholders hardcoded. Captura la CSF en Configuración → Empresas para que el contrato
+          tenga los datos correctos.
+        </div>
+      )}
+
       <div className="rounded-2xl border border-[var(--border)] bg-white shadow-sm">
-        <ContratoPrintable empleado={data} />
+        <ContratoPrintable empleado={data} patron={patron} />
       </div>
     </div>
   );
