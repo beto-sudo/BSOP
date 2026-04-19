@@ -151,6 +151,47 @@ function generateTitulo(fechaHora: string, tipo: string) {
   return `${fecha}, ${hora} - ${tipo}`;
 }
 
+/**
+ * TEMP component: shows a small preview of the junta's descripcion so Beto
+ * can eyeball what's already in BSOP while comparing side-by-side with Coda
+ * during the image backfill. Remove this + its column when backfill is done.
+ */
+function JuntaContentPreview({ descripcion }: { descripcion: string | null }) {
+  if (!descripcion) {
+    return <span className="text-xs text-[var(--text)]/40">(vacía)</span>;
+  }
+  // Plain text excerpt — strip HTML tags + collapse whitespace
+  const plain = descripcion
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const excerpt = plain.length > 200 ? `${plain.slice(0, 200).trim()}…` : plain;
+  const imgCount = (descripcion.match(/<img\b/gi) ?? []).length;
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+        <span
+          className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 font-mono ${
+            imgCount > 0
+              ? 'bg-emerald-500/15 text-emerald-400'
+              : 'bg-[var(--border)]/40 text-[var(--text)]/40'
+          }`}
+        >
+          {imgCount > 0 ? `📷 ${imgCount}` : '📷 0'}
+        </span>
+        <span className="inline-flex items-center gap-0.5 rounded bg-[var(--border)]/40 px-1.5 py-0.5 font-mono text-[var(--text)]/50">
+          {plain.length.toLocaleString()} chars
+        </span>
+      </div>
+      <p className="line-clamp-3 text-xs leading-snug text-[var(--text)]/65">{excerpt}</p>
+    </div>
+  );
+}
+
 function JuntasInner() {
   const router = useRouter();
   const supabase = createSupabaseERPClient();
@@ -460,6 +501,9 @@ function JuntasInner() {
                   onSort={onSort}
                   className="w-48"
                 />
+                {/* TEMP column to side-by-side compare with Coda during image
+                    backfill. Remove once post-2024 juntas are pasted over. */}
+                <TableHead className="min-w-[320px] max-w-[560px]">Contenido</TableHead>
                 <SortableHead
                   sortKey="asistentes"
                   label="Asist."
@@ -514,6 +558,9 @@ function JuntasInner() {
                     <span className="text-sm text-[var(--text)]/70">
                       {formatDateTime(junta.fecha_hora)}
                     </span>
+                  </TableCell>
+                  <TableCell className="min-w-[320px] max-w-[560px]">
+                    <JuntaContentPreview descripcion={junta.descripcion} />
                   </TableCell>
                   <TableCell>
                     <span className="text-sm text-[var(--text)]/60">
