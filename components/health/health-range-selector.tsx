@@ -10,6 +10,8 @@ const PRESET_OPTIONS: Array<{ value: Exclude<HealthRangePreset, 'custom'>; label
   { value: '7d', label: 'Last 7 Days' },
   { value: '30d', label: 'Last 30 Days' },
   { value: '90d', label: 'Last 90 Days' },
+  { value: '1y', label: 'Last 365 Days' },
+  { value: 'all', label: 'All history' },
 ];
 
 function formatIsoDate(date: Date) {

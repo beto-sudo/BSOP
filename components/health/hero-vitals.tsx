@@ -3,8 +3,9 @@ import { Surface } from '@/components/ui/surface';
 import type { HeroCard } from './types';
 
 /**
- * "Vitales del día" hero band — gradient section with one Surface per metric.
- * Pure presentational: parent owns the HeroCard array.
+ * Recovery hero band — four Surface tiles showing how the body is
+ * recovering today (Sleep, HRV, Resting HR, Wrist Temp). Pure
+ * presentational; parent owns the card data and wiring.
  */
 export function HeroVitals({ heroCards }: { heroCards: HeroCard[] }) {
   return (
@@ -12,11 +13,11 @@ export function HeroVitals({ heroCards }: { heroCards: HeroCard[] }) {
       <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(129,140,248,0.14),transparent_55%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(129,140,248,0.16),transparent_55%)]" />
       <div className="relative">
         <SectionHeading
-          eyebrow="Health"
-          title="Vitales del día"
-          copy="Lo primero: cómo amaneciste hoy. Recuperación, cardiovascular, oxigenación, peso y movimiento en una sola vista calmada."
+          eyebrow="Recovery"
+          title="Cómo amaneciste"
+          copy="Las señales que marcan qué tan preparado está tu cuerpo hoy: sueño, variabilidad, pulso en reposo y temperatura nocturna."
         />
-        <div className="-mt-2 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="-mt-2 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {heroCards.map((card) => {
             const Icon = card.icon;
             return (
