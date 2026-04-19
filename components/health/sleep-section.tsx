@@ -1,52 +1,95 @@
-import { BedDouble, MoonStar } from 'lucide-react';
+'use client';
+
+import { useState } from 'react';
+import { BedDouble, MoonStar, Wind } from 'lucide-react';
 import { Surface } from '@/components/ui/surface';
-import { formatDurationHours, formatMetricValue } from '@/lib/health';
+import { formatDurationHours, formatMetricValue, type HealthMetricRow } from '@/lib/health';
+import { ChartModal } from './chart-modal';
+import {
+  countDaysAtOrAbove,
+  filterRecentRows,
+  groupDailySleep,
+  groupDailySum,
+  groupSleepStages,
+  summarizeDailyWindow,
+} from './helpers';
 import { StatPill } from './stat-pill';
 import { TONES } from './tones';
 import { TrendSvg } from './trend-svg';
-import type { Point } from './types';
+import type { ChartConfig } from './types';
 
-type SleepBuckets = { short: number; ok: number; good: number; long: number };
-type SleepStageAverages = {
-  'Sleep Core': number;
-  'Sleep Deep': number;
-  'Sleep REM': number;
-  'Sleep Awake': number;
-};
+const SLEEP_TARGET_HOURS = 7;
 
-const STAGE_META: Array<{
-  key: keyof SleepStageAverages;
-  label: string;
-  color: string;
-}> = [
-  { key: 'Sleep Deep', label: 'Deep', color: 'bg-indigo-600' },
-  { key: 'Sleep REM', label: 'REM', color: 'bg-violet-500' },
-  { key: 'Sleep Core', label: 'Core', color: 'bg-sky-500' },
-  { key: 'Sleep Awake', label: 'Awake', color: 'bg-amber-400' },
-];
+const STAGE_META = [
+  { key: 'Sleep Deep', label: 'Deep', color: 'bg-indigo-600', target: 'Objetivo 13–23%' },
+  { key: 'Sleep REM', label: 'REM', color: 'bg-violet-500', target: 'Objetivo 20–25%' },
+  { key: 'Sleep Core', label: 'Core', color: 'bg-sky-500', target: 'Balance del total' },
+  { key: 'Sleep Awake', label: 'Awake', color: 'bg-amber-400', target: '< 10% idealmente' },
+] as const;
 
+/**
+ * Sleep — duration, stage mix, consistency (real "X/N nights ≥7h") and
+ * optional breathing-disturbance overlay. Consistency was previously a
+ * vague "% in target"; it now answers the question a rehab plan cares
+ * about: how many nights you actually slept enough.
+ */
 export function SleepSection({
-  latestSleep,
-  sleep7dAverage,
-  sleep30dAverage,
-  sleepConsistency,
-  sleepTrend,
-  sleepBuckets,
-  sleepStageAverages,
+  sleepStages,
+  breathing,
+  trendDays,
 }: {
-  latestSleep: Point | null;
-  sleep7dAverage: number | null;
-  sleep30dAverage: number | null;
-  sleepConsistency: number;
-  sleepTrend: Point[];
-  sleepBuckets: SleepBuckets;
-  sleepStageAverages: SleepStageAverages;
+  sleepStages: HealthMetricRow[];
+  breathing: HealthMetricRow[];
+  trendDays: number;
 }) {
+  const [openChart, setOpenChart] = useState<'sleep' | 'breathing' | null>(null);
+
+  const sleepDaily = groupDailySleep(sleepStages);
+  const sleepSeries = sleepDaily.slice(-trendDays);
+  const breathingSeries = groupDailySum(breathing).slice(-trendDays);
+
+  const latestSleep = sleepDaily.at(-1) ?? null;
+  const sleep7dAvg = summarizeDailyWindow(sleepDaily, 7, 0);
+  const sleep30dAvg = summarizeDailyWindow(sleepDaily, Math.min(30, trendDays), 0);
+  const consistency7 = countDaysAtOrAbove(sleepDaily, 7, SLEEP_TARGET_HOURS);
+  const consistency30 = countDaysAtOrAbove(sleepDaily, Math.min(30, trendDays), SLEEP_TARGET_HOURS);
+
+  const recentStageRows = filterRecentRows(sleepStages, 7);
+  const stageAverages = groupSleepStages(recentStageRows);
   const stageTotal =
-    sleepStageAverages['Sleep Core'] +
-    sleepStageAverages['Sleep Deep'] +
-    sleepStageAverages['Sleep REM'] +
-    sleepStageAverages['Sleep Awake'];
+    stageAverages['Sleep Core'] +
+    stageAverages['Sleep Deep'] +
+    stageAverages['Sleep REM'] +
+    stageAverages['Sleep Awake'];
+
+  const breathing7Total = breathingSeries.slice(-7).reduce((sum, point) => sum + point.value, 0);
+  const breathingLatest = breathingSeries.at(-1);
+
+  const sleepConfig: ChartConfig = {
+    key: 'sleep',
+    title: 'Sleep duration',
+    unit: 'hr',
+    tone: 'sleep',
+    icon: MoonStar,
+    data: sleepSeries,
+    emptyTitle: 'Sin datos de sueño',
+    emptyCopy:
+      'Sleep Analysis renderiza aquí una vez que haya datos del Sleeptracker® o Apple Watch en el rango.',
+    formatter: (v) => formatDurationHours(v),
+  };
+
+  const breathingConfig: ChartConfig = {
+    key: 'breathing',
+    title: 'Breathing Disturbances por noche',
+    unit: 'eventos',
+    tone: 'breathing',
+    icon: Wind,
+    data: breathingSeries,
+    emptyTitle: 'Sin eventos',
+    emptyCopy: 'Apple Watch cuenta episodios respiratorios anormales durante el sueño.',
+    formatter: (v) => formatMetricValue(v, 0),
+  };
+
   return (
     <section className="mt-10 grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
       <Surface className="p-6 shadow-sm dark:shadow-none">
@@ -55,59 +98,58 @@ export function SleepSection({
             <MoonStar className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold">Sleep Analysis</h2>
+            <h2 className="text-lg font-semibold">Sueño</h2>
             <p className="mt-1 text-sm text-[var(--muted-foreground)] dark:text-white/45">
-              Dedicated view for sleep duration and consistency.
+              Duración y consistencia — objetivo ≥ {SLEEP_TARGET_HOURS} hrs/noche para rehab
+              cardiaca.
             </p>
           </div>
         </div>
 
         <div className="mb-6 grid gap-3 md:grid-cols-4">
           <StatPill
-            label="Last night"
+            label="Anoche"
             value={`${latestSleep ? formatDurationHours(latestSleep.value) : '—'} hr`}
           />
           <StatPill
             label="7d avg"
-            value={`${sleep7dAverage == null ? '—' : formatDurationHours(sleep7dAverage)} hr`}
+            value={`${sleep7dAvg == null ? '—' : formatDurationHours(sleep7dAvg)} hr`}
           />
           <StatPill
             label="30d avg"
-            value={`${sleep30dAverage == null ? '—' : formatDurationHours(sleep30dAverage)} hr`}
+            value={`${sleep30dAvg == null ? '—' : formatDurationHours(sleep30dAvg)} hr`}
           />
-          <StatPill label="Consistency" value={`${sleepConsistency || 0}% in target`} />
+          <StatPill
+            label="Noches ≥7h (7d)"
+            value={`${consistency7.hits}/${consistency7.total || 7}`}
+          />
         </div>
 
-        <TrendSvg
-          config={{
-            key: 'sleep',
-            title: 'Sleep Analysis',
-            unit: 'hr',
-            tone: 'sleep',
-            icon: MoonStar,
-            data: sleepTrend,
-            emptyTitle: 'No sleep data yet',
-            emptyCopy:
-              'Sleep Analysis rows will render here automatically when they are present in the selected date range.',
-            formatter: (value) => formatMetricValue(value, 1),
-          }}
-        />
+        <button
+          type="button"
+          onClick={() => setOpenChart('sleep')}
+          className="block w-full text-left"
+        >
+          <TrendSvg config={sleepConfig} />
+        </button>
+
+        <div className="mt-4 text-xs text-[var(--muted-foreground)] dark:text-white/45">
+          Ventana amplia: {consistency30.hits}/{consistency30.total || Math.min(30, trendDays)}{' '}
+          noches cumplieron la meta.
+        </div>
       </Surface>
 
-      <Surface className="p-6 shadow-sm dark:shadow-none">
-        <div className="mb-4 flex items-center gap-3 text-[var(--text)] dark:text-white">
-          <BedDouble className="h-5 w-5 text-indigo-600 dark:text-indigo-200" />
-          <h2 className="text-lg font-semibold">Etapas + duración</h2>
-        </div>
-        <div className="rounded-3xl border border-indigo-200 bg-indigo-50 p-5 dark:border-indigo-400/15 dark:bg-indigo-400/8">
-          <div className="text-xs uppercase tracking-[0.22em] text-indigo-700/70 dark:text-white/35">
-            Mix de etapas (7d)
+      <div className="flex flex-col gap-6">
+        <Surface className="p-6 shadow-sm dark:shadow-none">
+          <div className="mb-4 flex items-center gap-3 text-[var(--text)] dark:text-white">
+            <BedDouble className="h-5 w-5 text-indigo-600 dark:text-indigo-200" />
+            <h2 className="text-lg font-semibold">Etapas (7 días)</h2>
           </div>
           {stageTotal > 0 ? (
             <>
-              <div className="mt-3 flex h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
+              <div className="flex h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
                 {STAGE_META.map((stage) => {
-                  const value = sleepStageAverages[stage.key];
+                  const value = stageAverages[stage.key as keyof typeof stageAverages];
                   const pct = stageTotal ? (value / stageTotal) * 100 : 0;
                   if (pct <= 0) return null;
                   return (
@@ -122,7 +164,7 @@ export function SleepSection({
               </div>
               <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                 {STAGE_META.map((stage) => {
-                  const value = sleepStageAverages[stage.key];
+                  const value = stageAverages[stage.key as keyof typeof stageAverages];
                   const pct = stageTotal ? (value / stageTotal) * 100 : 0;
                   return (
                     <div key={stage.key} className="flex items-center justify-between gap-2">
@@ -139,37 +181,57 @@ export function SleepSection({
               </div>
             </>
           ) : (
-            <p className="mt-3 text-sm text-[var(--muted-foreground)] dark:text-white/55">
+            <p className="text-sm text-[var(--muted-foreground)] dark:text-white/55">
               Sin etapas registradas los últimos 7 días.
             </p>
           )}
-        </div>
-        <div className="mt-5 space-y-3">
-          {[
-            ['<6h', sleepBuckets.short],
-            ['6–7h', sleepBuckets.ok],
-            ['7–8h', sleepBuckets.good],
-            ['8h+', sleepBuckets.long],
-          ].map(([label, count]) => {
-            const total = sleepTrend.length || 1;
-            const width = `${Math.max((Number(count) / total) * 100, Number(count) ? 8 : 0)}%`;
-            return (
-              <div key={String(label)}>
-                <div className="mb-2 flex items-center justify-between text-sm text-[var(--muted-foreground)] dark:text-white/70">
-                  <span>{label}</span>
-                  <span>{count} nights</span>
+        </Surface>
+
+        <Surface
+          className={`p-6 shadow-sm dark:shadow-none ${breathing7Total > 40 ? 'border-amber-300/40 bg-amber-50/40 dark:border-amber-300/20 dark:bg-amber-300/5' : ''}`}
+        >
+          <button
+            type="button"
+            onClick={() => setOpenChart('breathing')}
+            className="block w-full text-left"
+          >
+            <div className="mb-2 flex items-center gap-3 text-[var(--text)] dark:text-white">
+              <Wind className="h-5 w-5 text-sky-500 dark:text-sky-300" />
+              <h2 className="text-lg font-semibold">Breathing Disturbances</h2>
+            </div>
+            <p className="text-xs text-[var(--muted-foreground)] dark:text-white/45">
+              Eventos respiratorios anormales durante el sueño. Post-bypass, un alza puede sugerir
+              apnea.
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <div className="text-xs uppercase tracking-[0.18em] text-[var(--muted-foreground)] dark:text-white/35">
+                  Última noche
                 </div>
-                <div className="h-2 rounded-full bg-slate-200 dark:bg-white/8">
-                  <div
-                    className="h-2 rounded-full bg-gradient-to-r from-indigo-400 to-violet-400"
-                    style={{ width }}
-                  />
+                <div className="mt-1 text-xl font-semibold text-[var(--text)] dark:text-white">
+                  {breathingLatest ? formatMetricValue(breathingLatest.value, 0) : '—'}
                 </div>
               </div>
-            );
-          })}
-        </div>
-      </Surface>
+              <div>
+                <div className="text-xs uppercase tracking-[0.18em] text-[var(--muted-foreground)] dark:text-white/35">
+                  7d total
+                </div>
+                <div className="mt-1 text-xl font-semibold text-[var(--text)] dark:text-white">
+                  {formatMetricValue(breathing7Total, 0)}
+                </div>
+              </div>
+            </div>
+          </button>
+        </Surface>
+      </div>
+
+      <ChartModal
+        config={
+          openChart === 'sleep' ? sleepConfig : openChart === 'breathing' ? breathingConfig : null
+        }
+        onClose={() => setOpenChart(null)}
+        rangeLabel={openChart === 'sleep' ? sleepConfig.title : breathingConfig.title}
+      />
     </section>
   );
 }

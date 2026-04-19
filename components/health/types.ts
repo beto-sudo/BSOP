@@ -1,18 +1,10 @@
 import type { HeartPulse } from 'lucide-react';
-import type { HealthDashboardRange, HealthMetricRow, HealthWorkoutRow } from '@/lib/health';
+import type { HealthDashboardData } from '@/lib/health';
+import type { ToneKey } from './tones';
+
+export type { ToneKey };
 
 export type Point = { date: string; value: number };
-
-export type MetricKey =
-  | 'sleep'
-  | 'hr'
-  | 'bp'
-  | 'weight'
-  | 'steps'
-  | 'spo2'
-  | 'hrv'
-  | 'bodyfat'
-  | 'bmi';
 
 export type HeroCard = {
   key: string;
@@ -27,10 +19,10 @@ export type HeroCard = {
 };
 
 export type ChartConfig = {
-  key: MetricKey;
+  key: ToneKey;
   title: string;
   unit: string;
-  tone: string;
+  tone: ToneKey;
   icon: typeof HeartPulse;
   kind?: 'line' | 'dual-line';
   data: Point[];
@@ -42,20 +34,4 @@ export type ChartConfig = {
   formatter?: (value: number) => string;
 };
 
-export type HealthDashboardViewProps = {
-  vitals: HealthMetricRow[];
-  summaryMetrics: HealthMetricRow[];
-  hrvDaily: HealthMetricRow[];
-  spo2Daily: HealthMetricRow[];
-  stepsDaily: HealthMetricRow[];
-  bpSystolic: HealthMetricRow[];
-  bpDiastolic: HealthMetricRow[];
-  restingHrDaily: HealthMetricRow[];
-  weightDaily: HealthMetricRow[];
-  sleepDaily: HealthMetricRow[];
-  bodyFatDaily: HealthMetricRow[];
-  bmiDaily: HealthMetricRow[];
-  workouts: HealthWorkoutRow[];
-  errors: string[];
-  range: HealthDashboardRange;
-};
+export type HealthDashboardViewProps = HealthDashboardData;

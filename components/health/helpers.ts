@@ -3,7 +3,8 @@ import type { Point } from './types';
 
 /**
  * Collapse raw metric rows into a single daily-average series, sorted asc by
- * ISO date. Trend charts consume this; hero cards use raw vitals directly.
+ * ISO date. Trend charts of instantaneous measurements (HR, HRV, SpO2,
+ * temperature, BP) consume this.
  */
 export function groupDailyAverage(rows: HealthMetricRow[]) {
   const buckets = new Map<string, { total: number; count: number }>();
@@ -25,14 +26,37 @@ export function groupDailyAverage(rows: HealthMetricRow[]) {
 }
 
 /**
+ * Collapse raw metric rows into a daily-sum series. Use for cumulative
+ * quantities: steps, flights, distance, active energy, basal energy,
+ * exercise minutes, stand minutes, daylight minutes, breathing events.
+ * Averaging these misrepresents a day (Apple Health ships them as many
+ * small samples throughout the day).
+ */
+export function groupDailySum(rows: HealthMetricRow[]): Point[] {
+  const buckets = new Map<string, number>();
+  rows.forEach((row) => {
+    const key = row.date.slice(0, 10);
+    buckets.set(key, (buckets.get(key) ?? 0) + row.value);
+  });
+  return Array.from(buckets.entries())
+    .map(([date, value]) => ({ date, value }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
  * Sleep comes in as one row per stage/segment, from two devices (Sleeptracker®
  * bed and Apple Watch). A plain average is nonsense — it ends up averaging
  * 15-min stage slivers. Correct daily total is SUM per source per day, then
  * GREATEST across sources (never double-count the two devices).
+ *
+ * `stageMetrics` controls which metric_name rows are summed — pass the sleep
+ * stages that count as "asleep" (Core + Deep + REM) or all stages including
+ * Awake if you want total in-bed coverage.
  */
 export function groupDailySleep(rows: HealthMetricRow[]): Point[] {
   const buckets = new Map<string, { sleeptracker: number; other: number }>();
   rows.forEach((row) => {
+    if (row.metric_name === 'Sleep Awake') return;
     const key = row.date.slice(0, 10);
     const existing = buckets.get(key) ?? { sleeptracker: 0, other: 0 };
     const isSleeptracker = (row.source ?? '').toLowerCase().includes('sleeptracker');
@@ -56,13 +80,14 @@ export function normalizeWeightToLb(row: HealthMetricRow): number {
 }
 
 /**
- * Daily weight series restricted to a primary source (Garmin Connect), with
- * values normalized to lb. Averages multiple readings on the same day.
+ * Daily weight series with values normalized to lb. Averages multiple
+ * readings on the same day. Keeps all sources so the trend is continuous
+ * even when the primary scale (Garmin Connect) is disconnected — the
+ * staleness helper surfaces gaps separately.
  */
-export function groupDailyWeightConnect(rows: HealthMetricRow[]): Point[] {
-  const connect = rows.filter((row) => row.source === 'Connect');
+export function groupDailyWeight(rows: HealthMetricRow[]): Point[] {
   const buckets = new Map<string, { total: number; count: number }>();
-  connect.forEach((row) => {
+  rows.forEach((row) => {
     const key = row.date.slice(0, 10);
     const existing = buckets.get(key) ?? { total: 0, count: 0 };
     existing.total += normalizeWeightToLb(row);
@@ -79,8 +104,8 @@ export function groupDailyWeightConnect(rows: HealthMetricRow[]): Point[] {
 
 /**
  * Average a precomputed daily series over a rolling window. Use this when
- * rows have already been collapsed (e.g. sleep totals, normalized weight) so
- * raw-row averaging doesn't undo the collapse.
+ * rows have already been collapsed (e.g. sleep totals, normalized weight)
+ * so raw-row averaging doesn't undo the collapse.
  */
 export function summarizeDailyWindow(points: Point[], days: number, endOffsetDays: number) {
   const end = new Date();
@@ -103,43 +128,44 @@ export function summarizeDailyWindow(points: Point[], days: number, endOffsetDay
 }
 
 /**
- * Average a metric over a rolling window that ends `endOffsetDays` ago and
- * spans `days` days. Returns null when no rows fall in the window.
+ * Symmetric current-vs-previous delta: compares the last `days` days to the
+ * `days` immediately preceding. Easier to reason about than asymmetric
+ * windows (7 vs prev 23) because both sides carry equal weight.
  */
-export function summarizeWindow(rows: HealthMetricRow[], days: number, endOffsetDays: number) {
+export function computeSymmetricDelta(
+  points: Point[],
+  days: number
+): { current: number; previous: number; delta: number } | null {
+  const current = summarizeDailyWindow(points, days, 0);
+  const previous = summarizeDailyWindow(points, days, days);
+  if (current == null || previous == null) return null;
+  return { current, previous, delta: current - previous };
+}
+
+/**
+ * Count how many days in the most recent `days` window have a value at or
+ * above `threshold`. Used to express sleep consistency as "5/7 noches ≥7h"
+ * rather than a vague % in target band.
+ */
+export function countDaysAtOrAbove(
+  points: Point[],
+  days: number,
+  threshold: number
+): { hits: number; total: number } {
   const end = new Date();
   end.setHours(23, 59, 59, 999);
-  end.setDate(end.getDate() - endOffsetDays);
 
   const start = new Date(end);
   start.setDate(start.getDate() - (days - 1));
   start.setHours(0, 0, 0, 0);
 
-  const filtered = rows.filter((row) => {
-    const date = new Date(row.date).getTime();
-    return date >= start.getTime() && date <= end.getTime();
+  const filtered = points.filter((point) => {
+    const t = new Date(`${point.date}T12:00:00`).getTime();
+    return t >= start.getTime() && t <= end.getTime();
   });
 
-  if (!filtered.length) return null;
-  const total = filtered.reduce((sum, row) => sum + row.value, 0);
-  return total / filtered.length;
-}
-
-/**
- * Compute the delta between the most recent `currentDays` window and the
- * immediately preceding `prevDays` window, on a precomputed daily series.
- * Returns null when either window is empty. Matches the daily briefing
- * pattern (7d vs prev 23d) so dashboards and briefings stay in sync.
- */
-export function computePrevWindowDelta(
-  points: Point[],
-  currentDays: number,
-  prevDays: number
-): { current: number; previous: number; delta: number } | null {
-  const current = summarizeDailyWindow(points, currentDays, 0);
-  const previous = summarizeDailyWindow(points, prevDays, currentDays);
-  if (current == null || previous == null) return null;
-  return { current, previous, delta: current - previous };
+  const hits = filtered.filter((point) => point.value >= threshold).length;
+  return { hits, total: filtered.length };
 }
 
 /**
@@ -158,7 +184,7 @@ export function isStaleSince(latestIso: string | null | undefined, maxDaysStale:
 /**
  * Group sleep-stage rows into per-stage daily totals, de-duplicated across
  * Sleeptracker®/Apple Watch by taking the larger value per stage per day.
- * Returns series keyed by stage name for breakdown charts.
+ * Returns averages keyed by stage name for breakdown charts.
  */
 export function groupSleepStages(rows: HealthMetricRow[]) {
   const stages = ['Sleep Core', 'Sleep Deep', 'Sleep REM', 'Sleep Awake'] as const;
@@ -199,11 +225,31 @@ export function groupSleepStages(rows: HealthMetricRow[]) {
   return averages;
 }
 
+/**
+ * Keep only the rows whose date falls within the last `days` days. Used to
+ * scope stage averages or consistency calculations to a recent window even
+ * when the full series covers a larger range.
+ */
+export function filterRecentRows(rows: HealthMetricRow[], days: number): HealthMetricRow[] {
+  const cutoff = Date.now() - days * 86_400_000;
+  return rows.filter((row) => {
+    const t = new Date(row.date).getTime();
+    return Number.isFinite(t) && t >= cutoff;
+  });
+}
+
 export function formatDateLabel(date: string) {
   return new Date(`${date}T00:00:00`).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
   });
+}
+
+export function formatDaysAgo(daysAgo: number | null): string {
+  if (daysAgo == null) return 'Sin datos';
+  if (daysAgo === 0) return 'Hoy';
+  if (daysAgo === 1) return 'Ayer';
+  return `${daysAgo}d atrás`;
 }
 
 export function buildLinePath(
@@ -242,4 +288,33 @@ export function getDelta(points: Point[]) {
   const currentAvg = current.reduce((sum, point) => sum + point.value, 0) / current.length;
   const previousAvg = previous.reduce((sum, point) => sum + point.value, 0) / previous.length;
   return currentAvg - previousAvg;
+}
+
+export function formatDelta(value: number, digits = 1) {
+  const sign = value >= 0 ? '+' : '';
+  return `${sign}${value.toLocaleString('en-US', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  })}`;
+}
+
+/**
+ * Build a one-line helper showing the latest value, the current-vs-previous
+ * delta, and a direction arrow. `invertTone` flips the semantic direction for
+ * metrics where "up = bad" (resting HR, body fat, weight, BP).
+ */
+export function buildDeltaHelper(
+  points: Point[],
+  options: { days?: number; digits?: number; unit?: string; invertTone?: boolean } = {}
+) {
+  const { days = 7, digits = 1, unit } = options;
+  const delta = computeSymmetricDelta(points, days);
+  if (!delta) return `Sin base para comparar ${days}d`;
+  const unitSuffix = unit ? ` ${unit}` : '';
+  const arrow = delta.delta > 0 ? '↑' : delta.delta < 0 ? '↓' : '→';
+  const current = delta.current.toLocaleString('en-US', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+  return `${days}d ${current}${unitSuffix} · Δ ${formatDelta(delta.delta, digits)} vs prev ${days}d ${arrow}`;
 }

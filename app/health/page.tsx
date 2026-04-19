@@ -13,7 +13,7 @@ function resolveRangeParams(searchParams?: Record<string, string | string[] | un
     return { preset: 'custom' as const, from, to };
   }
 
-  const allowedPresets: HealthRangePreset[] = ['today', '7d', '30d', '90d'];
+  const allowedPresets: HealthRangePreset[] = ['today', '7d', '30d', '90d', '1y', 'all'];
   if (rawRange && allowedPresets.includes(rawRange as HealthRangePreset)) {
     return { preset: rawRange as HealthRangePreset };
   }
