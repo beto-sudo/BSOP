@@ -25,6 +25,7 @@ import {
   FiniquitoPrintable,
   type FiniquitoEmpleadoData,
 } from '@/components/rh/finiquito-printable';
+import { type ContratoPatron, PATRON_DILESA } from '@/components/rh/contrato-printable';
 import {
   calcularFiniquito,
   CAUSA_LABELS,
@@ -45,6 +46,7 @@ function Inner() {
   const supabase = createSupabaseERPClient();
 
   const [empleado, setEmpleado] = useState<FiniquitoEmpleadoData | null>(null);
+  const [patron, setPatron] = useState<ContratoPatron>(PATRON_DILESA);
   const [fechaIngreso, setFechaIngreso] = useState<string>('');
   const [fechaBajaGuardada, setFechaBajaGuardada] = useState<string | null>(null);
   const [motivoBajaGuardado, setMotivoBajaGuardado] = useState<string | null>(null);
@@ -66,7 +68,7 @@ function Inner() {
       .schema('erp')
       .from('empleados')
       .select(
-        `id, numero_empleado, fecha_ingreso, fecha_baja, motivo_baja,
+        `id, empresa_id, numero_empleado, fecha_ingreso, fecha_baja, motivo_baja,
          persona:persona_id(nombre, apellido_paterno, apellido_materno, rfc, nss),
          departamento:departamento_id(nombre),
          puesto:puesto_id(nombre)`
@@ -87,6 +89,58 @@ function Inner() {
       .eq('empleado_id', id)
       .eq('vigente', true)
       .maybeSingle();
+
+    // Cargar datos de la empresa para la cabecera del finiquito.
+    const { data: empresa } = await supabase
+      .schema('core')
+      .from('empresas')
+      .select(
+        `razon_social, rfc, registro_patronal_imss, representante_legal,
+         escritura_constitutiva, escritura_poder,
+         domicilio_calle, domicilio_numero_ext, domicilio_colonia,
+         domicilio_cp, domicilio_municipio, domicilio_estado`
+      )
+      .eq('id', (emp as any).empresa_id)
+      .maybeSingle();
+
+    if (empresa && (empresa as any).rfc) {
+      const e = empresa as any;
+      const domParts = [
+        e.domicilio_calle,
+        e.domicilio_numero_ext ? `#${e.domicilio_numero_ext}` : null,
+        e.domicilio_colonia ? `Col. ${e.domicilio_colonia}` : null,
+        e.domicilio_cp ? `C.P. ${e.domicilio_cp}` : null,
+        e.domicilio_municipio,
+        e.domicilio_estado,
+      ].filter(Boolean);
+      setPatron({
+        razonSocial: e.razon_social
+          ? `${e.razon_social}${/S\.A\.|SA DE CV/i.test(e.razon_social) ? '' : ', S.A. DE C.V.'}`
+          : PATRON_DILESA.razonSocial,
+        rfc: e.rfc,
+        domicilio: domParts.join(', '),
+        registroPatronalImss: e.registro_patronal_imss ?? '—',
+        representanteLegal: e.representante_legal ?? '—',
+        escrituraConstitutiva: e.escritura_constitutiva
+          ? {
+              numero: e.escritura_constitutiva.numero ?? '—',
+              fecha: e.escritura_constitutiva.fecha_texto ?? '—',
+              notario: e.escritura_constitutiva.notario ?? '—',
+              notariaNumero: e.escritura_constitutiva.notaria_numero ?? '—',
+              distrito: e.escritura_constitutiva.distrito ?? '—',
+            }
+          : PATRON_DILESA.escrituraConstitutiva,
+        poderRepresentante: e.escritura_poder
+          ? {
+              numero: e.escritura_poder.numero ?? '—',
+              fecha: e.escritura_poder.fecha_texto ?? '—',
+              notario: e.escritura_poder.notario ?? '—',
+              notariaNumero: e.escritura_poder.notaria_numero ?? '—',
+              distrito: e.escritura_poder.distrito ?? '—',
+            }
+          : PATRON_DILESA.poderRepresentante,
+      });
+    }
 
     const p = Array.isArray((emp as any).persona) ? (emp as any).persona[0] : (emp as any).persona;
     const dep = Array.isArray((emp as any).departamento)
@@ -291,6 +345,7 @@ function Inner() {
             empleado={empleado}
             calculo={calculo}
             motivoDetalle={motivoDetalle || motivoBajaGuardado || undefined}
+            patron={patron}
           />
         </div>
       )}
