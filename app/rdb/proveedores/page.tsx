@@ -42,6 +42,9 @@ type Proveedor = {
   id: string;
   persona_id: string | null;
   nombre: string;
+  nombre_raw: string | null;
+  apellido_paterno: string | null;
+  apellido_materno: string | null;
   contacto: string | null;
   telefono: string | null;
   email: string | null;
@@ -183,6 +186,8 @@ export default function ProveedoresPage() {
   const [creating, setCreating] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [newNombre, setNewNombre] = useState('');
+  const [newApellidoPaterno, setNewApellidoPaterno] = useState('');
+  const [newApellidoMaterno, setNewApellidoMaterno] = useState('');
   const [newContacto, setNewContacto] = useState('');
   const [newTelefono, setNewTelefono] = useState('');
   const [newEmail, setNewEmail] = useState('');
@@ -190,6 +195,8 @@ export default function ProveedoresPage() {
   const [newDireccion, setNewDireccion] = useState('');
   const [newNotas, setNewNotas] = useState('');
   const [editNombre, setEditNombre] = useState('');
+  const [editApellidoPaterno, setEditApellidoPaterno] = useState('');
+  const [editApellidoMaterno, setEditApellidoMaterno] = useState('');
   const [editTelefono, setEditTelefono] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editRFC, setEditRFC] = useState('');
@@ -208,6 +215,8 @@ export default function ProveedoresPage() {
         .insert({
           empresa_id: RDB_EMPRESA_ID,
           nombre: newNombre.trim(),
+          apellido_paterno: newApellidoPaterno.trim() || null,
+          apellido_materno: newApellidoMaterno.trim() || null,
           email: newEmail.trim() || null,
           telefono: newTelefono.trim() || null,
           rfc: newRFC.trim() || null,
@@ -228,6 +237,8 @@ export default function ProveedoresPage() {
 
       setCreateDrawerOpen(false);
       setNewNombre('');
+      setNewApellidoPaterno('');
+      setNewApellidoMaterno('');
       setNewContacto('');
       setNewTelefono('');
       setNewEmail('');
@@ -252,7 +263,7 @@ export default function ProveedoresPage() {
         .schema('erp')
         .from('proveedores')
         .select(
-          'id, persona_id, activo, created_at, updated_at, personas!persona_id(nombre, email, telefono, rfc)'
+          'id, persona_id, activo, created_at, updated_at, personas!persona_id(nombre, apellido_paterno, apellido_materno, email, telefono, rfc)'
         )
         .eq('empresa_id', RDB_EMPRESA_ID);
       if (err) throw err;
@@ -268,14 +279,25 @@ export default function ProveedoresPage() {
         .map((p) => {
           const persona = p.personas as {
             nombre: string;
+            apellido_paterno: string | null;
+            apellido_materno: string | null;
             email: string | null;
             telefono: string | null;
             rfc: string | null;
           } | null;
+          const nombreCompleto = persona
+            ? [persona.nombre, persona.apellido_paterno, persona.apellido_materno]
+                .filter((s) => s && s.trim())
+                .join(' ')
+                .trim()
+            : '';
           return {
             id: p.id,
             persona_id: p.persona_id,
-            nombre: persona?.nombre ?? '—',
+            nombre: nombreCompleto || '—',
+            nombre_raw: persona?.nombre ?? null,
+            apellido_paterno: persona?.apellido_paterno ?? null,
+            apellido_materno: persona?.apellido_materno ?? null,
             contacto: null,
             telefono: persona?.telefono ?? null,
             email: persona?.email ?? null,
@@ -315,7 +337,9 @@ export default function ProveedoresPage() {
   const activos = proveedores.filter((p) => p.activo).length;
 
   const openEdit = (p: Proveedor) => {
-    setEditNombre(p.nombre ?? '');
+    setEditNombre(p.nombre_raw ?? '');
+    setEditApellidoPaterno(p.apellido_paterno ?? '');
+    setEditApellidoMaterno(p.apellido_materno ?? '');
     setEditTelefono(p.telefono ?? '');
     setEditEmail(p.email ?? '');
     setEditRFC(p.rfc ?? '');
@@ -336,6 +360,8 @@ export default function ProveedoresPage() {
         .from('personas')
         .update({
           nombre: editNombre.trim(),
+          apellido_paterno: editApellidoPaterno.trim() || null,
+          apellido_materno: editApellidoMaterno.trim() || null,
           telefono: editTelefono.trim() || null,
           email: editEmail.trim() || null,
           rfc: editRFC.trim() || null,
@@ -557,9 +583,29 @@ export default function ProveedoresPage() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium leading-none">
-                    Razón Social / Nombre Comercial <span className="text-destructive">*</span>
+                    Nombre / Razón Social <span className="text-destructive">*</span>
                   </label>
                   <Input value={editNombre} onChange={(e) => setEditNombre(e.target.value)} />
+                  <p className="text-xs text-muted-foreground">
+                    Persona física: sólo el nombre de pila. Persona moral: razón social completa
+                    (apellidos vacíos).
+                  </p>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">Apellido paterno</label>
+                    <Input
+                      value={editApellidoPaterno}
+                      onChange={(e) => setEditApellidoPaterno(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">Apellido materno</label>
+                    <Input
+                      value={editApellidoMaterno}
+                      onChange={(e) => setEditApellidoMaterno(e.target.value)}
+                    />
+                  </div>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
@@ -605,13 +651,32 @@ export default function ProveedoresPage() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium leading-none">
-                    Razón Social / Nombre Comercial <span className="text-destructive">*</span>
+                    Nombre / Razón Social <span className="text-destructive">*</span>
                   </label>
                   <Input
                     value={newNombre}
                     onChange={(e) => setNewNombre(e.target.value)}
-                    placeholder="Ej. Comercializadora La Estrella"
+                    placeholder="Persona física: nombre de pila. Moral: razón social."
                   />
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">Apellido paterno</label>
+                    <Input
+                      value={newApellidoPaterno}
+                      onChange={(e) => setNewApellidoPaterno(e.target.value)}
+                      placeholder="Sólo personas físicas"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">Apellido materno</label>
+                    <Input
+                      value={newApellidoMaterno}
+                      onChange={(e) => setNewApellidoMaterno(e.target.value)}
+                      placeholder="Sólo personas físicas"
+                    />
+                  </div>
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
