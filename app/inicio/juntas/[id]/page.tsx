@@ -76,6 +76,7 @@ type Junta = {
   creado_por: string | null;
   created_at: string;
   updated_at: string | null;
+  fecha_terminada: string | null;
 };
 
 type Asistencia = {
@@ -387,12 +388,17 @@ function JuntaDetailInner() {
 
     const taskIds = (tasksData ?? []).map((t: any) => t.id);
     if (taskIds.length > 0) {
-      const { data: updatesData } = await supabase
+      let updatesQuery = supabase
         .schema('erp')
         .from('task_updates')
         .select('*')
         .in('task_id', taskIds)
+        .gte('created_at', juntaData.fecha_hora)
         .order('created_at', { ascending: false });
+      if (juntaData.fecha_terminada) {
+        updatesQuery = updatesQuery.lte('created_at', juntaData.fecha_terminada);
+      }
+      const { data: updatesData } = await updatesQuery;
       if (updatesData && updatesData.length > 0) {
         const userIds = [...new Set(updatesData.map((u: any) => u.creado_por).filter(Boolean))];
         const { data: usersData } =
@@ -634,12 +640,17 @@ function JuntaDetailInner() {
           setTasks(tasksData as JuntaTask[]);
           const tIds = tasksData.map((t: any) => t.id);
           if (tIds.length > 0) {
-            const { data: updData } = await supabase
+            let updQuery = supabase
               .schema('erp')
               .from('task_updates')
               .select('*')
               .in('task_id', tIds)
+              .gte('created_at', junta.fecha_hora)
               .order('created_at', { ascending: false });
+            if (junta.fecha_terminada) {
+              updQuery = updQuery.lte('created_at', junta.fecha_terminada);
+            }
+            const { data: updData } = await updQuery;
             if (updData) {
               const uIds = [...new Set(updData.map((u: any) => u.creado_por).filter(Boolean))];
               const { data: uData } =
