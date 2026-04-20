@@ -9,33 +9,14 @@ import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
-import {
-  getAdjuntoSignedUrl,
-  rewriteHtmlImagesToSigned,
-  normalizeHtmlImagesToPaths,
-} from '@/lib/adjuntos';
+import { rewriteHtmlImagesToSigned, normalizeHtmlImagesToPaths } from '@/lib/adjuntos';
 import { htmlHasCodaImages, importCodaImagesInHtml } from '@/lib/coda-paste-import';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Image from '@tiptap/extension-image';
 import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import {
-  Command,
-  CommandInput,
-  CommandList,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-} from '@/components/ui/command';
+import { Combobox } from '@/components/ui/combobox';
 import {
   Sheet,
   SheetContent,
@@ -74,7 +55,6 @@ import {
   Heading3,
   CheckCircle2,
   ImagePlus,
-  ChevronsUpDown,
   MessageSquarePlus,
   Clock,
 } from 'lucide-react';
@@ -222,62 +202,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Combobox({
-  value,
-  onChange,
-  options,
-  placeholder,
-  searchPlaceholder,
-  emptyText,
-  className,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  options: { id: string; label: string }[];
-  placeholder?: string;
-  searchPlaceholder?: string;
-  emptyText?: string;
-  className?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const selected = options.find((o) => o.id === value);
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        className={`flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--panel)] text-[var(--text)] px-3 h-9 text-sm hover:bg-[var(--panel)]/80 transition-colors ${className ?? 'w-full'}`}
-      >
-        <span className={`truncate ${selected ? '' : 'text-[var(--text)]/40'}`}>
-          {selected ? selected.label : (placeholder ?? 'Seleccionar...')}
-        </span>
-        <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-40" />
-      </PopoverTrigger>
-      <PopoverContent className="w-64 p-0" align="start">
-        <Command>
-          <CommandInput placeholder={searchPlaceholder ?? 'Buscar...'} />
-          <CommandList>
-            <CommandEmpty>{emptyText ?? 'Sin resultados'}</CommandEmpty>
-            <CommandGroup>
-              {options.map((o) => (
-                <CommandItem
-                  key={o.id}
-                  value={o.label}
-                  onSelect={() => {
-                    onChange(o.id);
-                    setOpen(false);
-                  }}
-                  data-checked={value === o.id}
-                >
-                  {o.label}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
+// Combobox local eliminado — ahora se usa el universal `@/components/ui/combobox`.
 
 function EditorToolbar({
   editor,
@@ -1119,7 +1044,7 @@ function JuntaDetailInner() {
 
   const empleadoMap = new Map(empleados.map((e) => [e.id, e]));
   const empleadoOptions = useMemo(
-    () => empleados.map((e) => ({ id: e.id, label: e.nombre })),
+    () => empleados.map((e) => ({ value: e.id, label: e.nombre })),
     [empleados]
   );
 
@@ -1128,7 +1053,7 @@ function JuntaDetailInner() {
     () =>
       personas
         .filter((p) => !addedPersonaIds.has(p.id))
-        .map((p) => ({ id: p.id, label: p.nombre })),
+        .map((p) => ({ value: p.id, label: p.nombre })),
     [personas, addedPersonaIds]
   );
 
@@ -1245,33 +1170,29 @@ function JuntaDetailInner() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <FieldLabel>Estado</FieldLabel>
-            <Select value={estado} onValueChange={(v) => setEstado(v as Junta['estado'])}>
-              <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(ESTADO_JUNTA).map(([k, v]) => (
-                  <SelectItem key={k} value={k}>
-                    {v.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Combobox
+              value={estado}
+              onChange={(v) => setEstado(v as Junta['estado'])}
+              options={Object.entries(ESTADO_JUNTA).map(([k, v]) => ({
+                value: k,
+                label: v.label,
+              }))}
+              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+            />
           </div>
           <div>
             <FieldLabel>Tipo</FieldLabel>
-            <Select value={tipo ?? ''} onValueChange={(v) => setTipo(v || '')}>
-              <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                <SelectValue placeholder="Sin tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                {TIPO_OPTIONS.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>
-                    {t.icon} {t.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Combobox
+              value={tipo ?? ''}
+              onChange={(v) => setTipo(v)}
+              options={TIPO_OPTIONS.map((t) => ({
+                value: t.value,
+                label: `${t.icon} ${t.label}`,
+              }))}
+              placeholder="Sin tipo"
+              allowClear
+              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+            />
           </div>
         </div>
         <div>
@@ -1696,21 +1617,17 @@ function JuntaDetailInner() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <FieldLabel>Cambiar estado</FieldLabel>
-                <Select
+                <Combobox
                   value={updateForm.nuevoEstado}
-                  onValueChange={(v) => setUpdateForm((f) => ({ ...f, nuevoEstado: v ?? '' }))}
-                >
-                  <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                    <SelectValue placeholder="Sin cambio" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(ESTADO_TASK).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>
-                        {v.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(v) => setUpdateForm((f) => ({ ...f, nuevoEstado: v }))}
+                  options={Object.entries(ESTADO_TASK).map(([k, v]) => ({
+                    value: k,
+                    label: v.label,
+                  }))}
+                  placeholder="Sin cambio"
+                  allowClear
+                  className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+                />
               </div>
               <div>
                 <FieldLabel>Cambiar fecha compromiso</FieldLabel>
@@ -1792,41 +1709,25 @@ function JuntaDetailInner() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <FieldLabel required>Prioridad</FieldLabel>
-                <Select
+                <Combobox
                   value={taskForm.prioridad}
-                  onValueChange={(v) => setTaskForm((f) => ({ ...f, prioridad: v ?? '' }))}
-                >
-                  <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                    <SelectValue placeholder="Seleccionar" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PRIORIDAD_OPTIONS.map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {p}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(v) => setTaskForm((f) => ({ ...f, prioridad: v }))}
+                  options={PRIORIDAD_OPTIONS.map((p) => ({ value: p, label: p }))}
+                  placeholder="Seleccionar"
+                  className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+                />
               </div>
               <div>
                 <FieldLabel>Estado</FieldLabel>
-                <Select
+                <Combobox
                   value={taskForm.estado}
-                  onValueChange={(v) =>
-                    setTaskForm((f) => ({ ...f, estado: v as JuntaTask['estado'] }))
-                  }
-                >
-                  <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(ESTADO_TASK).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>
-                        {v.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(v) => setTaskForm((f) => ({ ...f, estado: v as JuntaTask['estado'] }))}
+                  options={Object.entries(ESTADO_TASK).map(([k, v]) => ({
+                    value: k,
+                    label: v.label,
+                  }))}
+                  className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+                />
               </div>
             </div>
 
@@ -1838,6 +1739,7 @@ function JuntaDetailInner() {
                 options={empleadoOptions}
                 placeholder="Buscar responsable..."
                 searchPlaceholder="Escriba un nombre..."
+                allowClear
               />
             </div>
 

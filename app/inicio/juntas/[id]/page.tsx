@@ -15,13 +15,7 @@ import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Image from '@tiptap/extension-image';
 import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import {
   Sheet,
   SheetContent,
@@ -1011,33 +1005,29 @@ function JuntaDetailInner() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <FieldLabel>Estado</FieldLabel>
-            <Select value={estado} onValueChange={(v) => setEstado(v as Junta['estado'])}>
-              <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(ESTADO_JUNTA).map(([k, v]) => (
-                  <SelectItem key={k} value={k}>
-                    {v.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Combobox
+              value={estado}
+              onChange={(v) => setEstado(v as Junta['estado'])}
+              options={Object.entries(ESTADO_JUNTA).map(([k, v]) => ({
+                value: k,
+                label: v.label,
+              }))}
+              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+            />
           </div>
           <div>
             <FieldLabel>Tipo</FieldLabel>
-            <Select value={tipo ?? ''} onValueChange={(v) => setTipo(v || '')}>
-              <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                <SelectValue placeholder="Sin tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(TIPO_CONFIG).map(([k, v]) => (
-                  <SelectItem key={k} value={k}>
-                    {v}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Combobox
+              value={tipo ?? ''}
+              onChange={(v) => setTipo(v)}
+              options={Object.entries(TIPO_CONFIG).map(([k, v]) => ({
+                value: k,
+                label: String(v),
+              }))}
+              placeholder="Sin tipo"
+              allowClear
+              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+            />
           </div>
         </div>
 
@@ -1270,18 +1260,13 @@ function JuntaDetailInner() {
         {/* Add participant inline */}
         {showAddPersona && (
           <div className="mt-3 flex items-center gap-2 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-3">
-            <Select value={selectedPersonaId} onValueChange={(v) => setSelectedPersonaId(v ?? '')}>
-              <SelectTrigger className="flex-1 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                <SelectValue placeholder="Seleccionar persona..." />
-              </SelectTrigger>
-              <SelectContent>
-                {availablePersonas.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Combobox
+              value={selectedPersonaId}
+              onChange={setSelectedPersonaId}
+              options={availablePersonas.map((p) => ({ value: p.id, label: p.nombre }))}
+              placeholder="Seleccionar persona..."
+              className="flex-1 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+            />
             <Button
               size="sm"
               onClick={handleAddParticipant}
@@ -1475,21 +1460,17 @@ function JuntaDetailInner() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <FieldLabel>Cambiar estado</FieldLabel>
-                <Select
+                <Combobox
                   value={updateForm.nuevoEstado}
-                  onValueChange={(v) => setUpdateForm((f) => ({ ...f, nuevoEstado: v ?? '' }))}
-                >
-                  <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                    <SelectValue placeholder="Sin cambio" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(ESTADO_TASK).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>
-                        {v.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(v) => setUpdateForm((f) => ({ ...f, nuevoEstado: v }))}
+                  options={Object.entries(ESTADO_TASK).map(([k, v]) => ({
+                    value: k,
+                    label: v.label,
+                  }))}
+                  placeholder="Sin cambio"
+                  allowClear
+                  className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+                />
               </div>
               <div>
                 <FieldLabel>Cambiar fecha compromiso</FieldLabel>
@@ -1550,62 +1531,40 @@ function JuntaDetailInner() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <FieldLabel>Estado</FieldLabel>
-                <Select
+                <Combobox
                   value={taskForm.estado}
-                  onValueChange={(v) =>
-                    setTaskForm((f) => ({ ...f, estado: v as JuntaTask['estado'] }))
-                  }
-                >
-                  <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(ESTADO_TASK).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>
-                        {v.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(v) => setTaskForm((f) => ({ ...f, estado: v as JuntaTask['estado'] }))}
+                  options={Object.entries(ESTADO_TASK).map(([k, v]) => ({
+                    value: k,
+                    label: v.label,
+                  }))}
+                  className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+                />
               </div>
               <div>
                 <FieldLabel>Prioridad</FieldLabel>
-                <Select
+                <Combobox
                   value={taskForm.prioridad}
-                  onValueChange={(v) => setTaskForm((f) => ({ ...f, prioridad: v ?? '' }))}
-                >
-                  <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                    <SelectValue placeholder="Sin prioridad" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PRIORIDAD_OPTIONS.map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {p}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(v) => setTaskForm((f) => ({ ...f, prioridad: v }))}
+                  options={PRIORIDAD_OPTIONS.map((p) => ({ value: p, label: p }))}
+                  placeholder="Sin prioridad"
+                  allowClear
+                  className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+                />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <FieldLabel>Asignar a</FieldLabel>
-                <Select
+                <Combobox
                   value={taskForm.asignado_a}
-                  onValueChange={(v) => setTaskForm((f) => ({ ...f, asignado_a: v ?? '' }))}
-                >
-                  <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                    <SelectValue placeholder="Sin asignar" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {empleados.map((e) => (
-                      <SelectItem key={e.id} value={e.id}>
-                        {e.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(v) => setTaskForm((f) => ({ ...f, asignado_a: v }))}
+                  options={empleados.map((e) => ({ value: e.id, label: e.nombre }))}
+                  placeholder="Sin asignar"
+                  allowClear
+                  className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+                />
               </div>
               <div>
                 <FieldLabel>Fecha límite</FieldLabel>

@@ -26,14 +26,8 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { FilterCombobox, type FilterComboboxOption } from '@/components/ui/filter-combobox';
+import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { FieldLabel } from '@/components/ui/field-label';
@@ -694,18 +688,16 @@ function JuntasInner() {
           <div className="space-y-5 py-4">
             <div>
               <FieldLabel>Tipo de Junta *</FieldLabel>
-              <Select value={createTipo} onValueChange={(v) => setCreateTipo(v ?? '')}>
-                <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                  <SelectValue placeholder="Seleccionar tipo..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {TIPO_OPTIONS.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>
-                      {t.icon} {t.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                value={createTipo}
+                onChange={setCreateTipo}
+                options={TIPO_OPTIONS.map((t) => ({
+                  value: t.value,
+                  label: `${t.icon} ${t.label}`,
+                }))}
+                placeholder="Seleccionar tipo..."
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
 
             <div>
