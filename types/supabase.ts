@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.4"
+    PostgrestVersion: "14.5"
   }
   core: {
     Tables: {
@@ -78,6 +78,7 @@ export type Database = {
           created_at: string | null
           csf_fecha_emision: string | null
           csf_url: string | null
+          curp: string | null
           domicilio_calle: string | null
           domicilio_colonia: string | null
           domicilio_cp: string | null
@@ -86,6 +87,7 @@ export type Database = {
           domicilio_municipio: string | null
           domicilio_numero_ext: string | null
           domicilio_numero_int: string | null
+          email_fiscal: string | null
           escritura_constitutiva: Json | null
           escritura_poder: Json | null
           estatus_sat: string | null
@@ -104,6 +106,9 @@ export type Database = {
           representante_legal: string | null
           rfc: string | null
           slug: string
+          solo_fiscal: boolean
+          tipo_contribuyente: string
+          uso_cfdi_default: string | null
         }
         Insert: {
           activa?: boolean | null
@@ -111,6 +116,7 @@ export type Database = {
           created_at?: string | null
           csf_fecha_emision?: string | null
           csf_url?: string | null
+          curp?: string | null
           domicilio_calle?: string | null
           domicilio_colonia?: string | null
           domicilio_cp?: string | null
@@ -119,6 +125,7 @@ export type Database = {
           domicilio_municipio?: string | null
           domicilio_numero_ext?: string | null
           domicilio_numero_int?: string | null
+          email_fiscal?: string | null
           escritura_constitutiva?: Json | null
           escritura_poder?: Json | null
           estatus_sat?: string | null
@@ -137,6 +144,9 @@ export type Database = {
           representante_legal?: string | null
           rfc?: string | null
           slug: string
+          solo_fiscal?: boolean
+          tipo_contribuyente?: string
+          uso_cfdi_default?: string | null
         }
         Update: {
           activa?: boolean | null
@@ -144,6 +154,7 @@ export type Database = {
           created_at?: string | null
           csf_fecha_emision?: string | null
           csf_url?: string | null
+          curp?: string | null
           domicilio_calle?: string | null
           domicilio_colonia?: string | null
           domicilio_cp?: string | null
@@ -152,6 +163,7 @@ export type Database = {
           domicilio_municipio?: string | null
           domicilio_numero_ext?: string | null
           domicilio_numero_int?: string | null
+          email_fiscal?: string | null
           escritura_constitutiva?: Json | null
           escritura_poder?: Json | null
           estatus_sat?: string | null
@@ -170,6 +182,9 @@ export type Database = {
           representante_legal?: string | null
           rfc?: string | null
           slug?: string
+          solo_fiscal?: boolean
+          tipo_contribuyente?: string
+          uso_cfdi_default?: string | null
         }
         Relationships: []
       }
@@ -1756,6 +1771,7 @@ export type Database = {
           descripcion: string | null
           duracion_minutos: number | null
           empresa_id: string
+          enviar_a_consejo: boolean
           estado: string
           fecha_hora: string
           fecha_terminada: string | null
@@ -1771,6 +1787,7 @@ export type Database = {
           descripcion?: string | null
           duracion_minutos?: number | null
           empresa_id: string
+          enviar_a_consejo?: boolean
           estado?: string
           fecha_hora: string
           fecha_terminada?: string | null
@@ -1786,6 +1803,7 @@ export type Database = {
           descripcion?: string | null
           duracion_minutos?: number | null
           empresa_id?: string
+          enviar_a_consejo?: boolean
           estado?: string
           fecha_hora?: string
           fecha_terminada?: string | null
@@ -4034,33 +4052,6 @@ export type Database = {
           source_ip?: string | null
           status?: string | null
           workouts_count?: number | null
-        }
-        Relationships: []
-      }
-      health_ingest_snapshot_2025_pre: {
-        Row: {
-          captured_at: string | null
-          first_date: string | null
-          last_date: string | null
-          metric_name: string
-          rows_2025: number | null
-          rows_total: number | null
-        }
-        Insert: {
-          captured_at?: string | null
-          first_date?: string | null
-          last_date?: string | null
-          metric_name: string
-          rows_2025?: number | null
-          rows_total?: number | null
-        }
-        Update: {
-          captured_at?: string | null
-          first_date?: string | null
-          last_date?: string | null
-          metric_name?: string
-          rows_2025?: number | null
-          rows_total?: number | null
         }
         Relationships: []
       }
