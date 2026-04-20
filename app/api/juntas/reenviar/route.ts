@@ -4,12 +4,12 @@ import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { validateBody } from '@/lib/validation';
 import { buildMinutaEmailPayload, sendMinutaEmail } from '@/lib/juntas/email';
 
-const TerminarJuntaSchema = z.object({
+const ReenviarJuntaSchema = z.object({
   juntaId: z.string().uuid('juntaId must be a valid UUID'),
 });
 
 export async function POST(req: NextRequest) {
-  const parsed = await validateBody(req, TerminarJuntaSchema);
+  const parsed = await validateBody(req, ReenviarJuntaSchema);
   if (!parsed.ok) return parsed.response;
   const { juntaId } = parsed.data;
 
@@ -23,38 +23,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'RESEND_API_KEY not configured' }, { status: 500 });
   }
 
-  // Duración calculada contra created_at (arranque real) porque fecha_hora
-  // viene de un datetime-local sin timezone y frecuentemente está desfasado.
-  const { data: existing } = await supabase
+  const { data: junta, error: jErr } = await supabase
     .schema('erp')
     .from('juntas')
-    .select('fecha_hora, created_at')
+    .select('estado, fecha_terminada, duracion_minutos')
     .eq('id', juntaId)
     .single();
 
-  const now = new Date();
-  const startRef = existing?.created_at ?? existing?.fecha_hora;
-  const duracionMinutos = startRef
-    ? Math.round((now.getTime() - new Date(startRef as string).getTime()) / 60000)
-    : null;
-
-  const { error: jErr } = await supabase
-    .schema('erp')
-    .from('juntas')
-    .update({
-      estado: 'completada',
-      fecha_terminada: now.toISOString(),
-      ...(duracionMinutos && duracionMinutos > 0 ? { duracion_minutos: duracionMinutos } : {}),
-    })
-    .eq('id', juntaId);
-
-  if (jErr) {
-    return NextResponse.json({ error: jErr.message }, { status: 404 });
+  if (jErr || !junta) {
+    return NextResponse.json({ error: jErr?.message ?? 'Junta not found' }, { status: 404 });
   }
 
+  if (junta.estado !== 'completada') {
+    return NextResponse.json(
+      { error: 'Solo se puede reenviar una junta que ya fue completada.' },
+      { status: 400 }
+    );
+  }
+
+  const fechaTerminadaISO = (junta.fecha_terminada as string | null) ?? new Date().toISOString();
+
   const payload = await buildMinutaEmailPayload(supabase, juntaId, {
-    fechaTerminadaISO: now.toISOString(),
-    duracionMinutos,
+    fechaTerminadaISO,
+    duracionMinutos: (junta.duracion_minutos as number | null) ?? null,
   });
   if (!payload.ok) {
     return NextResponse.json({ error: payload.error }, { status: payload.status });
@@ -64,7 +55,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       emailsSent: 0,
-      warning: 'No attendee emails found – junta completada but no email sent.',
+      warning: 'No attendee emails found – no se envió el correo.',
     });
   }
 
