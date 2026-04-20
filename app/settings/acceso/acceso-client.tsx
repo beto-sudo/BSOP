@@ -37,13 +37,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -344,26 +338,16 @@ export function AccesoClient({
           {/* Company selector + new rol button */}
           <div className="flex items-center gap-3">
             <span className="text-sm dark:text-white/55 text-[var(--text)]/55">Empresa:</span>
-            <Select
+            <Combobox
               value={filterEmpresaId}
-              onValueChange={(v) => {
+              onChange={(v) => {
                 if (v) setFilterEmpresaId(v);
                 setSelectedRolId(null);
               }}
-            >
-              <SelectTrigger className="w-52">
-                <SelectValue placeholder="Selecciona empresa">
-                  {empresas.find((e) => e.id === filterEmpresaId)?.nombre ?? 'Selecciona empresa'}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {empresas.map((emp) => (
-                  <SelectItem key={emp.id} value={emp.id}>
-                    {emp.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              options={empresas.map((emp) => ({ value: emp.id, label: emp.nombre }))}
+              placeholder="Selecciona empresa"
+              className="w-52"
+            />
             {filterEmpresaId && (
               <Button
                 size="sm"
@@ -712,36 +696,27 @@ export function AccesoClient({
                                   <span className="text-xs dark:text-white/50 text-[var(--text)]/50">
                                     Rol base:
                                   </span>
-                                  <Select
-                                    value={ue.rol_id ?? '__none__'}
+                                  <Combobox
+                                    value={ue.rol_id ?? ''}
                                     disabled={isPending}
-                                    onValueChange={(v) => {
+                                    onChange={(v) => {
                                       run(() =>
                                         updateUsuarioEmpresaRol(
                                           selectedUsuario.id,
                                           emp.id,
-                                          v === '__none__' ? null : v
+                                          v || null
                                         )
                                       );
                                     }}
-                                  >
-                                    <SelectTrigger className="h-7 w-48 text-xs">
-                                      <SelectValue placeholder="Sin rol">
-                                        {ue.rol_id
-                                          ? (roles.find((r) => r.id === ue.rol_id)?.nombre ??
-                                            'Sin rol')
-                                          : 'Sin rol'}
-                                      </SelectValue>
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="__none__">Sin rol</SelectItem>
-                                      {empRoles.map((rol) => (
-                                        <SelectItem key={rol.id} value={rol.id}>
-                                          {rol.nombre}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
+                                    options={empRoles.map((rol) => ({
+                                      value: rol.id,
+                                      label: rol.nombre,
+                                    }))}
+                                    placeholder="Sin rol"
+                                    allowClear
+                                    size="sm"
+                                    className="w-48 text-xs"
+                                  />
                                 </div>
                               )}
                             </div>
@@ -792,45 +767,37 @@ export function AccesoClient({
                             <p className="text-xs dark:text-white/45 text-[var(--text)]/45">
                               Empresa
                             </p>
-                            <Select
+                            <Combobox
                               value={newExcEmpresaId}
-                              onValueChange={(v) => {
+                              onChange={(v) => {
                                 if (v) setNewExcEmpresaId(v);
                               }}
-                            >
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue placeholder="Empresa" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {empresas.map((emp) => (
-                                  <SelectItem key={emp.id} value={emp.id}>
-                                    {emp.nombre}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              options={empresas.map((emp) => ({
+                                value: emp.id,
+                                label: emp.nombre,
+                              }))}
+                              placeholder="Empresa"
+                              size="sm"
+                              className="text-xs"
+                            />
                           </div>
                           <div className="space-y-1">
                             <p className="text-xs dark:text-white/45 text-[var(--text)]/45">
                               Módulo
                             </p>
-                            <Select
+                            <Combobox
                               value={newExcModuloId}
-                              onValueChange={(v) => {
+                              onChange={(v) => {
                                 if (v) setNewExcModuloId(v);
                               }}
-                            >
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue placeholder="Módulo" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {modulos.map((mod) => (
-                                  <SelectItem key={mod.id} value={mod.id}>
-                                    {mod.nombre}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              options={modulos.map((mod) => ({
+                                value: mod.id,
+                                label: mod.nombre,
+                              }))}
+                              placeholder="Módulo"
+                              size="sm"
+                              className="text-xs"
+                            />
                           </div>
                         </div>
                         <div className="flex gap-4">

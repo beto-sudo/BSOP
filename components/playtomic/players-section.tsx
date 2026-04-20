@@ -1,12 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import {
   Table,
   TableBody,
@@ -49,20 +43,17 @@ export function PlayersSection({
               placeholder="Buscar jugador o correo…"
               className="sm:w-64"
             />
-            <Select
+            <Combobox
               value={playerSort}
-              onValueChange={(value) => onPlayerSortChange(value as PlayerSortKey)}
-            >
-              <SelectTrigger className="sm:w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="gasto">Ordenar por gasto</SelectItem>
-                <SelectItem value="reservas">Ordenar por reservas</SelectItem>
-                <SelectItem value="name">Ordenar por nombre</SelectItem>
-                <SelectItem value="sport">Ordenar por deporte</SelectItem>
-              </SelectContent>
-            </Select>
+              onChange={(value) => onPlayerSortChange(value as PlayerSortKey)}
+              options={[
+                { value: 'gasto', label: 'Ordenar por gasto' },
+                { value: 'reservas', label: 'Ordenar por reservas' },
+                { value: 'name', label: 'Ordenar por nombre' },
+                { value: 'sport', label: 'Ordenar por deporte' },
+              ]}
+              className="sm:w-48"
+            />
           </div>
         </div>
         <div className="overflow-hidden rounded-2xl border border-[var(--border)]">

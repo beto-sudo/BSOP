@@ -1,13 +1,7 @@
 import { CalendarDays, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { ESTADO_OPTIONS } from './types';
 
 export function CortesFilters({
@@ -37,18 +31,12 @@ export function CortesFilters({
 }) {
   return (
     <div className="flex flex-wrap items-end gap-3">
-      <Select value={estadoFilter} onValueChange={(v) => onEstadoChange(v ?? 'all')}>
-        <SelectTrigger className="w-44">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {ESTADO_OPTIONS.map((opt) => (
-            <SelectItem key={opt.value} value={opt.value}>
-              {opt.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <Combobox
+        value={estadoFilter}
+        onChange={(v) => onEstadoChange(v || 'all')}
+        options={ESTADO_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+        className="w-44"
+      />
 
       <div className="flex items-center gap-2">
         <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -68,23 +56,21 @@ export function CortesFilters({
           aria-label="Fecha hasta"
         />
       </div>
-      <Select value={presetKey} onValueChange={onPresetChange}>
-        <SelectTrigger className="w-[140px]">
-          <SelectValue placeholder="Rango..." />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="hoy">Hoy</SelectItem>
-          <SelectItem value="ayer">Ayer</SelectItem>
-          <SelectItem value="semana">Esta semana</SelectItem>
-          <SelectItem value="7dias">Últimos 7 días</SelectItem>
-          <SelectItem value="mes">Este mes</SelectItem>
-          <SelectItem value="30dias">Últimos 30 días</SelectItem>
-          <SelectItem value="ano">Este año</SelectItem>
-          <SelectItem value="custom" className="hidden">
-            Personalizado
-          </SelectItem>
-        </SelectContent>
-      </Select>
+      <Combobox
+        value={presetKey}
+        onChange={onPresetChange}
+        options={[
+          { value: 'hoy', label: 'Hoy' },
+          { value: 'ayer', label: 'Ayer' },
+          { value: 'semana', label: 'Esta semana' },
+          { value: '7dias', label: 'Últimos 7 días' },
+          { value: 'mes', label: 'Este mes' },
+          { value: '30dias', label: 'Últimos 30 días' },
+          { value: 'ano', label: 'Este año' },
+        ]}
+        placeholder="Rango..."
+        className="w-[140px]"
+      />
 
       <Button variant="outline" size="icon" onClick={onRefresh} aria-label="Actualizar">
         <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
