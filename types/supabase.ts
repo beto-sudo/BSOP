@@ -1,3 +1,14 @@
+// ==============================================================================
+// Auto-generated Supabase database types.
+// Last regenerated: 2026-04-20T09:04:30Z
+// Project ref: ybklderteyhuugzfmxbi
+// Schemas: public, core, erp, rdb, dilesa, playtomic
+//
+// DO NOT EDIT BY HAND. Regenerate via:
+//   - GitHub Actions: trigger 'DB Types' workflow manually
+//   - Local: npm run db:types (requiere supabase CLI + SUPABASE_ACCESS_TOKEN)
+// ==============================================================================
+
 export type Json =
   | string
   | number
@@ -10,7 +21,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.4"
+    PostgrestVersion: "14.5"
   }
   core: {
     Tables: {
@@ -78,6 +89,7 @@ export type Database = {
           created_at: string | null
           csf_fecha_emision: string | null
           csf_url: string | null
+          curp: string | null
           domicilio_calle: string | null
           domicilio_colonia: string | null
           domicilio_cp: string | null
@@ -86,6 +98,7 @@ export type Database = {
           domicilio_municipio: string | null
           domicilio_numero_ext: string | null
           domicilio_numero_int: string | null
+          email_fiscal: string | null
           escritura_constitutiva: Json | null
           escritura_poder: Json | null
           estatus_sat: string | null
@@ -104,6 +117,9 @@ export type Database = {
           representante_legal: string | null
           rfc: string | null
           slug: string
+          solo_fiscal: boolean
+          tipo_contribuyente: string
+          uso_cfdi_default: string | null
         }
         Insert: {
           activa?: boolean | null
@@ -111,6 +127,7 @@ export type Database = {
           created_at?: string | null
           csf_fecha_emision?: string | null
           csf_url?: string | null
+          curp?: string | null
           domicilio_calle?: string | null
           domicilio_colonia?: string | null
           domicilio_cp?: string | null
@@ -119,6 +136,7 @@ export type Database = {
           domicilio_municipio?: string | null
           domicilio_numero_ext?: string | null
           domicilio_numero_int?: string | null
+          email_fiscal?: string | null
           escritura_constitutiva?: Json | null
           escritura_poder?: Json | null
           estatus_sat?: string | null
@@ -137,6 +155,9 @@ export type Database = {
           representante_legal?: string | null
           rfc?: string | null
           slug: string
+          solo_fiscal?: boolean
+          tipo_contribuyente?: string
+          uso_cfdi_default?: string | null
         }
         Update: {
           activa?: boolean | null
@@ -144,6 +165,7 @@ export type Database = {
           created_at?: string | null
           csf_fecha_emision?: string | null
           csf_url?: string | null
+          curp?: string | null
           domicilio_calle?: string | null
           domicilio_colonia?: string | null
           domicilio_cp?: string | null
@@ -152,6 +174,7 @@ export type Database = {
           domicilio_municipio?: string | null
           domicilio_numero_ext?: string | null
           domicilio_numero_int?: string | null
+          email_fiscal?: string | null
           escritura_constitutiva?: Json | null
           escritura_poder?: Json | null
           estatus_sat?: string | null
@@ -170,6 +193,9 @@ export type Database = {
           representante_legal?: string | null
           rfc?: string | null
           slug?: string
+          solo_fiscal?: boolean
+          tipo_contribuyente?: string
+          uso_cfdi_default?: string | null
         }
         Relationships: []
       }
