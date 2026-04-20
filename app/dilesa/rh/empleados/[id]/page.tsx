@@ -736,11 +736,11 @@ function EmpleadoDetailInner() {
               <img
                 src={photoUrl}
                 alt={fullName(empleado)}
-                className="h-20 w-20 rounded-2xl border border-[var(--border)] object-cover shadow-sm"
+                className="h-32 w-32 rounded-2xl border border-[var(--border)] object-cover shadow-sm"
               />
             </a>
           ) : (
-            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent)]/15 text-3xl font-bold text-[var(--accent)]">
+            <div className="flex h-32 w-32 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent)]/15 text-5xl font-bold text-[var(--accent)]">
               {(titleCase(persona?.nombre ?? '').charAt(0) || '?').toUpperCase()}
             </div>
           )}
