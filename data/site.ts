@@ -102,21 +102,6 @@ export type TravelTrip = {
   todo: string[];
 };
 
-export type CodaDoc = {
-  slug: string;
-  name: string;
-  docId: string;
-  type: string;
-  tables: number;
-  lastAudit: string;
-  pages: number;
-  columns: number;
-  healthScore: number;
-  status: string;
-  note: string;
-  riskTables: string[];
-};
-
 export const personalContext = {
   title: 'Beto Santos Operations Platform',
   short: 'BSOP',
@@ -1382,83 +1367,9 @@ export function getTripBySlug(slug: string) {
   return travelTrips.find((trip) => trip.slug === slug);
 }
 
-export const codaDocs: CodaDoc[] = [
-  {
-    slug: 'dilesa',
-    name: 'DILESA',
-    docId: 'ZNxWl_DI2D',
-    type: 'real-estate-developer',
-    tables: 286,
-    lastAudit: '2026-03-12',
-    pages: 274,
-    columns: 4444,
-    healthScore: 0.6,
-    status: 'Stable foundation · scale complexity',
-    note: 'The largest operating model in the stack — broad, mature, and structurally ambitious.',
-    riskTables: ['Clientes', 'Inscrita', 'Asignada'],
-  },
-  {
-    slug: 'ansa',
-    name: 'ANSA',
-    docId: 'pnqM3j0Yal',
-    type: 'automotive-dealership',
-    tables: 59,
-    lastAudit: '2026-03-14',
-    pages: 76,
-    columns: 757,
-    healthScore: 0.3,
-    status: 'Lean doc · HR tables need attention',
-    note: 'Compact dealership operating core with a few concentrated risk tables around personnel workflows.',
-    riskTables: ['Personal', 'Alta Personal Autos del Norte S.A. de C.V.', 'Ex-Empleados'],
-  },
-  {
-    slug: 'ansa-ventas',
-    name: 'ANSA-Ventas',
-    docId: 'vVmCl2wBfC',
-    type: 'automotive-dealership',
-    tables: 77,
-    lastAudit: '2026-03-14',
-    pages: 74,
-    columns: 935,
-    healthScore: 0.3,
-    status: 'Commercial engine · customer table is the hotspot',
-    note: 'Sales-specific operating layer with most of the system healthy and one meaningful concentration of complexity.',
-    riskTables: ['Cliente', 'Avanzadas', 'Facturas Venta Unidades'],
-  },
-  {
-    slug: 'sr-group',
-    name: 'SR Group',
-    docId: 'MaXoDlRxXE',
-    type: 'family-wealth-hub',
-    tables: 58,
-    lastAudit: '2026-03-15',
-    pages: 43,
-    columns: 505,
-    healthScore: 0.1,
-    status: 'Cleanest architecture in the set',
-    note: 'A lightweight patrimonial control hub with very low structural friction and strong clarity.',
-    riskTables: ['Tipo de Ingreso', 'Movimientos Banamex'],
-  },
-  {
-    slug: 'rdb',
-    name: 'RDB',
-    docId: 'yvrM3UilPt',
-    type: 'sports-club',
-    tables: 59,
-    lastAudit: '2026-03-16',
-    pages: 57,
-    columns: 733,
-    healthScore: 0.2,
-    status: 'Operationally sharp · checkout workflows to watch',
-    note: 'Sports-club system with solid health overall and a few operational tables carrying extra weight.',
-    riskTables: ['Cortes de Caja', 'Pedidos Waitry', 'Requisiciones de Compra'],
-  },
-];
-
 export const navItems = [
   { href: '/', label: 'Overview' },
   { href: '/travel', label: 'Viajes' },
-  { href: '/coda', label: 'Coda Architect' },
   { href: '/usage', label: 'Usage' },
   { href: '/agents', label: 'Agents' },
 ];

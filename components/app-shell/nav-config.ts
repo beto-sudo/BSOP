@@ -61,18 +61,6 @@ export const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
-    href: '/coda',
-    labelKey: 'nav.coda',
-    icon: '📊',
-    children: [
-      { label: 'DILESA', href: '/coda/dilesa' },
-      { label: 'ANSA', href: '/coda/ansa' },
-      { label: 'ANSA-Ventas', href: '/coda/ansa-ventas' },
-      { label: 'SR Group', href: '/coda/sr-group' },
-      { label: 'RDB', href: '/coda/rdb' },
-    ],
-  },
-  {
     href: '/family',
     labelKey: 'Familia / Grupo SR',
     icon: 'SR_LOGO',
@@ -100,7 +88,6 @@ export const NAV_ITEMS: NavItem[] = [
 export const NAV_TO_EMPRESA: Record<string, string> = {
   '/dilesa': 'dilesa',
   '/rdb': 'rdb',
-  '/coda': 'coda',
   '/family': 'familia',
   '/settings': 'settings',
 };
