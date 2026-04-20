@@ -20,13 +20,7 @@ import { useState } from 'react';
 import { FileText, Image as ImageIcon, Loader2, Paperclip, Trash2, Upload } from 'lucide-react';
 
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 
 import type { Adjunto, AdjuntoRol } from './types';
@@ -210,16 +204,17 @@ export function AdjuntosSection({
       {!readOnly && (
         <div className="pt-2 border-t border-[var(--border)]">
           <div className="flex items-center gap-2 flex-wrap">
-            <Select value={uploadRole} onValueChange={(v) => setUploadRole(v as AdjuntoRol)}>
-              <SelectTrigger className="w-52 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)] text-xs h-8">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="documento_principal">📄 Documento principal</SelectItem>
-                <SelectItem value="imagen_referencia">🖼️ Imagen / Plano</SelectItem>
-                <SelectItem value="anexo">📎 Anexo</SelectItem>
-              </SelectContent>
-            </Select>
+            <Combobox
+              value={uploadRole}
+              onChange={(v) => setUploadRole(v as AdjuntoRol)}
+              options={[
+                { value: 'documento_principal', label: '📄 Documento principal' },
+                { value: 'imagen_referencia', label: '🖼️ Imagen / Plano' },
+                { value: 'anexo', label: '📎 Anexo' },
+              ]}
+              size="sm"
+              className="w-52 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)] text-xs"
+            />
             <label className="cursor-pointer">
               <input
                 type="file"

@@ -10,13 +10,7 @@
  */
 
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 
 import { FLabel } from './ui';
 
@@ -225,21 +219,20 @@ function PoderFields({ meta, onChange }: { meta: Meta; onChange: MetaChange }) {
       <div className="grid grid-cols-2 gap-3">
         <div>
           <FLabel>Tipo de Poder</FLabel>
-          <Select
-            value={v(meta, 'tipo_poder') || undefined}
-            onValueChange={(val) => onChange({ ...meta, tipo_poder: val })}
-          >
-            <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-              <SelectValue placeholder="Seleccionar..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="General">General</SelectItem>
-              <SelectItem value="Especial">Especial</SelectItem>
-              <SelectItem value="Pleitos y cobranzas">Pleitos y cobranzas</SelectItem>
-              <SelectItem value="Actos de administración">Actos de administración</SelectItem>
-              <SelectItem value="Actos de dominio">Actos de dominio</SelectItem>
-            </SelectContent>
-          </Select>
+          <Combobox
+            value={v(meta, 'tipo_poder')}
+            onChange={(val) => onChange({ ...meta, tipo_poder: val })}
+            options={[
+              { value: 'General', label: 'General' },
+              { value: 'Especial', label: 'Especial' },
+              { value: 'Pleitos y cobranzas', label: 'Pleitos y cobranzas' },
+              { value: 'Actos de administración', label: 'Actos de administración' },
+              { value: 'Actos de dominio', label: 'Actos de dominio' },
+            ]}
+            placeholder="Seleccionar..."
+            allowClear
+            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+          />
         </div>
         <div>
           <FLabel>Fecha del Poder</FLabel>
