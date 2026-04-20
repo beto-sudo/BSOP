@@ -27,14 +27,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { FilterCombobox } from '@/components/ui/filter-combobox';
+import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -505,41 +499,29 @@ function JuntasInner() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <FieldLabel>Tipo</FieldLabel>
-                <Select
+                <Combobox
                   value={createForm.tipo ?? ''}
-                  onValueChange={(v) => setCreateForm((f) => ({ ...f, tipo: v || '' }))}
-                >
-                  <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                    <SelectValue placeholder="Sin tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(TIPO_CONFIG).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>
-                        {v.icon} {v.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(v) => setCreateForm((f) => ({ ...f, tipo: v }))}
+                  options={Object.entries(TIPO_CONFIG).map(([k, v]) => ({
+                    value: k,
+                    label: `${v.icon} ${v.label}`,
+                  }))}
+                  placeholder="Sin tipo"
+                  allowClear
+                  className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+                />
               </div>
               <div>
                 <FieldLabel>Estado</FieldLabel>
-                <Select
+                <Combobox
                   value={createForm.estado}
-                  onValueChange={(v) =>
-                    setCreateForm((f) => ({ ...f, estado: v as Junta['estado'] }))
-                  }
-                >
-                  <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(ESTADO_CONFIG).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>
-                        {v.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(v) => setCreateForm((f) => ({ ...f, estado: v as Junta['estado'] }))}
+                  options={Object.entries(ESTADO_CONFIG).map(([k, v]) => ({
+                    value: k,
+                    label: v.label,
+                  }))}
+                  className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+                />
               </div>
             </div>
 

@@ -17,14 +17,8 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { FilterCombobox } from '@/components/ui/filter-combobox';
+import { Combobox } from '@/components/ui/combobox';
 import {
   Sheet,
   SheetContent,
@@ -482,20 +476,17 @@ export default function ProductosPage() {
                     <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                       Tipo
                     </label>
-                    <Select
+                    <Combobox
                       value={formCategoria || 'producto'}
-                      onValueChange={(v) => setFormCategoria(v ?? 'producto')}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar tipo..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="producto">Producto</SelectItem>
-                        <SelectItem value="servicio">Servicio</SelectItem>
-                        <SelectItem value="insumo">Insumo</SelectItem>
-                        <SelectItem value="refaccion">Refacción</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      onChange={(v) => setFormCategoria(v || 'producto')}
+                      options={[
+                        { value: 'producto', label: 'Producto' },
+                        { value: 'servicio', label: 'Servicio' },
+                        { value: 'insumo', label: 'Insumo' },
+                        { value: 'refaccion', label: 'Refacción' },
+                      ]}
+                      placeholder="Seleccionar tipo..."
+                    />
                   </div>
                 </div>
 
@@ -548,20 +539,17 @@ export default function ProductosPage() {
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium leading-none">Tipo</label>
-                  <Select
+                  <Combobox
                     value={newCategoria || 'producto'}
-                    onValueChange={(v) => setNewCategoria(v ?? 'producto')}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar tipo..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="producto">Producto</SelectItem>
-                      <SelectItem value="servicio">Servicio</SelectItem>
-                      <SelectItem value="insumo">Insumo</SelectItem>
-                      <SelectItem value="refaccion">Refacción</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    onChange={(v) => setNewCategoria(v || 'producto')}
+                    options={[
+                      { value: 'producto', label: 'Producto' },
+                      { value: 'servicio', label: 'Servicio' },
+                      { value: 'insumo', label: 'Insumo' },
+                      { value: 'refaccion', label: 'Refacción' },
+                    ]}
+                    placeholder="Seleccionar tipo..."
+                  />
                 </div>
 
                 {/* Inventariable Toggle */}

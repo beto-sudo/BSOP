@@ -27,13 +27,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -1238,18 +1232,15 @@ export default function RequisicionesPage() {
             />
           </div>
 
-          <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value ?? 'all')}>
-            <SelectTrigger className="w-48">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {STATUS_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Combobox
+            value={statusFilter}
+            onChange={(value) => setStatusFilter(value || 'all')}
+            options={STATUS_OPTIONS.map((option) => ({
+              value: option.value,
+              label: option.label,
+            }))}
+            className="w-48"
+          />
 
           <div className="flex items-center gap-2">
             <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -1275,23 +1266,21 @@ export default function RequisicionesPage() {
               aria-label="Fecha hasta"
             />
           </div>
-          <Select value={presetKey} onValueChange={handlePreset}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Rango..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="hoy">Hoy</SelectItem>
-              <SelectItem value="ayer">Ayer</SelectItem>
-              <SelectItem value="semana">Esta semana</SelectItem>
-              <SelectItem value="7dias">Últimos 7 días</SelectItem>
-              <SelectItem value="mes">Este mes</SelectItem>
-              <SelectItem value="30dias">Últimos 30 días</SelectItem>
-              <SelectItem value="ano">Este año</SelectItem>
-              <SelectItem value="custom" className="hidden">
-                Personalizado
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          <Combobox
+            value={presetKey}
+            onChange={handlePreset}
+            options={[
+              { value: 'hoy', label: 'Hoy' },
+              { value: 'ayer', label: 'Ayer' },
+              { value: 'semana', label: 'Esta semana' },
+              { value: '7dias', label: 'Últimos 7 días' },
+              { value: 'mes', label: 'Este mes' },
+              { value: '30dias', label: 'Últimos 30 días' },
+              { value: 'ano', label: 'Este año' },
+            ]}
+            placeholder="Rango..."
+            className="w-[140px]"
+          />
 
           <Button
             variant="outline"

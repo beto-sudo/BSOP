@@ -48,13 +48,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { FieldLabel } from '@/components/ui/field-label';
@@ -353,21 +347,14 @@ export function DepartamentosModule({
       </div>
       <div>
         <FieldLabel>Departamento padre</FieldLabel>
-        <Select
+        <Combobox
           value={form.padre_id}
-          onValueChange={(v) => setForm((f) => ({ ...f, padre_id: v ?? '' }))}
-        >
-          <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-            <SelectValue placeholder="Ninguno (nivel raíz)" />
-          </SelectTrigger>
-          <SelectContent>
-            {parentOptions.map((d) => (
-              <SelectItem key={d.id} value={d.id}>
-                {d.nombre}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          onChange={(v) => setForm((f) => ({ ...f, padre_id: v }))}
+          options={parentOptions.map((d) => ({ value: d.id, label: d.nombre }))}
+          placeholder="Ninguno (nivel raíz)"
+          allowClear
+          className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+        />
       </div>
     </div>
   );

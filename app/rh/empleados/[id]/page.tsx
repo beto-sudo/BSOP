@@ -7,7 +7,7 @@
  */
 
 import { RequireAccess } from '@/components/require-access';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import {
@@ -17,13 +17,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { FieldLabel } from '@/components/ui/field-label';
@@ -122,6 +116,24 @@ function EmpleadoDetailInner() {
   const [fechaNacimiento, setFechaNacimiento] = useState('');
   const [telefonoEmpresa, setTelefonoEmpresa] = useState('');
   const [extension, setExtension] = useState('');
+
+  const departamentoOptions = useMemo(() => {
+    const opts = departamentos.map((d) => ({ value: d.id, label: d.nombre }));
+    const current = empleado?.departamento;
+    if (current?.id && !opts.some((o) => o.value === current.id)) {
+      opts.unshift({ value: current.id, label: `${current.nombre} (inactivo)` });
+    }
+    return opts;
+  }, [departamentos, empleado?.departamento]);
+
+  const puestoOptions = useMemo(() => {
+    const opts = puestos.map((p) => ({ value: p.id, label: p.nombre }));
+    const current = empleado?.puesto;
+    if (current?.id && !opts.some((o) => o.value === current.id)) {
+      opts.unshift({ value: current.id, label: `${current.nombre} (inactivo)` });
+    }
+    return opts;
+  }, [puestos, empleado?.puesto]);
 
   // Baja dialog
   const [showBajaDialog, setShowBajaDialog] = useState(false);
@@ -345,33 +357,25 @@ function EmpleadoDetailInner() {
           </div>
           <div>
             <FieldLabel>Departamento</FieldLabel>
-            <Select value={departamentoId} onValueChange={(v) => setDepartamentoId(v ?? '')}>
-              <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                <SelectValue placeholder="Sin departamento" />
-              </SelectTrigger>
-              <SelectContent>
-                {departamentos.map((d) => (
-                  <SelectItem key={d.id} value={d.id}>
-                    {d.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Combobox
+              value={departamentoId}
+              onChange={setDepartamentoId}
+              options={departamentoOptions}
+              placeholder="Sin departamento"
+              allowClear
+              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+            />
           </div>
           <div>
             <FieldLabel>Puesto</FieldLabel>
-            <Select value={puestoId} onValueChange={(v) => setPuestoId(v ?? '')}>
-              <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                <SelectValue placeholder="Sin puesto" />
-              </SelectTrigger>
-              <SelectContent>
-                {puestos.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Combobox
+              value={puestoId}
+              onChange={setPuestoId}
+              options={puestoOptions}
+              placeholder="Sin puesto"
+              allowClear
+              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+            />
           </div>
           <div>
             <FieldLabel>Teléfono empresa</FieldLabel>

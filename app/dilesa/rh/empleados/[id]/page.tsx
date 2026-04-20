@@ -8,7 +8,7 @@
 
 import { RequireAccess } from '@/components/require-access';
 import { usePermissions } from '@/components/providers';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import { composeFullName, titleCase } from '@/lib/name-case';
@@ -21,13 +21,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { FieldLabel } from '@/components/ui/field-label';
@@ -444,6 +438,24 @@ function EmpleadoDetailInner() {
 
   // Beneficiarios (Art. 501 LFT)
   const [beneficiarios, setBeneficiarios] = useState<Beneficiario[]>([]);
+
+  const departamentoOptions = useMemo(() => {
+    const opts = departamentos.map((d) => ({ value: d.id, label: d.nombre }));
+    const current = empleado?.departamento;
+    if (current?.id && !opts.some((o) => o.value === current.id)) {
+      opts.unshift({ value: current.id, label: `${current.nombre} (inactivo)` });
+    }
+    return opts;
+  }, [departamentos, empleado?.departamento]);
+
+  const puestoOptions = useMemo(() => {
+    const opts = puestos.map((p) => ({ value: p.id, label: p.nombre }));
+    const current = empleado?.puesto;
+    if (current?.id && !opts.some((o) => o.value === current.id)) {
+      opts.unshift({ value: current.id, label: `${current.nombre} (inactivo)` });
+    }
+    return opts;
+  }, [puestos, empleado?.puesto]);
 
   const [showBajaDialog, setShowBajaDialog] = useState(false);
   const [motivoBaja, setMotivoBaja] = useState('');
@@ -893,33 +905,25 @@ function EmpleadoDetailInner() {
             </div>
             <div>
               <FieldLabel>Estado civil</FieldLabel>
-              <Select value={pEstadoCivil} onValueChange={(v) => setPEstadoCivil(v ?? '')}>
-                <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                  <SelectValue placeholder="Seleccionar…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ESTADO_CIVIL_OPTIONS.map((o) => (
-                    <SelectItem key={o} value={o}>
-                      {o}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                value={pEstadoCivil}
+                onChange={setPEstadoCivil}
+                options={ESTADO_CIVIL_OPTIONS.map((o) => ({ value: o, label: o }))}
+                placeholder="Seleccionar…"
+                allowClear
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
             <div>
               <FieldLabel>Sexo</FieldLabel>
-              <Select value={pSexo} onValueChange={(v) => setPSexo(v ?? '')}>
-                <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                  <SelectValue placeholder="Seleccionar…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {SEXO_OPTIONS.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                value={pSexo}
+                onChange={setPSexo}
+                options={SEXO_OPTIONS}
+                placeholder="Seleccionar…"
+                allowClear
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
             <div>
               <FieldLabel>RFC</FieldLabel>
@@ -1122,33 +1126,25 @@ function EmpleadoDetailInner() {
             </div>
             <div>
               <FieldLabel>Departamento</FieldLabel>
-              <Select value={departamentoId} onValueChange={(v) => setDepartamentoId(v ?? '')}>
-                <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                  <SelectValue placeholder="Sin departamento" />
-                </SelectTrigger>
-                <SelectContent>
-                  {departamentos.map((d) => (
-                    <SelectItem key={d.id} value={d.id}>
-                      {d.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                value={departamentoId}
+                onChange={setDepartamentoId}
+                options={departamentoOptions}
+                placeholder="Sin departamento"
+                allowClear
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
             <div>
               <FieldLabel>Puesto</FieldLabel>
-              <Select value={puestoId} onValueChange={(v) => setPuestoId(v ?? '')}>
-                <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                  <SelectValue placeholder="Sin puesto" />
-                </SelectTrigger>
-                <SelectContent>
-                  {puestos.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                value={puestoId}
+                onChange={setPuestoId}
+                options={puestoOptions}
+                placeholder="Sin puesto"
+                allowClear
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
             <div>
               <FieldLabel>Email empresa</FieldLabel>
@@ -1179,18 +1175,14 @@ function EmpleadoDetailInner() {
             </div>
             <div>
               <FieldLabel>Tipo de contrato</FieldLabel>
-              <Select value={tipoContrato} onValueChange={(v) => setTipoContrato(v ?? '')}>
-                <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                  <SelectValue placeholder="Seleccionar…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {TIPO_CONTRATO_OPTIONS.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                value={tipoContrato}
+                onChange={setTipoContrato}
+                options={TIPO_CONTRATO_OPTIONS}
+                placeholder="Seleccionar…"
+                allowClear
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
             {(tipoContrato === 'prueba' || tipoContrato === 'capacitacion_inicial') && (
               <>

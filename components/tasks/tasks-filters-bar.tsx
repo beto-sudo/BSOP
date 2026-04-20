@@ -18,7 +18,6 @@ import { FilterCombobox } from '@/components/ui/filter-combobox';
 import { Input } from '@/components/ui/input';
 
 import {
-  Combobox,
   ESTADO_CONFIG,
   PRIORIDAD_OPTIONS,
   type ComboboxOption,
@@ -115,7 +114,7 @@ export function TasksFiltersBar({
 
         {isRich ? (
           <>
-            <Combobox
+            <FilterCombobox
               value={filterEstado}
               onChange={onFilterEstadoChange}
               options={estadoOptions}
@@ -125,7 +124,7 @@ export function TasksFiltersBar({
               clearLabel="Todos"
               className="w-40"
             />
-            <Combobox
+            <FilterCombobox
               value={filterPrioridad}
               onChange={onFilterPrioridadChange}
               options={prioridadOptions}
@@ -135,7 +134,7 @@ export function TasksFiltersBar({
               clearLabel="Todas"
               className="w-36"
             />
-            <Combobox
+            <FilterCombobox
               value={filterAsignado}
               onChange={onFilterAsignadoChange}
               options={empleadoOptions}
@@ -145,7 +144,7 @@ export function TasksFiltersBar({
               clearLabel="Todos"
               className="w-48"
             />
-            <Combobox
+            <FilterCombobox
               value={filterDepto}
               onChange={onFilterDeptoChange}
               options={deptoOptions}

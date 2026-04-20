@@ -33,13 +33,7 @@ import {
 
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import { getAdjuntoProxyUrl } from '@/lib/adjuntos';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 
 type Adjunto = {
@@ -307,18 +301,15 @@ export function EmpleadoAdjuntos({
 
       {!readOnly && (
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[var(--border)]">
-          <Select value={uploadRole} onValueChange={(v) => setUploadRole(v ?? 'otro')}>
-            <SelectTrigger className="h-8 w-56 rounded-xl border-[var(--border)] bg-[var(--panel)] text-xs text-[var(--text)]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {EMPLEADO_ROLES.map((r) => (
-                <SelectItem key={r.id} value={r.id}>
-                  {r.icon} {r.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Combobox
+            value={uploadRole}
+            onChange={(v) => setUploadRole(v || 'otro')}
+            options={EMPLEADO_ROLES.map((r) => ({
+              value: r.id,
+              label: `${r.icon} ${r.label}`,
+            }))}
+            className="h-8 w-56 rounded-xl border-[var(--border)] bg-[var(--panel)] text-xs text-[var(--text)]"
+          />
           <label className="cursor-pointer">
             <input
               type="file"

@@ -12,13 +12,7 @@ import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FieldLabel } from '@/components/ui/field-label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Printer } from 'lucide-react';
 import {
@@ -263,18 +257,15 @@ function Inner() {
           </div>
           <div>
             <FieldLabel>Causa de terminación</FieldLabel>
-            <Select value={causa} onValueChange={(v) => setCausa(v as CausaTerminacion)}>
-              <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(CAUSA_LABELS).map(([k, label]) => (
-                  <SelectItem key={k} value={k}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Combobox
+              value={causa}
+              onChange={(v) => setCausa(v as CausaTerminacion)}
+              options={Object.entries(CAUSA_LABELS).map(([k, label]) => ({
+                value: k,
+                label,
+              }))}
+              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+            />
           </div>
           <div>
             <FieldLabel>Salario mínimo diario</FieldLabel>

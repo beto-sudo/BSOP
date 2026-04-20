@@ -47,14 +47,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { FilterCombobox } from '@/components/ui/filter-combobox';
+// Combobox queda disponible si se necesita en form fields (ver documento-form-fields.tsx).
 import { useSortableTable } from '@/hooks/use-sortable-table';
 
 import type { Adjunto, Documento, NotariaOption } from './types';

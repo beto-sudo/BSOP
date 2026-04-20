@@ -9,13 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import type { Caja } from './types';
 
 export type AbrirForm = {
@@ -84,21 +78,14 @@ export function AbrirCajaDialog({
                   {cajas.find((c) => c.id === form.caja_id)?.nombre || '—'}
                 </div>
               ) : (
-                <Select
+                <Combobox
                   value={form.caja_id}
-                  onValueChange={(v) => onFormChange((f) => ({ ...f, caja_id: v ?? '' }))}
-                >
-                  <SelectTrigger className="h-8 mt-1 border-muted-foreground/30 bg-background">
-                    <SelectValue placeholder="Selecciona tu caja…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {cajas.map((caja) => (
-                      <SelectItem key={caja.id} value={caja.id}>
-                        {caja.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(v) => onFormChange((f) => ({ ...f, caja_id: v }))}
+                  options={cajas.map((caja) => ({ value: caja.id, label: caja.nombre }))}
+                  placeholder="Selecciona tu caja…"
+                  allowClear
+                  className="mt-1 border-muted-foreground/30 bg-background"
+                />
               )}
             </div>
           </div>

@@ -47,14 +47,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { FilterCombobox } from '@/components/ui/filter-combobox';
+import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { FieldLabel } from '@/components/ui/field-label';
@@ -401,21 +395,14 @@ export function PuestosModule({
         </div>
         <div>
           <FieldLabel>Departamento</FieldLabel>
-          <Select
+          <Combobox
             value={form.departamento_id}
-            onValueChange={(v) => setForm((f) => ({ ...f, departamento_id: v ?? '' }))}
-          >
-            <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-              <SelectValue placeholder="Sin departamento" />
-            </SelectTrigger>
-            <SelectContent>
-              {departamentos.map((d) => (
-                <SelectItem key={d.id} value={d.id}>
-                  {d.nombre}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(v) => setForm((f) => ({ ...f, departamento_id: v }))}
+            options={departamentos.map((d) => ({ value: d.id, label: d.nombre }))}
+            placeholder="Sin departamento"
+            allowClear
+            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+          />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">

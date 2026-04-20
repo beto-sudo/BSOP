@@ -23,18 +23,11 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  Combobox,
   type ComboboxOption,
   type Empleado,
   type ErpTask,
@@ -119,50 +112,39 @@ function SimpleEditDialog({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <FieldLabel>Estado</FieldLabel>
-              <Select value={value.estado} onValueChange={(v) => set({ estado: v as TaskEstado })}>
-                <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(ESTADO_CONFIG).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>
-                      {v.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                value={value.estado}
+                onChange={(v) => set({ estado: v as TaskEstado })}
+                options={Object.entries(ESTADO_CONFIG).map(([k, v]) => ({
+                  value: k,
+                  label: v.label,
+                }))}
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
             <div>
               <FieldLabel>Prioridad</FieldLabel>
-              <Select value={value.prioridad} onValueChange={(v) => set({ prioridad: v ?? '' })}>
-                <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                  <SelectValue placeholder="Sin prioridad" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PRIORIDAD_OPTIONS.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {p}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                value={value.prioridad}
+                onChange={(v) => set({ prioridad: v })}
+                options={PRIORIDAD_OPTIONS.map((p) => ({ value: p, label: p }))}
+                placeholder="Sin prioridad"
+                allowClear
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <FieldLabel>Asignado a</FieldLabel>
-              <Select value={value.asignado_a} onValueChange={(v) => set({ asignado_a: v ?? '' })}>
-                <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                  <SelectValue placeholder="Sin asignar" />
-                </SelectTrigger>
-                <SelectContent>
-                  {empleados.map((e) => (
-                    <SelectItem key={e.id} value={e.id}>
-                      {e.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                value={value.asignado_a}
+                onChange={(v) => set({ asignado_a: v })}
+                options={empleados.map((e) => ({ value: e.id, label: e.nombre }))}
+                placeholder="Sin asignar"
+                allowClear
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
             <div>
               <FieldLabel>Fecha límite</FieldLabel>
@@ -259,22 +241,16 @@ function RichEditSheet({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <FieldLabel>Estado</FieldLabel>
-              <Select
+              <Combobox
                 value={value.estado}
-                onValueChange={(v) => set({ estado: v as TaskEstado })}
+                onChange={(v) => set({ estado: v as TaskEstado })}
+                options={Object.entries(ESTADO_CONFIG).map(([k, v]) => ({
+                  value: k,
+                  label: v.label,
+                }))}
                 disabled={!canCompleteTask}
-              >
-                <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(ESTADO_CONFIG).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>
-                      {v.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
               {!canCompleteTask && (
                 <p className="mt-1 text-[10px] text-[var(--text)]/40">
                   Solo dirección o el creador pueden cambiar el estado
@@ -283,18 +259,14 @@ function RichEditSheet({
             </div>
             <div>
               <FieldLabel>Prioridad</FieldLabel>
-              <Select value={value.prioridad} onValueChange={(v) => set({ prioridad: v ?? '' })}>
-                <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                  <SelectValue placeholder="Sin prioridad" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PRIORIDAD_OPTIONS.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {p}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                value={value.prioridad}
+                onChange={(v) => set({ prioridad: v })}
+                options={PRIORIDAD_OPTIONS.map((p) => ({ value: p, label: p }))}
+                placeholder="Sin prioridad"
+                allowClear
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
           </div>
 
@@ -315,10 +287,11 @@ function RichEditSheet({
             <FieldLabel>Responsable</FieldLabel>
             <Combobox
               value={value.asignado_a}
-              onChange={(v) => set({ asignado_a: v === 'all' ? '' : v })}
-              options={empleadoOptions}
+              onChange={(v) => set({ asignado_a: v })}
+              options={empleadoOptions.map((o) => ({ value: o.id, label: o.label }))}
               placeholder="Buscar responsable..."
               searchPlaceholder="Escriba un nombre..."
+              allowClear
             />
           </div>
 

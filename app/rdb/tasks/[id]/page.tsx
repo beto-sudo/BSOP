@@ -10,13 +10,7 @@ import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { FieldLabel } from '@/components/ui/field-label';
@@ -586,87 +580,43 @@ function TaskDetailInner() {
           {/* Estado */}
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
             <FieldLabel>Estado</FieldLabel>
-            <Select
+            <Combobox
               value={task.estado}
-              onValueChange={(v) => void patchTask({ estado: v as ErpTask['estado'] })}
-            >
-              <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                <SelectValue>
-                  <span
-                    className={`inline-flex items-center gap-1.5 ${estadoCfg.cls.includes('text-') ? estadoCfg.cls.split(' ').find((c: string) => c.startsWith('text-')) : ''}`}
-                  >
-                    {estadoCfg.label}
-                  </span>
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(ESTADO_CONFIG).map(([k, v]) => (
-                  <SelectItem key={k} value={k}>
-                    {v.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onChange={(v) => void patchTask({ estado: v as ErpTask['estado'] })}
+              options={Object.entries(ESTADO_CONFIG).map(([k, v]) => ({
+                value: k,
+                label: v.label,
+              }))}
+              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+            />
           </div>
 
           {/* Metadata */}
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 space-y-4">
             <div>
               <FieldLabel>Prioridad</FieldLabel>
-              <Select
+              <Combobox
                 value={task.prioridad ?? ''}
-                onValueChange={(v) => void patchTask({ prioridad: v || null } as any)}
-              >
-                <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                  <SelectValue placeholder="Sin prioridad">
-                    {task.prioridad ? (
-                      <span
-                        className={`inline-flex items-center gap-1.5 ${PRIORIDAD_CONFIG[task.prioridad]?.cls.split(' ').find((c: string) => c.startsWith('text-')) ?? ''}`}
-                      >
-                        {task.prioridad}
-                      </span>
-                    ) : (
-                      <span className="text-[var(--text)]/40">Sin prioridad</span>
-                    )}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Sin prioridad</SelectItem>
-                  {PRIORIDAD_OPTIONS.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {p}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(v) => void patchTask({ prioridad: (v || null) as any })}
+                options={PRIORIDAD_OPTIONS.map((p) => ({ value: p, label: p }))}
+                placeholder="Sin prioridad"
+                allowClear
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
 
             <Separator className="bg-[var(--border)]" />
 
             <div>
               <FieldLabel>Asignado a</FieldLabel>
-              <Select
+              <Combobox
                 value={task.asignado_a ?? ''}
-                onValueChange={(v) => void patchTask({ asignado_a: v || null })}
-              >
-                <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                  <SelectValue placeholder="Sin asignar">
-                    {asignado ? (
-                      asignado.nombre
-                    ) : (
-                      <span className="text-[var(--text)]/40">Sin asignar</span>
-                    )}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Sin asignar</SelectItem>
-                  {empleados.map((e) => (
-                    <SelectItem key={e.id} value={e.id}>
-                      {e.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(v) => void patchTask({ asignado_a: v || null })}
+                options={empleados.map((e) => ({ value: e.id, label: e.nombre }))}
+                placeholder="Sin asignar"
+                allowClear
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
 
             <Separator className="bg-[var(--border)]" />
@@ -739,22 +689,17 @@ function TaskDetailInner() {
 
             <div>
               <FieldLabel>Cambiar estado (opcional)</FieldLabel>
-              <Select
+              <Combobox
                 value={updateForm.nuevoEstado}
-                onValueChange={(v) => setUpdateForm((f) => ({ ...f, nuevoEstado: v ?? '' }))}
-              >
-                <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-                  <SelectValue placeholder="Sin cambio" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Sin cambio</SelectItem>
-                  {Object.entries(ESTADO_CONFIG).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>
-                      {v.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(v) => setUpdateForm((f) => ({ ...f, nuevoEstado: v }))}
+                options={Object.entries(ESTADO_CONFIG).map(([k, v]) => ({
+                  value: k,
+                  label: v.label,
+                }))}
+                placeholder="Sin cambio"
+                allowClear
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
             </div>
 
             <div>

@@ -15,13 +15,7 @@
 import type React from 'react';
 
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { Textarea } from '@/components/ui/textarea';
 
 import type { DocForm, NotariaOption } from './types';
@@ -42,7 +36,7 @@ export function DocFormFields({
   onOpenCreateNotaria: () => void;
 }) {
   const handleNotariaChange = (value: string | null) => {
-    if (!value || value === '__none__') {
+    if (!value) {
       setForm((f) => ({ ...f, notario_proveedor_id: '', notaria: '' }));
       return;
     }
@@ -78,20 +72,16 @@ export function DocFormFields({
       {/* Tipo selector — first, drives everything */}
       <div>
         <FLabel req>Tipo de documento</FLabel>
-        <Select value={form.tipo || undefined} onValueChange={handleTipoChange}>
-          <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-            <SelectValue placeholder="Seleccionar tipo..." />
-          </SelectTrigger>
-          <SelectContent>
-            {TIPOS_DOCUMENTO.map((t) => (
-              <SelectItem key={t.value} value={t.value}>
-                <span className="flex items-center gap-2">
-                  {t.icon} {t.label}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Combobox
+          value={form.tipo}
+          onChange={handleTipoChange}
+          options={TIPOS_DOCUMENTO.map((t) => ({
+            value: t.value,
+            label: `${t.icon} ${t.label}`,
+          }))}
+          placeholder="Seleccionar tipo..."
+          className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+        />
       </div>
 
       {/* Type-specific fields */}
@@ -164,22 +154,14 @@ export function DocFormFields({
               + Nueva notaría
             </button>
           </div>
-          <Select
-            value={form.notario_proveedor_id || '__none__'}
-            onValueChange={handleNotariaChange}
-          >
-            <SelectTrigger className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
-              <SelectValue placeholder="Seleccionar notaría" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none__">Sin asignar</SelectItem>
-              {notarias.map((n) => (
-                <SelectItem key={n.id} value={n.id}>
-                  {n.nombre}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Combobox
+            value={form.notario_proveedor_id}
+            onChange={(v) => handleNotariaChange(v || null)}
+            options={notarias.map((n) => ({ value: n.id, label: n.nombre }))}
+            placeholder="Seleccionar notaría"
+            allowClear
+            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+          />
         </div>
       )}
 
