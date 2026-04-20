@@ -59,7 +59,7 @@ import {
   Send,
 } from 'lucide-react';
 
-const EMPRESA_ID = '41c0b58f-5483-439b-aaa6-17b9d995697f';
+const EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
 
 type Junta = {
   id: string;
