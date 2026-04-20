@@ -43,6 +43,7 @@ type Junta = {
   titulo: string;
   descripcion: string | null;
   fecha_hora: string;
+  fecha_terminada: string | null;
   duracion_minutos: number | null;
   lugar: string | null;
   estado: JuntaEstado;
@@ -223,16 +224,15 @@ function JuntasInner() {
         .eq('empresa_id', EMPRESA_ID)
         .eq('entidad_tipo', 'junta')
         .limit(50000),
-      // task_updates para todas las tareas de junta de la empresa. Se hace un
-      // !inner join con tasks para poder filtrar por entidad_tipo='junta' y
-      // obtener la junta_id sin un segundo round-trip. Límite alto para que
-      // no se corte con el default de 1000 filas de PostgREST.
+      // task_updates de toda la empresa con su timestamp. Agrupamos por
+      // ventana de junta en cliente (misma lógica que el detalle): un update
+      // cuenta si su created_at cae entre fecha_hora y fecha_terminada de la
+      // junta, sin importar de qué tarea provenga.
       supabase
         .schema('erp')
         .from('task_updates')
-        .select('task_id, tasks!inner(entidad_id, entidad_tipo)')
+        .select('task_id, created_at')
         .eq('empresa_id', EMPRESA_ID)
-        .eq('tasks.entidad_tipo', 'junta')
         .limit(50000),
     ]);
     if (jRes.error) {
@@ -247,15 +247,13 @@ function JuntasInner() {
     });
     setAsistenciaCounts(aCounts);
 
-    // Map task_id → junta_id + total de tareas por junta + tally de
-    // terminadas (estado='completado') directamente desde erp.tasks.
-    const taskToJunta = new Map<string, string>();
+    // Total de tareas por junta + tally de terminadas (estado='completado')
+    // directamente desde erp.tasks.
     const tCounts = new Map<string, number>();
     const teCounts = new Map<string, number>();
     (tRes.data ?? []).forEach(
       (t: { id: string; entidad_id: string | null; estado: string | null }) => {
         if (!t.entidad_id) return;
-        taskToJunta.set(t.id, t.entidad_id);
         tCounts.set(t.entidad_id, (tCounts.get(t.entidad_id) ?? 0) + 1);
         if (t.estado === 'completado') {
           teCounts.set(t.entidad_id, (teCounts.get(t.entidad_id) ?? 0) + 1);
@@ -265,22 +263,24 @@ function JuntasInner() {
     setTaskCounts(tCounts);
     setTaskTerminadasCounts(teCounts);
 
-    // Avanzadas = # tareas distintas con ≥1 task_update durante la junta
-    // (cruzan en la sección "Actualizaciones de tareas" del detalle). Uso
-    // Set<task_id> para no duplicar cuando una tarea tiene varios updates.
-    const avanzadasPerJunta = new Map<string, Set<string>>();
-    (uRes.data ?? []).forEach((u: { task_id: string }) => {
-      const juntaId = taskToJunta.get(u.task_id);
-      if (!juntaId) return;
-      let aSet = avanzadasPerJunta.get(juntaId);
-      if (!aSet) {
-        aSet = new Set<string>();
-        avanzadasPerJunta.set(juntaId, aSet);
-      }
-      aSet.add(u.task_id);
-    });
+    // Avanzadas = # tareas distintas con ≥1 task_update dentro de la ventana
+    // de la junta [fecha_hora, fecha_terminada]. Misma definición que la
+    // sección "Actualizaciones de tareas" del detalle: cualquier tarea de la
+    // empresa actualizada en esa ventana — no tiene que pertenecer a esta
+    // junta. Para juntas sin fecha_terminada (en curso) la ventana es
+    // abierta hacia el futuro.
+    const updatesData = (uRes.data ?? []) as { task_id: string; created_at: string }[];
     const avCounts = new Map<string, number>();
-    for (const [j, s] of avanzadasPerJunta) avCounts.set(j, s.size);
+    for (const j of (jRes.data ?? []) as Junta[]) {
+      const startTs = new Date(j.fecha_hora).getTime();
+      const endTs = j.fecha_terminada ? new Date(j.fecha_terminada).getTime() : Infinity;
+      const taskSet = new Set<string>();
+      for (const u of updatesData) {
+        const ts = new Date(u.created_at).getTime();
+        if (ts >= startTs && ts <= endTs) taskSet.add(u.task_id);
+      }
+      if (taskSet.size > 0) avCounts.set(j.id, taskSet.size);
+    }
     setTaskAvanzadasCounts(avCounts);
   }, [supabase]);
 

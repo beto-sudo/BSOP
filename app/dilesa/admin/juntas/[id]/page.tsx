@@ -57,6 +57,7 @@ import {
   ImagePlus,
   MessageSquarePlus,
   Clock,
+  Send,
 } from 'lucide-react';
 
 type Junta = {
@@ -335,6 +336,8 @@ function JuntaDetailInner() {
 
   const [terminating, setTerminating] = useState(false);
   const [showTerminarDialog, setShowTerminarDialog] = useState(false);
+  const [reenviando, setReenviando] = useState(false);
+  const [showReenviarDialog, setShowReenviarDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [isDireccion, setIsDireccion] = useState(false);
@@ -1086,6 +1089,31 @@ function JuntaDetailInner() {
     }
   };
 
+  const handleReenviar = async () => {
+    if (!junta) return;
+    setReenviando(true);
+    try {
+      const res = await fetch('/api/juntas/reenviar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ juntaId: junta.id }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        alert(`Error al reenviar minuta: ${result.error ?? 'Error desconocido'}`);
+        return;
+      }
+      setShowReenviarDialog(false);
+      const emailMsg =
+        result.emailsSent > 0
+          ? `Minuta reenviada a ${result.emailsSent} participante(s).`
+          : (result.warning ?? 'No se envió el correo.');
+      alert(emailMsg);
+    } finally {
+      setReenviando(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!junta) return;
     setDeleting(true);
@@ -1215,6 +1243,21 @@ function JuntaDetailInner() {
             >
               <CheckCircle2 className="h-4 w-4" />
               Terminar junta
+            </Button>
+          )}
+          {estado === 'completada' && (
+            <Button
+              variant="outline"
+              onClick={() => setShowReenviarDialog(true)}
+              disabled={reenviando}
+              className="gap-1.5 rounded-xl border-[var(--accent)]/40 text-[var(--accent)] hover:bg-[var(--accent)]/10 hover:border-[var(--accent)]/60"
+            >
+              {reenviando ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+              Reenviar minuta
             </Button>
           )}
           <Button
@@ -1876,6 +1919,40 @@ function JuntaDetailInner() {
           </div>
         </SheetContent>
       </Sheet>
+
+      <Dialog open={showReenviarDialog} onOpenChange={setShowReenviarDialog}>
+        <DialogContent className="max-w-sm rounded-3xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
+          <DialogHeader>
+            <DialogTitle className="text-[var(--text)]">Reenviar minuta</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-[var(--text)]/70 pb-2">
+            Se enviará nuevamente la minuta por correo a los participantes con email registrado, con
+            el contenido actual de las notas, tareas y avances.
+          </p>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowReenviarDialog(false)}
+              disabled={reenviando}
+              className="rounded-xl border-[var(--border)] text-[var(--text)]"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleReenviar}
+              disabled={reenviando}
+              className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60"
+            >
+              {reenviando ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+              Sí, reenviar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showTerminarDialog} onOpenChange={setShowTerminarDialog}>
         <DialogContent className="max-w-sm rounded-3xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]">

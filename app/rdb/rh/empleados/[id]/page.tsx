@@ -26,7 +26,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, Save, Loader2, UserX, Pencil, X } from 'lucide-react';
 
-const EMPRESA_ID = '41c0b58f-5483-439b-aaa6-17b9d995697f';
+const EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
 const EMPRESA_SLUG = 'rdb';
 
 type Persona = {
