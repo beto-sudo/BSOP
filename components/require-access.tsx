@@ -12,7 +12,7 @@ import { useRef, type ReactNode } from 'react';
 
 interface RequireAccessProps {
   children: ReactNode;
-  /** Empresa slug to check (e.g. 'rdb', 'coda', 'familia') */
+  /** Empresa slug to check (e.g. 'rdb', 'dilesa', 'familia') */
   empresa?: string;
   /** Module slug to check (e.g. 'rdb.ventas') — requires read access by default */
   modulo?: string;

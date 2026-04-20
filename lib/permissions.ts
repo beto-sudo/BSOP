@@ -60,7 +60,6 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
 /** Maps a nav section href to its empresa slug */
 export const ROUTE_TO_EMPRESA: Record<string, string> = {
   '/rdb': 'rdb',
-  '/coda': 'coda',
   '/family': 'familia',
   '/travel': 'familia',
   '/health': 'familia',

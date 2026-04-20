@@ -32,7 +32,6 @@ function resolveModuleName(pathname: string): string {
   if (pathname.startsWith('/rdb/ordenes-compra')) return 'Órdenes de Compra';
   if (pathname.startsWith('/rdb/playtomic')) return 'Playtomic';
   if (pathname.startsWith('/rdb')) return 'RDB';
-  if (pathname.startsWith('/coda')) return 'Coda';
   if (pathname.startsWith('/travel')) return 'Viajes';
   if (pathname.startsWith('/health')) return 'Salud';
   if (pathname.startsWith('/family')) return 'Familia';
