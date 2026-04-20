@@ -63,6 +63,7 @@ export const ROUTE_TO_EMPRESA: Record<string, string> = {
   '/family': 'familia',
   '/travel': 'familia',
   '/health': 'familia',
+  '/personas-fisicas': 'personas_fisicas',
   '/settings': 'settings',
 };
 
