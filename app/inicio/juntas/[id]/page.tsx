@@ -108,6 +108,7 @@ type TaskUpdate = {
   creado_por: string | null;
   created_at: string;
   usuario?: { nombre: string } | null;
+  task_titulo?: string | null;
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -386,39 +387,43 @@ function JuntaDetailInner() {
 
     setTasks((tasksData ?? []) as JuntaTask[]);
 
-    const taskIds = (tasksData ?? []).map((t: any) => t.id);
-    if (taskIds.length > 0) {
-      let updatesQuery = supabase
-        .schema('erp')
-        .from('task_updates')
-        .select('*')
-        .in('task_id', taskIds)
-        .gte('created_at', juntaData.fecha_hora)
-        .order('created_at', { ascending: false });
-      if (juntaData.fecha_terminada) {
-        updatesQuery = updatesQuery.lte('created_at', juntaData.fecha_terminada);
-      }
-      const { data: updatesData } = await updatesQuery;
-      if (updatesData && updatesData.length > 0) {
-        const userIds = [...new Set(updatesData.map((u: any) => u.creado_por).filter(Boolean))];
-        const { data: usersData } =
-          userIds.length > 0
-            ? await supabase
-                .schema('core')
-                .from('usuarios')
-                .select('id, first_name')
-                .in('id', userIds)
-            : { data: [] };
-        const userMap = new Map((usersData ?? []).map((u: any) => [u.id, u.first_name]));
-        setTaskUpdates(
-          updatesData.map((u: any) => ({
-            ...u,
-            usuario: u.creado_por ? { nombre: userMap.get(u.creado_por) ?? 'Usuario' } : null,
-          }))
-        );
-      } else {
-        setTaskUpdates([]);
-      }
+    // Avances de CUALQUIER tarea de la empresa generados durante la ventana de
+    // la junta (desde fecha_hora; hasta fecha_terminada si ya cerró). Durante
+    // la junta se tocan tareas cuyo entidad_id es de OTRAS juntas; filtrar por
+    // task_id local dejaría fuera la mayoría.
+    let updatesQuery = supabase
+      .schema('erp')
+      .from('task_updates')
+      .select('*')
+      .eq('empresa_id', juntaData.empresa_id)
+      .gte('created_at', juntaData.fecha_hora)
+      .order('created_at', { ascending: false });
+    if (juntaData.fecha_terminada) {
+      updatesQuery = updatesQuery.lte('created_at', juntaData.fecha_terminada);
+    }
+    const { data: updatesData } = await updatesQuery;
+    if (updatesData && updatesData.length > 0) {
+      const userIds = [...new Set(updatesData.map((u: any) => u.creado_por).filter(Boolean))];
+      const uTaskIds = [...new Set(updatesData.map((u: any) => u.task_id).filter(Boolean))];
+      const [{ data: usersData }, { data: uTasksData }] = await Promise.all([
+        userIds.length > 0
+          ? supabase.schema('core').from('usuarios').select('id, first_name').in('id', userIds)
+          : Promise.resolve({ data: [] as any[] }),
+        uTaskIds.length > 0
+          ? supabase.schema('erp').from('tasks').select('id, titulo').in('id', uTaskIds)
+          : Promise.resolve({ data: [] as any[] }),
+      ]);
+      const userMap = new Map((usersData ?? []).map((u: any) => [u.id, u.first_name]));
+      const taskMap = new Map((uTasksData ?? []).map((t: any) => [t.id, t.titulo]));
+      setTaskUpdates(
+        updatesData.map((u: any) => ({
+          ...u,
+          usuario: u.creado_por ? { nombre: userMap.get(u.creado_por) ?? 'Usuario' } : null,
+          task_titulo: taskMap.get(u.task_id) ?? null,
+        }))
+      );
+    } else {
+      setTaskUpdates([]);
     }
 
     // Load personas for this empresa
@@ -638,38 +643,38 @@ function JuntaDetailInner() {
           .order('created_at');
         if (tasksData) {
           setTasks(tasksData as JuntaTask[]);
-          const tIds = tasksData.map((t: any) => t.id);
-          if (tIds.length > 0) {
-            let updQuery = supabase
-              .schema('erp')
-              .from('task_updates')
-              .select('*')
-              .in('task_id', tIds)
-              .gte('created_at', junta.fecha_hora)
-              .order('created_at', { ascending: false });
-            if (junta.fecha_terminada) {
-              updQuery = updQuery.lte('created_at', junta.fecha_terminada);
-            }
-            const { data: updData } = await updQuery;
-            if (updData) {
-              const uIds = [...new Set(updData.map((u: any) => u.creado_por).filter(Boolean))];
-              const { data: uData } =
-                uIds.length > 0
-                  ? await supabase
-                      .schema('core')
-                      .from('usuarios')
-                      .select('id, first_name')
-                      .in('id', uIds)
-                  : { data: [] };
-              const uMap = new Map((uData ?? []).map((u: any) => [u.id, u.first_name]));
-              setTaskUpdates(
-                updData.map((u: any) => ({
-                  ...u,
-                  usuario: u.creado_por ? { nombre: uMap.get(u.creado_por) ?? 'Usuario' } : null,
-                }))
-              );
-            }
-          }
+        }
+        let updQuery = supabase
+          .schema('erp')
+          .from('task_updates')
+          .select('*')
+          .eq('empresa_id', junta.empresa_id)
+          .gte('created_at', junta.fecha_hora)
+          .order('created_at', { ascending: false });
+        if (junta.fecha_terminada) {
+          updQuery = updQuery.lte('created_at', junta.fecha_terminada);
+        }
+        const { data: updData } = await updQuery;
+        if (updData) {
+          const uIds = [...new Set(updData.map((u: any) => u.creado_por).filter(Boolean))];
+          const uTaskIds = [...new Set(updData.map((u: any) => u.task_id).filter(Boolean))];
+          const [{ data: uData }, { data: uTasksData }] = await Promise.all([
+            uIds.length > 0
+              ? supabase.schema('core').from('usuarios').select('id, first_name').in('id', uIds)
+              : Promise.resolve({ data: [] as any[] }),
+            uTaskIds.length > 0
+              ? supabase.schema('erp').from('tasks').select('id, titulo').in('id', uTaskIds)
+              : Promise.resolve({ data: [] as any[] }),
+          ]);
+          const uMap = new Map((uData ?? []).map((u: any) => [u.id, u.first_name]));
+          const tMap = new Map((uTasksData ?? []).map((t: any) => [t.id, t.titulo]));
+          setTaskUpdates(
+            updData.map((u: any) => ({
+              ...u,
+              usuario: u.creado_por ? { nombre: uMap.get(u.creado_por) ?? 'Usuario' } : null,
+              task_titulo: tMap.get(u.task_id) ?? null,
+            }))
+          );
         }
         const { data: asistData } = await supabase
           .schema('erp')
@@ -1117,96 +1122,96 @@ function JuntaDetailInner() {
       </div>
 
       {/* ── Actualizaciones de tareas ─────────────────────────── */}
-      {tasks.length > 0 && (
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
-          <SectionTitle>Actualizaciones de tareas</SectionTitle>
-          {taskUpdates.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-6 text-center">
-              <Clock className="mb-2 h-8 w-8 text-[var(--text)]/20" />
-              <p className="text-sm text-[var(--text)]/50">No hay actualizaciones registradas</p>
-            </div>
-          ) : (
-            (() => {
-              const grouped = new Map<string, TaskUpdate[]>();
-              for (const u of taskUpdates) {
-                const arr = grouped.get(u.task_id) ?? [];
-                arr.push(u);
-                grouped.set(u.task_id, arr);
-              }
-              return (
-                <div className="space-y-4">
-                  {Array.from(grouped.entries()).map(([taskId, updates]) => {
-                    const task = tasks.find((t) => t.id === taskId);
-                    if (!task) return null;
-                    return (
-                      <div key={taskId} className="space-y-2">
-                        <p className="text-xs font-semibold text-[var(--text)]/50 uppercase tracking-wide">
-                          {task.titulo}
-                        </p>
-                        {updates.map((u) => {
-                          const tipoCfg: Record<string, { label: string; cls: string }> = {
-                            avance: {
-                              label: 'Avance',
-                              cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
-                            },
-                            cambio_estado: {
-                              label: 'Estado',
-                              cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
-                            },
-                            cambio_fecha: {
-                              label: 'Fecha',
-                              cls: 'bg-purple-500/15 text-purple-400 border-purple-500/20',
-                            },
-                            nota: {
-                              label: 'Nota',
-                              cls: 'bg-[var(--border)]/60 text-[var(--text)]/60 border-[var(--border)]',
-                            },
-                            cambio_responsable: {
-                              label: 'Responsable',
-                              cls: 'bg-teal-500/15 text-teal-400 border-teal-500/20',
-                            },
-                          };
-                          const tc = tipoCfg[u.tipo] ?? { label: u.tipo, cls: '' };
-                          return (
-                            <div
-                              key={u.id}
-                              className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2.5"
-                            >
-                              <div className="flex items-center gap-2 mb-1">
-                                <span
-                                  className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[10px] font-medium ${tc.cls}`}
-                                >
-                                  {tc.label}
-                                </span>
-                                <span className="text-[10px] text-[var(--text)]/40">
-                                  {u.usuario?.nombre ?? 'Sistema'}
-                                </span>
-                                <span className="text-[10px] text-[var(--text)]/30 ml-auto">
-                                  {formatDate(u.created_at)}
-                                </span>
-                              </div>
-                              {u.contenido && (
-                                <p className="text-sm text-[var(--text)]/80">{u.contenido}</p>
-                              )}
-                              {u.valor_anterior != null && u.valor_nuevo != null && (
-                                <p className="text-xs text-[var(--text)]/50">
-                                  {u.tipo === 'cambio_estado'
-                                    ? `${ESTADO_TASK[u.valor_anterior]?.label ?? u.valor_anterior} → ${ESTADO_TASK[u.valor_nuevo]?.label ?? u.valor_nuevo}`
-                                    : `${u.valor_anterior || '—'} → ${u.valor_nuevo || '—'}`}
-                                </p>
-                              )}
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
+        <SectionTitle>Actualizaciones de tareas</SectionTitle>
+        {taskUpdates.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-6 text-center">
+            <Clock className="mb-2 h-8 w-8 text-[var(--text)]/20" />
+            <p className="text-sm text-[var(--text)]/50">No hay actualizaciones registradas</p>
+          </div>
+        ) : (
+          (() => {
+            const grouped = new Map<string, TaskUpdate[]>();
+            for (const u of taskUpdates) {
+              const arr = grouped.get(u.task_id) ?? [];
+              arr.push(u);
+              grouped.set(u.task_id, arr);
+            }
+            return (
+              <div className="space-y-4">
+                {Array.from(grouped.entries()).map(([taskId, updates]) => {
+                  const titulo =
+                    updates[0]?.task_titulo ??
+                    tasks.find((t) => t.id === taskId)?.titulo ??
+                    'Tarea';
+                  return (
+                    <div key={taskId} className="space-y-2">
+                      <p className="text-xs font-semibold text-[var(--text)]/50 uppercase tracking-wide">
+                        {titulo}
+                      </p>
+                      {updates.map((u) => {
+                        const tipoCfg: Record<string, { label: string; cls: string }> = {
+                          avance: {
+                            label: 'Avance',
+                            cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
+                          },
+                          cambio_estado: {
+                            label: 'Estado',
+                            cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
+                          },
+                          cambio_fecha: {
+                            label: 'Fecha',
+                            cls: 'bg-purple-500/15 text-purple-400 border-purple-500/20',
+                          },
+                          nota: {
+                            label: 'Nota',
+                            cls: 'bg-[var(--border)]/60 text-[var(--text)]/60 border-[var(--border)]',
+                          },
+                          cambio_responsable: {
+                            label: 'Responsable',
+                            cls: 'bg-teal-500/15 text-teal-400 border-teal-500/20',
+                          },
+                        };
+                        const tc = tipoCfg[u.tipo] ?? { label: u.tipo, cls: '' };
+                        return (
+                          <div
+                            key={u.id}
+                            className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2.5"
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              <span
+                                className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[10px] font-medium ${tc.cls}`}
+                              >
+                                {tc.label}
+                              </span>
+                              <span className="text-[10px] text-[var(--text)]/40">
+                                {u.usuario?.nombre ?? 'Sistema'}
+                              </span>
+                              <span className="text-[10px] text-[var(--text)]/30 ml-auto">
+                                {formatDate(u.created_at)}
+                              </span>
                             </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })()
-          )}
-        </div>
-      )}
+                            {u.contenido && (
+                              <p className="text-sm text-[var(--text)]/80">{u.contenido}</p>
+                            )}
+                            {u.valor_anterior != null && u.valor_nuevo != null && (
+                              <p className="text-xs text-[var(--text)]/50">
+                                {u.tipo === 'cambio_estado'
+                                  ? `${ESTADO_TASK[u.valor_anterior]?.label ?? u.valor_anterior} → ${ESTADO_TASK[u.valor_nuevo]?.label ?? u.valor_nuevo}`
+                                  : `${u.valor_anterior || '—'} → ${u.valor_nuevo || '—'}`}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()
+        )}
+      </div>
 
       {/* Participants */}
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
