@@ -62,14 +62,19 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     href: '/family',
-    labelKey: 'Familia / Grupo SR',
-    icon: 'SR_LOGO',
+    labelKey: 'SANREN',
+    icon: 'SANREN_LOGO',
     matchPaths: ['/family', '/travel', '/health'],
     children: [
       { label: 'Viajes', href: '/travel' },
       { label: 'Salud', href: '/health' },
       { label: 'Familia', href: '/family' },
     ],
+  },
+  {
+    href: '/personas-fisicas',
+    labelKey: 'Personas Físicas',
+    icon: '🪪',
   },
   {
     href: '/settings',
@@ -89,6 +94,7 @@ export const NAV_TO_EMPRESA: Record<string, string> = {
   '/dilesa': 'dilesa',
   '/rdb': 'rdb',
   '/family': 'familia',
+  '/personas-fisicas': 'personas_fisicas',
   '/settings': 'settings',
 };
 

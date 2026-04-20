@@ -184,10 +184,10 @@ export function Sidebar({
                         alt="RDB"
                         className="h-5 w-5 object-contain rounded-sm"
                       />
-                    ) : item.icon === 'SR_LOGO' ? (
+                    ) : item.icon === 'SANREN_LOGO' ? (
                       <img
-                        src="/logo-familia-sr.jpg"
-                        alt="SR"
+                        src="/logos/sanren.png"
+                        alt="SANREN"
                         className="h-5 w-5 object-contain rounded-sm"
                       />
                     ) : (

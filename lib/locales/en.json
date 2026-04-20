@@ -6,7 +6,8 @@
   "nav.health": "Health",
   "nav.ai_operations": "AI Operations",
   "nav.documents": "Documents",
-  "nav.family": "Family / SR Group",
+  "nav.family": "SANREN",
+  "nav.personas_fisicas": "Individuals",
   "nav.settings": "Settings",
 
   "header.no_events": "No upcoming events",

@@ -34,7 +34,8 @@ function resolveModuleName(pathname: string): string {
   if (pathname.startsWith('/rdb')) return 'RDB';
   if (pathname.startsWith('/travel')) return 'Viajes';
   if (pathname.startsWith('/health')) return 'Salud';
-  if (pathname.startsWith('/family')) return 'Familia';
+  if (pathname.startsWith('/family')) return 'SANREN';
+  if (pathname.startsWith('/personas-fisicas')) return 'Personas Físicas';
   if (pathname.startsWith('/settings/acceso')) return 'Acceso';
   if (pathname.startsWith('/settings')) return 'Settings';
   return 'Overview';
