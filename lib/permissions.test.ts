@@ -121,8 +121,6 @@ describe('isAdminOnly', () => {
   });
 
   it('matches a child of an admin-only route', () => {
-    expect(isAdminOnly('/agents/foo')).toBe(true);
-    expect(isAdminOnly('/usage/2026')).toBe(true);
     expect(isAdminOnly('/rnd/experiments/42')).toBe(true);
   });
 
@@ -134,9 +132,7 @@ describe('isAdminOnly', () => {
   });
 
   it('does not match a prefix that only shares the first characters', () => {
-    // `/agents-admin` starts with `/agents` but isn't under the route.
-    expect(isAdminOnly('/agents-admin')).toBe(false);
-    expect(isAdminOnly('/usagelogs')).toBe(false);
+    expect(isAdminOnly('/rndx')).toBe(false);
   });
 
   it('treats empty string as not admin-only', () => {

@@ -30,10 +30,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isStandaloneSharePage = pathname.startsWith('/compartir/');
   const isAuthPage = pathname === '/login';
 
-  const { collapsed, setCollapsed, mobileOpen, setMobileOpen, now, user } = useShellState({
-    isAuthPage,
-    isStandaloneSharePage,
-  });
+  const { collapsed, setCollapsed, mobileOpen, setMobileOpen, now, user } = useShellState();
 
   // Close the mobile overlay whenever the route changes.
   useEffect(() => {

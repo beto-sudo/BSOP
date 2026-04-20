@@ -185,8 +185,6 @@ Lógica exclusiva de RDB que no aplica a otras empresas.
 | `health_ingest_log`  | 99     | Log de ingesta         | ✅                  |
 | `health_ecg`         | 0      | ECG                    | ✅                  |
 | `health_medications` | 0      | Medicamentos           | ✅                  |
-| `usage_messages`     | 500    | Mensajes OpenClaw      | ✅                  |
-| `usage_summary`      | 0      | Resumen de uso         | ✅                  |
 | `profile`            | 5      | Perfil de usuarios     | ✅                  |
 | `user_presence`      | 0      | Presencia              | 🟡 Sin uso          |
 | `trip_expenses`      | 0      | Gastos de viaje        | 🟡 Sin uso          |

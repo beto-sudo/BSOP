@@ -10,22 +10,14 @@ import type { AuthUser } from './nav-config';
  *   - mobile overlay open state
  *   - now() ticking clock
  *   - auth user (synced with Supabase session)
- *   - today's usage cost (polled every 2 min, skipped on auth/share pages)
  *
  * Kept as one hook because most of these are consumed together by the shell
  * composition and extracting them individually would just scatter imports.
  */
-export function useShellState({
-  isAuthPage,
-  isStandaloneSharePage,
-}: {
-  isAuthPage: boolean;
-  isStandaloneSharePage: boolean;
-}) {
+export function useShellState() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
-  const [costToday, setCostToday] = useState<number | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
 
   // Sidebar collapsed preference — hydrate from localStorage (or responsive default) on mount.
@@ -102,29 +94,6 @@ export function useShellState({
     return () => window.clearInterval(timer);
   }, []);
 
-  // Usage cost (skipped on auth/share pages).
-  useEffect(() => {
-    if (isAuthPage || isStandaloneSharePage) {
-      return;
-    }
-
-    let cancelled = false;
-    const fetchCost = () => {
-      fetch('/api/usage/summary', { cache: 'no-store' })
-        .then((res) => res.json())
-        .then((data) => {
-          if (!cancelled && data.summary) setCostToday(data.summary.cost_today ?? 0);
-        })
-        .catch(() => {});
-    };
-    fetchCost();
-    const costTimer = window.setInterval(fetchCost, 120_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(costTimer);
-    };
-  }, [isAuthPage, isStandaloneSharePage]);
-
   // Persist sidebar collapsed preference whenever it changes.
   useEffect(() => {
     window.localStorage.setItem('bsop-sidebar-collapsed', String(collapsed));
@@ -136,7 +105,6 @@ export function useShellState({
     mobileOpen,
     setMobileOpen,
     now,
-    costToday,
     user,
     setUser,
   };

@@ -68,7 +68,7 @@ export const ROUTE_TO_EMPRESA: Record<string, string> = {
 };
 
 /** These routes require admin (usuario.rol === 'admin') */
-export const ADMIN_ONLY_ROUTES = new Set(['/agents', '/usage', '/rnd']);
+export const ADMIN_ONLY_ROUTES = new Set(['/rnd']);
 
 // ── Fetcher ────────────────────────────────────────────────────────────────
 
