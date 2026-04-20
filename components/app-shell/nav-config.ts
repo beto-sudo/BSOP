@@ -61,6 +61,11 @@ export const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
+    href: '/personas-fisicas',
+    labelKey: 'Personas Físicas',
+    icon: '🪪',
+  },
+  {
     href: '/family',
     labelKey: 'SANREN',
     icon: 'SANREN_LOGO',
@@ -70,11 +75,6 @@ export const NAV_ITEMS: NavItem[] = [
       { label: 'Salud', href: '/health' },
       { label: 'Familia', href: '/family' },
     ],
-  },
-  {
-    href: '/personas-fisicas',
-    labelKey: 'Personas Físicas',
-    icon: '🪪',
   },
   {
     href: '/settings',
