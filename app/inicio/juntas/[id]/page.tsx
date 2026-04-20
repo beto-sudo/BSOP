@@ -391,17 +391,19 @@ function JuntaDetailInner() {
     // la junta (desde fecha_hora; hasta fecha_terminada si ya cerró). Durante
     // la junta se tocan tareas cuyo entidad_id es de OTRAS juntas; filtrar por
     // task_id local dejaría fuera la mayoría.
-    let updatesQuery = supabase
+    let updatesBuilder = supabase
       .schema('erp')
       .from('task_updates')
       .select('*')
       .eq('empresa_id', juntaData.empresa_id)
-      .gte('created_at', juntaData.fecha_hora)
-      .order('created_at', { ascending: false });
+      .gte('created_at', juntaData.fecha_hora);
     if (juntaData.fecha_terminada) {
-      updatesQuery = updatesQuery.lte('created_at', juntaData.fecha_terminada);
+      updatesBuilder = updatesBuilder.lte('created_at', juntaData.fecha_terminada);
     }
-    const { data: updatesData } = await updatesQuery;
+    const { data: updatesData, error: updatesErr } = await updatesBuilder.order('created_at', {
+      ascending: false,
+    });
+    if (updatesErr) console.error('[juntas] task_updates query error:', updatesErr);
     if (updatesData && updatesData.length > 0) {
       const userIds = [...new Set(updatesData.map((u: any) => u.creado_por).filter(Boolean))];
       const uTaskIds = [...new Set(updatesData.map((u: any) => u.task_id).filter(Boolean))];
@@ -644,17 +646,19 @@ function JuntaDetailInner() {
         if (tasksData) {
           setTasks(tasksData as JuntaTask[]);
         }
-        let updQuery = supabase
+        let updBuilder = supabase
           .schema('erp')
           .from('task_updates')
           .select('*')
           .eq('empresa_id', junta.empresa_id)
-          .gte('created_at', junta.fecha_hora)
-          .order('created_at', { ascending: false });
+          .gte('created_at', junta.fecha_hora);
         if (junta.fecha_terminada) {
-          updQuery = updQuery.lte('created_at', junta.fecha_terminada);
+          updBuilder = updBuilder.lte('created_at', junta.fecha_terminada);
         }
-        const { data: updData } = await updQuery;
+        const { data: updData, error: updErr } = await updBuilder.order('created_at', {
+          ascending: false,
+        });
+        if (updErr) console.error('[juntas poll] task_updates query error:', updErr);
         if (updData) {
           const uIds = [...new Set(updData.map((u: any) => u.creado_por).filter(Boolean))];
           const uTaskIds = [...new Set(updData.map((u: any) => u.task_id).filter(Boolean))];
