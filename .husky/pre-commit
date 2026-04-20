@@ -1,1 +1,21 @@
 npx lint-staged
+
+# Si se modificó algo que afecta el schema (migrations o SCHEMA_REF.md), y
+# SUPABASE_DB_URL está disponible localmente, verifica que SCHEMA_REF.md
+# esté al día. Se salta silenciosamente si falta la variable (ej. en un
+# checkout fresco sin credenciales).
+if git diff --cached --name-only | grep -qE '^(supabase/migrations/|supabase/SCHEMA_REF\.md$)'; then
+  if [ -n "$SUPABASE_DB_URL" ]; then
+    echo "→ schema:check (migrations tocadas)"
+    npm run schema:check --silent || {
+      echo ""
+      echo "⚠️  supabase/SCHEMA_REF.md está desactualizado."
+      echo "   Corre: npm run schema:ref && git add supabase/SCHEMA_REF.md"
+      exit 1
+    }
+  else
+    echo "⚠️  Saltando schema:check — SUPABASE_DB_URL no definida."
+    echo "   Agrégala a .env.local (ver .env.local.example) para validar"
+    echo "   que SCHEMA_REF.md coincide con la DB antes de commit."
+  fi
+fi
