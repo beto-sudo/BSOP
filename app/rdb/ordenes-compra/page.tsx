@@ -638,7 +638,7 @@ export default function OrdenesCompraPage() {
         .schema('erp')
         .from('ordenes_compra')
         .select(
-          'id, codigo, requisicion_id, proveedor_id, total, autorizada_at, created_at, proveedor:proveedores!proveedor_id(id, persona:personas!persona_id(nombre, email, telefono, rfc)), requisicion:requisiciones!requisicion_id(codigo)'
+          'id, codigo, requisicion_id, proveedor_id, total, autorizada_at, created_at, proveedor:proveedores!proveedor_id(id, persona:personas!persona_id(nombre, apellido_paterno, apellido_materno, email, telefono, rfc)), requisicion:requisiciones!requisicion_id(codigo)'
         )
         .eq('empresa_id', RDB_EMPRESA_ID)
         .order('created_at', { ascending: false });
@@ -660,11 +660,27 @@ export default function OrdenesCompraPage() {
         proveedor: unknown;
         requisicion: unknown;
       };
+      const buildNombre = (
+        p: {
+          nombre: string;
+          apellido_paterno: string | null;
+          apellido_materno: string | null;
+        } | null
+      ) => {
+        if (!p) return null;
+        const full = [p.nombre, p.apellido_paterno, p.apellido_materno]
+          .filter((s) => s && s.trim())
+          .join(' ')
+          .trim();
+        return full || null;
+      };
       const ordenesMapped: OrdenCompra[] = ((data ?? []) as unknown as RawOrden[]).map((o) => {
         const prov = o.proveedor as {
           id: string;
           persona: {
             nombre: string;
+            apellido_paterno: string | null;
+            apellido_materno: string | null;
             email: string | null;
             telefono: string | null;
             rfc: string | null;
@@ -674,7 +690,7 @@ export default function OrdenesCompraPage() {
         const proveedor: Proveedor | null = prov
           ? {
               id: prov.id,
-              nombre: persona?.nombre ?? null,
+              nombre: buildNombre(persona),
               email: persona?.email ?? null,
               telefono: persona?.telefono ?? null,
               rfc: persona?.rfc ?? null,
@@ -700,13 +716,17 @@ export default function OrdenesCompraPage() {
       const { data: provRaw } = await supabase
         .schema('erp')
         .from('proveedores')
-        .select('id, activo, persona:personas!persona_id(nombre, email, telefono, rfc)')
+        .select(
+          'id, activo, persona:personas!persona_id(nombre, apellido_paterno, apellido_materno, email, telefono, rfc)'
+        )
         .eq('empresa_id', RDB_EMPRESA_ID)
         .eq('activo', true);
       type RawProv = {
         id: string;
         persona: {
           nombre: string;
+          apellido_paterno: string | null;
+          apellido_materno: string | null;
           email: string | null;
           telefono: string | null;
           rfc: string | null;
@@ -717,7 +737,7 @@ export default function OrdenesCompraPage() {
           const persona = p.persona ?? null;
           return {
             id: p.id,
-            nombre: persona?.nombre ?? null,
+            nombre: buildNombre(persona),
             email: persona?.email ?? null,
             telefono: persona?.telefono ?? null,
             rfc: persona?.rfc ?? null,
