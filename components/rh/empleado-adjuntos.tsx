@@ -21,15 +21,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import {
-  FileText,
-  Image as ImageIcon,
-  Loader2,
-  Paperclip,
-  Trash2,
-  Upload,
-  Download,
-} from 'lucide-react';
+import { FileText, Loader2, Paperclip, Trash2, Upload, Download } from 'lucide-react';
 
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import { getAdjuntoProxyUrl } from '@/lib/adjuntos';
@@ -48,13 +40,15 @@ type Adjunto = {
 
 export const EMPLEADO_ROLES: Array<{ id: string; label: string; icon: string }> = [
   { id: 'foto', label: 'Fotografía', icon: '🖼️' },
+  { id: 'ine', label: 'Credencial de Elector (INE)', icon: '🪪' },
+  { id: 'curp', label: 'CURP', icon: '🆔' },
+  { id: 'acta_nacimiento', label: 'Acta de Nacimiento', icon: '📋' },
+  { id: 'comprobante_domicilio', label: 'Comprobante de Domicilio', icon: '🏠' },
+  { id: 'csf', label: 'Constancia de Situación Fiscal', icon: '🧾' },
+  { id: 'imss', label: 'IMSS', icon: '🏥' },
   { id: 'cv', label: 'Curriculum Vitae', icon: '📄' },
   { id: 'solicitud', label: 'Solicitud de Empleo', icon: '📝' },
   { id: 'constancia_estudios', label: 'Constancia de Estudios', icon: '🎓' },
-  { id: 'acta_nacimiento', label: 'Acta de Nacimiento', icon: '📋' },
-  { id: 'ine', label: 'Credencial de Elector (INE)', icon: '🪪' },
-  { id: 'curp', label: 'CURP', icon: '🆔' },
-  { id: 'imss', label: 'IMSS', icon: '🏥' },
   { id: 'licencia_conducir', label: 'Licencia de Conducir', icon: '🚗' },
   { id: 'finiquito', label: 'Finiquito', icon: '📑' },
   { id: 'otro', label: 'Otro', icon: '📎' },

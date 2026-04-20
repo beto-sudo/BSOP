@@ -27,7 +27,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Search, RefreshCw, Loader2, Users } from 'lucide-react';
+import { Plus, Search, RefreshCw, Users } from 'lucide-react';
 
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import { composeFullName, titleCase } from '@/lib/name-case';
@@ -41,22 +41,13 @@ import {
 } from '@/components/ui/table';
 import { SortableHead } from '@/components/ui/sortable-head';
 import { useSortableTable } from '@/hooks/use-sortable-table';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
 import { FilterCombobox } from '@/components/ui/filter-combobox';
-import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { FieldLabel } from '@/components/ui/field-label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RowActions } from '@/components/shared/row-actions';
 import { useToast } from '@/components/ui/toast';
+import { EmpleadoAltaWizard } from '@/components/rh/empleado-alta-wizard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -77,7 +68,6 @@ type Empleado = {
   puesto: { nombre: string } | null;
 };
 
-type Persona = { id: string; nombre: string; apellido_paterno: string | null };
 type Departamento = { id: string; nombre: string };
 type Puesto = { id: string; nombre: string };
 
@@ -110,7 +100,11 @@ export type EmpleadosModuleProps = {
   /** Optional subtitle. Defaults to "Directorio de personal". */
   subtitle?: string;
 
-  /** Use a Sheet (default) or a Dialog for the create form. */
+  /**
+   * Accepted for backwards compatibility with callers that still pass
+   * `createVariant`. El wizard de alta siempre usa Sheet porque 3 pasos
+   * con archivos no caben en un Dialog.
+   */
   createVariant?: 'sheet' | 'dialog';
 
   /** Show extra "No. Empleado" column (DILESA variant). */
@@ -158,7 +152,6 @@ export function EmpleadosModule({
   empresaSlug,
   title,
   subtitle = 'Directorio de personal',
-  createVariant = 'sheet',
   showNumeroEmpleadoColumn = false,
   showEstadoColumn = false,
   showDeptoFilter = false,
@@ -173,7 +166,6 @@ export function EmpleadosModule({
   );
 
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
-  const [personas, setPersonas] = useState<Persona[]>([]);
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
   const [puestos, setPuestos] = useState<Puesto[]>([]);
 
@@ -184,38 +176,6 @@ export function EmpleadosModule({
   const [filterDepto, setFilterDepto] = useState('all');
 
   const [showCreate, setShowCreate] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [createForm, setCreateForm] = useState({
-    // Campos de persona (separados para que Nombre/Apellidos siempre queden
-    // en columnas distintas — facilita matching y preserva el formato
-    // estándar Title Case de BSOP).
-    nombre: '',
-    apellido_paterno: '',
-    apellido_materno: '',
-    email: '',
-    telefono: '',
-    telefono_casa: '',
-    rfc: '',
-    curp: '',
-    nss: '',
-    fecha_nacimiento: '',
-    lugar_nacimiento: '',
-    nacionalidad: 'Mexicana',
-    estado_civil: '',
-    sexo: '',
-    domicilio: '',
-    contacto_emergencia_nombre: '',
-    contacto_emergencia_telefono: '',
-    contacto_emergencia_parentesco: '',
-    // Campos de empleado.
-    departamento_id: '',
-    puesto_id: '',
-    numero_empleado: '',
-    fecha_ingreso: '',
-    tipo_contrato: 'prueba',
-    horario: '',
-    lugar_trabajo: '',
-  });
 
   const fetchEmpresaIds = useCallback(async (): Promise<string[]> => {
     if (scope === 'empresa') return empresaId ? [empresaId] : [];
@@ -245,13 +205,12 @@ export function EmpleadosModule({
     async (ids: string[]) => {
       if (ids.length === 0) {
         setEmpleados([]);
-        setPersonas([]);
         setDepartamentos([]);
         setPuestos([]);
         return;
       }
 
-      const [empRes, personasRes, deptRes, puestosRes] = await Promise.all([
+      const [empRes, deptRes, puestosRes] = await Promise.all([
         supabase
           .schema('erp')
           .from('empleados')
@@ -261,14 +220,6 @@ export function EmpleadosModule({
           .in('empresa_id', ids)
           .is('deleted_at', null)
           .order('created_at', { ascending: false }),
-        supabase
-          .schema('erp')
-          .from('personas')
-          .select('id, nombre, apellido_paterno')
-          .in('empresa_id', ids)
-          .eq('activo', true)
-          .is('deleted_at', null)
-          .order('nombre'),
         supabase
           .schema('erp')
           .from('departamentos')
@@ -296,7 +247,6 @@ export function EmpleadosModule({
         puesto: Array.isArray(e.puesto) ? (e.puesto[0] ?? null) : e.puesto,
       })) as Empleado[];
       setEmpleados(normalized);
-      setPersonas((personasRes.data ?? []) as Persona[]);
       setDepartamentos((deptRes.data ?? []) as Departamento[]);
       setPuestos((puestosRes.data ?? []) as Puesto[]);
     },
@@ -320,133 +270,11 @@ export function EmpleadosModule({
     };
   }, [fetchEmpresaIds, fetchAll]);
 
-  const handleCreate = async () => {
-    const nombre = titleCase(createForm.nombre);
-    const apellidoPaterno = titleCase(createForm.apellido_paterno);
-    const apellidoMaterno = titleCase(createForm.apellido_materno);
-    if (!nombre) {
-      toast.add({ title: 'Falta el nombre', type: 'error' });
-      return;
-    }
+  const insertEmpresaId = empresaId ?? empresaIds[0] ?? null;
 
-    const insertEmpresaId = empresaId ?? empresaIds[0];
-    if (!insertEmpresaId) return;
-
-    setCreating(true);
-
-    // 1) Crear persona (o reusar si ya existe una con el mismo RFC para
-    //    evitar duplicados silenciosos).
-    const rfc = createForm.rfc.trim().toUpperCase();
-    let personaId: string | null = null;
-    if (rfc) {
-      const { data: existing } = await supabase
-        .schema('erp')
-        .from('personas')
-        .select('id')
-        .eq('empresa_id', insertEmpresaId)
-        .eq('rfc', rfc)
-        .is('deleted_at', null)
-        .maybeSingle();
-      if (existing?.id) personaId = existing.id as string;
-    }
-    if (!personaId) {
-      const { data: newP, error: pErr } = await supabase
-        .schema('erp')
-        .from('personas')
-        .insert({
-          empresa_id: insertEmpresaId,
-          nombre,
-          apellido_paterno: apellidoPaterno || null,
-          apellido_materno: apellidoMaterno || null,
-          email: createForm.email.trim().toLowerCase() || null,
-          telefono: createForm.telefono.trim() || null,
-          telefono_casa: createForm.telefono_casa.trim() || null,
-          rfc: rfc || null,
-          curp: createForm.curp.trim().toUpperCase() || null,
-          nss: createForm.nss.trim() || null,
-          fecha_nacimiento: createForm.fecha_nacimiento || null,
-          lugar_nacimiento: titleCase(createForm.lugar_nacimiento) || null,
-          nacionalidad: titleCase(createForm.nacionalidad) || 'Mexicana',
-          estado_civil: createForm.estado_civil || null,
-          sexo: createForm.sexo || null,
-          domicilio: createForm.domicilio.trim() || null,
-          contacto_emergencia_nombre: titleCase(createForm.contacto_emergencia_nombre) || null,
-          contacto_emergencia_telefono: createForm.contacto_emergencia_telefono.trim() || null,
-          contacto_emergencia_parentesco:
-            titleCase(createForm.contacto_emergencia_parentesco) || null,
-          tipo: 'empleado',
-          activo: true,
-        })
-        .select('id')
-        .single();
-      if (pErr || !newP) {
-        setCreating(false);
-        toast.add({
-          title: 'No se pudo crear la persona',
-          description: pErr?.message,
-          type: 'error',
-        });
-        return;
-      }
-      personaId = newP.id as string;
-    }
-
-    // 2) Crear empleado ligado a esa persona.
-    const payload = {
-      empresa_id: insertEmpresaId,
-      persona_id: personaId,
-      departamento_id: createForm.departamento_id || null,
-      puesto_id: createForm.puesto_id || null,
-      numero_empleado: createForm.numero_empleado.trim() || null,
-      fecha_ingreso: createForm.fecha_ingreso || null,
-      tipo_contrato: createForm.tipo_contrato || null,
-      periodo_prueba_dias: createForm.tipo_contrato === 'prueba' ? 30 : null,
-      periodo_prueba_numero: createForm.tipo_contrato === 'prueba' ? 1 : null,
-      horario: createForm.horario.trim() || null,
-      lugar_trabajo: createForm.lugar_trabajo.trim() || null,
-      activo: true,
-    };
-    const { data: newEmp, error: err } = await supabase
-      .schema('erp')
-      .from('empleados')
-      .insert(payload)
-      .select()
-      .single();
-    setCreating(false);
-    if (err) {
-      toast.add({ title: 'No se pudo crear el empleado', description: err.message, type: 'error' });
-      return;
-    }
-    setShowCreate(false);
-    setCreateForm({
-      nombre: '',
-      apellido_paterno: '',
-      apellido_materno: '',
-      email: '',
-      telefono: '',
-      telefono_casa: '',
-      rfc: '',
-      curp: '',
-      nss: '',
-      fecha_nacimiento: '',
-      lugar_nacimiento: '',
-      nacionalidad: 'Mexicana',
-      estado_civil: '',
-      sexo: '',
-      domicilio: '',
-      contacto_emergencia_nombre: '',
-      contacto_emergencia_telefono: '',
-      contacto_emergencia_parentesco: '',
-      departamento_id: '',
-      puesto_id: '',
-      numero_empleado: '',
-      fecha_ingreso: '',
-      tipo_contrato: 'prueba',
-      horario: '',
-      lugar_trabajo: '',
-    });
-    toast.add({ title: 'Empleado creado', type: 'success' });
-    if (newEmp) router.push(detailHref(empresaSlug, newEmp.id as string));
+  const handleEmpleadoCreated = async (empleadoId: string) => {
+    await fetchAll(empresaIds);
+    router.push(detailHref(empresaSlug, empleadoId));
   };
 
   const handleToggleActivo = async (emp: Empleado) => {
@@ -495,365 +323,6 @@ export function EmpleadosModule({
   });
 
   const { sortKey, sortDir, onSort, sortData } = useSortableTable('nombre', 'asc');
-
-  // Form body shared between Sheet and Dialog variants
-  const CreateFormBody = (
-    <div className="space-y-4 py-2">
-      {/* Persona — 3 campos separados. Title-case se aplica onBlur y al save. */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div>
-          <FieldLabel required>Nombre(s)</FieldLabel>
-          <Input
-            placeholder="Juan Carlos"
-            value={createForm.nombre}
-            onChange={(e) => setCreateForm((f) => ({ ...f, nombre: e.target.value }))}
-            onBlur={(e) => setCreateForm((f) => ({ ...f, nombre: titleCase(e.target.value) }))}
-            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-          />
-        </div>
-        <div>
-          <FieldLabel>Apellido paterno</FieldLabel>
-          <Input
-            placeholder="Pérez"
-            value={createForm.apellido_paterno}
-            onChange={(e) => setCreateForm((f) => ({ ...f, apellido_paterno: e.target.value }))}
-            onBlur={(e) =>
-              setCreateForm((f) => ({ ...f, apellido_paterno: titleCase(e.target.value) }))
-            }
-            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-          />
-        </div>
-        <div>
-          <FieldLabel>Apellido materno</FieldLabel>
-          <Input
-            placeholder="González"
-            value={createForm.apellido_materno}
-            onChange={(e) => setCreateForm((f) => ({ ...f, apellido_materno: e.target.value }))}
-            onBlur={(e) =>
-              setCreateForm((f) => ({ ...f, apellido_materno: titleCase(e.target.value) }))
-            }
-            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-          />
-        </div>
-      </div>
-
-      {createForm.nombre && (
-        <p className="text-[10px] text-[var(--text)]/40">
-          Nombre completo:{' '}
-          <span className="text-[var(--text)]/70">
-            {composeFullName(
-              createForm.nombre,
-              createForm.apellido_paterno,
-              createForm.apellido_materno
-            )}
-          </span>
-        </p>
-      )}
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <FieldLabel>Email personal</FieldLabel>
-          <Input
-            placeholder="correo@dominio.com"
-            value={createForm.email}
-            onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))}
-            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-          />
-        </div>
-        <div>
-          <FieldLabel>Teléfono personal</FieldLabel>
-          <Input
-            placeholder="(878) 000-0000"
-            value={createForm.telefono}
-            onChange={(e) => setCreateForm((f) => ({ ...f, telefono: e.target.value }))}
-            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div>
-          <FieldLabel>Teléfono casa</FieldLabel>
-          <Input
-            placeholder="(878) 000-0000"
-            value={createForm.telefono_casa}
-            onChange={(e) => setCreateForm((f) => ({ ...f, telefono_casa: e.target.value }))}
-            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-          />
-        </div>
-        <div>
-          <FieldLabel>Fecha de nacimiento</FieldLabel>
-          <Input
-            type="date"
-            value={createForm.fecha_nacimiento}
-            onChange={(e) => setCreateForm((f) => ({ ...f, fecha_nacimiento: e.target.value }))}
-            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-          />
-        </div>
-        <div>
-          <FieldLabel>Lugar de nacimiento</FieldLabel>
-          <Input
-            placeholder="Piedras Negras, Coahuila"
-            value={createForm.lugar_nacimiento}
-            onChange={(e) => setCreateForm((f) => ({ ...f, lugar_nacimiento: e.target.value }))}
-            onBlur={(e) =>
-              setCreateForm((f) => ({ ...f, lugar_nacimiento: titleCase(e.target.value) }))
-            }
-            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div>
-          <FieldLabel>Nacionalidad</FieldLabel>
-          <Input
-            value={createForm.nacionalidad}
-            onChange={(e) => setCreateForm((f) => ({ ...f, nacionalidad: e.target.value }))}
-            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-          />
-        </div>
-        <div>
-          <FieldLabel>Estado civil</FieldLabel>
-          <Combobox
-            value={createForm.estado_civil}
-            onChange={(v) => setCreateForm((f) => ({ ...f, estado_civil: v }))}
-            options={['Soltero/a', 'Casado/a', 'Unión libre', 'Divorciado/a', 'Viudo/a'].map(
-              (o) => ({ value: o, label: o })
-            )}
-            placeholder="Seleccionar…"
-            allowClear
-            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-          />
-        </div>
-        <div>
-          <FieldLabel>Sexo</FieldLabel>
-          <Combobox
-            value={createForm.sexo}
-            onChange={(v) => setCreateForm((f) => ({ ...f, sexo: v }))}
-            options={[
-              { value: 'M', label: 'Masculino' },
-              { value: 'F', label: 'Femenino' },
-              { value: 'X', label: 'Otro / No especifica' },
-            ]}
-            placeholder="Seleccionar…"
-            allowClear
-            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div>
-          <FieldLabel>RFC</FieldLabel>
-          <Input
-            placeholder="XXXX000000XXX"
-            value={createForm.rfc}
-            onChange={(e) => setCreateForm((f) => ({ ...f, rfc: e.target.value.toUpperCase() }))}
-            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)] font-mono"
-          />
-          <p className="mt-1 text-[10px] text-[var(--text)]/40">
-            Si ya existe una persona con este RFC, se reutiliza.
-          </p>
-        </div>
-        <div>
-          <FieldLabel>CURP</FieldLabel>
-          <Input
-            placeholder="XXXX000000XXXXXX00"
-            value={createForm.curp}
-            onChange={(e) => setCreateForm((f) => ({ ...f, curp: e.target.value.toUpperCase() }))}
-            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)] font-mono"
-          />
-        </div>
-        <div>
-          <FieldLabel>NSS</FieldLabel>
-          <Input
-            placeholder="00000000000"
-            value={createForm.nss}
-            onChange={(e) => setCreateForm((f) => ({ ...f, nss: e.target.value }))}
-            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)] font-mono"
-          />
-        </div>
-      </div>
-
-      <div>
-        <FieldLabel>Domicilio</FieldLabel>
-        <Input
-          placeholder="Calle, número, colonia, C.P., ciudad, estado"
-          value={createForm.domicilio}
-          onChange={(e) => setCreateForm((f) => ({ ...f, domicilio: e.target.value }))}
-          className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-        />
-      </div>
-
-      <div className="pt-3 border-t border-[var(--border)]">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/40 mb-2">
-          Contacto de emergencia
-        </p>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div>
-            <FieldLabel>Nombre</FieldLabel>
-            <Input
-              placeholder="Nombre completo"
-              value={createForm.contacto_emergencia_nombre}
-              onChange={(e) =>
-                setCreateForm((f) => ({ ...f, contacto_emergencia_nombre: e.target.value }))
-              }
-              onBlur={(e) =>
-                setCreateForm((f) => ({
-                  ...f,
-                  contacto_emergencia_nombre: titleCase(e.target.value),
-                }))
-              }
-              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-            />
-          </div>
-          <div>
-            <FieldLabel>Parentesco</FieldLabel>
-            <Input
-              placeholder="Esposa, madre…"
-              value={createForm.contacto_emergencia_parentesco}
-              onChange={(e) =>
-                setCreateForm((f) => ({
-                  ...f,
-                  contacto_emergencia_parentesco: e.target.value,
-                }))
-              }
-              onBlur={(e) =>
-                setCreateForm((f) => ({
-                  ...f,
-                  contacto_emergencia_parentesco: titleCase(e.target.value),
-                }))
-              }
-              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-            />
-          </div>
-          <div>
-            <FieldLabel>Teléfono</FieldLabel>
-            <Input
-              placeholder="(878) 000-0000"
-              value={createForm.contacto_emergencia_telefono}
-              onChange={(e) =>
-                setCreateForm((f) => ({
-                  ...f,
-                  contacto_emergencia_telefono: e.target.value,
-                }))
-              }
-              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <FieldLabel>Departamento</FieldLabel>
-          <Combobox
-            value={createForm.departamento_id}
-            onChange={(v) => setCreateForm((f) => ({ ...f, departamento_id: v }))}
-            options={departamentos.map((d) => ({ value: d.id, label: d.nombre }))}
-            placeholder="Sin departamento"
-            allowClear
-            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-          />
-        </div>
-        <div>
-          <FieldLabel>Puesto</FieldLabel>
-          <Combobox
-            value={createForm.puesto_id}
-            onChange={(v) => setCreateForm((f) => ({ ...f, puesto_id: v }))}
-            options={puestos.map((p) => ({ value: p.id, label: p.nombre }))}
-            placeholder="Sin puesto"
-            allowClear
-            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-          />
-        </div>
-      </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <FieldLabel>No. Empleado</FieldLabel>
-          <Input
-            placeholder="Ej: EMP-001"
-            value={createForm.numero_empleado}
-            onChange={(e) => setCreateForm((f) => ({ ...f, numero_empleado: e.target.value }))}
-            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-          />
-        </div>
-        <div>
-          <FieldLabel>Fecha de ingreso</FieldLabel>
-          <Input
-            type="date"
-            value={createForm.fecha_ingreso}
-            onChange={(e) => setCreateForm((f) => ({ ...f, fecha_ingreso: e.target.value }))}
-            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-          />
-        </div>
-      </div>
-
-      <div>
-        <FieldLabel>Tipo de contrato</FieldLabel>
-        <Combobox
-          value={createForm.tipo_contrato}
-          onChange={(v) => setCreateForm((f) => ({ ...f, tipo_contrato: v || 'prueba' }))}
-          options={[
-            { value: 'prueba', label: 'Periodo de prueba (default DILESA)' },
-            { value: 'indefinido', label: 'Tiempo indefinido / Planta' },
-            { value: 'determinado', label: 'Tiempo determinado' },
-            { value: 'obra', label: 'Obra determinada' },
-            { value: 'temporada', label: 'Temporada' },
-            { value: 'capacitacion_inicial', label: 'Capacitación inicial' },
-          ]}
-          placeholder="Seleccionar…"
-          className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-        />
-        {createForm.tipo_contrato === 'prueba' && (
-          <p className="mt-1 text-[10px] text-[var(--text)]/40">
-            Por defecto 30 días, prueba 1 de 3. Ajusta después en la ficha si es necesario.
-          </p>
-        )}
-      </div>
-
-      <div>
-        <FieldLabel>Horario y jornada</FieldLabel>
-        <Input
-          placeholder="Lun-Vie 8:00-17:00, 1h comida (48 h/sem)"
-          value={createForm.horario}
-          onChange={(e) => setCreateForm((f) => ({ ...f, horario: e.target.value }))}
-          className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-        />
-      </div>
-
-      <div>
-        <FieldLabel>Lugar(es) de trabajo</FieldLabel>
-        <Input
-          placeholder="Oficinas DILESA Piedras Negras"
-          value={createForm.lugar_trabajo}
-          onChange={(e) => setCreateForm((f) => ({ ...f, lugar_trabajo: e.target.value }))}
-          className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-        />
-      </div>
-    </div>
-  );
-
-  const CreateActions = (
-    <>
-      <Button
-        variant="outline"
-        onClick={() => setShowCreate(false)}
-        className="rounded-xl border-[var(--border)] text-[var(--text)]"
-      >
-        Cancelar
-      </Button>
-      <Button
-        onClick={handleCreate}
-        disabled={creating || !createForm.nombre.trim()}
-        className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60"
-      >
-        {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-        Crear
-      </Button>
-    </>
-  );
 
   return (
     <div className="space-y-6">
@@ -1097,30 +566,19 @@ export function EmpleadosModule({
         </p>
       )}
 
-      {/* Create form — Sheet or Dialog */}
-      {createVariant === 'sheet' ? (
-        <Sheet open={showCreate} onOpenChange={setShowCreate}>
-          <SheetContent
-            side="right"
-            className="w-full max-w-lg overflow-y-auto border-[var(--border)] bg-[var(--card)] text-[var(--text)]"
-          >
-            <SheetHeader>
-              <SheetTitle>Nuevo empleado</SheetTitle>
-            </SheetHeader>
-            {CreateFormBody}
-            <SheetFooter className="gap-2">{CreateActions}</SheetFooter>
-          </SheetContent>
-        </Sheet>
-      ) : (
-        <Dialog open={showCreate} onOpenChange={setShowCreate}>
-          <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto rounded-3xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
-            <DialogHeader>
-              <DialogTitle className="text-[var(--text)]">Nuevo empleado</DialogTitle>
-            </DialogHeader>
-            {CreateFormBody}
-            <DialogFooter className="gap-2">{CreateActions}</DialogFooter>
-          </DialogContent>
-        </Dialog>
+      {/* Alta wizard — el alta completa (persona + empleado + compensación +
+          beneficiarios + archivos) vive en un componente aparte. Sólo se
+          monta cuando hay insertEmpresaId resuelto para evitar crear sin
+          empresa destino. */}
+      {insertEmpresaId && (
+        <EmpleadoAltaWizard
+          open={showCreate}
+          onOpenChange={setShowCreate}
+          empresaId={insertEmpresaId}
+          departamentos={departamentos}
+          puestos={puestos}
+          onCreated={handleEmpleadoCreated}
+        />
       )}
     </div>
   );
