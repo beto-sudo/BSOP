@@ -74,6 +74,7 @@ type Junta = {
   creado_por: string | null;
   created_at: string;
   updated_at: string | null;
+  fecha_terminada: string | null;
 };
 
 type Asistencia = {
@@ -105,6 +106,12 @@ type TaskUpdate = {
   creado_por: string | null;
   created_at: string;
   usuario?: { nombre: string } | null;
+  task?: {
+    titulo: string;
+    estado: string;
+    asignado_a: string | null;
+    fecha_vence: string | null;
+  } | null;
 };
 
 const ESTADO_JUNTA: Record<Junta['estado'], { label: string; cls: string }> = {
@@ -365,34 +372,59 @@ function JuntaDetailInner() {
 
     setTasks((tasksData ?? []) as JuntaTask[]);
 
-    const taskIds = (tasksData ?? []).map((t: any) => t.id);
-    if (taskIds.length > 0) {
-      const { data: updatesData } = await supabase
-        .schema('erp')
-        .from('task_updates')
-        .select('*')
-        .in('task_id', taskIds)
-        .order('created_at', { ascending: false });
-      if (updatesData && updatesData.length > 0) {
-        const userIds = [...new Set(updatesData.map((u: any) => u.creado_por).filter(Boolean))];
-        const { data: usersData } =
-          userIds.length > 0
-            ? await supabase
-                .schema('core')
-                .from('usuarios')
-                .select('id, first_name')
-                .in('id', userIds)
-            : { data: [] };
-        const userMap = new Map((usersData ?? []).map((u: any) => [u.id, u.first_name]));
-        setTaskUpdates(
-          updatesData.map((u: any) => ({
-            ...u,
-            usuario: u.creado_por ? { nombre: userMap.get(u.creado_por) ?? 'Usuario' } : null,
-          }))
-        );
-      } else {
-        setTaskUpdates([]);
-      }
+    // Avances de CUALQUIER tarea de la empresa creados dentro de la ventana
+    // de la junta (desde fecha_hora; hasta fecha_terminada si ya cerró).
+    // Durante la sesión se actualizan tareas que pertenecen a OTRAS juntas,
+    // así que filtrar por task_id local dejaría fuera la mayoría.
+    let updatesBuilder = supabase
+      .schema('erp')
+      .from('task_updates')
+      .select('*')
+      .eq('empresa_id', juntaData.empresa_id)
+      .gte('created_at', juntaData.fecha_hora);
+    if (juntaData.fecha_terminada) {
+      updatesBuilder = updatesBuilder.lte('created_at', juntaData.fecha_terminada);
+    }
+    const { data: updatesData, error: updatesErr } = await updatesBuilder.order('created_at', {
+      ascending: false,
+    });
+    if (updatesErr) console.error('[juntas] task_updates query error:', updatesErr);
+    if (updatesData && updatesData.length > 0) {
+      const userIds = [...new Set(updatesData.map((u: any) => u.creado_por).filter(Boolean))];
+      const uTaskIds = [...new Set(updatesData.map((u: any) => u.task_id).filter(Boolean))];
+      const [{ data: usersData }, { data: uTasksData }] = await Promise.all([
+        userIds.length > 0
+          ? supabase.schema('core').from('usuarios').select('id, first_name').in('id', userIds)
+          : Promise.resolve({ data: [] as any[] }),
+        uTaskIds.length > 0
+          ? supabase
+              .schema('erp')
+              .from('tasks')
+              .select('id, titulo, estado, asignado_a, fecha_vence')
+              .in('id', uTaskIds)
+          : Promise.resolve({ data: [] as any[] }),
+      ]);
+      const userMap = new Map((usersData ?? []).map((u: any) => [u.id, u.first_name]));
+      const taskMap = new Map(
+        (uTasksData ?? []).map((t: any) => [
+          t.id,
+          {
+            titulo: t.titulo,
+            estado: t.estado,
+            asignado_a: t.asignado_a,
+            fecha_vence: t.fecha_vence,
+          },
+        ])
+      );
+      setTaskUpdates(
+        updatesData.map((u: any) => ({
+          ...u,
+          usuario: u.creado_por ? { nombre: userMap.get(u.creado_por) ?? 'Usuario' } : null,
+          task: taskMap.get(u.task_id) ?? null,
+        }))
+      );
+    } else {
+      setTaskUpdates([]);
     }
 
     const { data: personasData } = await supabase
@@ -609,33 +641,53 @@ function JuntaDetailInner() {
           .order('created_at');
         if (tasksData) {
           setTasks(tasksData as JuntaTask[]);
-          const tIds = tasksData.map((t: any) => t.id);
-          if (tIds.length > 0) {
-            const { data: updData } = await supabase
-              .schema('erp')
-              .from('task_updates')
-              .select('*')
-              .in('task_id', tIds)
-              .order('created_at', { ascending: false });
-            if (updData) {
-              const uIds = [...new Set(updData.map((u: any) => u.creado_por).filter(Boolean))];
-              const { data: uData } =
-                uIds.length > 0
-                  ? await supabase
-                      .schema('core')
-                      .from('usuarios')
-                      .select('id, first_name')
-                      .in('id', uIds)
-                  : { data: [] };
-              const uMap = new Map((uData ?? []).map((u: any) => [u.id, u.first_name]));
-              setTaskUpdates(
-                updData.map((u: any) => ({
-                  ...u,
-                  usuario: u.creado_por ? { nombre: uMap.get(u.creado_por) ?? 'Usuario' } : null,
-                }))
-              );
-            }
-          }
+        }
+
+        // Refresh avances — toda la empresa dentro de la ventana de la junta.
+        let updPollBuilder = supabase
+          .schema('erp')
+          .from('task_updates')
+          .select('*')
+          .eq('empresa_id', junta.empresa_id)
+          .gte('created_at', junta.fecha_hora);
+        if (junta.fecha_terminada) {
+          updPollBuilder = updPollBuilder.lte('created_at', junta.fecha_terminada);
+        }
+        const { data: updData } = await updPollBuilder.order('created_at', { ascending: false });
+        if (updData) {
+          const uIds = [...new Set(updData.map((u: any) => u.creado_por).filter(Boolean))];
+          const tIds = [...new Set(updData.map((u: any) => u.task_id).filter(Boolean))];
+          const [{ data: uData }, { data: tData }] = await Promise.all([
+            uIds.length > 0
+              ? supabase.schema('core').from('usuarios').select('id, first_name').in('id', uIds)
+              : Promise.resolve({ data: [] as any[] }),
+            tIds.length > 0
+              ? supabase
+                  .schema('erp')
+                  .from('tasks')
+                  .select('id, titulo, estado, asignado_a, fecha_vence')
+                  .in('id', tIds)
+              : Promise.resolve({ data: [] as any[] }),
+          ]);
+          const uMap = new Map((uData ?? []).map((u: any) => [u.id, u.first_name]));
+          const tMap = new Map(
+            (tData ?? []).map((t: any) => [
+              t.id,
+              {
+                titulo: t.titulo,
+                estado: t.estado,
+                asignado_a: t.asignado_a,
+                fecha_vence: t.fecha_vence,
+              },
+            ])
+          );
+          setTaskUpdates(
+            updData.map((u: any) => ({
+              ...u,
+              usuario: u.creado_por ? { nombre: uMap.get(u.creado_por) ?? 'Usuario' } : null,
+              task: tMap.get(u.task_id) ?? null,
+            }))
+          );
         }
         const { data: asistData } = await supabase
           .schema('erp')
@@ -1069,7 +1121,7 @@ function JuntaDetailInner() {
       </div>
 
       {/* ── Actualizaciones de tareas ─────────────────────────── */}
-      {tasks.length > 0 && (
+      {(tasks.length > 0 || taskUpdates.length > 0) && (
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
           <SectionTitle>Actualizaciones de tareas</SectionTitle>
           {taskUpdates.length === 0 ? (
@@ -1088,7 +1140,7 @@ function JuntaDetailInner() {
               return (
                 <div className="space-y-4">
                   {Array.from(grouped.entries()).map(([taskId, updates]) => {
-                    const task = tasks.find((t) => t.id === taskId);
+                    const task = updates[0]?.task ?? tasks.find((t) => t.id === taskId);
                     if (!task) return null;
                     return (
                       <div key={taskId} className="space-y-2">
