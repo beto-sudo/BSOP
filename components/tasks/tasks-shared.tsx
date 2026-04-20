@@ -7,17 +7,8 @@
  * orchestration. Split further only if any section starts growing independently.
  */
 
-import { useState } from 'react';
-import { ChevronsUpDown } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
+// (Combobox local eliminado — usar @/components/ui/combobox para form fields y
+// @/components/ui/filter-combobox para filtros de tabla).
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -239,78 +230,6 @@ export function ProgressBar({ value }: { value: number }) {
 
 export { FieldLabel } from '@/components/ui/field-label';
 
-// ─── Combobox — used by DILESA variant for filters and responsable picker ────
-
-export type ComboboxOption = { id: string; label: string };
-
-export function Combobox({
-  value,
-  onChange,
-  options,
-  placeholder = 'Seleccionar...',
-  searchPlaceholder = 'Buscar...',
-  emptyText = 'Sin resultados',
-  allowClear = false,
-  clearLabel = 'Todos',
-  className,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  options: ComboboxOption[];
-  placeholder?: string;
-  searchPlaceholder?: string;
-  emptyText?: string;
-  allowClear?: boolean;
-  clearLabel?: string;
-  className?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const selected = options.find((o) => o.id === value);
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        className={`flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--panel)] text-[var(--text)] px-3 h-9 text-sm hover:bg-[var(--panel)]/80 transition-colors ${className ?? 'w-full'}`}
-      >
-        <span className={`truncate ${selected ? '' : 'text-[var(--text)]/40'}`}>
-          {selected ? selected.label : placeholder}
-        </span>
-        <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-40" />
-      </PopoverTrigger>
-      <PopoverContent className="w-64 p-0" align="start">
-        <Command>
-          <CommandInput placeholder={searchPlaceholder} />
-          <CommandList>
-            <CommandEmpty>{emptyText}</CommandEmpty>
-            <CommandGroup>
-              {allowClear && (
-                <CommandItem
-                  value={`__clear__${clearLabel}`}
-                  onSelect={() => {
-                    onChange('all');
-                    setOpen(false);
-                  }}
-                  data-checked={value === 'all' || value === ''}
-                >
-                  {clearLabel}
-                </CommandItem>
-              )}
-              {options.map((o) => (
-                <CommandItem
-                  key={o.id}
-                  value={o.label}
-                  onSelect={() => {
-                    onChange(o.id);
-                    setOpen(false);
-                  }}
-                  data-checked={value === o.id}
-                >
-                  {o.label}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
+// Re-export del tipo de FilterCombobox para consumidores que importaban
+// `ComboboxOption` desde este módulo (eran filtros filter-style).
+export type { FilterComboboxOption as ComboboxOption } from '@/components/ui/filter-combobox';

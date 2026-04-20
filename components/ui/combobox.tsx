@@ -16,7 +16,9 @@ import {
 
 export interface ComboboxOption {
   value: string;
-  label: string;
+  label: React.ReactNode;
+  /** Texto puro del label — requerido si `label` es ReactNode, para search + trigger. */
+  searchLabel?: string;
   sub?: string;
   keywords?: string[];
   disabled?: boolean;
@@ -119,7 +121,11 @@ export function Combobox({
                 <CommandItem
                   key={opt.value}
                   value={opt.value}
-                  keywords={[opt.label, ...(opt.keywords ?? []), ...(opt.sub ? [opt.sub] : [])]}
+                  keywords={[
+                    opt.searchLabel ?? (typeof opt.label === 'string' ? opt.label : ''),
+                    ...(opt.keywords ?? []),
+                    ...(opt.sub ? [opt.sub] : []),
+                  ]}
                   disabled={opt.disabled}
                   data-checked={opt.value === value ? 'true' : 'false'}
                   onSelect={() => {
