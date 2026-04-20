@@ -236,6 +236,38 @@ export function rewriteHtmlImagesToProxy(html: string | null | undefined): strin
 }
 
 /**
+ * Reescribe cada `<img src="…">` a una signed URL pública de Supabase
+ * Storage. Pensada para contextos que se consumen fuera del navegador
+ * autenticado (ej. correo enviado por Resend): el cliente de mail no
+ * tiene cookies del mismo origen, así que el proxy `/api/adjuntos/<path>`
+ * no le sirve.
+ *
+ * Requiere un `SupabaseClient` con permisos para firmar objetos del
+ * bucket privado `adjuntos` (en server-side, service role). Si alguna
+ * firma falla, deja el `src` original (no rompe el HTML).
+ */
+export async function rewriteHtmlImagesWithSignedUrls(
+  supabase: SupabaseClient,
+  html: string | null | undefined,
+  expiresInSeconds = 3600
+): Promise<string> {
+  if (!html) return '';
+  const paths = new Set<string>();
+  replaceImgSrcs(html, (src) => {
+    const path = getAdjuntoPath(src);
+    if (path) paths.add(path);
+    return src;
+  });
+  if (paths.size === 0) return html;
+  const signedMap = await getAdjuntoSignedUrls(supabase, [...paths], expiresInSeconds);
+  return replaceImgSrcs(html, (src) => {
+    const path = getAdjuntoPath(src);
+    if (!path) return src;
+    return signedMap.get(path) ?? src;
+  });
+}
+
+/**
  * Normalize every `<img src="…">` in an HTML string to the canonical
  * `/api/adjuntos/<path>` form. Call this in the save path so the DB
  * always holds the same format (no signed URLs, no legacy public URLs).
