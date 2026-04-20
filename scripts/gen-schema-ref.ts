@@ -372,9 +372,37 @@ async function fetchSchemaData(client: Client, schemas: string[]): Promise<Schem
   return { tables, columns, pks, fks };
 }
 
+// ── .env.local loader ─────────────────────────────────────────────────────────
+//
+// Carga `.env.local` desde `process.cwd()` para que el script funcione con
+// `npm run schema:ref` sin que el usuario tenga que exportar SUPABASE_DB_URL
+// manualmente. Solo define variables que no estén ya en el entorno (el entorno
+// real gana — importante para CI, donde la var viene del GitHub secret).
+function loadEnvLocal(): void {
+  const envPath = path.join(process.cwd(), '.env.local');
+  if (!fs.existsSync(envPath)) return;
+  const content = fs.readFileSync(envPath, 'utf8');
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+    const eqIndex = line.indexOf('=');
+    if (eqIndex === -1) continue;
+    const key = line.slice(0, eqIndex).trim();
+    let value = line.slice(eqIndex + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    if (!(key in process.env)) process.env[key] = value;
+  }
+}
+
 // ── CLI entry ─────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
+  loadEnvLocal();
   const connectionString = process.env.SUPABASE_DB_URL;
   if (!connectionString) {
     console.error(

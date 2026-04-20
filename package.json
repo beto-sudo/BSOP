@@ -24,7 +24,7 @@
     "db:types": "supabase gen types typescript --project-id ybklderteyhuugzfmxbi --schema public --schema core --schema erp --schema rdb --schema dilesa --schema playtomic > types/supabase.ts",
     "db:check": "npm run db:types && git diff --exit-code types/supabase.ts",
     "schema:ref": "npx tsx scripts/gen-schema-ref.ts",
-    "schema:check": "npm run schema:ref && git diff --exit-code supabase/SCHEMA_REF.md",
+    "schema:check": "npm run schema:ref && git diff --exit-code -I '^  Last regenerated: ' supabase/SCHEMA_REF.md",
     "prepare": "husky"
   },
   "dependencies": {
