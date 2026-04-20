@@ -24,15 +24,20 @@ import { OrderDetail } from './order-detail';
 import { SummaryBar } from './summary-bar';
 import { VentasFilters } from './ventas-filters';
 import { VentasTable } from './ventas-table';
+import { VentasPorProducto } from './ventas-por-producto';
 import type { CorteOption, Pedido } from './types';
 import { TZ, rangeForPreset, todayRange } from './utils';
 
+type VentasTab = 'pedidos' | 'por-producto';
+
 export function VentasView() {
+  const [tab, setTab] = useState<VentasTab>('pedidos');
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [productoSearch, setProductoSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [corteFilter, setCorteFilter] = useState<string>('all');
   const { sortKey, sortDir, onSort, sortData } = useSortableTable<Pedido>('timestamp', 'desc');
@@ -197,12 +202,36 @@ export function VentasView() {
         </p>
       </div>
 
-      {/* Summary stats */}
-      {!loading && !error && <SummaryBar pedidos={filtered} />}
+      {/* Tabs */}
+      <div className="flex flex-wrap gap-2 border-b">
+        {(
+          [
+            ['pedidos', 'Pedidos'],
+            ['por-producto', 'Por producto'],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            className={[
+              '-mb-px border-b-2 px-4 py-2 text-sm font-medium transition',
+              tab === key
+                ? 'border-emerald-500 text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground',
+            ].join(' ')}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Summary stats (solo en Pedidos) */}
+      {tab === 'pedidos' && !loading && !error && <SummaryBar pedidos={filtered} />}
 
       {/* Filters */}
       <VentasFilters
-        search={search}
+        search={tab === 'pedidos' ? search : ''}
         onSearchChange={setSearch}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
@@ -233,24 +262,33 @@ export function VentasView() {
         </div>
       ) : null}
 
-      {/* Table */}
-      <VentasTable
-        pedidos={filtered}
-        loading={loading}
-        sortKey={sortKey}
-        sortDir={sortDir}
-        onSort={onSort}
-        sortData={sortData}
-        onRowClick={(pedido) => void openDetail(pedido)}
-      />
-
-      {/* Order detail drawer */}
-      <OrderDetail
-        pedido={selected}
-        loadingDetail={loadingDetail}
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-      />
+      {tab === 'pedidos' ? (
+        <>
+          <VentasTable
+            pedidos={filtered}
+            loading={loading}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={onSort}
+            sortData={sortData}
+            onRowClick={(pedido) => void openDetail(pedido)}
+          />
+          <OrderDetail
+            pedido={selected}
+            loadingDetail={loadingDetail}
+            open={drawerOpen}
+            onClose={() => setDrawerOpen(false)}
+          />
+        </>
+      ) : (
+        <VentasPorProducto
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          corteFilter={corteFilter}
+          search={productoSearch}
+          onSearchChange={setProductoSearch}
+        />
+      )}
     </div>
   );
 }
