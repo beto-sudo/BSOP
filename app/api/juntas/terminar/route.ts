@@ -9,12 +9,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { validateBody } from '@/lib/validation';
+import { rewriteHtmlImagesWithSignedUrls } from '@/lib/adjuntos';
 
 const TerminarJuntaSchema = z.object({
   juntaId: z.string().uuid('juntaId must be a valid UUID'),
 });
 
 const CONSEJO_EMAIL = 'consejo@dilesa.mx';
+
+// 1 año — los correos pueden abrirse meses después (archivo, reenvíos). La
+// firma es server-side con service role, sin costo por TTLs largos.
+const EMAIL_IMAGE_TTL_SECONDS = 365 * 24 * 60 * 60;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -376,11 +381,20 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Generate email ─────────────────────────────────────────────────────────
+  // Reescribir <img src="/api/adjuntos/…"> → signed URL pública antes de
+  // serializar el HTML. El cliente de correo no tiene cookies del mismo
+  // origen, así que el proxy same-origin del flujo web no funciona en
+  // Gmail/Outlook: las imágenes salen rotas. La firma dura 1 año.
+  const descripcionParaCorreo = await rewriteHtmlImagesWithSignedUrls(
+    supabase,
+    junta.descripcion as string | null,
+    EMAIL_IMAGE_TTL_SECONDS
+  );
   const html = generateMinutaHtml({
     titulo: junta.titulo as string,
     fechaTerminada: now.toISOString(),
     duracionMinutos,
-    descripcion: junta.descripcion as string | null,
+    descripcion: descripcionParaCorreo || null,
     asistentes,
     tareasCreadas,
     tareasCompletadas,
