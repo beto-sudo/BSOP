@@ -31,13 +31,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { AlertTriangle, CalendarDays, RefreshCw, Search, Send, Truck } from 'lucide-react';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -354,21 +348,14 @@ function OrdenDetail({
                   Asignación de proveedor
                 </div>
                 <div className="flex gap-2">
-                  <Select
+                  <Combobox
                     value={selectedProveedorId}
-                    onValueChange={(v) => setSelectedProveedorId(v ?? '')}
-                  >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Seleccionar proveedor…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {proveedores.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.nombre}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onChange={setSelectedProveedorId}
+                    options={proveedores.map((p) => ({ value: p.id, label: p.nombre }))}
+                    placeholder="Seleccionar proveedor…"
+                    allowClear
+                    className="flex-1"
+                  />
                   <Button
                     size="sm"
                     disabled={!selectedProveedorId || selectedProveedorId === orden?.proveedor_id}
@@ -1006,23 +993,21 @@ export default function OrdenesCompraPage() {
             />
           </div>
 
-          <Select value={presetKey} onValueChange={handlePreset}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Rango..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="hoy">Hoy</SelectItem>
-              <SelectItem value="ayer">Ayer</SelectItem>
-              <SelectItem value="semana">Esta semana</SelectItem>
-              <SelectItem value="7dias">Últimos 7 días</SelectItem>
-              <SelectItem value="mes">Este mes</SelectItem>
-              <SelectItem value="30dias">Últimos 30 días</SelectItem>
-              <SelectItem value="ano">Este año</SelectItem>
-              <SelectItem value="custom" className="hidden">
-                Personalizado
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          <Combobox
+            value={presetKey}
+            onChange={handlePreset}
+            options={[
+              { value: 'hoy', label: 'Hoy' },
+              { value: 'ayer', label: 'Ayer' },
+              { value: 'semana', label: 'Esta semana' },
+              { value: '7dias', label: 'Últimos 7 días' },
+              { value: 'mes', label: 'Este mes' },
+              { value: '30dias', label: 'Últimos 30 días' },
+              { value: 'ano', label: 'Este año' },
+            ]}
+            placeholder="Rango..."
+            className="w-[140px]"
+          />
 
           <Button
             variant="outline"

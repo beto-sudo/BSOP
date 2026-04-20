@@ -33,13 +33,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -557,18 +551,12 @@ function RegistrarMovimientoDialog({
           {/* Tipo */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Tipo de movimiento</label>
-            <Select value={tipo} onValueChange={(v) => setTipo(v as TipoUI)}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TIPO_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Combobox
+              value={tipo}
+              onChange={(v) => setTipo(v as TipoUI)}
+              options={TIPO_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+              className="w-full"
+            />
             {tipoSeleccionado && (
               <p className="text-xs text-muted-foreground">{tipoSeleccionado.desc}</p>
             )}
@@ -1088,46 +1076,38 @@ export default function InventarioPage() {
           )}
 
           {tab === 'stock' && (
-            <Select value={categoriaFiltro} onValueChange={(v) => setCategoriaFiltro(v ?? '')}>
-              <SelectTrigger className="w-40 h-8 text-sm">
-                <SelectValue placeholder="Categoría" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">Todas</SelectItem>
-                {[
-                  'Alimentos',
-                  'Bebidas',
-                  'Licores',
-                  'Artículos',
-                  'Deportes',
-                  'Consumibles',
-                  'Propinas',
-                ].map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Combobox
+              value={categoriaFiltro}
+              onChange={setCategoriaFiltro}
+              options={[
+                'Alimentos',
+                'Bebidas',
+                'Licores',
+                'Artículos',
+                'Deportes',
+                'Consumibles',
+                'Propinas',
+              ].map((c) => ({ value: c, label: c }))}
+              placeholder="Categoría"
+              allowClear
+              size="sm"
+              className="w-40"
+            />
           )}
 
           {tab === 'stock' && (
-            <Select
+            <Combobox
               value={clasificacionFiltro}
-              onValueChange={(v) => setClasificacionFiltro(v ?? '')}
-            >
-              <SelectTrigger className="w-40 h-8 text-sm">
-                <SelectValue placeholder="Clasificación" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">Todas</SelectItem>
-                {['inventariable', 'consumible', 'merchandising', 'activo_fijo'].map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onChange={setClasificacionFiltro}
+              options={['inventariable', 'consumible', 'merchandising', 'activo_fijo'].map((c) => ({
+                value: c,
+                label: c,
+              }))}
+              placeholder="Clasificación"
+              allowClear
+              size="sm"
+              className="w-40"
+            />
           )}
 
           {tab === 'stock' && (
