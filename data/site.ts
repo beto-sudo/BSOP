@@ -1366,10 +1366,3 @@ export const travelTrips: TravelTrip[] = [
 export function getTripBySlug(slug: string) {
   return travelTrips.find((trip) => trip.slug === slug);
 }
-
-export const navItems = [
-  { href: '/', label: 'Overview' },
-  { href: '/travel', label: 'Viajes' },
-  { href: '/usage', label: 'Usage' },
-  { href: '/agents', label: 'Agents' },
-];
