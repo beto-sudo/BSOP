@@ -14,6 +14,8 @@ const TerminarJuntaSchema = z.object({
   juntaId: z.string().uuid('juntaId must be a valid UUID'),
 });
 
+const CONSEJO_EMAIL = 'consejo@dilesa.mx';
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatDateCST(iso: string): string {
@@ -239,7 +241,7 @@ export async function POST(req: NextRequest) {
   const { data: existing } = await supabase
     .schema('erp')
     .from('juntas')
-    .select('fecha_hora, created_at')
+    .select('fecha_hora, created_at, enviar_a_consejo')
     .eq('id', juntaId)
     .single();
 
@@ -280,7 +282,13 @@ export async function POST(req: NextRequest) {
     asistio: a.asistio as boolean | null,
   }));
 
-  const recipients = asistentes.filter((a) => Boolean(a.email)).map((a) => a.email as string);
+  const attendeeEmails = asistentes
+    .filter((a) => Boolean(a.email))
+    .map((a) => (a.email as string).toLowerCase());
+  const enviarAConsejo = existing?.enviar_a_consejo ?? true;
+  const recipients = enviarAConsejo
+    ? Array.from(new Set([...attendeeEmails, CONSEJO_EMAIL]))
+    : attendeeEmails;
 
   // ── Fetch tasks linked to this meeting ─────────────────────────────────────
   const { data: tasksData } = await supabase

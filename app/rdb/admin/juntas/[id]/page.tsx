@@ -70,6 +70,7 @@ type Junta = {
   lugar: string | null;
   estado: 'programada' | 'en_curso' | 'completada' | 'cancelada';
   tipo: string | null;
+  enviar_a_consejo: boolean;
   creado_por: string | null;
   created_at: string;
   updated_at: string | null;
@@ -268,6 +269,7 @@ function JuntaDetailInner() {
   const [lugar, setLugar] = useState('');
   const [estado, setEstado] = useState<Junta['estado']>('programada');
   const [tipo, setTipo] = useState<string>('');
+  const [enviarAConsejo, setEnviarAConsejo] = useState(true);
 
   const [terminating, setTerminating] = useState(false);
   const [showTerminarDialog, setShowTerminarDialog] = useState(false);
@@ -335,6 +337,7 @@ function JuntaDetailInner() {
     setLugar(juntaData.lugar ?? '');
     setEstado(juntaData.estado as Junta['estado']);
     setTipo(juntaData.tipo ?? '');
+    setEnviarAConsejo(juntaData.enviar_a_consejo ?? true);
 
     if (editor && juntaData.descripcion) {
       // Rewrite bare paths / legacy public URLs to signed URLs so the private
@@ -459,6 +462,7 @@ function JuntaDetailInner() {
         lugar: lugar.trim() || null,
         estado,
         tipo: tipo || null,
+        enviar_a_consejo: enviarAConsejo,
         descripcion: notesHtml && notesHtml !== '<p></p>' ? notesHtml : null,
       })
       .eq('id', junta.id);
@@ -467,6 +471,21 @@ function JuntaDetailInner() {
 
     if (err) {
       alert(`Error al guardar: ${err.message}`);
+    }
+  };
+
+  const toggleEnviarAConsejo = async (next: boolean) => {
+    if (!junta) return;
+    const prev = enviarAConsejo;
+    setEnviarAConsejo(next);
+    const { error: err } = await supabase
+      .schema('erp')
+      .from('juntas')
+      .update({ enviar_a_consejo: next })
+      .eq('id', junta.id);
+    if (err) {
+      setEnviarAConsejo(prev);
+      alert(`Error al actualizar: ${err.message}`);
     }
   };
 
@@ -1142,17 +1161,36 @@ function JuntaDetailInner() {
       )}
 
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
           <SectionTitle>Participantes</SectionTitle>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowAddPersona(true)}
-            className="gap-1.5 rounded-xl border-[var(--border)] text-[var(--text)] hover:bg-[var(--panel)]"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Agregar
-          </Button>
+          <div className="flex items-center gap-3">
+            <label
+              className={`flex items-center gap-2 text-xs text-[var(--text)]/80 select-none ${
+                estado === 'completada' || estado === 'cancelada'
+                  ? 'opacity-60 cursor-not-allowed'
+                  : 'cursor-pointer'
+              }`}
+              title="Al terminar la junta, enviar también la minuta a consejo@dilesa.mx"
+            >
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-[var(--border)] accent-[var(--accent)]"
+                checked={enviarAConsejo}
+                disabled={estado === 'completada' || estado === 'cancelada'}
+                onChange={(e) => toggleEnviarAConsejo(e.target.checked)}
+              />
+              Enviar Junta a Consejo
+            </label>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAddPersona(true)}
+              className="gap-1.5 rounded-xl border-[var(--border)] text-[var(--text)] hover:bg-[var(--panel)]"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Agregar
+            </Button>
+          </div>
         </div>
 
         {asistencia.length === 0 ? (
