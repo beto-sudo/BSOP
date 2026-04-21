@@ -1,5 +1,9 @@
 'use client';
 
+/* eslint-disable react-hooks/set-state-in-effect --
+ * Pre-existing data-sync pattern (loading guards around async fetch).
+ */
+
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
