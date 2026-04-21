@@ -5,6 +5,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { rewriteHtmlImagesWithSignedUrls } from '@/lib/adjuntos';
+import { fetchJuntaUpdates } from '@/lib/juntas/fetch-updates';
 
 // 1 año — los correos pueden abrirse meses después (archivo, reenvíos).
 // La firma es server-side con service role, sin costo por TTLs largos.
@@ -302,22 +303,19 @@ export async function buildMinutaEmailPayload(
   );
   const tareasCompletadas = allTasks.filter((t) => t.estado === 'completado');
 
-  // Avances generados dentro de la ventana [fecha_hora, fecha_terminada].
-  // Mismo criterio que el detalle de junta en el navegador.
+  // Avances: ligados por junta_id o, para históricos sin liga, dentro de
+  // la ventana [fecha_hora, fecha_terminada] de la misma empresa.
   const fechaHora = (junta as any).fecha_hora as string;
   const fechaTerminadaDb = (junta as any).fecha_terminada as string | null;
   let actualizaciones: { tarea: string; contenido: string; tipo: string; autor: string }[] = [];
 
-  let updBuilder = supabase
-    .schema('erp')
-    .from('task_updates')
-    .select('task_id, tipo, contenido, valor_anterior, valor_nuevo, creado_por')
-    .eq('empresa_id', (junta as any).empresa_id)
-    .gte('created_at', fechaHora);
-  if (fechaTerminadaDb) {
-    updBuilder = updBuilder.lte('created_at', fechaTerminadaDb);
-  }
-  const { data: updatesData } = await updBuilder;
+  const { data: updatesData } = await fetchJuntaUpdates(supabase, {
+    juntaId: (junta as any).id,
+    empresaId: (junta as any).empresa_id,
+    fechaHora,
+    fechaTerminada: fechaTerminadaDb,
+    columns: 'task_id, tipo, contenido, valor_anterior, valor_nuevo, creado_por, created_at',
+  });
 
   if (updatesData && updatesData.length > 0) {
     const uTaskIds = [...new Set(updatesData.map((u: any) => u.task_id).filter(Boolean))];

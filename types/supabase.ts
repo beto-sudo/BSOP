@@ -323,6 +323,7 @@ export type Database = {
           email: string
           first_name: string | null
           id: string
+          junta_activa_id: string | null
           rol: string
           welcome_sent_at: string | null
         }
@@ -332,6 +333,7 @@ export type Database = {
           email: string
           first_name?: string | null
           id?: string
+          junta_activa_id?: string | null
           rol?: string
           welcome_sent_at?: string | null
         }
@@ -341,6 +343,7 @@ export type Database = {
           email?: string
           first_name?: string | null
           id?: string
+          junta_activa_id?: string | null
           rol?: string
           welcome_sent_at?: string | null
         }
@@ -3097,6 +3100,7 @@ export type Database = {
           created_at: string
           empresa_id: string
           id: string
+          junta_id: string | null
           task_id: string
           tipo: string
           valor_anterior: string | null
@@ -3108,6 +3112,7 @@ export type Database = {
           created_at?: string
           empresa_id: string
           id?: string
+          junta_id?: string | null
           task_id: string
           tipo: string
           valor_anterior?: string | null
@@ -3119,12 +3124,20 @@ export type Database = {
           created_at?: string
           empresa_id?: string
           id?: string
+          junta_id?: string | null
           task_id?: string
           tipo?: string
           valor_anterior?: string | null
           valor_nuevo?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "task_updates_junta_id_fkey"
+            columns: ["junta_id"]
+            isOneToOne: false
+            referencedRelation: "juntas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "task_updates_task_id_fkey"
             columns: ["task_id"]

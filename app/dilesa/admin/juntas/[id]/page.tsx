@@ -11,6 +11,9 @@ import { useParams, useRouter } from 'next/navigation';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import { rewriteHtmlImagesToSigned, normalizeHtmlImagesToPaths } from '@/lib/adjuntos';
 import { htmlHasCodaImages, importCodaImagesInHtml } from '@/lib/coda-paste-import';
+import { fetchJuntaUpdates } from '@/lib/juntas/fetch-updates';
+import { TasksCreateForm } from '@/components/tasks/tasks-create-form';
+import { emptyTaskForm, type TaskFormValues } from '@/components/tasks/tasks-shared';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -399,13 +402,7 @@ function JuntaDetailInner() {
   const [addingPersona, setAddingPersona] = useState(false);
 
   const [showAddTask, setShowAddTask] = useState(false);
-  const [taskForm, setTaskForm] = useState({
-    titulo: '',
-    prioridad: '',
-    asignado_a: '',
-    estado: 'pendiente' as JuntaTask['estado'],
-    fecha_vence: '',
-  });
+  const [taskForm, setTaskForm] = useState<TaskFormValues>(emptyTaskForm());
   const [addingTask, setAddingTask] = useState(false);
   const [completingTask, setCompletingTask] = useState<string | null>(null);
 
@@ -525,17 +522,13 @@ function JuntaDetailInner() {
     // de la junta (desde fecha_hora; hasta fecha_terminada si ya cerró).
     // Durante la sesión se actualizan tareas que pertenecen a OTRAS juntas,
     // así que filtrar por task_id local dejaría fuera la mayoría.
-    let updatesBuilder = supabase
-      .schema('erp')
-      .from('task_updates')
-      .select('*')
-      .eq('empresa_id', juntaData.empresa_id)
-      .gte('created_at', juntaData.fecha_hora);
-    if (juntaData.fecha_terminada) {
-      updatesBuilder = updatesBuilder.lte('created_at', juntaData.fecha_terminada);
-    }
-    const { data: updatesData, error: updatesErr } = await updatesBuilder.order('created_at', {
-      ascending: false,
+    // Avances ligados por junta_id + fallback temporal para históricos con
+    // junta_id NULL (registros ambiguos pre-migración).
+    const { data: updatesData, error: updatesErr } = await fetchJuntaUpdates(supabase as any, {
+      juntaId: id,
+      empresaId: juntaData.empresa_id,
+      fechaHora: juntaData.fecha_hora,
+      fechaTerminada: juntaData.fecha_terminada,
     });
     if (updatesErr) console.error('[juntas] task_updates query error:', updatesErr);
     if (updatesData && updatesData.length > 0) {
@@ -625,6 +618,15 @@ function JuntaDetailInner() {
   useEffect(() => {
     void fetchAll();
   }, [fetchAll]);
+
+  // Marca esta junta como activa del usuario mientras esté en curso (liga
+  // avances del módulo de tareas a esta junta via trigger de DB).
+  useEffect(() => {
+    if (junta?.estado === 'en_curso') {
+      void fetch(`/api/juntas/${id}/activar`, { method: 'POST' }).catch(() => {});
+    }
+  }, [id, junta?.estado]);
+
   useEffect(() => {
     if (editor && junta?.descripcion) {
       // Always set content when editor becomes ready or junta data changes.
@@ -937,10 +939,11 @@ function JuntaDetailInner() {
       .insert({
         empresa_id: junta.empresa_id,
         titulo: taskForm.titulo.trim(),
+        descripcion: taskForm.descripcion.trim() || null,
         asignado_a: taskForm.asignado_a || null,
         prioridad: taskForm.prioridad,
         estado: taskForm.estado,
-        fecha_compromiso: taskForm.fecha_vence || null,
+        fecha_compromiso: taskForm.fecha_compromiso || null,
         creado_por: coreUser?.id ?? null,
         entidad_tipo: 'junta',
         entidad_id: junta.id,
@@ -953,13 +956,7 @@ function JuntaDetailInner() {
       return;
     }
     setTasks((prev) => [...prev, newTask as JuntaTask]);
-    setTaskForm({
-      titulo: '',
-      prioridad: '',
-      asignado_a: '',
-      estado: 'pendiente',
-      fecha_vence: '',
-    });
+    setTaskForm(emptyTaskForm());
     setShowAddTask(false);
   };
 
@@ -1800,125 +1797,22 @@ function JuntaDetailInner() {
         </SheetContent>
       </Sheet>
 
-      <Sheet
+      <TasksCreateForm
+        variant="rich"
         open={showAddTask}
         onOpenChange={(open) => {
           if (!open) {
             setShowAddTask(false);
-            setTaskForm({
-              titulo: '',
-              prioridad: '',
-              asignado_a: '',
-              estado: 'pendiente',
-              fecha_vence: '',
-            });
+            setTaskForm(emptyTaskForm());
           }
         }}
-      >
-        <SheetContent
-          side="right"
-          className="w-full sm:max-w-lg border-[var(--border)] bg-[var(--card)] text-[var(--text)] overflow-y-auto"
-        >
-          <SheetHeader className="pb-2">
-            <SheetTitle className="text-[var(--text)] text-lg">
-              Nueva tarea para esta junta
-            </SheetTitle>
-            <SheetDescription className="text-[var(--text)]/50">
-              Completa los campos requeridos para crear una tarea
-            </SheetDescription>
-          </SheetHeader>
-
-          <div className="space-y-5 py-4">
-            <div>
-              <FieldLabel required>Título</FieldLabel>
-              <Input
-                placeholder="Descripción de la tarea..."
-                value={taskForm.titulo}
-                onChange={(e) => setTaskForm((f) => ({ ...f, titulo: e.target.value }))}
-                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <FieldLabel required>Prioridad</FieldLabel>
-                <Combobox
-                  value={taskForm.prioridad}
-                  onChange={(v) => setTaskForm((f) => ({ ...f, prioridad: v }))}
-                  options={PRIORIDAD_OPTIONS.map((p) => ({ value: p, label: p }))}
-                  placeholder="Seleccionar"
-                  className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-                />
-              </div>
-              <div>
-                <FieldLabel>Estado</FieldLabel>
-                <Combobox
-                  value={taskForm.estado}
-                  onChange={(v) => setTaskForm((f) => ({ ...f, estado: v as JuntaTask['estado'] }))}
-                  options={Object.entries(ESTADO_TASK).map(([k, v]) => ({
-                    value: k,
-                    label: v.label,
-                  }))}
-                  className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-                />
-              </div>
-            </div>
-
-            <div>
-              <FieldLabel required>Responsable</FieldLabel>
-              <Combobox
-                value={taskForm.asignado_a}
-                onChange={(v) => setTaskForm((f) => ({ ...f, asignado_a: v }))}
-                options={empleadoOptions}
-                placeholder="Buscar responsable..."
-                searchPlaceholder="Escriba un nombre..."
-                allowClear
-              />
-            </div>
-
-            <div>
-              <FieldLabel required>Fecha Compromiso</FieldLabel>
-              <Input
-                type="date"
-                value={taskForm.fecha_vence}
-                onChange={(e) => setTaskForm((f) => ({ ...f, fecha_vence: e.target.value }))}
-                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 pt-4 border-t border-[var(--border)]">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowAddTask(false);
-                setTaskForm({
-                  titulo: '',
-                  prioridad: '',
-                  asignado_a: '',
-                  estado: 'pendiente',
-                  fecha_vence: '',
-                });
-              }}
-              className="flex-1 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleAddTask}
-              disabled={addingTask || !canCreateTask}
-              className="flex-1 gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60"
-            >
-              {addingTask ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Plus className="h-4 w-4" />
-              )}
-              Crear tarea
-            </Button>
-          </div>
-        </SheetContent>
-      </Sheet>
+        value={taskForm}
+        onChange={setTaskForm}
+        onCreate={handleAddTask}
+        creating={addingTask}
+        empleados={empleados}
+        empleadoOptions={empleadoOptions as any}
+      />
 
       <Dialog open={showReenviarDialog} onOpenChange={setShowReenviarDialog}>
         <DialogContent className="max-w-sm rounded-3xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]">

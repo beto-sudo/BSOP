@@ -10,6 +10,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import { normalizeHtmlImagesToPaths, rewriteHtmlImagesToSigned } from '@/lib/adjuntos';
+import { fetchJuntaUpdates } from '@/lib/juntas/fetch-updates';
+import { TasksCreateForm } from '@/components/tasks/tasks-create-form';
+import { emptyTaskForm, type TaskFormValues } from '@/components/tasks/tasks-shared';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -322,14 +325,7 @@ function JuntaDetailInner() {
 
   // Add task dialog
   const [showAddTask, setShowAddTask] = useState(false);
-  const [taskForm, setTaskForm] = useState({
-    titulo: '',
-    descripcion: '',
-    asignado_a: '',
-    prioridad: '',
-    estado: 'pendiente' as JuntaTask['estado'],
-    fecha_vence: '',
-  });
+  const [taskForm, setTaskForm] = useState<TaskFormValues>(emptyTaskForm());
   const [addingTask, setAddingTask] = useState(false);
   const [completingTask, setCompletingTask] = useState<string | null>(null);
 
@@ -394,17 +390,13 @@ function JuntaDetailInner() {
     // la junta (desde fecha_hora; hasta fecha_terminada si ya cerró). Durante
     // la junta se tocan tareas cuyo entidad_id es de OTRAS juntas; filtrar por
     // task_id local dejaría fuera la mayoría.
-    let updatesBuilder = supabase
-      .schema('erp')
-      .from('task_updates')
-      .select('*')
-      .eq('empresa_id', juntaData.empresa_id)
-      .gte('created_at', juntaData.fecha_hora);
-    if (juntaData.fecha_terminada) {
-      updatesBuilder = updatesBuilder.lte('created_at', juntaData.fecha_terminada);
-    }
-    const { data: updatesData, error: updatesErr } = await updatesBuilder.order('created_at', {
-      ascending: false,
+    // Avances ligados por junta_id + fallback temporal para históricos con
+    // junta_id NULL (registros ambiguos pre-migración).
+    const { data: updatesData, error: updatesErr } = await fetchJuntaUpdates(supabase as any, {
+      juntaId: id,
+      empresaId: juntaData.empresa_id,
+      fechaHora: juntaData.fecha_hora,
+      fechaTerminada: juntaData.fecha_terminada,
     });
     if (updatesErr) console.error('[juntas] task_updates query error:', updatesErr);
     if (updatesData && updatesData.length > 0) {
@@ -470,6 +462,14 @@ function JuntaDetailInner() {
   useEffect(() => {
     void fetchAll();
   }, [fetchAll]);
+
+  // Marca esta junta como activa del usuario mientras esté en curso (liga
+  // avances del módulo de tareas a esta junta via trigger de DB).
+  useEffect(() => {
+    if (junta?.estado === 'en_curso') {
+      void fetch(`/api/juntas/${id}/activar`, { method: 'POST' }).catch(() => {});
+    }
+  }, [id, junta?.estado]);
 
   // Sync editor content once junta loads (editor might not be ready on first render).
   // Rewrite any stored <img src> (bare path or legacy public URL) to a signed URL
@@ -794,14 +794,7 @@ function JuntaDetailInner() {
     }
 
     setTasks((prev) => [...prev, newTask as JuntaTask]);
-    setTaskForm({
-      titulo: '',
-      descripcion: '',
-      asignado_a: '',
-      prioridad: '',
-      estado: 'pendiente',
-      fecha_vence: '',
-    });
+    setTaskForm(emptyTaskForm());
     setShowAddTask(false);
   };
 
@@ -1612,96 +1605,17 @@ function JuntaDetailInner() {
       </Sheet>
 
       {/* Add task dialog */}
-      <Dialog open={showAddTask} onOpenChange={setShowAddTask}>
-        <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto rounded-3xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
-          <DialogHeader>
-            <DialogTitle className="text-[var(--text)]">Nueva tarea para esta junta</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2">
-            <div>
-              <FieldLabel>Título *</FieldLabel>
-              <Input
-                placeholder="Descripción de la tarea..."
-                value={taskForm.titulo}
-                onChange={(e) => setTaskForm((f) => ({ ...f, titulo: e.target.value }))}
-                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <FieldLabel>Estado</FieldLabel>
-                <Combobox
-                  value={taskForm.estado}
-                  onChange={(v) => setTaskForm((f) => ({ ...f, estado: v as JuntaTask['estado'] }))}
-                  options={Object.entries(ESTADO_TASK).map(([k, v]) => ({
-                    value: k,
-                    label: v.label,
-                  }))}
-                  className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-                />
-              </div>
-              <div>
-                <FieldLabel>Prioridad</FieldLabel>
-                <Combobox
-                  value={taskForm.prioridad}
-                  onChange={(v) => setTaskForm((f) => ({ ...f, prioridad: v }))}
-                  options={PRIORIDAD_OPTIONS.map((p) => ({ value: p, label: p }))}
-                  placeholder="Sin prioridad"
-                  allowClear
-                  className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <FieldLabel>Asignar a</FieldLabel>
-                <Combobox
-                  value={taskForm.asignado_a}
-                  onChange={(v) => setTaskForm((f) => ({ ...f, asignado_a: v }))}
-                  options={empleados.map((e) => ({ value: e.id, label: e.nombre }))}
-                  placeholder="Sin asignar"
-                  allowClear
-                  className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-                />
-              </div>
-              <div>
-                <FieldLabel>Fecha límite</FieldLabel>
-                <Input
-                  type="date"
-                  value={taskForm.fecha_vence}
-                  onChange={(e) => setTaskForm((f) => ({ ...f, fecha_vence: e.target.value }))}
-                  className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-                />
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowAddTask(false)}
-              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleAddTask}
-              disabled={addingTask || !taskForm.titulo.trim()}
-              className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60"
-            >
-              {addingTask ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Plus className="h-4 w-4" />
-              )}
-              Crear tarea
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TasksCreateForm
+        variant="simple"
+        open={showAddTask}
+        onOpenChange={setShowAddTask}
+        value={taskForm}
+        onChange={setTaskForm}
+        onCreate={handleAddTask}
+        creating={addingTask}
+        empleados={empleados}
+        empleadoOptions={empleados.map((e) => ({ id: e.id, label: e.nombre }))}
+      />
 
       {/* Reenviar minuta confirmation */}
       <Dialog open={showReenviarDialog} onOpenChange={setShowReenviarDialog}>
