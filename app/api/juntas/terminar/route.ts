@@ -52,6 +52,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: jErr.message }, { status: 404 });
   }
 
+  // Limpia la junta activa de todos los usuarios que la tenían marcada — a
+  // partir de aquí los avances nuevos ya no deben ligarse a esta junta.
+  await supabase
+    .schema('core')
+    .from('usuarios')
+    .update({ junta_activa_id: null })
+    .eq('junta_activa_id', juntaId);
+
   const payload = await buildMinutaEmailPayload(supabase, juntaId, {
     fechaTerminadaISO: now.toISOString(),
     duracionMinutos,
