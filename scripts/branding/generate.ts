@@ -205,9 +205,12 @@ async function svgBox(svg: string): Promise<{ width: number; height: number }> {
  *             el contenido del SVG es blanco/inverso para que el trim no recorte
  *             los pixeles del propio logo.
  */
+// Override desde main() cuando se pasa --split-ratio
+let DEFAULT_SPLIT_RATIO = 0.72;
+
 async function splitMaster(
   masterSvg: string,
-  splitRatio = 0.72,
+  splitRatio: number = DEFAULT_SPLIT_RATIO,
   mode: 'opaque' | 'alpha' = 'opaque'
 ) {
   const base = sharp(Buffer.from(masterSvg), { density: 300, limitInputPixels: false });
@@ -372,7 +375,7 @@ async function composeFavicon(
 ): Promise<GeneratedAsset> {
   // 512x512 cuadrado con fondo color primario + isotipo en color inverso centrado.
   const invSvg = recolorSvgAll(masterSvg, paleta.inverso);
-  const { iso } = await splitMaster(invSvg, 0.72, 'alpha');
+  const { iso } = await splitMaster(invSvg, DEFAULT_SPLIT_RATIO, 'alpha');
   const isoFit = await sharp(iso)
     .resize({ width: 360, height: 360, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png()
@@ -402,7 +405,7 @@ async function composeHeaderEmail(
 
   // Recolorea TODO a inverso (isotipo + wordmark) porque el fondo es primario.
   const invSvg = recolorSvgAll(masterSvg, paleta.inverso);
-  const { iso, word } = await splitMaster(invSvg, 0.72, 'alpha');
+  const { iso, word } = await splitMaster(invSvg, DEFAULT_SPLIT_RATIO, 'alpha');
 
   const targetIsoH = Math.round(H * 0.62);
   const targetWordH = Math.round(targetIsoH * 0.38);
@@ -557,7 +560,12 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   const slug = args.empresa as string;
   const svgArg = args.svg as string | undefined;
+  const splitRatio = args['split-ratio'] ? parseFloat(args['split-ratio'] as string) : 0.72;
   if (!slug) throw new Error('--empresa <slug> es obligatorio');
+  if (Number.isNaN(splitRatio) || splitRatio <= 0 || splitRatio >= 1) {
+    throw new Error('--split-ratio debe ser número entre 0 y 1 (ej. 0.55)');
+  }
+  DEFAULT_SPLIT_RATIO = splitRatio;
 
   const paleta: Paleta = {
     primario: (args.primario as string) ?? '#000000',
