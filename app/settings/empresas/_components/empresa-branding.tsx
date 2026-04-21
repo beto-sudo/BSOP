@@ -121,13 +121,11 @@ function LogoCard({ variant, url }: { variant: LogoVariant; url: string | null }
       <div className={`${bg} flex items-center justify-center p-4`}>
         {url ? (
           /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={url}
-            alt={variant.label}
-            className={`${sizing} object-contain`}
-          />
+          <img src={url} alt={variant.label} className={`${sizing} object-contain`} />
         ) : (
-          <div className={`${sizing} flex items-center justify-center text-xs text-[var(--text)]/40`}>
+          <div
+            className={`${sizing} flex items-center justify-center text-xs text-[var(--text)]/40`}
+          >
             <FileImage className="h-6 w-6" />
           </div>
         )}
@@ -170,7 +168,8 @@ export function EmpresaBranding({ branding, slug }: { branding: Branding; slug: 
         <p className="mt-2 text-xs text-[var(--text)]/40">
           Corre el script:{' '}
           <code className="font-mono bg-[var(--card)] px-1.5 py-0.5 rounded text-[var(--text)]/70">
-            npx tsx scripts/branding/generate.ts --empresa {slug} --svg path/to/master.svg --primario &apos;#XXXXXX&apos; --upload
+            npx tsx scripts/branding/generate.ts --empresa {slug} --svg path/to/master.svg
+            --primario &apos;#XXXXXX&apos; --upload
           </code>
         </p>
       </div>
