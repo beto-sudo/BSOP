@@ -615,10 +615,10 @@ function JuntaDetailInner() {
     void fetchAll();
   }, [fetchAll]);
 
-  // Marca esta junta como activa del usuario mientras esté en curso (liga
-  // avances del módulo de tareas a esta junta via trigger de DB).
+  // Marca esta junta como activa del usuario mientras esté programada o en
+  // curso (liga avances del módulo de tareas a esta junta via trigger).
   useEffect(() => {
-    if (junta?.estado === 'en_curso') {
+    if (junta?.estado === 'en_curso' || junta?.estado === 'programada') {
       void fetch(`/api/juntas/${id}/activar`, { method: 'POST' }).catch(() => {});
     }
   }, [id, junta?.estado]);

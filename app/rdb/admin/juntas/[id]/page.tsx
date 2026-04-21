@@ -452,12 +452,12 @@ function JuntaDetailInner() {
     void fetchAll();
   }, [fetchAll]);
 
-  // Marca esta junta como "activa" del usuario mientras esté en curso. El
-  // trigger de DB usa ese valor para ligar avances creados desde el módulo
-  // de tareas (sin URL de junta) a la junta correcta. Seguro contra dobles
-  // renders: el endpoint es idempotente.
+  // Marca esta junta como "activa" del usuario mientras esté programada o
+  // en curso. El trigger de DB usa ese valor para ligar avances creados
+  // desde el módulo de tareas (sin URL de junta) a la junta correcta.
+  // Idempotente — seguro contra dobles renders.
   useEffect(() => {
-    if (junta?.estado === 'en_curso') {
+    if (junta?.estado === 'en_curso' || junta?.estado === 'programada') {
       void fetch(`/api/juntas/${id}/activar`, { method: 'POST' }).catch(() => {});
     }
   }, [id, junta?.estado]);
