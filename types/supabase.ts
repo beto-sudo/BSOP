@@ -75,6 +75,13 @@ export type Database = {
         Row: {
           activa: boolean | null
           actividades_economicas: Json | null
+          branding_updated_at: string | null
+          color_fondo_brand: string | null
+          color_inverso: string | null
+          color_primario: string | null
+          color_primario_dark: string | null
+          color_secundario: string | null
+          color_texto_titulo: string | null
           created_at: string | null
           csf_fecha_emision: string | null
           csf_url: string | null
@@ -91,11 +98,19 @@ export type Database = {
           escritura_constitutiva: Json | null
           escritura_poder: Json | null
           estatus_sat: string | null
+          favicon_url: string | null
           fecha_inicio_operaciones: string | null
+          footer_doc_url: string | null
+          header_email_url: string | null
           header_url: string | null
           id: string
           id_cif: string | null
+          isotipo_url: string | null
+          logo_horizontal_dark_url: string | null
+          logo_horizontal_light_url: string | null
+          logo_master_url: string | null
           logo_url: string | null
+          logo_vertical_url: string | null
           nombre: string
           nombre_comercial: string | null
           obligaciones_fiscales: Json | null
@@ -109,10 +124,18 @@ export type Database = {
           solo_fiscal: boolean
           tipo_contribuyente: string
           uso_cfdi_default: string | null
+          watermark_url: string | null
         }
         Insert: {
           activa?: boolean | null
           actividades_economicas?: Json | null
+          branding_updated_at?: string | null
+          color_fondo_brand?: string | null
+          color_inverso?: string | null
+          color_primario?: string | null
+          color_primario_dark?: string | null
+          color_secundario?: string | null
+          color_texto_titulo?: string | null
           created_at?: string | null
           csf_fecha_emision?: string | null
           csf_url?: string | null
@@ -129,11 +152,19 @@ export type Database = {
           escritura_constitutiva?: Json | null
           escritura_poder?: Json | null
           estatus_sat?: string | null
+          favicon_url?: string | null
           fecha_inicio_operaciones?: string | null
+          footer_doc_url?: string | null
+          header_email_url?: string | null
           header_url?: string | null
           id?: string
           id_cif?: string | null
+          isotipo_url?: string | null
+          logo_horizontal_dark_url?: string | null
+          logo_horizontal_light_url?: string | null
+          logo_master_url?: string | null
           logo_url?: string | null
+          logo_vertical_url?: string | null
           nombre: string
           nombre_comercial?: string | null
           obligaciones_fiscales?: Json | null
@@ -147,10 +178,18 @@ export type Database = {
           solo_fiscal?: boolean
           tipo_contribuyente?: string
           uso_cfdi_default?: string | null
+          watermark_url?: string | null
         }
         Update: {
           activa?: boolean | null
           actividades_economicas?: Json | null
+          branding_updated_at?: string | null
+          color_fondo_brand?: string | null
+          color_inverso?: string | null
+          color_primario?: string | null
+          color_primario_dark?: string | null
+          color_secundario?: string | null
+          color_texto_titulo?: string | null
           created_at?: string | null
           csf_fecha_emision?: string | null
           csf_url?: string | null
@@ -167,11 +206,19 @@ export type Database = {
           escritura_constitutiva?: Json | null
           escritura_poder?: Json | null
           estatus_sat?: string | null
+          favicon_url?: string | null
           fecha_inicio_operaciones?: string | null
+          footer_doc_url?: string | null
+          header_email_url?: string | null
           header_url?: string | null
           id?: string
           id_cif?: string | null
+          isotipo_url?: string | null
+          logo_horizontal_dark_url?: string | null
+          logo_horizontal_light_url?: string | null
+          logo_master_url?: string | null
           logo_url?: string | null
+          logo_vertical_url?: string | null
           nombre?: string
           nombre_comercial?: string | null
           obligaciones_fiscales?: Json | null
@@ -185,6 +232,7 @@ export type Database = {
           solo_fiscal?: boolean
           tipo_contribuyente?: string
           uso_cfdi_default?: string | null
+          watermark_url?: string | null
         }
         Relationships: []
       }
