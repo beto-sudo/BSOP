@@ -10,9 +10,11 @@ import { getSupabaseAdminClient } from '@/lib/supabase-admin';
  * cualquier avance creado desde el módulo de tareas (sin URL de junta) a la
  * junta que el usuario tiene abierta.
  *
- * Solo activa juntas en estado `en_curso`. Si la junta ya terminó o está
- * programada, no hace nada — evita que una minuta incluya avances de una
- * junta que nunca estuvo realmente abierta.
+ * Activa juntas en `programada` o `en_curso`. Si la junta es `programada`
+ * y el usuario entró a la pantalla, claramente está trabajando en ella —
+ * esperar a que alguien clickee explícitamente "iniciar" perdía el enlace
+ * de avances durante la ventana de transición. Juntas `completada` o
+ * `cancelada` se ignoran.
  *
  * DELETE limpia la junta activa del usuario (por si salen manualmente del
  * flujo de junta y quieren volver a capturar avances "libres"). No es
@@ -36,7 +38,6 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Server config error' }, { status: 500 });
   }
 
-  // Solo marcar como activa si la junta está en curso.
   const { data: junta } = await admin
     .schema('erp')
     .from('juntas')
@@ -47,7 +48,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   if (!junta) {
     return NextResponse.json({ error: 'Junta no encontrada' }, { status: 404 });
   }
-  if (junta.estado !== 'en_curso') {
+  if (junta.estado !== 'en_curso' && junta.estado !== 'programada') {
     return NextResponse.json({ ok: true, activated: false, estado: junta.estado });
   }
 
