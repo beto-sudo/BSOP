@@ -57,26 +57,30 @@ function EmpresaPageInner() {
 
   const fetchEmpresa = useCallback(async () => {
     if (!slug) return;
-    const { data, error: err } = await supabase
-      .schema('core')
-      .from('empresas')
-      .select(SELECT_COLS)
-      .eq('slug', slug)
-      .maybeSingle();
-    if (err) {
-      setError(err.message);
-      return;
+    setLoading(true);
+    try {
+      const { data, error: err } = await supabase
+        .schema('core')
+        .from('empresas')
+        .select(SELECT_COLS)
+        .eq('slug', slug)
+        .maybeSingle();
+      if (err) {
+        setError(err.message);
+        return;
+      }
+      if (!data) {
+        setError('Empresa no encontrada');
+        return;
+      }
+      setEmpresa(data as unknown as EmpresaWithBranding);
+    } finally {
+      setLoading(false);
     }
-    if (!data) {
-      setError('Empresa no encontrada');
-      return;
-    }
-    setEmpresa(data as unknown as EmpresaWithBranding);
   }, [supabase, slug]);
 
   useEffect(() => {
-    setLoading(true);
-    fetchEmpresa().finally(() => setLoading(false));
+    fetchEmpresa();
   }, [fetchEmpresa]);
 
   if (loading) {
@@ -145,12 +149,10 @@ function EmpresaPageInner() {
 
       {/* Tabs */}
       <div className="flex border-b border-[var(--border)]">
-        {(
-          [
-            { key: 'branding' as const, label: 'Branding' },
-            { key: 'fiscal' as const, label: 'Datos fiscales y dirección' },
-          ]
-        ).map((t) => (
+        {[
+          { key: 'branding' as const, label: 'Branding' },
+          { key: 'fiscal' as const, label: 'Datos fiscales y dirección' },
+        ].map((t) => (
           <button
             key={t.key}
             type="button"

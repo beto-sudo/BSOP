@@ -48,23 +48,27 @@ function EmpresasSettingsInner() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchEmpresas = useCallback(async () => {
-    const { data, error: err } = await supabase
-      .schema('core')
-      .from('empresas')
-      .select(
-        'id, nombre, slug, activa, rfc, estatus_sat, regimen_fiscal, domicilio_municipio, domicilio_estado, csf_url, color_primario, logo_horizontal_light_url, branding_updated_at',
-      )
-      .order('nombre');
-    if (err) {
-      setError(err.message);
-      return;
+    setLoading(true);
+    try {
+      const { data, error: err } = await supabase
+        .schema('core')
+        .from('empresas')
+        .select(
+          'id, nombre, slug, activa, rfc, estatus_sat, regimen_fiscal, domicilio_municipio, domicilio_estado, csf_url, color_primario, logo_horizontal_light_url, branding_updated_at'
+        )
+        .order('nombre');
+      if (err) {
+        setError(err.message);
+        return;
+      }
+      setEmpresas((data ?? []) as EmpresaRow[]);
+    } finally {
+      setLoading(false);
     }
-    setEmpresas((data ?? []) as EmpresaRow[]);
   }, [supabase]);
 
   useEffect(() => {
-    setLoading(true);
-    fetchEmpresas().finally(() => setLoading(false));
+    fetchEmpresas();
   }, [fetchEmpresas]);
 
   return (
@@ -79,10 +83,7 @@ function EmpresasSettingsInner() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => {
-            setLoading(true);
-            fetchEmpresas().finally(() => setLoading(false));
-          }}
+          onClick={() => fetchEmpresas()}
           disabled={loading}
           className="rounded-xl border-[var(--border)] bg-[var(--card)] text-[var(--text)] hover:bg-[var(--panel)]"
         >
