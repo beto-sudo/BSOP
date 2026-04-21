@@ -175,7 +175,7 @@ export function MisTareasWidget() {
           .in('asignado_a', empleadoIds)
           .in('estado', ['pendiente', 'en_progreso', 'bloqueado'])
           .order('fecha_vence', { ascending: true, nullsFirst: false })
-          .limit(50);
+          .limit(100);
 
         if (taskErr) throw taskErr;
         if (!cancelled) {
@@ -283,7 +283,7 @@ export function MisTareasWidget() {
                     <span className="text-xs text-[var(--text)]/40">{grouped[bucket].length}</span>
                   </div>
                   <ul className="space-y-1.5">
-                    {grouped[bucket].slice(0, 5).map((t) => (
+                    {grouped[bucket].slice(0, 10).map((t) => (
                       <li key={t.id}>
                         <Link
                           href="/inicio/tasks"
@@ -299,9 +299,9 @@ export function MisTareasWidget() {
                       </li>
                     ))}
                   </ul>
-                  {grouped[bucket].length > 5 && (
+                  {grouped[bucket].length > 10 && (
                     <p className="mt-1.5 text-right text-xs text-[var(--text)]/40">
-                      + {grouped[bucket].length - 5} más
+                      + {grouped[bucket].length - 10} más
                     </p>
                   )}
                 </section>
