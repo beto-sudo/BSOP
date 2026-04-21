@@ -47,12 +47,12 @@ const BUCKET_CONFIG: Record<Bucket, { label: string; tone: string; icon: typeof 
   },
   despues: {
     label: 'Después',
-    tone: 'text-white/60 bg-white/5 border-white/10',
+    tone: 'text-slate-500 bg-slate-500/10 border-slate-500/20',
     icon: ListTodo,
   },
   sin_fecha: {
     label: 'Sin fecha',
-    tone: 'text-white/50 bg-white/5 border-white/10',
+    tone: 'text-slate-500 bg-slate-500/10 border-slate-500/20',
     icon: ListTodo,
   },
 };
