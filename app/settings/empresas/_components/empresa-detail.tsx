@@ -1,9 +1,5 @@
 'use client';
 
-/* eslint-disable react-hooks/set-state-in-effect --
- * Same hydration pattern as before — out of scope for this refactor.
- */
-
 import { useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';

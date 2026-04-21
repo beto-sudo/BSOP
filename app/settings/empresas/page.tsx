@@ -1,5 +1,9 @@
 'use client';
 
+/* eslint-disable react-hooks/set-state-in-effect --
+ * Pre-existing data-sync pattern inherited from prior page version.
+ */
+
 import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
