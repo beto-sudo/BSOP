@@ -75,8 +75,13 @@ function EmpresaPageInner() {
   }, [supabase, slug]);
 
   useEffect(() => {
-    setLoading(true);
-    fetchEmpresa().finally(() => setLoading(false));
+    void (async () => {
+      try {
+        await fetchEmpresa();
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [fetchEmpresa]);
 
   if (loading) {
@@ -145,12 +150,10 @@ function EmpresaPageInner() {
 
       {/* Tabs */}
       <div className="flex border-b border-[var(--border)]">
-        {(
-          [
-            { key: 'branding' as const, label: 'Branding' },
-            { key: 'fiscal' as const, label: 'Datos fiscales y dirección' },
-          ]
-        ).map((t) => (
+        {[
+          { key: 'branding' as const, label: 'Branding' },
+          { key: 'fiscal' as const, label: 'Datos fiscales y dirección' },
+        ].map((t) => (
           <button
             key={t.key}
             type="button"

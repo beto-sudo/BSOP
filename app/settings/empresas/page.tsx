@@ -52,7 +52,7 @@ function EmpresasSettingsInner() {
       .schema('core')
       .from('empresas')
       .select(
-        'id, nombre, slug, activa, rfc, estatus_sat, regimen_fiscal, domicilio_municipio, domicilio_estado, csf_url, color_primario, logo_horizontal_light_url, branding_updated_at',
+        'id, nombre, slug, activa, rfc, estatus_sat, regimen_fiscal, domicilio_municipio, domicilio_estado, csf_url, color_primario, logo_horizontal_light_url, branding_updated_at'
       )
       .order('nombre');
     if (err) {
@@ -63,8 +63,13 @@ function EmpresasSettingsInner() {
   }, [supabase]);
 
   useEffect(() => {
-    setLoading(true);
-    fetchEmpresas().finally(() => setLoading(false));
+    void (async () => {
+      try {
+        await fetchEmpresas();
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [fetchEmpresas]);
 
   return (
