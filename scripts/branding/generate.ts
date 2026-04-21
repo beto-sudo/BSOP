@@ -27,6 +27,7 @@
  */
 
 import fs from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharpBase from 'sharp';
@@ -46,7 +47,9 @@ function sharp(input?: unknown, opts?: Record<string, unknown>) {
     !Array.isArray(input) &&
     !(input instanceof ArrayBuffer)
   ) {
-    return sharpBase({ ...(input as object), ...mergedOpts } as unknown as Parameters<typeof sharpBase>[0]);
+    return sharpBase({ ...(input as object), ...mergedOpts } as unknown as Parameters<
+      typeof sharpBase
+    >[0]);
   }
   // @ts-expect-error — input overloads are broad
   return sharpBase(input, mergedOpts);
@@ -56,7 +59,7 @@ function sharp(input?: unknown, opts?: Record<string, unknown>) {
 
 function loadEnvFile(filePath: string) {
   try {
-    const content = require('node:fs').readFileSync(filePath, 'utf8');
+    const content = readFileSync(filePath, 'utf8');
     for (const rawLine of content.split(/\r?\n/)) {
       const line = rawLine.trim();
       if (!line || line.startsWith('#')) continue;
@@ -64,7 +67,10 @@ function loadEnvFile(filePath: string) {
       if (eq === -1) continue;
       const key = line.slice(0, eq).trim();
       let value = line.slice(eq + 1).trim();
-      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
         value = value.slice(1, -1);
       }
       if (!(key in process.env)) process.env[key] = value;
@@ -199,7 +205,11 @@ async function svgBox(svg: string): Promise<{ width: number; height: number }> {
  *             el contenido del SVG es blanco/inverso para que el trim no recorte
  *             los pixeles del propio logo.
  */
-async function splitMaster(masterSvg: string, splitRatio = 0.72, mode: 'opaque' | 'alpha' = 'opaque') {
+async function splitMaster(
+  masterSvg: string,
+  splitRatio = 0.72,
+  mode: 'opaque' | 'alpha' = 'opaque'
+) {
   const base = sharp(Buffer.from(masterSvg), { density: 300, limitInputPixels: false });
   const masterPng =
     mode === 'opaque'
@@ -213,10 +223,7 @@ async function splitMaster(masterSvg: string, splitRatio = 0.72, mode: 'opaque' 
 
   // Sharp tiene un bug al encadenar extract().trim() sobre output de flatten();
   // separamos en 2 pipelines (extract → buffer → trim → buffer).
-  const trimOpts =
-    mode === 'opaque'
-      ? { background: '#ffffff', threshold: 10 }
-      : { threshold: 10 }; // sin background → usa pixel top-left (transparente)
+  const trimOpts = mode === 'opaque' ? { background: '#ffffff', threshold: 10 } : { threshold: 10 }; // sin background → usa pixel top-left (transparente)
 
   const isoRaw = await sharp(masterPng)
     .extract({ left: 0, top: 0, width: W, height: splitY })
@@ -236,13 +243,16 @@ async function splitMaster(masterSvg: string, splitRatio = 0.72, mode: 'opaque' 
 async function composeHorizontalLight(
   outDir: string,
   masterSvg: string,
-  _paleta: Paleta,
+  _paleta: Paleta
 ): Promise<GeneratedAsset> {
   const { iso, word } = await splitMaster(masterSvg);
 
   const targetH = 400;
   const isoResized = await sharp(iso).resize({ height: targetH }).png().toBuffer();
-  const wordResized = await sharp(word).resize({ height: Math.round(targetH * 0.38) }).png().toBuffer();
+  const wordResized = await sharp(word)
+    .resize({ height: Math.round(targetH * 0.38) })
+    .png()
+    .toBuffer();
   const iM = await sharp(isoResized).metadata();
   const wM = await sharp(wordResized).metadata();
 
@@ -252,11 +262,20 @@ async function composeHorizontalLight(
   const canvasH = padding * 2 + targetH;
 
   const composed = await sharp({
-    create: { width: canvasW, height: canvasH, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 0 } },
+    create: {
+      width: canvasW,
+      height: canvasH,
+      channels: 4,
+      background: { r: 255, g: 255, b: 255, alpha: 0 },
+    },
   })
     .composite([
       { input: isoResized, left: padding, top: Math.round((canvasH - iM.height!) / 2) },
-      { input: wordResized, left: padding + iM.width! + gap, top: Math.round((canvasH - wM.height!) / 2) },
+      {
+        input: wordResized,
+        left: padding + iM.width! + gap,
+        top: Math.round((canvasH - wM.height!) / 2),
+      },
     ])
     .png()
     .toBuffer();
@@ -269,13 +288,15 @@ async function composeHorizontalLight(
 async function composeHorizontalDark(
   outDir: string,
   masterSvg: string,
-  paleta: Paleta,
+  paleta: Paleta
 ): Promise<GeneratedAsset> {
   // Para dark: pinta el wordmark (el gris neutro del SVG) a color inverso (blanco/crema)
   // Dejamos el isotipo con su color primario original (se ve bien sobre oscuro).
   const darkSvg = recolorSvgWordmark(masterSvg, paleta.inverso);
 
-  const masterPng = await sharp(Buffer.from(darkSvg), { density: 300, limitInputPixels: false }).png().toBuffer();
+  const masterPng = await sharp(Buffer.from(darkSvg), { density: 300, limitInputPixels: false })
+    .png()
+    .toBuffer();
   const meta = await sharp(masterPng).metadata();
   const W = meta.width!;
   const H = meta.height!;
@@ -290,7 +311,10 @@ async function composeHorizontalDark(
     .toBuffer();
   const targetH = 400;
   const isoResized = await sharp(iso).resize({ height: targetH }).png().toBuffer();
-  const wordResized = await sharp(word).resize({ height: Math.round(targetH * 0.45) }).png().toBuffer();
+  const wordResized = await sharp(word)
+    .resize({ height: Math.round(targetH * 0.45) })
+    .png()
+    .toBuffer();
   const isoM = await sharp(isoResized).metadata();
   const wordM = await sharp(wordResized).metadata();
   const gap = 40;
@@ -298,11 +322,20 @@ async function composeHorizontalDark(
   const canvasW = padding * 2 + isoM.width! + gap + wordM.width!;
   const canvasH = padding * 2 + targetH;
   const composed = await sharp({
-    create: { width: canvasW, height: canvasH, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+    create: {
+      width: canvasW,
+      height: canvasH,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
   })
     .composite([
       { input: isoResized, left: padding, top: Math.round((canvasH - isoM.height!) / 2) },
-      { input: wordResized, left: padding + isoM.width! + gap, top: Math.round((canvasH - wordM.height!) / 2) },
+      {
+        input: wordResized,
+        left: padding + isoM.width! + gap,
+        top: Math.round((canvasH - wordM.height!) / 2),
+      },
     ])
     .png()
     .toBuffer();
@@ -332,7 +365,11 @@ async function composeIsotipo(outDir: string, masterSvg: string): Promise<Genera
   return { variant: 'isotipo', localPath: finalPath, contentType: 'image/png' };
 }
 
-async function composeFavicon(outDir: string, masterSvg: string, paleta: Paleta): Promise<GeneratedAsset> {
+async function composeFavicon(
+  outDir: string,
+  masterSvg: string,
+  paleta: Paleta
+): Promise<GeneratedAsset> {
   // 512x512 cuadrado con fondo color primario + isotipo en color inverso centrado.
   const invSvg = recolorSvgAll(masterSvg, paleta.inverso);
   const { iso } = await splitMaster(invSvg, 0.72, 'alpha');
@@ -357,7 +394,7 @@ async function composeFavicon(outDir: string, masterSvg: string, paleta: Paleta)
 async function composeHeaderEmail(
   outDir: string,
   masterSvg: string,
-  paleta: Paleta,
+  paleta: Paleta
 ): Promise<GeneratedAsset> {
   // Banner 1600x320 con fondo gradiente primario y logo completo en color inverso.
   const W = 1600;
@@ -406,7 +443,7 @@ async function composeHeaderEmail(
 async function composeFooterDoc(
   outDir: string,
   empresa: EmpresaRow,
-  paleta: Paleta,
+  paleta: Paleta
 ): Promise<GeneratedAsset> {
   // Footer 1600x160 con barra de color primario arriba + texto fiscal abajo
   const W = 1600;
@@ -481,7 +518,7 @@ async function uploadAsset(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any, any, any>,
   slug: string,
-  asset: GeneratedAsset,
+  asset: GeneratedAsset
 ): Promise<string> {
   const filename = path.basename(asset.localPath);
   const storagePath = `${slug}/brand/${filename}`;
@@ -498,7 +535,7 @@ async function uploadMasterSvg(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any, any, any>,
   slug: string,
-  svgPath: string,
+  svgPath: string
 ): Promise<string> {
   const body = await fs.readFile(svgPath);
   const storagePath = `${slug}/brand/master.svg`;
@@ -536,7 +573,7 @@ async function main() {
   await fs.mkdir(outDir, { recursive: true });
 
   // SVG master
-  let masterSvgPath = svgArg ? path.resolve(svgArg) : path.join(outDir, 'master.svg');
+  const masterSvgPath = svgArg ? path.resolve(svgArg) : path.join(outDir, 'master.svg');
   if (!(await fileExists(masterSvgPath))) {
     throw new Error(`No se encontró el SVG master en ${masterSvgPath}. Pasa --svg <path>.`);
   }
@@ -562,8 +599,7 @@ async function main() {
   if (shouldRun('logo_vertical')) assets.push(await composeVertical(outDir, masterSvg));
   if (shouldRun('isotipo')) assets.push(await composeIsotipo(outDir, masterSvg));
   if (shouldRun('favicon')) assets.push(await composeFavicon(outDir, masterSvg, paleta));
-  if (shouldRun('header_email'))
-    assets.push(await composeHeaderEmail(outDir, masterSvg, paleta));
+  if (shouldRun('header_email')) assets.push(await composeHeaderEmail(outDir, masterSvg, paleta));
   if (shouldRun('watermark')) assets.push(await composeWatermark(outDir, masterSvg));
 
   console.log(`✓ Generados ${assets.length} variantes en ${path.relative(repoRoot, outDir)}/`);
@@ -573,7 +609,8 @@ async function main() {
   if (args.upload || shouldRun('footer_doc')) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !key) throw new Error('Faltan NEXT_PUBLIC_SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY');
+    if (!url || !key)
+      throw new Error('Faltan NEXT_PUBLIC_SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY');
     const supabase = createClient(url, key, {
       auth: { persistSession: false, autoRefreshToken: false },
       db: { schema: 'core' },
@@ -581,7 +618,7 @@ async function main() {
     const { data, error } = await supabase
       .from('empresas')
       .select(
-        'id, slug, nombre, nombre_comercial, razon_social, rfc, domicilio_calle, domicilio_numero_ext, domicilio_colonia, domicilio_municipio, domicilio_estado, domicilio_cp',
+        'id, slug, nombre, nombre_comercial, razon_social, rfc, domicilio_calle, domicilio_numero_ext, domicilio_colonia, domicilio_municipio, domicilio_estado, domicilio_cp'
       )
       .eq('slug', slug)
       .maybeSingle();
