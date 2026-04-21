@@ -390,13 +390,9 @@ function JuntaDetailInner() {
     // la junta (desde fecha_hora; hasta fecha_terminada si ya cerró). Durante
     // la junta se tocan tareas cuyo entidad_id es de OTRAS juntas; filtrar por
     // task_id local dejaría fuera la mayoría.
-    // Avances ligados por junta_id + fallback temporal para históricos con
-    // junta_id NULL (registros ambiguos pre-migración).
+    // Avances ligados a esta junta por junta_id (trigger de DB).
     const { data: updatesData, error: updatesErr } = await fetchJuntaUpdates(supabase as any, {
       juntaId: id,
-      empresaId: juntaData.empresa_id,
-      fechaHora: juntaData.fecha_hora,
-      fechaTerminada: juntaData.fecha_terminada,
     });
     if (updatesErr) console.error('[juntas] task_updates query error:', updatesErr);
     if (updatesData && updatesData.length > 0) {
