@@ -78,6 +78,18 @@ export type TasksModuleProps = {
 
   /** Rich-only: auto-link new tasks to an in-progress junta (default true). */
   autoLinkJunta?: boolean;
+
+  /**
+   * Personal view: filter to tasks where `asignado_a` matches the current
+   * user's empleado_id across all their empresas. Used by `/inicio/tasks`.
+   */
+  onlyMine?: boolean;
+
+  /**
+   * Show the "Ocultar/Mostrar completadas" toggle (always shown on rich).
+   * When true in simple variant, also applies the `hideCompleted` filter.
+   */
+  hideCompletedToggle?: boolean;
 };
 
 export function TasksModule({
@@ -88,6 +100,8 @@ export function TasksModule({
   subtitle = 'Gestión de tareas operativas',
   variant = 'simple',
   autoLinkJunta = true,
+  onlyMine = false,
+  hideCompletedToggle = false,
 }: TasksModuleProps) {
   // `_empresaSlug` is accepted for call-site parity with EmpleadosModule and
   // future detail-page links; silence unused-var lint until then.
@@ -106,6 +120,10 @@ export function TasksModule({
   const [isDireccion, setIsDireccion] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
+  // ── Personal view (onlyMine) ───────────────────────────────────────────────
+  // null = still loading, [] = user has no empleado rows, [...] = resolved.
+  const [myEmpleadoIds, setMyEmpleadoIds] = useState<string[] | null>(null);
+
   // ── Data ───────────────────────────────────────────────────────────────────
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [tasks, setTasks] = useState<ErpTask[]>([]);
@@ -118,7 +136,8 @@ export function TasksModule({
   const [filterPrioridad, setFilterPrioridad] = useState('all');
   const [filterAsignado, setFilterAsignado] = useState('all');
   const [filterDepto, setFilterDepto] = useState('all'); // rich only
-  const [hideCompleted, setHideCompleted] = useState(true); // rich only
+  // Used by rich variant and by simple+hideCompletedToggle.
+  const [hideCompleted, setHideCompleted] = useState(true);
 
   // ── Create / edit state ────────────────────────────────────────────────────
   const [showCreate, setShowCreate] = useState(false);
@@ -198,6 +217,24 @@ export function TasksModule({
       });
       setEmpleados(mapped);
 
+      // Personal view: resolve my empleado_ids across all empresas in scope.
+      if (onlyMine) {
+        if (!email) {
+          setMyEmpleadoIds([]);
+        } else {
+          const { data: mineRows } = await supabase
+            .schema('erp')
+            .from('v_empleados_full')
+            .select('empleado_id, empresa_id, email_empresa, email_personal')
+            .in('empresa_id', ids)
+            .or(`email_empresa.eq.${email},email_personal.eq.${email}`);
+          const mineIds = (mineRows ?? [])
+            .map((r: { empleado_id: string | null }) => r.empleado_id)
+            .filter((x: string | null): x is string => Boolean(x));
+          setMyEmpleadoIds(mineIds);
+        }
+      }
+
       if (!isRich || !email) return;
 
       // Role gating + currentEmpleadoId (DILESA / rich variant only)
@@ -258,7 +295,7 @@ export function TasksModule({
         }
       }
     },
-    [supabase, isRich]
+    [supabase, isRich, onlyMine]
   );
 
   const fetchTasks = useCallback(
@@ -677,6 +714,13 @@ export function TasksModule({
   const { sortKey, sortDir, onSort, sortData } = useSortableTable('created_at', 'desc');
 
   const visibleTasks = useMemo(() => {
+    if (onlyMine) {
+      // While resolving ids, hide everything (avoid flashing all tasks).
+      if (myEmpleadoIds === null) return [];
+      if (myEmpleadoIds.length === 0) return [];
+      const idSet = new Set(myEmpleadoIds);
+      return tasks.filter((t) => t.asignado_a && idSet.has(t.asignado_a));
+    }
     if (!isRich) return tasks;
     if (isAdmin || isDireccion) return tasks;
     return tasks.filter(
@@ -685,10 +729,16 @@ export function TasksModule({
         t.asignado_por === currentEmpleadoId ||
         t.creado_por === currentEmpleadoId
     );
-  }, [tasks, isRich, isAdmin, isDireccion, currentEmpleadoId]);
+  }, [tasks, isRich, isAdmin, isDireccion, currentEmpleadoId, onlyMine, myEmpleadoIds]);
+
+  const showHideCompletedToggle = isRich || hideCompletedToggle;
 
   const filtered = visibleTasks.filter((t) => {
-    if (isRich && hideCompleted && (t.estado === 'completado' || t.estado === 'cancelado'))
+    if (
+      showHideCompletedToggle &&
+      hideCompleted &&
+      (t.estado === 'completado' || t.estado === 'cancelado')
+    )
       return false;
 
     if (search) {
@@ -779,8 +829,8 @@ export function TasksModule({
         empleadoOptions={empleadoOptions}
       />
 
-      {/* Hide-completadas toggle (rich only) */}
-      {isRich && (
+      {/* Hide-completadas toggle (rich or when explicitly enabled) */}
+      {showHideCompletedToggle && (
         <div className="flex items-center justify-between">
           <button
             type="button"
@@ -828,8 +878,8 @@ export function TasksModule({
         />
       </div>
 
-      {/* Footer counter (simple only — rich shows its own) */}
-      {!isRich && !loading && tasks.length > 0 && (
+      {/* Footer counter (simple only — rich and simple+toggle show their own) */}
+      {!isRich && !showHideCompletedToggle && !loading && tasks.length > 0 && (
         <p className="text-right text-xs text-[var(--text)]/40">
           {filtered.length} de {tasks.length} {tasks.length === 1 ? 'tarea' : 'tareas'}
         </p>
