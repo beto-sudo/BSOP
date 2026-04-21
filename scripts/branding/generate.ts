@@ -20,6 +20,11 @@
  *   --upload               si se pasa, sube al bucket `empresas` y actualiza DB
  *   --only <list>          solo genera variantes de la lista (comma-separated)
  *                          ej. --only header_email,footer_doc
+ *   --split-ratio <0..1>   fracción vertical donde termina el isotipo; default 0.72
+ *                          (bajar si el wordmark ocupa más de la mitad del SVG)
+ *   --wordmark-colors <hex,hex>
+ *                          colores del wordmark (para SVGs donde NO es gris neutro;
+ *                          e.g. RDB tiene wordmark en dos verdes saturados)
  *
  * Salida:
  *   Archivos locales → `public/brand/<slug>/<variant>.{svg,png,ico}`
@@ -163,19 +168,24 @@ function recolorSvgAll(svg: string, targetHex: string): string {
 }
 
 /**
- * Reemplaza solo el wordmark (gris neutro, detectado por bajo saturation) por un color target.
+ * Reemplaza solo el wordmark por un color target. Por default detecta grises
+ * neutros (saturación < 0.2). Si se pasan `extraHexes`, también reemplaza esos
+ * colores exactos (para wordmarks con colores saturados como RDB).
  * Preserva el color del isotipo.
  */
-function recolorSvgWordmark(svg: string, targetHex: string): string {
+function recolorSvgWordmark(svg: string, targetHex: string, extraHexes: string[] = []): string {
   const [r, g, b] = hexToRgb(targetHex);
   const targetStr = `rgb(${((r / 255) * 100).toFixed(4)}%, ${((g / 255) * 100).toFixed(4)}%, ${((b / 255) * 100).toFixed(4)}%)`;
+  const extras = extraHexes.map((h) => hexToRgb(h));
+  const colorMatches = (rr: number, gg: number, bb: number) =>
+    extras.some(([er, eg, eb]) => Math.abs(rr - er) <= 3 && Math.abs(gg - eg) <= 3 && Math.abs(bb - eb) <= 3);
   return svg.replace(/rgb\(([\d.]+)%,\s*([\d.]+)%,\s*([\d.]+)%\)/g, (match) => {
     const [rr, gg, bb] = rgbFromPctString(match);
     const max = Math.max(rr, gg, bb);
     const min = Math.min(rr, gg, bb);
     const saturation = max === 0 ? 0 : (max - min) / max;
-    // si saturación < 0.2 lo consideramos gris neutro (wordmark)
     if (saturation < 0.2) return targetStr;
+    if (colorMatches(rr, gg, bb)) return targetStr;
     return match;
   });
 }
@@ -237,8 +247,9 @@ async function composeHorizontalLight(
   outDir: string,
   masterSvg: string,
   _paleta: Paleta,
+  splitRatio: number,
 ): Promise<GeneratedAsset> {
-  const { iso, word } = await splitMaster(masterSvg);
+  const { iso, word } = await splitMaster(masterSvg, splitRatio);
 
   const targetH = 400;
   const isoResized = await sharp(iso).resize({ height: targetH }).png().toBuffer();
@@ -270,16 +281,18 @@ async function composeHorizontalDark(
   outDir: string,
   masterSvg: string,
   paleta: Paleta,
+  splitRatio: number,
+  wordmarkColors: string[],
 ): Promise<GeneratedAsset> {
   // Para dark: pinta el wordmark (el gris neutro del SVG) a color inverso (blanco/crema)
   // Dejamos el isotipo con su color primario original (se ve bien sobre oscuro).
-  const darkSvg = recolorSvgWordmark(masterSvg, paleta.inverso);
+  const darkSvg = recolorSvgWordmark(masterSvg, paleta.inverso, wordmarkColors);
 
   const masterPng = await sharp(Buffer.from(darkSvg), { density: 300, limitInputPixels: false }).png().toBuffer();
   const meta = await sharp(masterPng).metadata();
   const W = meta.width!;
   const H = meta.height!;
-  const splitY = Math.round(H * 0.72);
+  const splitY = Math.round(H * splitRatio);
   const iso = await sharp(masterPng)
     .extract({ left: 0, top: 0, width: W, height: splitY })
     .trim({ background: 'white', threshold: 10 })
@@ -324,18 +337,18 @@ async function composeVertical(outDir: string, masterSvg: string): Promise<Gener
   return { variant: 'logo_vertical', localPath: finalPath, contentType: 'image/png' };
 }
 
-async function composeIsotipo(outDir: string, masterSvg: string): Promise<GeneratedAsset> {
-  const { iso } = await splitMaster(masterSvg);
+async function composeIsotipo(outDir: string, masterSvg: string, splitRatio: number): Promise<GeneratedAsset> {
+  const { iso } = await splitMaster(masterSvg, splitRatio);
   const out = await sharp(iso).resize({ height: 1200 }).png().toBuffer();
   const finalPath = path.join(outDir, 'isotipo.png');
   await fs.writeFile(finalPath, out);
   return { variant: 'isotipo', localPath: finalPath, contentType: 'image/png' };
 }
 
-async function composeFavicon(outDir: string, masterSvg: string, paleta: Paleta): Promise<GeneratedAsset> {
+async function composeFavicon(outDir: string, masterSvg: string, paleta: Paleta, splitRatio: number): Promise<GeneratedAsset> {
   // 512x512 cuadrado con fondo color primario + isotipo en color inverso centrado.
   const invSvg = recolorSvgAll(masterSvg, paleta.inverso);
-  const { iso } = await splitMaster(invSvg, 0.72, 'alpha');
+  const { iso } = await splitMaster(invSvg, splitRatio, 'alpha');
   const isoFit = await sharp(iso)
     .resize({ width: 360, height: 360, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png()
@@ -358,6 +371,7 @@ async function composeHeaderEmail(
   outDir: string,
   masterSvg: string,
   paleta: Paleta,
+  splitRatio: number,
 ): Promise<GeneratedAsset> {
   // Banner 1600x320 con fondo gradiente primario y logo completo en color inverso.
   const W = 1600;
@@ -365,7 +379,7 @@ async function composeHeaderEmail(
 
   // Recolorea TODO a inverso (isotipo + wordmark) porque el fondo es primario.
   const invSvg = recolorSvgAll(masterSvg, paleta.inverso);
-  const { iso, word } = await splitMaster(invSvg, 0.72, 'alpha');
+  const { iso, word } = await splitMaster(invSvg, splitRatio, 'alpha');
 
   const targetIsoH = Math.round(H * 0.62);
   const targetWordH = Math.round(targetIsoH * 0.38);
@@ -441,9 +455,9 @@ async function composeFooterDoc(
   return { variant: 'footer_doc', localPath: finalPath, contentType: 'image/png' };
 }
 
-async function composeWatermark(outDir: string, masterSvg: string): Promise<GeneratedAsset> {
+async function composeWatermark(outDir: string, masterSvg: string, splitRatio: number): Promise<GeneratedAsset> {
   // Marca de agua: isotipo grande, opacidad 8%, rotado 30°
-  const { iso: isoBuf } = await splitMaster(masterSvg);
+  const { iso: isoBuf } = await splitMaster(masterSvg, splitRatio);
   const iso = await sharp(isoBuf)
     .resize({ height: 1200 })
     .rotate(-30, { background: { r: 0, g: 0, b: 0, alpha: 0 } })
@@ -553,18 +567,26 @@ async function main() {
   const only = typeof args.only === 'string' ? (args.only as string).split(',') : null;
   const shouldRun = (v: string) => !only || only.includes(v);
 
+  const splitRatio = typeof args['split-ratio'] === 'string' ? parseFloat(args['split-ratio'] as string) : 0.72;
+  const wordmarkColors =
+    typeof args['wordmark-colors'] === 'string'
+      ? (args['wordmark-colors'] as string).split(',').map((s) => s.trim())
+      : [];
+  console.log(`  split-ratio: ${splitRatio}`);
+  if (wordmarkColors.length) console.log(`  wordmark-colors: ${wordmarkColors.join(', ')}`);
+
   const assets: GeneratedAsset[] = [];
 
   if (shouldRun('logo_horizontal_light'))
-    assets.push(await composeHorizontalLight(outDir, masterSvg, paleta));
+    assets.push(await composeHorizontalLight(outDir, masterSvg, paleta, splitRatio));
   if (shouldRun('logo_horizontal_dark'))
-    assets.push(await composeHorizontalDark(outDir, masterSvg, paleta));
+    assets.push(await composeHorizontalDark(outDir, masterSvg, paleta, splitRatio, wordmarkColors));
   if (shouldRun('logo_vertical')) assets.push(await composeVertical(outDir, masterSvg));
-  if (shouldRun('isotipo')) assets.push(await composeIsotipo(outDir, masterSvg));
-  if (shouldRun('favicon')) assets.push(await composeFavicon(outDir, masterSvg, paleta));
+  if (shouldRun('isotipo')) assets.push(await composeIsotipo(outDir, masterSvg, splitRatio));
+  if (shouldRun('favicon')) assets.push(await composeFavicon(outDir, masterSvg, paleta, splitRatio));
   if (shouldRun('header_email'))
-    assets.push(await composeHeaderEmail(outDir, masterSvg, paleta));
-  if (shouldRun('watermark')) assets.push(await composeWatermark(outDir, masterSvg));
+    assets.push(await composeHeaderEmail(outDir, masterSvg, paleta, splitRatio));
+  if (shouldRun('watermark')) assets.push(await composeWatermark(outDir, masterSvg, splitRatio));
 
   console.log(`✓ Generados ${assets.length} variantes en ${path.relative(repoRoot, outDir)}/`);
 
