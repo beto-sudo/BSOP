@@ -164,13 +164,16 @@ export function MisTareasWidget() {
           return;
         }
 
-        // tareas asignadas a este usuario, no completadas
+        // tareas asignadas a este usuario en estado activo.
+        // Whitelist en vez de blacklist: si aparece un estado nuevo ('archivado',
+        // etc.) no queremos que se cuele. Estados actuales:
+        // pendiente · en_progreso · bloqueado · completado · cancelado.
         const { data: taskRows, error: taskErr } = await supabase
           .schema('erp')
           .from('tasks')
           .select('id, empresa_id, titulo, estado, fecha_vence, fecha_compromiso, prioridad')
           .in('asignado_a', empleadoIds)
-          .neq('estado', 'completada')
+          .in('estado', ['pendiente', 'en_progreso', 'bloqueado'])
           .order('fecha_vence', { ascending: true, nullsFirst: false })
           .limit(50);
 
