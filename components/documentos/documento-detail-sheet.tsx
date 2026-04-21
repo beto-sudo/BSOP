@@ -74,6 +74,7 @@ export function DocumentoDetailSheet({
         fecha_vencimiento: editForm.fecha_vencimiento || null,
         notario_proveedor_id: editForm.notario_proveedor_id || null,
         notaria: editForm.notaria.trim() || null,
+        descripcion: editForm.descripcion.trim() || null,
         notas: editForm.notas.trim() || null,
         subtipo_meta: Object.keys(editForm.subtipo_meta).length > 0 ? editForm.subtipo_meta : null,
         updated_at: new Date().toISOString(),
@@ -95,6 +96,7 @@ export function DocumentoDetailSheet({
       fecha_vencimiento: editForm.fecha_vencimiento || null,
       notario_proveedor_id: editForm.notario_proveedor_id || null,
       notaria: editForm.notaria.trim() || null,
+      descripcion: editForm.descripcion.trim() || null,
       notas: editForm.notas.trim() || null,
       subtipo_meta: Object.keys(editForm.subtipo_meta).length > 0 ? editForm.subtipo_meta : null,
     };
@@ -199,6 +201,18 @@ export function DocumentoDetailSheet({
                           <p className="text-[var(--text)]/80">{String(v)}</p>
                         </div>
                       ))}
+                    </div>
+                  </>
+                )}
+
+                {doc.descripcion && (
+                  <>
+                    <Separator />
+                    <div>
+                      <FLabel>Descripción</FLabel>
+                      <p className="text-sm text-[var(--text)]/70 whitespace-pre-wrap">
+                        {doc.descripcion}
+                      </p>
                     </div>
                   </>
                 )}

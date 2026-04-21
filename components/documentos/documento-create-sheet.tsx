@@ -65,6 +65,7 @@ export function DocumentoCreateSheet({
         fecha_vencimiento: form.fecha_vencimiento || null,
         notario_proveedor_id: form.notario_proveedor_id || null,
         notaria: form.notaria.trim() || null,
+        descripcion: form.descripcion.trim() || null,
         notas: form.notas.trim() || null,
         subtipo_meta: Object.keys(form.subtipo_meta).length > 0 ? form.subtipo_meta : null,
         creado_por: cu?.id ?? null,

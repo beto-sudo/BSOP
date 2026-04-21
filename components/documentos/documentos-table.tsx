@@ -122,6 +122,7 @@ export function DocumentosTable({
               onSort={onSort}
               className="w-40"
             />
+            <TableHead className="font-medium text-[var(--text)]/55">Descripción</TableHead>
             <TableHead className="w-24 font-medium text-[var(--text)]/55">PDF</TableHead>
             <TableHead className="w-24 font-medium text-[var(--text)]/55">Imagen</TableHead>
             <TableHead className="w-20 font-medium text-[var(--text)]/55">Anexos</TableHead>
@@ -174,6 +175,18 @@ export function DocumentosTable({
                 </TableCell>
                 <TableCell>
                   <TipoBadge tipo={doc.tipo} />
+                </TableCell>
+                <TableCell>
+                  {doc.descripcion ? (
+                    <span
+                      className="line-clamp-2 block max-w-xs text-xs text-[var(--text)]/65"
+                      title={doc.descripcion}
+                    >
+                      {doc.descripcion}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-[var(--text)]/25">—</span>
+                  )}
                 </TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
                   {pdfs.length > 0 ? (

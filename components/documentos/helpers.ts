@@ -50,6 +50,7 @@ export function emptyForm(): DocForm {
     fecha_vencimiento: '',
     notario_proveedor_id: '',
     notaria: '',
+    descripcion: '',
     notas: '',
     subtipo_meta: {},
   };
@@ -64,6 +65,7 @@ export function docToForm(doc: Documento): DocForm {
     fecha_vencimiento: doc.fecha_vencimiento ?? '',
     notario_proveedor_id: doc.notario_proveedor_id ?? '',
     notaria: doc.notaria ?? '',
+    descripcion: doc.descripcion ?? '',
     notas: doc.notas ?? '',
     subtipo_meta: doc.subtipo_meta ?? {},
   };

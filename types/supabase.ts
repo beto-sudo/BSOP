@@ -1297,6 +1297,7 @@ export type Database = {
           creado_por: string | null
           created_at: string
           deleted_at: string | null
+          descripcion: string | null
           empresa_id: string
           fecha_emision: string | null
           fecha_vencimiento: string | null
@@ -1315,6 +1316,7 @@ export type Database = {
           creado_por?: string | null
           created_at?: string
           deleted_at?: string | null
+          descripcion?: string | null
           empresa_id: string
           fecha_emision?: string | null
           fecha_vencimiento?: string | null
@@ -1333,6 +1335,7 @@ export type Database = {
           creado_por?: string | null
           created_at?: string
           deleted_at?: string | null
+          descripcion?: string | null
           empresa_id?: string
           fecha_emision?: string | null
           fecha_vencimiento?: string | null

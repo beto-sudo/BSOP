@@ -338,12 +338,13 @@ export function DocumentosModule({
   const tiposPresentes = [...new Set(documentos.map((d) => d.tipo).filter(Boolean))] as string[];
 
   const filtered = documentos.filter((d) => {
-    if (
-      search &&
-      !d.titulo.toLowerCase().includes(search.toLowerCase()) &&
-      !(d.numero_documento ?? '').toLowerCase().includes(search.toLowerCase())
-    )
-      return false;
+    if (search) {
+      const q = search.toLowerCase();
+      const inTitulo = d.titulo.toLowerCase().includes(q);
+      const inNumero = (d.numero_documento ?? '').toLowerCase().includes(q);
+      const inDescripcion = (d.descripcion ?? '').toLowerCase().includes(q);
+      if (!inTitulo && !inNumero && !inDescripcion) return false;
+    }
     if (filterTipo !== 'all' && d.tipo !== filterTipo) return false;
     return true;
   });
@@ -412,7 +413,7 @@ export function DocumentosModule({
           <div className="relative min-w-48 flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text)]/40" />
             <Input
-              placeholder="Buscar por título o número..."
+              placeholder="Buscar por título, número o descripción..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"

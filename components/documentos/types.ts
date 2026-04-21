@@ -19,6 +19,7 @@ export type Documento = {
   fecha_vencimiento: string | null;
   notaria: string | null;
   notario_proveedor_id: string | null;
+  descripcion: string | null;
   notas: string | null;
   archivo_url: string | null;
   subtipo_meta: Record<string, any> | null;
@@ -48,6 +49,7 @@ export type DocForm = {
   fecha_vencimiento: string;
   notario_proveedor_id: string;
   notaria: string;
+  descripcion: string;
   notas: string;
   subtipo_meta: Record<string, any>;
 };

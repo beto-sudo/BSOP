@@ -166,6 +166,21 @@ export function DocFormFields({
       )}
 
       <div>
+        <FLabel>Descripción</FLabel>
+        <Textarea
+          placeholder="Resumen breve de lo que contiene el documento..."
+          value={form.descripcion}
+          onChange={(e) => setForm((f) => ({ ...f, descripcion: e.target.value }))}
+          rows={3}
+          maxLength={500}
+          className="resize-none rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+        />
+        <p className="mt-1 text-[10px] text-[var(--text)]/40">
+          Se muestra como vista previa en la tabla. Máx 500 caracteres.
+        </p>
+      </div>
+
+      <div>
         <FLabel>Notas</FLabel>
         <Textarea
           placeholder="Observaciones adicionales..."
