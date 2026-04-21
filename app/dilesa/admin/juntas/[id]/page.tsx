@@ -19,6 +19,7 @@ import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Image from '@tiptap/extension-image';
 import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table';
+import { EditorToolbar, MINUTA_EDITOR_STYLES } from '@/components/juntas/editor-toolbar';
 import { Combobox } from '@/components/ui/combobox';
 import {
   Sheet,
@@ -48,16 +49,7 @@ import {
   Trash2,
   Check,
   X,
-  Bold,
-  Italic,
-  Underline as UnderlineIcon,
-  List,
-  ListOrdered,
-  Table2,
-  Heading2,
-  Heading3,
   CheckCircle2,
-  ImagePlus,
   MessageSquarePlus,
   Clock,
   Send,
@@ -215,101 +207,6 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 // Combobox local eliminado — ahora se usa el universal `@/components/ui/combobox`.
-
-function EditorToolbar({
-  editor,
-  onInsertImage,
-}: {
-  // Con `immediatelyRender: false` (requerido por Next SSR), `useEditor`
-  // puede devolver null en el primer render antes de hidratar.
-  editor: ReturnType<typeof useEditor> | null;
-  onInsertImage: () => void;
-}) {
-  if (!editor) return null;
-  const btn = (active: boolean, onClick: () => void, title: string, icon: React.ReactNode) => (
-    <button
-      type="button"
-      title={title}
-      onClick={onClick}
-      className={[
-        'inline-flex h-7 w-7 items-center justify-center rounded-lg text-sm transition',
-        active
-          ? 'bg-[var(--accent)]/20 text-[var(--accent)]'
-          : 'text-[var(--text)]/60 hover:bg-[var(--panel)] hover:text-[var(--text)]',
-      ].join(' ')}
-    >
-      {icon}
-    </button>
-  );
-  return (
-    <div className="flex flex-wrap items-center gap-0.5 rounded-t-xl border border-[var(--border)] bg-[var(--card)] p-1.5">
-      {btn(
-        editor.isActive('bold'),
-        () => editor.chain().focus().toggleBold().run(),
-        'Negrita',
-        <Bold className="h-3.5 w-3.5" />
-      )}
-      {btn(
-        editor.isActive('italic'),
-        () => editor.chain().focus().toggleItalic().run(),
-        'Cursiva',
-        <Italic className="h-3.5 w-3.5" />
-      )}
-      {btn(
-        editor.isActive('underline'),
-        () => editor.chain().focus().toggleUnderline().run(),
-        'Subrayado',
-        <UnderlineIcon className="h-3.5 w-3.5" />
-      )}
-      <div className="mx-1 h-5 w-px bg-[var(--border)]" />
-      {btn(
-        editor.isActive('heading', { level: 2 }),
-        () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
-        'H2',
-        <Heading2 className="h-3.5 w-3.5" />
-      )}
-      {btn(
-        editor.isActive('heading', { level: 3 }),
-        () => editor.chain().focus().toggleHeading({ level: 3 }).run(),
-        'H3',
-        <Heading3 className="h-3.5 w-3.5" />
-      )}
-      <div className="mx-1 h-5 w-px bg-[var(--border)]" />
-      {btn(
-        editor.isActive('bulletList'),
-        () => editor.chain().focus().toggleBulletList().run(),
-        'Lista',
-        <List className="h-3.5 w-3.5" />
-      )}
-      {btn(
-        editor.isActive('orderedList'),
-        () => editor.chain().focus().toggleOrderedList().run(),
-        'Lista numerada',
-        <ListOrdered className="h-3.5 w-3.5" />
-      )}
-      <div className="mx-1 h-5 w-px bg-[var(--border)]" />
-      <button
-        type="button"
-        title="Insertar tabla"
-        onClick={() =>
-          editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
-        }
-        className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-sm text-[var(--text)]/60 hover:bg-[var(--panel)] hover:text-[var(--text)] transition"
-      >
-        <Table2 className="h-3.5 w-3.5" />
-      </button>
-      <div className="mx-1 h-5 w-px bg-[var(--border)]" />
-      <button
-        type="button"
-        title="Insertar imagen"
-        onClick={onInsertImage}
-        className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-sm text-[var(--text)]/60 hover:bg-[var(--panel)] hover:text-[var(--text)] transition"
-      >
-        <ImagePlus className="h-3.5 w-3.5" />
-      </button>
-    </div>
-  );
-}
 
 function JuntaDetailInner() {
   const params = useParams();
@@ -1428,10 +1325,10 @@ function JuntaDetailInner() {
 
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
         <SectionTitle>Notas y minuta</SectionTitle>
-        <div className="overflow-hidden rounded-xl border border-[var(--border)]">
+        <div className="rounded-xl border border-[var(--border)]">
           <EditorToolbar editor={editor} onInsertImage={handleInsertImageClick} />
-          <div className="bg-[var(--panel)]">
-            <style>{`.ProseMirror { color: var(--text); } .ProseMirror p { margin: 0.4em 0; } .ProseMirror h2 { font-size: 1.1rem; font-weight: 700; margin: 0.8em 0 0.4em; } .ProseMirror h3 { font-size: 1rem; font-weight: 600; margin: 0.7em 0 0.35em; } .ProseMirror ul, .ProseMirror ol { padding-left: 1.4em; margin: 0.4em 0; } .ProseMirror li { margin: 0.2em 0; } .ProseMirror table { border-collapse: collapse; width: 100%; margin: 0.6em 0; } .ProseMirror td, .ProseMirror th { border: 1px solid var(--border); padding: 0.4em 0.6em; } .ProseMirror th { background: var(--card); font-weight: 600; } .ProseMirror p.is-editor-empty:first-child::before { color: var(--text); opacity: 0.35; content: attr(data-placeholder); float: left; height: 0; pointer-events: none; } .ProseMirror img { max-width: 100%; border-radius: 0.75rem; margin: 0.5em 0; }`}</style>
+          <div className="rounded-b-xl bg-[var(--panel)]">
+            <style>{MINUTA_EDITOR_STYLES}</style>
             <EditorContent editor={editor} />
           </div>
         </div>
