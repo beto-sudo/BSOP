@@ -408,7 +408,6 @@ _(sin tablas ni vistas)_
 - **deleted_at** `timestamp with time zone`
 - **archivo_url** `text`
 - **subtipo_meta** `jsonb`
-- **descripcion** `text`
 
 ### `erp.empleado_beneficiarios`
 
