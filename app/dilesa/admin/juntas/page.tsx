@@ -224,15 +224,14 @@ function JuntasInner() {
         .eq('empresa_id', EMPRESA_ID)
         .eq('entidad_tipo', 'junta')
         .limit(50000),
-      // task_updates de toda la empresa con su timestamp. Agrupamos por
-      // ventana de junta en cliente (misma lógica que el detalle): un update
-      // cuenta si su created_at cae entre fecha_hora y fecha_terminada de la
-      // junta, sin importar de qué tarea provenga.
+      // task_updates con junta_id directo (poblado por trigger al insertar
+      // desde la pantalla de junta o el módulo de tareas con junta activa).
       supabase
         .schema('erp')
         .from('task_updates')
-        .select('task_id, created_at')
+        .select('task_id, junta_id')
         .eq('empresa_id', EMPRESA_ID)
+        .not('junta_id', 'is', null)
         .limit(50000),
     ]);
     if (jRes.error) {
@@ -263,23 +262,22 @@ function JuntasInner() {
     setTaskCounts(tCounts);
     setTaskTerminadasCounts(teCounts);
 
-    // Avanzadas = # tareas distintas con ≥1 task_update dentro de la ventana
-    // de la junta [fecha_hora, fecha_terminada]. Misma definición que la
-    // sección "Actualizaciones de tareas" del detalle: cualquier tarea de la
-    // empresa actualizada en esa ventana — no tiene que pertenecer a esta
-    // junta. Para juntas sin fecha_terminada (en curso) la ventana es
-    // abierta hacia el futuro.
-    const updatesData = (uRes.data ?? []) as { task_id: string; created_at: string }[];
-    const avCounts = new Map<string, number>();
-    for (const j of (jRes.data ?? []) as Junta[]) {
-      const startTs = new Date(j.fecha_hora).getTime();
-      const endTs = j.fecha_terminada ? new Date(j.fecha_terminada).getTime() : Infinity;
-      const taskSet = new Set<string>();
-      for (const u of updatesData) {
-        const ts = new Date(u.created_at).getTime();
-        if (ts >= startTs && ts <= endTs) taskSet.add(u.task_id);
+    // Avanzadas = # tareas distintas con ≥1 task_update ligado a esta junta
+    // vía junta_id (trigger en DB lo popula al insertar el avance).
+    const updatesData = (uRes.data ?? []) as { task_id: string; junta_id: string }[];
+    const taskSetsByJunta = new Map<string, Set<string>>();
+    for (const u of updatesData) {
+      if (!u.junta_id || !u.task_id) continue;
+      let set = taskSetsByJunta.get(u.junta_id);
+      if (!set) {
+        set = new Set<string>();
+        taskSetsByJunta.set(u.junta_id, set);
       }
-      if (taskSet.size > 0) avCounts.set(j.id, taskSet.size);
+      set.add(u.task_id);
+    }
+    const avCounts = new Map<string, number>();
+    for (const [juntaId, set] of taskSetsByJunta) {
+      if (set.size > 0) avCounts.set(juntaId, set.size);
     }
     setTaskAvanzadasCounts(avCounts);
   }, [supabase]);

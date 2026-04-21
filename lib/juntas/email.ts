@@ -303,17 +303,11 @@ export async function buildMinutaEmailPayload(
   );
   const tareasCompletadas = allTasks.filter((t) => t.estado === 'completado');
 
-  // Avances: ligados por junta_id o, para históricos sin liga, dentro de
-  // la ventana [fecha_hora, fecha_terminada] de la misma empresa.
-  const fechaHora = (junta as any).fecha_hora as string;
-  const fechaTerminadaDb = (junta as any).fecha_terminada as string | null;
+  // Avances ligados a esta junta por junta_id (trigger de DB).
   let actualizaciones: { tarea: string; contenido: string; tipo: string; autor: string }[] = [];
 
   const { data: updatesData } = await fetchJuntaUpdates(supabase, {
     juntaId: (junta as any).id,
-    empresaId: (junta as any).empresa_id,
-    fechaHora,
-    fechaTerminada: fechaTerminadaDb,
     columns: 'task_id, tipo, contenido, valor_anterior, valor_nuevo, creado_por, created_at',
   });
 
