@@ -107,9 +107,12 @@ export async function GET(req: NextRequest) {
     'empresa:empresa_id(nombre,slug),' +
     'empleado:asignado_a(id,email_empresa,activo,persona:persona_id(nombre,apellido_paterno,email))';
 
+  // Whitelist de estados activos (mismo criterio que components/inicio/mis-tareas-widget,
+  // arreglado en #119 — el enum real es 'completado', no 'completada'). Whitelist > blacklist:
+  // si mañana aparece 'archivado', 'pausado', etc. no se cuelan silenciosamente.
   const query = new URLSearchParams({
     select,
-    estado: 'not.in.(completada,cancelada)',
+    estado: 'in.(pendiente,en_progreso,bloqueado)',
     fecha_completado: 'is.null',
     asignado_a: 'not.is.null',
   });
