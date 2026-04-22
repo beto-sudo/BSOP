@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/table';
 
 import type { Adjunto, Documento } from './types';
-import { formatDate, formatMonto, formatPrecioM2 } from './helpers';
+import { formatDate, formatMonto, formatPrecioM2, formatSuperficie } from './helpers';
 import { TipoBadge, TipoOperacionBadge, VencBadge } from './ui';
 
 type SortCtx = {
@@ -59,6 +59,7 @@ export function DocumentosTable({
   // que se corra el pipeline en esa empresa).
   const hasTipoOperacion = documentos.some((d) => d.tipo_operacion);
   const hasMonto = documentos.some((d) => d.monto != null);
+  const hasSuperficie = documentos.some((d) => d.superficie_m2 != null);
   const hasPrecioM2 = documentos.some((d) => d.precio_m2 != null);
 
   if (error) {
@@ -149,6 +150,16 @@ export function DocumentosTable({
                 className="w-32 text-right"
               />
             )}
+            {hasSuperficie && (
+              <SortableHead
+                sortKey="superficie_m2"
+                label="Superficie"
+                currentSort={sortKey}
+                currentDir={sortDir}
+                onSort={onSort}
+                className="w-28 text-right"
+              />
+            )}
             {hasPrecioM2 && (
               <SortableHead
                 sortKey="precio_m2"
@@ -223,6 +234,17 @@ export function DocumentosTable({
                     {doc.monto != null ? (
                       <span className="font-mono text-sm text-[var(--text)]/80">
                         {formatMonto(doc.monto, doc.moneda)}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-[var(--text)]/25">—</span>
+                    )}
+                  </TableCell>
+                )}
+                {hasSuperficie && (
+                  <TableCell className="text-right">
+                    {doc.superficie_m2 != null ? (
+                      <span className="font-mono text-xs text-[var(--text)]/70">
+                        {formatSuperficie(doc.superficie_m2)}
                       </span>
                     ) : (
                       <span className="text-xs text-[var(--text)]/25">—</span>
