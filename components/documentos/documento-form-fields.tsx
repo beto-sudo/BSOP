@@ -8,8 +8,19 @@
 /**
  * DocFormFields — common field set shared by both create and edit flows.
  *
- * Shares the tipo→meta→titulo auto-generation logic (Escritura titles are
- * derived from notaría + numero) so both sheets stay in sync.
+ * Flujo simplificado (2026-04): con el pipeline de extracción IA, la mayoría
+ * de los metadatos (número, fecha, partes, monto, ubicación, etc.) se
+ * rellenan automáticamente cuando el usuario dispara "Procesar con IA" sobre
+ * el PDF adjunto. Por eso los campos subtipo-específicos de Escritura,
+ * Contrato, Acta Constitutiva y Poder se **ocultan en el form de creación**
+ * (`mode === 'create'`); el usuario solo los ve/edita desde el detail sheet.
+ *
+ * Excepción: `Seguro` mantiene sus campos visibles (número de póliza,
+ * aseguradora, cobertura, prima) porque la IA no extrae esos datos — el
+ * schema actual cubre documentos legales notariales, no pólizas de seguros.
+ *
+ * En `mode === 'edit'` siempre se muestran todos los campos para que admin
+ * pueda ajustar si la extracción IA se equivocó o para capturar manualmente.
  */
 
 import type React from 'react';
@@ -29,12 +40,24 @@ export function DocFormFields({
   setForm,
   notarias,
   onOpenCreateNotaria,
+  mode = 'edit',
 }: {
   form: DocForm;
   setForm: React.Dispatch<React.SetStateAction<DocForm>>;
   notarias: NotariaOption[];
   onOpenCreateNotaria: () => void;
+  /**
+   * 'create' oculta los campos que la IA va a rellenar automáticamente
+   * (número, fecha emisión, descripción, subtipo específico salvo Seguro).
+   * 'edit' (default) muestra todo para capturas manuales o correcciones.
+   */
+  mode?: 'create' | 'edit';
 }) {
+  const isCreate = mode === 'create';
+  // Campos subtipo-específicos solo tienen sentido mostrarlos en create si
+  // la IA NO los extrae (Seguro). Para escritura/acta/poder/contrato los
+  // ocultamos porque son redundantes con lo que la extracción va a poblar.
+  const showSubtipoFieldsInCreate = form.tipo === 'Seguro';
   const handleNotariaChange = (value: string | null) => {
     if (!value) {
       setForm((f) => ({ ...f, notario_proveedor_id: '', notaria: '' }));
@@ -84,62 +107,78 @@ export function DocFormFields({
         />
       </div>
 
-      {/* Type-specific fields */}
-      {form.tipo && (
+      {/* Type-specific fields — en create, solo Seguro (la IA no extrae sus
+          campos específicos). En edit, siempre. */}
+      {form.tipo && (!isCreate || showSubtipoFieldsInCreate) && (
         <SubtipoFields tipo={form.tipo} meta={form.subtipo_meta} onChange={handleMetaChange} />
       )}
 
-      {/* Título */}
-      <div>
-        <FLabel req>Título</FLabel>
-        <Input
-          placeholder={
-            form.tipo === 'Escritura'
-              ? 'Se genera automáticamente'
-              : 'Ej: Contrato de arrendamiento oficina'
-          }
-          value={form.titulo}
-          onChange={(e) => setForm((f) => ({ ...f, titulo: e.target.value }))}
-          className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-          readOnly={form.tipo === 'Escritura'}
-        />
-        {form.tipo === 'Escritura' && (
-          <p className="mt-1 text-[10px] text-[var(--text)]/40">
-            Se genera a partir de los datos de la escritura.
-          </p>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
+      {/* Título — en create se omite (se genera placeholder automático y la IA
+          lo actualiza al procesar). En edit es editable manualmente. */}
+      {!isCreate && (
         <div>
-          <FLabel>No. de documento</FLabel>
+          <FLabel req>Título</FLabel>
           <Input
-            placeholder="Ej: 4521"
-            value={form.numero_documento}
-            onChange={(e) => setForm((f) => ({ ...f, numero_documento: e.target.value }))}
+            placeholder={
+              form.tipo === 'Escritura'
+                ? 'Se genera automáticamente'
+                : 'Ej: Contrato de arrendamiento oficina'
+            }
+            value={form.titulo}
+            onChange={(e) => setForm((f) => ({ ...f, titulo: e.target.value }))}
             className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+            readOnly={form.tipo === 'Escritura'}
           />
+          {form.tipo === 'Escritura' && (
+            <p className="mt-1 text-[10px] text-[var(--text)]/40">
+              Se genera a partir de los datos de la escritura.
+            </p>
+          )}
         </div>
+      )}
+
+      {/* Número y fecha de emisión — en create solo para Seguro (para el resto
+          la IA los extrae del PDF). En edit, siempre. */}
+      {(!isCreate || showSubtipoFieldsInCreate) && (
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <FLabel>No. de documento</FLabel>
+            <Input
+              placeholder="Ej: 4521"
+              value={form.numero_documento}
+              onChange={(e) => setForm((f) => ({ ...f, numero_documento: e.target.value }))}
+              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+            />
+          </div>
+          <div>
+            <FLabel>Fecha de emisión</FLabel>
+            <Input
+              type="date"
+              value={form.fecha_emision}
+              onChange={(e) => setForm((f) => ({ ...f, fecha_emision: e.target.value }))}
+              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Fecha de vencimiento: solo tiene sentido capturar al crear para
+          Contrato / Seguro (alertas de caducidad). Para Escritura/Acta/Poder
+          no aplica y la ocultamos en create — si hace falta, se edita. */}
+      {(!isCreate ||
+        form.tipo === 'Contrato' ||
+        form.tipo === 'Seguro' ||
+        form.tipo === 'Otro') && (
         <div>
-          <FLabel>Fecha de emisión</FLabel>
+          <FLabel>Fecha de vencimiento</FLabel>
           <Input
             type="date"
-            value={form.fecha_emision}
-            onChange={(e) => setForm((f) => ({ ...f, fecha_emision: e.target.value }))}
+            value={form.fecha_vencimiento}
+            onChange={(e) => setForm((f) => ({ ...f, fecha_vencimiento: e.target.value }))}
             className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
           />
         </div>
-      </div>
-
-      <div>
-        <FLabel>Fecha de vencimiento</FLabel>
-        <Input
-          type="date"
-          value={form.fecha_vencimiento}
-          onChange={(e) => setForm((f) => ({ ...f, fecha_vencimiento: e.target.value }))}
-          className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-        />
-      </div>
+      )}
 
       {/* Notaría — only for relevant types */}
       {showNotaria && (
@@ -165,20 +204,24 @@ export function DocFormFields({
         </div>
       )}
 
-      <div>
-        <FLabel>Descripción</FLabel>
-        <Textarea
-          placeholder="Resumen breve de lo que contiene el documento..."
-          value={form.descripcion}
-          onChange={(e) => setForm((f) => ({ ...f, descripcion: e.target.value }))}
-          rows={3}
-          maxLength={500}
-          className="resize-none rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-        />
-        <p className="mt-1 text-[10px] text-[var(--text)]/40">
-          Se muestra como vista previa en la tabla. Máx 500 caracteres.
-        </p>
-      </div>
+      {/* Descripción — en create se oculta (la IA la genera al procesar
+          el PDF). En edit se muestra por si el usuario quiere ajustarla. */}
+      {!isCreate && (
+        <div>
+          <FLabel>Descripción</FLabel>
+          <Textarea
+            placeholder="Resumen breve de lo que contiene el documento..."
+            value={form.descripcion}
+            onChange={(e) => setForm((f) => ({ ...f, descripcion: e.target.value }))}
+            rows={3}
+            maxLength={500}
+            className="resize-none rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+          />
+          <p className="mt-1 text-[10px] text-[var(--text)]/40">
+            Se muestra como vista previa en la tabla. Máx 500 caracteres.
+          </p>
+        </div>
+      )}
 
       <div>
         <FLabel>Notas</FLabel>

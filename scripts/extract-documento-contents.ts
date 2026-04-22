@@ -50,21 +50,18 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { createAnthropic } from '@ai-sdk/anthropic';
-import { openai } from '@ai-sdk/openai';
-import { embed, generateObject } from 'ai';
-import { z } from 'zod';
-import { spawn } from 'node:child_process';
-import { readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 
 import { getAdjuntoPath } from '../lib/adjuntos';
-
-// baseURL explícito para evitar que una ANTHROPIC_BASE_URL seteada en el
-// shell (ej. cuando este script corre dentro de Claude Code) rompa las
-// llamadas apuntándolas a un proxy. El default oficial es el mismo.
-const anthropic = createAnthropic({ baseURL: 'https://api.anthropic.com/v1' });
+import {
+  ensurePdfFitsForClaude,
+  embedContent,
+  extractWithClaude,
+  formatMB,
+  MODELO_CLAUDE,
+  MODELO_EMBEDDING,
+  EMBEDDING_DIMS,
+  type Extraccion,
+} from '../lib/documentos/extraction-core';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -84,114 +81,15 @@ if (!process.env.OPENAI_API_KEY) throw new Error('Missing OPENAI_API_KEY');
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const MODELO_CLAUDE = 'claude-opus-4-7';
-const MODELO_EMBEDDING = 'text-embedding-3-large';
-const EMBEDDING_DIMS = 1536;
+// Constantes del pipeline (MODELO_CLAUDE, EMBEDDING_DIMS, PDF_*) y helpers
+// puros (extractWithClaude, embedContent, ensurePdfFitsForClaude) viven en
+// `lib/documentos/extraction-core.ts` y se reutilizan en el API route
+// `/api/documentos/[id]/extract`. Ver ese módulo para detalles de schema Zod
+// y prompt engineering.
 
-// Anthropic API recomienda <32 MB por PDF (base64 infla ~33%, así que el
-// payload real queda ~42 MB, aún bajo el límite global del endpoint). Dejamos
-// margen bajando a 20 MB — por arriba de eso pasamos el PDF por Ghostscript
-// /ebook (150 dpi) que baja drásticamente el tamaño sin perder legibilidad.
-const PDF_COMPRESS_THRESHOLD_BYTES = 20 * 1024 * 1024;
-const PDF_MAX_AFTER_COMPRESS_BYTES = 28 * 1024 * 1024;
-
-// ─── Schema de extracción ────────────────────────────────────────────────────
-
-const ParteSchema = z.object({
-  rol: z
-    .string()
-    .describe(
-      'Rol de esta parte en el documento: vendedor, comprador, poderdante, ' +
-        'apoderado, fideicomitente, fiduciaria, fideicomisario, arrendador, ' +
-        'arrendatario, otorgante, beneficiario, donante, donatario, etc. Usar minúsculas.'
-    ),
-  nombre: z.string().describe('Nombre completo de la persona física o moral.'),
-  rfc: z.string().nullable().describe('RFC si aparece en el documento, si no null.'),
-  representante: z
-    .string()
-    .nullable()
-    .describe('Nombre del representante legal si la parte es una persona moral, si no null.'),
-});
-
-const ExtraccionSchema = z.object({
-  descripcion: z
-    .string()
-    .max(500)
-    .describe(
-      'Resumen humano de 2-3 oraciones (máximo 500 caracteres) de qué contiene el documento. ' +
-        'Debe incluir tipo de operación, partes principales y objeto en lenguaje natural. ' +
-        'Ejemplo: "Compraventa por $1,500,000 MXN del predio urbano en Calle X #123 de Juan Pérez ' +
-        'a DILESA S.A. de C.V. ante notario 42 de Piedras Negras."'
-    ),
-  contenido_texto: z
-    .string()
-    .describe(
-      'Transcripción completa del documento, incluyendo encabezados, cláusulas, firmas y ' +
-        'anexos. Preservar saltos de línea entre secciones. Si es escaneado ilegible, ' +
-        'hacer tu mejor esfuerzo y marcar [ilegible] donde no se pueda leer.'
-    ),
-  tipo_operacion: z
-    .string()
-    .nullable()
-    .describe(
-      'Naturaleza legal del documento, en minúsculas y sin acentos: compraventa, donacion, ' +
-        'hipoteca, poder, fideicomiso, permuta, arrendamiento, constitutiva, acta, ' +
-        'testamento, convenio, etc. null si no se puede determinar.'
-    ),
-  monto: z
-    .number()
-    .nullable()
-    .describe('Valor económico de la operación si aplica y está explícito. null si no aplica.'),
-  moneda: z
-    .string()
-    .describe(
-      'Moneda de la operación: MXN, USD, EUR. Default MXN si hay monto pero no se especifica moneda.'
-    ),
-  superficie_m2: z
-    .number()
-    .nullable()
-    .describe(
-      'Superficie en metros cuadrados si es un inmueble. Convertir hectáreas a m² (1 ha = 10,000 m²). ' +
-        'null si no aplica.'
-    ),
-  ubicacion_predio: z
-    .string()
-    .nullable()
-    .describe(
-      'Dirección o descripción del objeto del documento (inmueble, predio, negocio). ' +
-        'null si no aplica.'
-    ),
-  municipio: z
-    .string()
-    .nullable()
-    .describe('Municipio donde está el objeto del documento. null si no se menciona.'),
-  estado: z
-    .string()
-    .nullable()
-    .describe(
-      'Entidad federativa donde está el objeto (Coahuila, Nuevo León, Texas, etc.). ' +
-        'null si no se menciona.'
-    ),
-  folio_real: z
-    .string()
-    .nullable()
-    .describe('Folio real del Registro Público de la Propiedad si aparece. null si no.'),
-  libro_tomo: z
-    .string()
-    .nullable()
-    .describe(
-      'Referencia al protocolo notarial (libro, tomo, foja, folio) si aparece. ' +
-        'Ejemplo: "Libro 5, Tomo II, Folio 123". null si no.'
-    ),
-  partes: z
-    .array(ParteSchema)
-    .describe(
-      'Todas las personas físicas o morales que intervienen en el documento con su rol. ' +
-        'Incluir otorgantes, beneficiarios, testigos si son relevantes (no incluir al notario).'
-    ),
-});
-
-type Extraccion = z.infer<typeof ExtraccionSchema>;
+// ─── Referencias útiles (antes definidas aquí, ahora vienen de la lib) ───────
+void MODELO_EMBEDDING;
+void EMBEDDING_DIMS;
 
 // ─── Tipos de datos ──────────────────────────────────────────────────────────
 
@@ -281,55 +179,9 @@ async function downloadPdf(urlOrPath: string): Promise<Uint8Array> {
   return new Uint8Array(buf);
 }
 
-// Comprime un PDF con Ghostscript. /ebook = 150 dpi (default, buen balance
-// calidad/tamaño). /screen = 72 dpi (más agresivo, último recurso). El OCR
-// sigue siendo muy legible para Claude incluso a 72 dpi.
-async function compressPdf(
-  input: Uint8Array,
-  preset: '/ebook' | '/screen' = '/ebook'
-): Promise<Uint8Array> {
-  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-  const tmpIn = join(tmpdir(), `bsop-extract-${stamp}-in.pdf`);
-  const tmpOut = join(tmpdir(), `bsop-extract-${stamp}-out.pdf`);
-  try {
-    await writeFile(tmpIn, input);
-    await new Promise<void>((resolve, reject) => {
-      const proc = spawn('gs', [
-        '-sDEVICE=pdfwrite',
-        '-dCompatibilityLevel=1.4',
-        `-dPDFSETTINGS=${preset}`,
-        '-dNOPAUSE',
-        '-dQUIET',
-        '-dBATCH',
-        `-sOutputFile=${tmpOut}`,
-        tmpIn,
-      ]);
-      let stderr = '';
-      proc.stderr.on('data', (chunk) => {
-        stderr += String(chunk);
-      });
-      proc.on('error', reject);
-      proc.on('exit', (code) => {
-        if (code === 0) resolve();
-        else reject(new Error(`gs exit ${code}: ${stderr.slice(0, 500)}`));
-      });
-    });
-    const out = await readFile(tmpOut);
-    return new Uint8Array(out);
-  } finally {
-    await rm(tmpIn, { force: true }).catch(() => {});
-    await rm(tmpOut, { force: true }).catch(() => {});
-  }
-}
-
-function formatMB(bytes: number): string {
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 // Intenta cada candidato (más reciente primero) hasta que uno se descargue
-// exitosamente y, si es necesario, quepa después de comprimir. Reporta un
-// resumen por doc al log con cada intento y la última versión lista para
-// mandar a Claude.
+// y quepa tras compresión. Delega a `ensurePdfFitsForClaude` (lib) la lógica
+// de compresión con fallback /ebook→/screen.
 async function loadPdfForExtraction(
   candidates: string[],
   titulo: string,
@@ -340,33 +192,14 @@ async function loadPdfForExtraction(
     const url = candidates[i];
     const label = `${docIdPrefix} candidato ${i + 1}/${candidates.length}`;
     try {
-      let pdf = await downloadPdf(url);
-      if (pdf.byteLength > PDF_COMPRESS_THRESHOLD_BYTES) {
-        const originalSize = pdf.byteLength;
-        console.log(`… ${label} ${formatMB(originalSize)}, comprimiendo con gs /ebook...`);
-        pdf = await compressPdf(pdf, '/ebook');
-        console.log(
-          `… ${label} /ebook: ${formatMB(originalSize)} → ${formatMB(pdf.byteLength)} (${Math.round((1 - pdf.byteLength / originalSize) * 100)}% menos)`
-        );
-        // Si /ebook no fue suficiente, intentar /screen (72 dpi, más agresivo).
-        // El OCR de Claude sigue funcionando aceptablemente a 72 dpi para
-        // documentos en español con letra estándar.
-        if (pdf.byteLength > PDF_MAX_AFTER_COMPRESS_BYTES) {
-          console.log(`… ${label} aún ${formatMB(pdf.byteLength)}, recomprimiendo con /screen...`);
-          const ebookSize = pdf.byteLength;
-          pdf = await compressPdf(pdf, '/screen');
-          console.log(`… ${label} /screen: ${formatMB(ebookSize)} → ${formatMB(pdf.byteLength)}`);
-        }
-      }
-      if (pdf.byteLength > PDF_MAX_AFTER_COMPRESS_BYTES) {
-        throw new Error(
-          `PDF sigue muy grande post-compresión: ${formatMB(pdf.byteLength)} (máx ${formatMB(PDF_MAX_AFTER_COMPRESS_BYTES)})`
-        );
-      }
-      return pdf;
+      const raw = await downloadPdf(url);
+      const fitted = await ensurePdfFitsForClaude(raw, {
+        log: (msg) => console.log(`… ${label} ${msg}`),
+      });
+      return fitted;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      errors.push(`#${i + 1}: ${msg}`);
+      errors.push(`#${i + 1}: ${msg} (${formatMB(0)})`);
       console.log(`… ${label} falló: ${msg}`);
     }
   }
@@ -426,70 +259,10 @@ async function writeError(id: string, err: unknown): Promise<void> {
   if (error) console.error(`writeError(${id}) falló: ${error.message}`);
 }
 
-// ─── Llamada a Claude con PDF ────────────────────────────────────────────────
-
-async function extractWithClaude(pdfBytes: Uint8Array, titulo: string): Promise<Extraccion> {
-  // Usamos generateObject (no generateText + Output.object) porque tiene mejor
-  // prompt engineering interno para forzar JSON schema compliance y reintenta
-  // automáticamente si el modelo devuelve formato inválido.
-  // maxRetries=4 cubre tanto errores transitorios como schema mismatch.
-  const { object } = await generateObject({
-    model: anthropic(MODELO_CLAUDE),
-    schema: ExtraccionSchema,
-    maxRetries: 4,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'text',
-            text:
-              `Eres un asistente legal especializado en documentos notariales mexicanos. ` +
-              `Analiza el siguiente PDF y extrae la información solicitada. ` +
-              `El título del documento en nuestro sistema es: "${titulo}". ` +
-              `Si el PDF es un escaneado, transcribe el texto lo mejor posible. ` +
-              `Para campos numéricos (monto, superficie_m2), si el valor aparece ` +
-              `en letra o con formato raro, conviértelo a número o usa null si no es claro. ` +
-              `Usa null para cualquier campo estructurado que no puedas determinar con ` +
-              `certeza, en vez de inventar o poner strings genéricas.`,
-          },
-          {
-            type: 'file',
-            data: pdfBytes,
-            mediaType: 'application/pdf',
-          },
-        ],
-      },
-    ],
-  });
-
-  return object;
-}
-
-// ─── Embedding ───────────────────────────────────────────────────────────────
-
-async function embedContent(contenido: string): Promise<number[]> {
-  // text-embedding-3-large max input = 8191 tokens. Truncamos por chars como aproximación
-  // conservadora (~4 chars por token). No vale la pena meter tiktoken solo para esto.
-  const MAX_CHARS = 28000;
-  const truncated = contenido.length > MAX_CHARS ? contenido.slice(0, MAX_CHARS) : contenido;
-
-  const { embedding } = await embed({
-    model: openai.embedding(MODELO_EMBEDDING),
-    value: truncated,
-    providerOptions: {
-      openai: {
-        dimensions: EMBEDDING_DIMS,
-      },
-    },
-    maxRetries: 2,
-  });
-
-  if (embedding.length !== EMBEDDING_DIMS) {
-    throw new Error(`Embedding tiene ${embedding.length} dims, esperaba ${EMBEDDING_DIMS}`);
-  }
-  return embedding;
-}
+// `extractWithClaude` y `embedContent` ahora viven en
+// `lib/documentos/extraction-core.ts` y se importan arriba. Así el API route
+// `/api/documentos/[id]/extract` puede reutilizar exactamente las mismas
+// funciones (mismo schema, mismo prompt, misma lógica de retries).
 
 // ─── Procesamiento por documento ─────────────────────────────────────────────
 

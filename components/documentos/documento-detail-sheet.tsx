@@ -1,10 +1,6 @@
 'use client';
 
-/* eslint-disable react-hooks/set-state-in-effect --
- * Carried from the original pages. The `setEditForm(docToForm(doc))` sync
- * on doc change is a data-sync pattern flagged by the new React hook rules;
- * rewriting changes render behavior and is out of scope for this PR.
- */
+ 
 
 import { useEffect, useState } from 'react';
 import {
@@ -16,6 +12,7 @@ import {
   Save,
   Sparkles,
   Trash2,
+  Wand2,
 } from 'lucide-react';
 
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
@@ -81,6 +78,8 @@ export function DocumentoDetailSheet({
   const [showContenido, setShowContenido] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
 
   useEffect(() => {
     if (doc) {
@@ -154,9 +153,38 @@ export function DocumentoDetailSheet({
     onClose();
   };
 
+  const handleExtract = async () => {
+    if (!doc || extracting) return;
+    setExtracting(true);
+    setExtractError(null);
+    try {
+      const res = await fetch(`/api/documentos/${doc.id}/extract`, { method: 'POST' });
+      const body = await res.json();
+      if (!res.ok) {
+        setExtractError(body?.error ?? `Error ${res.status}`);
+        return;
+      }
+      if (body.documento) {
+        onDocUpdated(body.documento as Documento);
+      }
+      // Los adjuntos pudieron renombrarse — refrescamos para ver el nombre
+      // estándar en la sección de archivos.
+      onRefreshAdjuntos();
+    } catch (err) {
+      setExtractError(err instanceof Error ? err.message : 'Error de red');
+    } finally {
+      setExtracting(false);
+    }
+  };
+
   if (!doc) return null;
 
   const metaEntries = Object.entries(doc.subtipo_meta ?? {}).filter(([, v]) => v);
+  const canExtract =
+    !!doc.id &&
+    (doc.extraccion_status === 'pendiente' ||
+      doc.extraccion_status === 'error' ||
+      !doc.extraccion_status);
 
   const hasPrincipalPdf = adjuntos.some((a) => a.rol === 'documento_principal');
   const needsPdf = doc.tipo && doc.tipo !== 'Otro';
@@ -172,6 +200,23 @@ export function DocumentoDetailSheet({
         <SheetHeader>
           <SheetTitle>{editing ? 'Editar Documento' : doc.titulo}</SheetTitle>
           <div className="absolute right-12 top-4 hidden sm:flex gap-2 print:hidden">
+            {!editing && canExtract && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExtract}
+                disabled={extracting}
+                className="border-[var(--accent)]/30 bg-[var(--accent)]/5 text-[var(--accent)] hover:bg-[var(--accent)]/10"
+                title="Extraer datos del PDF con IA (60-120s)"
+              >
+                {extracting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Wand2 className="mr-2 h-4 w-4" />
+                )}
+                {extracting ? 'Procesando...' : 'Procesar con IA'}
+              </Button>
+            )}
             {!editing && (
               <>
                 <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
@@ -197,6 +242,16 @@ export function DocumentoDetailSheet({
 
         <ScrollArea className="flex-1 pr-1 print:h-auto">
           <div className="mt-4 space-y-5 pb-6">
+            {extractError && (
+              <div className="flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-xs text-red-400">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium mb-0.5">Procesar con IA falló</p>
+                  <p className="text-red-400/80">{extractError}</p>
+                </div>
+              </div>
+            )}
+
             {/* ── Info / Edit section ── */}
             {editing ? (
               <>

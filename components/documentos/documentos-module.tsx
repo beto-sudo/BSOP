@@ -87,13 +87,10 @@ export type DocumentosModuleProps = {
 export function DocumentosModule({
   empresaId,
   scope = 'empresa',
-  empresaSlug: _empresaSlug,
+  empresaSlug,
   title,
   subtitle = 'Escrituras, contratos, seguros y documentos legales',
 }: DocumentosModuleProps) {
-  // `_empresaSlug` reserved for future detail-page links; silence unused-var lint.
-  void _empresaSlug;
-
   const supabase = createSupabaseERPClient();
 
   const [empresaIds, setEmpresaIds] = useState<string[]>(
@@ -564,6 +561,7 @@ export function DocumentosModule({
         notarias={notarias}
         onOpenCreateNotaria={() => setShowCreateNotaria(true)}
         primaryEmpresaId={primaryEmpresaId}
+        empresaSlugForTitulo={empresaSlug || undefined}
         onCreated={handleDocCreated}
       />
 
