@@ -36,7 +36,7 @@ export function PendingPaymentsSection({
       <div className="space-y-3">
         <div>
           <h3 className="text-base font-semibold text-[var(--text)]">Resumen por Jugador</h3>
-          <p className="text-sm text-[var(--text)]/55">
+          <p className="text-sm text-[var(--text-muted)]">
             Top 20 jugadores con saldo pendiente acumulado.
           </p>
         </div>
@@ -96,7 +96,7 @@ export function PendingPaymentsSection({
             <h3 className="text-base font-semibold text-[var(--text)]">
               Detalle de Reservas Pendientes
             </h3>
-            <p className="text-sm text-[var(--text)]/55">
+            <p className="text-sm text-[var(--text-muted)]">
               Listado individual de reservas pendientes.
             </p>
           </div>
@@ -195,7 +195,7 @@ export function PendingPaymentsSection({
               </div>
             </div>
             {pendingPayments.detailTruncated ? (
-              <p className="text-sm text-[var(--text)]/55">
+              <p className="text-sm text-[var(--text-muted)]">
                 Mostrando 200 de {pendingPayments.totalReservas} reservas pendientes.
               </p>
             ) : null}

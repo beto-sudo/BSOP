@@ -495,7 +495,7 @@ export function PuestosModule({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text)]">{title}</h1>
-          <p className="mt-1 text-sm text-[var(--text)]/55">{subtitle}</p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">{subtitle}</p>
         </div>
         <div className="flex gap-2">
           <Button
@@ -554,7 +554,7 @@ export function PuestosModule({
         ) : visible.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-16">
             <Briefcase className="mb-3 h-10 w-10 text-[var(--text)]/20" />
-            <p className="text-sm text-[var(--text)]/55">No hay puestos registrados</p>
+            <p className="text-sm text-[var(--text-muted)]">No hay puestos registrados</p>
           </div>
         ) : (
           <Table>
@@ -670,7 +670,7 @@ export function PuestosModule({
                           'inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium',
                           p.activo
                             ? 'border-green-500/20 bg-green-500/10 text-green-400'
-                            : 'border-[var(--border)] bg-[var(--panel)] text-[var(--text)]/40',
+                            : 'border-[var(--border)] bg-[var(--panel)] text-[var(--text-subtle)]',
                         ].join(' ')}
                       >
                         {p.activo ? 'Activo' : 'Inactivo'}

@@ -238,7 +238,7 @@ export function AccesoClient({
         <h1 className="text-2xl font-semibold dark:text-white text-[var(--text)]">
           Configuración de Accesos
         </h1>
-        <p className="mt-1 text-sm dark:text-white/55 text-[var(--text)]/55">
+        <p className="mt-1 text-sm dark:text-white/55 text-[var(--text-muted)]">
           Gestiona empresas, roles, permisos y accesos de usuarios en BSOP.
         </p>
       </div>
@@ -254,7 +254,7 @@ export function AccesoClient({
               'flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors',
               tab === id
                 ? 'bg-[var(--accent)] text-white shadow-sm'
-                : 'dark:text-white/55 text-[var(--text)]/55 dark:hover:text-white hover:text-[var(--text)] dark:hover:bg-white/5 hover:bg-black/3'
+                : 'dark:text-white/55 text-[var(--text-muted)] dark:hover:text-white hover:text-[var(--text)] dark:hover:bg-white/5 hover:bg-black/3'
             )}
           >
             {icon}
@@ -267,7 +267,7 @@ export function AccesoClient({
       {tab === 'empresas' && (
         <>
           <div className="flex items-center justify-between">
-            <p className="text-sm dark:text-white/40 text-[var(--text)]/40">
+            <p className="text-sm dark:text-white/40 text-[var(--text-subtle)]">
               {empresas.length} empresa{empresas.length !== 1 ? 's' : ''} registrada
               {empresas.length !== 1 ? 's' : ''}
             </p>
@@ -337,7 +337,7 @@ export function AccesoClient({
         <div className="space-y-4">
           {/* Company selector + new rol button */}
           <div className="flex items-center gap-3">
-            <span className="text-sm dark:text-white/55 text-[var(--text)]/55">Empresa:</span>
+            <span className="text-sm dark:text-white/55 text-[var(--text-muted)]">Empresa:</span>
             <Combobox
               value={filterEmpresaId}
               onChange={(v) => {
@@ -365,7 +365,7 @@ export function AccesoClient({
             {/* Roles list */}
             <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)]">
               <div className="border-b border-[var(--border)] px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide dark:text-white/40 text-[var(--text)]/40">
+                <p className="text-xs font-semibold uppercase tracking-wide dark:text-white/40 text-[var(--text-subtle)]">
                   Roles
                 </p>
               </div>
@@ -436,7 +436,7 @@ export function AccesoClient({
                     <p className="text-sm font-semibold dark:text-white/85 text-[var(--text)]/85">
                       {selectedRol.nombre}
                     </p>
-                    <p className="mt-0.5 text-xs dark:text-white/40 text-[var(--text)]/40">
+                    <p className="mt-0.5 text-xs dark:text-white/40 text-[var(--text-subtle)]">
                       Permisos por módulo — haz clic para cambiar
                     </p>
                   </div>
@@ -528,7 +528,7 @@ export function AccesoClient({
       {tab === 'usuarios' && (
         <>
           <div className="flex items-center justify-between">
-            <p className="text-sm dark:text-white/40 text-[var(--text)]/40">
+            <p className="text-sm dark:text-white/40 text-[var(--text-subtle)]">
               {usuarios.length} usuario{usuarios.length !== 1 ? 's' : ''} registrado
               {usuarios.length !== 1 ? 's' : ''}
             </p>
@@ -650,7 +650,7 @@ export function AccesoClient({
                 <div className="space-y-8 px-6 py-5">
                   {/* ── Empresas section ── */}
                   <section>
-                    <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide dark:text-white/40 text-[var(--text)]/40">
+                    <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide dark:text-white/40 text-[var(--text-subtle)]">
                       Acceso a empresas
                     </h3>
                     <div className="space-y-3">
@@ -729,7 +729,7 @@ export function AccesoClient({
                   {/* ── Excepciones section ── */}
                   <section>
                     <div className="mb-3 flex items-center justify-between">
-                      <h3 className="text-xs font-semibold uppercase tracking-wide dark:text-white/40 text-[var(--text)]/40">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide dark:text-white/40 text-[var(--text-subtle)]">
                         Excepciones de módulo
                       </h3>
                       <Button
@@ -759,7 +759,7 @@ export function AccesoClient({
                     {/* Add exception form */}
                     {addingExcepcion && (
                       <div className="mb-4 space-y-3 rounded-xl border border-dashed border-[var(--accent)]/40 bg-[var(--accent)]/5 p-4">
-                        <p className="text-xs dark:text-white/55 text-[var(--text)]/55">
+                        <p className="text-xs dark:text-white/55 text-[var(--text-muted)]">
                           Sobrescribe un permiso específico para este usuario.
                         </p>
                         <div className="grid grid-cols-2 gap-2">
@@ -870,7 +870,7 @@ export function AccesoClient({
                                 <span className="font-medium dark:text-white/80 text-[var(--text)]/80">
                                   {getModuloNombre(ex.modulo_id)}
                                 </span>
-                                <span className="ml-1.5 dark:text-white/40 text-[var(--text)]/40">
+                                <span className="ml-1.5 dark:text-white/40 text-[var(--text-subtle)]">
                                   en {getEmpresaNombre(ex.empresa_id)}
                                 </span>
                               </div>

@@ -128,7 +128,7 @@ const ESTADO_TASK: Record<string, { label: string; cls: string }> = {
   completado: { label: 'Completado', cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
   cancelado: {
     label: 'Cancelado',
-    cls: 'bg-[var(--border)]/60 text-[var(--text)]/40 border-[var(--border)]',
+    cls: 'bg-[var(--border)]/60 text-[var(--text-subtle)] border-[var(--border)]',
   },
 };
 
@@ -1029,7 +1029,7 @@ function JuntaDetailInner() {
             <EditorContent editor={editor} />
           </div>
         </div>
-        <p className="mt-2 text-[10px] text-[var(--text)]/40">
+        <p className="mt-2 text-[10px] text-[var(--text-subtle)]">
           {estado !== 'completada' && estado !== 'cancelada'
             ? autoSaveStatus === 'saving'
               ? '⏳ Guardando notas...'
@@ -1105,7 +1105,7 @@ function JuntaDetailInner() {
                                 >
                                   {tc.label}
                                 </span>
-                                <span className="text-[10px] text-[var(--text)]/40">
+                                <span className="text-[10px] text-[var(--text-subtle)]">
                                   {u.usuario?.nombre ?? 'Sistema'}
                                 </span>
                                 <span className="text-[10px] text-[var(--text)]/30 ml-auto">
@@ -1202,7 +1202,7 @@ function JuntaDetailInner() {
                         ? 'border-green-500/50 bg-green-500/15 text-green-400'
                         : a.asistio === false
                           ? 'border-red-500/50 bg-red-500/15 text-red-400'
-                          : 'border-[var(--border)] bg-[var(--card)] text-[var(--text)]/40',
+                          : 'border-[var(--border)] bg-[var(--card)] text-[var(--text-subtle)]',
                     ].join(' ')}
                   >
                     {a.asistio === true ? (
@@ -1268,7 +1268,7 @@ function JuntaDetailInner() {
           <SectionTitle>
             Tareas de esta junta{' '}
             {tasks.length > 0 && (
-              <span className="text-[var(--text)]/40 font-normal">({tasks.length})</span>
+              <span className="text-[var(--text-subtle)] font-normal">({tasks.length})</span>
             )}
           </SectionTitle>
           <Button
@@ -1337,7 +1337,7 @@ function JuntaDetailInner() {
                   )}
                   <div className="flex-1 min-w-0">
                     <span
-                      className={`text-sm font-medium line-clamp-1 ${task.estado === 'completado' ? 'text-[var(--text)]/40 line-through' : 'text-[var(--text)]'}`}
+                      className={`text-sm font-medium line-clamp-1 ${task.estado === 'completado' ? 'text-[var(--text-subtle)] line-through' : 'text-[var(--text)]'}`}
                     >
                       {task.titulo}
                     </span>
@@ -1351,7 +1351,7 @@ function JuntaDetailInner() {
                     {cfg.label}
                   </span>
                   {task.fecha_vence && (
-                    <span className="text-xs text-[var(--text)]/40 shrink-0">
+                    <span className="text-xs text-[var(--text-subtle)] shrink-0">
                       {formatDate(task.fecha_vence)}
                     </span>
                   )}

@@ -29,7 +29,7 @@ function AccessDenied() {
       <h2 className="mt-4 text-xl font-semibold dark:text-white text-[var(--text)]">
         Acceso restringido
       </h2>
-      <p className="mt-2 text-sm dark:text-white/55 text-[var(--text)]/55">
+      <p className="mt-2 text-sm dark:text-white/55 text-[var(--text-muted)]">
         No tienes permisos para acceder a esta sección. Contacta al administrador si necesitas
         acceso.
       </p>

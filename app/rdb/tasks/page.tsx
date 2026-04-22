@@ -123,7 +123,7 @@ function EstadoBadge({ estado }: { estado: ErpTask['estado'] }) {
 }
 
 function PrioridadBadge({ prioridad }: { prioridad: string | null }) {
-  if (!prioridad) return <span className="text-[var(--text)]/40">—</span>;
+  if (!prioridad) return <span className="text-[var(--text-subtle)]">—</span>;
   const cfg = PRIORIDAD_CONFIG[prioridad] ?? { label: prioridad, cls: '' };
   return (
     <span
@@ -375,7 +375,7 @@ function TasksInner() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text)]">Tareas</h1>
-          <p className="mt-1 text-sm text-[var(--text)]/55">Gestión de tareas operativas</p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">Gestión de tareas operativas</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -402,7 +402,7 @@ function TasksInner() {
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
         <div className="flex flex-wrap gap-3">
           <div className="relative min-w-48 flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text)]/40" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-subtle)]" />
             <Input
               placeholder="Buscar tareas..."
               value={search}
@@ -461,7 +461,7 @@ function TasksInner() {
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-16 text-center">
             <TicketCheck className="mb-3 h-10 w-10 text-[var(--text)]/20" />
-            <p className="text-sm text-[var(--text)]/55">
+            <p className="text-sm text-[var(--text-muted)]">
               {tasks.length === 0
                 ? 'No hay tareas creadas aún'
                 : 'No hay tareas que coincidan con los filtros'}
@@ -546,7 +546,7 @@ function TasksInner() {
                         {task.titulo}
                       </span>
                       {task.entidad_tipo && (
-                        <span className="mt-0.5 block text-xs text-[var(--text)]/40">
+                        <span className="mt-0.5 block text-xs text-[var(--text-subtle)]">
                           {task.entidad_tipo}
                         </span>
                       )}
@@ -590,7 +590,7 @@ function TasksInner() {
 
       {/* Summary */}
       {!loading && tasks.length > 0 && (
-        <p className="text-right text-xs text-[var(--text)]/40">
+        <p className="text-right text-xs text-[var(--text-subtle)]">
           {filtered.length} de {tasks.length} {tasks.length === 1 ? 'tarea' : 'tareas'}
         </p>
       )}

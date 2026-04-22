@@ -378,8 +378,10 @@ function TaskDetailInner() {
           Tareas
         </Button>
         <span className="text-[var(--text)]/30">/</span>
-        <span className="text-sm text-[var(--text)]/55 line-clamp-1 max-w-xs">{task.titulo}</span>
-        {saving && <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--text)]/40 ml-1" />}
+        <span className="text-sm text-[var(--text-muted)] line-clamp-1 max-w-xs">
+          {task.titulo}
+        </span>
+        {saving && <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--text-subtle)] ml-1" />}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -504,7 +506,7 @@ function TaskDetailInner() {
                   setDescVal('');
                   setEditingDesc(true);
                 }}
-                className="text-sm italic text-[var(--text)]/35 hover:text-[var(--text)]/55 transition-colors"
+                className="text-sm italic text-[var(--text)]/35 hover:text-[var(--text-muted)] transition-colors"
               >
                 Sin descripción. Haz clic para agregar.
               </button>
@@ -548,7 +550,7 @@ function TaskDetailInner() {
                         >
                           {tc.label}
                         </span>
-                        <span className="text-[10px] text-[var(--text)]/40">
+                        <span className="text-[10px] text-[var(--text-subtle)]">
                           {u.usuario?.nombre ?? 'Sistema'}
                         </span>
                         <span className="text-[10px] text-[var(--text)]/30 ml-auto">

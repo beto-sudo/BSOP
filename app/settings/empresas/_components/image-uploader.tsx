@@ -65,7 +65,7 @@ export function ImageUploader({
           />
         </div>
       ) : (
-        <div className="flex h-20 items-center justify-center rounded-xl border border-dashed border-[var(--border)] bg-[var(--panel)] text-xs text-[var(--text)]/40">
+        <div className="flex h-20 items-center justify-center rounded-xl border border-dashed border-[var(--border)] bg-[var(--panel)] text-xs text-[var(--text-subtle)]">
           Sin imagen
         </div>
       )}

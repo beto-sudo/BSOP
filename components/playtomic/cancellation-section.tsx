@@ -12,7 +12,7 @@ export function CancellationSection({
     <section className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold text-[var(--text)]">Análisis de Cancelaciones</h2>
-        <p className="text-sm text-[var(--text)]/55">
+        <p className="text-sm text-[var(--text-muted)]">
           Patrones y tendencias en reservas canceladas dentro del periodo seleccionado.
         </p>
       </div>
@@ -25,7 +25,7 @@ export function CancellationSection({
           <div className="mt-2 text-3xl font-semibold text-[var(--text)]">
             {analysis.canceledCount}
           </div>
-          <div className="mt-1 text-sm text-[var(--text)]/55">
+          <div className="mt-1 text-sm text-[var(--text-muted)]">
             Reservas marcadas como canceladas.
           </div>
         </div>
@@ -36,7 +36,7 @@ export function CancellationSection({
           <div className="mt-2 text-3xl font-semibold text-[var(--text)]">
             {analysis.cancellationRate.toFixed(1)}%
           </div>
-          <div className="mt-1 text-sm text-[var(--text)]/55">
+          <div className="mt-1 text-sm text-[var(--text-muted)]">
             Sobre {totalBookings} reservas del periodo.
           </div>
         </div>
@@ -79,7 +79,7 @@ export function CancellationSection({
           <div className="mt-2 text-3xl font-semibold text-[var(--text)]">
             {analysis.avgCanceledDuration.toFixed(0)} min
           </div>
-          <div className="mt-1 text-sm text-[var(--text)]/55">
+          <div className="mt-1 text-sm text-[var(--text-muted)]">
             Promedio de minutos en reservas canceladas.
           </div>
         </div>

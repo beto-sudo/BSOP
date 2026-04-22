@@ -102,7 +102,7 @@ export function TasksTable(props: TasksTableProps) {
     return (
       <div className="flex flex-col items-center justify-center p-16 text-center">
         <TicketCheck className="mb-3 h-10 w-10 text-[var(--text)]/20" />
-        <p className="text-sm text-[var(--text)]/55">
+        <p className="text-sm text-[var(--text-muted)]">
           {totalCount === 0
             ? 'No hay tareas creadas aún'
             : 'No hay tareas que coincidan con los filtros'}
@@ -202,7 +202,7 @@ function SimpleTable({
               <TableCell>
                 <span className="line-clamp-1 font-medium text-[var(--text)]">{task.titulo}</span>
                 {task.entidad_tipo && (
-                  <span className="mt-0.5 block text-xs text-[var(--text)]/40">
+                  <span className="mt-0.5 block text-xs text-[var(--text-subtle)]">
                     {task.entidad_tipo}
                   </span>
                 )}
@@ -363,7 +363,7 @@ function RichTable({
 
               <TableCell className="whitespace-normal">
                 <span className="line-clamp-1 font-medium text-[var(--text)]">{task.titulo}</span>
-                <span className="mt-0.5 block text-xs text-[var(--text)]/40 line-clamp-1">
+                <span className="mt-0.5 block text-xs text-[var(--text-subtle)] line-clamp-1">
                   {[task.departamento_nombre, task.descripcion].filter(Boolean).join(' · ') || ' '}
                 </span>
               </TableCell>

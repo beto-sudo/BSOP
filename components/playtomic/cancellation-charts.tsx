@@ -10,7 +10,7 @@ export function CancellationWeekdayChart({ data }: { data: { label: string; valu
     <div className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-4 sm:p-5">
       <div>
         <h3 className="text-base font-semibold text-[var(--text)]">Cancelaciones por día</h3>
-        <p className="text-sm text-[var(--text)]/55">
+        <p className="text-sm text-[var(--text-muted)]">
           Distribución semanal de reservas canceladas.
         </p>
       </div>
@@ -81,7 +81,7 @@ export function CancellationHourChart({ data }: { data: { label: string; value: 
     <div className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-4 sm:p-5">
       <div>
         <h3 className="text-base font-semibold text-[var(--text)]">Cancelaciones por hora</h3>
-        <p className="text-sm text-[var(--text)]/55">Horas del día con más cancelaciones.</p>
+        <p className="text-sm text-[var(--text-muted)]">Horas del día con más cancelaciones.</p>
       </div>
       <div className="mt-4 overflow-x-auto">
         <svg viewBox={`0 0 ${width} ${height}`} className="min-w-[760px] text-[var(--text)]">

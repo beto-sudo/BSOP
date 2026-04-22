@@ -101,7 +101,7 @@ export function TasksFiltersBar({
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
       <div className="flex flex-wrap gap-3">
         <div className="relative min-w-48 flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text)]/40" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-subtle)]" />
           <Input
             placeholder={
               isRich ? 'Buscar por título, descripción o responsable...' : 'Buscar tareas...'

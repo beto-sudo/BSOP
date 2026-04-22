@@ -255,7 +255,7 @@ function JuntasInner() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text)]">Juntas</h1>
-          <p className="mt-1 text-sm text-[var(--text)]/55">
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
             Agenda y minutas de juntas operativas
           </p>
         </div>
@@ -289,7 +289,7 @@ function JuntasInner() {
         <div className="flex flex-wrap gap-3">
           <div className="relative min-w-48 flex-1">
             <Search
-              className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text)]/40"
+              className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-subtle)]"
               aria-hidden="true"
             />
             <Input
@@ -341,7 +341,7 @@ function JuntasInner() {
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-16 text-center">
             <CalendarDays className="mb-3 h-10 w-10 text-[var(--text)]/20" />
-            <p className="text-sm text-[var(--text)]/55">
+            <p className="text-sm text-[var(--text-muted)]">
               {juntas.length === 0
                 ? 'No hay juntas registradas aún'
                 : 'No hay juntas que coincidan con los filtros'}
@@ -421,7 +421,7 @@ function JuntasInner() {
                         {TIPO_CONFIG[junta.tipo]?.icon} {TIPO_CONFIG[junta.tipo]?.label}
                       </span>
                     ) : (
-                      <span className="text-[var(--text)]/40">—</span>
+                      <span className="text-[var(--text-subtle)]">—</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -448,7 +448,7 @@ function JuntasInner() {
       </div>
 
       {!loading && juntas.length > 0 && (
-        <p className="text-right text-xs text-[var(--text)]/40">
+        <p className="text-right text-xs text-[var(--text-subtle)]">
           {filtered.length} de {juntas.length} {juntas.length === 1 ? 'junta' : 'juntas'}
         </p>
       )}
