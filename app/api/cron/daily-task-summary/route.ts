@@ -17,6 +17,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import {
   generateTaskSummaryHtml,
   groupTasksByUrgency,
@@ -100,38 +101,37 @@ export async function GET(req: NextRequest) {
   const todayCst = getTodayCst();
   const subjectDate = formatSubjectDate(todayCst);
 
-  // Fetch all open tasks with employee + company + person embedded.
-  // Filters: estado not in completada/cancelada, fecha_completado IS NULL, has assignee.
+  // Supabase JS client con service role — bypasea RLS y maneja el Accept-Profile
+  // automáticamente cuando haces .schema('erp'). Patrón idiomático del repo
+  // (ver proxy.ts y app/settings/acceso/actions.ts).
+  const supabase = createClient(supabaseUrl, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  // Whitelist de estados activos (mismo criterio que components/inicio/mis-tareas-widget,
+  // arreglado en #119 — el enum real es 'completado', no 'completada'). Whitelist > blacklist:
+  // si mañana aparece 'archivado', 'pausado', etc. no se cuelan silenciosamente.
   const select =
     'id,titulo,fecha_vence,fecha_compromiso,porcentaje_avance,' +
     'empresa:empresa_id(nombre,slug),' +
     'empleado:asignado_a(id,email_empresa,activo,persona:persona_id(nombre,apellido_paterno,email))';
 
-  // Whitelist de estados activos (mismo criterio que components/inicio/mis-tareas-widget,
-  // arreglado en #119 — el enum real es 'completado', no 'completada'). Whitelist > blacklist:
-  // si mañana aparece 'archivado', 'pausado', etc. no se cuelan silenciosamente.
-  const query = new URLSearchParams({
-    select,
-    estado: 'in.(pendiente,en_progreso,bloqueado)',
-    fecha_completado: 'is.null',
-    asignado_a: 'not.is.null',
-  });
+  const { data: rows, error: tasksError } = await supabase
+    .schema('erp')
+    .from('tasks')
+    .select(select)
+    .in('estado', ['pendiente', 'en_progreso', 'bloqueado'])
+    .is('fecha_completado', null)
+    .not('asignado_a', 'is', null)
+    .returns<EmbeddedTaskRow[]>();
 
-  const tasksRes = await fetch(`${supabaseUrl}/rest/v1/tasks?${query}`, {
-    headers: {
-      apikey: serviceKey,
-      Authorization: `Bearer ${serviceKey}`,
-      'Content-Profile': 'erp',
-    },
-  });
-
-  if (!tasksRes.ok) {
-    const detail = await tasksRes.text();
-    console.error('[daily-task-summary] Tasks query failed:', tasksRes.status, detail);
-    return NextResponse.json({ error: 'Tasks query failed', detail }, { status: 500 });
+  if (tasksError || !rows) {
+    console.error('[daily-task-summary] Tasks query failed:', tasksError);
+    return NextResponse.json(
+      { error: 'Tasks query failed', detail: tasksError?.message ?? 'unknown' },
+      { status: 500 }
+    );
   }
-
-  const rows = (await tasksRes.json()) as EmbeddedTaskRow[];
 
   // Group by empleado_id, resolving email (empresa → personal fallback).
   const buckets = new Map<string, PerEmployeeBucket>();
