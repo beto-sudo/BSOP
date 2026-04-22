@@ -13,9 +13,17 @@
  * Agrupa por fecha_vence (o fecha_compromiso si fecha_vence es null).
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, Calendar, CheckCircle2, ChevronRight, Clock, ListTodo } from 'lucide-react';
+import {
+  AlertCircle,
+  Calendar,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  ListTodo,
+  RefreshCw,
+} from 'lucide-react';
 
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import { Surface } from '@/components/ui/surface';
@@ -92,108 +100,96 @@ export function MisTareasWidget() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user?.email) {
-          if (!cancelled) {
-            setTasks([]);
-            setLoading(false);
-          }
-          return;
-        }
-
-        // core.usuarios por email
-        const { data: coreUser } = await supabase
-          .schema('core')
-          .from('usuarios')
-          .select('id')
-          .eq('email', user.email.toLowerCase())
-          .maybeSingle();
-
-        if (!coreUser) {
-          if (!cancelled) {
-            setTasks([]);
-            setLoading(false);
-          }
-          return;
-        }
-
-        // empresas del usuario
-        const { data: ue } = await supabase
-          .schema('core')
-          .from('usuarios_empresas')
-          .select('empresa_id')
-          .eq('usuario_id', coreUser.id)
-          .eq('activo', true);
-
-        const empresaIds = (ue ?? []).map((r: { empresa_id: string }) => r.empresa_id);
-        if (empresaIds.length === 0) {
-          if (!cancelled) {
-            setTasks([]);
-            setLoading(false);
-          }
-          return;
-        }
-
-        // empleados del usuario en esas empresas (match por email empresa o personal)
-        const emailLower = user.email.toLowerCase();
-        const { data: empleados } = await supabase
-          .schema('erp')
-          .from('v_empleados_full')
-          .select('empleado_id, empresa_id, email_empresa, email_personal')
-          .in('empresa_id', empresaIds)
-          .or(`email_empresa.eq.${emailLower},email_personal.eq.${emailLower}`);
-
-        const empleadoIds = (empleados ?? [])
-          .map((e: { empleado_id: string | null }) => e.empleado_id)
-          .filter((id: string | null): id is string => Boolean(id));
-
-        if (empleadoIds.length === 0) {
-          // Usuario no tiene ficha de empleado en ninguna empresa: no tareas personales.
-          if (!cancelled) {
-            setTasks([]);
-            setLoading(false);
-          }
-          return;
-        }
-
-        // tareas asignadas a este usuario en estado activo.
-        // Whitelist en vez de blacklist: si aparece un estado nuevo ('archivado',
-        // etc.) no queremos que se cuele. Estados actuales:
-        // pendiente · en_progreso · bloqueado · completado · cancelado.
-        const { data: taskRows, error: taskErr } = await supabase
-          .schema('erp')
-          .from('tasks')
-          .select('id, empresa_id, titulo, estado, fecha_vence, fecha_compromiso, prioridad')
-          .in('asignado_a', empleadoIds)
-          .in('estado', ['pendiente', 'en_progreso', 'bloqueado'])
-          .order('fecha_vence', { ascending: true, nullsFirst: false })
-          .limit(100);
-
-        if (taskErr) throw taskErr;
-        if (!cancelled) {
-          setTasks((taskRows ?? []) as TaskRow[]);
-          setLoading(false);
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : 'Error cargando tareas');
-          setLoading(false);
-        }
+  const loadTasks = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user?.email) {
+        setTasks([]);
+        setLoading(false);
+        return;
       }
-    })();
 
-    return () => {
-      cancelled = true;
-    };
+      // core.usuarios por email
+      const { data: coreUser } = await supabase
+        .schema('core')
+        .from('usuarios')
+        .select('id')
+        .eq('email', user.email.toLowerCase())
+        .maybeSingle();
+
+      if (!coreUser) {
+        setTasks([]);
+        setLoading(false);
+        return;
+      }
+
+      // empresas del usuario
+      const { data: ue } = await supabase
+        .schema('core')
+        .from('usuarios_empresas')
+        .select('empresa_id')
+        .eq('usuario_id', coreUser.id)
+        .eq('activo', true);
+
+      const empresaIds = (ue ?? []).map((r: { empresa_id: string }) => r.empresa_id);
+      if (empresaIds.length === 0) {
+        setTasks([]);
+        setLoading(false);
+        return;
+      }
+
+      // empleados del usuario en esas empresas (match por email empresa o personal)
+      const emailLower = user.email.toLowerCase();
+      const { data: empleados } = await supabase
+        .schema('erp')
+        .from('v_empleados_full')
+        .select('empleado_id, empresa_id, email_empresa, email_personal')
+        .in('empresa_id', empresaIds)
+        .or(`email_empresa.eq.${emailLower},email_personal.eq.${emailLower}`);
+
+      const empleadoIds = (empleados ?? [])
+        .map((e: { empleado_id: string | null }) => e.empleado_id)
+        .filter((id: string | null): id is string => Boolean(id));
+
+      if (empleadoIds.length === 0) {
+        // Usuario no tiene ficha de empleado en ninguna empresa: no tareas personales.
+        setTasks([]);
+        setLoading(false);
+        return;
+      }
+
+      // tareas asignadas a este usuario en estado activo.
+      // Whitelist en vez de blacklist: si aparece un estado nuevo ('archivado',
+      // etc.) no queremos que se cuele. Estados actuales:
+      // pendiente · en_progreso · bloqueado · completado · cancelado.
+      const { data: taskRows, error: taskErr } = await supabase
+        .schema('erp')
+        .from('tasks')
+        .select('id, empresa_id, titulo, estado, fecha_vence, fecha_compromiso, prioridad')
+        .in('asignado_a', empleadoIds)
+        .in('estado', ['pendiente', 'en_progreso', 'bloqueado'])
+        .order('fecha_vence', { ascending: true, nullsFirst: false })
+        .limit(100);
+
+      if (taskErr) throw taskErr;
+      setTasks((taskRows ?? []) as TaskRow[]);
+      setLoading(false);
+    } catch (e) {
+      // El detalle técnico (ej. "permission denied for schema core") va a consola
+      // para debugging; al usuario le mostramos un mensaje accionable.
+      console.error('[MisTareasWidget]', e);
+      setError('No pudimos cargar tus tareas. Intenta recargar la página.');
+      setLoading(false);
+    }
   }, [supabase]);
+
+  useEffect(() => {
+    void loadTasks();
+  }, [loadTasks]);
 
   const { grouped, todayIso } = useMemo(() => {
     const today = new Date();
@@ -228,7 +224,7 @@ export function MisTareasWidget() {
           </div>
           <div>
             <h2 className="text-lg font-semibold text-[var(--text)]">Mis tareas</h2>
-            <p className="text-xs text-[var(--text)]/55">
+            <p className="text-xs text-[var(--text-muted)]">
               {loading
                 ? 'Cargando…'
                 : totalPendientes === 0
@@ -249,9 +245,17 @@ export function MisTareasWidget() {
       {error ? (
         <div
           role="alert"
-          className="mt-4 rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-400"
+          className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-400"
         >
-          {error}
+          <span className="min-w-0 flex-1">{error}</span>
+          <button
+            type="button"
+            onClick={() => void loadTasks()}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-300 transition hover:border-red-500/50 hover:bg-red-500/20 focus:outline-none focus:ring-2 focus:ring-red-500/40"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Reintentar
+          </button>
         </div>
       ) : loading ? (
         <div className="mt-4 space-y-2" aria-busy="true">
@@ -280,7 +284,9 @@ export function MisTareasWidget() {
                       <Icon className="h-3.5 w-3.5" />
                       {cfg.label}
                     </span>
-                    <span className="text-xs text-[var(--text)]/40">{grouped[bucket].length}</span>
+                    <span className="text-xs text-[var(--text-subtle)]">
+                      {grouped[bucket].length}
+                    </span>
                   </div>
                   <ul className="space-y-1.5">
                     {grouped[bucket].slice(0, 10).map((t) => (
@@ -300,7 +306,7 @@ export function MisTareasWidget() {
                     ))}
                   </ul>
                   {grouped[bucket].length > 10 && (
-                    <p className="mt-1.5 text-right text-xs text-[var(--text)]/40">
+                    <p className="mt-1.5 text-right text-xs text-[var(--text-subtle)]">
                       + {grouped[bucket].length - 10} más
                     </p>
                   )}

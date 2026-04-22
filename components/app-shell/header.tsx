@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, Moon, Sun } from 'lucide-react';
+import { Bell, ChevronDown, Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useLocale } from '@/lib/i18n';
 import { AccountMenu } from './account-menu';
@@ -96,26 +96,43 @@ export function Header({
             <button
               type="button"
               onClick={() => setLocale(locale === 'es' ? 'en' : 'es')}
-              className="flex h-7 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--card)] px-2 text-[10px] font-semibold dark:text-white/70 text-[var(--text)]/70 transition hover:border-[var(--accent)] dark:hover:text-white hover:text-[var(--text)]"
+              className="flex h-7 items-center justify-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--card)] px-2 text-[10px] font-semibold dark:text-white/70 text-[var(--text)]/70 transition hover:border-[var(--accent)] dark:hover:text-white hover:text-[var(--text)]"
               aria-label={t('header.toggle_locale')}
+              title={locale === 'es' ? 'Cambiar a English' : 'Change to Español'}
             >
               {locale === 'es' ? 'ES' : 'EN'}
-              <span className="mx-1 dark:text-white/25 text-[var(--text)]/25">|</span>
-              {locale === 'es' ? 'EN' : 'ES'}
+              <ChevronDown className="h-3 w-3" />
             </button>
 
             {/* Notifications bell */}
-            <div className="relative">
-              <Bell className="h-4 w-4 dark:text-white/70 text-[var(--text)]/70" />
-              <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-semibold text-white">
-                0
-              </span>
-            </div>
+            <NotificationsBell />
 
             <AccountMenu user={user} />
           </div>
         </div>
       </div>
     </header>
+  );
+}
+
+function NotificationsBell() {
+  const count = 0;
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        // TODO: abrir panel de notificaciones (pendiente de implementación)
+      }}
+      aria-label="Notificaciones"
+      title="Próximamente"
+      className="relative flex h-7 w-7 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--card)] dark:text-white/70 text-[var(--text)]/70 transition hover:border-[var(--accent)] dark:hover:text-white hover:text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40"
+    >
+      <Bell className="h-3.5 w-3.5" />
+      {count > 0 ? (
+        <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-semibold text-white">
+          {count}
+        </span>
+      ) : null}
+    </button>
   );
 }

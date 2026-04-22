@@ -232,7 +232,7 @@ export function FechasImportantesWidget() {
         </div>
         <div>
           <h2 className="text-lg font-semibold text-[var(--text)]">Próximas fechas importantes</h2>
-          <p className="text-xs text-[var(--text)]/55">Cumpleaños y días festivos (30 días)</p>
+          <p className="text-xs text-[var(--text-muted)]">Cumpleaños y días festivos (30 días)</p>
         </div>
       </div>
 
@@ -294,7 +294,9 @@ export function FechasImportantesWidget() {
                     <p className="text-xs font-medium text-[var(--text)]/80">
                       {formatDiasFaltan(e.diasFaltan)}
                     </p>
-                    <p className="text-[11px] text-[var(--text)]/40">{formatFechaCorta(e.fecha)}</p>
+                    <p className="text-[11px] text-[var(--text-subtle)]">
+                      {formatFechaCorta(e.fecha)}
+                    </p>
                   </div>
                 </div>
               </li>

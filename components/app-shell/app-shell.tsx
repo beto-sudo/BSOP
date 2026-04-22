@@ -4,6 +4,7 @@ import { Menu } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 import { useLocale } from '@/lib/i18n';
+import { getGreeting } from '@/lib/datetime/greeting';
 import { usePermissions } from '@/components/providers';
 import { Header } from './header';
 import { ImpersonationBanner } from './impersonation-banner';
@@ -42,13 +43,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const displayName = user?.name ?? '';
 
-  const greeting = useMemo(() => {
-    const date = now ?? new Date();
-    const hour = date.getHours();
-    if (hour < 12) return t('greeting.morning');
-    if (hour < 19) return t('greeting.afternoon');
-    return t('greeting.evening');
-  }, [now, t]);
+  const greeting = useMemo(() => getGreeting(now ?? new Date(), t), [now, t]);
 
   const formattedDate = now
     ? now.toLocaleString(locale === 'es' ? 'es-MX' : 'en-US', {
