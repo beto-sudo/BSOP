@@ -1320,6 +1320,7 @@ export type Database = {
           notas: string | null
           numero_documento: string | null
           partes: Json | null
+          precio_m2: number | null
           subtipo_meta: Json | null
           superficie_m2: number | null
           tipo: string | null
@@ -1356,6 +1357,7 @@ export type Database = {
           notas?: string | null
           numero_documento?: string | null
           partes?: Json | null
+          precio_m2?: number | null
           subtipo_meta?: Json | null
           superficie_m2?: number | null
           tipo?: string | null
@@ -1392,6 +1394,7 @@ export type Database = {
           notas?: string | null
           numero_documento?: string | null
           partes?: Json | null
+          precio_m2?: number | null
           subtipo_meta?: Json | null
           superficie_m2?: number | null
           tipo?: string | null

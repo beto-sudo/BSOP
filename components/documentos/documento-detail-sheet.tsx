@@ -1,7 +1,5 @@
 'use client';
 
- 
-
 import { useEffect, useState } from 'react';
 import {
   AlertTriangle,
@@ -32,7 +30,14 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 
 import type { Adjunto, DocForm, Documento, NotariaOption } from './types';
 import { META_LABELS } from './types';
-import { docToForm, emptyForm, formatDate, formatMonto, formatSuperficie } from './helpers';
+import {
+  docToForm,
+  emptyForm,
+  formatDate,
+  formatMonto,
+  formatPrecioM2,
+  formatSuperficie,
+} from './helpers';
 import { FLabel, TipoBadge, TipoOperacionBadge, VencBadge } from './ui';
 import { DocFormFields } from './documento-form-fields';
 import { AdjuntosSection } from './documento-adjuntos';
@@ -361,6 +366,14 @@ export function DocumentoDetailSheet({
                             <FLabel>Superficie</FLabel>
                             <p className="text-[var(--text)]/80">
                               {formatSuperficie(doc.superficie_m2)}
+                            </p>
+                          </div>
+                        )}
+                        {doc.precio_m2 != null && (
+                          <div>
+                            <FLabel>Precio / m²</FLabel>
+                            <p className="font-mono text-[var(--text)]/80">
+                              {formatPrecioM2(doc.precio_m2, doc.moneda)}
                             </p>
                           </div>
                         )}

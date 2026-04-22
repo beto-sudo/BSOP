@@ -46,6 +46,8 @@ export type Documento = {
   monto: number | null;
   moneda: string | null;
   superficie_m2: number | null;
+  /** Calculado en DB: monto/superficie_m2 cuando ambos > 0. GENERATED STORED. */
+  precio_m2: number | null;
   ubicacion_predio: string | null;
   municipio: string | null;
   estado: string | null;
