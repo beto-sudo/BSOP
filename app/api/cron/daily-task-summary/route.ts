@@ -117,11 +117,14 @@ export async function GET(req: NextRequest) {
     asignado_a: 'not.is.null',
   });
 
+  // PostgREST: para GET contra un schema no-default, el header es Accept-Profile
+  // (Content-Profile es para POST/PATCH/DELETE). Sin esto, PostgREST busca en
+  // public.tasks y falla con PGRST205.
   const tasksRes = await fetch(`${supabaseUrl}/rest/v1/tasks?${query}`, {
     headers: {
       apikey: serviceKey,
       Authorization: `Bearer ${serviceKey}`,
-      'Content-Profile': 'erp',
+      'Accept-Profile': 'erp',
     },
   });
 
