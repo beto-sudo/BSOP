@@ -1,7 +1,5 @@
 'use client';
 
- 
-
 import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
