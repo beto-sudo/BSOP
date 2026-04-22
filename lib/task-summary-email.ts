@@ -1,10 +1,12 @@
 // ── Daily task summary email HTML generator for BSOP ───────────────────────
 //
-// Generates the morning summary with pending tasks grouped by urgency:
-//   🔴 Vencidas  ·  🟡 Hoy  ·  🟢 Esta semana  ·  ⚪ Más adelante  ·  ⬜ Sin fecha
+// Un correo por (empleado, empresa). El branding refleja la empresa dueña
+// de las tareas — banner, logo y colores salen de core.empresas. BSOP queda
+// visible solo en el footer chico y en el texto del botón "Abrir en BSOP".
 //
-// Empty sections are not rendered. If there are zero total tasks, the caller
-// should NOT invoke this function and skip the email entirely.
+// Secciones por urgencia: 🔴 Vencidas · 🟡 Hoy · 🟢 Esta semana · ⚪ Más adelante · ⬜ Sin fecha
+// Las secciones vacías no se renderizan. Si el empleado tiene cero tareas
+// en la empresa, el caller NO debe invocar esta función (no mandes correo vacío).
 
 const MONTHS_ES = [
   'ene',
@@ -21,10 +23,13 @@ const MONTHS_ES = [
   'dic',
 ];
 
+/** BSOP orange — fallback cuando la empresa no tiene color_primario. */
+const DEFAULT_ACCENT = '#F7941D';
+const DEFAULT_ACCENT_DARK = '#D97E0C';
+
 export type TaskSummaryItem = {
   id: string;
   titulo: string;
-  empresaNombre: string;
   fechaVence: string | null; // ISO date (YYYY-MM-DD) or null
   fechaCompromiso: string | null;
   porcentajeAvance: number;
@@ -38,13 +43,23 @@ export type TaskSummaryGroups = {
   sinFecha: TaskSummaryItem[];
 };
 
+export type EmpresaBranding = {
+  nombre: string;
+  /** Banner ancho para tope del correo (preferido). */
+  headerEmailUrl: string | null;
+  /** Logo horizontal como fallback si no hay header. */
+  logoHorizontalUrl: string | null;
+  /** Logo vertical como último recurso. */
+  logoUrl: string | null;
+  /** Color del botón CTA y acentos. */
+  colorPrimario: string | null;
+  /** Variante oscura para hover/edges — usada aquí como fondo de banner si no hay imagen. */
+  colorPrimarioDark: string | null;
+};
+
 /**
  * Split task rows into urgency buckets relative to `todayCst` (ISO date).
  * Uses `fecha_vence` first, falls back to `fecha_compromiso`, null → sinFecha.
- *
- * Sorting inside each bucket:
- *   vencidas / hoy / estaSemana / masAdelante → by date ASC
- *   sinFecha → by titulo ASC
  */
 export function groupTasksByUrgency(tasks: TaskSummaryItem[], todayCst: string): TaskSummaryGroups {
   const todayMs = Date.parse(`${todayCst}T00:00:00Z`);
@@ -116,17 +131,17 @@ function renderTaskRow(
 
   const avanceLabel =
     task.porcentajeAvance > 0 && task.porcentajeAvance < 100
-      ? ` · ${task.porcentajeAvance}% avance`
+      ? `${dueLabel ? ' · ' : ''}${task.porcentajeAvance}% avance`
       : '';
 
-  const metaLine = [task.empresaNombre, dueLabel].filter(Boolean).join(' · ');
+  const metaLine = `${dueLabel}${avanceLabel}`;
 
   return `
     <tr>
       <td style="padding:10px 0;border-bottom:1px solid #eee">
         <table cellpadding="0" cellspacing="0" border="0" width="100%">
           <tr><td style="font-size:14px;font-weight:500;color:#1a1a1a;line-height:1.4">${escapeHtml(task.titulo)}</td></tr>
-          <tr><td style="font-size:12px;color:#888;padding-top:2px">${escapeHtml(metaLine)}${avanceLabel}</td></tr>
+          ${metaLine ? `<tr><td style="font-size:12px;color:#888;padding-top:2px">${escapeHtml(metaLine)}</td></tr>` : ''}
         </table>
       </td>
     </tr>`;
@@ -161,10 +176,43 @@ function escapeHtml(s: string): string {
     .replace(/'/g, '&#39;');
 }
 
+/** Header/banner block: usa header_email_url si existe; si no, logo sobre color de marca. */
+function renderBanner(empresa: EmpresaBranding): string {
+  const bgColor = empresa.colorPrimarioDark || empresa.colorPrimario || '#f8f8f8';
+  const fallbackLogo = empresa.logoHorizontalUrl || empresa.logoUrl;
+
+  if (empresa.headerEmailUrl) {
+    return `
+      <tr>
+        <td style="padding:0;border-radius:12px 12px 0 0;overflow:hidden">
+          <img src="${escapeHtml(empresa.headerEmailUrl)}" alt="${escapeHtml(empresa.nombre)}" width="520" style="display:block;width:100%;max-width:520px;height:auto;border-radius:12px 12px 0 0"/>
+        </td>
+      </tr>`;
+  }
+
+  if (fallbackLogo) {
+    return `
+      <tr>
+        <td style="background:${bgColor};padding:28px 32px;text-align:center;border-radius:12px 12px 0 0">
+          <img src="${escapeHtml(fallbackLogo)}" alt="${escapeHtml(empresa.nombre)}" height="48" style="display:block;margin:0 auto;max-height:48px;width:auto"/>
+        </td>
+      </tr>`;
+  }
+
+  // Último fallback: texto sobre color de marca.
+  return `
+    <tr>
+      <td style="background:${bgColor};padding:32px;text-align:center;border-radius:12px 12px 0 0">
+        <div style="font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.3px">${escapeHtml(empresa.nombre)}</div>
+      </td>
+    </tr>`;
+}
+
 export function generateTaskSummaryHtml(
   firstName: string,
   groups: TaskSummaryGroups,
-  todayCst: string
+  todayCst: string,
+  empresa: EmpresaBranding
 ): string {
   const total =
     groups.vencidas.length +
@@ -172,6 +220,9 @@ export function generateTaskSummaryHtml(
     groups.estaSemana.length +
     groups.masAdelante.length +
     groups.sinFecha.length;
+
+  const accent = empresa.colorPrimario || DEFAULT_ACCENT;
+  const accentHover = empresa.colorPrimarioDark || DEFAULT_ACCENT_DARK;
 
   const sections = [
     renderSection('Vencidas', '🔴', groups.vencidas, todayCst, 'vencidas'),
@@ -191,30 +242,26 @@ export function generateTaskSummaryHtml(
 
   <table cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;background:#ffffff;border-radius:12px;border:1px solid #e5e5e5">
 
-    <tr>
-      <td style="background:#f8f8f8;padding:24px 32px;text-align:center;border-bottom:1px solid #e5e5e5;border-radius:12px 12px 0 0">
-        <img src="https://bsop.io/logo-bsop.jpg" alt="BSOP" width="140" style="display:block;margin:0 auto"/>
-      </td>
-    </tr>
+    ${renderBanner(empresa)}
 
     <tr>
       <td style="padding:28px 32px 24px">
         <table cellpadding="0" cellspacing="0" border="0" width="100%">
           <tr><td style="font-size:20px;font-weight:700;color:#1a1a1a;padding-bottom:4px">Buenos días, ${escapeHtml(firstName)} 👋</td></tr>
-          <tr><td style="font-size:15px;color:#555;line-height:1.5;padding-bottom:8px">Tienes <strong>${total}</strong> ${total === 1 ? 'tarea abierta' : 'tareas abiertas'} en BSOP.</td></tr>
+          <tr><td style="font-size:15px;color:#555;line-height:1.5;padding-bottom:8px">Tienes <strong>${total}</strong> ${total === 1 ? 'tarea abierta' : 'tareas abiertas'} en <strong>${escapeHtml(empresa.nombre)}</strong>.</td></tr>
         </table>
 
         ${sections}
 
         <table cellpadding="0" cellspacing="0" border="0" width="100%" style="padding-top:28px">
           <tr><td align="center">
-            <a href="https://bsop.io" style="display:inline-block;background:#F7941D;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px;letter-spacing:0.3px">Abrir BSOP</a>
+            <a href="https://bsop.io" style="display:inline-block;background:${accent};color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px;letter-spacing:0.3px;border-bottom:2px solid ${accentHover}">Abrir en BSOP</a>
           </td></tr>
         </table>
 
         <table cellpadding="0" cellspacing="0" border="0" width="100%" style="padding-top:20px">
           <tr><td style="font-size:12px;color:#888;line-height:1.5;text-align:center">
-            Si alguna tarea ya no aplica, responde este correo o márcala como completada en BSOP.
+            Si alguna tarea ya no aplica, responde este correo.
           </td></tr>
         </table>
       </td>
@@ -223,7 +270,7 @@ export function generateTaskSummaryHtml(
     <tr>
       <td style="background:#f8f8f8;padding:14px 32px;text-align:center;border-top:1px solid #e5e5e5;border-radius:0 0 12px 12px">
         <table cellpadding="0" cellspacing="0" border="0" width="100%">
-          <tr><td align="center" style="font-size:11px;color:#999">BSOP · Sistema Operativo</td></tr>
+          <tr><td align="center" style="font-size:11px;color:#999">Enviado por BSOP · Sistema Operativo</td></tr>
         </table>
       </td>
     </tr>
