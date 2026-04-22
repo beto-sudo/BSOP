@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useLocale } from '@/lib/i18n';
@@ -35,7 +35,6 @@ export function Sidebar({
   mobileOpen: boolean;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const { t } = useLocale();
   const { permissions } = usePermissions();
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
@@ -150,59 +149,70 @@ export function Sidebar({
 
             return (
               <div key={item.href} className="group/item relative">
-                <Link
-                  href={item.href}
-                  onClick={(e) => {
-                    if (collapsed) setCollapsed(false);
-                    if (hasChildren) {
-                      e.preventDefault();
-                      setExpandedSection(expanded && !collapsed ? null : item.href);
-                      router.push(item.href);
-                    } else {
-                      setExpandedSection(null);
-                    }
-                  }}
+                <div
                   className={[
-                    'group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition',
+                    'flex items-center rounded-2xl text-sm transition',
                     active
                       ? 'border border-[var(--accent)]/40 bg-[var(--accent)]/15 dark:text-white text-[var(--text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
                       : 'border border-transparent dark:text-white/68 text-[var(--text)]/68 hover:border-[var(--border)] hover:bg-[var(--card)] dark:hover:text-white hover:text-[var(--text)]',
-                    collapsed ? 'justify-center px-2' : '',
+                    !collapsed && hasChildren ? 'pr-1' : '',
                   ].join(' ')}
-                  title={collapsed ? label : undefined}
                 >
-                  <span className="text-lg leading-none">
-                    {item.icon === 'DILESA_LOGO' ? (
-                      <img
-                        src="/logos/dilesa.jpg"
-                        alt="DILESA"
-                        className="h-5 w-5 object-contain rounded-sm"
-                      />
-                    ) : item.icon === 'RDB_LOGO' ? (
-                      <img
-                        src="/logos/rdb.jpg"
-                        alt="RDB"
-                        className="h-5 w-5 object-contain rounded-sm"
-                      />
-                    ) : item.icon === 'SANREN_LOGO' ? (
-                      <img
-                        src="/logos/sanren.png"
-                        alt="SANREN"
-                        className="h-5 w-5 object-contain rounded-sm"
-                      />
-                    ) : (
-                      item.icon
-                    )}
-                  </span>
-                  {!collapsed ? <span className="min-w-0 flex-1 truncate">{label}</span> : null}
+                  <Link
+                    href={item.href}
+                    onClick={() => {
+                      if (collapsed) setCollapsed(false);
+                    }}
+                    className={[
+                      'flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-3 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40',
+                      collapsed ? 'justify-center px-2' : '',
+                    ].join(' ')}
+                    title={collapsed ? label : undefined}
+                  >
+                    <span className="text-lg leading-none">
+                      {item.icon === 'DILESA_LOGO' ? (
+                        <img
+                          src="/logos/dilesa.jpg"
+                          alt="DILESA"
+                          className="h-5 w-5 object-contain rounded-sm"
+                        />
+                      ) : item.icon === 'RDB_LOGO' ? (
+                        <img
+                          src="/logos/rdb.jpg"
+                          alt="RDB"
+                          className="h-5 w-5 object-contain rounded-sm"
+                        />
+                      ) : item.icon === 'SANREN_LOGO' ? (
+                        <img
+                          src="/logos/sanren.png"
+                          alt="SANREN"
+                          className="h-5 w-5 object-contain rounded-sm"
+                        />
+                      ) : (
+                        item.icon
+                      )}
+                    </span>
+                    {!collapsed ? <span className="min-w-0 flex-1 truncate">{label}</span> : null}
+                  </Link>
                   {!collapsed && hasChildren ? (
-                    expanded ? (
-                      <ChevronDown className="h-4 w-4 shrink-0 dark:text-white/45 text-[var(--text)]/45 transition-transform duration-200" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 shrink-0 dark:text-white/45 text-[var(--text)]/45 transition-transform duration-200" />
-                    )
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedSection(expanded ? null : item.href);
+                      }}
+                      aria-label={expanded ? `Contraer ${label}` : `Expandir ${label}`}
+                      aria-expanded={expanded}
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg dark:text-white/45 text-[var(--text)]/45 transition-colors hover:dark:text-white hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40"
+                    >
+                      {expanded ? (
+                        <ChevronDown className="h-4 w-4 transition-transform duration-200" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 transition-transform duration-200" />
+                      )}
+                    </button>
                   ) : null}
-                </Link>
+                </div>
 
                 {!collapsed && hasChildren ? (
                   <div
