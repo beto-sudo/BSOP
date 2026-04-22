@@ -20,10 +20,10 @@ export function LoginCard({ unauthorized }: { unauthorized: boolean }) {
             Acceso privado
           </div>
 
-          <h1 className="mt-5 text-3xl font-semibold tracking-tight text-white">
+          <h1 className="mt-5 text-3xl font-semibold tracking-tight text-[var(--text)]">
             Bienvenido de vuelta
           </h1>
-          <p className="mt-3 max-w-sm text-sm leading-6 text-white/60">
+          <p className="mt-3 max-w-sm text-sm leading-6 text-[var(--text-muted)]">
             Entra con tu cuenta de Google para acceder a BSOP y a tu panel privado de operaciones.
           </p>
 
@@ -62,7 +62,7 @@ export function LoginCard({ unauthorized }: { unauthorized: boolean }) {
             Entrar con Google
           </a>
 
-          <p className="mt-4 text-xs text-white/40">
+          <p className="mt-4 text-xs text-[var(--text-subtle)]">
             Solo las cuentas autorizadas pueden acceder a este espacio.
           </p>
         </div>
