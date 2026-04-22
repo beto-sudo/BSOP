@@ -293,6 +293,14 @@ export function DocumentosModule({
     setDocumentos((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
   };
 
+  const handleDocDeleted = (id: string) => {
+    // El detail sheet ya cerró el panel — aquí solo removemos del listado y
+    // limpiamos cualquier referencia stale (selectedDoc, semanticResultIds).
+    setDocumentos((prev) => prev.filter((d) => d.id !== id));
+    setSelectedDoc((prev) => (prev?.id === id ? null : prev));
+    setSemanticResultIds((prev) => (prev ? prev.filter((rid) => rid !== id) : prev));
+  };
+
   const handleDocCreated = (newDoc: Documento) => {
     setDocumentos((prev) => [newDoc, ...prev]);
     setSelectedDoc(newDoc);
@@ -568,6 +576,7 @@ export function DocumentosModule({
         adjuntos={selectedDoc ? (adjuntosPorDoc[selectedDoc.id] ?? []) : []}
         onRefreshAdjuntos={handleRefreshAdjuntos}
         onDocUpdated={handleDocUpdated}
+        onDocDeleted={handleDocDeleted}
         scopedEmpresaId={scopedEmpresaId}
       />
 

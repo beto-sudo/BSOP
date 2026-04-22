@@ -15,10 +15,20 @@ import {
   Pencil,
   Save,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
 
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
+import { usePermissions } from '@/components/providers';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -39,6 +49,7 @@ export function DocumentoDetailSheet({
   adjuntos,
   onRefreshAdjuntos,
   onDocUpdated,
+  onDocDeleted,
   scopedEmpresaId,
 }: {
   doc: Documento | null;
@@ -50,6 +61,12 @@ export function DocumentoDetailSheet({
   onRefreshAdjuntos: () => void;
   onDocUpdated: (d: Documento) => void;
   /**
+   * Callback para notificar al padre que el documento fue soft-deleted y
+   * debería removerse de la lista en memoria. Solo aplica si el usuario
+   * actual es admin y confirma la acción.
+   */
+  onDocDeleted?: (id: string) => void;
+  /**
    * When set, the update query is also scoped by `empresa_id = scopedEmpresaId`
    * as defense-in-depth for per-empresa routes. Leave undefined for the
    * cross-empresa admin view (RLS does the filtering there).
@@ -57,10 +74,13 @@ export function DocumentoDetailSheet({
   scopedEmpresaId?: string;
 }) {
   const supabase = createSupabaseERPClient();
+  const { permissions } = usePermissions();
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState<DocForm>(emptyForm());
   const [saving, setSaving] = useState(false);
   const [showContenido, setShowContenido] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (doc) {
@@ -113,6 +133,27 @@ export function DocumentoDetailSheet({
     setEditing(false);
   };
 
+  const handleDelete = async () => {
+    if (!doc) return;
+    setDeleting(true);
+    let query = supabase
+      .schema('erp')
+      .from('documentos')
+      .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq('id', doc.id)
+      .is('deleted_at', null);
+    if (scopedEmpresaId) query = query.eq('empresa_id', scopedEmpresaId);
+    const { error: err } = await query;
+    setDeleting(false);
+    if (err) {
+      alert(`Error al eliminar: ${err.message}`);
+      return;
+    }
+    setConfirmingDelete(false);
+    onDocDeleted?.(doc.id);
+    onClose();
+  };
+
   if (!doc) return null;
 
   const metaEntries = Object.entries(doc.subtipo_meta ?? {}).filter(([, v]) => v);
@@ -132,10 +173,24 @@ export function DocumentoDetailSheet({
           <SheetTitle>{editing ? 'Editar Documento' : doc.titulo}</SheetTitle>
           <div className="absolute right-12 top-4 hidden sm:flex gap-2 print:hidden">
             {!editing && (
-              <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-                <Pencil className="mr-2 h-4 w-4" />
-                Editar
-              </Button>
+              <>
+                <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Editar
+                </Button>
+                {permissions.isAdmin && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setConfirmingDelete(true)}
+                    className="border-red-500/30 bg-red-500/5 text-red-400 hover:bg-red-500/10"
+                    title="Eliminar documento (solo admin)"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Eliminar
+                  </Button>
+                )}
+              </>
             )}
           </div>
         </SheetHeader>
@@ -399,6 +454,57 @@ export function DocumentoDetailSheet({
           </div>
         </ScrollArea>
       </SheetContent>
+
+      {/* Confirmación de borrado — solo alcanza aquí si el usuario es admin. */}
+      <Dialog
+        open={confirmingDelete}
+        onOpenChange={(v) => {
+          if (!v && !deleting) setConfirmingDelete(false);
+        }}
+      >
+        <DialogContent className="max-w-md rounded-3xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-400">
+              <Trash2 className="h-5 w-5" />
+              Eliminar documento
+            </DialogTitle>
+            <DialogDescription className="text-[var(--text)]/60">
+              Esta acción archivará el documento{' '}
+              <span className="font-semibold text-[var(--text)]">«{doc.titulo}»</span>. Dejará de
+              aparecer en el módulo, pero los archivos adjuntos, las partes y el texto extraído por
+              IA se conservan en la base de datos y pueden restaurarse desde SQL si hiciera falta.
+              ¿Continuar?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmingDelete(false)}
+              disabled={deleting}
+              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="rounded-xl bg-red-500 text-white hover:bg-red-500/90"
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Eliminando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Sí, eliminar
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Sheet>
   );
 }
