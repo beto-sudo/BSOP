@@ -217,7 +217,7 @@ export function Sidebar({
                           return (
                             <div
                               key={child.label}
-                              className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] dark:text-white/35 text-[var(--text)]/40"
+                              className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] dark:text-white/35 text-[var(--text-subtle)]"
                             >
                               {child.label}
                             </div>
@@ -232,7 +232,7 @@ export function Sidebar({
                               'block rounded-xl border-l-2 px-3 py-2 text-xs transition',
                               childActive
                                 ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
-                                : 'border-transparent dark:text-white/48 text-[var(--text)]/55 hover:bg-[var(--card)] dark:hover:text-white/80 hover:text-[var(--text)]',
+                                : 'border-transparent dark:text-white/48 text-[var(--text-muted)] hover:bg-[var(--card)] dark:hover:text-white/80 hover:text-[var(--text)]',
                             ].join(' ')}
                           >
                             {child.label}
@@ -245,7 +245,7 @@ export function Sidebar({
 
                 {collapsed && hasChildren ? (
                   <div className="pointer-events-none absolute left-full top-0 z-50 ml-2 hidden min-w-48 rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-2 opacity-0 shadow-2xl transition duration-200 group-hover/item:pointer-events-auto group-hover/item:block group-hover/item:opacity-100 md:block">
-                    <div className="px-2 pb-2 text-xs font-semibold uppercase tracking-[0.16em] dark:text-white/40 text-[var(--text)]/40">
+                    <div className="px-2 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-subtle)]">
                       {label}
                     </div>
                     <div className="space-y-1">
@@ -254,7 +254,7 @@ export function Sidebar({
                           return (
                             <div
                               key={child.label}
-                              className="px-2 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] dark:text-white/35 text-[var(--text)]/40"
+                              className="px-2 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] dark:text-white/35 text-[var(--text-subtle)]"
                             >
                               {child.label}
                             </div>

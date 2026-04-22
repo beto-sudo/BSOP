@@ -70,7 +70,7 @@ export function AccountMenu({ user }: { user: AuthUser | null }) {
           <div className="max-w-56 truncate text-xs dark:text-white/90 text-[var(--text)]/90">
             {displayName}
           </div>
-          <div className="max-w-56 truncate text-[10px] dark:text-white/45 text-[var(--text)]/55">
+          <div className="max-w-56 truncate text-[10px] dark:text-white/45 text-[var(--text-muted)]">
             {displayEmail}
           </div>
         </div>
@@ -83,7 +83,7 @@ export function AccountMenu({ user }: { user: AuthUser | null }) {
             <div className="truncate text-xs font-medium dark:text-white text-[var(--text)]">
               {displayName}
             </div>
-            <div className="mt-1 text-xs dark:text-white/45 text-[var(--text)]/55">
+            <div className="mt-1 text-xs dark:text-white/45 text-[var(--text-muted)]">
               {displayEmail}
             </div>
           </div>

@@ -228,7 +228,7 @@ export function MisTareasWidget() {
           </div>
           <div>
             <h2 className="text-lg font-semibold text-[var(--text)]">Mis tareas</h2>
-            <p className="text-xs text-[var(--text)]/55">
+            <p className="text-xs text-[var(--text-muted)]">
               {loading
                 ? 'Cargando…'
                 : totalPendientes === 0
@@ -280,7 +280,9 @@ export function MisTareasWidget() {
                       <Icon className="h-3.5 w-3.5" />
                       {cfg.label}
                     </span>
-                    <span className="text-xs text-[var(--text)]/40">{grouped[bucket].length}</span>
+                    <span className="text-xs text-[var(--text-subtle)]">
+                      {grouped[bucket].length}
+                    </span>
                   </div>
                   <ul className="space-y-1.5">
                     {grouped[bucket].slice(0, 10).map((t) => (
@@ -300,7 +302,7 @@ export function MisTareasWidget() {
                     ))}
                   </ul>
                   {grouped[bucket].length > 10 && (
-                    <p className="mt-1.5 text-right text-xs text-[var(--text)]/40">
+                    <p className="mt-1.5 text-right text-xs text-[var(--text-subtle)]">
                       + {grouped[bucket].length - 10} más
                     </p>
                   )}
