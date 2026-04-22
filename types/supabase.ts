@@ -1294,59 +1294,110 @@ export type Database = {
       documentos: {
         Row: {
           archivo_url: string | null
+          contenido_embedding: string | null
+          contenido_texto: string | null
+          contenido_texto_tsv: unknown
           creado_por: string | null
           created_at: string
           deleted_at: string | null
           descripcion: string | null
           empresa_id: string
+          estado: string | null
+          extraccion_error: string | null
+          extraccion_fecha: string | null
+          extraccion_modelo: string | null
+          extraccion_status: string
           fecha_emision: string | null
           fecha_vencimiento: string | null
+          folio_real: string | null
           id: string
+          libro_tomo: string | null
+          moneda: string | null
+          monto: number | null
+          municipio: string | null
           notaria: string | null
           notario_proveedor_id: string | null
           notas: string | null
           numero_documento: string | null
+          partes: Json | null
           subtipo_meta: Json | null
+          superficie_m2: number | null
           tipo: string | null
+          tipo_operacion: string | null
           titulo: string
+          ubicacion_predio: string | null
           updated_at: string | null
         }
         Insert: {
           archivo_url?: string | null
+          contenido_embedding?: string | null
+          contenido_texto?: string | null
+          contenido_texto_tsv?: unknown
           creado_por?: string | null
           created_at?: string
           deleted_at?: string | null
           descripcion?: string | null
           empresa_id: string
+          estado?: string | null
+          extraccion_error?: string | null
+          extraccion_fecha?: string | null
+          extraccion_modelo?: string | null
+          extraccion_status?: string
           fecha_emision?: string | null
           fecha_vencimiento?: string | null
+          folio_real?: string | null
           id?: string
+          libro_tomo?: string | null
+          moneda?: string | null
+          monto?: number | null
+          municipio?: string | null
           notaria?: string | null
           notario_proveedor_id?: string | null
           notas?: string | null
           numero_documento?: string | null
+          partes?: Json | null
           subtipo_meta?: Json | null
+          superficie_m2?: number | null
           tipo?: string | null
+          tipo_operacion?: string | null
           titulo: string
+          ubicacion_predio?: string | null
           updated_at?: string | null
         }
         Update: {
           archivo_url?: string | null
+          contenido_embedding?: string | null
+          contenido_texto?: string | null
+          contenido_texto_tsv?: unknown
           creado_por?: string | null
           created_at?: string
           deleted_at?: string | null
           descripcion?: string | null
           empresa_id?: string
+          estado?: string | null
+          extraccion_error?: string | null
+          extraccion_fecha?: string | null
+          extraccion_modelo?: string | null
+          extraccion_status?: string
           fecha_emision?: string | null
           fecha_vencimiento?: string | null
+          folio_real?: string | null
           id?: string
+          libro_tomo?: string | null
+          moneda?: string | null
+          monto?: number | null
+          municipio?: string | null
           notaria?: string | null
           notario_proveedor_id?: string | null
           notas?: string | null
           numero_documento?: string | null
+          partes?: Json | null
           subtipo_meta?: Json | null
+          superficie_m2?: number | null
           tipo?: string | null
+          tipo_operacion?: string | null
           titulo?: string
+          ubicacion_predio?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -3703,7 +3754,17 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      search_documentos_by_embedding: {
+        Args: {
+          p_empresa_ids: string[]
+          query_embedding: string
+          top_k?: number
+        }
+        Returns: {
+          id: string
+          similarity: number
+        }[]
+      }
     }
     Enums: {
       clasificacion_producto:

@@ -40,6 +40,23 @@ export function TipoBadge({ tipo }: { tipo: string | null }) {
   );
 }
 
+// Tipo de operación viene normalizado en minúsculas sin acentos del prompt
+// de extracción. Para la UI capitalizamos la primera letra y nada más — si
+// empezamos a tener muchas variantes, vale la pena moverlo a un lookup con
+// colores por categoría.
+export function TipoOperacionBadge({ tipo }: { tipo: string | null }) {
+  if (!tipo) return <span className="text-[var(--text)]/25">—</span>;
+  const label = tipo.charAt(0).toUpperCase() + tipo.slice(1);
+  return (
+    <span
+      className="inline-flex items-center rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/8 px-2 py-0.5 text-xs font-medium text-[var(--accent)]"
+      title={tipo}
+    >
+      {label}
+    </span>
+  );
+}
+
 export function FLabel({ children, req }: { children: React.ReactNode; req?: boolean }) {
   return (
     <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50 mb-1.5">

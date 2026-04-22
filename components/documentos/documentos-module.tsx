@@ -33,8 +33,8 @@
  * render those URLs directly.
  */
 
-import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Clock, Loader2, Plus, RefreshCw, Search } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, Clock, Loader2, Plus, RefreshCw, Search, Sparkles } from 'lucide-react';
 
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import { getAdjuntoPath, getAdjuntoSignedUrls } from '@/lib/adjuntos';
@@ -57,6 +57,7 @@ import { FLabel } from './ui';
 import { DocumentosTable } from './documentos-table';
 import { DocumentoCreateSheet } from './documento-create-sheet';
 import { DocumentoDetailSheet } from './documento-detail-sheet';
+import { DocumentoSemanticSearch } from './documento-semantic-search';
 
 export type DocumentosModuleProps = {
   /**
@@ -107,6 +108,10 @@ export function DocumentosModule({
 
   const [search, setSearch] = useState('');
   const [filterTipo, setFilterTipo] = useState('all');
+  const [filterTipoOperacion, setFilterTipoOperacion] = useState('all');
+  const [filterMunicipio, setFilterMunicipio] = useState('all');
+  const [showSemanticSearch, setShowSemanticSearch] = useState(false);
+  const [semanticResultIds, setSemanticResultIds] = useState<string[] | null>(null);
 
   const [showCreate, setShowCreate] = useState(false);
   const [showCreateNotaria, setShowCreateNotaria] = useState(false);
@@ -337,15 +342,48 @@ export function DocumentosModule({
 
   const tiposPresentes = [...new Set(documentos.map((d) => d.tipo).filter(Boolean))] as string[];
 
+  const tiposOperacionPresentes = useMemo(
+    () => [...new Set(documentos.map((d) => d.tipo_operacion).filter(Boolean))] as string[],
+    [documentos]
+  );
+
+  const municipiosPresentes = useMemo(
+    () => [...new Set(documentos.map((d) => d.municipio).filter(Boolean))] as string[],
+    [documentos]
+  );
+
+  // Orden determinado por búsqueda semántica si hay resultados; si no, el que
+  // venga de la tabla. `semanticResultIds` es un array ranqueado.
+  const semanticRankMap = useMemo(() => {
+    if (!semanticResultIds) return null;
+    const map = new Map<string, number>();
+    semanticResultIds.forEach((id, i) => map.set(id, i));
+    return map;
+  }, [semanticResultIds]);
+
   const filtered = documentos.filter((d) => {
+    // Si hay resultados de búsqueda semántica, solo mostramos esos.
+    if (semanticRankMap && !semanticRankMap.has(d.id)) return false;
+
     if (search) {
       const q = search.toLowerCase();
       const inTitulo = d.titulo.toLowerCase().includes(q);
       const inNumero = (d.numero_documento ?? '').toLowerCase().includes(q);
       const inDescripcion = (d.descripcion ?? '').toLowerCase().includes(q);
-      if (!inTitulo && !inNumero && !inDescripcion) return false;
+      const inContenido = (d.contenido_texto ?? '').toLowerCase().includes(q);
+      const inUbicacion = (d.ubicacion_predio ?? '').toLowerCase().includes(q);
+      const inPartes = (d.partes ?? []).some(
+        (p) =>
+          p.nombre.toLowerCase().includes(q) ||
+          (p.rfc ?? '').toLowerCase().includes(q) ||
+          (p.representante ?? '').toLowerCase().includes(q)
+      );
+      if (!inTitulo && !inNumero && !inDescripcion && !inContenido && !inUbicacion && !inPartes)
+        return false;
     }
     if (filterTipo !== 'all' && d.tipo !== filterTipo) return false;
+    if (filterTipoOperacion !== 'all' && d.tipo_operacion !== filterTipoOperacion) return false;
+    if (filterMunicipio !== 'all' && d.municipio !== filterMunicipio) return false;
     return true;
   });
 
@@ -354,7 +392,28 @@ export function DocumentosModule({
   ).length;
   const soonCount = documentos.filter((d) => getVencStatus(d.fecha_vencimiento) === 'soon').length;
 
-  const sortCtx = useSortableTable('fecha_emision', 'desc');
+  const baseSortCtx = useSortableTable('fecha_emision', 'desc');
+
+  // Si hay búsqueda semántica activa, override sortData para respetar el rank
+  // devuelto por la API (el doc más similar primero). Los filtros, sorts por
+  // columna y reset siguen disponibles — el usuario puede ordenar por fecha
+  // si prefiere, pero el default mientras dure la búsqueda es el rank IA.
+  const sortCtx = useMemo(() => {
+    if (!semanticRankMap) return baseSortCtx;
+    return {
+      ...baseSortCtx,
+      sortData: <T extends Record<string, unknown>>(rows: T[]): T[] => {
+        if (baseSortCtx.sortKey !== 'fecha_emision' || baseSortCtx.sortDir !== 'desc') {
+          return baseSortCtx.sortData(rows);
+        }
+        return [...rows].sort((a, b) => {
+          const ra = semanticRankMap.get(a.id as string) ?? Number.MAX_SAFE_INTEGER;
+          const rb = semanticRankMap.get(b.id as string) ?? Number.MAX_SAFE_INTEGER;
+          return ra - rb;
+        });
+      },
+    };
+  }, [baseSortCtx, semanticRankMap]);
 
   // Scope the detail sheet's update query by empresa_id for single-empresa
   // mounts (defense-in-depth). The cross-empresa admin view relies on RLS.
@@ -413,7 +472,7 @@ export function DocumentosModule({
           <div className="relative min-w-48 flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text)]/40" />
             <Input
-              placeholder="Buscar por título, número o descripción..."
+              placeholder="Buscar en título, número, contenido, ubicación o partes..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
@@ -426,8 +485,49 @@ export function DocumentosModule({
             placeholder="Tipo"
             searchPlaceholder="Buscar tipo..."
             clearLabel="Todos los tipos"
-            className="w-48"
+            className="w-40"
           />
+          {tiposOperacionPresentes.length > 0 && (
+            <FilterCombobox
+              value={filterTipoOperacion}
+              onChange={setFilterTipoOperacion}
+              options={tiposOperacionPresentes.map((t) => ({ id: t, label: t }))}
+              placeholder="Operación"
+              searchPlaceholder="Buscar operación..."
+              clearLabel="Todas las operaciones"
+              className="w-52"
+            />
+          )}
+          {municipiosPresentes.length > 0 && (
+            <FilterCombobox
+              value={filterMunicipio}
+              onChange={setFilterMunicipio}
+              options={municipiosPresentes.map((m) => ({ id: m, label: m }))}
+              placeholder="Municipio"
+              searchPlaceholder="Buscar municipio..."
+              clearLabel="Todos los municipios"
+              className="w-44"
+            />
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowSemanticSearch(true)}
+            className="gap-1.5 rounded-xl border-[var(--border)] bg-[var(--card)] text-[var(--text)] hover:bg-[var(--panel)]"
+          >
+            <Sparkles className="h-4 w-4 text-[var(--accent)]" />
+            Búsqueda IA
+          </Button>
+          {semanticRankMap && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSemanticResultIds(null)}
+              className="rounded-xl border-amber-500/30 bg-amber-500/5 text-amber-400 hover:bg-amber-500/10"
+            >
+              Limpiar búsqueda IA ({semanticRankMap.size})
+            </Button>
+          )}
         </div>
       </div>
 
@@ -469,6 +569,16 @@ export function DocumentosModule({
         onRefreshAdjuntos={handleRefreshAdjuntos}
         onDocUpdated={handleDocUpdated}
         scopedEmpresaId={scopedEmpresaId}
+      />
+
+      <DocumentoSemanticSearch
+        open={showSemanticSearch}
+        onClose={() => setShowSemanticSearch(false)}
+        empresaIds={empresaIds}
+        onResults={(ids) => {
+          setSemanticResultIds(ids);
+          setShowSemanticSearch(false);
+        }}
       />
 
       {/* Create Notaría Dialog (small, on top of sheet) */}

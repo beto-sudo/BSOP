@@ -9,6 +9,13 @@
  * Shared types for the DocumentosModule feature.
  */
 
+export type Parte = {
+  rol: string;
+  nombre: string;
+  rfc?: string | null;
+  representante?: string | null;
+};
+
 export type Documento = {
   id: string;
   empresa_id: string;
@@ -27,6 +34,24 @@ export type Documento = {
   created_at: string;
   updated_at: string | null;
   deleted_at: string | null;
+
+  // Campos poblados por el pipeline de extracción IA (PR B).
+  // Todos opcionales — pueden ser null mientras el doc no se procese.
+  contenido_texto: string | null;
+  extraccion_status: 'pendiente' | 'procesando' | 'completado' | 'error' | 'omitido' | null;
+  extraccion_fecha: string | null;
+  extraccion_modelo: string | null;
+  extraccion_error: string | null;
+  tipo_operacion: string | null;
+  monto: number | null;
+  moneda: string | null;
+  superficie_m2: number | null;
+  ubicacion_predio: string | null;
+  municipio: string | null;
+  estado: string | null;
+  folio_real: string | null;
+  libro_tomo: string | null;
+  partes: Parte[] | null;
 };
 
 export type Adjunto = {
