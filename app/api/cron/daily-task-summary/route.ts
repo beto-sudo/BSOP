@@ -1,19 +1,23 @@
 /**
- * Daily task summary cron — sends each employee their pending tasks by email.
+ * Daily task summary cron — un correo por (empleado, empresa).
  *
  * Schedule: every day at 13:00 UTC = 07:00 CST (see vercel.json).
  *
  * Delivery rules:
+ *   - Un correo por empresa donde el empleado tiene tareas abiertas.
+ *     El empleado con tareas en 2 empresas recibe 2 correos, cada uno branded
+ *     con el header/logo/colores de esa empresa.
  *   - Primary destination: erp.empleados.email_empresa
  *   - Fallback: erp.personas.email
  *   - If both null → skip employee (logged)
- *   - If employee has zero pending tasks → no email sent
- *   - If TASK_SUMMARY_TEST_TO env is set → all emails are redirected to that address
- *     (subject is prefixed with the original recipient name for clarity during testing)
+ *   - Si el empleado tiene 0 tareas en alguna empresa → no se le manda correo de esa.
+ *   - TASK_SUMMARY_TEST_TO env redirige TODOS los envíos a esa dirección,
+ *     prefijando el subject con [TEST → Nombre] para iteración de plantilla.
  *
- * Security:
- *   - Requires `Authorization: Bearer ${CRON_SECRET}` header (Vercel Cron supplies this)
- *   - Rejects everything else with 401
+ * Rate limit: Resend free tier = 5 req/s. Metemos sleep(220ms) entre envíos
+ * para quedar holgados bajo ese cap.
+ *
+ * Security: requiere `Authorization: Bearer ${CRON_SECRET}`. Vercel Cron lo envía.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -21,12 +25,16 @@ import { createClient } from '@supabase/supabase-js';
 import {
   generateTaskSummaryHtml,
   groupTasksByUrgency,
+  type EmpresaBranding,
   type TaskSummaryItem,
 } from '@/lib/task-summary-email';
 
-// Types matching the PostgREST response shape for our embedded select.
-// NOTA: empresa se resuelve en TS (no como embed) porque PostgREST no
-// puede hacer joins cross-schema (erp.tasks.empresa_id → core.empresas).
+// 300s cap for cron — tolera crecimiento hasta ~1000 buckets con sleep(220ms)
+// entre envíos y fetch a Resend. Si llegamos cerca del cap, migrar a Workflow
+// con step-based execution.
+export const maxDuration = 300;
+
+/** PostgREST embedded select — empleado + persona viven en erp, OK embed. */
 type EmbeddedTaskRow = {
   id: string;
   titulo: string;
@@ -46,15 +54,42 @@ type EmbeddedTaskRow = {
   } | null;
 };
 
-type EmpresaLite = { id: string; nombre: string; slug: string };
+/** core.empresas row — branding para el correo. */
+type EmpresaRow = {
+  id: string;
+  nombre: string;
+  slug: string;
+  header_email_url: string | null;
+  logo_horizontal_light_url: string | null;
+  logo_url: string | null;
+  color_primario: string | null;
+  color_primario_dark: string | null;
+};
 
-type PerEmployeeBucket = {
+/** Un bucket por (empleado, empresa) → un correo. */
+type Bucket = {
+  key: string;
   empleadoId: string;
+  empresaId: string;
   firstName: string;
   email: string;
-  emailSource: 'empresa' | 'personal';
   tasks: TaskSummaryItem[];
 };
+
+const MONTHS_ES = [
+  'ene',
+  'feb',
+  'mar',
+  'abr',
+  'may',
+  'jun',
+  'jul',
+  'ago',
+  'sep',
+  'oct',
+  'nov',
+  'dic',
+];
 
 /** Today (YYYY-MM-DD) in CST (UTC-6, no DST in Mexico since 2022). */
 function getTodayCst(): string {
@@ -63,28 +98,27 @@ function getTodayCst(): string {
   return cst.toISOString().slice(0, 10);
 }
 
-/** Short Spanish date label for subject: "20 abr". */
+/** Short Spanish date label: "22 abr". */
 function formatSubjectDate(todayCst: string): string {
-  const months = [
-    'ene',
-    'feb',
-    'mar',
-    'abr',
-    'may',
-    'jun',
-    'jul',
-    'ago',
-    'sep',
-    'oct',
-    'nov',
-    'dic',
-  ];
   const [, m, d] = todayCst.split('-');
-  return `${parseInt(d, 10)} ${months[parseInt(m, 10) - 1]}`;
+  return `${parseInt(d, 10)} ${MONTHS_ES[parseInt(m, 10) - 1]}`;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+function toBranding(row: EmpresaRow): EmpresaBranding {
+  return {
+    nombre: row.nombre,
+    headerEmailUrl: row.header_email_url,
+    logoHorizontalUrl: row.logo_horizontal_light_url,
+    logoUrl: row.logo_url,
+    colorPrimario: row.color_primario,
+    colorPrimarioDark: row.color_primario_dark,
+  };
 }
 
 export async function GET(req: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
+  const cronSecret = process.env.CRON_SECRET?.trim();
   const authHeader = req.headers.get('authorization');
   if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -93,7 +127,8 @@ export async function GET(req: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const resendKey = process.env.RESEND_API_KEY;
-  const testTo = process.env.TASK_SUMMARY_TEST_TO?.toLowerCase() || null;
+  const testToRaw = process.env.TASK_SUMMARY_TEST_TO?.trim().toLowerCase();
+  const testTo = testToRaw && testToRaw.length > 0 ? testToRaw : null;
 
   if (!supabaseUrl || !serviceKey) {
     return NextResponse.json({ error: 'Supabase env missing' }, { status: 500 });
@@ -105,20 +140,13 @@ export async function GET(req: NextRequest) {
   const todayCst = getTodayCst();
   const subjectDate = formatSubjectDate(todayCst);
 
-  // Supabase JS client con service role — bypasea RLS y maneja el Accept-Profile
-  // automáticamente cuando haces .schema('erp'). Patrón idiomático del repo
-  // (ver proxy.ts y app/settings/acceso/actions.ts).
   const supabase = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  // Whitelist de estados activos (mismo criterio que components/inicio/mis-tareas-widget,
-  // arreglado en #119 — el enum real es 'completado', no 'completada'). Whitelist > blacklist:
-  // si mañana aparece 'archivado', 'pausado', etc. no se cuelan silenciosamente.
-  //
-  // empleado y persona están en erp → se pueden embedear. empresa vive en core
-  // y PostgREST no hace joins cross-schema, así que la resolvemos abajo con un
-  // Map en memoria.
+  // Whitelist de estados activos (ver fix #119). Fetch en paralelo de tasks y
+  // empresas (cross-schema: empresa_id → core.empresas; PostgREST no hace joins
+  // cross-schema en embeds, así que resolvemos con Map en memoria).
   const select =
     'id,titulo,fecha_vence,fecha_compromiso,porcentaje_avance,empresa_id,' +
     'empleado:asignado_a(id,email_empresa,activo,persona:persona_id(nombre,apellido_paterno,email))';
@@ -132,7 +160,13 @@ export async function GET(req: NextRequest) {
       .is('fecha_completado', null)
       .not('asignado_a', 'is', null)
       .returns<EmbeddedTaskRow[]>(),
-    supabase.schema('core').from('empresas').select('id,nombre,slug').returns<EmpresaLite[]>(),
+    supabase
+      .schema('core')
+      .from('empresas')
+      .select(
+        'id,nombre,slug,header_email_url,logo_horizontal_light_url,logo_url,color_primario,color_primario_dark'
+      )
+      .returns<EmpresaRow[]>(),
   ]);
 
   if (tasksRes.error || !tasksRes.data) {
@@ -151,12 +185,13 @@ export async function GET(req: NextRequest) {
   }
 
   const rows = tasksRes.data;
-  const empresaMap = new Map<string, EmpresaLite>(empresasRes.data.map((e) => [e.id, e]));
+  const empresaMap = new Map<string, EmpresaRow>(empresasRes.data.map((e) => [e.id, e]));
 
-  // Group by empleado_id, resolving email (empresa → personal fallback).
-  const buckets = new Map<string, PerEmployeeBucket>();
+  // Bucket por (empleado, empresa): un correo por pareja.
+  const buckets = new Map<string, Bucket>();
   let skippedNoEmail = 0;
   let skippedInactive = 0;
+  let skippedNoEmpresa = 0;
 
   for (const row of rows) {
     const empleado = row.empleado;
@@ -165,55 +200,77 @@ export async function GET(req: NextRequest) {
       skippedInactive++;
       continue;
     }
+    if (!empresaMap.has(row.empresa_id)) {
+      skippedNoEmpresa++;
+      continue;
+    }
 
     const email = (empleado.email_empresa ?? empleado.persona?.email ?? '').trim();
     if (!email) {
       skippedNoEmail++;
       continue;
     }
-    const emailSource: 'empresa' | 'personal' = empleado.email_empresa ? 'empresa' : 'personal';
     const firstName = empleado.persona?.nombre?.trim() || 'colega';
 
     const task: TaskSummaryItem = {
       id: row.id,
       titulo: row.titulo,
-      empresaNombre: empresaMap.get(row.empresa_id)?.nombre ?? 'Sin empresa',
       fechaVence: row.fecha_vence,
       fechaCompromiso: row.fecha_compromiso,
       porcentajeAvance: row.porcentaje_avance ?? 0,
     };
 
-    const existing = buckets.get(empleado.id);
+    const key = `${empleado.id}:${row.empresa_id}`;
+    const existing = buckets.get(key);
     if (existing) {
       existing.tasks.push(task);
     } else {
-      buckets.set(empleado.id, {
+      buckets.set(key, {
+        key,
         empleadoId: empleado.id,
+        empresaId: row.empresa_id,
         firstName,
         email,
-        emailSource,
         tasks: [task],
       });
     }
   }
 
-  // Send emails (serialized — Resend doesn't need parallel, keeps rate limit calm).
+  // Envío serializado con sleep 220ms → ≤5 req/s. Resend free = 5/s.
   let sent = 0;
   let failed = 0;
-  const failures: Array<{ empleadoId: string; email: string; error: string }> = [];
-  const previews: Array<{ empleadoId: string; to: string; total: number; subject: string }> = [];
+  const failures: Array<{ empleadoId: string; empresaId: string; email: string; error: string }> =
+    [];
+  const previews: Array<{
+    empleadoId: string;
+    empresaSlug: string;
+    to: string;
+    total: number;
+    subject: string;
+    fromName: string;
+  }> = [];
 
+  let firstSend = true;
   for (const bucket of buckets.values()) {
     if (bucket.tasks.length === 0) continue;
 
-    const groups = groupTasksByUrgency(bucket.tasks, todayCst);
-    const html = generateTaskSummaryHtml(bucket.firstName, groups, todayCst);
+    const empresaRow = empresaMap.get(bucket.empresaId);
+    if (!empresaRow) continue; // already filtered above, defensive
+    const branding = toBranding(empresaRow);
 
-    // Test mode: redirect all sends to TASK_SUMMARY_TEST_TO, prefix subject with original name.
+    const groups = groupTasksByUrgency(bucket.tasks, todayCst);
+    const html = generateTaskSummaryHtml(bucket.firstName, groups, todayCst, branding);
+
+    const fromName = empresaRow.nombre;
     const destination = testTo ?? bucket.email;
     const subject = testTo
-      ? `[TEST → ${bucket.firstName}] Tareas de hoy — ${subjectDate}`
-      : `Tareas de hoy — ${subjectDate}`;
+      ? `[TEST → ${bucket.firstName}] Tareas de hoy en ${empresaRow.nombre} — ${subjectDate}`
+      : `Tareas de hoy en ${empresaRow.nombre} — ${subjectDate}`;
+
+    if (!firstSend) {
+      await sleep(220);
+    }
+    firstSend = false;
 
     const resendRes = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -222,7 +279,7 @@ export async function GET(req: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'BSOP <noreply@bsop.io>',
+        from: `${fromName} <noreply@bsop.io>`,
         to: [destination],
         subject,
         html,
@@ -233,16 +290,23 @@ export async function GET(req: NextRequest) {
       const err = await resendRes.text();
       console.error('[daily-task-summary] Resend failed:', bucket.email, err);
       failed++;
-      failures.push({ empleadoId: bucket.empleadoId, email: bucket.email, error: err });
+      failures.push({
+        empleadoId: bucket.empleadoId,
+        empresaId: bucket.empresaId,
+        email: bucket.email,
+        error: err,
+      });
       continue;
     }
 
     sent++;
     previews.push({
       empleadoId: bucket.empleadoId,
+      empresaSlug: empresaRow.slug,
       to: destination,
       total: bucket.tasks.length,
       subject,
+      fromName,
     });
   }
 
@@ -250,15 +314,16 @@ export async function GET(req: NextRequest) {
     ok: true,
     todayCst,
     totalTasks: rows.length,
-    employeesWithTasks: buckets.size,
+    bucketsWithTasks: buckets.size,
     sent,
     failed,
     skippedNoEmail,
     skippedInactive,
+    skippedNoEmpresa,
     testMode: Boolean(testTo),
     testTo,
     failures: failures.length > 0 ? failures : undefined,
-    previews: testTo ? previews : undefined, // only surface previews in test mode
+    previews: testTo ? previews : undefined,
   };
 
   console.log('[daily-task-summary]', JSON.stringify(summary));
