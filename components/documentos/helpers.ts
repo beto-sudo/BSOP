@@ -41,6 +41,28 @@ export function fmtBytes(b: number | null | undefined) {
   return `${(b / 1048576).toFixed(1)} MB`;
 }
 
+export function formatMonto(monto: number | null, moneda: string | null = 'MXN') {
+  if (monto == null) return '—';
+  try {
+    return new Intl.NumberFormat('es-MX', {
+      style: 'currency',
+      currency: moneda || 'MXN',
+      maximumFractionDigits: 0,
+    }).format(monto);
+  } catch {
+    return `${moneda ?? 'MXN'} ${monto.toLocaleString('es-MX')}`;
+  }
+}
+
+export function formatSuperficie(m2: number | null) {
+  if (m2 == null) return '—';
+  if (m2 >= 10000) {
+    const ha = m2 / 10000;
+    return `${ha.toLocaleString('es-MX', { maximumFractionDigits: 2 })} ha`;
+  }
+  return `${m2.toLocaleString('es-MX', { maximumFractionDigits: 0 })} m²`;
+}
+
 export function emptyForm(): DocForm {
   return {
     titulo: '',

@@ -23,8 +23,8 @@ import {
 } from '@/components/ui/table';
 
 import type { Adjunto, Documento } from './types';
-import { formatDate } from './helpers';
-import { TipoBadge, VencBadge } from './ui';
+import { formatDate, formatMonto } from './helpers';
+import { TipoBadge, TipoOperacionBadge, VencBadge } from './ui';
 
 type SortCtx = {
   sortKey: string;
@@ -53,6 +53,12 @@ export function DocumentosTable({
   sort: SortCtx;
 }) {
   const { sortKey, sortDir, onSort, sortData } = sort;
+
+  // Mostrar columnas derivadas de la extracción IA solo si al menos un
+  // documento del dataset las tiene (evita columnas siempre vacías antes de
+  // que se corra el pipeline en esa empresa).
+  const hasTipoOperacion = documentos.some((d) => d.tipo_operacion);
+  const hasMonto = documentos.some((d) => d.monto != null);
 
   if (error) {
     return (
@@ -120,8 +126,28 @@ export function DocumentosTable({
               currentSort={sortKey}
               currentDir={sortDir}
               onSort={onSort}
-              className="w-40"
+              className="w-32"
             />
+            {hasTipoOperacion && (
+              <SortableHead
+                sortKey="tipo_operacion"
+                label="Operación"
+                currentSort={sortKey}
+                currentDir={sortDir}
+                onSort={onSort}
+                className="w-40"
+              />
+            )}
+            {hasMonto && (
+              <SortableHead
+                sortKey="monto"
+                label="Monto"
+                currentSort={sortKey}
+                currentDir={sortDir}
+                onSort={onSort}
+                className="w-32 text-right"
+              />
+            )}
             <TableHead className="font-medium text-[var(--text)]/55">Descripción</TableHead>
             <TableHead className="w-24 font-medium text-[var(--text)]/55">PDF</TableHead>
             <TableHead className="w-24 font-medium text-[var(--text)]/55">Imagen</TableHead>
@@ -176,6 +202,22 @@ export function DocumentosTable({
                 <TableCell>
                   <TipoBadge tipo={doc.tipo} />
                 </TableCell>
+                {hasTipoOperacion && (
+                  <TableCell>
+                    <TipoOperacionBadge tipo={doc.tipo_operacion} />
+                  </TableCell>
+                )}
+                {hasMonto && (
+                  <TableCell className="text-right">
+                    {doc.monto != null ? (
+                      <span className="font-mono text-sm text-[var(--text)]/80">
+                        {formatMonto(doc.monto, doc.moneda)}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-[var(--text)]/25">—</span>
+                    )}
+                  </TableCell>
+                )}
                 <TableCell>
                   {doc.descripcion ? (
                     <span

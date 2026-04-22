@@ -7,7 +7,15 @@
  */
 
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Loader2, Pencil, Save } from 'lucide-react';
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  Pencil,
+  Save,
+  Sparkles,
+} from 'lucide-react';
 
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
@@ -17,8 +25,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 
 import type { Adjunto, DocForm, Documento, NotariaOption } from './types';
 import { META_LABELS } from './types';
-import { docToForm, emptyForm, formatDate } from './helpers';
-import { FLabel, TipoBadge, VencBadge } from './ui';
+import { docToForm, emptyForm, formatDate, formatMonto, formatSuperficie } from './helpers';
+import { FLabel, TipoBadge, TipoOperacionBadge, VencBadge } from './ui';
 import { DocFormFields } from './documento-form-fields';
 import { AdjuntosSection } from './documento-adjuntos';
 
@@ -52,6 +60,7 @@ export function DocumentoDetailSheet({
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState<DocForm>(emptyForm());
   const [saving, setSaving] = useState(false);
+  const [showContenido, setShowContenido] = useState(false);
 
   useEffect(() => {
     if (doc) {
@@ -203,6 +212,146 @@ export function DocumentoDetailSheet({
                       ))}
                     </div>
                   </>
+                )}
+
+                {/* ── Datos extraídos por IA ── */}
+                {doc.extraccion_status === 'completado' && (
+                  <>
+                    <Separator />
+                    <div>
+                      <div className="mb-3 flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-[var(--accent)]" />
+                        <h3 className="text-sm font-semibold text-[var(--text)]">
+                          Datos extraídos
+                        </h3>
+                        {doc.extraccion_fecha && (
+                          <span className="ml-auto text-[10px] text-[var(--text)]/40">
+                            {formatDate(doc.extraccion_fecha.slice(0, 10))}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        {doc.tipo_operacion && (
+                          <div>
+                            <FLabel>Operación</FLabel>
+                            <TipoOperacionBadge tipo={doc.tipo_operacion} />
+                          </div>
+                        )}
+                        {doc.monto != null && (
+                          <div>
+                            <FLabel>Monto</FLabel>
+                            <p className="font-mono text-[var(--text)]/80">
+                              {formatMonto(doc.monto, doc.moneda)}
+                            </p>
+                          </div>
+                        )}
+                        {doc.superficie_m2 != null && (
+                          <div>
+                            <FLabel>Superficie</FLabel>
+                            <p className="text-[var(--text)]/80">
+                              {formatSuperficie(doc.superficie_m2)}
+                            </p>
+                          </div>
+                        )}
+                        {(doc.municipio || doc.estado) && (
+                          <div>
+                            <FLabel>Ubicación</FLabel>
+                            <p className="text-[var(--text)]/80">
+                              {[doc.municipio, doc.estado].filter(Boolean).join(', ')}
+                            </p>
+                          </div>
+                        )}
+                        {doc.folio_real && (
+                          <div>
+                            <FLabel>Folio real</FLabel>
+                            <p className="text-[var(--text)]/80">{doc.folio_real}</p>
+                          </div>
+                        )}
+                        {doc.libro_tomo && (
+                          <div>
+                            <FLabel>Libro / Tomo</FLabel>
+                            <p className="text-[var(--text)]/80">{doc.libro_tomo}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {doc.ubicacion_predio && (
+                        <div className="mt-3">
+                          <FLabel>Ubicación del predio</FLabel>
+                          <p className="text-sm text-[var(--text)]/70 whitespace-pre-wrap">
+                            {doc.ubicacion_predio}
+                          </p>
+                        </div>
+                      )}
+
+                      {doc.partes && doc.partes.length > 0 && (
+                        <div className="mt-4">
+                          <FLabel>Partes involucradas</FLabel>
+                          <ul className="space-y-2">
+                            {doc.partes.map((p, i) => (
+                              <li
+                                key={i}
+                                className="rounded-xl border border-[var(--border)] bg-[var(--panel)]/40 p-2.5"
+                              >
+                                <div className="flex items-baseline justify-between gap-2">
+                                  <span className="text-sm font-medium text-[var(--text)]">
+                                    {p.nombre}
+                                  </span>
+                                  <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">
+                                    {p.rol}
+                                  </span>
+                                </div>
+                                <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-[var(--text)]/55">
+                                  {p.rfc && <span>RFC: {p.rfc}</span>}
+                                  {p.representante && <span>Rep: {p.representante}</span>}
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {doc.contenido_texto && (
+                        <div className="mt-4">
+                          <button
+                            type="button"
+                            onClick={() => setShowContenido((v) => !v)}
+                            className="flex w-full items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--panel)]/40 px-3 py-2 text-xs font-medium text-[var(--text)]/70 hover:bg-[var(--panel)]"
+                          >
+                            <span>
+                              Contenido completo ·{' '}
+                              {doc.contenido_texto.length.toLocaleString('es-MX')} chars
+                            </span>
+                            {showContenido ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </button>
+                          {showContenido && (
+                            <div className="mt-2 max-h-96 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--panel)]/30 p-3">
+                              <p className="whitespace-pre-wrap font-mono text-xs text-[var(--text)]/75 leading-relaxed">
+                                {doc.contenido_texto}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {doc.extraccion_status === 'error' && (
+                  <div className="flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-xs text-red-400">
+                    <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium mb-0.5">Extracción IA falló</p>
+                      <p className="text-red-400/80">
+                        {doc.extraccion_error ?? 'Error desconocido'}
+                      </p>
+                    </div>
+                  </div>
                 )}
 
                 {doc.descripcion && (
