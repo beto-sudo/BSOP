@@ -57,13 +57,15 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  // Vercel/Next.js hace "file tracing" para decidir qué archivos subir con
-  // cada Function serverless. Normalmente detecta imports JS automáticamente,
-  // pero los assets no-JS dentro de node_modules (como `.wasm`) no siempre
-  // los recoge. `outputFileTracingIncludes` fuerza la inclusión del wasm de
-  // Ghostscript en el bundle del route handler que lo usa.
+  // `@jspawn/ghostscript-wasm` es un módulo de Emscripten con un gran
+  // `gs.js` (~10 MB) y su `gs.wasm` adyacente. Lo marcamos como external
+  // para que webpack no intente parsearlo/bundle'arlo (rompe el top-level
+  // `require()` que hace Emscripten para su FS de Node), y forzamos que
+  // el paquete completo — JS + WASM — viaje con la Function serverless
+  // vía outputFileTracingIncludes.
+  serverExternalPackages: ['@jspawn/ghostscript-wasm'],
   outputFileTracingIncludes: {
-    '/api/documentos/[id]/extract': ['node_modules/@jspawn/ghostscript-wasm/gs.wasm'],
+    '/api/documentos/[id]/extract': ['node_modules/@jspawn/ghostscript-wasm/**'],
   },
   async headers() {
     return [
