@@ -24,14 +24,16 @@ import {
   type TaskSummaryItem,
 } from '@/lib/task-summary-email';
 
-// Types matching the PostgREST response shape for our embedded select
+// Types matching the PostgREST response shape for our embedded select.
+// NOTA: empresa se resuelve en TS (no como embed) porque PostgREST no
+// puede hacer joins cross-schema (erp.tasks.empresa_id → core.empresas).
 type EmbeddedTaskRow = {
   id: string;
   titulo: string;
   fecha_vence: string | null;
   fecha_compromiso: string | null;
   porcentaje_avance: number | null;
-  empresa: { nombre: string; slug: string } | null;
+  empresa_id: string;
   empleado: {
     id: string;
     email_empresa: string | null;
@@ -43,6 +45,8 @@ type EmbeddedTaskRow = {
     } | null;
   } | null;
 };
+
+type EmpresaLite = { id: string; nombre: string; slug: string };
 
 type PerEmployeeBucket = {
   empleadoId: string;
@@ -111,27 +115,43 @@ export async function GET(req: NextRequest) {
   // Whitelist de estados activos (mismo criterio que components/inicio/mis-tareas-widget,
   // arreglado en #119 — el enum real es 'completado', no 'completada'). Whitelist > blacklist:
   // si mañana aparece 'archivado', 'pausado', etc. no se cuelan silenciosamente.
+  //
+  // empleado y persona están en erp → se pueden embedear. empresa vive en core
+  // y PostgREST no hace joins cross-schema, así que la resolvemos abajo con un
+  // Map en memoria.
   const select =
-    'id,titulo,fecha_vence,fecha_compromiso,porcentaje_avance,' +
-    'empresa:empresa_id(nombre,slug),' +
+    'id,titulo,fecha_vence,fecha_compromiso,porcentaje_avance,empresa_id,' +
     'empleado:asignado_a(id,email_empresa,activo,persona:persona_id(nombre,apellido_paterno,email))';
 
-  const { data: rows, error: tasksError } = await supabase
-    .schema('erp')
-    .from('tasks')
-    .select(select)
-    .in('estado', ['pendiente', 'en_progreso', 'bloqueado'])
-    .is('fecha_completado', null)
-    .not('asignado_a', 'is', null)
-    .returns<EmbeddedTaskRow[]>();
+  const [tasksRes, empresasRes] = await Promise.all([
+    supabase
+      .schema('erp')
+      .from('tasks')
+      .select(select)
+      .in('estado', ['pendiente', 'en_progreso', 'bloqueado'])
+      .is('fecha_completado', null)
+      .not('asignado_a', 'is', null)
+      .returns<EmbeddedTaskRow[]>(),
+    supabase.schema('core').from('empresas').select('id,nombre,slug').returns<EmpresaLite[]>(),
+  ]);
 
-  if (tasksError || !rows) {
-    console.error('[daily-task-summary] Tasks query failed:', tasksError);
+  if (tasksRes.error || !tasksRes.data) {
+    console.error('[daily-task-summary] Tasks query failed:', tasksRes.error);
     return NextResponse.json(
-      { error: 'Tasks query failed', detail: tasksError?.message ?? 'unknown' },
+      { error: 'Tasks query failed', detail: tasksRes.error?.message ?? 'unknown' },
       { status: 500 }
     );
   }
+  if (empresasRes.error || !empresasRes.data) {
+    console.error('[daily-task-summary] Empresas query failed:', empresasRes.error);
+    return NextResponse.json(
+      { error: 'Empresas query failed', detail: empresasRes.error?.message ?? 'unknown' },
+      { status: 500 }
+    );
+  }
+
+  const rows = tasksRes.data;
+  const empresaMap = new Map<string, EmpresaLite>(empresasRes.data.map((e) => [e.id, e]));
 
   // Group by empleado_id, resolving email (empresa → personal fallback).
   const buckets = new Map<string, PerEmployeeBucket>();
@@ -157,7 +177,7 @@ export async function GET(req: NextRequest) {
     const task: TaskSummaryItem = {
       id: row.id,
       titulo: row.titulo,
-      empresaNombre: row.empresa?.nombre ?? 'Sin empresa',
+      empresaNombre: empresaMap.get(row.empresa_id)?.nombre ?? 'Sin empresa',
       fechaVence: row.fecha_vence,
       fechaCompromiso: row.fecha_compromiso,
       porcentajeAvance: row.porcentaje_avance ?? 0,
