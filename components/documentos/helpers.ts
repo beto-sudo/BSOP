@@ -63,6 +63,20 @@ export function formatSuperficie(m2: number | null) {
   return `${m2.toLocaleString('es-MX', { maximumFractionDigits: 0 })} m²`;
 }
 
+export function formatPrecioM2(precio: number | null, moneda: string | null = 'MXN') {
+  if (precio == null) return '—';
+  try {
+    const formatted = new Intl.NumberFormat('es-MX', {
+      style: 'currency',
+      currency: moneda || 'MXN',
+      maximumFractionDigits: precio < 10 ? 2 : 0,
+    }).format(precio);
+    return `${formatted}/m²`;
+  } catch {
+    return `${moneda ?? 'MXN'} ${precio.toLocaleString('es-MX')}/m²`;
+  }
+}
+
 export function emptyForm(): DocForm {
   return {
     titulo: '',

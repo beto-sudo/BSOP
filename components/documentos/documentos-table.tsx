@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/table';
 
 import type { Adjunto, Documento } from './types';
-import { formatDate, formatMonto } from './helpers';
+import { formatDate, formatMonto, formatPrecioM2 } from './helpers';
 import { TipoBadge, TipoOperacionBadge, VencBadge } from './ui';
 
 type SortCtx = {
@@ -59,6 +59,7 @@ export function DocumentosTable({
   // que se corra el pipeline en esa empresa).
   const hasTipoOperacion = documentos.some((d) => d.tipo_operacion);
   const hasMonto = documentos.some((d) => d.monto != null);
+  const hasPrecioM2 = documentos.some((d) => d.precio_m2 != null);
 
   if (error) {
     return (
@@ -148,6 +149,16 @@ export function DocumentosTable({
                 className="w-32 text-right"
               />
             )}
+            {hasPrecioM2 && (
+              <SortableHead
+                sortKey="precio_m2"
+                label="$/m²"
+                currentSort={sortKey}
+                currentDir={sortDir}
+                onSort={onSort}
+                className="w-28 text-right"
+              />
+            )}
             <TableHead className="font-medium text-[var(--text)]/55">Descripción</TableHead>
             <TableHead className="w-24 font-medium text-[var(--text)]/55">PDF</TableHead>
             <TableHead className="w-24 font-medium text-[var(--text)]/55">Imagen</TableHead>
@@ -212,6 +223,17 @@ export function DocumentosTable({
                     {doc.monto != null ? (
                       <span className="font-mono text-sm text-[var(--text)]/80">
                         {formatMonto(doc.monto, doc.moneda)}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-[var(--text)]/25">—</span>
+                    )}
+                  </TableCell>
+                )}
+                {hasPrecioM2 && (
+                  <TableCell className="text-right">
+                    {doc.precio_m2 != null ? (
+                      <span className="font-mono text-xs text-[var(--text)]/70">
+                        {formatPrecioM2(doc.precio_m2, doc.moneda)}
                       </span>
                     ) : (
                       <span className="text-xs text-[var(--text)]/25">—</span>
