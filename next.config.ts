@@ -57,6 +57,14 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Vercel/Next.js hace "file tracing" para decidir qué archivos subir con
+  // cada Function serverless. Normalmente detecta imports JS automáticamente,
+  // pero los assets no-JS dentro de node_modules (como `.wasm`) no siempre
+  // los recoge. `outputFileTracingIncludes` fuerza la inclusión del wasm de
+  // Ghostscript en el bundle del route handler que lo usa.
+  outputFileTracingIncludes: {
+    '/api/documentos/[id]/extract': ['node_modules/@jspawn/ghostscript-wasm/gs.wasm'],
+  },
   async headers() {
     return [
       {
