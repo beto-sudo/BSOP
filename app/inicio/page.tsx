@@ -16,24 +16,11 @@ import { ContentShell } from '@/components/ui/content-shell';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { MisTareasWidget } from '@/components/inicio/mis-tareas-widget';
 import { FechasImportantesWidget } from '@/components/inicio/fechas-importantes-widget';
-
-function getGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Buenos días';
-  if (hour < 19) return 'Buenas tardes';
-  return 'Buenas noches';
-}
-
-function formatToday(): string {
-  return new Date().toLocaleDateString('es-MX', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-}
+import { useLocale } from '@/lib/i18n';
+import { getGreeting, formatLongDate } from '@/lib/datetime/greeting';
 
 export default function InicioPage() {
+  const { t, locale } = useLocale();
   const [userName, setUserName] = useState<string>('');
 
   useEffect(() => {
@@ -55,12 +42,14 @@ export default function InicioPage() {
   return (
     <ContentShell>
       <header className="mb-6">
-        <p className="text-xs uppercase tracking-wider text-[var(--text)]/40">{formatToday()}</p>
+        <p className="text-xs uppercase tracking-wider text-[var(--text-subtle)]">
+          {formatLongDate(new Date(), locale)}
+        </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--text)] sm:text-4xl">
-          {getGreeting()}
+          {getGreeting(new Date(), t)}
           {userName ? `, ${userName}` : ''}
         </h1>
-        <p className="mt-2 text-sm text-[var(--text)]/55">
+        <p className="mt-2 text-sm text-[var(--text-muted)]">
           Este es tu panel personal. Aquí vas a encontrar tus pendientes y las fechas que te
           importan.
         </p>
