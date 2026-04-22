@@ -52,8 +52,14 @@
 import { createClient } from '@supabase/supabase-js';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { openai } from '@ai-sdk/openai';
-import { generateText, embed, Output } from 'ai';
+import { embed, generateObject } from 'ai';
 import { z } from 'zod';
+import { spawn } from 'node:child_process';
+import { readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { getAdjuntoPath } from '../lib/adjuntos';
 
 // baseURL explícito para evitar que una ANTHROPIC_BASE_URL seteada en el
 // shell (ej. cuando este script corre dentro de Claude Code) rompa las
@@ -81,6 +87,13 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const MODELO_CLAUDE = 'claude-opus-4-7';
 const MODELO_EMBEDDING = 'text-embedding-3-large';
 const EMBEDDING_DIMS = 1536;
+
+// Anthropic API recomienda <32 MB por PDF (base64 infla ~33%, así que el
+// payload real queda ~42 MB, aún bajo el límite global del endpoint). Dejamos
+// margen bajando a 20 MB — por arriba de eso pasamos el PDF por Ghostscript
+// /ebook (150 dpi) que baja drásticamente el tamaño sin perder legibilidad.
+const PDF_COMPRESS_THRESHOLD_BYTES = 20 * 1024 * 1024;
+const PDF_MAX_AFTER_COMPRESS_BYTES = 28 * 1024 * 1024;
 
 // ─── Schema de extracción ────────────────────────────────────────────────────
 
@@ -188,7 +201,10 @@ type DocRow = {
   titulo: string;
   numero_documento: string | null;
   extraccion_status: string;
-  pdf_url: string; // path en el bucket `adjuntos`
+  // Una misma fila puede tener varios adjuntos con rol='documento_principal'
+  // (p.ej. re-subidas sin limpiar el anterior). Los tratamos como candidatos:
+  // se intenta en orden inverso (más reciente primero) hasta que uno funcione.
+  pdf_candidates: string[];
 };
 
 // ─── Helpers DB ──────────────────────────────────────────────────────────────
@@ -213,33 +229,38 @@ async function fetchPendingDocs(): Promise<DocRow[]> {
   if (error) throw new Error(`fetch documentos: ${error.message}`);
   if (!docs || docs.length === 0) return [];
 
-  // Traemos los adjuntos 'documento_principal' para todos esos docs en un batch.
+  // Traemos los adjuntos 'documento_principal' para todos esos docs. Ordenamos
+  // por created_at DESC para intentar el más reciente primero — así cuando hay
+  // re-subidas sin limpiar el anterior, usamos la versión vigente.
   const docIds = docs.map((d: any) => d.id);
   const { data: adjuntos, error: errAdj } = await (supabase.schema('erp') as any)
     .from('adjuntos')
-    .select('entidad_id, url, rol')
+    .select('entidad_id, url, rol, created_at')
     .eq('entidad_tipo', 'documento')
     .eq('rol', 'documento_principal')
-    .in('entidad_id', docIds);
+    .in('entidad_id', docIds)
+    .order('created_at', { ascending: false });
 
   if (errAdj) throw new Error(`fetch adjuntos: ${errAdj.message}`);
 
-  const pdfByDocId = new Map<string, string>();
+  const pdfsByDocId = new Map<string, string[]>();
   for (const a of adjuntos ?? []) {
-    if (!pdfByDocId.has(a.entidad_id)) pdfByDocId.set(a.entidad_id, a.url);
+    const arr = pdfsByDocId.get(a.entidad_id) ?? [];
+    arr.push(a.url);
+    pdfsByDocId.set(a.entidad_id, arr);
   }
 
   const rows: DocRow[] = [];
   for (const d of docs) {
-    const pdf = pdfByDocId.get(d.id);
-    if (!pdf) continue;
+    const pdfs = pdfsByDocId.get(d.id);
+    if (!pdfs || pdfs.length === 0) continue;
     rows.push({
       id: d.id,
       empresa_id: d.empresa_id,
       titulo: d.titulo,
       numero_documento: d.numero_documento,
       extraccion_status: d.extraccion_status,
-      pdf_url: pdf,
+      pdf_candidates: pdfs,
     });
     if (LIMIT && rows.length >= LIMIT) break;
   }
@@ -247,15 +268,111 @@ async function fetchPendingDocs(): Promise<DocRow[]> {
   return rows;
 }
 
-async function downloadPdf(path: string): Promise<Uint8Array> {
-  // Algunos paths guardados en erp.adjuntos traen el nombre del bucket como prefijo
-  // (p.ej. "adjuntos/DILESA-..."); hay que quitárselo antes de llamar al storage.
-  const clean = path.replace(/^adjuntos\//, '').replace(/^\//, '');
-  const { data, error } = await supabase.storage.from(BUCKET).download(clean);
-  if (error) throw new Error(`download(${clean}): ${error.message}`);
-  if (!data) throw new Error(`download(${clean}): no data`);
+async function downloadPdf(urlOrPath: string): Promise<Uint8Array> {
+  // `erp.adjuntos.url` puede venir como path bare, URL pública, URL firmada o
+  // URL del proxy `/api/adjuntos/` — `getAdjuntoPath` normaliza cualquier
+  // variante al path dentro del bucket.
+  const path = getAdjuntoPath(urlOrPath);
+  if (!path) throw new Error(`URL/path inválido: ${urlOrPath}`);
+  const { data, error } = await supabase.storage.from(BUCKET).download(path);
+  if (error) throw new Error(`download(${path}): ${error.message}`);
+  if (!data) throw new Error(`download(${path}): no data`);
   const buf = await data.arrayBuffer();
   return new Uint8Array(buf);
+}
+
+// Comprime un PDF con Ghostscript. /ebook = 150 dpi (default, buen balance
+// calidad/tamaño). /screen = 72 dpi (más agresivo, último recurso). El OCR
+// sigue siendo muy legible para Claude incluso a 72 dpi.
+async function compressPdf(
+  input: Uint8Array,
+  preset: '/ebook' | '/screen' = '/ebook'
+): Promise<Uint8Array> {
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const tmpIn = join(tmpdir(), `bsop-extract-${stamp}-in.pdf`);
+  const tmpOut = join(tmpdir(), `bsop-extract-${stamp}-out.pdf`);
+  try {
+    await writeFile(tmpIn, input);
+    await new Promise<void>((resolve, reject) => {
+      const proc = spawn('gs', [
+        '-sDEVICE=pdfwrite',
+        '-dCompatibilityLevel=1.4',
+        `-dPDFSETTINGS=${preset}`,
+        '-dNOPAUSE',
+        '-dQUIET',
+        '-dBATCH',
+        `-sOutputFile=${tmpOut}`,
+        tmpIn,
+      ]);
+      let stderr = '';
+      proc.stderr.on('data', (chunk) => {
+        stderr += String(chunk);
+      });
+      proc.on('error', reject);
+      proc.on('exit', (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`gs exit ${code}: ${stderr.slice(0, 500)}`));
+      });
+    });
+    const out = await readFile(tmpOut);
+    return new Uint8Array(out);
+  } finally {
+    await rm(tmpIn, { force: true }).catch(() => {});
+    await rm(tmpOut, { force: true }).catch(() => {});
+  }
+}
+
+function formatMB(bytes: number): string {
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// Intenta cada candidato (más reciente primero) hasta que uno se descargue
+// exitosamente y, si es necesario, quepa después de comprimir. Reporta un
+// resumen por doc al log con cada intento y la última versión lista para
+// mandar a Claude.
+async function loadPdfForExtraction(
+  candidates: string[],
+  titulo: string,
+  docIdPrefix: string
+): Promise<Uint8Array> {
+  const errors: string[] = [];
+  for (let i = 0; i < candidates.length; i++) {
+    const url = candidates[i];
+    const label = `${docIdPrefix} candidato ${i + 1}/${candidates.length}`;
+    try {
+      let pdf = await downloadPdf(url);
+      if (pdf.byteLength > PDF_COMPRESS_THRESHOLD_BYTES) {
+        const originalSize = pdf.byteLength;
+        console.log(`… ${label} ${formatMB(originalSize)}, comprimiendo con gs /ebook...`);
+        pdf = await compressPdf(pdf, '/ebook');
+        console.log(
+          `… ${label} /ebook: ${formatMB(originalSize)} → ${formatMB(pdf.byteLength)} (${Math.round((1 - pdf.byteLength / originalSize) * 100)}% menos)`
+        );
+        // Si /ebook no fue suficiente, intentar /screen (72 dpi, más agresivo).
+        // El OCR de Claude sigue funcionando aceptablemente a 72 dpi para
+        // documentos en español con letra estándar.
+        if (pdf.byteLength > PDF_MAX_AFTER_COMPRESS_BYTES) {
+          console.log(`… ${label} aún ${formatMB(pdf.byteLength)}, recomprimiendo con /screen...`);
+          const ebookSize = pdf.byteLength;
+          pdf = await compressPdf(pdf, '/screen');
+          console.log(`… ${label} /screen: ${formatMB(ebookSize)} → ${formatMB(pdf.byteLength)}`);
+        }
+      }
+      if (pdf.byteLength > PDF_MAX_AFTER_COMPRESS_BYTES) {
+        throw new Error(
+          `PDF sigue muy grande post-compresión: ${formatMB(pdf.byteLength)} (máx ${formatMB(PDF_MAX_AFTER_COMPRESS_BYTES)})`
+        );
+      }
+      return pdf;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`#${i + 1}: ${msg}`);
+      console.log(`… ${label} falló: ${msg}`);
+    }
+  }
+  throw new Error(
+    `Ninguno de los ${candidates.length} PDF candidatos funcionó para "${titulo}" — ${errors.join(' | ')}`
+  );
 }
 
 async function markProcessing(id: string): Promise<boolean> {
@@ -312,10 +429,14 @@ async function writeError(id: string, err: unknown): Promise<void> {
 // ─── Llamada a Claude con PDF ────────────────────────────────────────────────
 
 async function extractWithClaude(pdfBytes: Uint8Array, titulo: string): Promise<Extraccion> {
-  const { experimental_output: output } = await generateText({
+  // Usamos generateObject (no generateText + Output.object) porque tiene mejor
+  // prompt engineering interno para forzar JSON schema compliance y reintenta
+  // automáticamente si el modelo devuelve formato inválido.
+  // maxRetries=4 cubre tanto errores transitorios como schema mismatch.
+  const { object } = await generateObject({
     model: anthropic(MODELO_CLAUDE),
-    experimental_output: Output.object({ schema: ExtraccionSchema }),
-    maxRetries: 2,
+    schema: ExtraccionSchema,
+    maxRetries: 4,
     messages: [
       {
         role: 'user',
@@ -324,10 +445,13 @@ async function extractWithClaude(pdfBytes: Uint8Array, titulo: string): Promise<
             type: 'text',
             text:
               `Eres un asistente legal especializado en documentos notariales mexicanos. ` +
-              `Analiza el siguiente PDF y extrae la información solicitada en el schema. ` +
+              `Analiza el siguiente PDF y extrae la información solicitada. ` +
               `El título del documento en nuestro sistema es: "${titulo}". ` +
               `Si el PDF es un escaneado, transcribe el texto lo mejor posible. ` +
-              `Responde únicamente con los datos del schema, sin texto adicional.`,
+              `Para campos numéricos (monto, superficie_m2), si el valor aparece ` +
+              `en letra o con formato raro, conviértelo a número o usa null si no es claro. ` +
+              `Usa null para cualquier campo estructurado que no puedas determinar con ` +
+              `certeza, en vez de inventar o poner strings genéricas.`,
           },
           {
             type: 'file',
@@ -339,7 +463,7 @@ async function extractWithClaude(pdfBytes: Uint8Array, titulo: string): Promise<
     ],
   });
 
-  return output as Extraccion;
+  return object;
 }
 
 // ─── Embedding ───────────────────────────────────────────────────────────────
@@ -388,7 +512,7 @@ async function processDoc(doc: DocRow): Promise<Result> {
       }
     }
 
-    const pdf = await downloadPdf(doc.pdf_url);
+    const pdf = await loadPdfForExtraction(doc.pdf_candidates, doc.titulo, doc.id.slice(0, 8));
     const extraccion = await extractWithClaude(pdf, doc.titulo);
     const embedding = await embedContent(extraccion.contenido_texto);
 
