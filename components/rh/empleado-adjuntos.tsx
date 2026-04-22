@@ -173,13 +173,13 @@ export function EmpleadoAdjuntos({
   ];
 
   if (loading) {
-    return <p className="text-xs text-[var(--text)]/40">Cargando documentos…</p>;
+    return <p className="text-xs text-[var(--text-subtle)]">Cargando documentos…</p>;
   }
 
   return (
     <div className="space-y-3">
       {orderedRoles.length === 0 ? (
-        <p className="text-xs text-[var(--text)]/40">Sin documentos registrados todavía.</p>
+        <p className="text-xs text-[var(--text-subtle)]">Sin documentos registrados todavía.</p>
       ) : (
         // Lista vertical: cada documento ocupa una fila completa con el nombre
         // del archivo visible sin truncar. Ocupa más espacio pero es mucho más
@@ -235,7 +235,7 @@ export function EmpleadoAdjuntos({
                       className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] ${
                         pdf
                           ? 'bg-red-500/10 text-red-400'
-                          : 'bg-[var(--card)] text-[var(--text)]/40'
+                          : 'bg-[var(--card)] text-[var(--text-subtle)]'
                       }`}
                     >
                       {pdf ? <FileText className="h-5 w-5" /> : <Paperclip className="h-4 w-4" />}
@@ -254,7 +254,7 @@ export function EmpleadoAdjuntos({
                     <div className="text-sm text-[var(--text)] break-words leading-snug">
                       {a.nombre}
                     </div>
-                    <div className="mt-0.5 flex items-center gap-2 text-[10px] text-[var(--text)]/40">
+                    <div className="mt-0.5 flex items-center gap-2 text-[10px] text-[var(--text-subtle)]">
                       {a.tamano_bytes != null && <span>{formatSize(a.tamano_bytes)}</span>}
                       <span>
                         ·{' '}

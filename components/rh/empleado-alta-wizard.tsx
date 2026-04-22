@@ -624,7 +624,7 @@ export function EmpleadoAltaWizard({
   // ─── Step 1 render ──────────────────────────────────────────────────────────
   const Step1 = (
     <div className="space-y-4 py-2">
-      <p className="text-xs text-[var(--text)]/55">
+      <p className="text-xs text-[var(--text-muted)]">
         Datos del trabajador y su contacto de emergencia. Obligatorios para el contrato individual y
         el expediente.
       </p>
@@ -667,7 +667,7 @@ export function EmpleadoAltaWizard({
       </div>
 
       {persona.nombre && (
-        <p className="text-[10px] text-[var(--text)]/40">
+        <p className="text-[10px] text-[var(--text-subtle)]">
           Nombre completo:{' '}
           <span className="text-[var(--text)]/70">
             {composeFullName(persona.nombre, persona.apellido_paterno, persona.apellido_materno)}
@@ -884,7 +884,7 @@ export function EmpleadoAltaWizard({
 
   const Step2 = (
     <div className="space-y-4 py-2">
-      <p className="text-xs text-[var(--text)]/55">
+      <p className="text-xs text-[var(--text-muted)]">
         Puesto, cláusulas de contrato (Art. 25 LFT) y compensación. El SDI se calcula
         automáticamente a partir del sueldo mensual.
       </p>
@@ -1065,7 +1065,7 @@ export function EmpleadoAltaWizard({
               onChange={(e) => setEmpleado((s) => ({ ...s, sueldo_diario: e.target.value }))}
               className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)] font-mono"
             />
-            <p className="mt-1 text-[10px] text-[var(--text)]/40">Auto = mensual / 30.4167</p>
+            <p className="mt-1 text-[10px] text-[var(--text-subtle)]">Auto = mensual / 30.4167</p>
           </div>
           <div>
             <FieldLabel>SDI</FieldLabel>
@@ -1077,13 +1077,13 @@ export function EmpleadoAltaWizard({
               onChange={(e) => setEmpleado((s) => ({ ...s, sdi: e.target.value }))}
               className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)] font-mono"
             />
-            <p className="mt-1 text-[10px] text-[var(--text)]/40">
+            <p className="mt-1 text-[10px] text-[var(--text-subtle)]">
               Auto = diario × 1.0452 (1er año)
             </p>
           </div>
         </div>
         {empleado.sueldo_mensual && Number(empleado.sueldo_mensual) > 0 && (
-          <p className="text-[11px] text-[var(--text)]/55">
+          <p className="text-[11px] text-[var(--text-muted)]">
             Mensual {formatCurrency(Number(empleado.sueldo_mensual))} · diario{' '}
             {empleado.sueldo_diario ? formatCurrency(Number(empleado.sueldo_diario)) : '—'} · SDI{' '}
             {empleado.sdi ? formatCurrency(Number(empleado.sdi)) : '—'}
@@ -1117,7 +1117,7 @@ export function EmpleadoAltaWizard({
               ? 'bg-green-500/10 text-green-400'
               : required && !exento
                 ? 'bg-red-500/10 text-red-400'
-                : 'bg-[var(--card)] text-[var(--text)]/40'
+                : 'bg-[var(--card)] text-[var(--text-subtle)]'
           }`}
         >
           {file && isImageFile(file) ? (
@@ -1131,7 +1131,9 @@ export function EmpleadoAltaWizard({
             {r.label}
             {required && !exento && <span className="text-red-400">*</span>}
             {exento && (
-              <span className="text-[10px] text-[var(--text)]/40">(exento · primer empleo)</span>
+              <span className="text-[10px] text-[var(--text-subtle)]">
+                (exento · primer empleo)
+              </span>
             )}
           </p>
           {file && (
@@ -1183,7 +1185,7 @@ export function EmpleadoAltaWizard({
 
   const Step3 = (
     <div className="space-y-5 py-2">
-      <p className="text-xs text-[var(--text)]/55">
+      <p className="text-xs text-[var(--text-muted)]">
         Expediente legal: archivos obligatorios (INE, CURP, acta, comprobante de domicilio, CSF y
         constancia IMSS) + foto y beneficiarios (Art. 501 LFT). Sin estos archivos no se puede
         generar contrato.
@@ -1254,7 +1256,7 @@ export function EmpleadoAltaWizard({
                     <button
                       type="button"
                       onClick={() => removeBeneficiario(idx)}
-                      className="rounded-lg p-1.5 text-[var(--text)]/40 hover:bg-red-500/10 hover:text-red-400"
+                      className="rounded-lg p-1.5 text-[var(--text-subtle)] hover:bg-red-500/10 hover:text-red-400"
                       title="Quitar beneficiario"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -1283,7 +1285,7 @@ export function EmpleadoAltaWizard({
             <Check className="h-4 w-4" />
             Expediente completo — listo para generar contrato
           </p>
-          <p className="mt-1 text-[11px] text-[var(--text)]/55">
+          <p className="mt-1 text-[11px] text-[var(--text-muted)]">
             Al crear el empleado se guardan los datos, se suben los archivos y se redirige a la
             ficha. Desde ahí se puede imprimir el contrato individual de trabajo.
           </p>

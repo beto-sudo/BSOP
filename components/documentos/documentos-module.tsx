@@ -430,7 +430,7 @@ export function DocumentosModule({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text)]">{title}</h1>
-          <p className="mt-1 text-sm text-[var(--text)]/55">{subtitle}</p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">{subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -475,7 +475,7 @@ export function DocumentosModule({
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
         <div className="flex flex-wrap gap-3">
           <div className="relative min-w-48 flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text)]/40" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-subtle)]" />
             <Input
               placeholder="Buscar en título, número, contenido, ubicación o partes..."
               value={search}
@@ -549,7 +549,7 @@ export function DocumentosModule({
       />
 
       {!loading && documentos.length > 0 && (
-        <p className="text-right text-xs text-[var(--text)]/40">
+        <p className="text-right text-xs text-[var(--text-subtle)]">
           {filtered.length} de {documentos.length} documentos
         </p>
       )}

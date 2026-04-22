@@ -276,7 +276,7 @@ function Inner() {
               onChange={(e) => setSalarioMinimo(Number(e.target.value) || 0)}
               className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
             />
-            <p className="mt-1 text-[10px] text-[var(--text)]/40">
+            <p className="mt-1 text-[10px] text-[var(--text-subtle)]">
               Zona libre frontera norte 2026: $374.89. Ajustar si cambia vigencia.
             </p>
           </div>

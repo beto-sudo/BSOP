@@ -96,7 +96,7 @@ export const ESTADO_CONFIG: Record<TaskEstado, { label: string; cls: string }> =
   completado: { label: 'Completado', cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
   cancelado: {
     label: 'Cancelado',
-    cls: 'bg-[var(--border)]/60 text-[var(--text)]/40 border-[var(--border)]',
+    cls: 'bg-[var(--border)]/60 text-[var(--text-subtle)] border-[var(--border)]',
   },
 };
 
@@ -168,7 +168,7 @@ export function EstadoBadge({ estado }: { estado: TaskEstado }) {
  * exact prioridad value (e.g. "Urgente", "Alta").
  */
 export function PrioridadBadge({ prioridad }: { prioridad: string | null }) {
-  if (!prioridad) return <span className="text-[var(--text)]/40">—</span>;
+  if (!prioridad) return <span className="text-[var(--text-subtle)]">—</span>;
   const cfg = PRIORIDAD_CONFIG[prioridad] ?? { label: prioridad, cls: '' };
   return (
     <span
@@ -184,7 +184,7 @@ export function PrioridadBadge({ prioridad }: { prioridad: string | null }) {
  * text (case-insensitive matching for "alta"/"urgente"/"media"/"baja").
  */
 export function PrioridadTextBadge({ text }: { text: string | null }) {
-  if (!text) return <span className="text-[var(--text)]/40">—</span>;
+  if (!text) return <span className="text-[var(--text-subtle)]">—</span>;
   const lower = text.toLowerCase();
   const dotColor =
     lower === 'alta' || lower === 'urgente'

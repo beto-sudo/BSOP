@@ -1,9 +1,5 @@
 'use client';
 
-/* eslint-disable react-hooks/set-state-in-effect --
- * Pre-existing data-sync pattern (loading guards around async fetch).
- */
-
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -128,7 +124,7 @@ function EmpresaPageInner() {
             <h1 className="text-2xl font-bold tracking-tight text-[var(--text)] truncate">
               {empresa.nombre}
             </h1>
-            <p className="mt-1 text-sm text-[var(--text)]/55">
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
               {empresa.razon_social ?? empresa.nombre_comercial ?? '—'}
               {empresa.rfc && (
                 <>
@@ -165,7 +161,7 @@ function EmpresaPageInner() {
             className={`px-4 py-2.5 text-sm font-medium transition border-b-2 -mb-px cursor-pointer ${
               tab === t.key
                 ? 'border-[var(--accent)] text-[var(--text)]'
-                : 'border-transparent text-[var(--text)]/55 hover:text-[var(--text)]/80'
+                : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text)]/80'
             }`}
           >
             {t.label}

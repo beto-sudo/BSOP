@@ -145,7 +145,7 @@ function InfoRow({
     <div>
       <FieldLabel>{label}</FieldLabel>
       <p className="text-sm text-[var(--text)]">{value || '—'}</p>
-      {sub && <p className="text-xs text-[var(--text)]/40 mt-0.5">{sub}</p>}
+      {sub && <p className="text-xs text-[var(--text-subtle)] mt-0.5">{sub}</p>}
     </div>
   );
 }

@@ -41,7 +41,7 @@ export default async function AccesoPage() {
         <h2 className="text-xl font-semibold dark:text-white text-[var(--text)]">
           Error de configuración
         </h2>
-        <p className="mt-2 text-sm dark:text-white/55 text-[var(--text)]/55">
+        <p className="mt-2 text-sm dark:text-white/55 text-[var(--text-muted)]">
           SUPABASE_SERVICE_ROLE_KEY no está configurada.
         </p>
       </div>
@@ -67,7 +67,7 @@ export default async function AccesoPage() {
         <h2 className="mt-4 text-xl font-semibold dark:text-white text-[var(--text)]">
           Acceso restringido
         </h2>
-        <p className="mt-2 text-sm dark:text-white/55 text-[var(--text)]/55">
+        <p className="mt-2 text-sm dark:text-white/55 text-[var(--text-muted)]">
           Solo los administradores pueden gestionar el acceso de usuarios.
         </p>
       </div>

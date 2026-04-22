@@ -340,7 +340,7 @@ export function DocumentoDetailSheet({
                           Datos extraídos
                         </h3>
                         {doc.extraccion_fecha && (
-                          <span className="ml-auto text-[10px] text-[var(--text)]/40">
+                          <span className="ml-auto text-[10px] text-[var(--text-subtle)]">
                             {formatDate(doc.extraccion_fecha.slice(0, 10))}
                           </span>
                         )}
@@ -425,7 +425,7 @@ export function DocumentoDetailSheet({
                                     {p.rol}
                                   </span>
                                 </div>
-                                <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-[var(--text)]/55">
+                                <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-[var(--text-muted)]">
                                   {p.rfc && <span>RFC: {p.rfc}</span>}
                                   {p.representante && <span>Rep: {p.representante}</span>}
                                 </div>

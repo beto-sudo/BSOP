@@ -24,7 +24,7 @@ export function SortableHead({
   return (
     <TableHead
       className={`cursor-pointer select-none font-medium transition-colors hover:text-[var(--text)]/80 ${
-        active ? 'text-[var(--text)]' : 'text-[var(--text)]/55'
+        active ? 'text-[var(--text)]' : 'text-[var(--text-muted)]'
       } ${className}`}
       onClick={() => onSort(sortKey)}
     >

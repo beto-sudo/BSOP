@@ -138,7 +138,7 @@ function generateTitulo(fechaHora: string, tipo: string) {
  */
 function JuntaContentPreview({ descripcion }: { descripcion: string | null }) {
   if (!descripcion) {
-    return <span className="text-xs text-[var(--text)]/40">(vacía)</span>;
+    return <span className="text-xs text-[var(--text-subtle)]">(vacía)</span>;
   }
   // Plain text excerpt — strip HTML tags + collapse whitespace
   const plain = descripcion
@@ -158,7 +158,7 @@ function JuntaContentPreview({ descripcion }: { descripcion: string | null }) {
           className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 font-mono ${
             imgCount > 0
               ? 'bg-emerald-500/15 text-emerald-400'
-              : 'bg-[var(--border)]/40 text-[var(--text)]/40'
+              : 'bg-[var(--border)]/40 text-[var(--text-subtle)]'
           }`}
         >
           {imgCount > 0 ? `📷 ${imgCount}` : '📷 0'}
@@ -388,7 +388,7 @@ function JuntasInner() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text)]">Juntas — DILESA</h1>
-          <p className="mt-1 text-sm text-[var(--text)]/55">Agenda y minutas de juntas</p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">Agenda y minutas de juntas</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -418,7 +418,7 @@ function JuntasInner() {
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
         <div className="flex flex-wrap gap-3">
           <div className="relative min-w-48 flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text)]/40" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-subtle)]" />
             <Input
               placeholder="Buscar juntas..."
               value={search}
@@ -486,7 +486,7 @@ function JuntasInner() {
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-16 text-center">
             <CalendarDays className="mb-3 h-10 w-10 text-[var(--text)]/20" />
-            <p className="text-sm text-[var(--text)]/55">
+            <p className="text-sm text-[var(--text-muted)]">
               {juntas.length === 0
                 ? 'No hay juntas registradas aún'
                 : 'No hay juntas que coincidan con los filtros'}
@@ -602,7 +602,7 @@ function JuntasInner() {
                         {TIPO_CONFIG[junta.tipo]?.label ?? junta.tipo}
                       </span>
                     ) : (
-                      <span className="text-[var(--text)]/40">—</span>
+                      <span className="text-[var(--text-subtle)]">—</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -661,7 +661,7 @@ function JuntasInner() {
       </div>
 
       {!loading && juntas.length > 0 && (
-        <p className="text-right text-xs text-[var(--text)]/40">
+        <p className="text-right text-xs text-[var(--text-subtle)]">
           {filtered.length} de {juntas.length} {juntas.length === 1 ? 'junta' : 'juntas'}
         </p>
       )}
@@ -719,7 +719,7 @@ function JuntasInner() {
                 }}
                 className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
               />
-              <p className="mt-1 text-[10px] text-[var(--text)]/40">
+              <p className="mt-1 text-[10px] text-[var(--text-subtle)]">
                 Se genera como &quot;fecha, hora - tipo&quot;. Puedes editarlo si quieres.
               </p>
             </div>

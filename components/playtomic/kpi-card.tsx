@@ -18,7 +18,7 @@ export function KpiCard({
         {label}
       </div>
       <div className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text)]">{value}</div>
-      {hint ? <div className="mt-1 text-sm text-[var(--text)]/55">{hint}</div> : null}
+      {hint ? <div className="mt-1 text-sm text-[var(--text-muted)]">{hint}</div> : null}
     </div>
   );
 }

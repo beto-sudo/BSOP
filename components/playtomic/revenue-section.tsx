@@ -8,7 +8,7 @@ export function RevenueSection({ revenueSeries }: { revenueSeries: ChartBucket[]
       <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-[var(--text)]">Ingresos diarios</h2>
-          <p className="text-sm text-[var(--text)]/55">
+          <p className="text-sm text-[var(--text-muted)]">
             Barras apiladas por deporte, sin librerías externas.
           </p>
         </div>

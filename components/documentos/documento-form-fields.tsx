@@ -130,7 +130,7 @@ export function DocFormFields({
             readOnly={form.tipo === 'Escritura'}
           />
           {form.tipo === 'Escritura' && (
-            <p className="mt-1 text-[10px] text-[var(--text)]/40">
+            <p className="mt-1 text-[10px] text-[var(--text-subtle)]">
               Se genera a partir de los datos de la escritura.
             </p>
           )}
@@ -217,7 +217,7 @@ export function DocFormFields({
             maxLength={500}
             className="resize-none rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
           />
-          <p className="mt-1 text-[10px] text-[var(--text)]/40">
+          <p className="mt-1 text-[10px] text-[var(--text-subtle)]">
             Se muestra como vista previa en la tabla. Máx 500 caracteres.
           </p>
         </div>

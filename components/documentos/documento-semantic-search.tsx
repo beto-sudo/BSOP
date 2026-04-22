@@ -96,7 +96,7 @@ export function DocumentoSemanticSearch({
             <Sparkles className="h-5 w-5 text-[var(--accent)]" />
             Búsqueda IA
           </DialogTitle>
-          <DialogDescription className="text-[var(--text)]/55">
+          <DialogDescription className="text-[var(--text-muted)]">
             Describe lo que buscas en lenguaje natural. La IA encontrará documentos relacionados por
             significado, no solo por palabras exactas.
           </DialogDescription>
@@ -117,7 +117,7 @@ export function DocumentoSemanticSearch({
               }
             }}
           />
-          <div className="flex items-center justify-between text-[10px] text-[var(--text)]/40">
+          <div className="flex items-center justify-between text-[10px] text-[var(--text-subtle)]">
             <span>⌘/Ctrl + Enter para buscar</span>
             <span>{query.length}/400</span>
           </div>
@@ -129,7 +129,7 @@ export function DocumentoSemanticSearch({
           )}
 
           <div>
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text)]/40">
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
               Ejemplos
             </p>
             <div className="flex flex-wrap gap-1.5">

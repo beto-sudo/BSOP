@@ -198,7 +198,7 @@ export function AdjuntosSection({
       )}
       {renderGroup(
         'Anexos / Antecedentes',
-        <Paperclip className="h-3.5 w-3.5 text-[var(--text)]/40" />,
+        <Paperclip className="h-3.5 w-3.5 text-[var(--text-subtle)]" />,
         anexos
       )}
       {!readOnly && (

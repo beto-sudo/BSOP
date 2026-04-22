@@ -785,7 +785,7 @@ export function TasksModule({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text)]">{title}</h1>
-          <p className="mt-1 text-sm text-[var(--text)]/55">{subtitle}</p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">{subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -841,7 +841,7 @@ export function TasksModule({
             {hideCompleted ? 'Mostrar completadas' : 'Ocultar completadas'}
           </button>
           {!loading && (
-            <span className="text-xs text-[var(--text)]/40">
+            <span className="text-xs text-[var(--text-subtle)]">
               {filtered.length} de {visibleTasks.length} tareas
               {hideCompleted ? ' (sin completadas)' : ''}
             </span>
@@ -880,7 +880,7 @@ export function TasksModule({
 
       {/* Footer counter (simple only — rich and simple+toggle show their own) */}
       {!isRich && !showHideCompletedToggle && !loading && tasks.length > 0 && (
-        <p className="text-right text-xs text-[var(--text)]/40">
+        <p className="text-right text-xs text-[var(--text-subtle)]">
           {filtered.length} de {tasks.length} {tasks.length === 1 ? 'tarea' : 'tareas'}
         </p>
       )}

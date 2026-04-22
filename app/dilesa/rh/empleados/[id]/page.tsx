@@ -268,7 +268,7 @@ function BeneficiariosSection({
         )}
       </div>
       {beneficiarios.length === 0 && !adding ? (
-        <p className="text-xs text-[var(--text)]/40">
+        <p className="text-xs text-[var(--text-subtle)]">
           Sin beneficiarios registrados. El Art. 501 LFT permite designar a quién pagarle salarios y
           prestaciones devengadas en caso de fallecimiento del trabajador.
         </p>
@@ -366,7 +366,7 @@ function InfoRow({
     <div>
       <FieldLabel>{label}</FieldLabel>
       <p className="text-sm text-[var(--text)]">{value || '—'}</p>
-      {sub && <p className="text-xs text-[var(--text)]/40 mt-0.5">{sub}</p>}
+      {sub && <p className="text-xs text-[var(--text-subtle)] mt-0.5">{sub}</p>}
     </div>
   );
 }
@@ -1024,7 +1024,7 @@ function EmpleadoDetailInner() {
               />
             </div>
             <div className="pt-3 border-t border-[var(--border)] sm:col-span-2 lg:col-span-3">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/40 mb-2">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-subtle)] mb-2">
                 Contacto de emergencia
               </p>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -1066,7 +1066,7 @@ function EmpleadoDetailInner() {
             <InfoRow label="Teléfono celular" value={persona?.telefono ?? null} />
             <InfoRow label="Teléfono de casa" value={persona?.telefono_casa ?? null} />
             <div className="sm:col-span-2 lg:col-span-3 pt-3 border-t border-[var(--border)]">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/40 mb-2">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-subtle)] mb-2">
                 Contacto de emergencia
               </p>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -1362,7 +1362,7 @@ function EmpleadoDetailInner() {
             dangerouslySetInnerHTML={{ __html: empleado.notas }}
           />
         ) : (
-          <p className="text-xs text-[var(--text)]/40">Sin notas registradas.</p>
+          <p className="text-xs text-[var(--text-subtle)]">Sin notas registradas.</p>
         )}
       </div>
 

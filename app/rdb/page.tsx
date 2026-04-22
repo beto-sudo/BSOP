@@ -328,7 +328,7 @@ function KpiCard({
         {label}
       </div>
       <div className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text)]">{value}</div>
-      {hint ? <div className="mt-1 text-sm text-[var(--text)]/55">{hint}</div> : null}
+      {hint ? <div className="mt-1 text-sm text-[var(--text-muted)]">{hint}</div> : null}
     </div>
   );
 }
@@ -667,7 +667,7 @@ export default function RdbHomePage() {
             <section className="space-y-3">
               <div>
                 <h2 className="text-lg font-semibold text-[var(--text)]">Requiere atención</h2>
-                <p className="text-sm text-[var(--text)]/55">
+                <p className="text-sm text-[var(--text-muted)]">
                   Alertas cortas, derivadas de pedidos y cortes que ya existen en RDB.
                 </p>
               </div>
@@ -723,7 +723,7 @@ export default function RdbHomePage() {
               <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-[var(--text)]">Ventas</h2>
-                  <p className="text-sm text-[var(--text)]/55">
+                  <p className="text-sm text-[var(--text-muted)]">
                     Serie principal del periodo seleccionado. El default es mes actual.
                   </p>
                 </div>
@@ -762,7 +762,7 @@ export default function RdbHomePage() {
                     <div className="mt-2 text-xl font-semibold text-[var(--text)]">
                       {vsPrev == null ? '—' : `${vsPrev >= 0 ? '+' : ''}${vsPrev.toFixed(1)}%`}
                     </div>
-                    <div className="mt-1 text-sm text-[var(--text)]/55">
+                    <div className="mt-1 text-sm text-[var(--text-muted)]">
                       Base: {formatMoney(previousTotal)}
                     </div>
                   </div>
@@ -775,7 +775,7 @@ export default function RdbHomePage() {
                         ? '—'
                         : `${vsLastYear >= 0 ? '+' : ''}${vsLastYear.toFixed(1)}%`}
                     </div>
-                    <div className="mt-1 text-sm text-[var(--text)]/55">
+                    <div className="mt-1 text-sm text-[var(--text-muted)]">
                       Base: {formatMoney(lastYearTotal)}
                     </div>
                   </div>

@@ -92,7 +92,7 @@ export function DocumentosTable({
       <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)]">
         <div className="flex flex-col items-center justify-center p-16 text-center">
           <FileText className="mb-3 h-10 w-10 text-[var(--text)]/20" />
-          <p className="text-sm text-[var(--text)]/55">
+          <p className="text-sm text-[var(--text-muted)]">
             {documentos.length === 0 ? 'No hay documentos capturados aún' : 'Sin resultados'}
           </p>
           {documentos.length === 0 && (
@@ -170,10 +170,10 @@ export function DocumentosTable({
                 className="w-28 text-right"
               />
             )}
-            <TableHead className="font-medium text-[var(--text)]/55">Descripción</TableHead>
-            <TableHead className="w-24 font-medium text-[var(--text)]/55">PDF</TableHead>
-            <TableHead className="w-24 font-medium text-[var(--text)]/55">Imagen</TableHead>
-            <TableHead className="w-20 font-medium text-[var(--text)]/55">Anexos</TableHead>
+            <TableHead className="font-medium text-[var(--text-muted)]">Descripción</TableHead>
+            <TableHead className="w-24 font-medium text-[var(--text-muted)]">PDF</TableHead>
+            <TableHead className="w-24 font-medium text-[var(--text-muted)]">Imagen</TableHead>
+            <TableHead className="w-20 font-medium text-[var(--text-muted)]">Anexos</TableHead>
             <SortableHead
               sortKey="fecha_emision"
               label="Emisión"
@@ -216,7 +216,7 @@ export function DocumentosTable({
                     )}
                   </div>
                   {doc.notaria && (
-                    <span className="mt-0.5 block text-xs text-[var(--text)]/40">
+                    <span className="mt-0.5 block text-xs text-[var(--text-subtle)]">
                       {doc.notaria}
                     </span>
                   )}

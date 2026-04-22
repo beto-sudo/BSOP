@@ -46,7 +46,9 @@ export function UpdatesList({
 
   if (updates.length === 0) {
     if (variant === 'embedded') {
-      return <p className="text-xs text-[var(--text)]/40 text-center py-3">Sin actualizaciones</p>;
+      return (
+        <p className="text-xs text-[var(--text-subtle)] text-center py-3">Sin actualizaciones</p>
+      );
     }
     return (
       <div className="flex flex-col items-center justify-center py-6 text-center">
@@ -74,7 +76,7 @@ export function UpdatesList({
               >
                 {tc.label}
               </span>
-              <span className="text-[10px] text-[var(--text)]/40">
+              <span className="text-[10px] text-[var(--text-subtle)]">
                 {u.usuario?.nombre ?? 'Sistema'}
               </span>
               <span className="text-[10px] text-[var(--text)]/30 ml-auto">

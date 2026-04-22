@@ -1,9 +1,5 @@
 'use client';
 
-/* eslint-disable react-hooks/set-state-in-effect --
- * Pre-existing data-sync pattern inherited from prior page version.
- */
-
 import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -81,7 +77,7 @@ function EmpresasSettingsInner() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text)]">Empresas</h1>
-          <p className="mt-1 text-sm text-[var(--text)]/55">
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
             Selecciona una empresa para ver y editar sus datos fiscales y branding
           </p>
         </div>
@@ -124,7 +120,7 @@ function EmpresasSettingsInner() {
       ) : empresas.length === 0 ? (
         <div className="flex flex-col items-center justify-center p-16 text-center rounded-2xl border border-[var(--border)] bg-[var(--card)]">
           <Building2 className="mb-3 h-10 w-10 text-[var(--text)]/20" />
-          <p className="text-sm text-[var(--text)]/55">No hay empresas registradas.</p>
+          <p className="text-sm text-[var(--text-muted)]">No hay empresas registradas.</p>
         </div>
       ) : (
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">

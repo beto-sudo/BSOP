@@ -34,7 +34,9 @@ export function PlayersSection({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-[var(--text)]">Top jugadores</h2>
-            <p className="text-sm text-[var(--text)]/55">Ranking operable con búsqueda y orden.</p>
+            <p className="text-sm text-[var(--text-muted)]">
+              Ranking operable con búsqueda y orden.
+            </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Input
@@ -99,7 +101,7 @@ export function PlayersSection({
       <div className="overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--card)] self-start">
         <div className="border-b border-[var(--border)] px-4 py-4 sm:px-5">
           <h3 className="text-base font-semibold text-[var(--text)]">Top canceladores</h3>
-          <p className="text-sm text-[var(--text)]/55">
+          <p className="text-sm text-[var(--text-muted)]">
             Jugadores con al menos 2 cancelaciones dentro del periodo.
           </p>
         </div>

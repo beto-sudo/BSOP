@@ -10,7 +10,7 @@ import { formatDate, getVencStatus } from './helpers';
 import { TIPOS_DOCUMENTO } from './types';
 
 export function VencBadge({ d }: { d: string | null }) {
-  if (!d) return <span className="text-[var(--text)]/40">—</span>;
+  if (!d) return <span className="text-[var(--text-subtle)]">—</span>;
   const st = getVencStatus(d);
   const txt = formatDate(d);
   if (st === 'expired')
@@ -31,7 +31,7 @@ export function VencBadge({ d }: { d: string | null }) {
 }
 
 export function TipoBadge({ tipo }: { tipo: string | null }) {
-  if (!tipo) return <span className="text-[var(--text)]/40">—</span>;
+  if (!tipo) return <span className="text-[var(--text-subtle)]">—</span>;
   const f = TIPOS_DOCUMENTO.find((t) => t.value === tipo);
   return (
     <span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-0.5 text-xs font-medium text-[var(--text)]/70">

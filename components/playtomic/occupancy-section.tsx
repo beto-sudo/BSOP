@@ -18,7 +18,7 @@ export function OccupancySection({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-[var(--text)]">Ocupación</h2>
-          <p className="text-sm text-[var(--text)]/55">
+          <p className="text-sm text-[var(--text-muted)]">
             Vista cruzada de canchas por hora dentro del rango seleccionado.
           </p>
         </div>

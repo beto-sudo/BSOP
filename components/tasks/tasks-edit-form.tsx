@@ -252,7 +252,7 @@ function RichEditSheet({
                 className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
               />
               {!canCompleteTask && (
-                <p className="mt-1 text-[10px] text-[var(--text)]/40">
+                <p className="mt-1 text-[10px] text-[var(--text-subtle)]">
                   Solo dirección o el creador pueden cambiar el estado
                 </p>
               )}
@@ -328,31 +328,35 @@ function RichEditSheet({
               <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl bg-[var(--panel)] p-3 border border-[var(--border)] text-[11px]">
                 {selectedTask.iniciativa && (
                   <div>
-                    <span className="font-semibold text-[var(--text)]/40 block">Iniciativa</span>
+                    <span className="font-semibold text-[var(--text-subtle)] block">
+                      Iniciativa
+                    </span>
                     {selectedTask.iniciativa}
                   </div>
                 )}
                 {selectedTask.tipo && (
                   <div>
-                    <span className="font-semibold text-[var(--text)]/40 block">Tipo</span>
+                    <span className="font-semibold text-[var(--text-subtle)] block">Tipo</span>
                     {selectedTask.tipo}
                   </div>
                 )}
                 {selectedTask.fecha_vence && (
                   <div>
-                    <span className="font-semibold text-[var(--text)]/40 block">Fecha Vence</span>
+                    <span className="font-semibold text-[var(--text-subtle)] block">
+                      Fecha Vence
+                    </span>
                     {formatDate(selectedTask.fecha_vence)}
                   </div>
                 )}
                 {selectedTask.motivo_bloqueo && (
                   <div className="col-span-2">
-                    <span className="font-semibold text-[var(--text)]/40 block">Bloqueo</span>
+                    <span className="font-semibold text-[var(--text-subtle)] block">Bloqueo</span>
                     {selectedTask.motivo_bloqueo}
                   </div>
                 )}
                 {selectedTask.siguiente_accion && (
                   <div className="col-span-2">
-                    <span className="font-semibold text-[var(--text)]/40 block">
+                    <span className="font-semibold text-[var(--text-subtle)] block">
                       Siguiente Acción
                     </span>
                     {selectedTask.siguiente_accion}
@@ -362,7 +366,7 @@ function RichEditSheet({
             )}
 
           {selectedTask?.asignado_por && (
-            <div className="text-xs text-[var(--text)]/40">
+            <div className="text-xs text-[var(--text-subtle)]">
               Asignada por: {empleadoMap.get(selectedTask.asignado_por)?.nombre ?? 'Desconocido'}
               {selectedTask.fecha_completado && (
                 <> · Completada: {formatDate(selectedTask.fecha_completado)}</>

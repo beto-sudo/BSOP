@@ -374,7 +374,7 @@ export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved:
           )}
         </div>
         {empresa.csf_fecha_emision && (
-          <p className="text-xs text-[var(--text)]/40">
+          <p className="text-xs text-[var(--text-subtle)]">
             Emitida el {formatDate(empresa.csf_fecha_emision)}
           </p>
         )}

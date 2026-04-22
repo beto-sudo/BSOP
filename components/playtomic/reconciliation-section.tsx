@@ -36,7 +36,7 @@ export function ReconciliationSection({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-[var(--text)]">Conciliación de Ingresos</h2>
-          <p className="text-sm text-[var(--text)]/55">
+          <p className="text-sm text-[var(--text-muted)]">
             Desglose diario de reservas por estado de pago y origen para cuadrar contra depósitos.
           </p>
         </div>

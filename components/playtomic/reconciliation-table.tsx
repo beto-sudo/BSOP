@@ -76,7 +76,7 @@ export function ReconciliationTable({ reconciliation }: { reconciliation: Reconc
         </div>
       </div>
       {reconciliation.truncated ? (
-        <p className="text-sm text-[var(--text)]/55">
+        <p className="text-sm text-[var(--text-muted)]">
           Mostrando 60 de {reconciliation.totalDays} días. Los totales reflejan el periodo completo.
         </p>
       ) : null}

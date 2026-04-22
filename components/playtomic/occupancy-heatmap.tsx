@@ -68,7 +68,7 @@ export function OccupancyHeatmap({
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <div className="text-lg font-semibold text-[var(--text)]">Mapa de ocupación</div>
-          <div className="text-sm text-[var(--text)]/55">
+          <div className="text-sm text-[var(--text-muted)]">
             Intensidad por hora y cancha. Más oscuro = más reservas.
           </div>
         </div>

@@ -124,7 +124,7 @@ function LogoCard({ variant, url }: { variant: LogoVariant; url: string | null }
           <img src={url} alt={variant.label} className={`${sizing} object-contain`} />
         ) : (
           <div
-            className={`${sizing} flex items-center justify-center text-xs text-[var(--text)]/40`}
+            className={`${sizing} flex items-center justify-center text-xs text-[var(--text-subtle)]`}
           >
             <FileImage className="h-6 w-6" />
           </div>
@@ -165,7 +165,7 @@ export function EmpresaBranding({ branding, slug }: { branding: Branding; slug: 
         <p className="text-sm text-[var(--text)]/60">
           Esta empresa todavía no tiene branding configurado.
         </p>
-        <p className="mt-2 text-xs text-[var(--text)]/40">
+        <p className="mt-2 text-xs text-[var(--text-subtle)]">
           Corre el script:{' '}
           <code className="font-mono bg-[var(--card)] px-1.5 py-0.5 rounded text-[var(--text)]/70">
             npx tsx scripts/branding/generate.ts --empresa {slug} --svg path/to/master.svg
