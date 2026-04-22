@@ -7,15 +7,23 @@
  * candidatos, bajar del bucket) vive en los call sites, no aquí.
  */
 
-import { spawn } from 'node:child_process';
-import { readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { openai } from '@ai-sdk/openai';
 import { embed, generateObject } from 'ai';
 import { z } from 'zod';
+
+// Ghostscript via WebAssembly (~16 MB de bundle, pero funciona en cualquier
+// runtime: Mac local, Vercel Functions, Linux CI, etc. Antes usábamos spawn
+// del binary nativo de gs, lo cual rompía en serverless donde no hay gs).
+// Import dinámico para no cargar el wasm en módulos que no lo usan.
+type GsModuleFactory = (init?: unknown) => Promise<{
+  callMain: (args: string[]) => number;
+  FS: {
+    writeFile: (path: string, data: Uint8Array) => void;
+    readFile: (path: string) => Uint8Array;
+    unlink: (path: string) => void;
+  };
+}>;
 
 // ─── Configuración ───────────────────────────────────────────────────────────
 
@@ -104,43 +112,97 @@ export const ExtraccionSchema = z.object({
 
 export type Extraccion = z.infer<typeof ExtraccionSchema>;
 
-// ─── Compresión con Ghostscript ──────────────────────────────────────────────
+// ─── Compresión con Ghostscript (WASM) ───────────────────────────────────────
+
+// Cache singleton del módulo wasm — la inicialización (parse del .wasm,
+// compile, instanciate) es ~500ms y se reusa entre invocaciones de la
+// misma función serverless o del mismo proceso del script batch.
+let cachedGsModulePromise: ReturnType<GsModuleFactory> | null = null;
+
+async function loadGsModule(): ReturnType<GsModuleFactory> {
+  if (!cachedGsModulePromise) {
+    // Import dinámico para que el wasm solo se cargue cuando realmente
+    // hace falta comprimir (PDFs pequeños no lo necesitan).
+    //
+    // Pasamos `wasmBinary` precargado en lugar de dejar que el módulo de
+    // Emscripten haga `fetch(path)` — fetch en Node 18+ exige una URL válida
+    // (http://, https://, file://) y el resolver interno del módulo arma un
+    // path absoluto sin protocolo, lo cual rompe con ERR_INVALID_URL.
+    cachedGsModulePromise = (async () => {
+      const [factoryMod, fsMod, pathMod, moduleMod] = await Promise.all([
+        import('@jspawn/ghostscript-wasm'),
+        import('node:fs/promises'),
+        import('node:path'),
+        import('node:module'),
+      ]);
+      const factory = (factoryMod as unknown as { default: GsModuleFactory }).default;
+      // `require.resolve` desde el propio módulo de gs-wasm nos da el path
+      // absoluto de su `gs.js`; el `.wasm` vive junto a él. Funciona en dev
+      // (node_modules local) y en Vercel Functions (bundle de la function).
+      const require = moduleMod.createRequire(import.meta.url);
+      const gsJsPath = require.resolve('@jspawn/ghostscript-wasm');
+      const wasmPath = pathMod.join(pathMod.dirname(gsJsPath), 'gs.wasm');
+      const wasmBinary = await fsMod.readFile(wasmPath);
+
+      // El módulo ignora `wasmBinary` y prefiere fetch (que falla en Node con
+      // un path absoluto). Overridemos `instantiateWasm` para controlar la
+      // carga directamente desde el Buffer — funciona en cualquier runtime.
+      return factory({
+        wasmBinary,
+        instantiateWasm(
+          imports: WebAssembly.Imports,
+          done: (instance: WebAssembly.Instance) => void
+        ) {
+          WebAssembly.instantiate(wasmBinary, imports)
+            .then((result) => done(result.instance))
+            .catch((err) => {
+              console.error('[gs-wasm] instantiate failed:', err);
+              throw err;
+            });
+          return {};
+        },
+      });
+    })();
+  }
+  return cachedGsModulePromise;
+}
 
 export async function compressPdf(
   input: Uint8Array,
   preset: '/ebook' | '/screen' = '/ebook'
 ): Promise<Uint8Array> {
-  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-  const tmpIn = join(tmpdir(), `bsop-extract-${stamp}-in.pdf`);
-  const tmpOut = join(tmpdir(), `bsop-extract-${stamp}-out.pdf`);
+  const gs = await loadGsModule();
+  // El FS de Emscripten es una memoria virtual aislada — no toca disco real.
+  // Escribimos input.pdf, corremos gs, leemos out.pdf, limpiamos.
+  const inPath = `/in-${Date.now()}.pdf`;
+  const outPath = `/out-${Date.now()}.pdf`;
   try {
-    await writeFile(tmpIn, input);
-    await new Promise<void>((resolve, reject) => {
-      const proc = spawn('gs', [
-        '-sDEVICE=pdfwrite',
-        '-dCompatibilityLevel=1.4',
-        `-dPDFSETTINGS=${preset}`,
-        '-dNOPAUSE',
-        '-dQUIET',
-        '-dBATCH',
-        `-sOutputFile=${tmpOut}`,
-        tmpIn,
-      ]);
-      let stderr = '';
-      proc.stderr.on('data', (chunk) => {
-        stderr += String(chunk);
-      });
-      proc.on('error', reject);
-      proc.on('exit', (code) => {
-        if (code === 0) resolve();
-        else reject(new Error(`gs exit ${code}: ${stderr.slice(0, 500)}`));
-      });
-    });
-    const out = await readFile(tmpOut);
-    return new Uint8Array(out);
+    gs.FS.writeFile(inPath, input);
+    const exitCode = gs.callMain([
+      '-sDEVICE=pdfwrite',
+      '-dCompatibilityLevel=1.4',
+      `-dPDFSETTINGS=${preset}`,
+      '-dNOPAUSE',
+      '-dQUIET',
+      '-dBATCH',
+      `-sOutputFile=${outPath}`,
+      inPath,
+    ]);
+    if (exitCode !== 0) {
+      throw new Error(`ghostscript-wasm exit ${exitCode}`);
+    }
+    return gs.FS.readFile(outPath);
   } finally {
-    await rm(tmpIn, { force: true }).catch(() => {});
-    await rm(tmpOut, { force: true }).catch(() => {});
+    try {
+      gs.FS.unlink(inPath);
+    } catch {
+      /* archivo puede no existir si writeFile falló */
+    }
+    try {
+      gs.FS.unlink(outPath);
+    } catch {
+      /* archivo puede no existir si gs falló */
+    }
   }
 }
 
