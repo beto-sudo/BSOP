@@ -106,6 +106,7 @@ export async function loadCodaIdMap(
   empresaId: string
 ): Promise<Map<string, string>> {
   const { data, error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase types only know schema 'public'; casting is the documented escape hatch for multi-schema clients.
     .schema(schema as any)
     .from(table)
     .select('id, coda_row_id')
@@ -137,6 +138,7 @@ export async function loadEmpleadosLookup(
   empresaId: string
 ): Promise<EmpleadoLookup> {
   const { data, error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase types only know schema 'public'; casting is the documented escape hatch for multi-schema clients.
     .schema('erp' as any)
     .from('empleados')
     .select('id, persona:persona_id(nombre, apellido_paterno)')
@@ -149,8 +151,12 @@ export async function loadEmpleadosLookup(
   const nameToId = new Map<string, string>();
   const entries: { full: string; id: string }[] = [];
 
-  for (const e of data ?? []) {
-    const p = (e as any).persona;
+  type EmpleadoRow = {
+    id: string;
+    persona: { nombre: string | null; apellido_paterno: string | null } | null;
+  };
+  for (const e of (data as unknown as EmpleadoRow[]) ?? []) {
+    const p = e.persona;
     if (!p) continue;
     const full = normalize([p.nombre, p.apellido_paterno].filter(Boolean).join(' '));
     if (!full) continue;
@@ -167,7 +173,10 @@ export async function loadEmpleadosLookup(
  * en cascada: exacto → prefix match → nombre solo. Devuelve `null` si no hay
  * match (el caller decide qué hacer).
  */
-export function resolveEmpleado(lookup: EmpleadoLookup, raw: string | null | undefined): string | null {
+export function resolveEmpleado(
+  lookup: EmpleadoLookup,
+  raw: string | null | undefined
+): string | null {
   if (!raw) return null;
   const normalize = (s: string) => s.toLowerCase().trim().replace(/\s+/g, ' ');
   const key = normalize(raw);
