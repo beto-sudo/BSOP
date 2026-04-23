@@ -21,7 +21,7 @@
     "test:report": "playwright show-report",
     "audit:ui": "npx tsx scripts/audit-ui.ts",
     "audit:ui:json": "npx tsx scripts/audit-ui.ts --json",
-    "db:types": "supabase gen types typescript --project-id ybklderteyhuugzfmxbi --schema public --schema core --schema erp --schema rdb --schema health --schema playtomic > types/supabase.ts",
+    "db:types": "supabase gen types typescript --project-id ybklderteyhuugzfmxbi --schema public --schema core --schema erp --schema rdb --schema health --schema playtomic --schema dilesa --schema maquinaria > types/supabase.ts",
     "db:check": "npm run db:types && git diff --exit-code types/supabase.ts",
     "schema:ref": "npx tsx scripts/gen-schema-ref.ts",
     "schema:check": "npm run schema:ref && git diff --exit-code -I '^  Last regenerated: ' supabase/SCHEMA_REF.md",
