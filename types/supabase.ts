@@ -3918,6 +3918,181 @@ export type Database = {
       [_ in never]: never
     }
   }
+  health: {
+    Tables: {
+      health_ecg: {
+        Row: {
+          classification: string | null
+          date: string
+          heart_rate: number | null
+          id: number
+          ingested_at: string | null
+          raw_json: Json | null
+        }
+        Insert: {
+          classification?: string | null
+          date: string
+          heart_rate?: number | null
+          id?: number
+          ingested_at?: string | null
+          raw_json?: Json | null
+        }
+        Update: {
+          classification?: string | null
+          date?: string
+          heart_rate?: number | null
+          id?: number
+          ingested_at?: string | null
+          raw_json?: Json | null
+        }
+        Relationships: []
+      }
+      health_ingest_log: {
+        Row: {
+          id: number
+          metrics_count: number | null
+          payload_size_bytes: number | null
+          received_at: string | null
+          source_ip: string | null
+          status: string | null
+          workouts_count: number | null
+        }
+        Insert: {
+          id?: number
+          metrics_count?: number | null
+          payload_size_bytes?: number | null
+          received_at?: string | null
+          source_ip?: string | null
+          status?: string | null
+          workouts_count?: number | null
+        }
+        Update: {
+          id?: number
+          metrics_count?: number | null
+          payload_size_bytes?: number | null
+          received_at?: string | null
+          source_ip?: string | null
+          status?: string | null
+          workouts_count?: number | null
+        }
+        Relationships: []
+      }
+      health_medications: {
+        Row: {
+          date: string
+          dose: string | null
+          id: number
+          ingested_at: string | null
+          name: string | null
+          raw_json: Json | null
+        }
+        Insert: {
+          date: string
+          dose?: string | null
+          id?: number
+          ingested_at?: string | null
+          name?: string | null
+          raw_json?: Json | null
+        }
+        Update: {
+          date?: string
+          dose?: string | null
+          id?: number
+          ingested_at?: string | null
+          name?: string | null
+          raw_json?: Json | null
+        }
+        Relationships: []
+      }
+      health_metrics: {
+        Row: {
+          date: string
+          id: number
+          ingested_at: string | null
+          metric_name: string
+          source: string | null
+          unit: string | null
+          value: number
+        }
+        Insert: {
+          date: string
+          id?: number
+          ingested_at?: string | null
+          metric_name: string
+          source?: string | null
+          unit?: string | null
+          value: number
+        }
+        Update: {
+          date?: string
+          id?: number
+          ingested_at?: string | null
+          metric_name?: string
+          source?: string | null
+          unit?: string | null
+          value?: number
+        }
+        Relationships: []
+      }
+      health_workouts: {
+        Row: {
+          distance_km: number | null
+          duration_minutes: number | null
+          end_time: string | null
+          energy_kcal: number | null
+          heart_rate_avg: number | null
+          heart_rate_max: number | null
+          id: number
+          ingested_at: string | null
+          name: string
+          raw_json: Json | null
+          source: string | null
+          start_time: string
+        }
+        Insert: {
+          distance_km?: number | null
+          duration_minutes?: number | null
+          end_time?: string | null
+          energy_kcal?: number | null
+          heart_rate_avg?: number | null
+          heart_rate_max?: number | null
+          id?: number
+          ingested_at?: string | null
+          name: string
+          raw_json?: Json | null
+          source?: string | null
+          start_time: string
+        }
+        Update: {
+          distance_km?: number | null
+          duration_minutes?: number | null
+          end_time?: string | null
+          energy_kcal?: number | null
+          heart_rate_avg?: number | null
+          heart_rate_max?: number | null
+          id?: number
+          ingested_at?: string | null
+          name?: string
+          raw_json?: Json | null
+          source?: string | null
+          start_time?: string
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   playtomic: {
     Tables: {
       booking_participants: {
@@ -5617,6 +5792,9 @@ export const Constants = {
         "activo_fijo",
       ],
     },
+  },
+  health: {
+    Enums: {},
   },
   playtomic: {
     Enums: {},
