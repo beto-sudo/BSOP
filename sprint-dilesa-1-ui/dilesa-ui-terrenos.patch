@@ -1,0 +1,2063 @@
+diff --git a/app/dilesa/anteproyectos/page.tsx b/app/dilesa/anteproyectos/page.tsx
+new file mode 100644
+index 0000000..81c5700
+--- /dev/null
++++ b/app/dilesa/anteproyectos/page.tsx
+@@ -0,0 +1,13 @@
++'use client';
++
++import { ComingSoonModule } from '@/components/shared/coming-soon-module';
++
++export default function AnteproyectosPage() {
++  return (
++    <ComingSoonModule
++      title="Anteproyectos"
++      description="Evaluación financiera y decisión de convertir a proyecto. Incluirá panel financiero en vivo contra v_anteproyectos_analisis, multi-select de prototipos de referencia y el botón Convertir-a-Proyecto."
++      branchName="feat/dilesa-ui-anteproyectos"
++    />
++  );
++}
+diff --git a/app/dilesa/page.tsx b/app/dilesa/page.tsx
+index e4c80e0..4b28fae 100644
+--- a/app/dilesa/page.tsx
++++ b/app/dilesa/page.tsx
+@@ -2,44 +2,112 @@
+ 
+ import { RequireAccess } from '@/components/require-access';
+ import Link from 'next/link';
+-import { ClipboardList, Users, FileText, Briefcase, Building2 } from 'lucide-react';
++import {
++  ClipboardList,
++  Users,
++  FileText,
++  Briefcase,
++  Building2,
++  Map,
++  House,
++  ClipboardCheck,
++  Landmark,
++} from 'lucide-react';
+ 
+-const modules = [
+-  {
+-    label: 'Tareas',
+-    href: '/dilesa/admin/tasks',
+-    icon: ClipboardList,
+-    color: 'bg-blue-500/10 text-blue-500',
+-  },
+-  {
+-    label: 'Juntas',
+-    href: '/dilesa/admin/juntas',
+-    icon: Users,
+-    color: 'bg-violet-500/10 text-violet-500',
+-  },
+-  {
+-    label: 'Documentos',
+-    href: '/dilesa/admin/documentos',
+-    icon: FileText,
+-    color: 'bg-amber-500/10 text-amber-500',
+-  },
++type ModuleGroup = {
++  title: string;
++  items: {
++    label: string;
++    description?: string;
++    href: string;
++    icon: typeof ClipboardList;
++    color: string;
++  }[];
++};
++
++// Nota: el grupo "Inmobiliario" nace en el sprint dilesa-1 UI.
++// Los módulos de Terrenos/Prototipos/Anteproyectos/Proyectos se liberan en
++// esta misma rama con páginas de scaffold. Cuando Beto valide visualmente,
++// se revoca Coda para el módulo correspondiente.
++const moduleGroups: ModuleGroup[] = [
+   {
+-    label: 'Empleados',
+-    href: '/dilesa/rh/empleados',
+-    icon: Users,
+-    color: 'bg-emerald-500/10 text-emerald-500',
++    title: 'Inmobiliario',
++    items: [
++      {
++        label: 'Terrenos',
++        description: 'Portafolio de tierra pre-desarrollo',
++        href: '/dilesa/terrenos',
++        icon: Map,
++        color: 'bg-emerald-500/10 text-emerald-500',
++      },
++      {
++        label: 'Prototipos',
++        description: 'Catálogo de productos habitacionales',
++        href: '/dilesa/prototipos',
++        icon: House,
++        color: 'bg-sky-500/10 text-sky-500',
++      },
++      {
++        label: 'Anteproyectos',
++        description: 'Evaluación financiera y decisión',
++        href: '/dilesa/anteproyectos',
++        icon: ClipboardCheck,
++        color: 'bg-orange-500/10 text-orange-500',
++      },
++      {
++        label: 'Proyectos',
++        description: 'Desarrollos formalizados',
++        href: '/dilesa/proyectos',
++        icon: Landmark,
++        color: 'bg-indigo-500/10 text-indigo-500',
++      },
++    ],
+   },
+   {
+-    label: 'Puestos',
+-    href: '/dilesa/rh/puestos',
+-    icon: Briefcase,
+-    color: 'bg-cyan-500/10 text-cyan-500',
++    title: 'Administración',
++    items: [
++      {
++        label: 'Tareas',
++        href: '/dilesa/admin/tasks',
++        icon: ClipboardList,
++        color: 'bg-blue-500/10 text-blue-500',
++      },
++      {
++        label: 'Juntas',
++        href: '/dilesa/admin/juntas',
++        icon: Users,
++        color: 'bg-violet-500/10 text-violet-500',
++      },
++      {
++        label: 'Documentos',
++        href: '/dilesa/admin/documentos',
++        icon: FileText,
++        color: 'bg-amber-500/10 text-amber-500',
++      },
++    ],
+   },
+   {
+-    label: 'Departamentos',
+-    href: '/dilesa/rh/departamentos',
+-    icon: Building2,
+-    color: 'bg-rose-500/10 text-rose-500',
++    title: 'Recursos Humanos',
++    items: [
++      {
++        label: 'Empleados',
++        href: '/dilesa/rh/empleados',
++        icon: Users,
++        color: 'bg-emerald-500/10 text-emerald-500',
++      },
++      {
++        label: 'Puestos',
++        href: '/dilesa/rh/puestos',
++        icon: Briefcase,
++        color: 'bg-cyan-500/10 text-cyan-500',
++      },
++      {
++        label: 'Departamentos',
++        href: '/dilesa/rh/departamentos',
++        icon: Building2,
++        color: 'bg-rose-500/10 text-rose-500',
++      },
++    ],
+   },
+ ];
+ 
+@@ -64,28 +132,44 @@ export default function DilesaPage() {
+                 Panel DILESA
+               </h1>
+               <p className="mt-1 text-sm text-[var(--text)]/60">
+-                Administración, recursos humanos y documentos de DILESA.
++                Inmobiliario, administración, recursos humanos y documentos de DILESA.
+               </p>
+             </div>
+           </div>
+         </section>
+ 
+-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+-          {modules.map((mod) => (
+-            <Link
+-              key={mod.href}
+-              href={mod.href}
+-              className="group flex items-center gap-4 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 transition hover:border-[var(--accent)]/40 hover:shadow-md"
+-            >
+-              <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${mod.color}`}>
+-                <mod.icon className="h-5 w-5" />
+-              </div>
+-              <span className="text-sm font-medium text-[var(--text)] group-hover:text-[var(--accent)]">
+-                {mod.label}
+-              </span>
+-            </Link>
+-          ))}
+-        </section>
++        {moduleGroups.map((group) => (
++          <section key={group.title} className="space-y-3">
++            <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text)]/50">
++              {group.title}
++            </h2>
++            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
++              {group.items.map((mod) => (
++                <Link
++                  key={mod.href}
++                  href={mod.href}
++                  className="group flex items-start gap-4 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 transition hover:border-[var(--accent)]/40 hover:shadow-md"
++                >
++                  <div
++                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${mod.color}`}
++                  >
++                    <mod.icon className="h-5 w-5" />
++                  </div>
++                  <div className="min-w-0">
++                    <span className="block text-sm font-medium text-[var(--text)] group-hover:text-[var(--accent)]">
++                      {mod.label}
++                    </span>
++                    {mod.description ? (
++                      <span className="mt-0.5 block text-xs text-[var(--text)]/55">
++                        {mod.description}
++                      </span>
++                    ) : null}
++                  </div>
++                </Link>
++              ))}
++            </div>
++          </section>
++        ))}
+       </div>
+     </RequireAccess>
+   );
+diff --git a/app/dilesa/prototipos/page.tsx b/app/dilesa/prototipos/page.tsx
+new file mode 100644
+index 0000000..a0dd417
+--- /dev/null
++++ b/app/dilesa/prototipos/page.tsx
+@@ -0,0 +1,13 @@
++'use client';
++
++import { ComingSoonModule } from '@/components/shared/coming-soon-module';
++
++export default function PrototiposPage() {
++  return (
++    <ComingSoonModule
++      title="Prototipos"
++      description="Catálogo maestro de productos habitacionales con valor comercial, costos unitarios y planos. Se integra con anteproyectos y fraccionamiento."
++      branchName="feat/dilesa-ui-prototipos"
++    />
++  );
++}
+diff --git a/app/dilesa/proyectos/page.tsx b/app/dilesa/proyectos/page.tsx
+new file mode 100644
+index 0000000..19aa192
+--- /dev/null
++++ b/app/dilesa/proyectos/page.tsx
+@@ -0,0 +1,13 @@
++'use client';
++
++import { ComingSoonModule } from '@/components/shared/coming-soon-module';
++
++export default function ProyectosPage() {
++  return (
++    <ComingSoonModule
++      title="Proyectos"
++      description="Desarrollos formalizados. Incluirá tabs de Info general, Lotes (dilesa-2), Prototipos asignados (M:N fraccionamiento), Presupuesto y Documentos."
++      branchName="feat/dilesa-ui-proyectos"
++    />
++  );
++}
+diff --git a/app/dilesa/terrenos/[id]/page.tsx b/app/dilesa/terrenos/[id]/page.tsx
+new file mode 100644
+index 0000000..aec088a
+--- /dev/null
++++ b/app/dilesa/terrenos/[id]/page.tsx
+@@ -0,0 +1,460 @@
++'use client';
++
++/* eslint-disable react-hooks/set-state-in-effect --
++ * Data-sync pattern: setLoading/setError before firing async fetch; same
++ * convention used in juntas/[id] y tasks detail pages.
++ */
++
++/**
++ * Detalle de un terreno.
++ *
++ * Sprint dilesa-1 UI — scaffold con secciones colapsables A→H (ver
++ * /mnt/DILESA/knowledge/convencion-vistas-paginas.md §5). Esta primera
++ * versión es read-only: muestra el expediente completo y permite archivar.
++ * La edición inline por sección y el mapa embebido se agregan en iteración
++ * siguiente — placeholders presentes.
++ */
++
++import { RequireAccess } from '@/components/require-access';
++import { useCallback, useEffect, useMemo, useState } from 'react';
++import { useParams, useRouter } from 'next/navigation';
++import Link from 'next/link';
++import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
++import { Button } from '@/components/ui/button';
++import { Skeleton } from '@/components/ui/skeleton';
++import { ArrowLeft, Archive, Loader2, MapPin, ExternalLink } from 'lucide-react';
++import {
++  DILESA_EMPRESA_ID,
++  formatCurrency,
++  formatDateShort,
++  formatM2,
++  formatPercent,
++} from '@/lib/dilesa-constants';
++import {
++  TERRENO_ETAPA_CONFIG,
++  TERRENO_ESTATUS_PROPIEDAD_LABEL,
++  PRIORIDAD_CONFIG,
++  type TerrenoEtapa,
++  type PrioridadNivel,
++  type TerrenoEstatusPropiedad,
++} from '@/lib/status-tokens';
++
++type TerrenoFull = {
++  id: string;
++  empresa_id: string;
++  nombre: string;
++  clave_interna: string | null;
++  tipo: string | null;
++  area_terreno_m2: number | null;
++  areas_afectacion_m2: number | null;
++  areas_aprovechables_m2: number | null;
++  objetivo: string | null;
++  numero_escritura: string | null;
++  fecha_captura: string;
++  municipio: string | null;
++  zona_sector: string | null;
++  direccion_referencia: string | null;
++  nombre_propietario: string | null;
++  telefono_propietario: string | null;
++  nombre_corredor: string | null;
++  telefono_corredor: string | null;
++  precio_solicitado_m2: number | null;
++  precio_ofertado_m2: number | null;
++  valor_interno_estimado: number | null;
++  valor_objetivo_compra: number | null;
++  valor_predio: number | null;
++  valor_total_oferta: number | null;
++  pct_diferencia_solicitado_oferta: number | null;
++  origen: string | null;
++  estatus_propiedad: string | null;
++  etapa: string | null;
++  decision_actual: string | null;
++  prioridad: string | null;
++  responsable_id: string | null;
++  fecha_ultima_revision: string | null;
++  siguiente_accion: string | null;
++  imagen_zcu_url: string | null;
++  archivo_kmz_url: string | null;
++  pdf_escritura_url: string | null;
++  documentos: unknown;
++  notas: string | null;
++  created_at: string;
++  updated_at: string;
++};
++
++function TerrenoDetailInner() {
++  const router = useRouter();
++  const params = useParams<{ id: string }>();
++  const id = params?.id;
++  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
++
++  const [terreno, setTerreno] = useState<TerrenoFull | null>(null);
++  const [loading, setLoading] = useState(true);
++  const [error, setError] = useState<string | null>(null);
++  const [archiving, setArchiving] = useState(false);
++
++  const load = useCallback(async () => {
++    if (!id) return;
++    const { data, error: err } = await supabase
++      .schema('dilesa')
++      .from('terrenos')
++      .select('*')
++      .eq('id', id)
++      .eq('empresa_id', DILESA_EMPRESA_ID)
++      .is('deleted_at', null)
++      .maybeSingle();
++    if (err) {
++      setError(err.message);
++      setTerreno(null);
++      return;
++    }
++    setTerreno((data as TerrenoFull | null) ?? null);
++  }, [supabase, id]);
++
++  useEffect(() => {
++    let cancelled = false;
++    setLoading(true);
++    setError(null);
++    const init = async () => {
++      await load();
++      if (!cancelled) setLoading(false);
++    };
++    void init();
++    return () => {
++      cancelled = true;
++    };
++  }, [load]);
++
++  const handleArchive = async () => {
++    if (!terreno) return;
++    const ok = window.confirm(
++      `¿Archivar el terreno "${terreno.nombre}"? No se elimina de la DB; se puede restaurar quitando deleted_at por SQL.`
++    );
++    if (!ok) return;
++    setArchiving(true);
++    const { error: err } = await supabase
++      .schema('dilesa')
++      .from('terrenos')
++      .update({ deleted_at: new Date().toISOString() })
++      .eq('id', terreno.id);
++    setArchiving(false);
++    if (err) {
++      alert(`Error al archivar: ${err.message}`);
++      return;
++    }
++    router.push('/dilesa/terrenos');
++  };
++
++  if (loading) {
++    return (
++      <div className="space-y-4">
++        <Skeleton className="h-10 w-2/3" />
++        <Skeleton className="h-40 w-full" />
++        <Skeleton className="h-40 w-full" />
++      </div>
++    );
++  }
++
++  if (error || !terreno) {
++    return (
++      <div className="space-y-4">
++        <Button variant="outline" size="sm" onClick={() => router.push('/dilesa/terrenos')}>
++          <ArrowLeft className="size-4" />
++          Volver a Terrenos
++        </Button>
++        <div
++          role="alert"
++          className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400"
++        >
++          {error ?? 'No se encontró el terreno o fue archivado.'}
++        </div>
++      </div>
++    );
++  }
++
++  const mapQuery = encodeURIComponent(
++    [terreno.direccion_referencia, terreno.zona_sector, terreno.municipio]
++      .filter(Boolean)
++      .join(', ')
++  );
++  const mapSrc = mapQuery
++    ? `https://www.google.com/maps?q=${mapQuery}&output=embed`
++    : null;
++
++  return (
++    <div className="space-y-5">
++      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
++        <div className="flex items-start gap-2">
++          <Button
++            variant="outline"
++            size="icon-sm"
++            onClick={() => router.push('/dilesa/terrenos')}
++            aria-label="Volver a Terrenos"
++          >
++            <ArrowLeft className="size-4" />
++          </Button>
++          <div>
++            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text)]/45">
++              DILESA · Terreno
++            </div>
++            <h1 className="mt-0.5 text-2xl font-semibold tracking-tight text-[var(--text)]">
++              {terreno.nombre}
++            </h1>
++            {terreno.clave_interna ? (
++              <p className="mt-0.5 font-mono text-xs uppercase tracking-widest text-[var(--text)]/45">
++                {terreno.clave_interna}
++              </p>
++            ) : null}
++          </div>
++        </div>
++        <div className="flex items-center gap-2">
++          <EtapaBadgeLarge etapa={terreno.etapa} />
++          <Button
++            variant="outline"
++            size="sm"
++            onClick={handleArchive}
++            disabled={archiving}
++            className="text-red-400"
++          >
++            {archiving ? <Loader2 className="size-4 animate-spin" /> : <Archive className="size-4" />}
++            Archivar
++          </Button>
++        </div>
++      </div>
++
++      <div className="grid gap-4 lg:grid-cols-3">
++        <div className="space-y-4 lg:col-span-2">
++          <Section title="A. Identidad">
++            <Field label="Nombre">{terreno.nombre}</Field>
++            <Field label="Clave interna">{terreno.clave_interna ?? '—'}</Field>
++            <Field label="Tipo">{terreno.tipo ?? '—'}</Field>
++            <Field label="Objetivo">{terreno.objetivo ?? '—'}</Field>
++            <Field label="# Escritura">{terreno.numero_escritura ?? '—'}</Field>
++            <Field label="Fecha captura">{formatDateShort(terreno.fecha_captura)}</Field>
++          </Section>
++
++          <Section title="B. Ubicación">
++            <Field label="Municipio">{terreno.municipio ?? '—'}</Field>
++            <Field label="Zona / Sector">{terreno.zona_sector ?? '—'}</Field>
++            <Field label="Dirección / Referencia" wide>
++              {terreno.direccion_referencia ?? '—'}
++            </Field>
++            {mapSrc ? (
++              <div className="col-span-full mt-2 overflow-hidden rounded-lg border border-[var(--border)]">
++                <iframe
++                  title={`Mapa de ${terreno.nombre}`}
++                  src={mapSrc}
++                  width="100%"
++                  height="260"
++                  style={{ border: 0 }}
++                  loading="lazy"
++                  referrerPolicy="no-referrer-when-downgrade"
++                />
++              </div>
++            ) : (
++              <div className="col-span-full mt-2 flex items-center gap-2 rounded-lg border border-dashed border-[var(--border)] p-4 text-sm text-[var(--text)]/55">
++                <MapPin className="size-4" />
++                Sin ubicación capturada. Agrega municipio o dirección para ver el mapa.
++              </div>
++            )}
++          </Section>
++
++          <Section title="C. Contacto">
++            <Field label="Propietario">{terreno.nombre_propietario ?? '—'}</Field>
++            <Field label="Teléfono propietario">{terreno.telefono_propietario ?? '—'}</Field>
++            <Field label="Corredor">{terreno.nombre_corredor ?? '—'}</Field>
++            <Field label="Teléfono corredor">{terreno.telefono_corredor ?? '—'}</Field>
++          </Section>
++
++          <Section title="D. Económica">
++            <Field label="Precio solicitado /m²">
++              {formatCurrency(terreno.precio_solicitado_m2)}
++            </Field>
++            <Field label="Precio ofertado /m²">{formatCurrency(terreno.precio_ofertado_m2)}</Field>
++            <Field label="% Diferencia">
++              {formatPercent(terreno.pct_diferencia_solicitado_oferta)}
++            </Field>
++            <Field label="Valor interno estimado">
++              {formatCurrency(terreno.valor_interno_estimado)}
++            </Field>
++            <Field label="Valor objetivo de compra">
++              {formatCurrency(terreno.valor_objetivo_compra)}
++            </Field>
++          </Section>
++
++          <Section title="E. Gestión">
++            <Field label="Origen">{terreno.origen ?? '—'}</Field>
++            <Field label="Estatus propiedad">
++              {terreno.estatus_propiedad
++                ? TERRENO_ESTATUS_PROPIEDAD_LABEL[
++                    terreno.estatus_propiedad as TerrenoEstatusPropiedad
++                  ] ?? terreno.estatus_propiedad
++                : '—'}
++            </Field>
++            <Field label="Decisión actual">{terreno.decision_actual ?? '—'}</Field>
++            <Field label="Prioridad">
++              {terreno.prioridad
++                ? PRIORIDAD_CONFIG[terreno.prioridad as PrioridadNivel]?.label ?? terreno.prioridad
++                : '—'}
++            </Field>
++            <Field label="Responsable">
++              {terreno.responsable_id ? (
++                <span className="font-mono text-xs text-[var(--text)]/60">
++                  {terreno.responsable_id.slice(0, 8)}…
++                </span>
++              ) : (
++                '—'
++              )}
++            </Field>
++            <Field label="Última revisión">
++              {formatDateShort(terreno.fecha_ultima_revision)}
++            </Field>
++            <Field label="Siguiente acción" wide>
++              {terreno.siguiente_accion ?? '—'}
++            </Field>
++          </Section>
++        </div>
++
++        <div className="space-y-4">
++          <Section title="F. Cálculos">
++            <Field label="Área total">{formatM2(terreno.area_terreno_m2)}</Field>
++            <Field label="Áreas de afectación">{formatM2(terreno.areas_afectacion_m2)}</Field>
++            <Field label="Áreas aprovechables">
++              {formatM2(terreno.areas_aprovechables_m2)}
++            </Field>
++            <Field label="Valor predio">{formatCurrency(terreno.valor_predio)}</Field>
++            <Field label="Valor total oferta">{formatCurrency(terreno.valor_total_oferta)}</Field>
++          </Section>
++
++          <Section title="H. Documentos">
++            <DocLink label="Imagen ZCU" url={terreno.imagen_zcu_url} />
++            <DocLink label="Archivo KMZ" url={terreno.archivo_kmz_url} />
++            <DocLink label="PDF Escritura" url={terreno.pdf_escritura_url} />
++            {Array.isArray(terreno.documentos) && terreno.documentos.length > 0 ? (
++              <ul className="col-span-full space-y-1 text-sm">
++                {(terreno.documentos as Array<{ url?: string; label?: string; kind?: string }>).map(
++                  (d, i) =>
++                    d.url ? (
++                      <li key={i}>
++                        <a
++                          href={d.url}
++                          target="_blank"
++                          rel="noreferrer"
++                          className="inline-flex items-center gap-1 text-[var(--accent)] hover:underline"
++                        >
++                          <ExternalLink className="size-3.5" />
++                          {d.label ?? d.kind ?? `Documento ${i + 1}`}
++                        </a>
++                      </li>
++                    ) : null
++                )}
++              </ul>
++            ) : null}
++            {terreno.notas ? (
++              <div className="col-span-full pt-2">
++                <div className="text-xs font-semibold uppercase tracking-widest text-[var(--text)]/45">
++                  Notas
++                </div>
++                <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--text)]/75">
++                  {terreno.notas}
++                </p>
++              </div>
++            ) : null}
++          </Section>
++
++          <Section title="G. Continuidad">
++            <div className="col-span-full text-sm text-[var(--text)]/55">
++              Los anteproyectos derivados aparecerán aquí cuando el módulo Anteproyectos esté
++              disponible.{' '}
++              <Link href="/dilesa/anteproyectos" className="text-[var(--accent)] hover:underline">
++                Ver anteproyectos →
++              </Link>
++            </div>
++          </Section>
++        </div>
++      </div>
++    </div>
++  );
++}
++
++function Section({ title, children }: { title: string; children: React.ReactNode }) {
++  return (
++    <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
++      <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--text)]/50">
++        {title}
++      </h2>
++      <dl className="mt-3 grid gap-x-4 gap-y-2 sm:grid-cols-2">{children}</dl>
++    </section>
++  );
++}
++
++function Field({
++  label,
++  children,
++  wide,
++}: {
++  label: string;
++  children: React.ReactNode;
++  wide?: boolean;
++}) {
++  return (
++    <div className={wide ? 'col-span-full' : undefined}>
++      <dt className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/45">
++        {label}
++      </dt>
++      <dd className="mt-0.5 text-sm text-[var(--text)]/85">{children}</dd>
++    </div>
++  );
++}
++
++function DocLink({ label, url }: { label: string; url: string | null }) {
++  return (
++    <div>
++      <dt className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/45">
++        {label}
++      </dt>
++      <dd className="mt-0.5 text-sm">
++        {url ? (
++          <a
++            href={url}
++            target="_blank"
++            rel="noreferrer"
++            className="inline-flex items-center gap-1 text-[var(--accent)] hover:underline"
++          >
++            <ExternalLink className="size-3.5" />
++            Abrir
++          </a>
++        ) : (
++          <span className="text-[var(--text)]/40">—</span>
++        )}
++      </dd>
++    </div>
++  );
++}
++
++function EtapaBadgeLarge({ etapa }: { etapa: string | null }) {
++  if (!etapa) return null;
++  const cfg = TERRENO_ETAPA_CONFIG[etapa as TerrenoEtapa];
++  if (!cfg) {
++    return (
++      <span className="inline-flex items-center rounded-lg border border-[var(--border)] px-3 py-1 text-xs text-[var(--text)]/65">
++        {etapa}
++      </span>
++    );
++  }
++  return (
++    <span
++      className={`inline-flex items-center rounded-lg border px-3 py-1 text-xs font-medium ${cfg.cls}`}
++    >
++      {cfg.label}
++    </span>
++  );
++}
++
++export default function TerrenoDetailPage() {
++  return (
++    <RequireAccess empresa="dilesa">
++      <TerrenoDetailInner />
++    </RequireAccess>
++  );
++}
+diff --git a/app/dilesa/terrenos/page.tsx b/app/dilesa/terrenos/page.tsx
+new file mode 100644
+index 0000000..d37f4d1
+--- /dev/null
++++ b/app/dilesa/terrenos/page.tsx
+@@ -0,0 +1,834 @@
++'use client';
++
++/* eslint-disable react-hooks/set-state-in-effect --
++ * Data-sync pattern: the effect seeds loading state before firing an async
++ * fetch. Flagged by the hook-rule sweep but matches the convention used in
++ * the rest of the BSOP app (juntas, tasks, empleados). Refactoring to
++ * Suspense-driven data requires a wider change — out of scope for scaffold.
++ */
++
++/**
++ * Módulo Terrenos — master page.
++ *
++ * Sprint dilesa-1 UI (branch feat/dilesa-ui-terrenos). Primer módulo del
++ * backbone inmobiliario en BSOP. Expone tabs Consulta / Resumen / Timeline /
++ * Chart siguiendo la convención de flujo-maestro §6.
++ *
++ * Alcance del scaffold:
++ *   - Consulta: tabla master con columnas A→H (identidad, ubicación,
++ *     económica, gestión, cálculos), search y click-to-detail.
++ *   - Alta: Sheet lateral con campos mínimos de captura. El resto del
++ *     expediente se completa desde el detail page.
++ *   - Resumen / Timeline / Chart: placeholders con TODO markers para
++ *     iterar en siguientes sesiones sin romper navegación.
++ *
++ * Columnas definitivas: /mnt/DILESA/knowledge/modules/terrenos-columnas-definitivas.md
++ * Schema: supabase/SCHEMA_REF.md §Schema dilesa / dilesa.terrenos
++ */
++
++import { RequireAccess } from '@/components/require-access';
++import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
++import { useRouter } from 'next/navigation';
++import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
++import {
++  Table,
++  TableBody,
++  TableCell,
++  TableHead,
++  TableHeader,
++  TableRow,
++} from '@/components/ui/table';
++import { SortableHead } from '@/components/ui/sortable-head';
++import { useSortableTable } from '@/hooks/use-sortable-table';
++import {
++  Sheet,
++  SheetContent,
++  SheetHeader,
++  SheetTitle,
++  SheetDescription,
++} from '@/components/ui/sheet';
++import { Input } from '@/components/ui/input';
++import { Button } from '@/components/ui/button';
++import { FieldLabel } from '@/components/ui/field-label';
++import { Skeleton } from '@/components/ui/skeleton';
++import { Plus, Search, RefreshCw, Loader2, MapPin } from 'lucide-react';
++import {
++  TERRENO_ETAPA_CONFIG,
++  TERRENO_ETAPA_OPTIONS,
++  TERRENO_ESTATUS_PROPIEDAD_LABEL,
++  TERRENO_ESTATUS_PROPIEDAD_OPTIONS,
++  PRIORIDAD_CONFIG,
++  type TerrenoEtapa,
++  type PrioridadNivel,
++  type TerrenoEstatusPropiedad,
++} from '@/lib/status-tokens';
++import {
++  DILESA_EMPRESA_ID,
++  formatCurrency,
++  formatDateShort,
++  formatM2,
++  formatPercent,
++} from '@/lib/dilesa-constants';
++import { ModuleTabs, TabPanel, useActiveTab } from '@/components/shared/module-tabs';
++import { EmptyStateImported } from '@/components/shared/empty-state-imported';
++
++type Terreno = {
++  id: string;
++  nombre: string;
++  clave_interna: string | null;
++  tipo: string | null;
++  municipio: string | null;
++  zona_sector: string | null;
++  direccion_referencia: string | null;
++  objetivo: string | null;
++  nombre_propietario: string | null;
++  telefono_propietario: string | null;
++  nombre_corredor: string | null;
++  area_terreno_m2: number | null;
++  areas_afectacion_m2: number | null;
++  areas_aprovechables_m2: number | null;
++  precio_solicitado_m2: number | null;
++  precio_ofertado_m2: number | null;
++  valor_interno_estimado: number | null;
++  valor_objetivo_compra: number | null;
++  valor_predio: number | null;
++  valor_total_oferta: number | null;
++  pct_diferencia_solicitado_oferta: number | null;
++  origen: string | null;
++  estatus_propiedad: string | null;
++  etapa: string | null;
++  decision_actual: string | null;
++  prioridad: string | null;
++  responsable_id: string | null;
++  fecha_ultima_revision: string | null;
++  siguiente_accion: string | null;
++  fecha_captura: string;
++  created_at: string;
++  updated_at: string;
++};
++
++const TIPO_OPTIONS = ['Rústico', 'Urbano', 'Comercial', 'Industrial', 'Mixto', 'Otro'];
++const OBJETIVO_OPTIONS = [
++  'Fraccionamiento',
++  'Reserva territorial',
++  'Equipamiento',
++  'Especulación',
++  'Comercial',
++  'Otro',
++];
++const ORIGEN_OPTIONS = [
++  'Propio DILESA',
++  'Ofrecido por propietario',
++  'Ofrecido por corredor',
++  'Prospección interna',
++  'Otro',
++];
++
++function EtapaBadge({ etapa }: { etapa: string | null }) {
++  if (!etapa) return <span className="text-[var(--text)]/35">—</span>;
++  const key = etapa as TerrenoEtapa;
++  const cfg = TERRENO_ETAPA_CONFIG[key];
++  if (!cfg) {
++    return (
++      <span className="inline-flex items-center rounded-lg border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text)]/55">
++        {etapa}
++      </span>
++    );
++  }
++  return (
++    <span
++      className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}
++    >
++      {cfg.label}
++    </span>
++  );
++}
++
++function PrioridadDot({ prioridad }: { prioridad: string | null }) {
++  if (!prioridad) return <span className="text-[var(--text)]/35">—</span>;
++  const key = prioridad as PrioridadNivel;
++  const cfg = PRIORIDAD_CONFIG[key];
++  if (!cfg) return <span className="text-[var(--text)]/55">{prioridad}</span>;
++  return (
++    <span className="inline-flex items-center gap-1.5 text-xs text-[var(--text)]/75">
++      <span className={`inline-block size-2 rounded-full ${cfg.dot}`} aria-hidden="true" />
++      {cfg.label}
++    </span>
++  );
++}
++
++function StatusPropiedadLabel({ value }: { value: string | null }) {
++  if (!value) return <span className="text-[var(--text)]/35">—</span>;
++  const label =
++    TERRENO_ESTATUS_PROPIEDAD_LABEL[value as TerrenoEstatusPropiedad] ?? value.replace(/_/g, ' ');
++  return <span className="text-xs text-[var(--text)]/75">{label}</span>;
++}
++
++function TerrenosInner() {
++  const router = useRouter();
++  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
++  const active = useActiveTab();
++
++  const [terrenos, setTerrenos] = useState<Terreno[]>([]);
++  const [loading, setLoading] = useState(true);
++  const [error, setError] = useState<string | null>(null);
++
++  const [search, setSearch] = useState('');
++  const [filterEtapa, setFilterEtapa] = useState<string>('all');
++  const [filterEstatus, setFilterEstatus] = useState<string>('all');
++
++  const [showCreate, setShowCreate] = useState(false);
++  const [creating, setCreating] = useState(false);
++  const [createNombre, setCreateNombre] = useState('');
++  const [createMunicipio, setCreateMunicipio] = useState('');
++  const [createTipo, setCreateTipo] = useState('');
++  const [createObjetivo, setCreateObjetivo] = useState('');
++  const [createOrigen, setCreateOrigen] = useState('');
++  const [createAreaM2, setCreateAreaM2] = useState('');
++  const [createPrecioSolicitado, setCreatePrecioSolicitado] = useState('');
++  const [createNombrePropietario, setCreateNombrePropietario] = useState('');
++  const [createTelefonoPropietario, setCreateTelefonoPropietario] = useState('');
++
++  const fetchTerrenos = useCallback(async () => {
++    const { data, error: err } = await supabase
++      .schema('dilesa')
++      .from('terrenos')
++      .select('*')
++      .eq('empresa_id', DILESA_EMPRESA_ID)
++      .is('deleted_at', null)
++      .order('fecha_captura', { ascending: false });
++    if (err) {
++      setError(err.message);
++      return;
++    }
++    setTerrenos((data ?? []) as Terreno[]);
++  }, [supabase]);
++
++  useEffect(() => {
++    let cancelled = false;
++    setLoading(true);
++    setError(null);
++    const init = async () => {
++      await fetchTerrenos();
++      if (!cancelled) setLoading(false);
++    };
++    void init();
++    return () => {
++      cancelled = true;
++    };
++  }, [fetchTerrenos]);
++
++  const openCreate = () => {
++    setCreateNombre('');
++    setCreateMunicipio('');
++    setCreateTipo('');
++    setCreateObjetivo('');
++    setCreateOrigen('');
++    setCreateAreaM2('');
++    setCreatePrecioSolicitado('');
++    setCreateNombrePropietario('');
++    setCreateTelefonoPropietario('');
++    setShowCreate(true);
++  };
++
++  const handleCreate = async () => {
++    if (!createNombre.trim()) return;
++    setCreating(true);
++    const { data: newRow, error: err } = await supabase
++      .schema('dilesa')
++      .from('terrenos')
++      .insert({
++        empresa_id: DILESA_EMPRESA_ID,
++        nombre: createNombre.trim(),
++        municipio: createMunicipio.trim() || null,
++        tipo: createTipo || null,
++        objetivo: createObjetivo || null,
++        origen: createOrigen || null,
++        area_terreno_m2: createAreaM2 ? Number(createAreaM2) : null,
++        precio_solicitado_m2: createPrecioSolicitado ? Number(createPrecioSolicitado) : null,
++        nombre_propietario: createNombrePropietario.trim() || null,
++        telefono_propietario: createTelefonoPropietario.trim() || null,
++      })
++      .select('id')
++      .single();
++    setCreating(false);
++    if (err) {
++      alert(`Error al crear terreno: ${err.message}`);
++      return;
++    }
++    setShowCreate(false);
++    await fetchTerrenos();
++    if (newRow?.id) {
++      router.push(`/dilesa/terrenos/${newRow.id}`);
++    }
++  };
++
++  // Filtros + search cliente-side. Para datasets pequeños (típicamente <500
++  // filas de portafolio de terrenos) no se justifica query server-side por
++  // cada cambio de input.
++  const filtered = useMemo(() => {
++    const s = search.trim().toLowerCase();
++    return terrenos.filter((t) => {
++      if (filterEtapa !== 'all' && t.etapa !== filterEtapa) return false;
++      if (filterEstatus !== 'all' && t.estatus_propiedad !== filterEstatus) return false;
++      if (!s) return true;
++      return (
++        t.nombre.toLowerCase().includes(s) ||
++        (t.clave_interna ?? '').toLowerCase().includes(s) ||
++        (t.municipio ?? '').toLowerCase().includes(s) ||
++        (t.zona_sector ?? '').toLowerCase().includes(s) ||
++        (t.nombre_propietario ?? '').toLowerCase().includes(s) ||
++        (t.nombre_corredor ?? '').toLowerCase().includes(s)
++      );
++    });
++  }, [terrenos, search, filterEtapa, filterEstatus]);
++
++  const { sortKey, sortDir, onSort, sortData } = useSortableTable<Terreno>(
++    'fecha_captura',
++    'desc'
++  );
++  const sorted = useMemo(() => sortData(filtered as unknown as Record<string, unknown>[]) as unknown as Terreno[], [filtered, sortData]);
++
++  return (
++    <div className="space-y-6">
++      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
++        <div>
++          <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text)]/45">
++            DILESA · Inmobiliario
++          </div>
++          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--text)]">
++            Terrenos
++          </h1>
++          <p className="mt-1 text-sm text-[var(--text)]/55">
++            Portafolio de tierra: detectados, en análisis, en negociación, adquiridos, en radar.
++          </p>
++        </div>
++        <div className="flex items-center gap-2">
++          <Button type="button" variant="outline" onClick={() => fetchTerrenos()} size="sm">
++            <RefreshCw className="size-4" />
++            Actualizar
++          </Button>
++          <Button type="button" onClick={openCreate} size="sm">
++            <Plus className="size-4" />
++            Nuevo terreno
++          </Button>
++        </div>
++      </header>
++
++      <ModuleTabs
++        tabs={[
++          { key: 'consulta', label: 'Consulta', badge: terrenos.length },
++          { key: 'resumen', label: 'Resumen' },
++          { key: 'timeline', label: 'Timeline' },
++          { key: 'chart', label: 'Chart' },
++        ]}
++      />
++
++      <TabPanel tabKey="consulta" active={active}>
++        <ConsultaPanel
++          terrenos={sorted}
++          loading={loading}
++          error={error}
++          search={search}
++          setSearch={setSearch}
++          filterEtapa={filterEtapa}
++          setFilterEtapa={setFilterEtapa}
++          filterEstatus={filterEstatus}
++          setFilterEstatus={setFilterEstatus}
++          sortKey={sortKey}
++          sortDir={sortDir}
++          onSort={onSort}
++          onOpenCreate={openCreate}
++          onOpenDetail={(id) => router.push(`/dilesa/terrenos/${id}`)}
++        />
++      </TabPanel>
++
++      <TabPanel tabKey="resumen" active={active}>
++        <ResumenPanel terrenos={terrenos} loading={loading} />
++      </TabPanel>
++
++      <TabPanel tabKey="timeline" active={active}>
++        <PlaceholderPanel
++          title="Timeline"
++          description="Cronología de cambios por terreno. Se implementa cuando terrenos_updates esté disponible (siguiente sprint). Por ahora el detalle de cada terreno muestra fecha de captura y última revisión."
++        />
++      </TabPanel>
++
++      <TabPanel tabKey="chart" active={active}>
++        <PlaceholderPanel
++          title="Chart"
++          description="Distribución por municipio, etapa y evolución mensual de captura. Próximo sprint."
++        />
++      </TabPanel>
++
++      <Sheet open={showCreate} onOpenChange={setShowCreate}>
++        <SheetContent side="right" className="w-full max-w-xl">
++          <SheetHeader>
++            <SheetTitle>Nuevo terreno</SheetTitle>
++            <SheetDescription>
++              Solo campos esenciales — el resto del expediente se captura después desde el detalle.
++            </SheetDescription>
++          </SheetHeader>
++          <form
++            onSubmit={(e) => {
++              e.preventDefault();
++              void handleCreate();
++            }}
++            className="mt-6 space-y-5"
++          >
++            <div>
++              <FieldLabel htmlFor="t-nombre" required>
++                Nombre del terreno
++              </FieldLabel>
++              <Input
++                id="t-nombre"
++                value={createNombre}
++                onChange={(e) => setCreateNombre(e.target.value)}
++                placeholder="Ej. Rancho Los Nogales"
++                required
++              />
++            </div>
++
++            <div className="grid gap-4 sm:grid-cols-2">
++              <div>
++                <FieldLabel htmlFor="t-municipio">Municipio</FieldLabel>
++                <Input
++                  id="t-municipio"
++                  value={createMunicipio}
++                  onChange={(e) => setCreateMunicipio(e.target.value)}
++                  placeholder="Piedras Negras, Nava, Acuña…"
++                />
++              </div>
++              <div>
++                <FieldLabel htmlFor="t-tipo">Tipo</FieldLabel>
++                <select
++                  id="t-tipo"
++                  value={createTipo}
++                  onChange={(e) => setCreateTipo(e.target.value)}
++                  className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 text-sm"
++                >
++                  <option value="">(sin definir)</option>
++                  {TIPO_OPTIONS.map((o) => (
++                    <option key={o} value={o}>
++                      {o}
++                    </option>
++                  ))}
++                </select>
++              </div>
++            </div>
++
++            <div className="grid gap-4 sm:grid-cols-2">
++              <div>
++                <FieldLabel htmlFor="t-objetivo">Objetivo</FieldLabel>
++                <select
++                  id="t-objetivo"
++                  value={createObjetivo}
++                  onChange={(e) => setCreateObjetivo(e.target.value)}
++                  className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 text-sm"
++                >
++                  <option value="">(sin definir)</option>
++                  {OBJETIVO_OPTIONS.map((o) => (
++                    <option key={o} value={o}>
++                      {o}
++                    </option>
++                  ))}
++                </select>
++              </div>
++              <div>
++                <FieldLabel htmlFor="t-origen">Origen</FieldLabel>
++                <select
++                  id="t-origen"
++                  value={createOrigen}
++                  onChange={(e) => setCreateOrigen(e.target.value)}
++                  className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 text-sm"
++                >
++                  <option value="">(sin definir)</option>
++                  {ORIGEN_OPTIONS.map((o) => (
++                    <option key={o} value={o}>
++                      {o}
++                    </option>
++                  ))}
++                </select>
++              </div>
++            </div>
++
++            <div className="grid gap-4 sm:grid-cols-2">
++              <div>
++                <FieldLabel htmlFor="t-area">Área total (m²)</FieldLabel>
++                <Input
++                  id="t-area"
++                  type="number"
++                  step="0.01"
++                  inputMode="decimal"
++                  value={createAreaM2}
++                  onChange={(e) => setCreateAreaM2(e.target.value)}
++                  placeholder="0"
++                />
++              </div>
++              <div>
++                <FieldLabel htmlFor="t-precio">Precio solicitado / m²</FieldLabel>
++                <Input
++                  id="t-precio"
++                  type="number"
++                  step="0.01"
++                  inputMode="decimal"
++                  value={createPrecioSolicitado}
++                  onChange={(e) => setCreatePrecioSolicitado(e.target.value)}
++                  placeholder="0"
++                />
++              </div>
++            </div>
++
++            <div className="grid gap-4 sm:grid-cols-2">
++              <div>
++                <FieldLabel htmlFor="t-prop">Propietario</FieldLabel>
++                <Input
++                  id="t-prop"
++                  value={createNombrePropietario}
++                  onChange={(e) => setCreateNombrePropietario(e.target.value)}
++                  placeholder="Nombre"
++                />
++              </div>
++              <div>
++                <FieldLabel htmlFor="t-proptel">Teléfono propietario</FieldLabel>
++                <Input
++                  id="t-proptel"
++                  value={createTelefonoPropietario}
++                  onChange={(e) => setCreateTelefonoPropietario(e.target.value)}
++                  placeholder="10 dígitos"
++                />
++              </div>
++            </div>
++
++            <div className="flex items-center justify-end gap-2 pt-2">
++              <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>
++                Cancelar
++              </Button>
++              <Button type="submit" disabled={creating || !createNombre.trim()}>
++                {creating ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
++                Crear terreno
++              </Button>
++            </div>
++          </form>
++        </SheetContent>
++      </Sheet>
++    </div>
++  );
++}
++
++function ConsultaPanel(props: {
++  terrenos: Terreno[];
++  loading: boolean;
++  error: string | null;
++  search: string;
++  setSearch: (v: string) => void;
++  filterEtapa: string;
++  setFilterEtapa: (v: string) => void;
++  filterEstatus: string;
++  setFilterEstatus: (v: string) => void;
++  sortKey: string;
++  sortDir: 'asc' | 'desc';
++  onSort: (key: string) => void;
++  onOpenCreate: () => void;
++  onOpenDetail: (id: string) => void;
++}) {
++  const {
++    terrenos,
++    loading,
++    error,
++    search,
++    setSearch,
++    filterEtapa,
++    setFilterEtapa,
++    filterEstatus,
++    setFilterEstatus,
++    sortKey,
++    sortDir,
++    onSort,
++    onOpenCreate,
++    onOpenDetail,
++  } = props;
++
++  return (
++    <div className="space-y-3">
++      <div className="flex flex-wrap items-center gap-2">
++        <div className="relative min-w-[220px] flex-1">
++          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-[var(--text)]/40" />
++          <Input
++            value={search}
++            onChange={(e) => setSearch(e.target.value)}
++            placeholder="Buscar nombre, clave, municipio, propietario…"
++            className="pl-8"
++          />
++        </div>
++        <select
++          value={filterEtapa}
++          onChange={(e) => setFilterEtapa(e.target.value)}
++          className="h-8 rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 text-sm"
++          aria-label="Filtrar por etapa"
++        >
++          <option value="all">Todas las etapas</option>
++          {TERRENO_ETAPA_OPTIONS.map((o) => (
++            <option key={o} value={o}>
++              {TERRENO_ETAPA_CONFIG[o].label}
++            </option>
++          ))}
++        </select>
++        <select
++          value={filterEstatus}
++          onChange={(e) => setFilterEstatus(e.target.value)}
++          className="h-8 rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 text-sm"
++          aria-label="Filtrar por estatus de propiedad"
++        >
++          <option value="all">Todos los estatus</option>
++          {TERRENO_ESTATUS_PROPIEDAD_OPTIONS.map((o) => (
++            <option key={o} value={o}>
++              {TERRENO_ESTATUS_PROPIEDAD_LABEL[o]}
++            </option>
++          ))}
++        </select>
++      </div>
++
++      {loading ? (
++        <div className="space-y-2">
++          {Array.from({ length: 4 }).map((_, i) => (
++            <Skeleton key={i} className="h-10 w-full" />
++          ))}
++        </div>
++      ) : error ? (
++        <div
++          role="alert"
++          className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400"
++        >
++          No se pudieron cargar los terrenos: {error}
++        </div>
++      ) : terrenos.length === 0 ? (
++        <EmptyStateImported
++          entityLabel="Terrenos"
++          description="Captura el primer terreno para arrancar el portafolio o importa desde Coda cuando esté disponible."
++          onCreate={onOpenCreate}
++        />
++      ) : (
++        <div className="rounded-lg border border-[var(--border)] bg-[var(--card)]">
++          <Table>
++            <TableHeader>
++              <TableRow>
++                <SortableHead
++                  sortKey="nombre"
++                  label="Nombre"
++                  currentSort={sortKey}
++                  currentDir={sortDir}
++                  onSort={onSort}
++                />
++                <TableHead>Ubicación</TableHead>
++                <SortableHead
++                  sortKey="area_terreno_m2"
++                  label="Área"
++                  currentSort={sortKey}
++                  currentDir={sortDir}
++                  onSort={onSort}
++                />
++                <SortableHead
++                  sortKey="precio_solicitado_m2"
++                  label="Precio /m²"
++                  currentSort={sortKey}
++                  currentDir={sortDir}
++                  onSort={onSort}
++                />
++                <SortableHead
++                  sortKey="valor_predio"
++                  label="Valor predio"
++                  currentSort={sortKey}
++                  currentDir={sortDir}
++                  onSort={onSort}
++                />
++                <TableHead>Etapa</TableHead>
++                <TableHead>Estatus</TableHead>
++                <TableHead>Prioridad</TableHead>
++                <SortableHead
++                  sortKey="fecha_ultima_revision"
++                  label="Última revisión"
++                  currentSort={sortKey}
++                  currentDir={sortDir}
++                  onSort={onSort}
++                />
++              </TableRow>
++            </TableHeader>
++            <TableBody>
++              {terrenos.map((t) => (
++                <TableRow
++                  key={t.id}
++                  onClick={() => onOpenDetail(t.id)}
++                  className="cursor-pointer"
++                >
++                  <TableCell>
++                    <div className="flex min-w-0 flex-col">
++                      <span className="truncate font-medium text-[var(--text)]">{t.nombre}</span>
++                      {t.clave_interna ? (
++                        <span className="font-mono text-[10px] uppercase tracking-wide text-[var(--text)]/45">
++                          {t.clave_interna}
++                        </span>
++                      ) : null}
++                    </div>
++                  </TableCell>
++                  <TableCell>
++                    <div className="flex items-start gap-1 text-xs text-[var(--text)]/70">
++                      <MapPin className="mt-0.5 size-3.5 shrink-0 text-[var(--text)]/40" />
++                      <div className="min-w-0">
++                        <div className="truncate">{t.municipio ?? '—'}</div>
++                        {t.zona_sector ? (
++                          <div className="truncate text-[var(--text)]/50">{t.zona_sector}</div>
++                        ) : null}
++                      </div>
++                    </div>
++                  </TableCell>
++                  <TableCell className="text-xs tabular-nums text-[var(--text)]/75">
++                    {formatM2(t.area_terreno_m2)}
++                  </TableCell>
++                  <TableCell className="text-xs tabular-nums text-[var(--text)]/75">
++                    {formatCurrency(t.precio_solicitado_m2)}
++                    {t.pct_diferencia_solicitado_oferta != null ? (
++                      <div
++                        className="text-[10px] text-[var(--text)]/45"
++                        title="% diferencia solicitado vs ofertado"
++                      >
++                        {formatPercent(t.pct_diferencia_solicitado_oferta)}
++                      </div>
++                    ) : null}
++                  </TableCell>
++                  <TableCell className="text-xs tabular-nums text-[var(--text)]/75">
++                    {formatCurrency(t.valor_predio, { compact: true })}
++                  </TableCell>
++                  <TableCell>
++                    <EtapaBadge etapa={t.etapa} />
++                  </TableCell>
++                  <TableCell>
++                    <StatusPropiedadLabel value={t.estatus_propiedad} />
++                  </TableCell>
++                  <TableCell>
++                    <PrioridadDot prioridad={t.prioridad} />
++                  </TableCell>
++                  <TableCell className="whitespace-nowrap text-xs text-[var(--text)]/60">
++                    {formatDateShort(t.fecha_ultima_revision)}
++                  </TableCell>
++                </TableRow>
++              ))}
++            </TableBody>
++          </Table>
++        </div>
++      )}
++    </div>
++  );
++}
++
++function ResumenPanel({ terrenos, loading }: { terrenos: Terreno[]; loading: boolean }) {
++  const kpis = useMemo(() => {
++    const adquiridos = terrenos.filter((t) => t.estatus_propiedad === 'adquirido');
++    const valorPortafolio = adquiridos.reduce((acc, t) => acc + (t.valor_predio ?? 0), 0);
++    const areaPortafolio = adquiridos.reduce((acc, t) => acc + (t.area_terreno_m2 ?? 0), 0);
++    const porEtapa = new Map<string, number>();
++    terrenos.forEach((t) => {
++      const k = t.etapa ?? 'sin_etapa';
++      porEtapa.set(k, (porEtapa.get(k) ?? 0) + 1);
++    });
++    const altaPrioridad = terrenos.filter((t) => t.prioridad === 'alta').length;
++    return {
++      total: terrenos.length,
++      adquiridos: adquiridos.length,
++      valorPortafolio,
++      areaPortafolio,
++      porEtapa: Array.from(porEtapa.entries()).sort((a, b) => b[1] - a[1]),
++      altaPrioridad,
++    };
++  }, [terrenos]);
++
++  if (loading) {
++    return (
++      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
++        {Array.from({ length: 4 }).map((_, i) => (
++          <Skeleton key={i} className="h-24 w-full" />
++        ))}
++      </div>
++    );
++  }
++
++  return (
++    <div className="space-y-4">
++      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
++        <KpiCard label="Terrenos totales" value={kpis.total.toLocaleString('es-MX')} />
++        <KpiCard label="Adquiridos" value={kpis.adquiridos.toLocaleString('es-MX')} />
++        <KpiCard
++          label="Área portafolio adquirido"
++          value={formatM2(kpis.areaPortafolio)}
++        />
++        <KpiCard
++          label="Valor portafolio (solicitado)"
++          value={formatCurrency(kpis.valorPortafolio, { compact: true })}
++        />
++      </div>
++      <div className="grid gap-3 lg:grid-cols-2">
++        <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
++          <h3 className="text-xs font-semibold uppercase tracking-widest text-[var(--text)]/50">
++            Distribución por etapa
++          </h3>
++          <ul className="mt-3 space-y-2">
++            {kpis.porEtapa.length === 0 ? (
++              <li className="text-sm text-[var(--text)]/50">(sin datos)</li>
++            ) : (
++              kpis.porEtapa.map(([etapa, count]) => (
++                <li key={etapa} className="flex items-center justify-between gap-3">
++                  <EtapaBadge etapa={etapa === 'sin_etapa' ? null : etapa} />
++                  <span className="text-sm tabular-nums text-[var(--text)]/70">{count}</span>
++                </li>
++              ))
++            )}
++          </ul>
++        </section>
++        <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
++          <h3 className="text-xs font-semibold uppercase tracking-widest text-[var(--text)]/50">
++            Alertas
++          </h3>
++          <ul className="mt-3 space-y-2 text-sm text-[var(--text)]/75">
++            <li>
++              Alta prioridad sin cerrar:{' '}
++              <span className="font-semibold text-[var(--text)]">{kpis.altaPrioridad}</span>
++            </li>
++            <li className="text-[var(--text)]/50">
++              TODO: terrenos sin revisar en &gt;30 días, terrenos sin responsable, terrenos sin KMZ
++            </li>
++          </ul>
++        </section>
++      </div>
++    </div>
++  );
++}
++
++function KpiCard({ label, value }: { label: string; value: React.ReactNode }) {
++  return (
++    <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
++      <div className="text-xs font-semibold uppercase tracking-widest text-[var(--text)]/50">
++        {label}
++      </div>
++      <div className="mt-1 text-2xl font-semibold tracking-tight text-[var(--text)]">{value}</div>
++    </div>
++  );
++}
++
++function PlaceholderPanel({ title, description }: { title: string; description: string }) {
++  return (
++    <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--card)]/40 p-8 text-center">
++      <h3 className="text-base font-semibold text-[var(--text)]">{title}</h3>
++      <p className="mt-2 text-sm text-[var(--text)]/55">{description}</p>
++    </div>
++  );
++}
++
++export default function TerrenosPage() {
++  return (
++    <RequireAccess empresa="dilesa">
++      <Suspense fallback={<div className="p-6 text-sm text-[var(--text)]/55">Cargando…</div>}>
++        <TerrenosInner />
++      </Suspense>
++    </RequireAccess>
++  );
++}
+diff --git a/components/app-shell/nav-config.ts b/components/app-shell/nav-config.ts
+index f3b3edb..4613d1e 100644
+--- a/components/app-shell/nav-config.ts
++++ b/components/app-shell/nav-config.ts
+@@ -34,6 +34,11 @@ export const NAV_ITEMS: NavItem[] = [
+     labelKey: 'DILESA',
+     icon: 'dilesa-logo',
+     children: [
++      { label: 'Inmobiliario', href: '#', divider: true },
++      { label: 'Terrenos', href: '/dilesa/terrenos' },
++      { label: 'Prototipos', href: '/dilesa/prototipos' },
++      { label: 'Anteproyectos', href: '/dilesa/anteproyectos' },
++      { label: 'Proyectos', href: '/dilesa/proyectos' },
+       { label: 'Administración', href: '#', divider: true },
+       { label: 'Tareas', href: '/dilesa/admin/tasks' },
+       { label: 'Juntas', href: '/dilesa/admin/juntas' },
+diff --git a/components/shared/coming-soon-module.tsx b/components/shared/coming-soon-module.tsx
+new file mode 100644
+index 0000000..00cd23f
+--- /dev/null
++++ b/components/shared/coming-soon-module.tsx
+@@ -0,0 +1,57 @@
++'use client';
++
++/**
++ * Placeholder para módulos Dilesa cuya UI aún no se ha implementado, pero
++ * cuya ruta ya vive en la navegación principal.
++ *
++ * Se reemplaza con el módulo real conforme avancen los branches
++ * feat/dilesa-ui-prototipos, feat/dilesa-ui-anteproyectos y
++ * feat/dilesa-ui-proyectos.
++ */
++
++import { RequireAccess } from '@/components/require-access';
++import Link from 'next/link';
++
++type ComingSoonModuleProps = {
++  title: string;
++  description: string;
++  branchName: string;
++};
++
++export function ComingSoonModule({ title, description, branchName }: ComingSoonModuleProps) {
++  return (
++    <RequireAccess empresa="dilesa">
++      <div className="space-y-6">
++        <header>
++          <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text)]/45">
++            DILESA · Inmobiliario
++          </div>
++          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--text)]">
++            {title}
++          </h1>
++        </header>
++        <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--card)]/40 p-8">
++          <h2 className="text-base font-semibold text-[var(--text)]">
++            Módulo en construcción
++          </h2>
++          <p className="mt-2 text-sm text-[var(--text)]/55">{description}</p>
++          <p className="mt-4 text-xs text-[var(--text)]/45">
++            Se libera en el branch{' '}
++            <code className="rounded bg-[var(--border)]/40 px-1 py-0.5 font-mono">
++              {branchName}
++            </code>
++            . Mientras tanto, el trabajo se sigue haciendo en Coda.
++          </p>
++          <div className="mt-5">
++            <Link
++              href="/dilesa"
++              className="text-sm text-[var(--accent)] hover:underline"
++            >
++              ← Volver al panel DILESA
++            </Link>
++          </div>
++        </div>
++      </div>
++    </RequireAccess>
++  );
++}
+diff --git a/components/shared/empty-state-imported.tsx b/components/shared/empty-state-imported.tsx
+new file mode 100644
+index 0000000..9dc9719
+--- /dev/null
++++ b/components/shared/empty-state-imported.tsx
+@@ -0,0 +1,58 @@
++'use client';
++
++/**
++ * Empty state estándar para módulos Dilesa que arrancan sin datos.
++ *
++ * Mientras dilesa-1b termina de cargar datos desde Coda, o si el usuario
++ * nunca ha capturado nada, cada master table renderiza este componente.
++ *
++ * El CTA primario dispara el callback de Alta (abre el Sheet). El secundario
++ * es un placeholder para "Importar desde Coda" — cuando el flow de import
++ * esté listo (lib/coda-paste-import.ts ya existe como base), se reemplaza
++ * la prop `onImport` por un handler real.
++ */
++
++import { Button } from '@/components/ui/button';
++import { Plus, Download } from 'lucide-react';
++
++export function EmptyStateImported({
++  entityLabel,
++  description,
++  onCreate,
++  onImport,
++}: {
++  entityLabel: string;
++  description?: string;
++  onCreate: () => void;
++  onImport?: () => void;
++}) {
++  return (
++    <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--card)]/40 p-10 text-center">
++      <div className="text-4xl">📦</div>
++      <div>
++        <h3 className="text-base font-semibold text-[var(--text)]">
++          Aún no hay {entityLabel.toLowerCase()}
++        </h3>
++        <p className="mt-1 text-sm text-[var(--text)]/55">
++          {description ?? `Captura el primero o importa desde Coda cuando esté disponible.`}
++        </p>
++      </div>
++      <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
++        <Button type="button" onClick={onCreate}>
++          <Plus className="size-4" />
++          Capturar manual
++        </Button>
++        <Button
++          type="button"
++          variant="outline"
++          disabled={!onImport}
++          onClick={onImport}
++          title={onImport ? undefined : 'Próximamente'}
++        >
++          <Download className="size-4" />
++          Importar desde Coda
++        </Button>
++      </div>
++    </div>
++  );
++}
+diff --git a/components/shared/module-tabs.tsx b/components/shared/module-tabs.tsx
+new file mode 100644
+index 0000000..3cd1d1c
+--- /dev/null
++++ b/components/shared/module-tabs.tsx
+@@ -0,0 +1,120 @@
++'use client';
++
++/**
++ * Tabs para las páginas master de módulos Dilesa (sprint dilesa-1 UI).
++ *
++ * Convención de flujo-maestro §6:
++ *   Alta / Consulta / Resumen / Timeline / Chart
++ *
++ * El tab activo se persiste en el query param `?tab=...` para que el link sea
++ * compartible y el back-forward del navegador funcione. Los tabs opcionales
++ * (Timeline, Chart) pueden renderizar un placeholder mientras no se
++ * implementan — la navegación sigue siendo libre.
++ */
++
++import { usePathname, useRouter, useSearchParams } from 'next/navigation';
++import { useCallback } from 'react';
++import { cn } from '@/lib/utils';
++
++export type ModuleTabKey = 'consulta' | 'resumen' | 'timeline' | 'chart';
++
++export type ModuleTabDef = {
++  key: ModuleTabKey;
++  label: string;
++  badge?: string | number | null;
++};
++
++const DEFAULT_TAB: ModuleTabKey = 'consulta';
++
++export function useActiveTab(): ModuleTabKey {
++  const params = useSearchParams();
++  const raw = params.get('tab');
++  if (raw === 'consulta' || raw === 'resumen' || raw === 'timeline' || raw === 'chart') {
++    return raw;
++  }
++  return DEFAULT_TAB;
++}
++
++export function ModuleTabs({ tabs }: { tabs: ModuleTabDef[] }) {
++  const router = useRouter();
++  const pathname = usePathname();
++  const params = useSearchParams();
++  const active = useActiveTab();
++
++  const navigate = useCallback(
++    (key: ModuleTabKey) => {
++      const next = new URLSearchParams(params);
++      if (key === DEFAULT_TAB) next.delete('tab');
++      else next.set('tab', key);
++      const qs = next.toString();
++      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
++    },
++    [params, pathname, router]
++  );
++
++  return (
++    <div
++      role="tablist"
++      aria-label="Vistas del módulo"
++      className="flex items-center gap-1 border-b border-[var(--border)]"
++    >
++      {tabs.map((tab) => {
++        const isActive = tab.key === active;
++        return (
++          <button
++            key={tab.key}
++            role="tab"
++            type="button"
++            aria-selected={isActive}
++            aria-controls={`panel-${tab.key}`}
++            id={`tab-${tab.key}`}
++            onClick={() => navigate(tab.key)}
++            className={cn(
++              'relative flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors',
++              'border-b-2 -mb-px',
++              isActive
++                ? 'border-[var(--accent)] text-[var(--text)]'
++                : 'border-transparent text-[var(--text)]/55 hover:text-[var(--text)]'
++            )}
++          >
++            {tab.label}
++            {tab.badge != null ? (
++              <span
++                className={cn(
++                  'ml-0.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[10px] font-semibold',
++                  isActive
++                    ? 'bg-[var(--accent)]/15 text-[var(--accent)]'
++                    : 'bg-[var(--border)]/60 text-[var(--text)]/55'
++                )}
++              >
++                {tab.badge}
++              </span>
++            ) : null}
++          </button>
++        );
++      })}
++    </div>
++  );
++}
++
++export function TabPanel({
++  tabKey,
++  active,
++  children,
++}: {
++  tabKey: ModuleTabKey;
++  active: ModuleTabKey;
++  children: React.ReactNode;
++}) {
++  return (
++    <div
++      role="tabpanel"
++      id={`panel-${tabKey}`}
++      aria-labelledby={`tab-${tabKey}`}
++      hidden={active !== tabKey}
++      className="pt-4"
++    >
++      {active === tabKey ? children : null}
++    </div>
++  );
++}
+diff --git a/lib/dilesa-constants.ts b/lib/dilesa-constants.ts
+new file mode 100644
+index 0000000..513126e
+--- /dev/null
++++ b/lib/dilesa-constants.ts
+@@ -0,0 +1,54 @@
++/**
++ * Constantes compartidas de los módulos Dilesa (sprint dilesa-1 UI).
++ *
++ * Cuando el app soporte multi-empresa activa, EMPRESA_ID se reemplaza por el
++ * valor del context de permisos. Por ahora usamos el id fijo — mismo patrón
++ * que `app/dilesa/admin/juntas/page.tsx` y el resto del panel.
++ *
++ * Fuente única para no repetir el literal en cada página.
++ */
++export const DILESA_EMPRESA_ID = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479';
++
++/** Mexican peso currency formatter. Compact y siempre con 2 decimales. */
++export function formatCurrency(value: number | null | undefined, opts?: { compact?: boolean }) {
++  if (value == null || Number.isNaN(value)) return '—';
++  const { compact = false } = opts ?? {};
++  return new Intl.NumberFormat('es-MX', {
++    style: 'currency',
++    currency: 'MXN',
++    notation: compact ? 'compact' : 'standard',
++    maximumFractionDigits: compact ? 1 : 2,
++    minimumFractionDigits: compact ? 0 : 2,
++  }).format(value);
++}
++
++/** Format a numeric m² with thousands separators + suffix. */
++export function formatM2(value: number | null | undefined) {
++  if (value == null || Number.isNaN(value)) return '—';
++  return `${new Intl.NumberFormat('es-MX', {
++    maximumFractionDigits: 2,
++  }).format(value)} m²`;
++}
++
++/** Percent formatter. Accepts 0–1 range, renders as xx.y%. */
++export function formatPercent(value: number | null | undefined, fractionDigits = 1) {
++  if (value == null || Number.isNaN(value)) return '—';
++  return new Intl.NumberFormat('es-MX', {
++    style: 'percent',
++    minimumFractionDigits: fractionDigits,
++    maximumFractionDigits: fractionDigits,
++  }).format(value);
++}
++
++export function formatDateShort(iso: string | null | undefined) {
++  if (!iso) return '—';
++  try {
++    return new Date(iso).toLocaleDateString('es-MX', {
++      day: '2-digit',
++      month: 'short',
++      year: 'numeric',
++    });
++  } catch {
++    return '—';
++  }
++}
+diff --git a/lib/status-tokens.ts b/lib/status-tokens.ts
+index b20ee5e..882a855 100644
+--- a/lib/status-tokens.ts
++++ b/lib/status-tokens.ts
+@@ -26,3 +26,155 @@ export const JUNTA_ESTADO_CONFIG: Record<JuntaEstado, { label: string; cls: stri
+     cls: 'bg-red-500/15 text-red-400 border-red-500/20',
+   },
+ };
++
++// ────────────────────────────────────────────────────────────────────────────
++// Dilesa — backbone inmobiliario (sprint dilesa-1 UI)
++// ────────────────────────────────────────────────────────────────────────────
++
++export type PrioridadNivel = 'alta' | 'media' | 'baja';
++
++export const PRIORIDAD_CONFIG: Record<PrioridadNivel, { label: string; dot: string; cls: string }> =
++  {
++    alta: {
++      label: 'Alta',
++      dot: 'bg-red-500',
++      cls: 'bg-red-500/15 text-red-400 border-red-500/20',
++    },
++    media: {
++      label: 'Media',
++      dot: 'bg-amber-500',
++      cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
++    },
++    baja: {
++      label: 'Baja',
++      dot: 'bg-emerald-500',
++      cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20',
++    },
++  };
++
++/**
++ * Estados del anteproyecto. Coinciden con el CHECK constraint en
++ * `dilesa.anteproyectos.estado`.
++ *  - `en_analisis`           (default al crear)
++ *  - `en_tramite`
++ *  - `en_due_diligence`
++ *  - `pausado`
++ *  - `no_viable`
++ *  - `convertido_a_proyecto` (terminal; requiere proyecto_id NOT NULL)
++ */
++export type AnteproyectoEstado =
++  | 'en_analisis'
++  | 'en_tramite'
++  | 'en_due_diligence'
++  | 'pausado'
++  | 'no_viable'
++  | 'convertido_a_proyecto';
++
++export const ANTEPROYECTO_ESTADO_CONFIG: Record<
++  AnteproyectoEstado,
++  { label: string; cls: string }
++> = {
++  en_analisis: {
++    label: 'En análisis',
++    cls: 'bg-[var(--border)]/60 text-[var(--text)]/70 border-[var(--border)]',
++  },
++  en_tramite: {
++    label: 'En trámite',
++    cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
++  },
++  en_due_diligence: {
++    label: 'Due diligence',
++    cls: 'bg-orange-500/15 text-orange-400 border-orange-500/20',
++  },
++  pausado: {
++    label: 'Pausado',
++    cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
++  },
++  no_viable: {
++    label: 'No viable',
++    cls: 'bg-red-500/15 text-red-400 border-red-500/20',
++  },
++  convertido_a_proyecto: {
++    label: 'Convertido a proyecto',
++    cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20',
++  },
++};
++
++/**
++ * Opciones de `etapa` para Terrenos. Sin CHECK en DB — la UI las limita.
++ * Ver /mnt/DILESA/knowledge/modules/terrenos-columnas-definitivas.md §E.
++ */
++export const TERRENO_ETAPA_OPTIONS = [
++  'detectado',
++  'en_revision',
++  'en_analisis',
++  'en_negociacion',
++  'en_due_diligence',
++  'aprobado_compra',
++  'adquirido',
++  'pausado',
++  'descartado',
++] as const;
++export type TerrenoEtapa = (typeof TERRENO_ETAPA_OPTIONS)[number];
++
++export const TERRENO_ETAPA_CONFIG: Record<TerrenoEtapa, { label: string; cls: string }> = {
++  detectado: {
++    label: 'Detectado',
++    cls: 'bg-[var(--border)]/60 text-[var(--text)]/70 border-[var(--border)]',
++  },
++  en_revision: {
++    label: 'En revisión',
++    cls: 'bg-sky-500/15 text-sky-400 border-sky-500/20',
++  },
++  en_analisis: {
++    label: 'En análisis',
++    cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
++  },
++  en_negociacion: {
++    label: 'En negociación',
++    cls: 'bg-violet-500/15 text-violet-400 border-violet-500/20',
++  },
++  en_due_diligence: {
++    label: 'Due diligence',
++    cls: 'bg-orange-500/15 text-orange-400 border-orange-500/20',
++  },
++  aprobado_compra: {
++    label: 'Aprobado compra',
++    cls: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/20',
++  },
++  adquirido: {
++    label: 'Adquirido',
++    cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20',
++  },
++  pausado: {
++    label: 'Pausado',
++    cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
++  },
++  descartado: {
++    label: 'Descartado',
++    cls: 'bg-red-500/15 text-red-400 border-red-500/20',
++  },
++};
++
++/**
++ * Estatus de propiedad del terreno. UI-only (sin CHECK en DB).
++ * Ver terrenos-columnas-definitivas.md fila #21.
++ */
++export const TERRENO_ESTATUS_PROPIEDAD_OPTIONS = [
++  'ofrecido',
++  'en_negociacion',
++  'apartado_opcion',
++  'adquirido',
++  'descartado',
++  'en_radar',
++] as const;
++export type TerrenoEstatusPropiedad = (typeof TERRENO_ESTATUS_PROPIEDAD_OPTIONS)[number];
++
++export const TERRENO_ESTATUS_PROPIEDAD_LABEL: Record<TerrenoEstatusPropiedad, string> = {
++  ofrecido: 'Ofrecido',
++  en_negociacion: 'En negociación',
++  apartado_opcion: 'Apartado / Opción',
++  adquirido: 'Adquirido DILESA',
++  descartado: 'Descartado',
++  en_radar: 'En radar',
++};
