@@ -28,32 +28,42 @@
 -- (apply_migration). This file archives that DDL for reproducibility.
 -- ============================================================
 
-DROP VIEW IF EXISTS rdb.v_cortes_productos;
+-- EDITED 2026-04-23 (drift-1.5): rdb.waitry_* ambient.
+DO $do$
+BEGIN
+  IF to_regclass('rdb.waitry_productos') IS NULL OR to_regclass('rdb.waitry_pedidos') IS NULL THEN
+    RETURN;
+  END IF;
 
-CREATE VIEW rdb.v_cortes_productos
-WITH (security_invoker = true)
-AS
-  SELECT
-    wp.corte_id,
-    wpp.product_id,
-    wpp.product_name                                  AS producto_nombre,
-    SUM(wpp.quantity)                                 AS cantidad_vendida,
-    SUM(
-      COALESCE(
-        wpp.total_price,
-        wpp.unit_price * wpp.quantity,
-        0::numeric
-      )
-    )                                                 AS importe_total
-  FROM rdb.waitry_productos wpp
-  JOIN rdb.waitry_pedidos   wp ON wp.order_id = wpp.order_id
-  WHERE wp.corte_id IS NOT NULL
-    AND wp.status IS DISTINCT FROM 'order_canceled'
-  GROUP BY wp.corte_id, wpp.product_id, wpp.product_name;
+  DROP VIEW IF EXISTS rdb.v_cortes_productos;
 
-GRANT SELECT ON rdb.v_cortes_productos TO anon, authenticated, service_role;
+  EXECUTE $sql$
+    CREATE VIEW rdb.v_cortes_productos
+    WITH (security_invoker = true)
+    AS
+      SELECT
+        wp.corte_id,
+        wpp.product_id,
+        wpp.product_name                                  AS producto_nombre,
+        SUM(wpp.quantity)                                 AS cantidad_vendida,
+        SUM(
+          COALESCE(
+            wpp.total_price,
+            wpp.unit_price * wpp.quantity,
+            0::numeric
+          )
+        )                                                 AS importe_total
+      FROM rdb.waitry_productos wpp
+      JOIN rdb.waitry_pedidos   wp ON wp.order_id = wpp.order_id
+      WHERE wp.corte_id IS NOT NULL
+        AND wp.status IS DISTINCT FROM 'order_canceled'
+      GROUP BY wp.corte_id, wpp.product_id, wpp.product_name
+  $sql$;
 
-COMMENT ON VIEW rdb.v_cortes_productos IS
-  'Per-product sales aggregates per RDB corte (Waitry POS). security_invoker=true; '
-  'enforces RLS of the caller against waitry_pedidos/waitry_productos. See '
-  'app/rdb/cortes/page.tsx for consumer.';
+  GRANT SELECT ON rdb.v_cortes_productos TO anon, authenticated, service_role;
+
+  COMMENT ON VIEW rdb.v_cortes_productos IS
+    'Per-product sales aggregates per RDB corte (Waitry POS). security_invoker=true; '
+    'enforces RLS of the caller against waitry_pedidos/waitry_productos. See '
+    'app/rdb/cortes/page.tsx for consumer.';
+END $do$;

@@ -6,8 +6,8 @@
 --                         empleado no está cargado en la DB (ej. durante sync con Coda).
 
 ALTER TABLE erp.movimientos_caja
-  ADD COLUMN tipo_detalle text,
-  ADD COLUMN realizado_por_nombre text;
+  ADD COLUMN IF NOT EXISTS tipo_detalle text,
+  ADD COLUMN IF NOT EXISTS realizado_por_nombre text;
 
 COMMENT ON COLUMN erp.movimientos_caja.tipo_detalle IS
   'Sub-categoría de negocio (caja_negra, retiro_efectivo, propina, repartidor, proveedor, aporta_efectivo, etc.). Para reportes. NULL hasta que se poble.';

@@ -43,73 +43,48 @@ DROP TABLE IF EXISTS rdb.inv_productos CASCADE;
 -- ══════════════════════════════════════════════════════════════════
 -- Part 2 — rdb operational tables (waitry_*, productos_waitry_map,
 --          waitry_duplicate_candidates) — admin or RDB member only
+-- EDITED 2026-04-23 (drift-1.5): all rdb.waitry_* are ambient. Wrap
+-- each table's policy block in a to_regclass() guard so a fresh DB
+-- without the upstream tables doesn't fail.
 -- ══════════════════════════════════════════════════════════════════
 
--- waitry_inbound
-DROP POLICY IF EXISTS fix_rdb_waitry_inbound_select ON rdb.waitry_inbound;
-CREATE POLICY waitry_inbound_select ON rdb.waitry_inbound
-  FOR SELECT TO authenticated
-  USING (core.fn_is_admin()
-         OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid));
+DO $do$
+DECLARE
+  spec record;
+  rdb_uuid constant text := 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
+  -- table | old_select_policy | old_write_policy(or '') | new_select_policy | new_write_policy(or '')
+  specs text[][] := ARRAY[
+    ['rdb.waitry_inbound',              'fix_rdb_waitry_inbound_select',     '',                                  'waitry_inbound_select',              ''],
+    ['rdb.waitry_pagos',                'fix_rdb_waitry_pagos_select',       '',                                  'waitry_pagos_select',                ''],
+    ['rdb.waitry_pedidos',              'fix_rdb_waitry_pedidos_select',     '',                                  'waitry_pedidos_select',              ''],
+    ['rdb.waitry_productos',            'fix_rdb_waitry_productos_select',   '',                                  'waitry_productos_select',            ''],
+    ['rdb.productos_waitry_map',        'fix_rdb_productos_map_select',      'fix_rdb_productos_map_write',       'productos_waitry_map_select',        'productos_waitry_map_write'],
+    ['rdb.waitry_duplicate_candidates', 'fix_rdb_duplicate_candidates_select','fix_rdb_duplicate_candidates_write','waitry_duplicate_candidates_select','waitry_duplicate_candidates_write']
+  ];
+  i int;
+BEGIN
+  FOR i IN 1 .. array_length(specs, 1) LOOP
+    IF to_regclass(specs[i][1]) IS NULL THEN CONTINUE; END IF;
 
--- waitry_pagos
-DROP POLICY IF EXISTS fix_rdb_waitry_pagos_select ON rdb.waitry_pagos;
-CREATE POLICY waitry_pagos_select ON rdb.waitry_pagos
-  FOR SELECT TO authenticated
-  USING (core.fn_is_admin()
-         OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid));
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %s', specs[i][2], specs[i][1]);
+    IF specs[i][3] <> '' THEN
+      EXECUTE format('DROP POLICY IF EXISTS %I ON %s', specs[i][3], specs[i][1]);
+    END IF;
 
--- waitry_pedidos
-DROP POLICY IF EXISTS fix_rdb_waitry_pedidos_select ON rdb.waitry_pedidos;
-CREATE POLICY waitry_pedidos_select ON rdb.waitry_pedidos
-  FOR SELECT TO authenticated
-  USING (core.fn_is_admin()
-         OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid));
+    EXECUTE format(
+      'CREATE POLICY %I ON %s FOR SELECT TO authenticated USING (core.fn_is_admin() OR core.fn_has_empresa(%L::uuid))',
+      specs[i][4], specs[i][1], rdb_uuid
+    );
+    IF specs[i][5] <> '' THEN
+      EXECUTE format(
+        'CREATE POLICY %I ON %s FOR ALL TO authenticated USING (core.fn_is_admin() OR core.fn_has_empresa(%L::uuid)) WITH CHECK (core.fn_is_admin() OR core.fn_has_empresa(%L::uuid))',
+        specs[i][5], specs[i][1], rdb_uuid, rdb_uuid
+      );
+    END IF;
 
--- waitry_productos
-DROP POLICY IF EXISTS fix_rdb_waitry_productos_select ON rdb.waitry_productos;
-CREATE POLICY waitry_productos_select ON rdb.waitry_productos
-  FOR SELECT TO authenticated
-  USING (core.fn_is_admin()
-         OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid));
-
--- productos_waitry_map (mapping table between Waitry products and ERP)
-DROP POLICY IF EXISTS fix_rdb_productos_map_select ON rdb.productos_waitry_map;
-DROP POLICY IF EXISTS fix_rdb_productos_map_write  ON rdb.productos_waitry_map;
-CREATE POLICY productos_waitry_map_select ON rdb.productos_waitry_map
-  FOR SELECT TO authenticated
-  USING (core.fn_is_admin()
-         OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid));
-CREATE POLICY productos_waitry_map_write ON rdb.productos_waitry_map
-  FOR ALL TO authenticated
-  USING      (core.fn_is_admin()
-              OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid))
-  WITH CHECK (core.fn_is_admin()
-              OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid));
-
--- waitry_duplicate_candidates (workbench for dedup effort)
-DROP POLICY IF EXISTS fix_rdb_duplicate_candidates_select ON rdb.waitry_duplicate_candidates;
-DROP POLICY IF EXISTS fix_rdb_duplicate_candidates_write  ON rdb.waitry_duplicate_candidates;
-CREATE POLICY waitry_duplicate_candidates_select ON rdb.waitry_duplicate_candidates
-  FOR SELECT TO authenticated
-  USING (core.fn_is_admin()
-         OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid));
-CREATE POLICY waitry_duplicate_candidates_write ON rdb.waitry_duplicate_candidates
-  FOR ALL TO authenticated
-  USING      (core.fn_is_admin()
-              OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid))
-  WITH CHECK (core.fn_is_admin()
-              OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid));
-
--- Revoke anon access at the grant level as belt-and-suspenders.
-REVOKE SELECT, INSERT, UPDATE, DELETE ON
-  rdb.waitry_inbound,
-  rdb.waitry_pagos,
-  rdb.waitry_pedidos,
-  rdb.waitry_productos,
-  rdb.productos_waitry_map,
-  rdb.waitry_duplicate_candidates
-FROM anon;
+    EXECUTE format('REVOKE SELECT, INSERT, UPDATE, DELETE ON %s FROM anon', specs[i][1]);
+  END LOOP;
+END $do$;
 
 -- ══════════════════════════════════════════════════════════════════
 -- Part 3 — playtomic tables, all RDB-scoped

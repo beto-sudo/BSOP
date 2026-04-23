@@ -107,129 +107,137 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION rdb.upsert_corte TO service_role, authenticated;
+-- 2) Consolidate existing duplicates — EDITED 2026-04-23 (drift-1.5):
+-- references rdb.waitry_pedidos (ambient). Skip on a fresh DB.
+DO $do$
+BEGIN
+  IF to_regclass('rdb.waitry_pedidos') IS NULL THEN
+    RETURN;
+  END IF;
 
--- 2) Consolidate existing duplicates, keep the canonical row per natural key
-WITH ranked AS (
-  SELECT
-    c.id,
-    first_value(c.id) OVER (
-      PARTITION BY c.empresa_id, c.caja_nombre, c.fecha_operativa, c.abierto_at, COALESCE(c.cerrado_at, 'infinity'::timestamptz)
-      ORDER BY
-        (SELECT COUNT(*) FROM rdb.waitry_pedidos wp WHERE wp.corte_id = c.id) DESC,
-        (SELECT COUNT(*) FROM erp.movimientos_caja mc WHERE mc.corte_id = c.id AND mc.empresa_id = c.empresa_id) DESC,
-        CASE WHEN c.estado = 'cerrado' THEN 1 ELSE 0 END DESC,
-        c.created_at ASC,
-        c.id ASC
-    ) AS keep_id,
-    row_number() OVER (
-      PARTITION BY c.empresa_id, c.caja_nombre, c.fecha_operativa, c.abierto_at, COALESCE(c.cerrado_at, 'infinity'::timestamptz)
-      ORDER BY
-        (SELECT COUNT(*) FROM rdb.waitry_pedidos wp WHERE wp.corte_id = c.id) DESC,
-        (SELECT COUNT(*) FROM erp.movimientos_caja mc WHERE mc.corte_id = c.id AND mc.empresa_id = c.empresa_id) DESC,
-        CASE WHEN c.estado = 'cerrado' THEN 1 ELSE 0 END DESC,
-        c.created_at ASC,
-        c.id ASC
-    ) AS rn
-  FROM erp.cortes_caja c
-  WHERE c.empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
-), dupes AS (
-  SELECT id AS duplicate_id, keep_id
-  FROM ranked
-  WHERE rn > 1
-)
-UPDATE rdb.waitry_pedidos wp
-SET corte_id = d.keep_id
-FROM dupes d
-WHERE wp.corte_id = d.duplicate_id;
+  EXECUTE $sql$
+    WITH ranked AS (
+      SELECT
+        c.id,
+        first_value(c.id) OVER (
+          PARTITION BY c.empresa_id, c.caja_nombre, c.fecha_operativa, c.abierto_at, COALESCE(c.cerrado_at, 'infinity'::timestamptz)
+          ORDER BY
+            (SELECT COUNT(*) FROM rdb.waitry_pedidos wp WHERE wp.corte_id = c.id) DESC,
+            (SELECT COUNT(*) FROM erp.movimientos_caja mc WHERE mc.corte_id = c.id AND mc.empresa_id = c.empresa_id) DESC,
+            CASE WHEN c.estado = 'cerrado' THEN 1 ELSE 0 END DESC,
+            c.created_at ASC,
+            c.id ASC
+        ) AS keep_id,
+        row_number() OVER (
+          PARTITION BY c.empresa_id, c.caja_nombre, c.fecha_operativa, c.abierto_at, COALESCE(c.cerrado_at, 'infinity'::timestamptz)
+          ORDER BY
+            (SELECT COUNT(*) FROM rdb.waitry_pedidos wp WHERE wp.corte_id = c.id) DESC,
+            (SELECT COUNT(*) FROM erp.movimientos_caja mc WHERE mc.corte_id = c.id AND mc.empresa_id = c.empresa_id) DESC,
+            CASE WHEN c.estado = 'cerrado' THEN 1 ELSE 0 END DESC,
+            c.created_at ASC,
+            c.id ASC
+        ) AS rn
+      FROM erp.cortes_caja c
+      WHERE c.empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
+    ), dupes AS (
+      SELECT id AS duplicate_id, keep_id FROM ranked WHERE rn > 1
+    )
+    UPDATE rdb.waitry_pedidos wp
+    SET corte_id = d.keep_id
+    FROM dupes d
+    WHERE wp.corte_id = d.duplicate_id
+  $sql$;
 
-WITH ranked AS (
-  SELECT
-    c.id,
-    first_value(c.id) OVER (
-      PARTITION BY c.empresa_id, c.caja_nombre, c.fecha_operativa, c.abierto_at, COALESCE(c.cerrado_at, 'infinity'::timestamptz)
-      ORDER BY
-        (SELECT COUNT(*) FROM rdb.waitry_pedidos wp WHERE wp.corte_id = c.id) DESC,
-        (SELECT COUNT(*) FROM erp.movimientos_caja mc WHERE mc.corte_id = c.id AND mc.empresa_id = c.empresa_id) DESC,
-        CASE WHEN c.estado = 'cerrado' THEN 1 ELSE 0 END DESC,
-        c.created_at ASC,
-        c.id ASC
-    ) AS keep_id,
-    row_number() OVER (
-      PARTITION BY c.empresa_id, c.caja_nombre, c.fecha_operativa, c.abierto_at, COALESCE(c.cerrado_at, 'infinity'::timestamptz)
-      ORDER BY
-        (SELECT COUNT(*) FROM rdb.waitry_pedidos wp WHERE wp.corte_id = c.id) DESC,
-        (SELECT COUNT(*) FROM erp.movimientos_caja mc WHERE mc.corte_id = c.id AND mc.empresa_id = c.empresa_id) DESC,
-        CASE WHEN c.estado = 'cerrado' THEN 1 ELSE 0 END DESC,
-        c.created_at ASC,
-        c.id ASC
-    ) AS rn
-  FROM erp.cortes_caja c
-  WHERE c.empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
-), dupes AS (
-  SELECT id AS duplicate_id, keep_id
-  FROM ranked
-  WHERE rn > 1
-)
-UPDATE erp.movimientos_caja mc
-SET corte_id = d.keep_id
-FROM dupes d
-WHERE mc.corte_id = d.duplicate_id
-  AND mc.empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid;
+  EXECUTE $sql$
+    WITH ranked AS (
+      SELECT
+        c.id,
+        first_value(c.id) OVER (
+          PARTITION BY c.empresa_id, c.caja_nombre, c.fecha_operativa, c.abierto_at, COALESCE(c.cerrado_at, 'infinity'::timestamptz)
+          ORDER BY
+            (SELECT COUNT(*) FROM rdb.waitry_pedidos wp WHERE wp.corte_id = c.id) DESC,
+            (SELECT COUNT(*) FROM erp.movimientos_caja mc WHERE mc.corte_id = c.id AND mc.empresa_id = c.empresa_id) DESC,
+            CASE WHEN c.estado = 'cerrado' THEN 1 ELSE 0 END DESC,
+            c.created_at ASC,
+            c.id ASC
+        ) AS keep_id,
+        row_number() OVER (
+          PARTITION BY c.empresa_id, c.caja_nombre, c.fecha_operativa, c.abierto_at, COALESCE(c.cerrado_at, 'infinity'::timestamptz)
+          ORDER BY
+            (SELECT COUNT(*) FROM rdb.waitry_pedidos wp WHERE wp.corte_id = c.id) DESC,
+            (SELECT COUNT(*) FROM erp.movimientos_caja mc WHERE mc.corte_id = c.id AND mc.empresa_id = c.empresa_id) DESC,
+            CASE WHEN c.estado = 'cerrado' THEN 1 ELSE 0 END DESC,
+            c.created_at ASC,
+            c.id ASC
+        ) AS rn
+      FROM erp.cortes_caja c
+      WHERE c.empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
+    ), dupes AS (
+      SELECT id AS duplicate_id, keep_id FROM ranked WHERE rn > 1
+    )
+    UPDATE erp.movimientos_caja mc
+    SET corte_id = d.keep_id
+    FROM dupes d
+    WHERE mc.corte_id = d.duplicate_id
+      AND mc.empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
+  $sql$;
 
-WITH ranked AS (
-  SELECT
-    c.id,
-    first_value(c.id) OVER (
-      PARTITION BY c.empresa_id, c.caja_nombre, c.fecha_operativa, c.abierto_at, COALESCE(c.cerrado_at, 'infinity'::timestamptz)
-      ORDER BY
-        (SELECT COUNT(*) FROM rdb.waitry_pedidos wp WHERE wp.corte_id = c.id) DESC,
-        (SELECT COUNT(*) FROM erp.movimientos_caja mc WHERE mc.corte_id = c.id AND mc.empresa_id = c.empresa_id) DESC,
-        CASE WHEN c.estado = 'cerrado' THEN 1 ELSE 0 END DESC,
-        c.created_at ASC,
-        c.id ASC
-    ) AS keep_id,
-    row_number() OVER (
-      PARTITION BY c.empresa_id, c.caja_nombre, c.fecha_operativa, c.abierto_at, COALESCE(c.cerrado_at, 'infinity'::timestamptz)
-      ORDER BY
-        (SELECT COUNT(*) FROM rdb.waitry_pedidos wp WHERE wp.corte_id = c.id) DESC,
-        (SELECT COUNT(*) FROM erp.movimientos_caja mc WHERE mc.corte_id = c.id AND mc.empresa_id = c.empresa_id) DESC,
-        CASE WHEN c.estado = 'cerrado' THEN 1 ELSE 0 END DESC,
-        c.created_at ASC,
-        c.id ASC
-    ) AS rn
-  FROM erp.cortes_caja c
-  WHERE c.empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
-), dupes AS (
-  SELECT id AS duplicate_id, keep_id
-  FROM ranked
-  WHERE rn > 1
-)
-UPDATE erp.corte_conteo_denominaciones ccd
-SET corte_id = d.keep_id
-FROM dupes d
-WHERE ccd.corte_id = d.duplicate_id
-  AND ccd.empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid;
+  EXECUTE $sql$
+    WITH ranked AS (
+      SELECT
+        c.id,
+        first_value(c.id) OVER (
+          PARTITION BY c.empresa_id, c.caja_nombre, c.fecha_operativa, c.abierto_at, COALESCE(c.cerrado_at, 'infinity'::timestamptz)
+          ORDER BY
+            (SELECT COUNT(*) FROM rdb.waitry_pedidos wp WHERE wp.corte_id = c.id) DESC,
+            (SELECT COUNT(*) FROM erp.movimientos_caja mc WHERE mc.corte_id = c.id AND mc.empresa_id = c.empresa_id) DESC,
+            CASE WHEN c.estado = 'cerrado' THEN 1 ELSE 0 END DESC,
+            c.created_at ASC,
+            c.id ASC
+        ) AS keep_id,
+        row_number() OVER (
+          PARTITION BY c.empresa_id, c.caja_nombre, c.fecha_operativa, c.abierto_at, COALESCE(c.cerrado_at, 'infinity'::timestamptz)
+          ORDER BY
+            (SELECT COUNT(*) FROM rdb.waitry_pedidos wp WHERE wp.corte_id = c.id) DESC,
+            (SELECT COUNT(*) FROM erp.movimientos_caja mc WHERE mc.corte_id = c.id AND mc.empresa_id = c.empresa_id) DESC,
+            CASE WHEN c.estado = 'cerrado' THEN 1 ELSE 0 END DESC,
+            c.created_at ASC,
+            c.id ASC
+        ) AS rn
+      FROM erp.cortes_caja c
+      WHERE c.empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
+    ), dupes AS (
+      SELECT id AS duplicate_id, keep_id FROM ranked WHERE rn > 1
+    )
+    UPDATE erp.corte_conteo_denominaciones ccd
+    SET corte_id = d.keep_id
+    FROM dupes d
+    WHERE ccd.corte_id = d.duplicate_id
+      AND ccd.empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
+  $sql$;
 
-WITH ranked AS (
-  SELECT
-    c.id,
-    row_number() OVER (
-      PARTITION BY c.empresa_id, c.caja_nombre, c.fecha_operativa, c.abierto_at, COALESCE(c.cerrado_at, 'infinity'::timestamptz)
-      ORDER BY
-        (SELECT COUNT(*) FROM rdb.waitry_pedidos wp WHERE wp.corte_id = c.id) DESC,
-        (SELECT COUNT(*) FROM erp.movimientos_caja mc WHERE mc.corte_id = c.id AND mc.empresa_id = c.empresa_id) DESC,
-        CASE WHEN c.estado = 'cerrado' THEN 1 ELSE 0 END DESC,
-        c.created_at ASC,
-        c.id ASC
-    ) AS rn
-  FROM erp.cortes_caja c
-  WHERE c.empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
-)
-DELETE FROM erp.cortes_caja c
-USING ranked r
-WHERE c.id = r.id
-  AND r.rn > 1;
+  EXECUTE $sql$
+    WITH ranked AS (
+      SELECT
+        c.id,
+        row_number() OVER (
+          PARTITION BY c.empresa_id, c.caja_nombre, c.fecha_operativa, c.abierto_at, COALESCE(c.cerrado_at, 'infinity'::timestamptz)
+          ORDER BY
+            (SELECT COUNT(*) FROM rdb.waitry_pedidos wp WHERE wp.corte_id = c.id) DESC,
+            (SELECT COUNT(*) FROM erp.movimientos_caja mc WHERE mc.corte_id = c.id AND mc.empresa_id = c.empresa_id) DESC,
+            CASE WHEN c.estado = 'cerrado' THEN 1 ELSE 0 END DESC,
+            c.created_at ASC,
+            c.id ASC
+        ) AS rn
+      FROM erp.cortes_caja c
+      WHERE c.empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
+    )
+    DELETE FROM erp.cortes_caja c
+    USING ranked r
+    WHERE c.id = r.id
+      AND r.rn > 1
+  $sql$;
+END $do$;
 
 -- 3) Prevent future exact duplicates on natural key
 CREATE UNIQUE INDEX IF NOT EXISTS erp_cortes_caja_natural_key_idx

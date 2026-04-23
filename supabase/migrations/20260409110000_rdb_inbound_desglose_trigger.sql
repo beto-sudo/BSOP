@@ -245,9 +245,14 @@ END;
 $$;
 
 -- ── Crear el trigger ─────────────────────────────────────────
-DROP TRIGGER IF EXISTS trg_process_waitry_inbound ON rdb.waitry_inbound;
-
-CREATE TRIGGER trg_process_waitry_inbound
-BEFORE INSERT OR UPDATE OF payload_json ON rdb.waitry_inbound
-FOR EACH ROW
-EXECUTE FUNCTION rdb.process_waitry_inbound();
+-- EDITED 2026-04-23 (drift-1.5): rdb.waitry_inbound is ambient; skip when absent.
+DO $do$
+BEGIN
+  IF to_regclass('rdb.waitry_inbound') IS NOT NULL THEN
+    DROP TRIGGER IF EXISTS trg_process_waitry_inbound ON rdb.waitry_inbound;
+    CREATE TRIGGER trg_process_waitry_inbound
+    BEFORE INSERT OR UPDATE OF payload_json ON rdb.waitry_inbound
+    FOR EACH ROW
+    EXECUTE FUNCTION rdb.process_waitry_inbound();
+  END IF;
+END $do$;

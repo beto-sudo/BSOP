@@ -107,16 +107,29 @@ CREATE INDEX IF NOT EXISTS idx_ventas_refacciones_detalle_producto_id
 CREATE INDEX IF NOT EXISTS idx_ventas_tickets_vendedor_id
   ON erp.ventas_tickets (vendedor_id);
 
--- ── public ────────────────────────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_expense_splits_expense_id
-  ON public.expense_splits (expense_id);
-CREATE INDEX IF NOT EXISTS idx_expense_splits_participant_id
-  ON public.expense_splits (participant_id);
-CREATE INDEX IF NOT EXISTS idx_trip_expenses_paid_by
-  ON public.trip_expenses (paid_by);
+-- ── public — EDITED 2026-04-23 (drift-1.5): trip/expense legacy tables
+-- ambient and dropped by 20260423011302. Skip on fresh DB.
+DO $$
+BEGIN
+  IF to_regclass('public.expense_splits') IS NOT NULL THEN
+    CREATE INDEX IF NOT EXISTS idx_expense_splits_expense_id
+      ON public.expense_splits (expense_id);
+    CREATE INDEX IF NOT EXISTS idx_expense_splits_participant_id
+      ON public.expense_splits (participant_id);
+  END IF;
+  IF to_regclass('public.trip_expenses') IS NOT NULL THEN
+    CREATE INDEX IF NOT EXISTS idx_trip_expenses_paid_by
+      ON public.trip_expenses (paid_by);
+  END IF;
+END $$;
 
--- ── rdb (archive) ─────────────────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_ordenes_compra_archive_2026_04_17_proveedor_id
-  ON rdb.ordenes_compra_archive_2026_04_17 (proveedor_id);
-CREATE INDEX IF NOT EXISTS idx_ordenes_compra_archive_2026_04_17_requisicion_id
-  ON rdb.ordenes_compra_archive_2026_04_17 (requisicion_id);
+-- ── rdb (archive) — EDITED 2026-04-23 (drift-1.5): archive table ambient.
+DO $$
+BEGIN
+  IF to_regclass('rdb.ordenes_compra_archive_2026_04_17') IS NOT NULL THEN
+    CREATE INDEX IF NOT EXISTS idx_ordenes_compra_archive_2026_04_17_proveedor_id
+      ON rdb.ordenes_compra_archive_2026_04_17 (proveedor_id);
+    CREATE INDEX IF NOT EXISTS idx_ordenes_compra_archive_2026_04_17_requisicion_id
+      ON rdb.ordenes_compra_archive_2026_04_17 (requisicion_id);
+  END IF;
+END $$;

@@ -13,13 +13,18 @@ ALTER TABLE erp.productos
   ADD COLUMN IF NOT EXISTS parent_id UUID REFERENCES erp.productos(id),
   ADD COLUMN IF NOT EXISTS factor_consumo NUMERIC(8,4) NOT NULL DEFAULT 1.0;
 
--- 2. Backfill desde productos_legacy
-UPDATE erp.productos e
-SET 
-  parent_id = l.parent_id,
-  factor_consumo = COALESCE(l.factor_consumo, 1.0)
-FROM rdb.productos_legacy l
-WHERE e.id = l.id;
+-- 2. Backfill desde productos_legacy — EDITED 2026-04-23 (drift-1.5):
+-- rdb.productos_legacy ambient (created by 20260414000007 rename, dropped 20260415220000).
+DO $do$
+BEGIN
+  IF to_regclass('rdb.productos_legacy') IS NOT NULL THEN
+    UPDATE erp.productos e
+    SET parent_id = l.parent_id,
+        factor_consumo = COALESCE(l.factor_consumo, 1.0)
+    FROM rdb.productos_legacy l
+    WHERE e.id = l.id;
+  END IF;
+END $do$;
 
 -- 3. Trigger para ventas Waitry -> Movimientos ERP
 CREATE OR REPLACE FUNCTION erp.fn_trg_waitry_to_movimientos()
@@ -141,10 +146,15 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_waitry_productos_to_movimientos ON rdb.waitry_productos;
-CREATE TRIGGER trg_waitry_productos_to_movimientos
-AFTER INSERT OR UPDATE OR DELETE ON rdb.waitry_productos
-FOR EACH ROW EXECUTE FUNCTION erp.fn_trg_waitry_to_movimientos();
+-- EDITED 2026-04-23 (drift-1.5): rdb.waitry_productos ambient.
+DO $do$ BEGIN
+  IF to_regclass('rdb.waitry_productos') IS NOT NULL THEN
+    DROP TRIGGER IF EXISTS trg_waitry_productos_to_movimientos ON rdb.waitry_productos;
+    CREATE TRIGGER trg_waitry_productos_to_movimientos
+    AFTER INSERT OR UPDATE OR DELETE ON rdb.waitry_productos
+    FOR EACH ROW EXECUTE FUNCTION erp.fn_trg_waitry_to_movimientos();
+  END IF;
+END $do$;
 
 -- También necesitamos un trigger en waitry_pedidos para cachar cancelaciones
 CREATE OR REPLACE FUNCTION erp.fn_trg_waitry_pedidos_cancel()
@@ -162,26 +172,36 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_waitry_pedidos_cancel_movimientos ON rdb.waitry_pedidos;
-CREATE TRIGGER trg_waitry_pedidos_cancel_movimientos
-AFTER UPDATE ON rdb.waitry_pedidos
-FOR EACH ROW EXECUTE FUNCTION erp.fn_trg_waitry_pedidos_cancel();
+-- EDITED 2026-04-23 (drift-1.5): rdb.waitry_pedidos ambient.
+DO $do$ BEGIN
+  IF to_regclass('rdb.waitry_pedidos') IS NOT NULL THEN
+    DROP TRIGGER IF EXISTS trg_waitry_pedidos_cancel_movimientos ON rdb.waitry_pedidos;
+    CREATE TRIGGER trg_waitry_pedidos_cancel_movimientos
+    AFTER UPDATE ON rdb.waitry_pedidos
+    FOR EACH ROW EXECUTE FUNCTION erp.fn_trg_waitry_pedidos_cancel();
+  END IF;
+END $do$;
 
 
--- 4. Backfill de salidas históricas
-DO $$
+-- 4. Backfill de salidas históricas — EDITED 2026-04-23 (drift-1.5):
+-- rdb.waitry_* ambient. Skip whole block if either table is missing.
+DO $do$
 DECLARE
   rec RECORD;
   v_empresa_id UUID := 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid;
   v_almacen_id UUID;
   v_target_id UUID;
 BEGIN
+  IF to_regclass('rdb.waitry_productos') IS NULL OR to_regclass('rdb.waitry_pedidos') IS NULL THEN
+    RETURN;
+  END IF;
+
   SELECT id INTO v_almacen_id FROM erp.almacenes WHERE empresa_id = v_empresa_id LIMIT 1;
   IF v_almacen_id IS NULL THEN RETURN; END IF;
 
   DELETE FROM erp.movimientos_inventario WHERE referencia_tipo = 'venta_waitry';
 
-  FOR rec IN 
+  FOR rec IN
     SELECT wp.id, wp.order_id, wp.product_id, wp.quantity, wp.created_at, p.id as p_id, p.parent_id, p.factor_consumo
     FROM rdb.waitry_productos wp
     JOIN rdb.waitry_pedidos ped ON ped.order_id = wp.order_id
@@ -196,7 +216,7 @@ BEGIN
     );
   END LOOP;
 END
-$$;
+$do$;
 
 -- 5. Trigger en movimientos para mantener erp.inventario
 CREATE OR REPLACE FUNCTION erp.fn_trg_mantenimiento_inventario()
