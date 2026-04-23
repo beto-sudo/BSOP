@@ -63,11 +63,12 @@ sólo entornos nuevos (Preview, DR, local).
   `public.profile`, `public.user_presence`, archives `*_archive_*`).
   Sin agregar migraciones nuevas — sólo se editaron las originales.
 - **drift-2** (2026-04-23): cleanup post drift-1. Drop de 9 policies
-  service*role redundantes (`USING(true)` — service_role bypassa RLS),
+  `service_role` redundantes (`USING(true)` — `service_role` bypassa RLS),
   drop de index duplicado `erp_pagos_prov_anio_mes_idx` (ya cubierto
   por UNIQUE constraint), VACUUM FULL `health.health_metrics` (libera
-  ~100 MB), bootstrap de índices ambient `rdb.waitry*\*`agregados al
-pre-migration bootstrap, y GH Action`drift-check.yml`que corre`supabase/scripts/drift-check.sql`en cada PR a`supabase/migrations/`,
+  ~100 MB), bootstrap de índices ambient para `rdb.waitry_*` agregados
+  al pre-migration bootstrap, y GH Action `drift-check.yml` que corre
+  `supabase/scripts/drift-check.sql` en cada PR a `supabase/migrations/`,
   schedule semanal y manual dispatch.
 
 ## §3 — Validar antes de mergear
