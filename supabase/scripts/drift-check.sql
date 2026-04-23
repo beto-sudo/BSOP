@@ -34,7 +34,7 @@ SELECT
   ' views=' || (SELECT count(*) FROM pg_views WHERE schemaname = nspname)::text ||
   ' functions=' || (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON p.pronamespace = n.oid WHERE n.nspname = nspname)::text
 FROM pg_namespace
-WHERE nspname IN ('public','core','erp','rdb','health','playtomic')
+WHERE nspname IN ('public','core','erp','rdb','health','playtomic','dilesa','maquinaria')
 ORDER BY nspname;
 
 -- ─────────────── 2. Service_role policies redundantes ───────────────
@@ -63,7 +63,7 @@ WITH no_rls AS (
   JOIN pg_namespace n ON c.relnamespace = n.oid
   WHERE c.relkind = 'r'
     AND c.relrowsecurity = false
-    AND n.nspname IN ('core','erp','rdb','health','playtomic')
+    AND n.nspname IN ('core','erp','rdb','health','playtomic','dilesa','maquinaria')
     AND c.relname NOT LIKE '%_archive_%'
 )
 SELECT CASE
@@ -88,7 +88,7 @@ WITH dup AS (
       indexname,
       regexp_replace(indexdef, '^CREATE (UNIQUE )?INDEX [^ ]+ ', '') AS def_normalized
     FROM pg_indexes
-    WHERE schemaname IN ('public','core','erp','rdb','health','playtomic')
+    WHERE schemaname IN ('public','core','erp','rdb','health','playtomic','dilesa','maquinaria')
   ) i
   GROUP BY schemaname, tablename, def_normalized
   HAVING count(*) > 1
@@ -112,7 +112,7 @@ WITH bloated AS (
     pg_total_relation_size(schemaname || '.' || relname) AS sz,
     round(n_dead_tup::numeric / NULLIF(n_live_tup + n_dead_tup, 0) * 100, 1) AS pct_dead
   FROM pg_stat_all_tables
-  WHERE schemaname IN ('public','core','erp','rdb','health','playtomic')
+  WHERE schemaname IN ('public','core','erp','rdb','health','playtomic','dilesa','maquinaria')
     AND n_live_tup + n_dead_tup > 1000
 )
 SELECT CASE

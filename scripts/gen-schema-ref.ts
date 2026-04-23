@@ -38,7 +38,7 @@ function flagValue(flag: string, fallback: string): string {
   return i >= 0 && args[i + 1] ? args[i + 1] : fallback;
 }
 
-const SCHEMAS = flagValue('--schemas', 'public,core,erp,rdb,playtomic,health')
+const SCHEMAS = flagValue('--schemas', 'public,core,erp,rdb,playtomic,health,dilesa,maquinaria')
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean);
