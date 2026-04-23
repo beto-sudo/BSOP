@@ -103,6 +103,13 @@ function slugify(str: string): string {
     .replace(/(^-|-$)/g, '');
 }
 
+// core.modulos es una tabla global; la convención de slug (`{empresa_slug}.X`)
+// es la única fuente de verdad para saber a qué empresa pertenece cada módulo.
+function modulosParaEmpresa(modulos: Modulo[], empresaSlug: string): Modulo[] {
+  const prefix = `${empresaSlug}.`;
+  return modulos.filter((m) => m.slug.startsWith(prefix));
+}
+
 // ── Component ──────────────────────────────────────────────────────────────
 
 export function AccesoClient({
@@ -228,6 +235,15 @@ export function AccesoClient({
 
   const rolesDeEmpresa = roles.filter((r) => r.empresa_id === filterEmpresaId);
   const selectedRol = roles.find((r) => r.id === selectedRolId) ?? null;
+  const selectedRolEmpresa = selectedRol
+    ? (empresas.find((e) => e.id === selectedRol.empresa_id) ?? null)
+    : null;
+  const modulosDelRol = selectedRolEmpresa
+    ? modulosParaEmpresa(modulos, selectedRolEmpresa.slug)
+    : [];
+  const modulosExcepcion = newExcEmpresaId
+    ? modulosParaEmpresa(modulos, empresas.find((e) => e.id === newExcEmpresaId)?.slug ?? '')
+    : [];
 
   // ── Render ──
 
@@ -455,17 +471,17 @@ export function AccesoClient({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {modulos.length === 0 ? (
+                      {modulosDelRol.length === 0 ? (
                         <TableRow>
                           <TableCell
                             colSpan={3}
                             className="py-8 text-center text-sm dark:text-white/30 text-[var(--text)]/35"
                           >
-                            No hay módulos registrados.
+                            No hay módulos registrados para esta empresa.
                           </TableCell>
                         </TableRow>
                       ) : (
-                        modulos.map((mod) => {
+                        modulosDelRol.map((mod) => {
                           const perm = getPermisoRol(selectedRol.id, mod.id);
                           return (
                             <TableRow
@@ -770,7 +786,10 @@ export function AccesoClient({
                             <Combobox
                               value={newExcEmpresaId}
                               onChange={(v) => {
-                                if (v) setNewExcEmpresaId(v);
+                                if (v) {
+                                  setNewExcEmpresaId(v);
+                                  setNewExcModuloId('');
+                                }
                               }}
                               options={empresas.map((emp) => ({
                                 value: emp.id,
@@ -790,11 +809,14 @@ export function AccesoClient({
                               onChange={(v) => {
                                 if (v) setNewExcModuloId(v);
                               }}
-                              options={modulos.map((mod) => ({
+                              options={modulosExcepcion.map((mod) => ({
                                 value: mod.id,
                                 label: mod.nombre,
                               }))}
-                              placeholder="Módulo"
+                              placeholder={
+                                newExcEmpresaId ? 'Módulo' : 'Selecciona empresa primero'
+                              }
+                              disabled={!newExcEmpresaId}
                               size="sm"
                               className="text-xs"
                             />
