@@ -178,3 +178,50 @@ export const TERRENO_ESTATUS_PROPIEDAD_LABEL: Record<TerrenoEstatusPropiedad, st
   descartado: 'Descartado',
   en_radar: 'En radar',
 };
+
+/**
+ * Etapas del ciclo de vida de un prototipo (producto habitacional maestro).
+ * Sin CHECK en DB — la UI las limita. El campo `etapa` en dilesa.prototipos
+ * es text libre, igual que en terrenos.
+ */
+export const PROTOTIPO_ETAPA_OPTIONS = [
+  'borrador',
+  'en_diseno',
+  'en_costeo',
+  'aprobado',
+  'activo',
+  'pausado',
+  'obsoleto',
+] as const;
+export type PrototipoEtapa = (typeof PROTOTIPO_ETAPA_OPTIONS)[number];
+
+export const PROTOTIPO_ETAPA_CONFIG: Record<PrototipoEtapa, { label: string; cls: string }> = {
+  borrador: {
+    label: 'Borrador',
+    cls: 'bg-[var(--border)]/60 text-[var(--text)]/70 border-[var(--border)]',
+  },
+  en_diseno: {
+    label: 'En diseño',
+    cls: 'bg-sky-500/15 text-sky-400 border-sky-500/20',
+  },
+  en_costeo: {
+    label: 'En costeo',
+    cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
+  },
+  aprobado: {
+    label: 'Aprobado',
+    cls: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/20',
+  },
+  activo: {
+    label: 'Activo',
+    cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20',
+  },
+  pausado: {
+    label: 'Pausado',
+    cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
+  },
+  obsoleto: {
+    label: 'Obsoleto',
+    cls: 'bg-red-500/15 text-red-400 border-red-500/20',
+  },
+};
