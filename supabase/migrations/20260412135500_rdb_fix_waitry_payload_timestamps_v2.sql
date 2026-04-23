@@ -228,64 +228,76 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
-WITH latest_inbound AS (
-  SELECT DISTINCT ON (wi.order_id)
-    wi.order_id,
-    CASE
-      WHEN wi.payload_json ? 'payload' THEN wi.payload_json -> 'payload'
-      ELSE wi.payload_json
-    END AS payload
-  FROM rdb.waitry_inbound wi
-  WHERE wi.order_id IS NOT NULL
-  ORDER BY wi.order_id, wi.created_at DESC
-), pedidos_source AS (
-  SELECT
-    li.order_id,
-    rdb.parse_waitry_timestamptz(li.payload -> 'timestamp') AS pedido_timestamp,
-    (
-      SELECT rdb.parse_waitry_timestamptz(action -> 'timestamp')
-      FROM jsonb_array_elements(COALESCE(li.payload -> 'orderActions', '[]'::jsonb)) AS action
-      ORDER BY rdb.parse_waitry_timestamptz(action -> 'timestamp') DESC NULLS LAST
-      LIMIT 1
-    ) AS last_action_at
-  FROM latest_inbound li
-)
-UPDATE rdb.waitry_pedidos wp
-SET
-  "timestamp" = COALESCE(ps.pedido_timestamp, wp."timestamp"),
-  last_action_at = COALESCE(ps.last_action_at, wp.last_action_at),
-  updated_at = now()
-FROM pedidos_source ps
-WHERE wp.order_id = ps.order_id
-  AND (
-    wp."timestamp" IS DISTINCT FROM ps.pedido_timestamp
-    OR wp.last_action_at IS DISTINCT FROM ps.last_action_at
-  );
+-- EDITED 2026-04-23 (drift-1.5): rdb.waitry_inbound / waitry_pedidos /
+-- waitry_pagos are ambient. Wrap the corrective UPDATEs in a guard so a
+-- fresh DB without those tables (Preview Branch / dev local) skips them.
+DO $do$
+BEGIN
+  IF to_regclass('rdb.waitry_inbound') IS NULL
+     OR to_regclass('rdb.waitry_pedidos') IS NULL
+     OR to_regclass('rdb.waitry_pagos') IS NULL THEN
+    RETURN;
+  END IF;
 
-WITH latest_inbound AS (
-  SELECT DISTINCT ON (wi.order_id)
-    wi.order_id,
-    CASE
-      WHEN wi.payload_json ? 'payload' THEN wi.payload_json -> 'payload'
-      ELSE wi.payload_json
-    END AS payload
-  FROM rdb.waitry_inbound wi
-  WHERE wi.order_id IS NOT NULL
-  ORDER BY wi.order_id, wi.created_at DESC
-), pagos_source AS (
-  SELECT
-    li.order_id,
-    COALESCE(pay ->> 'orderPaymentId', pay ->> 'paymentId', pay ->> 'id', pay ->> 'paidId') AS payment_id,
-    rdb.parse_waitry_timestamptz(pay -> 'createdAt') AS created_at
-  FROM latest_inbound li
-  CROSS JOIN LATERAL jsonb_array_elements(COALESCE(li.payload -> 'payments', '[]'::jsonb)) AS pay
-)
-UPDATE rdb.waitry_pagos wp
-SET created_at = ps.created_at
-FROM pagos_source ps
-WHERE wp.order_id = ps.order_id
-  AND wp.payment_id = ps.payment_id
-  AND ps.payment_id IS NOT NULL
-  AND ps.payment_id <> ''
-  AND ps.created_at IS NOT NULL
-  AND wp.created_at IS DISTINCT FROM ps.created_at;
+  WITH latest_inbound AS (
+    SELECT DISTINCT ON (wi.order_id)
+      wi.order_id,
+      CASE
+        WHEN wi.payload_json ? 'payload' THEN wi.payload_json -> 'payload'
+        ELSE wi.payload_json
+      END AS payload
+    FROM rdb.waitry_inbound wi
+    WHERE wi.order_id IS NOT NULL
+    ORDER BY wi.order_id, wi.created_at DESC
+  ), pedidos_source AS (
+    SELECT
+      li.order_id,
+      rdb.parse_waitry_timestamptz(li.payload -> 'timestamp') AS pedido_timestamp,
+      (
+        SELECT rdb.parse_waitry_timestamptz(action -> 'timestamp')
+        FROM jsonb_array_elements(COALESCE(li.payload -> 'orderActions', '[]'::jsonb)) AS action
+        ORDER BY rdb.parse_waitry_timestamptz(action -> 'timestamp') DESC NULLS LAST
+        LIMIT 1
+      ) AS last_action_at
+    FROM latest_inbound li
+  )
+  UPDATE rdb.waitry_pedidos wp
+  SET
+    "timestamp" = COALESCE(ps.pedido_timestamp, wp."timestamp"),
+    last_action_at = COALESCE(ps.last_action_at, wp.last_action_at),
+    updated_at = now()
+  FROM pedidos_source ps
+  WHERE wp.order_id = ps.order_id
+    AND (
+      wp."timestamp" IS DISTINCT FROM ps.pedido_timestamp
+      OR wp.last_action_at IS DISTINCT FROM ps.last_action_at
+    );
+
+  WITH latest_inbound AS (
+    SELECT DISTINCT ON (wi.order_id)
+      wi.order_id,
+      CASE
+        WHEN wi.payload_json ? 'payload' THEN wi.payload_json -> 'payload'
+        ELSE wi.payload_json
+      END AS payload
+    FROM rdb.waitry_inbound wi
+    WHERE wi.order_id IS NOT NULL
+    ORDER BY wi.order_id, wi.created_at DESC
+  ), pagos_source AS (
+    SELECT
+      li.order_id,
+      COALESCE(pay ->> 'orderPaymentId', pay ->> 'paymentId', pay ->> 'id', pay ->> 'paidId') AS payment_id,
+      rdb.parse_waitry_timestamptz(pay -> 'createdAt') AS created_at
+    FROM latest_inbound li
+    CROSS JOIN LATERAL jsonb_array_elements(COALESCE(li.payload -> 'payments', '[]'::jsonb)) AS pay
+  )
+  UPDATE rdb.waitry_pagos wp
+  SET created_at = ps.created_at
+  FROM pagos_source ps
+  WHERE wp.order_id = ps.order_id
+    AND wp.payment_id = ps.payment_id
+    AND ps.payment_id IS NOT NULL
+    AND ps.payment_id <> ''
+    AND ps.created_at IS NOT NULL
+    AND wp.created_at IS DISTINCT FROM ps.created_at;
+END $do$;

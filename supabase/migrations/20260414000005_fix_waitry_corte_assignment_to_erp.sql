@@ -177,30 +177,38 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
--- Backfill orphan orders to the proper erp.cortes_caja by timestamp window
-WITH matches AS (
-  SELECT DISTINCT ON (wp.order_id)
-    wp.order_id,
-    c.id AS corte_id
-  FROM rdb.waitry_pedidos wp
-  JOIN erp.cortes_caja c
-    ON c.empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
-   AND c.abierto_at IS NOT NULL
-   AND wp."timestamp" >= c.abierto_at
-   AND (
-     (c.cerrado_at IS NOT NULL AND wp."timestamp" <= c.cerrado_at)
-     OR (c.estado = 'abierto' AND c.cerrado_at IS NULL)
-   )
-  WHERE wp.corte_id IS NULL
-    AND wp.status != 'order_cancelled'
-  ORDER BY wp.order_id,
-    CASE WHEN c.estado = 'abierto' THEN 0 ELSE 1 END,
-    c.abierto_at DESC
-)
-UPDATE rdb.waitry_pedidos wp
-SET corte_id = m.corte_id,
-    updated_at = now()
-FROM matches m
-WHERE wp.order_id = m.order_id;
+-- Backfill orphan orders — EDITED 2026-04-23 (drift-1.5): rdb.waitry_pedidos ambient.
+DO $do$ BEGIN
+  IF to_regclass('rdb.waitry_pedidos') IS NULL THEN
+    RETURN;
+  END IF;
+
+  EXECUTE $sql$
+    WITH matches AS (
+      SELECT DISTINCT ON (wp.order_id)
+        wp.order_id,
+        c.id AS corte_id
+      FROM rdb.waitry_pedidos wp
+      JOIN erp.cortes_caja c
+        ON c.empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
+       AND c.abierto_at IS NOT NULL
+       AND wp."timestamp" >= c.abierto_at
+       AND (
+         (c.cerrado_at IS NOT NULL AND wp."timestamp" <= c.cerrado_at)
+         OR (c.estado = 'abierto' AND c.cerrado_at IS NULL)
+       )
+      WHERE wp.corte_id IS NULL
+        AND wp.status != 'order_cancelled'
+      ORDER BY wp.order_id,
+        CASE WHEN c.estado = 'abierto' THEN 0 ELSE 1 END,
+        c.abierto_at DESC
+    )
+    UPDATE rdb.waitry_pedidos wp
+    SET corte_id = m.corte_id,
+        updated_at = now()
+    FROM matches m
+    WHERE wp.order_id = m.order_id
+  $sql$;
+END $do$;
 
 NOTIFY pgrst, 'reload schema';

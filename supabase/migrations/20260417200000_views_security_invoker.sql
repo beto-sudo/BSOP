@@ -1,5 +1,11 @@
 -- Sprint 2 (Sec DB) — force security_invoker=on on all existing views.
 --
+-- EDITED 2026-04-23 (drift-1.5): wrap each ALTER VIEW with a to_regclass()
+-- guard so a fresh DB (Preview Branch / dev local) without the upstream
+-- ambient views (rdb.* compatibility shims, playtomic / waitry-derived views)
+-- does not fail. Views that don't exist were never created against a fresh
+-- DB chain — there's nothing to harden.
+--
 -- Context
 -- -------
 -- Supabase's database linter flagged 16 views as running with SECURITY
@@ -30,19 +36,31 @@
 --
 -- Rollback: `ALTER VIEW <view> RESET (security_invoker);` on any entry.
 
-ALTER VIEW erp.v_empleados_full                         SET (security_invoker = on);
-ALTER VIEW playtomic.v_ocupacion_diaria                 SET (security_invoker = on);
-ALTER VIEW playtomic.v_revenue_diario                   SET (security_invoker = on);
-ALTER VIEW playtomic.v_top_players                      SET (security_invoker = on);
-ALTER VIEW rdb.corte_conteo_denominaciones              SET (security_invoker = on);
-ALTER VIEW rdb.ordenes_compra                           SET (security_invoker = on);
-ALTER VIEW rdb.proveedores                              SET (security_invoker = on);
-ALTER VIEW rdb.requisiciones                            SET (security_invoker = on);
-ALTER VIEW rdb.v_corte_conteo_totales                   SET (security_invoker = on);
-ALTER VIEW rdb.v_cortes_lista                           SET (security_invoker = on);
-ALTER VIEW rdb.v_cortes_totales                         SET (security_invoker = on);
-ALTER VIEW rdb.v_inv_stock_actual                       SET (security_invoker = on);
-ALTER VIEW rdb.v_inventario_stock                       SET (security_invoker = on);
-ALTER VIEW rdb.v_productos_grupo                        SET (security_invoker = on);
-ALTER VIEW rdb.v_waitry_pedidos_reversa_sospechosa      SET (security_invoker = on);
-ALTER VIEW rdb.v_waitry_pending_duplicates              SET (security_invoker = on);
+DO $$
+DECLARE
+  v text;
+  vs text[] := ARRAY[
+    'erp.v_empleados_full',
+    'playtomic.v_ocupacion_diaria',
+    'playtomic.v_revenue_diario',
+    'playtomic.v_top_players',
+    'rdb.corte_conteo_denominaciones',
+    'rdb.ordenes_compra',
+    'rdb.proveedores',
+    'rdb.requisiciones',
+    'rdb.v_corte_conteo_totales',
+    'rdb.v_cortes_lista',
+    'rdb.v_cortes_totales',
+    'rdb.v_inv_stock_actual',
+    'rdb.v_inventario_stock',
+    'rdb.v_productos_grupo',
+    'rdb.v_waitry_pedidos_reversa_sospechosa',
+    'rdb.v_waitry_pending_duplicates'
+  ];
+BEGIN
+  FOREACH v IN ARRAY vs LOOP
+    IF to_regclass(v) IS NOT NULL THEN
+      EXECUTE format('ALTER VIEW %s SET (security_invoker = on)', v);
+    END IF;
+  END LOOP;
+END $$;

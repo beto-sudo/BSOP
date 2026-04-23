@@ -44,27 +44,33 @@ DROP INDEX IF EXISTS rdb.rdb_waitry_pedidos_order_id_idx;
 -- once per query rather than per row. Behavior is unchanged; only
 -- the plan shape changes.
 
--- ── public.profile ──────────────────────────────────────────────────
-DROP POLICY IF EXISTS profile_select_own ON public.profile;
-CREATE POLICY profile_select_own ON public.profile
-  FOR SELECT TO authenticated
-  USING (id = (SELECT auth.uid()));
+-- ── public.profile / public.user_presence — EDITED 2026-04-23 (drift-1.5):
+-- both ambient and later moved to core.* by 20260423005835. Skip on fresh DB.
+DO $do$ BEGIN
+  IF to_regclass('public.profile') IS NOT NULL THEN
+    DROP POLICY IF EXISTS profile_select_own ON public.profile;
+    CREATE POLICY profile_select_own ON public.profile
+      FOR SELECT TO authenticated
+      USING (id = (SELECT auth.uid()));
 
-DROP POLICY IF EXISTS profile_update_own ON public.profile;
-CREATE POLICY profile_update_own ON public.profile
-  FOR UPDATE TO authenticated
-  USING (id = (SELECT auth.uid()));
+    DROP POLICY IF EXISTS profile_update_own ON public.profile;
+    CREATE POLICY profile_update_own ON public.profile
+      FOR UPDATE TO authenticated
+      USING (id = (SELECT auth.uid()));
+  END IF;
 
--- ── public.user_presence ───────────────────────────────────────────
-DROP POLICY IF EXISTS presence_update_own ON public.user_presence;
-CREATE POLICY presence_update_own ON public.user_presence
-  FOR UPDATE TO authenticated
-  USING (user_id = (SELECT auth.uid()));
+  IF to_regclass('public.user_presence') IS NOT NULL THEN
+    DROP POLICY IF EXISTS presence_update_own ON public.user_presence;
+    CREATE POLICY presence_update_own ON public.user_presence
+      FOR UPDATE TO authenticated
+      USING (user_id = (SELECT auth.uid()));
 
-DROP POLICY IF EXISTS presence_upsert_own ON public.user_presence;
-CREATE POLICY presence_upsert_own ON public.user_presence
-  FOR INSERT TO authenticated
-  WITH CHECK (user_id = (SELECT auth.uid()));
+    DROP POLICY IF EXISTS presence_upsert_own ON public.user_presence;
+    CREATE POLICY presence_upsert_own ON public.user_presence
+      FOR INSERT TO authenticated
+      WITH CHECK (user_id = (SELECT auth.uid()));
+  END IF;
+END $do$;
 
 -- ── core.audit_log ─────────────────────────────────────────────────
 DROP POLICY IF EXISTS audit_select ON core.audit_log;
@@ -118,28 +124,39 @@ CREATE POLICY permisos_usuario_excepcion_select_own ON core.permisos_usuario_exc
 -- on every SELECT. Narrow `_write` to the write-only commands; the
 -- SELECT path is then served only by `_select`.
 
+-- EDITED 2026-04-23 (drift-1.5): rdb.productos_waitry_map and
+-- rdb.waitry_duplicate_candidates are ambient. Skip per-table on fresh DB.
+
 -- ── rdb.productos_waitry_map ───────────────────────────────────────
-DROP POLICY IF EXISTS productos_waitry_map_write ON rdb.productos_waitry_map;
-CREATE POLICY productos_waitry_map_insert ON rdb.productos_waitry_map
-  FOR INSERT TO authenticated
-  WITH CHECK (core.fn_is_admin() OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid));
-CREATE POLICY productos_waitry_map_update ON rdb.productos_waitry_map
-  FOR UPDATE TO authenticated
-  USING      (core.fn_is_admin() OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid))
-  WITH CHECK (core.fn_is_admin() OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid));
-CREATE POLICY productos_waitry_map_delete ON rdb.productos_waitry_map
-  FOR DELETE TO authenticated
-  USING      (core.fn_is_admin() OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid));
+DO $do$ BEGIN
+  IF to_regclass('rdb.productos_waitry_map') IS NOT NULL THEN
+    DROP POLICY IF EXISTS productos_waitry_map_write ON rdb.productos_waitry_map;
+    CREATE POLICY productos_waitry_map_insert ON rdb.productos_waitry_map
+      FOR INSERT TO authenticated
+      WITH CHECK (core.fn_is_admin() OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid));
+    CREATE POLICY productos_waitry_map_update ON rdb.productos_waitry_map
+      FOR UPDATE TO authenticated
+      USING      (core.fn_is_admin() OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid))
+      WITH CHECK (core.fn_is_admin() OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid));
+    CREATE POLICY productos_waitry_map_delete ON rdb.productos_waitry_map
+      FOR DELETE TO authenticated
+      USING      (core.fn_is_admin() OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid));
+  END IF;
+END $do$;
 
 -- ── rdb.waitry_duplicate_candidates ────────────────────────────────
-DROP POLICY IF EXISTS waitry_duplicate_candidates_write ON rdb.waitry_duplicate_candidates;
-CREATE POLICY waitry_duplicate_candidates_insert ON rdb.waitry_duplicate_candidates
-  FOR INSERT TO authenticated
-  WITH CHECK (core.fn_is_admin() OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid));
-CREATE POLICY waitry_duplicate_candidates_update ON rdb.waitry_duplicate_candidates
-  FOR UPDATE TO authenticated
-  USING      (core.fn_is_admin() OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid))
-  WITH CHECK (core.fn_is_admin() OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid));
-CREATE POLICY waitry_duplicate_candidates_delete ON rdb.waitry_duplicate_candidates
-  FOR DELETE TO authenticated
-  USING      (core.fn_is_admin() OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid));
+DO $do$ BEGIN
+  IF to_regclass('rdb.waitry_duplicate_candidates') IS NOT NULL THEN
+    DROP POLICY IF EXISTS waitry_duplicate_candidates_write ON rdb.waitry_duplicate_candidates;
+    CREATE POLICY waitry_duplicate_candidates_insert ON rdb.waitry_duplicate_candidates
+      FOR INSERT TO authenticated
+      WITH CHECK (core.fn_is_admin() OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid));
+    CREATE POLICY waitry_duplicate_candidates_update ON rdb.waitry_duplicate_candidates
+      FOR UPDATE TO authenticated
+      USING      (core.fn_is_admin() OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid))
+      WITH CHECK (core.fn_is_admin() OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid));
+    CREATE POLICY waitry_duplicate_candidates_delete ON rdb.waitry_duplicate_candidates
+      FOR DELETE TO authenticated
+      USING      (core.fn_is_admin() OR core.fn_has_empresa('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid));
+  END IF;
+END $do$;

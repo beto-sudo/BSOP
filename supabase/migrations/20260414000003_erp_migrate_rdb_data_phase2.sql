@@ -42,87 +42,86 @@ CREATE POLICY corte_conteo_denominaciones_access ON erp.corte_conteo_denominacio
 GRANT SELECT, INSERT, UPDATE, DELETE ON erp.corte_conteo_denominaciones TO service_role, authenticated;
 
 -- ============================================================
+-- DATA MIGRATIONS — EDITED 2026-04-23 (drift-1.5)
+-- All INSERT...SELECT FROM rdb.* sources are guarded so a fresh DB
+-- (Preview Branch / dev local) without the legacy tables ends up with empty
+-- erp.* tables, which is the correct state. Production already has data.
+-- ============================================================
+
 -- 2. Migrate rdb.cortes → erp.cortes_caja
--- ============================================================
-INSERT INTO erp.cortes_caja (
-  id, empresa_id, caja_nombre, corte_nombre, tipo, estado,
-  efectivo_inicial, efectivo_contado, observaciones,
-  fecha_operativa, abierto_at, cerrado_at, created_at, updated_at
-)
-SELECT
-  c.id,
-  'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid,
-  c.caja_nombre,
-  COALESCE(c.corte_nombre, 'Corte-' || left(c.id::text, 8)),
-  COALESCE(
-    CASE WHEN c.tipo = 'sin_corte' THEN 'normal' ELSE c.tipo END,
-    'normal'
-  ),
-  -- Map estado: Cerrado→cerrado, Abierto→abierto, etc.
-  CASE LOWER(c.estado)
-    WHEN 'cerrado' THEN 'cerrado'
-    WHEN 'abierto' THEN 'abierto'
-    WHEN 'validado' THEN 'validado'
-    WHEN 'cancelado' THEN 'cancelado'
-    ELSE 'cerrado'
-  END,
-  COALESCE(c.efectivo_inicial, 0),
-  c.efectivo_contado,
-  c.observaciones,
-  c.fecha_operativa,
-  c.hora_inicio,
-  c.hora_fin,
-  c.hora_inicio,
-  c.hora_fin
-FROM rdb.cortes c
-ON CONFLICT (id) DO NOTHING;
+DO $do$ BEGIN
+  IF to_regclass('rdb.cortes') IS NOT NULL THEN
+    INSERT INTO erp.cortes_caja (
+      id, empresa_id, caja_nombre, corte_nombre, tipo, estado,
+      efectivo_inicial, efectivo_contado, observaciones,
+      fecha_operativa, abierto_at, cerrado_at, created_at, updated_at
+    )
+    SELECT
+      c.id, 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid,
+      c.caja_nombre,
+      COALESCE(c.corte_nombre, 'Corte-' || left(c.id::text, 8)),
+      COALESCE(
+        CASE WHEN c.tipo = 'sin_corte' THEN 'normal' ELSE c.tipo END,
+        'normal'
+      ),
+      CASE LOWER(c.estado)
+        WHEN 'cerrado' THEN 'cerrado'
+        WHEN 'abierto' THEN 'abierto'
+        WHEN 'validado' THEN 'validado'
+        WHEN 'cancelado' THEN 'cancelado'
+        ELSE 'cerrado'
+      END,
+      COALESCE(c.efectivo_inicial, 0),
+      c.efectivo_contado, c.observaciones, c.fecha_operativa,
+      c.hora_inicio, c.hora_fin, c.hora_inicio, c.hora_fin
+    FROM rdb.cortes c
+    ON CONFLICT (id) DO NOTHING;
+  END IF;
+END $do$;
 
--- ============================================================
 -- 3. Migrate rdb.movimientos → erp.movimientos_caja
--- ============================================================
-INSERT INTO erp.movimientos_caja (
-  id, empresa_id, corte_id, tipo, monto, concepto, referencia, created_at
-)
-SELECT
-  m.id,
-  'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid,
-  m.corte_id,
-  -- Map tipo: Depósito→entrada, Retiro→salida
-  CASE LOWER(m.tipo)
-    WHEN 'depósito' THEN 'entrada'
-    WHEN 'deposito' THEN 'entrada'
-    WHEN 'retiro' THEN 'salida'
-    WHEN 'fondo' THEN 'fondo'
-    WHEN 'devolucion' THEN 'devolucion'
-    ELSE 'entrada'
-  END,
-  m.monto,
-  m.nota,
-  COALESCE(m.coda_id, m.registrado_por),
-  COALESCE(m.fecha_hora, now())
-FROM rdb.movimientos m
-ON CONFLICT (id) DO NOTHING;
+DO $do$ BEGIN
+  IF to_regclass('rdb.movimientos') IS NOT NULL THEN
+    INSERT INTO erp.movimientos_caja (
+      id, empresa_id, corte_id, tipo, monto, concepto, referencia, created_at
+    )
+    SELECT
+      m.id, 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid, m.corte_id,
+      CASE LOWER(m.tipo)
+        WHEN 'depósito' THEN 'entrada'
+        WHEN 'deposito' THEN 'entrada'
+        WHEN 'retiro' THEN 'salida'
+        WHEN 'fondo' THEN 'fondo'
+        WHEN 'devolucion' THEN 'devolucion'
+        ELSE 'entrada'
+      END,
+      m.monto, m.nota,
+      COALESCE(m.coda_id, m.registrado_por),
+      COALESCE(m.fecha_hora, now())
+    FROM rdb.movimientos m
+    ON CONFLICT (id) DO NOTHING;
+  END IF;
+END $do$;
 
--- ============================================================
 -- 4. Migrate rdb.corte_conteo_denominaciones → erp.corte_conteo_denominaciones
--- (empty in RDB but create the structure for future use)
--- ============================================================
-INSERT INTO erp.corte_conteo_denominaciones (
-  id, empresa_id, corte_id, denominacion, tipo, cantidad, created_at
-)
-SELECT
-  ccd.id,
-  'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid,
-  ccd.corte_id,
-  ccd.denominacion,
-  ccd.tipo,
-  ccd.cantidad,
-  ccd.created_at
-FROM rdb.corte_conteo_denominaciones ccd
-ON CONFLICT (id) DO NOTHING;
+DO $do$ BEGIN
+  IF to_regclass('rdb.corte_conteo_denominaciones') IS NOT NULL THEN
+    INSERT INTO erp.corte_conteo_denominaciones (
+      id, empresa_id, corte_id, denominacion, tipo, cantidad, created_at
+    )
+    SELECT
+      ccd.id, 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid,
+      ccd.corte_id, ccd.denominacion, ccd.tipo, ccd.cantidad, ccd.created_at
+    FROM rdb.corte_conteo_denominaciones ccd
+    ON CONFLICT (id) DO NOTHING;
+  END IF;
+END $do$;
 
 -- ============================================================
 -- 5. Recreate views: now reading from erp.* + rdb.waitry_*
+-- EDITED 2026-04-23 (drift-1.5): views that read from rdb.waitry_* (ambient)
+-- are skipped on a fresh DB. The compatibility views are only meaningful when
+-- the upstream waitry data is present (production / RDB-restore).
 -- ============================================================
 
 -- Drop dependent views first
@@ -134,105 +133,113 @@ DROP VIEW IF EXISTS rdb.v_productos_grupo CASCADE;
 
 -- ============================================================
 -- 5a. v_cortes_totales — reads from erp.cortes_caja + rdb.waitry_*
--- ============================================================
-CREATE VIEW rdb.v_cortes_totales AS
-WITH pagos_por_corte AS (
-    SELECT
-        ped.corte_id,
-        LOWER(p.payment_method) AS method,
-        p.amount
-    FROM rdb.waitry_pedidos ped
-    JOIN rdb.waitry_pagos p ON p.order_id = ped.order_id
-    WHERE ped.corte_id IS NOT NULL
-      AND ped.status != 'order_cancelled'
-),
-pedidos_por_corte AS (
-    SELECT
-        corte_id,
-        COUNT(*) AS total_pedidos
-    FROM rdb.waitry_pedidos
-    WHERE corte_id IS NOT NULL
-      AND status != 'order_cancelled'
-    GROUP BY corte_id
-),
-movimientos_por_corte AS (
-    SELECT
-        corte_id,
-        SUM(CASE WHEN tipo = 'entrada' THEN monto ELSE 0 END) AS total_depositos,
-        SUM(CASE WHEN tipo = 'salida' THEN monto ELSE 0 END) AS total_retiros
-    FROM erp.movimientos_caja
-    WHERE empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
-    GROUP BY corte_id
-)
-SELECT
-    c.id                                                           AS corte_id,
-    c.empresa_id,
-    c.caja_nombre,
-    c.estado,
-    c.abierto_at                                                    AS hora_inicio,
-    c.cerrado_at                                                    AS hora_fin,
-    c.efectivo_inicial,
-    COALESCE(SUM(CASE WHEN pp.method = 'cash'             THEN pp.amount ELSE 0 END), 0) AS ingresos_efectivo,
-    COALESCE(SUM(CASE WHEN pp.method LIKE 'credit_card%'
-                        OR pp.method = 'pos'               THEN pp.amount ELSE 0 END), 0) AS ingresos_tarjeta,
-    COALESCE(SUM(CASE WHEN pp.method = 'stripe'           THEN pp.amount ELSE 0 END), 0) AS ingresos_stripe,
-    COALESCE(SUM(CASE WHEN pp.method = 'other'            THEN pp.amount ELSE 0 END), 0) AS ingresos_transferencias,
-    COALESCE(SUM(pp.amount), 0)                                                           AS total_ingresos,
-    COALESCE(m.total_depositos, 0)                                                        AS depositos,
-    COALESCE(m.total_retiros,   0)                                                        AS retiros,
-    (
-        c.efectivo_inicial
-        + COALESCE(SUM(CASE WHEN pp.method = 'cash' THEN pp.amount ELSE 0 END), 0)
-        + COALESCE(m.total_depositos, 0)
-        - COALESCE(m.total_retiros,   0)
-    )                                                                                     AS efectivo_esperado,
-    COALESCE(pc.total_pedidos, 0)                                                         AS pedidos_count
-FROM erp.cortes_caja c
-LEFT JOIN pagos_por_corte      pp ON pp.corte_id = c.id
-LEFT JOIN pedidos_por_corte    pc ON pc.corte_id = c.id
-LEFT JOIN movimientos_por_corte m ON m.corte_id  = c.id
-WHERE c.empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
-GROUP BY c.id, c.empresa_id, c.caja_nombre, c.estado, c.abierto_at, c.cerrado_at,
-         c.efectivo_inicial, m.total_depositos, m.total_retiros, pc.total_pedidos;
-
-GRANT SELECT ON rdb.v_cortes_totales TO anon, authenticated, service_role;
-
--- ============================================================
 -- 5b. v_cortes_lista — compatibility view for frontend
--- Exposes same columns as before but reads from erp.cortes_caja
+-- Both depend on rdb.waitry_* (ambient). Skipped on fresh DB.
 -- ============================================================
-CREATE VIEW rdb.v_cortes_lista AS
-SELECT
-  c.id,
-  COALESCE(c.corte_nombre, 'Corte-' || left(c.id::text, 8)) AS corte_nombre,
-  NULL::text                                                 AS coda_id,
-  NULL::uuid                                                 AS caja_id,
-  c.caja_nombre,
-  c.fecha_operativa,
-  c.abierto_at                                               AS hora_inicio,
-  c.cerrado_at                                               AS hora_fin,
-  c.estado,
-  NULL::text                                                 AS turno,
-  c.tipo,
-  c.observaciones,
-  c.efectivo_inicial,
-  c.efectivo_contado,
-  NULL::text                                                 AS responsable_apertura,
-  NULL::text                                                 AS responsable_cierre,
-  COALESCE(vt.ingresos_efectivo,       0) AS ingresos_efectivo,
-  COALESCE(vt.ingresos_tarjeta,        0) AS ingresos_tarjeta,
-  COALESCE(vt.ingresos_stripe,         0) AS ingresos_stripe,
-  COALESCE(vt.ingresos_transferencias, 0) AS ingresos_transferencias,
-  COALESCE(vt.total_ingresos,          0) AS total_ingresos,
-  COALESCE(vt.depositos,               0) AS depositos,
-  COALESCE(vt.retiros,                 0) AS retiros,
-  COALESCE(vt.efectivo_esperado,       0) AS efectivo_esperado,
-  COALESCE(vt.pedidos_count,           0) AS pedidos_count
-FROM erp.cortes_caja c
-LEFT JOIN rdb.v_cortes_totales vt ON vt.corte_id = c.id
-WHERE c.empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid;
+DO $do$ BEGIN
+  IF to_regclass('rdb.waitry_pedidos') IS NULL OR to_regclass('rdb.waitry_pagos') IS NULL THEN
+    RETURN;
+  END IF;
 
-GRANT SELECT ON rdb.v_cortes_lista TO anon, authenticated, service_role;
+  EXECUTE $sql$
+    CREATE VIEW rdb.v_cortes_totales AS
+    WITH pagos_por_corte AS (
+        SELECT
+            ped.corte_id,
+            LOWER(p.payment_method) AS method,
+            p.amount
+        FROM rdb.waitry_pedidos ped
+        JOIN rdb.waitry_pagos p ON p.order_id = ped.order_id
+        WHERE ped.corte_id IS NOT NULL
+          AND ped.status != 'order_cancelled'
+    ),
+    pedidos_por_corte AS (
+        SELECT
+            corte_id,
+            COUNT(*) AS total_pedidos
+        FROM rdb.waitry_pedidos
+        WHERE corte_id IS NOT NULL
+          AND status != 'order_cancelled'
+        GROUP BY corte_id
+    ),
+    movimientos_por_corte AS (
+        SELECT
+            corte_id,
+            SUM(CASE WHEN tipo = 'entrada' THEN monto ELSE 0 END) AS total_depositos,
+            SUM(CASE WHEN tipo = 'salida' THEN monto ELSE 0 END) AS total_retiros
+        FROM erp.movimientos_caja
+        WHERE empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
+        GROUP BY corte_id
+    )
+    SELECT
+        c.id                                                           AS corte_id,
+        c.empresa_id,
+        c.caja_nombre,
+        c.estado,
+        c.abierto_at                                                    AS hora_inicio,
+        c.cerrado_at                                                    AS hora_fin,
+        c.efectivo_inicial,
+        COALESCE(SUM(CASE WHEN pp.method = 'cash'             THEN pp.amount ELSE 0 END), 0) AS ingresos_efectivo,
+        COALESCE(SUM(CASE WHEN pp.method LIKE 'credit_card%'
+                            OR pp.method = 'pos'               THEN pp.amount ELSE 0 END), 0) AS ingresos_tarjeta,
+        COALESCE(SUM(CASE WHEN pp.method = 'stripe'           THEN pp.amount ELSE 0 END), 0) AS ingresos_stripe,
+        COALESCE(SUM(CASE WHEN pp.method = 'other'            THEN pp.amount ELSE 0 END), 0) AS ingresos_transferencias,
+        COALESCE(SUM(pp.amount), 0)                                                           AS total_ingresos,
+        COALESCE(m.total_depositos, 0)                                                        AS depositos,
+        COALESCE(m.total_retiros,   0)                                                        AS retiros,
+        (
+            c.efectivo_inicial
+            + COALESCE(SUM(CASE WHEN pp.method = 'cash' THEN pp.amount ELSE 0 END), 0)
+            + COALESCE(m.total_depositos, 0)
+            - COALESCE(m.total_retiros,   0)
+        )                                                                                     AS efectivo_esperado,
+        COALESCE(pc.total_pedidos, 0)                                                         AS pedidos_count
+    FROM erp.cortes_caja c
+    LEFT JOIN pagos_por_corte      pp ON pp.corte_id = c.id
+    LEFT JOIN pedidos_por_corte    pc ON pc.corte_id = c.id
+    LEFT JOIN movimientos_por_corte m ON m.corte_id  = c.id
+    WHERE c.empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
+    GROUP BY c.id, c.empresa_id, c.caja_nombre, c.estado, c.abierto_at, c.cerrado_at,
+             c.efectivo_inicial, m.total_depositos, m.total_retiros, pc.total_pedidos
+  $sql$;
+
+  GRANT SELECT ON rdb.v_cortes_totales TO anon, authenticated, service_role;
+
+  EXECUTE $sql$
+    CREATE VIEW rdb.v_cortes_lista AS
+    SELECT
+      c.id,
+      COALESCE(c.corte_nombre, 'Corte-' || left(c.id::text, 8)) AS corte_nombre,
+      NULL::text                                                 AS coda_id,
+      NULL::uuid                                                 AS caja_id,
+      c.caja_nombre,
+      c.fecha_operativa,
+      c.abierto_at                                               AS hora_inicio,
+      c.cerrado_at                                               AS hora_fin,
+      c.estado,
+      NULL::text                                                 AS turno,
+      c.tipo,
+      c.observaciones,
+      c.efectivo_inicial,
+      c.efectivo_contado,
+      NULL::text                                                 AS responsable_apertura,
+      NULL::text                                                 AS responsable_cierre,
+      COALESCE(vt.ingresos_efectivo,       0) AS ingresos_efectivo,
+      COALESCE(vt.ingresos_tarjeta,        0) AS ingresos_tarjeta,
+      COALESCE(vt.ingresos_stripe,         0) AS ingresos_stripe,
+      COALESCE(vt.ingresos_transferencias, 0) AS ingresos_transferencias,
+      COALESCE(vt.total_ingresos,          0) AS total_ingresos,
+      COALESCE(vt.depositos,               0) AS depositos,
+      COALESCE(vt.retiros,                 0) AS retiros,
+      COALESCE(vt.efectivo_esperado,       0) AS efectivo_esperado,
+      COALESCE(vt.pedidos_count,           0) AS pedidos_count
+    FROM erp.cortes_caja c
+    LEFT JOIN rdb.v_cortes_totales vt ON vt.corte_id = c.id
+    WHERE c.empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
+  $sql$;
+
+  GRANT SELECT ON rdb.v_cortes_lista TO anon, authenticated, service_role;
+END $do$;
 
 -- ============================================================
 -- 5c. v_corte_conteo_totales — reads from erp
@@ -253,63 +260,67 @@ GROUP BY corte_id;
 GRANT SELECT ON rdb.v_corte_conteo_totales TO anon, authenticated, service_role;
 
 -- ============================================================
--- 5d. v_inventario_stock — reads from erp.movimientos_inventario + erp.productos
---     + rdb.waitry_* for sales consumption
+-- 5d. v_inventario_stock — reads from erp.* + rdb.waitry_* (ambient)
+-- Skipped on fresh DB.
 -- ============================================================
-CREATE VIEW rdb.v_inventario_stock AS
-WITH
-movimientos_agg AS (
-  SELECT
-    producto_id,
-    SUM(CASE WHEN tipo_movimiento IN ('entrada','ajuste') THEN cantidad ELSE 0 END) AS total_entradas,
-    SUM(CASE WHEN tipo_movimiento IN ('salida','devolucion') THEN cantidad ELSE 0 END) AS total_salidas_manuales
-  FROM erp.movimientos_inventario
-  WHERE empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
-  GROUP BY producto_id
-),
-ventas_agg AS (
-  SELECT
-    p.id AS padre_id,
-    SUM(wp.quantity) AS total_consumido
-  FROM rdb.waitry_productos wp
-  JOIN rdb.waitry_pedidos ped ON ped.order_id = wp.order_id
-  JOIN erp.productos p        ON p.codigo::text = wp.product_id
-  WHERE ped.status != 'order_canceled'
-    AND p.empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
-  GROUP BY p.id
-)
-SELECT
-  p.id,
-  p.nombre,
-  p.tipo        AS categoria,
-  p.unidad,
-  p.inventariable,
-  COALESCE(pp.costo, 0)  AS costo_unitario,
-  COALESCE(pp.costo, 0)  AS ultimo_costo,
-  0                        AS stock_minimo,
-  1.0                      AS factor_consumo,
-  COALESCE(m.total_entradas, 0)                                 AS total_entradas,
-  COALESCE(v.total_consumido, 0)                                AS total_vendido,
-  COALESCE(m.total_salidas_manuales, 0)                         AS total_mermas,
-  COALESCE(m.total_entradas, 0)
-    - COALESCE(v.total_consumido, 0)
-    - COALESCE(m.total_salidas_manuales, 0)                     AS stock_actual,
-  ROUND(
-    (COALESCE(m.total_entradas, 0)
-     - COALESCE(v.total_consumido, 0)
-     - COALESCE(m.total_salidas_manuales, 0))
-    * COALESCE(pp.costo, 0), 2
-  )                                                             AS valor_inventario,
-  false                                                          AS bajo_minimo
-FROM erp.productos p
-LEFT JOIN movimientos_agg m ON m.producto_id = p.id
-LEFT JOIN ventas_agg      v ON v.padre_id    = p.id
-LEFT JOIN erp.productos_precios pp ON pp.producto_id = p.id AND pp.vigente = true
-WHERE p.inventariable = true
-  AND p.empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
-  AND p.deleted_at IS NULL;
+DO $do$ BEGIN
+  IF to_regclass('rdb.waitry_productos') IS NULL OR to_regclass('rdb.waitry_pedidos') IS NULL THEN
+    RETURN;
+  END IF;
 
-GRANT SELECT ON rdb.v_inventario_stock TO anon, authenticated, service_role;
+  EXECUTE $sql$
+    CREATE VIEW rdb.v_inventario_stock AS
+    WITH
+    movimientos_agg AS (
+      SELECT
+        producto_id,
+        SUM(CASE WHEN tipo_movimiento IN ('entrada','ajuste') THEN cantidad ELSE 0 END) AS total_entradas,
+        SUM(CASE WHEN tipo_movimiento IN ('salida','devolucion') THEN cantidad ELSE 0 END) AS total_salidas_manuales
+      FROM erp.movimientos_inventario
+      WHERE empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
+      GROUP BY producto_id
+    ),
+    ventas_agg AS (
+      SELECT
+        p.id AS padre_id,
+        SUM(wp.quantity) AS total_consumido
+      FROM rdb.waitry_productos wp
+      JOIN rdb.waitry_pedidos ped ON ped.order_id = wp.order_id
+      JOIN erp.productos p        ON p.codigo::text = wp.product_id
+      WHERE ped.status != 'order_canceled'
+        AND p.empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
+      GROUP BY p.id
+    )
+    SELECT
+      p.id, p.nombre, p.tipo AS categoria, p.unidad, p.inventariable,
+      COALESCE(pp.costo, 0)  AS costo_unitario,
+      COALESCE(pp.costo, 0)  AS ultimo_costo,
+      0   AS stock_minimo,
+      1.0 AS factor_consumo,
+      COALESCE(m.total_entradas, 0)                                 AS total_entradas,
+      COALESCE(v.total_consumido, 0)                                AS total_vendido,
+      COALESCE(m.total_salidas_manuales, 0)                         AS total_mermas,
+      COALESCE(m.total_entradas, 0)
+        - COALESCE(v.total_consumido, 0)
+        - COALESCE(m.total_salidas_manuales, 0)                     AS stock_actual,
+      ROUND(
+        (COALESCE(m.total_entradas, 0)
+         - COALESCE(v.total_consumido, 0)
+         - COALESCE(m.total_salidas_manuales, 0))
+        * COALESCE(pp.costo, 0), 2
+      )                                                             AS valor_inventario,
+      false                                                          AS bajo_minimo
+    FROM erp.productos p
+    LEFT JOIN movimientos_agg m ON m.producto_id = p.id
+    LEFT JOIN ventas_agg      v ON v.padre_id    = p.id
+    LEFT JOIN erp.productos_precios pp ON pp.producto_id = p.id AND pp.vigente = true
+    WHERE p.inventariable = true
+      AND p.empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
+      AND p.deleted_at IS NULL
+  $sql$;
+
+  GRANT SELECT ON rdb.v_inventario_stock TO anon, authenticated, service_role;
+END $do$;
 
 -- ============================================================
 -- 5e. v_productos_grupo — reads from erp.productos
