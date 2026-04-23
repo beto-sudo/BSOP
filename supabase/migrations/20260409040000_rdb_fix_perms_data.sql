@@ -108,9 +108,13 @@ declare
 begin
   for i in 1 .. array_length(specs, 1) loop
     if to_regclass('rdb.' || specs[i][1]) is not null then
+      -- Construir el policy name como un único identificador para evitar
+      -- que %I quotee palabras reservadas (ej. "select") y rompa el nombre.
       execute format(
-        'create policy fix_rdb_%I_%I on rdb.%I %s',
-        specs[i][1], specs[i][2], specs[i][1], specs[i][3]
+        'create policy %I on rdb.%I %s',
+        'fix_rdb_' || specs[i][1] || '_' || specs[i][2],
+        specs[i][1],
+        specs[i][3]
       );
     end if;
   end loop;
