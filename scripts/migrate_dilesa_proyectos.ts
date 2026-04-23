@@ -38,6 +38,48 @@ import {
 
 const CODA_TABLE_ID = 'grid-SlvkPAfZNE';
 
+/** Marker para el terreno placeholder usado por anteproyectos retroactivos legacy. */
+const LEGACY_TERRENO_PLACEHOLDER_NOMBRE = '⚠️ Terreno pendiente - legacy proyectos';
+
+/**
+ * Busca o crea el terreno placeholder compartido por los 6 proyectos legacy
+ * de Coda sin anteproyecto/terreno asociado. Se le dejan las columnas
+ * económicas y de gestión en NULL; Beto los edita y re-apunta terreno_id
+ * conforme aparezcan los terrenos reales.
+ */
+async function getOrCreatePlaceholderTerreno(
+  supabase: ReturnType<typeof import('./lib/dilesa-migrate-shared').supaAdmin>,
+  empresaId: string,
+  dryRun: boolean
+): Promise<string | null> {
+  const { data: existing } = await supabase
+    .schema('dilesa' as any)
+    .from('terrenos')
+    .select('id')
+    .eq('empresa_id', empresaId)
+    .eq('nombre', LEGACY_TERRENO_PLACEHOLDER_NOMBRE)
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (existing) return existing.id;
+  if (dryRun) return 'placeholder-dry-run';
+
+  const { data: ins, error } = await supabase
+    .schema('dilesa' as any)
+    .from('terrenos')
+    .insert({
+      empresa_id: empresaId,
+      nombre: LEGACY_TERRENO_PLACEHOLDER_NOMBRE,
+      notas:
+        'Placeholder generado por sprint dilesa-1b para proyectos legacy sin anteproyecto ni terreno en Coda. Reemplazar por el terreno real al editar cada anteproyecto.',
+      etapa: 'por_definir',
+      decision_actual: 'pendiente',
+    })
+    .select('id')
+    .single();
+  if (error) throw new Error(`placeholder terreno: ${error.message}`);
+  return ins.id;
+}
+
 export async function migrateProyectos(): Promise<TableReport> {
   const env = loadEnv();
   const supabase = supaAdmin(env);
@@ -83,24 +125,64 @@ export async function migrateProyectos(): Promise<TableReport> {
       continue;
     }
 
-    // Match anteproyecto por nombre (exacto primero, luego prefix)
+    // Match anteproyecto por nombre exacto. NO usamos prefix match: "Loma Verde 2"
+    // no debe compartir anteproyecto con "Loma Verde" — son proyectos distintos
+    // aunque nombres similares. Si no hay match exacto, se crea retroactivo.
     const nombreKey = nombre.toLowerCase().trim();
     let ap = apByName.get(nombreKey);
     if (!ap) {
-      // Fallback: Coda proyecto "Ampliación Lomas de los Encinos" vs anteproyecto
-      // "Ampliación Lomas de los Encinos" — mismo. Pero también casos donde el
-      // proyecto es un derivado ("Loma Verde 2" → anteproyecto "Loma Verde").
-      for (const [apKey, val] of apByName) {
-        if (nombreKey.startsWith(apKey) || apKey.startsWith(nombreKey)) {
-          ap = val;
-          break;
-        }
+      // Proyecto legacy sin anteproyecto homónimo en Coda. Creamos un
+      // anteproyecto retroactivo en BSOP apuntando al terreno placeholder,
+      // para que el proyecto tenga `terreno_id` (NOT NULL) y quede linkeado
+      // a un anteproyecto. Beto re-apunta al terreno real al editarlo.
+      if (env.dryRun) {
+        console.log(`  [DRY] ${nombre}: sin anteproyecto match → crearía retroactivo con terreno placeholder`);
+        // Marcamos como creado en reporte para DRY, pero sin persistir.
+        report.created++;
+        continue;
       }
-    }
-    if (!ap) {
-      report.warnings.push(`proyecto "${nombre}": sin anteproyecto match (terreno_id NOT NULL requerido)`);
-      report.skipped++;
-      continue;
+
+      const placeholderTerrenoId = await getOrCreatePlaceholderTerreno(
+        supabase,
+        env.empresaId,
+        env.dryRun
+      );
+      if (!placeholderTerrenoId) {
+        report.errors.push(`proyecto "${nombre}": no se pudo obtener placeholder terreno`);
+        if (!env.continueOnError) throw new Error('placeholder terreno failed');
+        report.skipped++;
+        continue;
+      }
+
+      const { data: newAp, error: newApErr } = await supabase
+        .schema('dilesa' as any)
+        .from('anteproyectos')
+        .insert({
+          empresa_id: env.empresaId,
+          nombre,
+          clave_interna: nombre,
+          terreno_id: placeholderTerrenoId,
+          estado: 'en_tramite', // asumimos convertido después; post-pass upgradea
+          notas:
+            'Anteproyecto retroactivo generado por sprint dilesa-1b — el proyecto existía en Coda sin anteproyecto homónimo. Re-apuntar terreno_id al real cuando esté definido.',
+          decision_actual: 'Definir terreno real',
+        })
+        .select('id, terreno_id, tipo_proyecto_id')
+        .single();
+      if (newApErr) {
+        report.errors.push(`proyecto "${nombre}": crear anteproyecto retroactivo — ${newApErr.message}`);
+        if (!env.continueOnError) throw new Error(newApErr.message);
+        report.skipped++;
+        continue;
+      }
+      ap = {
+        id: newAp.id,
+        terreno_id: newAp.terreno_id,
+        tipo_proyecto_id: newAp.tipo_proyecto_id,
+      };
+      apByName.set(nombreKey, ap);
+      report.warnings.push(`proyecto "${nombre}": anteproyecto retroactivo creado con terreno placeholder`);
+      console.log(`  + anteproyecto retroactivo para "${nombre}" → ap=${ap.id.slice(0, 8)}`);
     }
 
     const codigo = str(pick(v, colMap, 'abreviación', 'abreviacion', 'codigo', 'code'));
