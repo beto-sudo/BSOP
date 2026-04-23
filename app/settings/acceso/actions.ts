@@ -18,7 +18,7 @@ export type Usuario = {
 
 // ── RBAC schema types (core.*) ─────────────────────────────────────────────
 export type Empresa = { id: string; nombre: string; slug: string };
-export type Modulo = { id: string; slug: string; nombre: string };
+export type Modulo = { id: string; slug: string; nombre: string; empresa_id: string };
 export type RolRecord = { id: string; nombre: string; empresa_id: string };
 export type PermisoRol = {
   rol_id: string;
