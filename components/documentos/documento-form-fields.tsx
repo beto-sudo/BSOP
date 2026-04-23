@@ -213,12 +213,13 @@ export function DocFormFields({
             placeholder="Resumen breve de lo que contiene el documento..."
             value={form.descripcion}
             onChange={(e) => setForm((f) => ({ ...f, descripcion: e.target.value }))}
-            rows={3}
-            maxLength={500}
+            rows={4}
+            maxLength={1500}
             className="resize-none rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
           />
           <p className="mt-1 text-[10px] text-[var(--text-subtle)]">
-            Se muestra como vista previa en la tabla. Máx 500 caracteres.
+            Se muestra como vista previa en la tabla. Hasta 1500 caracteres para escrituras
+            complejas que contienen varios actos jurídicos.
           </p>
         </div>
       )}

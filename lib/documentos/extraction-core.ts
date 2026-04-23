@@ -62,10 +62,13 @@ export const ParteSchema = z.object({
 export const ExtraccionSchema = z.object({
   descripcion: z
     .string()
-    .max(500)
+    .max(1500)
     .describe(
-      'Resumen humano de 2-3 oraciones (máximo 500 caracteres) de qué contiene el documento. ' +
-        'Debe incluir tipo de operación, partes principales y objeto en lenguaje natural.'
+      'Resumen humano del documento (máximo ~1500 caracteres). Para escrituras simples ' +
+        '(una sola operación), 2-3 oraciones bastan (~300-500 chars). Para escrituras ' +
+        'complejas que contienen varios actos jurídicos en un mismo instrumento ' +
+        '(ej. compraventa + declaración unilateral + liberación de reserva), incluye ' +
+        'cada acto brevemente. Siempre menciona partes principales, objeto y montos clave.'
     ),
   contenido_texto: z
     .string()
