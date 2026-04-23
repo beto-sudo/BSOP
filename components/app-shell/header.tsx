@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, ChevronDown, Moon, Sun } from 'lucide-react';
+import { Bell, Calendar, ChevronDown, Clock, Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useLocale } from '@/lib/i18n';
 import { AccountMenu } from './account-menu';
@@ -75,8 +75,8 @@ export function Header({
         </div>
 
         <div className="flex flex-wrap items-center gap-3 text-sm dark:text-white/70 text-[var(--text)]/70">
-          <InfoPill label="🕐" value={formattedDate} />
-          <InfoPill label="📅" value={t('header.no_events')} />
+          <InfoPill icon={Clock} value={formattedDate} />
+          <InfoPill icon={Calendar} value={t('header.no_events')} />
           <div className="flex items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2">
             {/* Theme toggle */}
             <button

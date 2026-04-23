@@ -11,20 +11,28 @@ export type NavChild = {
   divider?: boolean;
 };
 
+export type NavIconKey =
+  | 'home'
+  | 'id-card'
+  | 'settings'
+  | 'dilesa-logo'
+  | 'rdb-logo'
+  | 'sanren-logo';
+
 export type NavItem = {
   href: string;
   labelKey: string;
-  icon: string;
+  icon: NavIconKey;
   matchPaths?: string[];
   children?: NavChild[];
 };
 
 export const NAV_ITEMS: NavItem[] = [
-  { href: '/', labelKey: 'nav.overview', icon: '🏠' },
+  { href: '/', labelKey: 'nav.overview', icon: 'home' },
   {
     href: '/dilesa',
     labelKey: 'DILESA',
-    icon: 'DILESA_LOGO',
+    icon: 'dilesa-logo',
     children: [
       { label: 'Administración', href: '#', divider: true },
       { label: 'Tareas', href: '/dilesa/admin/tasks' },
@@ -39,7 +47,7 @@ export const NAV_ITEMS: NavItem[] = [
   {
     href: '/rdb',
     labelKey: 'Rincón del Bosque',
-    icon: 'RDB_LOGO',
+    icon: 'rdb-logo',
     children: [
       { label: 'Administración', href: '#', divider: true },
       { label: 'Tareas', href: '/rdb/admin/tasks' },
@@ -63,12 +71,12 @@ export const NAV_ITEMS: NavItem[] = [
   {
     href: '/personas-fisicas',
     labelKey: 'Personas Físicas',
-    icon: '🪪',
+    icon: 'id-card',
   },
   {
     href: '/family',
     labelKey: 'SANREN',
-    icon: 'SANREN_LOGO',
+    icon: 'sanren-logo',
     matchPaths: ['/family', '/travel', '/health'],
     children: [
       { label: 'Viajes', href: '/travel' },
@@ -79,7 +87,7 @@ export const NAV_ITEMS: NavItem[] = [
   {
     href: '/settings',
     labelKey: 'nav.settings',
-    icon: '⚙️',
+    icon: 'settings',
     children: [
       { label: 'Acceso', href: '/settings/acceso' },
       { label: 'Empresas', href: '/settings/empresas' },
