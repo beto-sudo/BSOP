@@ -188,12 +188,9 @@ function normalizeMetricRecords(metrics: unknown[]) {
       const row = sample as Record<string, unknown>;
       const date = parseDate(row.date ?? row.startDate ?? row.sleepStart ?? row.start);
       if (!date) return;
-      const sampleSource =
-        typeof row.source === 'string'
-          ? row.source
-          : typeof entry.source === 'string'
-            ? entry.source
-            : 'Health Auto Export';
+      const rowSource = typeof row.source === 'string' ? row.source.trim() : '';
+      const entrySource = typeof entry.source === 'string' ? entry.source.trim() : '';
+      const sampleSource = rowSource || entrySource || 'Health Auto Export';
 
       if (isSleepAnalysis) {
         const stage = typeof row.value === 'string' ? row.value.trim() : null;
