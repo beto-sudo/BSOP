@@ -4,18 +4,53 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
-import { ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronRight,
+  Home,
+  IdCard,
+  type LucideIcon,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Settings as SettingsIcon,
+} from 'lucide-react';
 import { useLocale } from '@/lib/i18n';
 import { usePermissions } from '@/components/providers';
 import { canAccessEmpresa, canAccessModulo, ROUTE_TO_MODULE } from '@/lib/permissions';
 import {
   NAV_ITEMS,
   NAV_TO_EMPRESA,
+  type NavIconKey,
   type NavItem,
   getActiveSection,
   isItemActive,
   matchesPath,
 } from './nav-config';
+
+const LUCIDE_BY_KEY: Record<'home' | 'id-card' | 'settings', LucideIcon> = {
+  home: Home,
+  'id-card': IdCard,
+  settings: SettingsIcon,
+};
+
+const LOGO_BY_KEY: Record<
+  'dilesa-logo' | 'rdb-logo' | 'sanren-logo',
+  { src: string; alt: string }
+> = {
+  'dilesa-logo': { src: '/logos/dilesa.jpg', alt: 'DILESA' },
+  'rdb-logo': { src: '/logos/rdb.jpg', alt: 'RDB' },
+  'sanren-logo': { src: '/logos/sanren.png', alt: 'SANREN' },
+};
+
+function NavIcon({ icon }: { icon: NavIconKey }) {
+  if (icon in LOGO_BY_KEY) {
+    const { src, alt } = LOGO_BY_KEY[icon as keyof typeof LOGO_BY_KEY];
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={src} alt={alt} className="h-5 w-5 object-contain rounded-sm" />;
+  }
+  const Icon = LUCIDE_BY_KEY[icon as keyof typeof LUCIDE_BY_KEY];
+  return <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />;
+}
 
 /**
  * Left sidebar: logo header, collapsible nav tree, footer credit.
@@ -169,29 +204,7 @@ export function Sidebar({
                     ].join(' ')}
                     title={collapsed ? label : undefined}
                   >
-                    <span className="text-lg leading-none">
-                      {item.icon === 'DILESA_LOGO' ? (
-                        <img
-                          src="/logos/dilesa.jpg"
-                          alt="DILESA"
-                          className="h-5 w-5 object-contain rounded-sm"
-                        />
-                      ) : item.icon === 'RDB_LOGO' ? (
-                        <img
-                          src="/logos/rdb.jpg"
-                          alt="RDB"
-                          className="h-5 w-5 object-contain rounded-sm"
-                        />
-                      ) : item.icon === 'SANREN_LOGO' ? (
-                        <img
-                          src="/logos/sanren.png"
-                          alt="SANREN"
-                          className="h-5 w-5 object-contain rounded-sm"
-                        />
-                      ) : (
-                        item.icon
-                      )}
-                    </span>
+                    <NavIcon icon={item.icon} />
                     {!collapsed ? <span className="min-w-0 flex-1 truncate">{label}</span> : null}
                   </Link>
                   {!collapsed && hasChildren ? (
