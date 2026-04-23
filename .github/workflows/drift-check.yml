@@ -1,0 +1,107 @@
+name: DB Drift Check
+
+# Corre supabase/scripts/drift-check.sql contra la DB en vivo y reporta
+# drifts conocidos (policies redundantes, indexes duplicados, RLS deshabilitado,
+# bloat alto).
+#
+# Política de fallo:
+#   - PRs              → informativo: comenta output pero no falla el job
+#                        (la migración del PR puede ser justamente la cura;
+#                        el comment alcanza para que el reviewer lo vea)
+#   - Schedule semanal → falla si detecta ALERT (alguien dejó drift sin atender)
+#   - workflow_dispatch → falla si detecta ALERT (chequeo on-demand)
+#
+# Triggers:
+#   - PRs que tocan supabase/migrations/** o el script de drift
+#   - Manual desde la pestaña Actions
+#   - Schedule semanal (viernes 10:00 UTC ≈ 4:00 AM CT) — sanity check pasivo
+#
+# Requisitos:
+#   - Secret SUPABASE_DB_URL (pooler connection string del proyecto)
+#     Settings -> Secrets and variables -> Actions
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/scripts/drift-check.sql'
+      - '.github/workflows/drift-check.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '0 10 * * 5'
+
+concurrency:
+  group: drift-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  drift-check:
+    name: Run drift-check.sql
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install postgresql-client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Run drift-check
+        id: drift
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Secret SUPABASE_DB_URL is not configured."
+            exit 1
+          fi
+
+          psql "$SUPABASE_DB_URL" -f supabase/scripts/drift-check.sql \
+            > /tmp/drift-output.txt 2>&1 || true
+
+          {
+            echo 'output<<DRIFTEOF'
+            cat /tmp/drift-output.txt
+            echo 'DRIFTEOF'
+          } >> "$GITHUB_OUTPUT"
+
+          if grep -q '^ALERT' /tmp/drift-output.txt; then
+            echo "has_alert=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_alert=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const output = `${{ steps.drift.outputs.output }}`;
+            const hasAlert = `${{ steps.drift.outputs.has_alert }}` === 'true';
+            const title = hasAlert ? '🔴 Drift check: ALERTS' : '✅ Drift check: clean';
+            const body = `**${title}**\n\n\`\`\`\n${output.slice(0, 60000)}\n\`\`\``;
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });
+
+      - name: Print summary
+        run: |
+          cat /tmp/drift-output.txt
+
+      - name: Fail if ALERT present (schedule + manual only)
+        if: steps.drift.outputs.has_alert == 'true' && github.event_name != 'pull_request'
+        run: |
+          echo "::error::drift-check.sql reported ALERT(s). See output above."
+          exit 1
+
+      - name: Note ALERTs on PR (informational)
+        if: steps.drift.outputs.has_alert == 'true' && github.event_name == 'pull_request'
+        run: |
+          echo "::warning::drift-check.sql reported ALERT(s). PR runs are informational — see comment for detail."

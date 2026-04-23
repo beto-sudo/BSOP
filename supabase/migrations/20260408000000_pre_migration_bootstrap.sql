@@ -277,6 +277,55 @@ CREATE TABLE IF NOT EXISTS rdb.waitry_duplicate_candidates (
   CHECK (order_id_a <> order_id_b)
 );
 
+-- ───────────────────────── rdb.waitry_* índices ambient (drift-2) ─────────────────────────
+-- Índices que viven en prod pero no los crea ninguna migración. Se incluyen
+-- aquí para que Preview Branch tenga el mismo plan de queries que prod.
+-- Performance indexes adicionales (ej. corte_id, status, timestamp) los crea
+-- 20260409170000_rdb_performance_indexes.sql.
+
+CREATE INDEX IF NOT EXISTS waitry_inbound_payload_json_gin_idx
+  ON rdb.waitry_inbound USING gin (payload_json);
+CREATE INDEX IF NOT EXISTS waitry_inbound_processed_idx
+  ON rdb.waitry_inbound (processed, received_at DESC);
+CREATE INDEX IF NOT EXISTS waitry_inbound_received_at_idx
+  ON rdb.waitry_inbound (received_at DESC);
+
+CREATE INDEX IF NOT EXISTS waitry_pedidos_content_hash_idx
+  ON rdb.waitry_pedidos (content_hash);
+CREATE INDEX IF NOT EXISTS waitry_pedidos_duplicate_lookup_idx
+  ON rdb.waitry_pedidos (content_hash, "timestamp");
+CREATE INDEX IF NOT EXISTS waitry_pedidos_last_action_at_idx
+  ON rdb.waitry_pedidos (last_action_at DESC);
+CREATE INDEX IF NOT EXISTS waitry_pedidos_place_timestamp_idx
+  ON rdb.waitry_pedidos (place_id, "timestamp" DESC);
+
+CREATE INDEX IF NOT EXISTS waitry_productos_modifiers_gin_idx
+  ON rdb.waitry_productos USING gin (modifiers);
+CREATE INDEX IF NOT EXISTS waitry_productos_order_id_idx
+  ON rdb.waitry_productos (order_id);
+CREATE INDEX IF NOT EXISTS waitry_productos_product_id_idx
+  ON rdb.waitry_productos (product_id);
+
+CREATE INDEX IF NOT EXISTS waitry_pagos_created_at_idx
+  ON rdb.waitry_pagos (created_at DESC);
+CREATE INDEX IF NOT EXISTS waitry_pagos_payment_method_idx
+  ON rdb.waitry_pagos (payment_method);
+CREATE INDEX IF NOT EXISTS waitry_pagos_no_payment_id_idx
+  ON rdb.waitry_pagos (order_id) WHERE payment_id IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS waitry_pagos_unique_payment_idx
+  ON rdb.waitry_pagos (order_id, payment_id) WHERE payment_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS waitry_dup_candidates_content_hash_idx
+  ON rdb.waitry_duplicate_candidates (content_hash);
+CREATE INDEX IF NOT EXISTS waitry_dup_candidates_order_a_idx
+  ON rdb.waitry_duplicate_candidates (order_id_a);
+CREATE INDEX IF NOT EXISTS waitry_dup_candidates_order_b_idx
+  ON rdb.waitry_duplicate_candidates (order_id_b);
+CREATE UNIQUE INDEX IF NOT EXISTS waitry_dup_candidates_pair_unique_idx
+  ON rdb.waitry_duplicate_candidates (LEAST(order_id_a, order_id_b), GREATEST(order_id_a, order_id_b));
+CREATE INDEX IF NOT EXISTS waitry_dup_candidates_resolved_detected_idx
+  ON rdb.waitry_duplicate_candidates (resolved, detected_at DESC);
+
 -- ───────────────────────── public.health_* (ambient) ─────────────────────────
 -- Originalmente creadas via supabase/health-schema.sql corrido a mano.
 -- Después se mueven a schema `health` por 20260423005443, dejando views compat.

@@ -57,7 +57,7 @@ jobs:
             --schema core \
             --schema erp \
             --schema rdb \
-            --schema dilesa \
+            --schema health \
             --schema playtomic \
             > types/supabase.ts.new
 
@@ -67,7 +67,7 @@ jobs:
             echo "// Auto-generated Supabase database types."
             echo "// Last regenerated: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
             echo "// Project ref: $SUPABASE_PROJECT_REF"
-            echo "// Schemas: public, core, erp, rdb, dilesa, playtomic"
+            echo "// Schemas: public, core, erp, rdb, health, playtomic"
             echo "//"
             echo "// DO NOT EDIT BY HAND. Regenerate via:"
             echo "//   - GitHub Actions: trigger 'DB Types' workflow manually"
@@ -101,7 +101,7 @@ jobs:
           body: |
             Automated regeneration of `types/supabase.ts` from the live Supabase schema.
 
-            **Schemas incluidos:** public, core, erp, rdb, dilesa, playtomic
+            **Schemas incluidos:** public, core, erp, rdb, health, playtomic
 
             Este PR lo abrió el workflow `.github/workflows/db-types.yml`.
             Revisa el diff con cuidado antes de mergear — cualquier cambio aquí
