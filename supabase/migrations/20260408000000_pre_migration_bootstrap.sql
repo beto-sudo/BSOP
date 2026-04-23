@@ -277,4 +277,63 @@ CREATE TABLE IF NOT EXISTS rdb.waitry_duplicate_candidates (
   CHECK (order_id_a <> order_id_b)
 );
 
+-- ───────────────────────── public.health_* (ambient) ─────────────────────────
+-- Originalmente creadas via supabase/health-schema.sql corrido a mano.
+-- Después se mueven a schema `health` por 20260423005443, dejando views compat.
+-- Bootstrap las crea aquí para que la cadena posterior corra igual que en prod.
+CREATE TABLE IF NOT EXISTS public.health_metrics (
+  id           bigserial PRIMARY KEY,
+  metric_name  text NOT NULL,
+  date         timestamptz NOT NULL,
+  value        real NOT NULL,
+  unit         text,
+  source       text,
+  ingested_at  timestamptz DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_health_metrics_upsert ON public.health_metrics (metric_name, date, source);
+
+CREATE TABLE IF NOT EXISTS public.health_workouts (
+  id               bigserial PRIMARY KEY,
+  name             text NOT NULL,
+  start_time       timestamptz NOT NULL,
+  end_time         timestamptz,
+  duration_minutes real,
+  distance_km      real,
+  energy_kcal      real,
+  heart_rate_avg   real,
+  heart_rate_max   real,
+  source           text,
+  raw_json         jsonb,
+  ingested_at      timestamptz DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_health_workouts_upsert ON public.health_workouts (name, start_time, source);
+
+CREATE TABLE IF NOT EXISTS public.health_ecg (
+  id              bigserial PRIMARY KEY,
+  date            timestamptz NOT NULL,
+  classification  text,
+  heart_rate      real,
+  raw_json        jsonb,
+  ingested_at     timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.health_medications (
+  id           bigserial PRIMARY KEY,
+  date         timestamptz NOT NULL,
+  name         text,
+  dose         text,
+  raw_json     jsonb,
+  ingested_at  timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.health_ingest_log (
+  id                  bigserial PRIMARY KEY,
+  received_at         timestamptz DEFAULT now(),
+  payload_size_bytes  integer,
+  metrics_count       integer DEFAULT 0,
+  workouts_count      integer DEFAULT 0,
+  source_ip           text,
+  status              text DEFAULT 'ok'
+);
+
 NOTIFY pgrst, 'reload schema';
