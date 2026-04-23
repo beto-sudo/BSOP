@@ -117,9 +117,14 @@ END;
 $$;
 
 -- Crear el trigger en rdb.cortes (AFTER INSERT)
-DROP TRIGGER IF EXISTS trg_sc_corte_on_open ON rdb.cortes;
-
-CREATE TRIGGER trg_sc_corte_on_open
-AFTER INSERT ON rdb.cortes
-FOR EACH ROW
-EXECUTE FUNCTION rdb.handle_sc_corte_on_open();
+-- EDITED 2026-04-23 (drift-1.5): rdb.cortes ambient.
+DO $do$
+BEGIN
+  IF to_regclass('rdb.cortes') IS NOT NULL THEN
+    DROP TRIGGER IF EXISTS trg_sc_corte_on_open ON rdb.cortes;
+    CREATE TRIGGER trg_sc_corte_on_open
+    AFTER INSERT ON rdb.cortes
+    FOR EACH ROW
+    EXECUTE FUNCTION rdb.handle_sc_corte_on_open();
+  END IF;
+END $do$;

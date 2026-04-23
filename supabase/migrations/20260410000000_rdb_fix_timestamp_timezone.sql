@@ -272,40 +272,40 @@ END;
 $$;
 
 -- ── 2. Re-crear el trigger ───────────────────────────────────
-DROP TRIGGER IF EXISTS trg_process_waitry_inbound ON rdb.waitry_inbound;
+-- EDITED 2026-04-23 (drift-1.5): rdb.waitry_inbound is ambient.
+DO $do$
+BEGIN
+  IF to_regclass('rdb.waitry_inbound') IS NOT NULL THEN
+    DROP TRIGGER IF EXISTS trg_process_waitry_inbound ON rdb.waitry_inbound;
+    CREATE TRIGGER trg_process_waitry_inbound
+    BEFORE INSERT OR UPDATE OF payload_json ON rdb.waitry_inbound
+    FOR EACH ROW
+    EXECUTE FUNCTION rdb.process_waitry_inbound();
+  END IF;
 
-CREATE TRIGGER trg_process_waitry_inbound
-BEFORE INSERT OR UPDATE OF payload_json ON rdb.waitry_inbound
-FOR EACH ROW
-EXECUTE FUNCTION rdb.process_waitry_inbound();
-
--- ── 3. Corregir timestamps erróneos en pedidos existentes ────
--- Los 3 pedidos del 2026-04-09 con timestamp incorrecto.
--- Waitry mandó "21:36:52 BA (UTC-3)", el trigger guardó 18:36:52 UTC
--- (restó 3h en vez de sumar 3h). El valor correcto es 00:36:52 UTC del día siguiente.
--- Corregimos sumando 6 horas (la diferencia exacta observada).
---
--- NOTA: Aplicamos el fix usando el payload original guardado en waitry_inbound
--- para garantizar coherencia total.
-
-UPDATE rdb.waitry_pedidos wp
-SET "timestamp" = (
-  SELECT
-    to_timestamp(
-      wi.payload_json -> 'payload' -> 'timestamp' ->> 'date',
-      'YYYY-MM-DD HH24:MI:SS.US'
-    ) AT TIME ZONE COALESCE(
-      wi.payload_json -> 'payload' -> 'timestamp' ->> 'timezone',
-      'America/Argentina/Buenos_Aires'
-    )
-  FROM rdb.waitry_inbound wi
-  WHERE wi.order_id = wp.order_id
-  ORDER BY wi.created_at DESC
-  LIMIT 1
-),
-updated_at = now()
-WHERE wp.order_id IN ('16827960', '16827748', '16827596')
-  AND wp."timestamp" IS NOT NULL;
+  -- ── 3. Corregir timestamps erróneos en pedidos existentes ────
+  IF to_regclass('rdb.waitry_pedidos') IS NOT NULL
+     AND to_regclass('rdb.waitry_inbound') IS NOT NULL THEN
+    UPDATE rdb.waitry_pedidos wp
+    SET "timestamp" = (
+      SELECT
+        to_timestamp(
+          wi.payload_json -> 'payload' -> 'timestamp' ->> 'date',
+          'YYYY-MM-DD HH24:MI:SS.US'
+        ) AT TIME ZONE COALESCE(
+          wi.payload_json -> 'payload' -> 'timestamp' ->> 'timezone',
+          'America/Argentina/Buenos_Aires'
+        )
+      FROM rdb.waitry_inbound wi
+      WHERE wi.order_id = wp.order_id
+      ORDER BY wi.created_at DESC
+      LIMIT 1
+    ),
+    updated_at = now()
+    WHERE wp.order_id IN ('16827960', '16827748', '16827596')
+      AND wp."timestamp" IS NOT NULL;
+  END IF;
+END $do$;
 
 -- Verificación (solo lectura, no afecta datos):
 -- SELECT order_id, "timestamp" AT TIME ZONE 'America/Matamoros' AS hora_local
