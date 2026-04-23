@@ -525,6 +525,400 @@ export type Database = {
       [_ in never]: never
     }
   }
+  dilesa: {
+    Tables: {
+      clasificacion_inmobiliaria: {
+        Row: {
+          activo: boolean
+          coda_row_id: string | null
+          codigo: string
+          created_at: string
+          deleted_at: string | null
+          descripcion: string | null
+          empresa_id: string | null
+          id: string
+          nombre: string
+          orden: number
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          coda_row_id?: string | null
+          codigo: string
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string | null
+          id?: string
+          nombre: string
+          orden?: number
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          coda_row_id?: string | null
+          codigo?: string
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string | null
+          id?: string
+          nombre?: string
+          orden?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      etapas_construccion: {
+        Row: {
+          activo: boolean
+          coda_row_id: string | null
+          codigo: string
+          created_at: string
+          deleted_at: string | null
+          descripcion: string | null
+          empresa_id: string | null
+          id: string
+          nombre: string
+          orden: number
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          coda_row_id?: string | null
+          codigo: string
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string | null
+          id?: string
+          nombre: string
+          orden?: number
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          coda_row_id?: string | null
+          codigo?: string
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string | null
+          id?: string
+          nombre?: string
+          orden?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      fases_inventario: {
+        Row: {
+          activo: boolean
+          coda_row_id: string | null
+          codigo: string
+          created_at: string
+          deleted_at: string | null
+          descripcion: string | null
+          empresa_id: string | null
+          id: string
+          nombre: string
+          orden: number
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          coda_row_id?: string | null
+          codigo: string
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string | null
+          id?: string
+          nombre: string
+          orden?: number
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          coda_row_id?: string | null
+          codigo?: string
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string | null
+          id?: string
+          nombre?: string
+          orden?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      fases_urbanizacion: {
+        Row: {
+          activo: boolean
+          coda_row_id: string | null
+          codigo: string
+          created_at: string
+          deleted_at: string | null
+          descripcion: string | null
+          empresa_id: string | null
+          id: string
+          nombre: string
+          orden: number
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          coda_row_id?: string | null
+          codigo: string
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string | null
+          id?: string
+          nombre: string
+          orden?: number
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          coda_row_id?: string | null
+          codigo?: string
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string | null
+          id?: string
+          nombre?: string
+          orden?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      forma_pago: {
+        Row: {
+          activo: boolean
+          coda_row_id: string | null
+          codigo: string
+          created_at: string
+          deleted_at: string | null
+          descripcion: string | null
+          empresa_id: string | null
+          id: string
+          nombre: string
+          orden: number
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          coda_row_id?: string | null
+          codigo: string
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string | null
+          id?: string
+          nombre: string
+          orden?: number
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          coda_row_id?: string | null
+          codigo?: string
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string | null
+          id?: string
+          nombre?: string
+          orden?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tipo_credito: {
+        Row: {
+          activo: boolean
+          coda_row_id: string | null
+          codigo: string
+          created_at: string
+          deleted_at: string | null
+          descripcion: string | null
+          empresa_id: string | null
+          id: string
+          nombre: string
+          orden: number
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          coda_row_id?: string | null
+          codigo: string
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string | null
+          id?: string
+          nombre: string
+          orden?: number
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          coda_row_id?: string | null
+          codigo?: string
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string | null
+          id?: string
+          nombre?: string
+          orden?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tipo_deposito: {
+        Row: {
+          activo: boolean
+          coda_row_id: string | null
+          codigo: string
+          created_at: string
+          deleted_at: string | null
+          descripcion: string | null
+          empresa_id: string | null
+          id: string
+          nombre: string
+          orden: number
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          coda_row_id?: string | null
+          codigo: string
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string | null
+          id?: string
+          nombre: string
+          orden?: number
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          coda_row_id?: string | null
+          codigo?: string
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string | null
+          id?: string
+          nombre?: string
+          orden?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tipo_proyecto: {
+        Row: {
+          activo: boolean
+          coda_row_id: string | null
+          codigo: string
+          created_at: string
+          deleted_at: string | null
+          descripcion: string | null
+          empresa_id: string | null
+          id: string
+          nombre: string
+          orden: number
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          coda_row_id?: string | null
+          codigo: string
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string | null
+          id?: string
+          nombre: string
+          orden?: number
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          coda_row_id?: string | null
+          codigo?: string
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string | null
+          id?: string
+          nombre?: string
+          orden?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tipo_trabajo: {
+        Row: {
+          activo: boolean
+          coda_row_id: string | null
+          codigo: string
+          created_at: string
+          deleted_at: string | null
+          descripcion: string | null
+          empresa_id: string | null
+          id: string
+          nombre: string
+          orden: number
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          coda_row_id?: string | null
+          codigo: string
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string | null
+          id?: string
+          nombre: string
+          orden?: number
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          coda_row_id?: string | null
+          codigo?: string
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string | null
+          id?: string
+          nombre?: string
+          orden?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   erp: {
     Tables: {
       activos: {
@@ -4093,6 +4487,23 @@ export type Database = {
       [_ in never]: never
     }
   }
+  maquinaria: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   playtomic: {
     Tables: {
       booking_participants: {
@@ -5783,6 +6194,9 @@ export const Constants = {
   core: {
     Enums: {},
   },
+  dilesa: {
+    Enums: {},
+  },
   erp: {
     Enums: {
       clasificacion_producto: [
@@ -5794,6 +6208,9 @@ export const Constants = {
     },
   },
   health: {
+    Enums: {},
+  },
+  maquinaria: {
     Enums: {},
   },
   playtomic: {
