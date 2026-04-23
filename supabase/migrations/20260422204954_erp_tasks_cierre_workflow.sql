@@ -21,18 +21,20 @@ ALTER TABLE erp.tasks ADD CONSTRAINT tasks_estado_check
                     'completado', 'cancelado', 'cierre_solicitado'));
 
 -- 2. Columnas de tracking del workflow
+-- EDITED 2026-04-23 (drift-1.5): ADD COLUMN IF NOT EXISTS para idempotencia
+-- (en Preview Branches el bootstrap ya tiene las columnas con el state actual de prod).
 ALTER TABLE erp.tasks
-  ADD COLUMN cierre_solicitado_en     timestamptz,
-  ADD COLUMN cierre_solicitado_por    uuid REFERENCES erp.empleados(id) ON DELETE SET NULL,
-  ADD COLUMN cierre_aprobado_en       timestamptz,
-  ADD COLUMN cierre_aprobado_por      uuid REFERENCES erp.empleados(id) ON DELETE SET NULL,
-  ADD COLUMN cierre_rechazado_en      timestamptz,
-  ADD COLUMN cierre_rechazado_por     uuid REFERENCES erp.empleados(id) ON DELETE SET NULL,
-  ADD COLUMN cierre_rechazado_motivo  text;
+  ADD COLUMN IF NOT EXISTS cierre_solicitado_en     timestamptz,
+  ADD COLUMN IF NOT EXISTS cierre_solicitado_por    uuid REFERENCES erp.empleados(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS cierre_aprobado_en       timestamptz,
+  ADD COLUMN IF NOT EXISTS cierre_aprobado_por      uuid REFERENCES erp.empleados(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS cierre_rechazado_en      timestamptz,
+  ADD COLUMN IF NOT EXISTS cierre_rechazado_por     uuid REFERENCES erp.empleados(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS cierre_rechazado_motivo  text;
 
 -- 3. Flag "dirección" en roles
 ALTER TABLE core.roles
-  ADD COLUMN puede_aprobar_cierres boolean NOT NULL DEFAULT false;
+  ADD COLUMN IF NOT EXISTS puede_aprobar_cierres boolean NOT NULL DEFAULT false;
 
 -- 4. Índice parcial para la vista de aprobación (PR 3)
 CREATE INDEX IF NOT EXISTS idx_tasks_cierre_solicitado
