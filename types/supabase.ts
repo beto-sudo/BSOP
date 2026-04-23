@@ -705,6 +705,326 @@ export type Database = {
           },
         ]
       }
+      bitacora_obra: {
+        Row: {
+          actividades_realizadas: string | null
+          coda_row_id: string | null
+          condiciones_clima: string | null
+          construccion_lote_id: string
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          fecha: string
+          fotos_urls: string[] | null
+          id: string
+          incidencias: string | null
+          materiales_recibidos: Json | null
+          personal_presente: number | null
+          supervisor_id: string | null
+          temperatura_c: number | null
+          updated_at: string
+        }
+        Insert: {
+          actividades_realizadas?: string | null
+          coda_row_id?: string | null
+          condiciones_clima?: string | null
+          construccion_lote_id: string
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          fecha: string
+          fotos_urls?: string[] | null
+          id?: string
+          incidencias?: string | null
+          materiales_recibidos?: Json | null
+          personal_presente?: number | null
+          supervisor_id?: string | null
+          temperatura_c?: number | null
+          updated_at?: string
+        }
+        Update: {
+          actividades_realizadas?: string | null
+          coda_row_id?: string | null
+          condiciones_clima?: string | null
+          construccion_lote_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          fecha?: string
+          fotos_urls?: string[] | null
+          id?: string
+          incidencias?: string | null
+          materiales_recibidos?: Json | null
+          personal_presente?: number | null
+          supervisor_id?: string | null
+          temperatura_c?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bitacora_obra_construccion_lote_id_fkey"
+            columns: ["construccion_lote_id"]
+            isOneToOne: false
+            referencedRelation: "construccion_lote"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bitacora_obra_construccion_lote_id_fkey"
+            columns: ["construccion_lote_id"]
+            isOneToOne: false
+            referencedRelation: "v_lotes_estatus"
+            referencedColumns: ["construccion_id"]
+          },
+          {
+            foreignKeyName: "bitacora_obra_construccion_lote_id_fkey"
+            columns: ["construccion_lote_id"]
+            isOneToOne: false
+            referencedRelation: "v_obra_resumen"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklist_maestro: {
+        Row: {
+          activa: boolean
+          categoria: string | null
+          coda_row_id: string | null
+          created_at: string
+          deleted_at: string | null
+          descripcion: string | null
+          empresa_id: string
+          etapa_construccion_id: string | null
+          id: string
+          nombre: string
+          prototipo_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          categoria?: string | null
+          coda_row_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id: string
+          etapa_construccion_id?: string | null
+          id?: string
+          nombre: string
+          prototipo_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          categoria?: string | null
+          coda_row_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string
+          etapa_construccion_id?: string | null
+          id?: string
+          nombre?: string
+          prototipo_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_maestro_etapa_construccion_id_fkey"
+            columns: ["etapa_construccion_id"]
+            isOneToOne: false
+            referencedRelation: "etapas_construccion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_maestro_prototipo_id_fkey"
+            columns: ["prototipo_id"]
+            isOneToOne: false
+            referencedRelation: "prototipos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklist_maestro_items: {
+        Row: {
+          checklist_id: string
+          coda_row_id: string | null
+          created_at: string
+          criterio_aceptacion: string | null
+          deleted_at: string | null
+          descripcion_item: string
+          empresa_id: string
+          id: string
+          obligatorio: boolean
+          orden: number
+          updated_at: string
+        }
+        Insert: {
+          checklist_id: string
+          coda_row_id?: string | null
+          created_at?: string
+          criterio_aceptacion?: string | null
+          deleted_at?: string | null
+          descripcion_item: string
+          empresa_id: string
+          id?: string
+          obligatorio?: boolean
+          orden: number
+          updated_at?: string
+        }
+        Update: {
+          checklist_id?: string
+          coda_row_id?: string | null
+          created_at?: string
+          criterio_aceptacion?: string | null
+          deleted_at?: string | null
+          descripcion_item?: string
+          empresa_id?: string
+          id?: string
+          obligatorio?: boolean
+          orden?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_maestro_items_checklist_id_fkey"
+            columns: ["checklist_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_maestro"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklist_supervision: {
+        Row: {
+          checklist_maestro_id: string
+          coda_row_id: string | null
+          construccion_lote_id: string
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          fecha_inspeccion: string
+          id: string
+          observaciones_generales: string | null
+          resultado: string
+          supervisor_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          checklist_maestro_id: string
+          coda_row_id?: string | null
+          construccion_lote_id: string
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          fecha_inspeccion: string
+          id?: string
+          observaciones_generales?: string | null
+          resultado: string
+          supervisor_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          checklist_maestro_id?: string
+          coda_row_id?: string | null
+          construccion_lote_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          fecha_inspeccion?: string
+          id?: string
+          observaciones_generales?: string | null
+          resultado?: string
+          supervisor_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_supervision_checklist_maestro_id_fkey"
+            columns: ["checklist_maestro_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_maestro"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_supervision_construccion_lote_id_fkey"
+            columns: ["construccion_lote_id"]
+            isOneToOne: false
+            referencedRelation: "construccion_lote"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_supervision_construccion_lote_id_fkey"
+            columns: ["construccion_lote_id"]
+            isOneToOne: false
+            referencedRelation: "v_lotes_estatus"
+            referencedColumns: ["construccion_id"]
+          },
+          {
+            foreignKeyName: "checklist_supervision_construccion_lote_id_fkey"
+            columns: ["construccion_lote_id"]
+            isOneToOne: false
+            referencedRelation: "v_obra_resumen"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklist_supervision_resultados: {
+        Row: {
+          checklist_item_id: string
+          checklist_supervision_id: string
+          coda_row_id: string | null
+          created_at: string
+          cumple: boolean
+          deleted_at: string | null
+          empresa_id: string
+          evidencia_url: string | null
+          id: string
+          observaciones: string | null
+          updated_at: string
+        }
+        Insert: {
+          checklist_item_id: string
+          checklist_supervision_id: string
+          coda_row_id?: string | null
+          created_at?: string
+          cumple: boolean
+          deleted_at?: string | null
+          empresa_id: string
+          evidencia_url?: string | null
+          id?: string
+          observaciones?: string | null
+          updated_at?: string
+        }
+        Update: {
+          checklist_item_id?: string
+          checklist_supervision_id?: string
+          coda_row_id?: string | null
+          created_at?: string
+          cumple?: boolean
+          deleted_at?: string | null
+          empresa_id?: string
+          evidencia_url?: string | null
+          id?: string
+          observaciones?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_supervision_resultados_checklist_item_id_fkey"
+            columns: ["checklist_item_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_maestro_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_supervision_resultados_checklist_supervision_id_fkey"
+            columns: ["checklist_supervision_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_supervision"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clasificacion_inmobiliaria: {
         Row: {
           activo: boolean
@@ -850,6 +1170,210 @@ export type Database = {
             columns: ["prototipo_id"]
             isOneToOne: false
             referencedRelation: "prototipos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_construccion_lote_contratista_principal"
+            columns: ["contratista_principal_id"]
+            isOneToOne: false
+            referencedRelation: "contratistas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contratistas: {
+        Row: {
+          calificacion: number | null
+          coda_row_id: string | null
+          codigo: string | null
+          convenio_vigente: boolean
+          created_at: string
+          decision_actual: string | null
+          deleted_at: string | null
+          empresa_id: string
+          especialidad: string | null
+          etapa: string | null
+          fecha_alta: string | null
+          fecha_ultima_revision: string | null
+          id: string
+          observaciones: string | null
+          persona_id: string
+          prioridad: string | null
+          responsable_id: string | null
+          siguiente_accion: string | null
+          tipo_trabajo_principal_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          calificacion?: number | null
+          coda_row_id?: string | null
+          codigo?: string | null
+          convenio_vigente?: boolean
+          created_at?: string
+          decision_actual?: string | null
+          deleted_at?: string | null
+          empresa_id: string
+          especialidad?: string | null
+          etapa?: string | null
+          fecha_alta?: string | null
+          fecha_ultima_revision?: string | null
+          id?: string
+          observaciones?: string | null
+          persona_id: string
+          prioridad?: string | null
+          responsable_id?: string | null
+          siguiente_accion?: string | null
+          tipo_trabajo_principal_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          calificacion?: number | null
+          coda_row_id?: string | null
+          codigo?: string | null
+          convenio_vigente?: boolean
+          created_at?: string
+          decision_actual?: string | null
+          deleted_at?: string | null
+          empresa_id?: string
+          especialidad?: string | null
+          etapa?: string | null
+          fecha_alta?: string | null
+          fecha_ultima_revision?: string | null
+          id?: string
+          observaciones?: string | null
+          persona_id?: string
+          prioridad?: string | null
+          responsable_id?: string | null
+          siguiente_accion?: string | null
+          tipo_trabajo_principal_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contratistas_tipo_trabajo_principal_id_fkey"
+            columns: ["tipo_trabajo_principal_id"]
+            isOneToOne: false
+            referencedRelation: "tipo_trabajo"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contratos_construccion: {
+        Row: {
+          archivo_contrato_url: string | null
+          coda_row_id: string | null
+          codigo_contrato: string | null
+          construccion_lote_id: string
+          contratista_id: string
+          created_at: string
+          decision_actual: string | null
+          deleted_at: string | null
+          empresa_id: string
+          estado: string
+          etapa: string | null
+          fecha_firma: string | null
+          fecha_inicio_estimada: string | null
+          fecha_terminacion_estimada: string | null
+          fecha_terminacion_real: string | null
+          fecha_ultima_revision: string | null
+          id: string
+          monto_total: number | null
+          observaciones: string | null
+          porcentaje_anticipo: number | null
+          prioridad: string | null
+          responsable_id: string | null
+          siguiente_accion: string | null
+          tipo_trabajo_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          archivo_contrato_url?: string | null
+          coda_row_id?: string | null
+          codigo_contrato?: string | null
+          construccion_lote_id: string
+          contratista_id: string
+          created_at?: string
+          decision_actual?: string | null
+          deleted_at?: string | null
+          empresa_id: string
+          estado?: string
+          etapa?: string | null
+          fecha_firma?: string | null
+          fecha_inicio_estimada?: string | null
+          fecha_terminacion_estimada?: string | null
+          fecha_terminacion_real?: string | null
+          fecha_ultima_revision?: string | null
+          id?: string
+          monto_total?: number | null
+          observaciones?: string | null
+          porcentaje_anticipo?: number | null
+          prioridad?: string | null
+          responsable_id?: string | null
+          siguiente_accion?: string | null
+          tipo_trabajo_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          archivo_contrato_url?: string | null
+          coda_row_id?: string | null
+          codigo_contrato?: string | null
+          construccion_lote_id?: string
+          contratista_id?: string
+          created_at?: string
+          decision_actual?: string | null
+          deleted_at?: string | null
+          empresa_id?: string
+          estado?: string
+          etapa?: string | null
+          fecha_firma?: string | null
+          fecha_inicio_estimada?: string | null
+          fecha_terminacion_estimada?: string | null
+          fecha_terminacion_real?: string | null
+          fecha_ultima_revision?: string | null
+          id?: string
+          monto_total?: number | null
+          observaciones?: string | null
+          porcentaje_anticipo?: number | null
+          prioridad?: string | null
+          responsable_id?: string | null
+          siguiente_accion?: string | null
+          tipo_trabajo_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contratos_construccion_construccion_lote_id_fkey"
+            columns: ["construccion_lote_id"]
+            isOneToOne: false
+            referencedRelation: "construccion_lote"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_construccion_construccion_lote_id_fkey"
+            columns: ["construccion_lote_id"]
+            isOneToOne: false
+            referencedRelation: "v_lotes_estatus"
+            referencedColumns: ["construccion_id"]
+          },
+          {
+            foreignKeyName: "contratos_construccion_construccion_lote_id_fkey"
+            columns: ["construccion_lote_id"]
+            isOneToOne: false
+            referencedRelation: "v_obra_resumen"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_construccion_contratista_id_fkey"
+            columns: ["contratista_id"]
+            isOneToOne: false
+            referencedRelation: "contratistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_construccion_tipo_trabajo_id_fkey"
+            columns: ["tipo_trabajo_id"]
+            isOneToOne: false
+            referencedRelation: "tipo_trabajo"
             referencedColumns: ["id"]
           },
         ]
@@ -1188,6 +1712,126 @@ export type Database = {
           },
         ]
       }
+      plantilla_tareas_construccion: {
+        Row: {
+          activa: boolean
+          coda_row_id: string | null
+          created_at: string
+          deleted_at: string | null
+          descripcion: string | null
+          empresa_id: string
+          id: string
+          nombre: string
+          prototipo_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          coda_row_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id: string
+          id?: string
+          nombre: string
+          prototipo_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          coda_row_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string
+          id?: string
+          nombre?: string
+          prototipo_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plantilla_tareas_construccion_prototipo_id_fkey"
+            columns: ["prototipo_id"]
+            isOneToOne: false
+            referencedRelation: "prototipos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plantilla_tareas_construccion_items: {
+        Row: {
+          coda_row_id: string | null
+          created_at: string
+          deleted_at: string | null
+          descripcion: string | null
+          duracion_dias_estimada: number | null
+          empresa_id: string
+          etapa_construccion_id: string | null
+          id: string
+          nombre_tarea: string
+          obligatoria: boolean
+          orden: number
+          plantilla_id: string
+          tipo_trabajo_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          coda_row_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          duracion_dias_estimada?: number | null
+          empresa_id: string
+          etapa_construccion_id?: string | null
+          id?: string
+          nombre_tarea: string
+          obligatoria?: boolean
+          orden: number
+          plantilla_id: string
+          tipo_trabajo_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          coda_row_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          duracion_dias_estimada?: number | null
+          empresa_id?: string
+          etapa_construccion_id?: string | null
+          id?: string
+          nombre_tarea?: string
+          obligatoria?: boolean
+          orden?: number
+          plantilla_id?: string
+          tipo_trabajo_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plantilla_tareas_construccion_items_etapa_construccion_id_fkey"
+            columns: ["etapa_construccion_id"]
+            isOneToOne: false
+            referencedRelation: "etapas_construccion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plantilla_tareas_construccion_items_plantilla_id_fkey"
+            columns: ["plantilla_id"]
+            isOneToOne: false
+            referencedRelation: "plantilla_tareas_construccion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plantilla_tareas_construccion_items_tipo_trabajo_id_fkey"
+            columns: ["tipo_trabajo_id"]
+            isOneToOne: false
+            referencedRelation: "tipo_trabajo"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       prototipos: {
         Row: {
           banos: number | null
@@ -1407,6 +2051,198 @@ export type Database = {
             columns: ["tipo_proyecto_id"]
             isOneToOne: false
             referencedRelation: "tipo_proyecto"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recepciones_contratista: {
+        Row: {
+          avance_pct: number | null
+          coda_row_id: string | null
+          contrato_construccion_id: string
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          evidencias_urls: string[] | null
+          fecha_recepcion: string
+          id: string
+          monto_recibido: number | null
+          observaciones: string | null
+          supervisor_id: string | null
+          tipo_recepcion: string
+          updated_at: string
+        }
+        Insert: {
+          avance_pct?: number | null
+          coda_row_id?: string | null
+          contrato_construccion_id: string
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          evidencias_urls?: string[] | null
+          fecha_recepcion: string
+          id?: string
+          monto_recibido?: number | null
+          observaciones?: string | null
+          supervisor_id?: string | null
+          tipo_recepcion?: string
+          updated_at?: string
+        }
+        Update: {
+          avance_pct?: number | null
+          coda_row_id?: string | null
+          contrato_construccion_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          evidencias_urls?: string[] | null
+          fecha_recepcion?: string
+          id?: string
+          monto_recibido?: number | null
+          observaciones?: string | null
+          supervisor_id?: string | null
+          tipo_recepcion?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recepciones_contratista_contrato_construccion_id_fkey"
+            columns: ["contrato_construccion_id"]
+            isOneToOne: false
+            referencedRelation: "contratos_construccion"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tareas_construccion: {
+        Row: {
+          avance_pct: number
+          coda_row_id: string | null
+          construccion_lote_id: string
+          contratista_id: string | null
+          created_at: string
+          decision_actual: string | null
+          deleted_at: string | null
+          descripcion: string | null
+          empresa_id: string
+          estado: string
+          etapa: string | null
+          etapa_construccion_id: string | null
+          evidencias_urls: string[] | null
+          fecha_fin_estimada: string | null
+          fecha_fin_real: string | null
+          fecha_inicio_estimada: string | null
+          fecha_inicio_real: string | null
+          fecha_ultima_revision: string | null
+          id: string
+          nombre: string
+          observaciones: string | null
+          orden: number | null
+          plantilla_item_id: string | null
+          prioridad: string | null
+          responsable_id: string | null
+          siguiente_accion: string | null
+          updated_at: string
+        }
+        Insert: {
+          avance_pct?: number
+          coda_row_id?: string | null
+          construccion_lote_id: string
+          contratista_id?: string | null
+          created_at?: string
+          decision_actual?: string | null
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id: string
+          estado?: string
+          etapa?: string | null
+          etapa_construccion_id?: string | null
+          evidencias_urls?: string[] | null
+          fecha_fin_estimada?: string | null
+          fecha_fin_real?: string | null
+          fecha_inicio_estimada?: string | null
+          fecha_inicio_real?: string | null
+          fecha_ultima_revision?: string | null
+          id?: string
+          nombre: string
+          observaciones?: string | null
+          orden?: number | null
+          plantilla_item_id?: string | null
+          prioridad?: string | null
+          responsable_id?: string | null
+          siguiente_accion?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avance_pct?: number
+          coda_row_id?: string | null
+          construccion_lote_id?: string
+          contratista_id?: string | null
+          created_at?: string
+          decision_actual?: string | null
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string
+          estado?: string
+          etapa?: string | null
+          etapa_construccion_id?: string | null
+          evidencias_urls?: string[] | null
+          fecha_fin_estimada?: string | null
+          fecha_fin_real?: string | null
+          fecha_inicio_estimada?: string | null
+          fecha_inicio_real?: string | null
+          fecha_ultima_revision?: string | null
+          id?: string
+          nombre?: string
+          observaciones?: string | null
+          orden?: number | null
+          plantilla_item_id?: string | null
+          prioridad?: string | null
+          responsable_id?: string | null
+          siguiente_accion?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tareas_construccion_construccion_lote_id_fkey"
+            columns: ["construccion_lote_id"]
+            isOneToOne: false
+            referencedRelation: "construccion_lote"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tareas_construccion_construccion_lote_id_fkey"
+            columns: ["construccion_lote_id"]
+            isOneToOne: false
+            referencedRelation: "v_lotes_estatus"
+            referencedColumns: ["construccion_id"]
+          },
+          {
+            foreignKeyName: "tareas_construccion_construccion_lote_id_fkey"
+            columns: ["construccion_lote_id"]
+            isOneToOne: false
+            referencedRelation: "v_obra_resumen"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tareas_construccion_contratista_id_fkey"
+            columns: ["contratista_id"]
+            isOneToOne: false
+            referencedRelation: "contratistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tareas_construccion_etapa_construccion_id_fkey"
+            columns: ["etapa_construccion_id"]
+            isOneToOne: false
+            referencedRelation: "etapas_construccion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tareas_construccion_plantilla_item_id_fkey"
+            columns: ["plantilla_item_id"]
+            isOneToOne: false
+            referencedRelation: "plantilla_tareas_construccion_items"
             referencedColumns: ["id"]
           },
         ]
@@ -1933,6 +2769,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "fk_construccion_lote_contratista_principal"
+            columns: ["contratista_principal_id"]
+            isOneToOne: false
+            referencedRelation: "contratistas"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "lotes_fase_inventario_id_fkey"
             columns: ["fase_inventario_id"]
             isOneToOne: false
@@ -1951,6 +2794,69 @@ export type Database = {
             columns: ["proyecto_id"]
             isOneToOne: false
             referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_obra_resumen: {
+        Row: {
+          avance_tareas_pct: number | null
+          construccion_avance_pct: number | null
+          contratista_principal_id: string | null
+          contratista_principal_nombre: string | null
+          contratos_activos: number | null
+          costo_acumulado: number | null
+          created_at: string | null
+          empresa_id: string | null
+          etapa_construccion_id: string | null
+          fecha_estimada_entrega: string | null
+          fecha_inicio_obra: string | null
+          fecha_real_entrega: string | null
+          id: string | null
+          lote_id: string | null
+          presupuesto_asignado: number | null
+          prototipo_id: string | null
+          tareas_completadas: number | null
+          total_tareas: number | null
+          ultima_bitacora_fecha: string | null
+          ultima_inspeccion_fecha: string | null
+          ultima_inspeccion_resultado: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construccion_lote_etapa_construccion_id_fkey"
+            columns: ["etapa_construccion_id"]
+            isOneToOne: false
+            referencedRelation: "etapas_construccion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construccion_lote_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construccion_lote_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "v_lotes_estatus"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construccion_lote_prototipo_id_fkey"
+            columns: ["prototipo_id"]
+            isOneToOne: false
+            referencedRelation: "prototipos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_construccion_lote_contratista_principal"
+            columns: ["contratista_principal_id"]
+            isOneToOne: false
+            referencedRelation: "contratistas"
             referencedColumns: ["id"]
           },
         ]
