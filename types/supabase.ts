@@ -747,6 +747,113 @@ export type Database = {
         }
         Relationships: []
       }
+      construccion_lote: {
+        Row: {
+          avance_pct: number
+          coda_row_id: string | null
+          contratista_principal_id: string | null
+          costo_acumulado: number
+          created_at: string
+          decision_actual: string | null
+          deleted_at: string | null
+          empresa_id: string
+          etapa: string | null
+          etapa_construccion_id: string | null
+          fecha_estimada_entrega: string | null
+          fecha_inicio_obra: string | null
+          fecha_real_entrega: string | null
+          fecha_ultima_revision: string | null
+          id: string
+          lote_id: string
+          observaciones: string | null
+          presupuesto_asignado: number | null
+          prioridad: string | null
+          prototipo_id: string
+          responsable_id: string | null
+          siguiente_accion: string | null
+          updated_at: string
+        }
+        Insert: {
+          avance_pct?: number
+          coda_row_id?: string | null
+          contratista_principal_id?: string | null
+          costo_acumulado?: number
+          created_at?: string
+          decision_actual?: string | null
+          deleted_at?: string | null
+          empresa_id: string
+          etapa?: string | null
+          etapa_construccion_id?: string | null
+          fecha_estimada_entrega?: string | null
+          fecha_inicio_obra?: string | null
+          fecha_real_entrega?: string | null
+          fecha_ultima_revision?: string | null
+          id?: string
+          lote_id: string
+          observaciones?: string | null
+          presupuesto_asignado?: number | null
+          prioridad?: string | null
+          prototipo_id: string
+          responsable_id?: string | null
+          siguiente_accion?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avance_pct?: number
+          coda_row_id?: string | null
+          contratista_principal_id?: string | null
+          costo_acumulado?: number
+          created_at?: string
+          decision_actual?: string | null
+          deleted_at?: string | null
+          empresa_id?: string
+          etapa?: string | null
+          etapa_construccion_id?: string | null
+          fecha_estimada_entrega?: string | null
+          fecha_inicio_obra?: string | null
+          fecha_real_entrega?: string | null
+          fecha_ultima_revision?: string | null
+          id?: string
+          lote_id?: string
+          observaciones?: string | null
+          presupuesto_asignado?: number | null
+          prioridad?: string | null
+          prototipo_id?: string
+          responsable_id?: string | null
+          siguiente_accion?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construccion_lote_etapa_construccion_id_fkey"
+            columns: ["etapa_construccion_id"]
+            isOneToOne: false
+            referencedRelation: "etapas_construccion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construccion_lote_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construccion_lote_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "v_lotes_estatus"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construccion_lote_prototipo_id_fkey"
+            columns: ["prototipo_id"]
+            isOneToOne: false
+            referencedRelation: "prototipos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       etapas_construccion: {
         Row: {
           activo: boolean
@@ -965,6 +1072,115 @@ export type Database = {
           },
           {
             foreignKeyName: "fraccionamiento_prototipo_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lotes: {
+        Row: {
+          coda_row_id: string | null
+          colindancias: Json | null
+          coordenadas_lat: number | null
+          coordenadas_lng: number | null
+          created_at: string
+          decision_actual: string | null
+          deleted_at: string | null
+          empresa_id: string
+          etapa: string | null
+          fase_inventario_id: string | null
+          fecha_ultima_revision: string | null
+          fondo_m: number | null
+          frente_m: number | null
+          id: string
+          manzana: string | null
+          notas: string | null
+          numero_lote: string
+          precio_lote: number | null
+          prioridad: string | null
+          prototipo_asignado_id: string | null
+          proyecto_id: string
+          responsable_id: string | null
+          siguiente_accion: string | null
+          superficie_m2: number | null
+          tipo_uso: string | null
+          updated_at: string
+        }
+        Insert: {
+          coda_row_id?: string | null
+          colindancias?: Json | null
+          coordenadas_lat?: number | null
+          coordenadas_lng?: number | null
+          created_at?: string
+          decision_actual?: string | null
+          deleted_at?: string | null
+          empresa_id: string
+          etapa?: string | null
+          fase_inventario_id?: string | null
+          fecha_ultima_revision?: string | null
+          fondo_m?: number | null
+          frente_m?: number | null
+          id?: string
+          manzana?: string | null
+          notas?: string | null
+          numero_lote: string
+          precio_lote?: number | null
+          prioridad?: string | null
+          prototipo_asignado_id?: string | null
+          proyecto_id: string
+          responsable_id?: string | null
+          siguiente_accion?: string | null
+          superficie_m2?: number | null
+          tipo_uso?: string | null
+          updated_at?: string
+        }
+        Update: {
+          coda_row_id?: string | null
+          colindancias?: Json | null
+          coordenadas_lat?: number | null
+          coordenadas_lng?: number | null
+          created_at?: string
+          decision_actual?: string | null
+          deleted_at?: string | null
+          empresa_id?: string
+          etapa?: string | null
+          fase_inventario_id?: string | null
+          fecha_ultima_revision?: string | null
+          fondo_m?: number | null
+          frente_m?: number | null
+          id?: string
+          manzana?: string | null
+          notas?: string | null
+          numero_lote?: string
+          precio_lote?: number | null
+          prioridad?: string | null
+          prototipo_asignado_id?: string | null
+          proyecto_id?: string
+          responsable_id?: string | null
+          siguiente_accion?: string | null
+          superficie_m2?: number | null
+          tipo_uso?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lotes_fase_inventario_id_fkey"
+            columns: ["fase_inventario_id"]
+            isOneToOne: false
+            referencedRelation: "fases_inventario"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lotes_prototipo_asignado_id_fkey"
+            columns: ["prototipo_asignado_id"]
+            isOneToOne: false
+            referencedRelation: "prototipos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lotes_proyecto_id_fkey"
             columns: ["proyecto_id"]
             isOneToOne: false
             referencedRelation: "proyectos"
@@ -1498,6 +1714,94 @@ export type Database = {
         }
         Relationships: []
       }
+      urbanizacion_lote: {
+        Row: {
+          avance_pct: number
+          coda_row_id: string | null
+          created_at: string
+          decision_actual: string | null
+          deleted_at: string | null
+          empresa_id: string
+          etapa: string | null
+          evidencias_urls: string[] | null
+          fase_urbanizacion_id: string | null
+          fecha_inicio: string | null
+          fecha_terminacion: string | null
+          fecha_ultima_revision: string | null
+          id: string
+          lote_id: string
+          observaciones: string | null
+          prioridad: string | null
+          responsable_id: string | null
+          siguiente_accion: string | null
+          updated_at: string
+        }
+        Insert: {
+          avance_pct?: number
+          coda_row_id?: string | null
+          created_at?: string
+          decision_actual?: string | null
+          deleted_at?: string | null
+          empresa_id: string
+          etapa?: string | null
+          evidencias_urls?: string[] | null
+          fase_urbanizacion_id?: string | null
+          fecha_inicio?: string | null
+          fecha_terminacion?: string | null
+          fecha_ultima_revision?: string | null
+          id?: string
+          lote_id: string
+          observaciones?: string | null
+          prioridad?: string | null
+          responsable_id?: string | null
+          siguiente_accion?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avance_pct?: number
+          coda_row_id?: string | null
+          created_at?: string
+          decision_actual?: string | null
+          deleted_at?: string | null
+          empresa_id?: string
+          etapa?: string | null
+          evidencias_urls?: string[] | null
+          fase_urbanizacion_id?: string | null
+          fecha_inicio?: string | null
+          fecha_terminacion?: string | null
+          fecha_ultima_revision?: string | null
+          id?: string
+          lote_id?: string
+          observaciones?: string | null
+          prioridad?: string | null
+          responsable_id?: string | null
+          siguiente_accion?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "urbanizacion_lote_fase_urbanizacion_id_fkey"
+            columns: ["fase_urbanizacion_id"]
+            isOneToOne: false
+            referencedRelation: "fases_urbanizacion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "urbanizacion_lote_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "urbanizacion_lote_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "v_lotes_estatus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       v_anteproyectos_analisis: {
@@ -1569,6 +1873,84 @@ export type Database = {
             columns: ["tipo_proyecto_id"]
             isOneToOne: false
             referencedRelation: "tipo_proyecto"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_lotes_estatus: {
+        Row: {
+          construccion_avance_pct: number | null
+          construccion_id: string | null
+          construccion_prototipo_id: string | null
+          contratista_principal_id: string | null
+          costo_acumulado: number | null
+          created_at: string | null
+          decision_actual: string | null
+          empresa_id: string | null
+          estatus_unificado: string | null
+          etapa: string | null
+          etapa_construccion_id: string | null
+          fase_inventario_id: string | null
+          fecha_estimada_entrega: string | null
+          fecha_inicio_obra: string | null
+          fecha_real_entrega: string | null
+          fecha_ultima_revision: string | null
+          fondo_m: number | null
+          frente_m: number | null
+          id: string | null
+          manzana: string | null
+          numero_lote: string | null
+          precio_lote: number | null
+          presupuesto_asignado: number | null
+          prioridad: string | null
+          prototipo_asignado_id: string | null
+          prototipo_asignado_nombre: string | null
+          proyecto_id: string | null
+          responsable_id: string | null
+          siguiente_accion: string | null
+          superficie_m2: number | null
+          tipo_uso: string | null
+          updated_at: string | null
+          urbanizacion_avance_pct: number | null
+          urbanizacion_fases_completas: number | null
+          urbanizacion_fases_count: number | null
+          urbanizacion_fecha_inicio: string | null
+          urbanizacion_fecha_terminacion: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construccion_lote_etapa_construccion_id_fkey"
+            columns: ["etapa_construccion_id"]
+            isOneToOne: false
+            referencedRelation: "etapas_construccion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construccion_lote_prototipo_id_fkey"
+            columns: ["construccion_prototipo_id"]
+            isOneToOne: false
+            referencedRelation: "prototipos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lotes_fase_inventario_id_fkey"
+            columns: ["fase_inventario_id"]
+            isOneToOne: false
+            referencedRelation: "fases_inventario"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lotes_prototipo_asignado_id_fkey"
+            columns: ["prototipo_asignado_id"]
+            isOneToOne: false
+            referencedRelation: "prototipos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lotes_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
             referencedColumns: ["id"]
           },
         ]
