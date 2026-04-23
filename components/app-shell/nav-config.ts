@@ -77,9 +77,8 @@ export const NAV_ITEMS: NavItem[] = [
     href: '/family',
     labelKey: 'SANREN',
     icon: 'sanren-logo',
-    matchPaths: ['/family', '/travel', '/health'],
+    matchPaths: ['/family', '/health'],
     children: [
-      { label: 'Viajes', href: '/travel' },
       { label: 'Salud', href: '/health' },
       { label: 'Familia', href: '/family' },
     ],
