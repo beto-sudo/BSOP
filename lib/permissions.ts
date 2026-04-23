@@ -110,7 +110,7 @@ export async function fetchPermissionsForUserId(
         .select('empresa_id, rol_id, activo')
         .eq('usuario_id', coreUser.id)
         .eq('activo', true),
-      supabase.schema('core').from('modulos').select('id, slug'),
+      supabase.schema('core').from('modulos').select('id, slug, empresa_id'),
       supabase
         .schema('core')
         .from('permisos_rol')
@@ -209,7 +209,7 @@ export async function fetchUserPermissions(
         .select('empresa_id, rol_id, activo')
         .eq('usuario_id', coreUser.id)
         .eq('activo', true),
-      supabase.schema('core').from('modulos').select('id, slug'),
+      supabase.schema('core').from('modulos').select('id, slug, empresa_id'),
       supabase
         .schema('core')
         .from('permisos_rol')

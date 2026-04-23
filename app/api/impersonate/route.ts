@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
         .from('usuarios_empresas')
         .select('empresa_id, rol_id')
         .eq('usuario_id', targetUser.id),
-      admin.schema('core').from('modulos').select('id, slug'),
+      admin.schema('core').from('modulos').select('id, slug, empresa_id'),
       admin
         .schema('core')
         .from('permisos_rol')
