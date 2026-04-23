@@ -29,40 +29,9 @@ type ModuleGroup = {
 // Los módulos de Terrenos/Prototipos/Anteproyectos/Proyectos se liberan en
 // esta misma rama con páginas de scaffold. Cuando Beto valide visualmente,
 // se revoca Coda para el módulo correspondiente.
+// Orden de grupos: Administración y RH son módulos maduros y van arriba;
+// Inmobiliario se está estabilizando en el sprint dilesa-1 UI y va al final.
 const moduleGroups: ModuleGroup[] = [
-  {
-    title: 'Inmobiliario',
-    items: [
-      {
-        label: 'Terrenos',
-        description: 'Portafolio de tierra pre-desarrollo',
-        href: '/dilesa/terrenos',
-        icon: Map,
-        color: 'bg-emerald-500/10 text-emerald-500',
-      },
-      {
-        label: 'Prototipos',
-        description: 'Catálogo de productos habitacionales',
-        href: '/dilesa/prototipos',
-        icon: House,
-        color: 'bg-sky-500/10 text-sky-500',
-      },
-      {
-        label: 'Anteproyectos',
-        description: 'Evaluación financiera y decisión',
-        href: '/dilesa/anteproyectos',
-        icon: ClipboardCheck,
-        color: 'bg-orange-500/10 text-orange-500',
-      },
-      {
-        label: 'Proyectos',
-        description: 'Desarrollos formalizados',
-        href: '/dilesa/proyectos',
-        icon: Landmark,
-        color: 'bg-indigo-500/10 text-indigo-500',
-      },
-    ],
-  },
   {
     title: 'Administración',
     items: [
@@ -106,6 +75,39 @@ const moduleGroups: ModuleGroup[] = [
         href: '/dilesa/rh/departamentos',
         icon: Building2,
         color: 'bg-rose-500/10 text-rose-500',
+      },
+    ],
+  },
+  {
+    title: 'Inmobiliario',
+    items: [
+      {
+        label: 'Terrenos',
+        description: 'Portafolio de tierra pre-desarrollo',
+        href: '/dilesa/terrenos',
+        icon: Map,
+        color: 'bg-emerald-500/10 text-emerald-500',
+      },
+      {
+        label: 'Prototipos',
+        description: 'Catálogo de productos habitacionales',
+        href: '/dilesa/prototipos',
+        icon: House,
+        color: 'bg-sky-500/10 text-sky-500',
+      },
+      {
+        label: 'Anteproyectos',
+        description: 'Evaluación financiera y decisión',
+        href: '/dilesa/anteproyectos',
+        icon: ClipboardCheck,
+        color: 'bg-orange-500/10 text-orange-500',
+      },
+      {
+        label: 'Proyectos',
+        description: 'Desarrollos formalizados',
+        href: '/dilesa/proyectos',
+        icon: Landmark,
+        color: 'bg-indigo-500/10 text-indigo-500',
       },
     ],
   },

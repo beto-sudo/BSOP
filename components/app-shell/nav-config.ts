@@ -34,11 +34,6 @@ export const NAV_ITEMS: NavItem[] = [
     labelKey: 'DILESA',
     icon: 'dilesa-logo',
     children: [
-      { label: 'Inmobiliario', href: '#', divider: true },
-      { label: 'Terrenos', href: '/dilesa/terrenos' },
-      { label: 'Prototipos', href: '/dilesa/prototipos' },
-      { label: 'Anteproyectos', href: '/dilesa/anteproyectos' },
-      { label: 'Proyectos', href: '/dilesa/proyectos' },
       { label: 'Administración', href: '#', divider: true },
       { label: 'Tareas', href: '/dilesa/admin/tasks' },
       { label: 'Juntas', href: '/dilesa/admin/juntas' },
@@ -47,6 +42,11 @@ export const NAV_ITEMS: NavItem[] = [
       { label: 'Empleados', href: '/dilesa/rh/empleados' },
       { label: 'Puestos', href: '/dilesa/rh/puestos' },
       { label: 'Departamentos', href: '/dilesa/rh/departamentos' },
+      { label: 'Inmobiliario', href: '#', divider: true },
+      { label: 'Terrenos', href: '/dilesa/terrenos' },
+      { label: 'Prototipos', href: '/dilesa/prototipos' },
+      { label: 'Anteproyectos', href: '/dilesa/anteproyectos' },
+      { label: 'Proyectos', href: '/dilesa/proyectos' },
     ],
   },
   {
