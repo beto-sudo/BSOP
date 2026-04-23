@@ -332,6 +332,42 @@ export type Database = {
           },
         ]
       }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          email: string
+          first_name: string | null
+          id: string
+          is_active: boolean | null
+          last_name: string | null
+          locale: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          email?: string
+          first_name?: string | null
+          id: string
+          is_active?: boolean | null
+          last_name?: string | null
+          locale?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          email?: string
+          first_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_name?: string | null
+          locale?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       roles: {
         Row: {
           created_at: string | null
@@ -339,6 +375,7 @@ export type Database = {
           empresa_id: string | null
           id: string
           nombre: string
+          puede_aprobar_cierres: boolean
         }
         Insert: {
           created_at?: string | null
@@ -346,6 +383,7 @@ export type Database = {
           empresa_id?: string | null
           id?: string
           nombre: string
+          puede_aprobar_cierres?: boolean
         }
         Update: {
           created_at?: string | null
@@ -353,6 +391,7 @@ export type Database = {
           empresa_id?: string | null
           id?: string
           nombre?: string
+          puede_aprobar_cierres?: boolean
         }
         Relationships: [
           {
@@ -363,6 +402,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_presence: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          current_module: string
+          current_path: string
+          display_name: string | null
+          email: string
+          last_seen_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          current_module?: string
+          current_path?: string
+          display_name?: string | null
+          email: string
+          last_seen_at?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          current_module?: string
+          current_path?: string
+          display_name?: string | null
+          email?: string
+          last_seen_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       usuarios: {
         Row: {
@@ -3256,6 +3331,13 @@ export type Database = {
         Row: {
           asignado_a: string | null
           asignado_por: string | null
+          cierre_aprobado_en: string | null
+          cierre_aprobado_por: string | null
+          cierre_rechazado_en: string | null
+          cierre_rechazado_motivo: string | null
+          cierre_rechazado_por: string | null
+          cierre_solicitado_en: string | null
+          cierre_solicitado_por: string | null
           completado_por: string | null
           creado_por: string | null
           created_at: string
@@ -3282,6 +3364,13 @@ export type Database = {
         Insert: {
           asignado_a?: string | null
           asignado_por?: string | null
+          cierre_aprobado_en?: string | null
+          cierre_aprobado_por?: string | null
+          cierre_rechazado_en?: string | null
+          cierre_rechazado_motivo?: string | null
+          cierre_rechazado_por?: string | null
+          cierre_solicitado_en?: string | null
+          cierre_solicitado_por?: string | null
           completado_por?: string | null
           creado_por?: string | null
           created_at?: string
@@ -3308,6 +3397,13 @@ export type Database = {
         Update: {
           asignado_a?: string | null
           asignado_por?: string | null
+          cierre_aprobado_en?: string | null
+          cierre_aprobado_por?: string | null
+          cierre_rechazado_en?: string | null
+          cierre_rechazado_motivo?: string | null
+          cierre_rechazado_por?: string | null
+          cierre_solicitado_en?: string | null
+          cierre_solicitado_por?: string | null
           completado_por?: string | null
           creado_por?: string | null
           created_at?: string
@@ -3356,6 +3452,48 @@ export type Database = {
           {
             foreignKeyName: "tasks_asignado_por_fkey"
             columns: ["asignado_por"]
+            isOneToOne: false
+            referencedRelation: "v_empleados_full"
+            referencedColumns: ["empleado_id"]
+          },
+          {
+            foreignKeyName: "tasks_cierre_aprobado_por_fkey"
+            columns: ["cierre_aprobado_por"]
+            isOneToOne: false
+            referencedRelation: "empleados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_cierre_aprobado_por_fkey"
+            columns: ["cierre_aprobado_por"]
+            isOneToOne: false
+            referencedRelation: "v_empleados_full"
+            referencedColumns: ["empleado_id"]
+          },
+          {
+            foreignKeyName: "tasks_cierre_rechazado_por_fkey"
+            columns: ["cierre_rechazado_por"]
+            isOneToOne: false
+            referencedRelation: "empleados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_cierre_rechazado_por_fkey"
+            columns: ["cierre_rechazado_por"]
+            isOneToOne: false
+            referencedRelation: "v_empleados_full"
+            referencedColumns: ["empleado_id"]
+          },
+          {
+            foreignKeyName: "tasks_cierre_solicitado_por_fkey"
+            columns: ["cierre_solicitado_por"]
+            isOneToOne: false
+            referencedRelation: "empleados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_cierre_solicitado_por_fkey"
+            columns: ["cierre_solicitado_por"]
             isOneToOne: false
             referencedRelation: "v_empleados_full"
             referencedColumns: ["empleado_id"]
@@ -4093,28 +4231,31 @@ export type Database = {
   }
   public: {
     Tables: {
+      [_ in never]: never
+    }
+    Views: {
       health_ecg: {
         Row: {
           classification: string | null
-          date: string
+          date: string | null
           heart_rate: number | null
-          id: number
+          id: number | null
           ingested_at: string | null
           raw_json: Json | null
         }
         Insert: {
           classification?: string | null
-          date: string
+          date?: string | null
           heart_rate?: number | null
-          id?: number
+          id?: number | null
           ingested_at?: string | null
           raw_json?: Json | null
         }
         Update: {
           classification?: string | null
-          date?: string
+          date?: string | null
           heart_rate?: number | null
-          id?: number
+          id?: number | null
           ingested_at?: string | null
           raw_json?: Json | null
         }
@@ -4122,7 +4263,7 @@ export type Database = {
       }
       health_ingest_log: {
         Row: {
-          id: number
+          id: number | null
           metrics_count: number | null
           payload_size_bytes: number | null
           received_at: string | null
@@ -4131,7 +4272,7 @@ export type Database = {
           workouts_count: number | null
         }
         Insert: {
-          id?: number
+          id?: number | null
           metrics_count?: number | null
           payload_size_bytes?: number | null
           received_at?: string | null
@@ -4140,7 +4281,7 @@ export type Database = {
           workouts_count?: number | null
         }
         Update: {
-          id?: number
+          id?: number | null
           metrics_count?: number | null
           payload_size_bytes?: number | null
           received_at?: string | null
@@ -4152,25 +4293,25 @@ export type Database = {
       }
       health_medications: {
         Row: {
-          date: string
+          date: string | null
           dose: string | null
-          id: number
+          id: number | null
           ingested_at: string | null
           name: string | null
           raw_json: Json | null
         }
         Insert: {
-          date: string
+          date?: string | null
           dose?: string | null
-          id?: number
+          id?: number | null
           ingested_at?: string | null
           name?: string | null
           raw_json?: Json | null
         }
         Update: {
-          date?: string
+          date?: string | null
           dose?: string | null
-          id?: number
+          id?: number | null
           ingested_at?: string | null
           name?: string | null
           raw_json?: Json | null
@@ -4179,31 +4320,31 @@ export type Database = {
       }
       health_metrics: {
         Row: {
-          date: string
-          id: number
+          date: string | null
+          id: number | null
           ingested_at: string | null
-          metric_name: string
+          metric_name: string | null
           source: string | null
           unit: string | null
-          value: number
+          value: number | null
         }
         Insert: {
-          date: string
-          id?: number
+          date?: string | null
+          id?: number | null
           ingested_at?: string | null
-          metric_name: string
+          metric_name?: string | null
           source?: string | null
           unit?: string | null
-          value: number
+          value?: number | null
         }
         Update: {
-          date?: string
-          id?: number
+          date?: string | null
+          id?: number | null
           ingested_at?: string | null
-          metric_name?: string
+          metric_name?: string | null
           source?: string | null
           unit?: string | null
-          value?: number
+          value?: number | null
         }
         Relationships: []
       }
@@ -4215,12 +4356,12 @@ export type Database = {
           energy_kcal: number | null
           heart_rate_avg: number | null
           heart_rate_max: number | null
-          id: number
+          id: number | null
           ingested_at: string | null
-          name: string
+          name: string | null
           raw_json: Json | null
           source: string | null
-          start_time: string
+          start_time: string | null
         }
         Insert: {
           distance_km?: number | null
@@ -4229,12 +4370,12 @@ export type Database = {
           energy_kcal?: number | null
           heart_rate_avg?: number | null
           heart_rate_max?: number | null
-          id?: number
+          id?: number | null
           ingested_at?: string | null
-          name: string
+          name?: string | null
           raw_json?: Json | null
           source?: string | null
-          start_time: string
+          start_time?: string | null
         }
         Update: {
           distance_km?: number | null
@@ -4243,12 +4384,12 @@ export type Database = {
           energy_kcal?: number | null
           heart_rate_avg?: number | null
           heart_rate_max?: number | null
-          id?: number
+          id?: number | null
           ingested_at?: string | null
-          name?: string
+          name?: string | null
           raw_json?: Json | null
           source?: string | null
-          start_time?: string
+          start_time?: string | null
         }
         Relationships: []
       }
@@ -4256,9 +4397,9 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string | null
-          email: string
+          email: string | null
           first_name: string | null
-          id: string
+          id: string | null
           is_active: boolean | null
           last_name: string | null
           locale: string | null
@@ -4267,9 +4408,9 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string | null
-          email?: string
+          email?: string | null
           first_name?: string | null
-          id: string
+          id?: string | null
           is_active?: boolean | null
           last_name?: string | null
           locale?: string | null
@@ -4278,9 +4419,9 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string | null
-          email?: string
+          email?: string | null
           first_name?: string | null
-          id?: string
+          id?: string | null
           is_active?: boolean | null
           last_name?: string | null
           locale?: string | null
@@ -4291,42 +4432,39 @@ export type Database = {
       user_presence: {
         Row: {
           avatar_url: string | null
-          created_at: string
-          current_module: string
-          current_path: string
+          created_at: string | null
+          current_module: string | null
+          current_path: string | null
           display_name: string | null
-          email: string
-          last_seen_at: string
-          status: string
-          user_id: string
+          email: string | null
+          last_seen_at: string | null
+          status: string | null
+          user_id: string | null
         }
         Insert: {
           avatar_url?: string | null
-          created_at?: string
-          current_module?: string
-          current_path?: string
+          created_at?: string | null
+          current_module?: string | null
+          current_path?: string | null
           display_name?: string | null
-          email: string
-          last_seen_at?: string
-          status?: string
-          user_id: string
+          email?: string | null
+          last_seen_at?: string | null
+          status?: string | null
+          user_id?: string | null
         }
         Update: {
           avatar_url?: string | null
-          created_at?: string
-          current_module?: string
-          current_path?: string
+          created_at?: string | null
+          current_module?: string | null
+          current_path?: string | null
           display_name?: string | null
-          email?: string
-          last_seen_at?: string
-          status?: string
-          user_id?: string
+          email?: string | null
+          last_seen_at?: string | null
+          status?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
-    }
-    Views: {
-      [_ in never]: never
     }
     Functions: {
       get_health_timeline_monthly: {
