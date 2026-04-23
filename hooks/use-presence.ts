@@ -153,7 +153,7 @@ export function usePresence() {
         .channel('presence:global')
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'user_presence' },
+          { event: '*', schema: 'core', table: 'user_presence' },
           (payload) => {
             const myId = userMetaRef.current?.userId;
 
