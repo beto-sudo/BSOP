@@ -233,27 +233,40 @@ async function main() {
   const { data: existingProvs, error: provsErr } = await supabase
     .schema('erp' as never)
     .from('proveedores')
-    .select('id, persona:persona_id(nombre, apellido_paterno, apellido_materno)')
+    .select('id, persona_id')
     .eq('empresa_id', RDB_EMPRESA_ID);
   if (provsErr) throw provsErr;
 
+  const provList = (existingProvs ?? []) as Array<{ id: string; persona_id: string }>;
+  const personaIds = provList.map((p) => p.persona_id);
+
+  const { data: existingPersonas, error: persErr } = await supabase
+    .schema('erp' as never)
+    .from('personas')
+    .select('id, nombre, apellido_paterno, apellido_materno')
+    .in('id', personaIds);
+  if (persErr) throw persErr;
+
+  type PersonaRow = {
+    id: string;
+    nombre: string;
+    apellido_paterno: string | null;
+    apellido_materno: string | null;
+  };
+  const personaById = new Map<string, PersonaRow>();
+  for (const row of (existingPersonas ?? []) as PersonaRow[]) {
+    personaById.set(row.id, row);
+  }
+
   const provNameToId = new Map<string, string>();
-  for (const p of existingProvs ?? []) {
-    const per = (
-      p as {
-        persona: {
-          nombre: string;
-          apellido_paterno: string | null;
-          apellido_materno: string | null;
-        } | null;
-      }
-    ).persona;
+  for (const p of provList) {
+    const per = personaById.get(p.persona_id);
     if (!per) continue;
     const full = [per.nombre, per.apellido_paterno, per.apellido_materno]
       .filter(Boolean)
       .join(' ')
       .trim();
-    if (full) provNameToId.set(full, (p as { id: string }).id);
+    if (full) provNameToId.set(full, p.id);
   }
 
   const missingProvs = [...proveedorNames].filter((n) => !provNameToId.has(n));
