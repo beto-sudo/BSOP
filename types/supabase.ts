@@ -527,6 +527,173 @@ export type Database = {
   }
   dilesa: {
     Tables: {
+      anteproyectos: {
+        Row: {
+          area_vendible_m2: number | null
+          areas_verdes_m2: number | null
+          cantidad_lotes: number | null
+          clave_interna: string | null
+          coda_row_id: string | null
+          convertido_a_proyecto_en: string | null
+          convertido_a_proyecto_por: string | null
+          created_at: string
+          decision_actual: string | null
+          deleted_at: string | null
+          empresa_id: string
+          estado: string
+          etapa: string | null
+          fecha_inicio: string | null
+          fecha_ultima_revision: string | null
+          id: string
+          infraestructura_cabecera_inversion: number | null
+          lote_promedio_m2: number | null
+          motivo_no_viable: string | null
+          nombre: string
+          notas: string | null
+          plano_lotificacion_url: string | null
+          prioridad: string | null
+          proyecto_id: string | null
+          responsable_id: string | null
+          siguiente_accion: string | null
+          terreno_id: string
+          tipo_proyecto_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          area_vendible_m2?: number | null
+          areas_verdes_m2?: number | null
+          cantidad_lotes?: number | null
+          clave_interna?: string | null
+          coda_row_id?: string | null
+          convertido_a_proyecto_en?: string | null
+          convertido_a_proyecto_por?: string | null
+          created_at?: string
+          decision_actual?: string | null
+          deleted_at?: string | null
+          empresa_id: string
+          estado?: string
+          etapa?: string | null
+          fecha_inicio?: string | null
+          fecha_ultima_revision?: string | null
+          id?: string
+          infraestructura_cabecera_inversion?: number | null
+          lote_promedio_m2?: number | null
+          motivo_no_viable?: string | null
+          nombre: string
+          notas?: string | null
+          plano_lotificacion_url?: string | null
+          prioridad?: string | null
+          proyecto_id?: string | null
+          responsable_id?: string | null
+          siguiente_accion?: string | null
+          terreno_id: string
+          tipo_proyecto_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          area_vendible_m2?: number | null
+          areas_verdes_m2?: number | null
+          cantidad_lotes?: number | null
+          clave_interna?: string | null
+          coda_row_id?: string | null
+          convertido_a_proyecto_en?: string | null
+          convertido_a_proyecto_por?: string | null
+          created_at?: string
+          decision_actual?: string | null
+          deleted_at?: string | null
+          empresa_id?: string
+          estado?: string
+          etapa?: string | null
+          fecha_inicio?: string | null
+          fecha_ultima_revision?: string | null
+          id?: string
+          infraestructura_cabecera_inversion?: number | null
+          lote_promedio_m2?: number | null
+          motivo_no_viable?: string | null
+          nombre?: string
+          notas?: string | null
+          plano_lotificacion_url?: string | null
+          prioridad?: string | null
+          proyecto_id?: string | null
+          responsable_id?: string | null
+          siguiente_accion?: string | null
+          terreno_id?: string
+          tipo_proyecto_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anteproyectos_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anteproyectos_terreno_id_fkey"
+            columns: ["terreno_id"]
+            isOneToOne: false
+            referencedRelation: "terrenos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anteproyectos_tipo_proyecto_id_fkey"
+            columns: ["tipo_proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "tipo_proyecto"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      anteproyectos_prototipos_referencia: {
+        Row: {
+          anteproyecto_id: string
+          coda_row_id: string | null
+          created_at: string
+          empresa_id: string
+          id: string
+          prototipo_id: string
+        }
+        Insert: {
+          anteproyecto_id: string
+          coda_row_id?: string | null
+          created_at?: string
+          empresa_id: string
+          id?: string
+          prototipo_id: string
+        }
+        Update: {
+          anteproyecto_id?: string
+          coda_row_id?: string | null
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          prototipo_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anteproyectos_prototipos_referencia_anteproyecto_id_fkey"
+            columns: ["anteproyecto_id"]
+            isOneToOne: false
+            referencedRelation: "anteproyectos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anteproyectos_prototipos_referencia_anteproyecto_id_fkey"
+            columns: ["anteproyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_anteproyectos_analisis"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anteproyectos_prototipos_referencia_prototipo_id_fkey"
+            columns: ["prototipo_id"]
+            isOneToOne: false
+            referencedRelation: "prototipos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clasificacion_inmobiliaria: {
         Row: {
           activo: boolean
@@ -737,6 +904,421 @@ export type Database = {
         }
         Relationships: []
       }
+      fraccionamiento_prototipo: {
+        Row: {
+          cantidad_unidades: number
+          coda_row_id: string | null
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          id: string
+          notas: string | null
+          precio_venta: number | null
+          prototipo_id: string
+          proyecto_id: string
+          updated_at: string
+        }
+        Insert: {
+          cantidad_unidades?: number
+          coda_row_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          id?: string
+          notas?: string | null
+          precio_venta?: number | null
+          prototipo_id: string
+          proyecto_id: string
+          updated_at?: string
+        }
+        Update: {
+          cantidad_unidades?: number
+          coda_row_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          id?: string
+          notas?: string | null
+          precio_venta?: number | null
+          prototipo_id?: string
+          proyecto_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fraccionamiento_prototipo_prototipo_id_fkey"
+            columns: ["prototipo_id"]
+            isOneToOne: false
+            referencedRelation: "prototipos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fraccionamiento_prototipo_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prototipos: {
+        Row: {
+          banos: number | null
+          clasificacion_inmobiliaria_id: string | null
+          coda_row_id: string | null
+          codigo: string | null
+          costo_comercializacion: number | null
+          costo_mano_obra: number | null
+          costo_materiales: number | null
+          costo_registro_ruv: number | null
+          costo_total_unitario: number | null
+          costo_urbanizacion: number | null
+          created_at: string
+          decision_actual: string | null
+          deleted_at: string | null
+          empresa_id: string
+          etapa: string | null
+          fecha_ultima_revision: string | null
+          id: string
+          imagen_principal_url: string | null
+          nombre: string
+          notas: string | null
+          plano_arquitectonico_url: string | null
+          prioridad: string | null
+          recamaras: number | null
+          responsable_id: string | null
+          seguro_calidad: number | null
+          siguiente_accion: string | null
+          superficie_construida_m2: number | null
+          superficie_lote_min_m2: number | null
+          updated_at: string
+          valor_comercial: number | null
+        }
+        Insert: {
+          banos?: number | null
+          clasificacion_inmobiliaria_id?: string | null
+          coda_row_id?: string | null
+          codigo?: string | null
+          costo_comercializacion?: number | null
+          costo_mano_obra?: number | null
+          costo_materiales?: number | null
+          costo_registro_ruv?: number | null
+          costo_total_unitario?: number | null
+          costo_urbanizacion?: number | null
+          created_at?: string
+          decision_actual?: string | null
+          deleted_at?: string | null
+          empresa_id: string
+          etapa?: string | null
+          fecha_ultima_revision?: string | null
+          id?: string
+          imagen_principal_url?: string | null
+          nombre: string
+          notas?: string | null
+          plano_arquitectonico_url?: string | null
+          prioridad?: string | null
+          recamaras?: number | null
+          responsable_id?: string | null
+          seguro_calidad?: number | null
+          siguiente_accion?: string | null
+          superficie_construida_m2?: number | null
+          superficie_lote_min_m2?: number | null
+          updated_at?: string
+          valor_comercial?: number | null
+        }
+        Update: {
+          banos?: number | null
+          clasificacion_inmobiliaria_id?: string | null
+          coda_row_id?: string | null
+          codigo?: string | null
+          costo_comercializacion?: number | null
+          costo_mano_obra?: number | null
+          costo_materiales?: number | null
+          costo_registro_ruv?: number | null
+          costo_total_unitario?: number | null
+          costo_urbanizacion?: number | null
+          created_at?: string
+          decision_actual?: string | null
+          deleted_at?: string | null
+          empresa_id?: string
+          etapa?: string | null
+          fecha_ultima_revision?: string | null
+          id?: string
+          imagen_principal_url?: string | null
+          nombre?: string
+          notas?: string | null
+          plano_arquitectonico_url?: string | null
+          prioridad?: string | null
+          recamaras?: number | null
+          responsable_id?: string | null
+          seguro_calidad?: number | null
+          siguiente_accion?: string | null
+          superficie_construida_m2?: number | null
+          superficie_lote_min_m2?: number | null
+          updated_at?: string
+          valor_comercial?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prototipos_clasificacion_inmobiliaria_id_fkey"
+            columns: ["clasificacion_inmobiliaria_id"]
+            isOneToOne: false
+            referencedRelation: "clasificacion_inmobiliaria"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proyectos: {
+        Row: {
+          anteproyecto_id: string | null
+          area_vendible_m2: number | null
+          areas_verdes_m2: number | null
+          cantidad_lotes_total: number | null
+          coda_row_id: string | null
+          codigo: string | null
+          created_at: string
+          decision_actual: string | null
+          deleted_at: string | null
+          empresa_id: string
+          etapa: string | null
+          fase: string | null
+          fecha_estimada_cierre: string | null
+          fecha_inicio: string | null
+          fecha_ultima_revision: string | null
+          id: string
+          inversion_total: number | null
+          nombre: string
+          notas: string | null
+          presupuesto_total: number | null
+          prioridad: string | null
+          responsable_id: string | null
+          siguiente_accion: string | null
+          terreno_id: string
+          tipo_proyecto_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          anteproyecto_id?: string | null
+          area_vendible_m2?: number | null
+          areas_verdes_m2?: number | null
+          cantidad_lotes_total?: number | null
+          coda_row_id?: string | null
+          codigo?: string | null
+          created_at?: string
+          decision_actual?: string | null
+          deleted_at?: string | null
+          empresa_id: string
+          etapa?: string | null
+          fase?: string | null
+          fecha_estimada_cierre?: string | null
+          fecha_inicio?: string | null
+          fecha_ultima_revision?: string | null
+          id?: string
+          inversion_total?: number | null
+          nombre: string
+          notas?: string | null
+          presupuesto_total?: number | null
+          prioridad?: string | null
+          responsable_id?: string | null
+          siguiente_accion?: string | null
+          terreno_id: string
+          tipo_proyecto_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          anteproyecto_id?: string | null
+          area_vendible_m2?: number | null
+          areas_verdes_m2?: number | null
+          cantidad_lotes_total?: number | null
+          coda_row_id?: string | null
+          codigo?: string | null
+          created_at?: string
+          decision_actual?: string | null
+          deleted_at?: string | null
+          empresa_id?: string
+          etapa?: string | null
+          fase?: string | null
+          fecha_estimada_cierre?: string | null
+          fecha_inicio?: string | null
+          fecha_ultima_revision?: string | null
+          id?: string
+          inversion_total?: number | null
+          nombre?: string
+          notas?: string | null
+          presupuesto_total?: number | null
+          prioridad?: string | null
+          responsable_id?: string | null
+          siguiente_accion?: string | null
+          terreno_id?: string
+          tipo_proyecto_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proyectos_anteproyecto_id_fkey"
+            columns: ["anteproyecto_id"]
+            isOneToOne: false
+            referencedRelation: "anteproyectos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proyectos_anteproyecto_id_fkey"
+            columns: ["anteproyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_anteproyectos_analisis"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proyectos_terreno_id_fkey"
+            columns: ["terreno_id"]
+            isOneToOne: false
+            referencedRelation: "terrenos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proyectos_tipo_proyecto_id_fkey"
+            columns: ["tipo_proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "tipo_proyecto"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      terrenos: {
+        Row: {
+          archivo_kmz_url: string | null
+          area_terreno_m2: number | null
+          areas_afectacion_m2: number | null
+          areas_aprovechables_m2: number | null
+          clave_interna: string | null
+          coda_row_id: string | null
+          created_at: string
+          decision_actual: string | null
+          deleted_at: string | null
+          direccion_referencia: string | null
+          documentos: Json
+          empresa_id: string
+          estatus_propiedad: string | null
+          etapa: string | null
+          fecha_captura: string
+          fecha_ultima_revision: string | null
+          id: string
+          imagen_zcu_url: string | null
+          municipio: string | null
+          nombre: string
+          nombre_corredor: string | null
+          nombre_propietario: string | null
+          notas: string | null
+          numero_escritura: string | null
+          objetivo: string | null
+          origen: string | null
+          pct_diferencia_solicitado_oferta: number | null
+          pdf_escritura_url: string | null
+          precio_ofertado_m2: number | null
+          precio_solicitado_m2: number | null
+          prioridad: string | null
+          responsable_id: string | null
+          siguiente_accion: string | null
+          telefono_corredor: string | null
+          telefono_propietario: string | null
+          tipo: string | null
+          updated_at: string
+          valor_interno_estimado: number | null
+          valor_objetivo_compra: number | null
+          valor_predio: number | null
+          valor_total_oferta: number | null
+          zona_sector: string | null
+        }
+        Insert: {
+          archivo_kmz_url?: string | null
+          area_terreno_m2?: number | null
+          areas_afectacion_m2?: number | null
+          areas_aprovechables_m2?: number | null
+          clave_interna?: string | null
+          coda_row_id?: string | null
+          created_at?: string
+          decision_actual?: string | null
+          deleted_at?: string | null
+          direccion_referencia?: string | null
+          documentos?: Json
+          empresa_id: string
+          estatus_propiedad?: string | null
+          etapa?: string | null
+          fecha_captura?: string
+          fecha_ultima_revision?: string | null
+          id?: string
+          imagen_zcu_url?: string | null
+          municipio?: string | null
+          nombre: string
+          nombre_corredor?: string | null
+          nombre_propietario?: string | null
+          notas?: string | null
+          numero_escritura?: string | null
+          objetivo?: string | null
+          origen?: string | null
+          pct_diferencia_solicitado_oferta?: number | null
+          pdf_escritura_url?: string | null
+          precio_ofertado_m2?: number | null
+          precio_solicitado_m2?: number | null
+          prioridad?: string | null
+          responsable_id?: string | null
+          siguiente_accion?: string | null
+          telefono_corredor?: string | null
+          telefono_propietario?: string | null
+          tipo?: string | null
+          updated_at?: string
+          valor_interno_estimado?: number | null
+          valor_objetivo_compra?: number | null
+          valor_predio?: number | null
+          valor_total_oferta?: number | null
+          zona_sector?: string | null
+        }
+        Update: {
+          archivo_kmz_url?: string | null
+          area_terreno_m2?: number | null
+          areas_afectacion_m2?: number | null
+          areas_aprovechables_m2?: number | null
+          clave_interna?: string | null
+          coda_row_id?: string | null
+          created_at?: string
+          decision_actual?: string | null
+          deleted_at?: string | null
+          direccion_referencia?: string | null
+          documentos?: Json
+          empresa_id?: string
+          estatus_propiedad?: string | null
+          etapa?: string | null
+          fecha_captura?: string
+          fecha_ultima_revision?: string | null
+          id?: string
+          imagen_zcu_url?: string | null
+          municipio?: string | null
+          nombre?: string
+          nombre_corredor?: string | null
+          nombre_propietario?: string | null
+          notas?: string | null
+          numero_escritura?: string | null
+          objetivo?: string | null
+          origen?: string | null
+          pct_diferencia_solicitado_oferta?: number | null
+          pdf_escritura_url?: string | null
+          precio_ofertado_m2?: number | null
+          precio_solicitado_m2?: number | null
+          prioridad?: string | null
+          responsable_id?: string | null
+          siguiente_accion?: string | null
+          telefono_corredor?: string | null
+          telefono_propietario?: string | null
+          tipo?: string | null
+          updated_at?: string
+          valor_interno_estimado?: number | null
+          valor_objetivo_compra?: number | null
+          valor_predio?: number | null
+          valor_total_oferta?: number | null
+          zona_sector?: string | null
+        }
+        Relationships: []
+      }
       tipo_credito: {
         Row: {
           activo: boolean
@@ -907,7 +1489,79 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_anteproyectos_analisis: {
+        Row: {
+          aprovechamiento_pct: number | null
+          area_terreno_m2: number | null
+          area_vendible_m2: number | null
+          areas_aprovechables_m2: number | null
+          areas_verdes_m2: number | null
+          cantidad_lotes: number | null
+          clave_interna: string | null
+          convertido_a_proyecto_en: string | null
+          convertido_a_proyecto_por: string | null
+          costo_comercializacion_ref: number | null
+          costo_mano_obra_ref: number | null
+          costo_materiales_ref: number | null
+          costo_registro_ruv_ref: number | null
+          costo_total_proyecto: number | null
+          costo_total_ref: number | null
+          costo_urbanizacion_ref: number | null
+          created_at: string | null
+          decision_actual: string | null
+          empresa_id: string | null
+          estado: string | null
+          etapa: string | null
+          fecha_inicio: string | null
+          fecha_ultima_revision: string | null
+          id: string | null
+          infraestructura_cabecera_inversion: number | null
+          lote_promedio_m2: number | null
+          margen_pct: number | null
+          motivo_no_viable: string | null
+          nombre: string | null
+          plano_lotificacion_url: string | null
+          porcentaje_areas_verdes: number | null
+          precio_m2_aprovechable: number | null
+          prioridad: string | null
+          prototipos_referenciados: number | null
+          proyecto_id: string | null
+          responsable_id: string | null
+          seguro_calidad_ref: number | null
+          siguiente_accion: string | null
+          terreno_id: string | null
+          tipo_proyecto_id: string | null
+          updated_at: string | null
+          utilidad_proyecto: number | null
+          valor_comercial_proyecto: number | null
+          valor_comercial_ref: number | null
+          valor_predio: number | null
+          vialidades_banquetas_m2: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anteproyectos_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anteproyectos_terreno_id_fkey"
+            columns: ["terreno_id"]
+            isOneToOne: false
+            referencedRelation: "terrenos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anteproyectos_tipo_proyecto_id_fkey"
+            columns: ["tipo_proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "tipo_proyecto"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       [_ in never]: never
