@@ -103,11 +103,8 @@ function slugify(str: string): string {
     .replace(/(^-|-$)/g, '');
 }
 
-// core.modulos es una tabla global; la convención de slug (`{empresa_slug}.X`)
-// es la única fuente de verdad para saber a qué empresa pertenece cada módulo.
-function modulosParaEmpresa(modulos: Modulo[], empresaSlug: string): Modulo[] {
-  const prefix = `${empresaSlug}.`;
-  return modulos.filter((m) => m.slug.startsWith(prefix));
+function modulosParaEmpresa(modulos: Modulo[], empresaId: string): Modulo[] {
+  return modulos.filter((m) => m.empresa_id === empresaId);
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -235,15 +232,8 @@ export function AccesoClient({
 
   const rolesDeEmpresa = roles.filter((r) => r.empresa_id === filterEmpresaId);
   const selectedRol = roles.find((r) => r.id === selectedRolId) ?? null;
-  const selectedRolEmpresa = selectedRol
-    ? (empresas.find((e) => e.id === selectedRol.empresa_id) ?? null)
-    : null;
-  const modulosDelRol = selectedRolEmpresa
-    ? modulosParaEmpresa(modulos, selectedRolEmpresa.slug)
-    : [];
-  const modulosExcepcion = newExcEmpresaId
-    ? modulosParaEmpresa(modulos, empresas.find((e) => e.id === newExcEmpresaId)?.slug ?? '')
-    : [];
+  const modulosDelRol = selectedRol ? modulosParaEmpresa(modulos, selectedRol.empresa_id) : [];
+  const modulosExcepcion = newExcEmpresaId ? modulosParaEmpresa(modulos, newExcEmpresaId) : [];
 
   // ── Render ──
 

@@ -239,23 +239,34 @@ export type Database = {
       modulos: {
         Row: {
           descripcion: string | null
+          empresa_id: string
           id: string
           nombre: string
           slug: string
         }
         Insert: {
           descripcion?: string | null
+          empresa_id: string
           id?: string
           nombre: string
           slug: string
         }
         Update: {
           descripcion?: string | null
+          empresa_id?: string
           id?: string
           nombre?: string
           slug?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "modulos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       permisos_rol: {
         Row: {
@@ -4170,20 +4181,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_empleados_full"
             referencedColumns: ["departamento_id"]
-          },
-          {
-            foreignKeyName: "requisiciones_solicitante_id_fkey"
-            columns: ["solicitante_id"]
-            isOneToOne: false
-            referencedRelation: "empleados"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "requisiciones_solicitante_id_fkey"
-            columns: ["solicitante_id"]
-            isOneToOne: false
-            referencedRelation: "v_empleados_full"
-            referencedColumns: ["empleado_id"]
           },
         ]
       }
