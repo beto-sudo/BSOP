@@ -23,13 +23,19 @@ export type AbrirCajaInput = {
   fecha_operativa: string; // YYYY-MM-DD
 };
 
-export async function abrirCaja(input: AbrirCajaInput): Promise<{ id: string }> {
+export type AbrirCajaResult =
+  | { ok: true; id: string }
+  | { ok: false; error: string };
+
+export async function abrirCaja(input: AbrirCajaInput): Promise<AbrirCajaResult> {
   const supabase = await createSupabaseServerClient();
 
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  if (!session?.user) throw new Error('No autenticado');
+  if (!session?.user) {
+    return { ok: false, error: 'No autenticado. Vuelve a iniciar sesión.' };
+  }
 
   // Check for an existing open turn on this caja (case-insensitive)
   const { data: existing, error: checkErr } = await supabase
@@ -41,12 +47,15 @@ export async function abrirCaja(input: AbrirCajaInput): Promise<{ id: string }> 
     .eq('estado', 'abierto')
     .maybeSingle();
 
-  if (checkErr) throw new Error(checkErr.message);
+  if (checkErr) {
+    return { ok: false, error: `Error al verificar turno: ${checkErr.message}` };
+  }
 
   if (existing) {
-    throw new Error(
-      'Ya existe un turno abierto para esta caja. Ciérralo antes de abrir uno nuevo.'
-    );
+    return {
+      ok: false,
+      error: 'Ya existe un turno abierto para esta caja. Ciérralo antes de abrir uno nuevo.',
+    };
   }
 
   const now = new Date().toISOString();
@@ -66,11 +75,15 @@ export async function abrirCaja(input: AbrirCajaInput): Promise<{ id: string }> 
     .select('id')
     .single();
 
-  if (insertErr) throw new Error(insertErr.message);
-  if (!corte) throw new Error('Error al abrir el turno de caja');
+  if (insertErr) {
+    return { ok: false, error: `Error al abrir turno: ${insertErr.message}` };
+  }
+  if (!corte) {
+    return { ok: false, error: 'Error al abrir el turno de caja (sin datos de respuesta).' };
+  }
 
   revalidatePath('/rdb/cortes');
-  return corte as { id: string };
+  return { ok: true, id: corte.id };
 }
 
 export type Denominacion = {
