@@ -2,8 +2,18 @@
 
 import { revalidatePath } from 'next/cache';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
+import type { Voucher } from '@/components/cortes/types';
 
 const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
+const VOUCHERS_BUCKET = 'cortes-vouchers';
+const VOUCHER_MAX_BYTES = 10 * 1024 * 1024;
+const VOUCHER_ALLOWED_MIMES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+] as const;
 
 export type AbrirCajaInput = {
   caja_id: string;
@@ -202,4 +212,149 @@ export async function registrarMovimiento(
 
   revalidatePath('/rdb/cortes');
   return mov as { id: string };
+}
+
+// ─── Vouchers de terminal (cierres de lote BBVA) ──────────────────────────────
+
+export type SubirVoucherInput = {
+  corte_id: string;
+  file: File;
+};
+
+export async function subirVoucher(
+  input: SubirVoucherInput
+): Promise<{ id: string; signed_url: string }> {
+  const supabase = await createSupabaseServerClient();
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error('No autenticado');
+
+  if (input.file.size > VOUCHER_MAX_BYTES) {
+    throw new Error('Archivo excede 10 MB');
+  }
+  if (!VOUCHER_ALLOWED_MIMES.includes(input.file.type as (typeof VOUCHER_ALLOWED_MIMES)[number])) {
+    throw new Error(`Tipo no permitido: ${input.file.type}`);
+  }
+
+  // Corte debe existir y pertenecer a RDB.
+  const { data: corte, error: corteErr } = await supabase
+    .schema('erp')
+    .from('cortes_caja')
+    .select('id')
+    .eq('empresa_id', RDB_EMPRESA_ID)
+    .eq('id', input.corte_id)
+    .maybeSingle();
+  if (corteErr) throw new Error(corteErr.message);
+  if (!corte) throw new Error('Corte no encontrado');
+
+  // Path determinista: rdb/{corte_id}/{uuid}.{ext}.
+  const ext = (input.file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const storage_path = `rdb/${input.corte_id}/${crypto.randomUUID()}.${ext || 'jpg'}`;
+
+  const { error: uploadErr } = await supabase.storage
+    .from(VOUCHERS_BUCKET)
+    .upload(storage_path, input.file, {
+      contentType: input.file.type,
+      upsert: false,
+    });
+  if (uploadErr) throw new Error(`Upload falló: ${uploadErr.message}`);
+
+  const userMeta = session.user.user_metadata as { full_name?: string } | undefined;
+  const uploadedByNombre = (userMeta?.full_name || session.user.email || '').trim();
+
+  const { data: voucher, error: insertErr } = await supabase
+    .schema('erp')
+    .from('cortes_vouchers')
+    .insert({
+      empresa_id: RDB_EMPRESA_ID,
+      corte_id: input.corte_id,
+      storage_path,
+      nombre_original: input.file.name,
+      tamano_bytes: input.file.size,
+      mime_type: input.file.type,
+      uploaded_by: session.user.id,
+      uploaded_by_nombre: uploadedByNombre,
+    })
+    .select('id')
+    .single();
+
+  if (insertErr) {
+    // Rollback del archivo si el INSERT falla (p.ej. por RLS).
+    await supabase.storage.from(VOUCHERS_BUCKET).remove([storage_path]);
+    throw new Error(insertErr.message);
+  }
+
+  const { data: signed } = await supabase.storage
+    .from(VOUCHERS_BUCKET)
+    .createSignedUrl(storage_path, 3600);
+
+  revalidatePath('/rdb/cortes');
+  return { id: voucher.id, signed_url: signed?.signedUrl || '' };
+}
+
+export async function eliminarVoucher(voucher_id: string): Promise<void> {
+  const supabase = await createSupabaseServerClient();
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error('No autenticado');
+
+  // RLS ya limita DELETE a uploaded_by = fn_current_user_id() OR admin.
+  // Leer el storage_path antes de borrar la fila.
+  const { data: voucher, error: fetchErr } = await supabase
+    .schema('erp')
+    .from('cortes_vouchers')
+    .select('storage_path')
+    .eq('id', voucher_id)
+    .maybeSingle();
+  if (fetchErr) throw new Error(fetchErr.message);
+  if (!voucher) throw new Error('Voucher no encontrado (o sin permisos)');
+
+  const { error: delRowErr } = await supabase
+    .schema('erp')
+    .from('cortes_vouchers')
+    .delete()
+    .eq('id', voucher_id);
+  if (delRowErr) throw new Error(delRowErr.message);
+
+  // Best-effort: si el archivo falla, la fila ya no existe y el archivo queda huérfano.
+  await supabase.storage.from(VOUCHERS_BUCKET).remove([voucher.storage_path]);
+
+  revalidatePath('/rdb/cortes');
+}
+
+export async function obtenerVouchersDelCorte(corte_id: string): Promise<Voucher[]> {
+  const supabase = await createSupabaseServerClient();
+
+  const { data, error } = await supabase
+    .schema('erp')
+    .from('cortes_vouchers')
+    .select(
+      'id, corte_id, storage_path, nombre_original, tamano_bytes, mime_type, afiliacion, monto_reportado, uploaded_by_nombre, uploaded_at'
+    )
+    .eq('corte_id', corte_id)
+    .order('uploaded_at', { ascending: true });
+  if (error) throw new Error(error.message);
+
+  const rows = data ?? [];
+  if (rows.length === 0) return [];
+
+  // createSignedUrls hace un solo round-trip — más barato que N createSignedUrl.
+  const paths = rows.map((r) => r.storage_path);
+  const { data: signed } = await supabase.storage
+    .from(VOUCHERS_BUCKET)
+    .createSignedUrls(paths, 3600);
+
+  const urlByPath = new Map<string, string>();
+  for (const entry of signed ?? []) {
+    if (entry.path && entry.signedUrl) urlByPath.set(entry.path, entry.signedUrl);
+  }
+
+  return rows.map((r) => ({
+    ...r,
+    signed_url: urlByPath.get(r.storage_path) ?? null,
+  })) as Voucher[];
 }

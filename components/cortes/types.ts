@@ -76,6 +76,32 @@ export type CorteProducto = {
   importe_total: number | null;
 };
 
+// erp.cortes_vouchers row (signed_url resuelto en server action).
+export type Voucher = {
+  id: string;
+  corte_id: string;
+  storage_path: string;
+  signed_url?: string | null;
+  nombre_original: string | null;
+  tamano_bytes: number | null;
+  mime_type: string | null;
+  afiliacion: string | null;
+  monto_reportado: number | null;
+  uploaded_by_nombre: string | null;
+  uploaded_at: string | null;
+};
+
+// Validación client-side antes de llamar al server action.
+// Espejo del CHECK del bucket (10 MB, mime types de imagen).
+export const VOUCHER_MAX_BYTES = 10 * 1024 * 1024;
+export const VOUCHER_ALLOWED_MIMES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+] as const;
+
 export type Caja = { id: string; nombre: string };
 
 // ─── UI constants ─────────────────────────────────────────────────────────────

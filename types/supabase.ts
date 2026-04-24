@@ -3973,6 +3973,59 @@ export type Database = {
           },
         ]
       }
+      cortes_vouchers: {
+        Row: {
+          afiliacion: string | null
+          corte_id: string
+          empresa_id: string
+          id: string
+          mime_type: string | null
+          monto_reportado: number | null
+          nombre_original: string | null
+          storage_path: string
+          tamano_bytes: number | null
+          uploaded_at: string
+          uploaded_by: string | null
+          uploaded_by_nombre: string | null
+        }
+        Insert: {
+          afiliacion?: string | null
+          corte_id: string
+          empresa_id: string
+          id?: string
+          mime_type?: string | null
+          monto_reportado?: number | null
+          nombre_original?: string | null
+          storage_path: string
+          tamano_bytes?: number | null
+          uploaded_at?: string
+          uploaded_by?: string | null
+          uploaded_by_nombre?: string | null
+        }
+        Update: {
+          afiliacion?: string | null
+          corte_id?: string
+          empresa_id?: string
+          id?: string
+          mime_type?: string | null
+          monto_reportado?: number | null
+          nombre_original?: string | null
+          storage_path?: string
+          tamano_bytes?: number | null
+          uploaded_at?: string
+          uploaded_by?: string | null
+          uploaded_by_nombre?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cortes_vouchers_corte_id_fkey"
+            columns: ["corte_id"]
+            isOneToOne: false
+            referencedRelation: "cortes_caja"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cuentas_bancarias: {
         Row: {
           activo: boolean
