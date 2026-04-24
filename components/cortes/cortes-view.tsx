@@ -19,7 +19,7 @@ import { fetchCorteDetail, fetchCortesList } from './data';
 import { resolvePresetRange } from './date-presets';
 import { todayRange } from './helpers';
 import { SummaryBar } from './summary-bar';
-import type { Corte, CorteProducto, CorteTotales, Movimiento } from './types';
+import type { Corte, CorteProducto, CorteTotales, Movimiento, Voucher } from './types';
 import { useAbrirCaja } from './use-abrir-caja';
 import { useCerrarCorte } from './use-cerrar-corte';
 
@@ -57,6 +57,7 @@ export function CortesView() {
   const [selectedTotales, setSelectedTotales] = useState<CorteTotales | null>(null);
   const [selectedMovimientos, setSelectedMovimientos] = useState<Movimiento[]>([]);
   const [, setSelectedProductos] = useState<CorteProducto[]>([]);
+  const [selectedVouchers, setSelectedVouchers] = useState<Voucher[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -106,10 +107,11 @@ export function CortesView() {
   const loadDetail = useCallback(async (corteId: string, withSpinner: boolean) => {
     if (withSpinner) setLoadingDetail(true);
     try {
-      const { totales, movimientos, productos } = await fetchCorteDetail(corteId);
+      const { totales, movimientos, productos, vouchers } = await fetchCorteDetail(corteId);
       setSelectedTotales(totales);
       setSelectedMovimientos(movimientos);
       setSelectedProductos(productos);
+      setSelectedVouchers(vouchers);
     } catch {
       // non-fatal — drawer still shows corte base info
     } finally {
@@ -121,6 +123,7 @@ export function CortesView() {
     setSelected(corte);
     setSelectedTotales(null);
     setSelectedMovimientos([]);
+    setSelectedVouchers([]);
     setDrawerOpen(true);
     await loadDetail(corte.id, true);
   };
@@ -201,6 +204,7 @@ export function CortesView() {
           corte={selected}
           totales={selectedTotales}
           movimientos={selectedMovimientos}
+          vouchers={selectedVouchers}
           loadingDetail={loadingDetail}
           open={drawerOpen}
           onClose={() => setDrawerOpen(false)}
@@ -217,7 +221,12 @@ export function CortesView() {
           onUpdateCantidad={cerrar.updateCantidad}
           observaciones={cerrar.observaciones}
           onObservacionesChange={cerrar.setObservaciones}
-          onSubmit={() => cerrar.submit(() => void fetchCortes())}
+          onSubmit={() =>
+            cerrar.submit(() => {
+              void fetchCortes();
+              if (selected) void loadDetail(selected.id, false);
+            })
+          }
           isPending={cerrar.isPending}
           error={cerrar.error}
           isWizard={cerrar.isWizard}

@@ -1,3 +1,4 @@
+import { obtenerVouchersDelCorte } from '@/app/rdb/cortes/actions';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import {
   RDB_EMPRESA_ID,
@@ -6,6 +7,7 @@ import {
   type CorteProducto,
   type CorteTotales,
   type Movimiento,
+  type Voucher,
 } from './types';
 
 /**
@@ -40,14 +42,18 @@ export async function fetchCortesList({
   return (data ?? []) as Corte[];
 }
 
-// Per-corte detail: totales, movimientos, productos — loaded in parallel.
+// Per-corte detail: totales, movimientos, productos, vouchers — loaded in parallel.
+// Vouchers pasan por el server action porque resuelven signed URLs y aplican
+// la policy RLS autenticada (el browser client del detail drawer también
+// funcionaría, pero el server action ya centraliza la lógica de firmado).
 export async function fetchCorteDetail(corteId: string): Promise<{
   totales: CorteTotales | null;
   movimientos: Movimiento[];
   productos: CorteProducto[];
+  vouchers: Voucher[];
 }> {
   const supabase = createSupabaseBrowserClient();
-  const [totalesRes, movimientosRes, productosRes] = await Promise.all([
+  const [totalesRes, movimientosRes, productosRes, vouchers] = await Promise.all([
     supabase
       .schema('rdb')
       .from('v_cortes_totales')
@@ -75,12 +81,14 @@ export async function fetchCorteDetail(corteId: string): Promise<{
       .eq('corte_id', corteId)
       .order('importe_total', { ascending: false })
       .limit(100),
+    obtenerVouchersDelCorte(corteId).catch(() => [] as Voucher[]),
   ]);
 
   return {
     totales: (totalesRes.data as CorteTotales | null) ?? null,
     movimientos: (movimientosRes.data ?? []) as Movimiento[],
     productos: (productosRes?.data ?? []) as CorteProducto[],
+    vouchers,
   };
 }
 
