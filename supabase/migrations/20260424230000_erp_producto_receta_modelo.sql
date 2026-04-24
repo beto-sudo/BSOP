@@ -60,8 +60,7 @@ DROP POLICY IF EXISTS erp_producto_receta_delete ON erp.producto_receta;
 CREATE POLICY erp_producto_receta_delete ON erp.producto_receta FOR DELETE TO authenticated
 USING (core.fn_has_empresa(empresa_id) OR core.fn_is_admin());
 
-DROP POLICY IF EXISTS erp_producto_receta_service_role ON erp.producto_receta;
-CREATE POLICY erp_producto_receta_service_role ON erp.producto_receta FOR ALL TO service_role USING (true) WITH CHECK (true);
+-- service_role bypassa RLS automáticamente; no se necesita policy explícita.
 
 GRANT ALL ON erp.producto_receta TO authenticated;
 GRANT ALL ON erp.producto_receta TO service_role;
