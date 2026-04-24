@@ -98,7 +98,7 @@ export function CerrarCorteDialog({
         if (!v) onOpenChange(false);
       }}
     >
-      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-lg">
+      <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{titulo}</DialogTitle>
           <DialogDescription>
@@ -111,7 +111,7 @@ export function CerrarCorteDialog({
           )}
         </DialogHeader>
 
-        <ScrollArea className="flex-1 pr-2">
+        <ScrollArea className="min-h-0 flex-1 pr-2">
           {(!isWizard || step === 1) && (
             <div className="space-y-4 py-2">
               {/* Referencia */}
