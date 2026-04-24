@@ -15,7 +15,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CortePrintMarbete } from './corte-print-marbete';
 import { estadoVariant, formatCurrency, formatDate, formatDateTime } from './helpers';
 import { RegistrarMovimientoDialog } from './registrar-movimiento-dialog';
-import type { Corte, CorteTotales, Movimiento } from './types';
+import type { Corte, CorteTotales, Movimiento, Voucher } from './types';
+import { VoucherLightbox } from './voucher-lightbox';
 
 function DetailSkeleton() {
   return (
@@ -34,6 +35,7 @@ export function CorteDetail({
   corte,
   totales,
   movimientos,
+  vouchers,
   loadingDetail,
   open,
   onClose,
@@ -43,6 +45,7 @@ export function CorteDetail({
   corte: Corte | null;
   totales: CorteTotales | null;
   movimientos: Movimiento[];
+  vouchers: Voucher[];
   loadingDetail: boolean;
   open: boolean;
   onClose: () => void;
@@ -50,6 +53,7 @@ export function CorteDetail({
   onMovimientoRegistered: () => void;
 }) {
   const [registrarOpen, setRegistrarOpen] = useState(false);
+  const [lightboxVoucher, setLightboxVoucher] = useState<Voucher | null>(null);
   if (!corte) return null;
   const estaAbierto = corte.estado?.toLowerCase() === 'abierto';
   const efectivoEsperado = totales?.efectivo_esperado ?? corte.efectivo_esperado ?? 0;
@@ -254,6 +258,46 @@ export function CorteDetail({
                 </div>
               )}
             </div>
+
+            {vouchers.length > 0 && (
+              <>
+                <Separator />
+                <div>
+                  <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Vouchers de terminal ({vouchers.length})
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {vouchers.map((v) => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        className="group relative aspect-square overflow-hidden rounded-md border bg-muted hover:border-primary"
+                        onClick={() => setLightboxVoucher(v)}
+                      >
+                        {v.signed_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={v.signed_url}
+                            alt={v.nombre_original ?? 'voucher'}
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                            Sin preview
+                          </div>
+                        )}
+                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-1">
+                          <span className="block truncate text-xs text-white">
+                            {v.afiliacion ?? formatDateTime(v.uploaded_at)}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </ScrollArea>
 
@@ -265,6 +309,8 @@ export function CorteDetail({
             onSuccess={onMovimientoRegistered}
           />
         )}
+
+        <VoucherLightbox voucher={lightboxVoucher} onClose={() => setLightboxVoucher(null)} />
       </SheetContent>
     </Sheet>
   );
