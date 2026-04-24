@@ -82,17 +82,13 @@ WHERE empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'
   AND referencia_tipo IS NULL
   AND notas = 'Ajuste deistribucion inventario sabores';
 
--- 3) Rebuild completo de erp.inventario desde movimientos (single source of truth)
+-- 3) Rebuild completo de erp.inventario desde movimientos (single source of truth).
+--    Tolerante a DBs sin datos RDB (preview branches): si no hay movimientos
+--    para la empresa, los UPDATE/INSERT son no-op.
 DO $rebuild$
 DECLARE
   v_empresa_id UUID := 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid;
-  v_almacen_id UUID;
 BEGIN
-  SELECT id INTO v_almacen_id FROM erp.almacenes WHERE empresa_id = v_empresa_id LIMIT 1;
-  IF v_almacen_id IS NULL THEN
-    RAISE EXCEPTION 'Sin almacén para empresa RDB — no se puede rebuild';
-  END IF;
-
   -- Zero-out de inventario RDB antes del rebuild (evita filas stale)
   UPDATE erp.inventario SET cantidad = 0, updated_at = now() WHERE empresa_id = v_empresa_id;
 
