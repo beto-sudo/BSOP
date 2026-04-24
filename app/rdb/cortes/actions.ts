@@ -23,9 +23,7 @@ export type AbrirCajaInput = {
   fecha_operativa: string; // YYYY-MM-DD
 };
 
-export type AbrirCajaResult =
-  | { ok: true; id: string }
-  | { ok: false; error: string };
+export type AbrirCajaResult = { ok: true; id: string } | { ok: false; error: string };
 
 export async function abrirCaja(input: AbrirCajaInput): Promise<AbrirCajaResult> {
   const supabase = await createSupabaseServerClient();
