@@ -68,17 +68,25 @@ export function useAbrirCaja() {
 
     startTransition(async () => {
       try {
-        await abrirCaja({
+        const result = await abrirCaja({
           caja_id: form.caja_id,
           caja_nombre: selectedCaja?.nombre ?? form.caja_id,
           responsable_apertura: form.responsable_apertura.trim(),
           efectivo_inicial: parseFloat(form.efectivo_inicial) || 0,
           fecha_operativa: form.fecha_operativa || todayRange().from,
         });
+
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+
         setOpen(false);
         setForm(EMPTY_FORM);
         onSuccess();
       } catch (err) {
+        // Solo entra aquí por errores inesperados (red, parseo). Los errores
+        // de negocio (duplicado, no autenticado, etc.) llegan en result.error.
         setError(err instanceof Error ? err.message : 'Error al abrir la caja');
       }
     });
