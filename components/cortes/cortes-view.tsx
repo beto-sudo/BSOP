@@ -220,6 +220,13 @@ export function CortesView() {
           onSubmit={() => cerrar.submit(() => void fetchCortes())}
           isPending={cerrar.isPending}
           error={cerrar.error}
+          isWizard={cerrar.isWizard}
+          step={cerrar.step}
+          onNext={cerrar.goNext}
+          onBack={cerrar.goBack}
+          vouchers={cerrar.vouchers}
+          onVoucherUploaded={cerrar.onVoucherUploaded}
+          onVoucherRemoved={cerrar.onVoucherRemoved}
         />
 
         {/* Abrir Caja dialog */}
