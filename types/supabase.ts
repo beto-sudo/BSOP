@@ -1603,6 +1603,172 @@ export type Database = {
           },
         ]
       }
+      inventario_vivienda: {
+        Row: {
+          cliente_apartado_id: string | null
+          coda_row_id: string | null
+          codigo_unidad: string | null
+          construccion_lote_id: string
+          created_at: string
+          decision_actual: string | null
+          deleted_at: string | null
+          empresa_id: string
+          estado_comercial: string
+          etapa: string | null
+          fase_inventario_id: string | null
+          fecha_apartado: string | null
+          fecha_disponibilidad: string | null
+          fecha_entrega: string | null
+          fecha_escrituracion: string | null
+          fecha_ultima_revision: string | null
+          fecha_vencimiento_apartado: string | null
+          fecha_venta: string | null
+          id: string
+          lote_id: string
+          monto_apartado: number | null
+          observaciones: string | null
+          precio_lista: number | null
+          precio_promocional: number | null
+          prioridad: string | null
+          promocion_id: string | null
+          prototipo_id: string
+          proyecto_id: string
+          responsable_id: string | null
+          siguiente_accion: string | null
+          updated_at: string
+        }
+        Insert: {
+          cliente_apartado_id?: string | null
+          coda_row_id?: string | null
+          codigo_unidad?: string | null
+          construccion_lote_id: string
+          created_at?: string
+          decision_actual?: string | null
+          deleted_at?: string | null
+          empresa_id: string
+          estado_comercial?: string
+          etapa?: string | null
+          fase_inventario_id?: string | null
+          fecha_apartado?: string | null
+          fecha_disponibilidad?: string | null
+          fecha_entrega?: string | null
+          fecha_escrituracion?: string | null
+          fecha_ultima_revision?: string | null
+          fecha_vencimiento_apartado?: string | null
+          fecha_venta?: string | null
+          id?: string
+          lote_id: string
+          monto_apartado?: number | null
+          observaciones?: string | null
+          precio_lista?: number | null
+          precio_promocional?: number | null
+          prioridad?: string | null
+          promocion_id?: string | null
+          prototipo_id: string
+          proyecto_id: string
+          responsable_id?: string | null
+          siguiente_accion?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cliente_apartado_id?: string | null
+          coda_row_id?: string | null
+          codigo_unidad?: string | null
+          construccion_lote_id?: string
+          created_at?: string
+          decision_actual?: string | null
+          deleted_at?: string | null
+          empresa_id?: string
+          estado_comercial?: string
+          etapa?: string | null
+          fase_inventario_id?: string | null
+          fecha_apartado?: string | null
+          fecha_disponibilidad?: string | null
+          fecha_entrega?: string | null
+          fecha_escrituracion?: string | null
+          fecha_ultima_revision?: string | null
+          fecha_vencimiento_apartado?: string | null
+          fecha_venta?: string | null
+          id?: string
+          lote_id?: string
+          monto_apartado?: number | null
+          observaciones?: string | null
+          precio_lista?: number | null
+          precio_promocional?: number | null
+          prioridad?: string | null
+          promocion_id?: string | null
+          prototipo_id?: string
+          proyecto_id?: string
+          responsable_id?: string | null
+          siguiente_accion?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventario_vivienda_construccion_lote_id_fkey"
+            columns: ["construccion_lote_id"]
+            isOneToOne: false
+            referencedRelation: "construccion_lote"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventario_vivienda_construccion_lote_id_fkey"
+            columns: ["construccion_lote_id"]
+            isOneToOne: false
+            referencedRelation: "v_lotes_estatus"
+            referencedColumns: ["construccion_id"]
+          },
+          {
+            foreignKeyName: "inventario_vivienda_construccion_lote_id_fkey"
+            columns: ["construccion_lote_id"]
+            isOneToOne: false
+            referencedRelation: "v_obra_resumen"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventario_vivienda_fase_inventario_id_fkey"
+            columns: ["fase_inventario_id"]
+            isOneToOne: false
+            referencedRelation: "fases_inventario"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventario_vivienda_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventario_vivienda_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "v_lotes_estatus"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventario_vivienda_promocion_id_fkey"
+            columns: ["promocion_id"]
+            isOneToOne: false
+            referencedRelation: "promociones_ventas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventario_vivienda_prototipo_id_fkey"
+            columns: ["prototipo_id"]
+            isOneToOne: false
+            referencedRelation: "prototipos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventario_vivienda_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lotes: {
         Row: {
           coda_row_id: string | null
@@ -1828,6 +1994,68 @@ export type Database = {
             columns: ["tipo_trabajo_id"]
             isOneToOne: false
             referencedRelation: "tipo_trabajo"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      promociones_ventas: {
+        Row: {
+          activa: boolean
+          coda_row_id: string | null
+          condiciones: string | null
+          created_at: string
+          deleted_at: string | null
+          descripcion: string | null
+          descuento_monto: number | null
+          descuento_pct: number | null
+          empresa_id: string
+          fecha_fin: string | null
+          fecha_inicio: string | null
+          id: string
+          nombre: string
+          proyecto_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          coda_row_id?: string | null
+          condiciones?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          descuento_monto?: number | null
+          descuento_pct?: number | null
+          empresa_id: string
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          id?: string
+          nombre: string
+          proyecto_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          coda_row_id?: string | null
+          condiciones?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          descuento_monto?: number | null
+          descuento_pct?: number | null
+          empresa_id?: string
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          id?: string
+          nombre?: string
+          proyecto_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promociones_ventas_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
             referencedColumns: ["id"]
           },
         ]
@@ -2709,6 +2937,131 @@ export type Database = {
             columns: ["tipo_proyecto_id"]
             isOneToOne: false
             referencedRelation: "tipo_proyecto"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_inventario_comercial: {
+        Row: {
+          cliente_apartado_id: string | null
+          cliente_apartado_nombre: string | null
+          cliente_apartado_telefono: string | null
+          codigo_unidad: string | null
+          construccion_avance_pct: number | null
+          construccion_etapa_id: string | null
+          construccion_lote_id: string | null
+          created_at: string | null
+          decision_actual: string | null
+          dias_en_fase: number | null
+          empresa_id: string | null
+          estado_comercial: string | null
+          etapa: string | null
+          fase_inventario_id: string | null
+          fase_inventario_nombre: string | null
+          fecha_apartado: string | null
+          fecha_disponibilidad: string | null
+          fecha_entrega: string | null
+          fecha_escrituracion: string | null
+          fecha_ultima_revision: string | null
+          fecha_vencimiento_apartado: string | null
+          fecha_venta: string | null
+          id: string | null
+          lote_id: string | null
+          lote_manzana: string | null
+          lote_numero: string | null
+          lote_superficie_m2: number | null
+          monto_apartado: number | null
+          observaciones: string | null
+          precio_final: number | null
+          precio_lista: number | null
+          precio_promocional: number | null
+          prioridad: string | null
+          promocion_descuento_monto: number | null
+          promocion_descuento_pct: number | null
+          promocion_id: string | null
+          promocion_nombre: string | null
+          prototipo_banos: number | null
+          prototipo_codigo: string | null
+          prototipo_id: string | null
+          prototipo_nombre: string | null
+          prototipo_recamaras: number | null
+          prototipo_superficie_m2: number | null
+          proyecto_codigo: string | null
+          proyecto_id: string | null
+          proyecto_nombre: string | null
+          responsable_id: string | null
+          siguiente_accion: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construccion_lote_etapa_construccion_id_fkey"
+            columns: ["construccion_etapa_id"]
+            isOneToOne: false
+            referencedRelation: "etapas_construccion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventario_vivienda_construccion_lote_id_fkey"
+            columns: ["construccion_lote_id"]
+            isOneToOne: false
+            referencedRelation: "construccion_lote"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventario_vivienda_construccion_lote_id_fkey"
+            columns: ["construccion_lote_id"]
+            isOneToOne: false
+            referencedRelation: "v_lotes_estatus"
+            referencedColumns: ["construccion_id"]
+          },
+          {
+            foreignKeyName: "inventario_vivienda_construccion_lote_id_fkey"
+            columns: ["construccion_lote_id"]
+            isOneToOne: false
+            referencedRelation: "v_obra_resumen"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventario_vivienda_fase_inventario_id_fkey"
+            columns: ["fase_inventario_id"]
+            isOneToOne: false
+            referencedRelation: "fases_inventario"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventario_vivienda_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventario_vivienda_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "v_lotes_estatus"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventario_vivienda_promocion_id_fkey"
+            columns: ["promocion_id"]
+            isOneToOne: false
+            referencedRelation: "promociones_ventas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventario_vivienda_prototipo_id_fkey"
+            columns: ["prototipo_id"]
+            isOneToOne: false
+            referencedRelation: "prototipos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventario_vivienda_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
             referencedColumns: ["id"]
           },
         ]
