@@ -247,3 +247,11 @@ Activar escritura en todas las migraciones Tier 2+. Schema:
 ---
 
 _Versión: 1.0 — 2026-04-18 · Autor: Claude + Beto (audit conjunto)_
+
+---
+
+## Post-migración (abril 2026)
+
+- **2026-04-24**: cron `sync-cortes-5min` desactivado vía `cron.unschedule('sync-cortes-5min')` (última corrida 17:00 UTC). RDB captura cortes/movimientos directo en `erp.cortes_caja` y `erp.movimientos_caja` desde 2026-04-23.
+- **2026-04-24**: shims `rdb.upsert_corte` y `rdb.upsert_movimiento` marcados `DEPRECATED` con `RAISE WARNING` (ver migración `supabase/migrations/20260424171951_rdb_deprecate_coda_upsert_shims.sql`). La lógica del body queda intacta para evitar rupturas si algún caller tardío aparece; cada invocación deja rastro en los logs de Postgres. **DROP planeado ~2026-05-08** si los logs no muestran callers durante las 2 semanas siguientes.
+- **Edge function `sync-cortes`**: sigue `ACTIVE` en Supabase pero sin caller en BSOP. Se eliminará en el mismo PR que haga el `DROP FUNCTION` de los shims.
