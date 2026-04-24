@@ -130,3 +130,72 @@ export async function cerrarCaja(input: CerrarCajaInput): Promise<void> {
 
   revalidatePath('/rdb/cortes');
 }
+
+export type RegistrarMovimientoInput = {
+  corte_id: string;
+  tipo: 'entrada' | 'salida';
+  tipo_detalle: string;
+  monto: number;
+  concepto: string;
+  realizado_por_nombre: string;
+};
+
+export async function registrarMovimiento(
+  input: RegistrarMovimientoInput
+): Promise<{ id: string }> {
+  const supabase = await createSupabaseServerClient();
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error('No autenticado');
+
+  if (!input.corte_id) throw new Error('corte_id requerido');
+  if (!input.monto || input.monto <= 0) throw new Error('Monto debe ser mayor a 0');
+  if (!input.concepto?.trim()) throw new Error('Concepto requerido');
+  if (!['entrada', 'salida'].includes(input.tipo)) {
+    throw new Error(`tipo inválido: ${input.tipo}`);
+  }
+
+  // Solo cortes abiertos aceptan movimientos; cierres son inmutables.
+  const { data: corte, error: fetchErr } = await supabase
+    .schema('erp')
+    .from('cortes_caja')
+    .select('id, estado')
+    .eq('empresa_id', RDB_EMPRESA_ID)
+    .eq('id', input.corte_id)
+    .maybeSingle();
+
+  if (fetchErr) throw new Error(fetchErr.message);
+  if (!corte) throw new Error('Corte no encontrado');
+  if (corte.estado !== 'abierto') {
+    throw new Error(
+      `No se puede registrar movimiento: el corte está "${corte.estado}". Solo cortes abiertos aceptan movimientos.`
+    );
+  }
+
+  // Escribimos directo a erp.movimientos_caja. NO llamar rdb.upsert_movimiento:
+  // está DEPRECATED desde PR #172 y lanza RAISE WARNING — ese shim es solo
+  // para callers tardíos de Coda.
+  const { data: mov, error: insertErr } = await supabase
+    .schema('erp')
+    .from('movimientos_caja')
+    .insert({
+      empresa_id: RDB_EMPRESA_ID,
+      corte_id: input.corte_id,
+      tipo: input.tipo,
+      tipo_detalle: input.tipo_detalle,
+      monto: input.monto,
+      concepto: input.concepto.trim(),
+      realizado_por_nombre: input.realizado_por_nombre.trim(),
+      // `referencia` se reserva para marca histórica de Coda (i-xxxxx).
+    })
+    .select('id')
+    .single();
+
+  if (insertErr) throw new Error(insertErr.message);
+  if (!mov) throw new Error('Error al registrar movimiento');
+
+  revalidatePath('/rdb/cortes');
+  return mov as { id: string };
+}

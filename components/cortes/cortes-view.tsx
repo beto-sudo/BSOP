@@ -103,24 +103,33 @@ export function CortesView() {
     void fetchCortes();
   }, [fetchCortes]);
 
-  const openDetail = async (corte: Corte) => {
-    setSelected(corte);
-    setSelectedTotales(null);
-    setSelectedMovimientos([]);
-    setDrawerOpen(true);
-    setLoadingDetail(true);
-
+  const loadDetail = useCallback(async (corteId: string, withSpinner: boolean) => {
+    if (withSpinner) setLoadingDetail(true);
     try {
-      const { totales, movimientos, productos } = await fetchCorteDetail(corte.id);
+      const { totales, movimientos, productos } = await fetchCorteDetail(corteId);
       setSelectedTotales(totales);
       setSelectedMovimientos(movimientos);
       setSelectedProductos(productos);
     } catch {
       // non-fatal — drawer still shows corte base info
     } finally {
-      setLoadingDetail(false);
+      if (withSpinner) setLoadingDetail(false);
     }
+  }, []);
+
+  const openDetail = async (corte: Corte) => {
+    setSelected(corte);
+    setSelectedTotales(null);
+    setSelectedMovimientos([]);
+    setDrawerOpen(true);
+    await loadDetail(corte.id, true);
   };
+
+  const refreshSelectedDetail = useCallback(() => {
+    if (!selected) return;
+    void loadDetail(selected.id, false);
+    void fetchCortes();
+  }, [selected, loadDetail, fetchCortes]);
 
   const filtered = cortes.filter((c) => {
     if (estadoFilter !== 'all' && c.estado?.toLowerCase() !== estadoFilter) return false;
@@ -196,6 +205,7 @@ export function CortesView() {
           open={drawerOpen}
           onClose={() => setDrawerOpen(false)}
           onCerrar={openCerrarDialog}
+          onMovimientoRegistered={refreshSelectedDetail}
         />
 
         {/* Cerrar Corte dialog */}

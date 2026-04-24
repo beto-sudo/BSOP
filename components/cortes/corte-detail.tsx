@@ -1,4 +1,5 @@
-import { Printer, XCircle } from 'lucide-react';
+import { Plus, Printer, XCircle } from 'lucide-react';
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -13,6 +14,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { CortePrintMarbete } from './corte-print-marbete';
 import { estadoVariant, formatCurrency, formatDate, formatDateTime } from './helpers';
+import { RegistrarMovimientoDialog } from './registrar-movimiento-dialog';
 import type { Corte, CorteTotales, Movimiento } from './types';
 
 function DetailSkeleton() {
@@ -36,6 +38,7 @@ export function CorteDetail({
   open,
   onClose,
   onCerrar,
+  onMovimientoRegistered,
 }: {
   corte: Corte | null;
   totales: CorteTotales | null;
@@ -44,7 +47,9 @@ export function CorteDetail({
   open: boolean;
   onClose: () => void;
   onCerrar: (corte: Corte) => void;
+  onMovimientoRegistered: () => void;
 }) {
+  const [registrarOpen, setRegistrarOpen] = useState(false);
   if (!corte) return null;
   const estaAbierto = corte.estado?.toLowerCase() === 'abierto';
   const efectivoEsperado = totales?.efectivo_esperado ?? corte.efectivo_esperado ?? 0;
@@ -205,10 +210,23 @@ export function CorteDetail({
 
             <Separator />
 
-            {/* Movimientos — placeholder */}
+            {/* Movimientos */}
             <div>
-              <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Movimientos
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Movimientos
+                </span>
+                {estaAbierto && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setRegistrarOpen(true)}
+                    aria-label="Registrar movimiento de caja"
+                  >
+                    <Plus className="mr-1.5 h-3.5 w-3.5" />
+                    Registrar
+                  </Button>
+                )}
               </div>
               {loadingDetail ? (
                 <DetailSkeleton />
@@ -238,6 +256,16 @@ export function CorteDetail({
             </div>
           </div>
         </ScrollArea>
+
+        {estaAbierto && (
+          <RegistrarMovimientoDialog
+            corteId={corte.id}
+            defaultRealizadoPor={corte.responsable_apertura ?? ''}
+            open={registrarOpen}
+            onOpenChange={setRegistrarOpen}
+            onSuccess={onMovimientoRegistered}
+          />
+        )}
       </SheetContent>
     </Sheet>
   );
