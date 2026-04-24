@@ -5393,6 +5393,57 @@ export type Database = {
         }
         Relationships: []
       }
+      producto_receta: {
+        Row: {
+          cantidad: number
+          created_at: string
+          empresa_id: string
+          id: string
+          insumo_id: string
+          notas: string | null
+          producto_venta_id: string
+          unidad: string
+          updated_at: string
+        }
+        Insert: {
+          cantidad: number
+          created_at?: string
+          empresa_id: string
+          id?: string
+          insumo_id: string
+          notas?: string | null
+          producto_venta_id: string
+          unidad: string
+          updated_at?: string
+        }
+        Update: {
+          cantidad?: number
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          insumo_id?: string
+          notas?: string | null
+          producto_venta_id?: string
+          unidad?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "producto_receta_insumo_id_fkey"
+            columns: ["insumo_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "producto_receta_producto_venta_id_fkey"
+            columns: ["producto_venta_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       productos: {
         Row: {
           activo: boolean

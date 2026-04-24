@@ -26,7 +26,8 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import { Package, RefreshCw, Search, Tag, Box, Settings2, Save } from 'lucide-react';
+import { Package, RefreshCw, Search, Tag, Box, Settings2, Save, X } from 'lucide-react';
+import { upsertReceta } from './actions';
 
 const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
 
@@ -44,6 +45,20 @@ type Producto = {
   created_at: string | null;
   updated_at: string | null;
   inventariable: boolean;
+};
+
+type RecetaRow = {
+  id?: string;
+  insumo_id: string;
+  insumo_nombre: string;
+  cantidad: number;
+  unidad: string;
+};
+
+type InsumoDisponible = {
+  id: string;
+  nombre: string;
+  unidad: string;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -72,6 +87,12 @@ export default function ProductosPage() {
   // Form State
   const [formCategoria, setFormCategoria] = useState('');
   const [formInventariable, setFormInventariable] = useState(false);
+
+  // Receta state (drawer de edit)
+  const [recetaRows, setRecetaRows] = useState<RecetaRow[]>([]);
+  const [insumosDisponibles, setInsumosDisponibles] = useState<InsumoDisponible[]>([]);
+  const [recetaLoading, setRecetaLoading] = useState(false);
+  const [insumoToAdd, setInsumoToAdd] = useState('');
 
   // Create Form State
   const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
@@ -123,6 +144,61 @@ export default function ProductosPage() {
     void fetchProductos();
   }, [fetchProductos]);
 
+  useEffect(() => {
+    if (!drawerOpen || !selectedProducto) {
+      setRecetaRows([]);
+      setInsumosDisponibles([]);
+      setInsumoToAdd('');
+      return;
+    }
+    let cancelled = false;
+    setRecetaLoading(true);
+    const supabase = createSupabaseBrowserClient();
+    void Promise.all([
+      supabase
+        .schema('erp')
+        .from('producto_receta')
+        .select('id, insumo_id, cantidad, unidad, insumo:productos!insumo_id(nombre)')
+        .eq('producto_venta_id', selectedProducto.id),
+      supabase
+        .schema('erp')
+        .from('productos')
+        .select('id, nombre, unidad')
+        .eq('empresa_id', RDB_EMPRESA_ID)
+        .eq('inventariable', true)
+        .eq('activo', true)
+        .is('deleted_at', null)
+        .order('nombre'),
+    ]).then(([rec, ins]) => {
+      if (cancelled) return;
+      if (rec.data) {
+        setRecetaRows(
+          rec.data.map((r) => {
+            const insumo = r.insumo as { nombre?: string } | null;
+            return {
+              id: r.id,
+              insumo_id: r.insumo_id,
+              insumo_nombre: insumo?.nombre ?? '—',
+              cantidad: Number(r.cantidad),
+              unidad: r.unidad,
+            };
+          })
+        );
+      } else {
+        setRecetaRows([]);
+      }
+      if (ins.data) {
+        setInsumosDisponibles(
+          ins.data.map((i) => ({ id: i.id, nombre: i.nombre, unidad: i.unidad ?? 'pieza' }))
+        );
+      }
+      setRecetaLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [drawerOpen, selectedProducto]);
+
   const openDrawer = (p: Producto) => {
     setSelectedProducto(p);
     setFormCategoria(p.categoria || '');
@@ -147,6 +223,19 @@ export default function ProductosPage() {
         .eq('id', selectedProducto.id);
 
       if (err) throw err;
+
+      const recetaResult = await upsertReceta({
+        producto_venta_id: selectedProducto.id,
+        insumos: recetaRows.map((r) => ({
+          insumo_id: r.insumo_id,
+          cantidad: r.cantidad,
+          unidad: r.unidad,
+        })),
+      });
+      if (!recetaResult.ok) {
+        alert(`Error al guardar la receta: ${recetaResult.error}`);
+        return;
+      }
 
       setDrawerOpen(false);
       void fetchProductos();
@@ -488,6 +577,96 @@ export default function ProductosPage() {
                       placeholder="Seleccionar tipo..."
                     />
                   </div>
+                </div>
+
+                {/* Receta — insumos por venta */}
+                <div className="space-y-3 border-t pt-4">
+                  <div>
+                    <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                      Receta (insumos por venta)
+                    </h3>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Por cada venta de este producto, se descontarán estos insumos del inventario.
+                    </p>
+                  </div>
+
+                  {recetaLoading ? (
+                    <Skeleton className="h-20 w-full" />
+                  ) : (
+                    <>
+                      {recetaRows.length === 0 && (
+                        <div className="text-sm italic text-muted-foreground">
+                          Sin receta. Las ventas de este producto no descontarán inventario.
+                        </div>
+                      )}
+
+                      {recetaRows.map((row, idx) => (
+                        <div key={row.id ?? `new-${idx}`} className="flex items-center gap-2">
+                          <div className="flex-1 truncate text-sm">{row.insumo_nombre}</div>
+                          <Input
+                            type="number"
+                            step="0.0001"
+                            min="0"
+                            value={row.cantidad}
+                            onChange={(e) => {
+                              const v = parseFloat(e.target.value);
+                              setRecetaRows((rows) =>
+                                rows.map((r, i) =>
+                                  i === idx ? { ...r, cantidad: Number.isFinite(v) ? v : 0 } : r
+                                )
+                              );
+                            }}
+                            className="w-24 text-right"
+                            aria-label={`Cantidad de ${row.insumo_nombre}`}
+                          />
+                          <div className="w-16 text-xs text-muted-foreground">{row.unidad}</div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() =>
+                              setRecetaRows((rows) => rows.filter((_, i) => i !== idx))
+                            }
+                            aria-label={`Quitar ${row.insumo_nombre}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+
+                      <div className="flex items-center gap-2 border-t pt-2">
+                        <Combobox
+                          value={insumoToAdd}
+                          onChange={(insumo_id) => {
+                            if (!insumo_id) return;
+                            const ins = insumosDisponibles.find((i) => i.id === insumo_id);
+                            if (!ins) return;
+                            if (recetaRows.some((r) => r.insumo_id === insumo_id)) return;
+                            if (ins.id === selectedProducto.id) return;
+                            setRecetaRows((rows) => [
+                              ...rows,
+                              {
+                                insumo_id: ins.id,
+                                insumo_nombre: ins.nombre,
+                                cantidad: 1,
+                                unidad: ins.unidad,
+                              },
+                            ]);
+                            setInsumoToAdd('');
+                          }}
+                          options={insumosDisponibles
+                            .filter(
+                              (i) =>
+                                i.id !== selectedProducto.id &&
+                                !recetaRows.some((r) => r.insumo_id === i.id)
+                            )
+                            .map((i) => ({ value: i.id, label: i.nombre }))}
+                          placeholder="+ Agregar insumo…"
+                          className="flex-1"
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <div className="flex justify-end pt-6 border-t">
