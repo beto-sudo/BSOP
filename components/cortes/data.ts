@@ -58,7 +58,7 @@ export async function fetchCorteDetail(corteId: string): Promise<{
       .schema('erp')
       .from('movimientos_caja')
       .select(
-        'id,corte_id,fecha_hora:created_at,tipo,monto,nota:concepto,registrado_por:referencia'
+        'id,corte_id,fecha_hora:created_at,tipo,tipo_detalle,monto,nota:concepto,registrado_por:realizado_por_nombre'
       )
       .eq('empresa_id', RDB_EMPRESA_ID)
       .eq('corte_id', corteId)

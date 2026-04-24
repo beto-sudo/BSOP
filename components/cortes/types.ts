@@ -60,6 +60,7 @@ export type Movimiento = {
   corte_id: string;
   fecha_hora: string | null;
   tipo: string | null;
+  tipo_detalle: string | null;
   monto: number | null;
   nota: string | null;
   registrado_por: string | null;
@@ -97,4 +98,60 @@ export const DENOMINACIONES_DEFAULT: Denominacion[] = [
   { denominacion: 2, tipo: 'moneda', cantidad: 0 },
   { denominacion: 1, tipo: 'moneda', cantidad: 0 },
   { denominacion: 0.5, tipo: 'moneda', cantidad: 0 },
+];
+
+// ─── Catálogo de movimientos manuales de caja ─────────────────────────────────
+// Hardcoded: 6 valores fijos que replican lo que RDB usaba en Coda antes de la
+// migración (2026-04-23). Si el catálogo crece, mover a tabla seed en erp.
+
+export type TipoMovimientoDireccion = 'entrada' | 'salida';
+
+export type TipoMovimientoOption = {
+  tipo_detalle: string;
+  tipo: TipoMovimientoDireccion;
+  label: string;
+  descripcion: string;
+  conceptoDefault?: string;
+};
+
+export const TIPO_MOVIMIENTO_OPTIONS: TipoMovimientoOption[] = [
+  {
+    tipo_detalle: 'caja_negra',
+    tipo: 'salida',
+    label: 'Caja negra',
+    descripcion: 'Efectivo guardado al cierre (no es gasto).',
+    conceptoDefault: 'Caja negra',
+  },
+  {
+    tipo_detalle: 'retiro_efectivo',
+    tipo: 'salida',
+    label: 'Retiro de efectivo',
+    descripcion: 'Gasto o compra pagada en efectivo desde la caja.',
+  },
+  {
+    tipo_detalle: 'propina',
+    tipo: 'salida',
+    label: 'Propina a staff',
+    descripcion: 'Pago de propinas al personal al cierre del turno.',
+    conceptoDefault: 'Propinas staff',
+  },
+  {
+    tipo_detalle: 'deposito_inicial',
+    tipo: 'entrada',
+    label: 'Depósito inicial',
+    descripcion: 'Fondo extra que se agrega a la caja durante el turno (cambio).',
+    conceptoDefault: 'Depósito para cambio',
+  },
+  {
+    tipo_detalle: 'pago_proveedor',
+    tipo: 'salida',
+    label: 'Pago a proveedor',
+    descripcion: 'Pago en efectivo a un proveedor.',
+  },
+  {
+    tipo_detalle: 'gasto_operativo',
+    tipo: 'salida',
+    label: 'Gasto operativo',
+    descripcion: 'Gasto general del negocio pagado de caja.',
+  },
 ];
