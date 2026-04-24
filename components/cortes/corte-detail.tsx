@@ -260,7 +260,6 @@ export function CorteDetail({
         {estaAbierto && (
           <RegistrarMovimientoDialog
             corteId={corte.id}
-            defaultRealizadoPor={corte.responsable_apertura ?? ''}
             open={registrarOpen}
             onOpenChange={setRegistrarOpen}
             onSuccess={onMovimientoRegistered}

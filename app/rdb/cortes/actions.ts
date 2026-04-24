@@ -137,7 +137,6 @@ export type RegistrarMovimientoInput = {
   tipo_detalle: string;
   monto: number;
   concepto: string;
-  realizado_por_nombre: string;
 };
 
 export async function registrarMovimiento(
@@ -149,6 +148,11 @@ export async function registrarMovimiento(
     data: { session },
   } = await supabase.auth.getSession();
   if (!session?.user) throw new Error('No autenticado');
+
+  // Audit trail: quien capturó = user logueado. No confiamos en input del cliente.
+  const userMeta = session.user.user_metadata as { full_name?: string } | undefined;
+  const realizadoPorNombre = (userMeta?.full_name || session.user.email || '').trim();
+  if (!realizadoPorNombre) throw new Error('Usuario sin nombre ni email registrado');
 
   if (!input.corte_id) throw new Error('corte_id requerido');
   if (!input.monto || input.monto <= 0) throw new Error('Monto debe ser mayor a 0');
@@ -187,7 +191,7 @@ export async function registrarMovimiento(
       tipo_detalle: input.tipo_detalle,
       monto: input.monto,
       concepto: input.concepto.trim(),
-      realizado_por_nombre: input.realizado_por_nombre.trim(),
+      realizado_por_nombre: realizadoPorNombre,
       // `referencia` se reserva para marca histórica de Coda (i-xxxxx).
     })
     .select('id')

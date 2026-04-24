@@ -26,24 +26,16 @@ import { TIPO_MOVIMIENTO_OPTIONS } from './types';
 
 type Props = {
   corteId: string;
-  defaultRealizadoPor: string;
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onSuccess: () => void;
 };
 
-export function RegistrarMovimientoDialog({
-  corteId,
-  defaultRealizadoPor,
-  open,
-  onOpenChange,
-  onSuccess,
-}: Props) {
+export function RegistrarMovimientoDialog({ corteId, open, onOpenChange, onSuccess }: Props) {
   const toast = useToast();
   const [tipoDetalle, setTipoDetalle] = useState<string>('');
   const [monto, setMonto] = useState<string>('');
   const [concepto, setConcepto] = useState<string>('');
-  const [realizadoPor, setRealizadoPor] = useState<string>(defaultRealizadoPor);
   const [submitting, setSubmitting] = useState(false);
   const prevConceptoDefaultRef = useRef<string | undefined>(undefined);
   const tipoInputRef = useRef<HTMLButtonElement | null>(null);
@@ -53,11 +45,10 @@ export function RegistrarMovimientoDialog({
       setTipoDetalle('');
       setMonto('');
       setConcepto('');
-      setRealizadoPor(defaultRealizadoPor);
       prevConceptoDefaultRef.current = undefined;
       queueMicrotask(() => tipoInputRef.current?.focus());
     }
-  }, [open, defaultRealizadoPor]);
+  }, [open]);
 
   const selected = TIPO_MOVIMIENTO_OPTIONS.find((o) => o.tipo_detalle === tipoDetalle);
   const direccion = selected?.tipo;
@@ -81,7 +72,6 @@ export function RegistrarMovimientoDialog({
     Number.isFinite(montoNum) &&
     montoNum > 0 &&
     concepto.trim().length > 0 &&
-    realizadoPor.trim().length > 0 &&
     !submitting;
 
   async function handleSubmit() {
@@ -94,7 +84,6 @@ export function RegistrarMovimientoDialog({
         tipo_detalle: selected.tipo_detalle,
         monto: montoNum,
         concepto: concepto.trim(),
-        realizado_por_nombre: realizadoPor.trim(),
       });
       toast.add({ title: 'Movimiento registrado', type: 'success' });
       onSuccess();
@@ -212,21 +201,6 @@ export function RegistrarMovimientoDialog({
               value={concepto}
               onChange={(e) => setConcepto(e.target.value)}
               placeholder={conceptoPlaceholder}
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label
-              htmlFor="mov-realizado-por"
-              className="text-xs font-medium uppercase tracking-wider text-muted-foreground"
-            >
-              Realizado por
-            </label>
-            <Input
-              id="mov-realizado-por"
-              value={realizadoPor}
-              onChange={(e) => setRealizadoPor(e.target.value)}
-              placeholder="Nombre del cajero"
             />
           </div>
 
