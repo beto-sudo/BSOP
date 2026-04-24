@@ -225,3 +225,53 @@ export const PROTOTIPO_ETAPA_CONFIG: Record<PrototipoEtapa, { label: string; cls
     cls: 'bg-red-500/15 text-red-400 border-red-500/20',
   },
 };
+
+/**
+ * Fases del ciclo de vida de un proyecto inmobiliario formalizado.
+ * Sin CHECK en DB — la UI las limita. Se mueve en secuencia temporal:
+ *   planeacion → urbanizacion → construccion → comercializacion → entrega → cerrado.
+ * `pausado` queda fuera de la secuencia para casos de congelamiento. El valor
+ * inicial al convertir desde anteproyecto es `planeacion` (ver endpoint
+ * /api/dilesa/anteproyectos/[id]/convertir).
+ */
+export const PROYECTO_FASE_OPTIONS = [
+  'planeacion',
+  'urbanizacion',
+  'construccion',
+  'comercializacion',
+  'entrega',
+  'cerrado',
+  'pausado',
+] as const;
+export type ProyectoFase = (typeof PROYECTO_FASE_OPTIONS)[number];
+
+export const PROYECTO_FASE_CONFIG: Record<ProyectoFase, { label: string; cls: string }> = {
+  planeacion: {
+    label: 'Planeación',
+    cls: 'bg-sky-500/15 text-sky-400 border-sky-500/20',
+  },
+  urbanizacion: {
+    label: 'Urbanización',
+    cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
+  },
+  construccion: {
+    label: 'Construcción',
+    cls: 'bg-violet-500/15 text-violet-400 border-violet-500/20',
+  },
+  comercializacion: {
+    label: 'Comercialización',
+    cls: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/20',
+  },
+  entrega: {
+    label: 'Entrega',
+    cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20',
+  },
+  cerrado: {
+    label: 'Cerrado',
+    cls: 'bg-[var(--border)]/60 text-[var(--text)]/50 border-[var(--border)]',
+  },
+  pausado: {
+    label: 'Pausado',
+    cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
+  },
+};

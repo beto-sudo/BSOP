@@ -1,38 +1,54 @@
 'use client';
 
 /* eslint-disable react-hooks/set-state-in-effect --
- * Data-sync pattern consistente con el resto del sprint dilesa-1.
+ * Data-sync pattern: setLoading/setError antes de firing async fetch; mismo
+ * patrón que terrenos/[id], prototipos/[id] y el resto del panel.
  */
 
 /**
- * Scaffold temporal del detail de Proyecto.
+ * Detalle de un proyecto.
  *
- * Este archivo existe para que el redirect post-"Convertir a Proyecto"
- * tenga un destino visible y coherente. El módulo Proyectos completo
- * (tabs Info / Lotes / Prototipos / Presupuesto / Documentos, edición,
- * archivar, lotificación, progreso de obra) llega en el siguiente PR:
- * feat/dilesa-ui-proyectos.
+ * Sprint dilesa-1 UI (branch feat/dilesa-ui-proyectos). Cinco sub-tabs con
+ * estado persistido en ?section=… para que el link sea compartible:
  *
- * Scope actual (read-only):
- *   - Secciones Identidad / Económica / Gestión / Notas
- *   - Header con badge de fase y link "← Anteproyectos" cuando aplique
+ *   - Info general: secciones colapsables A→H (identidad, planeación,
+ *     snapshot físico, financiero, gestión, notas). Read-only en v1.
+ *   - Lotes: placeholder (dilesa-2 — lotes, urbanizacion_lote, construccion_lote).
+ *   - Prototipos asignados: editor M:N de fraccionamiento_prototipo.
+ *   - Presupuesto: placeholder (erp-bancos).
+ *   - Documentos: placeholder (iteración siguiente).
+ *
+ * Schema: supabase/SCHEMA_REF.md §dilesa.proyectos, §dilesa.fraccionamiento_prototipo.
  */
 
 import { RequireAccess } from '@/components/require-access';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ArrowLeft, Archive, Loader2, MoreVertical, Link2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
   DILESA_EMPRESA_ID,
   formatCurrency,
   formatDateShort,
   formatM2,
 } from '@/lib/dilesa-constants';
-import { PRIORIDAD_CONFIG, type PrioridadNivel } from '@/lib/status-tokens';
+import {
+  PROYECTO_FASE_CONFIG,
+  PRIORIDAD_CONFIG,
+  type ProyectoFase,
+  type PrioridadNivel,
+} from '@/lib/status-tokens';
+import { FraccionamientoEditor } from '@/components/dilesa/fraccionamiento-editor';
 
 type ProyectoFull = {
   id: string;
@@ -40,8 +56,11 @@ type ProyectoFull = {
   nombre: string;
   codigo: string | null;
   terreno_id: string;
+  terreno: { nombre: string; clave_interna: string | null } | null;
   anteproyecto_id: string | null;
+  anteproyecto: { nombre: string; clave_interna: string | null } | null;
   tipo_proyecto_id: string | null;
+  tipo_proyecto: { nombre: string } | null;
   fase: string | null;
   fecha_inicio: string | null;
   fecha_estimada_cierre: string | null;
@@ -57,20 +76,49 @@ type ProyectoFull = {
   responsable_id: string | null;
   fecha_ultima_revision: string | null;
   siguiente_accion: string | null;
-  terreno: { id: string; nombre: string; municipio: string | null } | null;
-  anteproyecto: { id: string; nombre: string; clave_interna: string | null } | null;
-  tipo_proyecto: { id: string; nombre: string } | null;
+  created_at: string;
+  updated_at: string;
 };
+
+type Section = 'info' | 'lotes' | 'prototipos' | 'presupuesto' | 'documentos';
+const DEFAULT_SECTION: Section = 'info';
+
+const SECTIONS: { key: Section; label: string }[] = [
+  { key: 'info', label: 'Info general' },
+  { key: 'lotes', label: 'Lotes' },
+  { key: 'prototipos', label: 'Prototipos asignados' },
+  { key: 'presupuesto', label: 'Presupuesto' },
+  { key: 'documentos', label: 'Documentos' },
+];
+
+function useActiveSection(): Section {
+  const params = useSearchParams();
+  const raw = params.get('section');
+  if (
+    raw === 'info' ||
+    raw === 'lotes' ||
+    raw === 'prototipos' ||
+    raw === 'presupuesto' ||
+    raw === 'documentos'
+  ) {
+    return raw;
+  }
+  return DEFAULT_SECTION;
+}
 
 function ProyectoDetailInner() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const params = useParams<{ id: string }>();
   const id = params?.id;
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const active = useActiveSection();
 
   const [proyecto, setProyecto] = useState<ProyectoFull | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [archiving, setArchiving] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -78,7 +126,7 @@ function ProyectoDetailInner() {
       .schema('dilesa')
       .from('proyectos')
       .select(
-        '*, terreno:terreno_id(id, nombre, municipio), anteproyecto:anteproyecto_id(id, nombre, clave_interna), tipo_proyecto:tipo_proyecto_id(id, nombre)'
+        '*, terreno:terreno_id(nombre, clave_interna), anteproyecto:anteproyecto_id(nombre, clave_interna), tipo_proyecto:tipo_proyecto_id(nombre)'
       )
       .eq('id', id)
       .eq('empresa_id', DILESA_EMPRESA_ID)
@@ -106,10 +154,42 @@ function ProyectoDetailInner() {
     };
   }, [load]);
 
+  const navigateSection = useCallback(
+    (next: Section) => {
+      const qs = new URLSearchParams(searchParams);
+      if (next === DEFAULT_SECTION) qs.delete('section');
+      else qs.set('section', next);
+      const s = qs.toString();
+      router.replace(s ? `${pathname}?${s}` : pathname, { scroll: false });
+    },
+    [searchParams, pathname, router]
+  );
+
+  const handleArchive = async () => {
+    if (!proyecto) return;
+    const ok = window.confirm(
+      `¿Archivar el proyecto "${proyecto.nombre}"? No se elimina de la DB; se puede restaurar quitando deleted_at por SQL.`
+    );
+    if (!ok) return;
+    setArchiving(true);
+    const { error: err } = await supabase
+      .schema('dilesa')
+      .from('proyectos')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', proyecto.id);
+    setArchiving(false);
+    if (err) {
+      alert(`Error al archivar: ${err.message}`);
+      return;
+    }
+    router.push('/dilesa/proyectos');
+  };
+
   if (loading) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-10 w-2/3" />
+        <Skeleton className="h-8 w-full max-w-lg" />
         <Skeleton className="h-40 w-full" />
         <Skeleton className="h-40 w-full" />
       </div>
@@ -119,9 +199,9 @@ function ProyectoDetailInner() {
   if (error || !proyecto) {
     return (
       <div className="space-y-4">
-        <Button variant="outline" size="sm" onClick={() => router.push('/dilesa')}>
+        <Button variant="outline" size="sm" onClick={() => router.push('/dilesa/proyectos')}>
           <ArrowLeft className="size-4" />
-          Volver a DILESA
+          Volver a Proyectos
         </Button>
         <div
           role="alert"
@@ -140,12 +220,8 @@ function ProyectoDetailInner() {
           <Button
             variant="outline"
             size="icon-sm"
-            onClick={() =>
-              proyecto.anteproyecto_id
-                ? router.push(`/dilesa/anteproyectos/${proyecto.anteproyecto_id}`)
-                : router.push('/dilesa')
-            }
-            aria-label={proyecto.anteproyecto_id ? 'Volver al anteproyecto' : 'Volver a DILESA'}
+            onClick={() => router.push('/dilesa/proyectos')}
+            aria-label="Volver a Proyectos"
           >
             <ArrowLeft className="size-4" />
           </Button>
@@ -156,25 +232,121 @@ function ProyectoDetailInner() {
             <h1 className="mt-0.5 text-2xl font-semibold tracking-tight text-[var(--text)]">
               {proyecto.nombre}
             </h1>
-            {proyecto.codigo ? (
-              <p className="mt-0.5 font-mono text-xs uppercase tracking-widest text-[var(--text)]/45">
-                {proyecto.codigo}
-              </p>
-            ) : null}
+            <div className="mt-0.5 flex flex-wrap items-center gap-2">
+              {proyecto.codigo ? (
+                <span className="font-mono text-xs uppercase tracking-widest text-[var(--text)]/45">
+                  {proyecto.codigo}
+                </span>
+              ) : null}
+              {proyecto.anteproyecto_id ? (
+                <Link
+                  href={`/dilesa/anteproyectos/${proyecto.anteproyecto_id}`}
+                  className="inline-flex items-center gap-1 rounded-md border border-[var(--accent)]/25 bg-[var(--accent)]/10 px-2 py-0.5 text-[10px] font-medium text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/15"
+                  title={
+                    proyecto.anteproyecto?.nombre
+                      ? `Desde anteproyecto: ${proyecto.anteproyecto.nombre}`
+                      : 'Desde anteproyecto'
+                  }
+                >
+                  <Link2 className="size-3" />← Anteproyecto
+                  {proyecto.anteproyecto?.clave_interna
+                    ? ` · ${proyecto.anteproyecto.clave_interna}`
+                    : ''}
+                </Link>
+              ) : null}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <FaseBadge fase={proyecto.fase} />
+          <FaseBadgeLarge fase={proyecto.fase} />
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={(triggerProps) => (
+                <Button
+                  {...triggerProps}
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label="Más acciones"
+                >
+                  <MoreVertical className="size-4" />
+                </Button>
+              )}
+            />
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem variant="destructive" onClick={handleArchive} disabled={archiving}>
+                {archiving ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Archive className="size-4" />
+                )}
+                Archivar proyecto
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      <div className="rounded-lg border border-dashed border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-300">
-        Scaffold temporal del detail de proyecto. El módulo completo (tabs Info / Lotes / Prototipos
-        / Presupuesto / Documentos, edición y progreso de obra) llega con{' '}
-        <span className="font-mono">feat/dilesa-ui-proyectos</span>.
+      <div
+        role="tablist"
+        aria-label="Secciones del proyecto"
+        className="flex items-center gap-1 border-b border-[var(--border)]"
+      >
+        {SECTIONS.map((s) => {
+          const isActive = s.key === active;
+          return (
+            <button
+              key={s.key}
+              role="tab"
+              type="button"
+              aria-selected={isActive}
+              aria-controls={`section-panel-${s.key}`}
+              id={`section-tab-${s.key}`}
+              onClick={() => navigateSection(s.key)}
+              className={cn(
+                'relative flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors',
+                '-mb-px border-b-2',
+                isActive
+                  ? 'border-[var(--accent)] text-[var(--text)]'
+                  : 'border-transparent text-[var(--text)]/55 hover:text-[var(--text)]'
+              )}
+            >
+              {s.label}
+            </button>
+          );
+        })}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      {active === 'info' ? <InfoGeneralPanel proyecto={proyecto} /> : null}
+      {active === 'lotes' ? (
+        <PlaceholderPanel
+          title="Lotes"
+          description="Este tab estará disponible con sprint dilesa-2 (dilesa.lotes, urbanizacion_lote, construccion_lote)."
+        />
+      ) : null}
+      {active === 'prototipos' ? (
+        <FraccionamientoEditor proyectoId={proyecto.id} anteproyectoId={proyecto.anteproyecto_id} />
+      ) : null}
+      {active === 'presupuesto' ? (
+        <PlaceholderPanel
+          title="Presupuesto"
+          description="Integración con erp.cotizaciones y erp.movimientos_bancarios llega con sprint erp-bancos."
+        />
+      ) : null}
+      {active === 'documentos' ? (
+        <PlaceholderPanel
+          title="Documentos"
+          description="Pendiente: filtrar erp.documentos por entidad_tipo='proyecto_dilesa' y entidad_id=proyecto.id. Siguiente iteración."
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function InfoGeneralPanel({ proyecto }: { proyecto: ProyectoFull }) {
+  return (
+    <div className="grid gap-4 lg:grid-cols-3">
+      <div className="space-y-4 lg:col-span-2">
         <Section title="A. Identidad">
           <Field label="Nombre">{proyecto.nombre}</Field>
           <Field label="Código">{proyecto.codigo ?? '—'}</Field>
@@ -185,43 +357,57 @@ function ProyectoDetailInner() {
                 className="text-[var(--accent)] hover:underline"
               >
                 {proyecto.terreno.nombre}
+                {proyecto.terreno.clave_interna ? ` (${proyecto.terreno.clave_interna})` : ''}
               </Link>
             ) : (
               '—'
             )}
-            {proyecto.terreno?.municipio ? (
-              <span className="block text-[11px] text-[var(--text)]/45">
-                {proyecto.terreno.municipio}
-              </span>
-            ) : null}
           </Field>
           <Field label="Anteproyecto origen">
-            {proyecto.anteproyecto ? (
+            {proyecto.anteproyecto_id ? (
               <Link
-                href={`/dilesa/anteproyectos/${proyecto.anteproyecto.id}`}
+                href={`/dilesa/anteproyectos/${proyecto.anteproyecto_id}`}
                 className="text-[var(--accent)] hover:underline"
               >
-                {proyecto.anteproyecto.nombre}
+                {proyecto.anteproyecto?.nombre ??
+                  proyecto.anteproyecto?.clave_interna ??
+                  'Ver anteproyecto'}
               </Link>
             ) : (
-              <span className="text-[var(--text)]/40">(sin anteproyecto origen)</span>
+              <span className="text-[var(--text)]/50">Proyecto manual (sin anteproyecto)</span>
             )}
           </Field>
           <Field label="Tipo de proyecto">{proyecto.tipo_proyecto?.nombre ?? '—'}</Field>
         </Section>
 
-        <Section title="D. Económica">
-          <Field label="Presupuesto total">{formatCurrency(proyecto.presupuesto_total)}</Field>
-          <Field label="Inversión total">{formatCurrency(proyecto.inversion_total)}</Field>
-          <Field label="Área vendible">{formatM2(proyecto.area_vendible_m2)}</Field>
-          <Field label="Áreas verdes">{formatM2(proyecto.areas_verdes_m2)}</Field>
-          <Field label="Cantidad lotes total">
-            {proyecto.cantidad_lotes_total ?? <span className="text-[var(--text)]/40">—</span>}
+        <Section title="B. Planeación">
+          <Field label="Fase">
+            {proyecto.fase
+              ? (PROYECTO_FASE_CONFIG[proyecto.fase as ProyectoFase]?.label ?? proyecto.fase)
+              : '—'}
+          </Field>
+          <Field label="Fecha de inicio">{formatDateShort(proyecto.fecha_inicio)}</Field>
+          <Field label="Fecha estimada de cierre">
+            {formatDateShort(proyecto.fecha_estimada_cierre)}
           </Field>
         </Section>
 
+        <Section title="C. Snapshot físico">
+          <Field label="Área vendible">{formatM2(proyecto.area_vendible_m2)}</Field>
+          <Field label="Áreas verdes">{formatM2(proyecto.areas_verdes_m2)}</Field>
+          <Field label="Cantidad de lotes total">
+            {proyecto.cantidad_lotes_total != null
+              ? proyecto.cantidad_lotes_total.toLocaleString('es-MX')
+              : '—'}
+          </Field>
+        </Section>
+
+        <Section title="D. Financiero">
+          <Field label="Presupuesto total">{formatCurrency(proyecto.presupuesto_total)}</Field>
+          <Field label="Inversión total">{formatCurrency(proyecto.inversion_total)}</Field>
+        </Section>
+
         <Section title="E. Gestión">
-          <Field label="Fase">{proyecto.fase ?? '—'}</Field>
           <Field label="Etapa">{proyecto.etapa ?? '—'}</Field>
           <Field label="Decisión actual">{proyecto.decision_actual ?? '—'}</Field>
           <Field label="Prioridad">
@@ -239,22 +425,56 @@ function ProyectoDetailInner() {
               '—'
             )}
           </Field>
-          <Field label="Fecha inicio">{formatDateShort(proyecto.fecha_inicio)}</Field>
-          <Field label="Cierre estimado">{formatDateShort(proyecto.fecha_estimada_cierre)}</Field>
           <Field label="Última revisión">{formatDateShort(proyecto.fecha_ultima_revision)}</Field>
           <Field label="Siguiente acción" wide>
             {proyecto.siguiente_accion ?? '—'}
           </Field>
         </Section>
 
-        {proyecto.notas ? (
-          <Section title="Notas">
-            <div className="col-span-full whitespace-pre-wrap text-sm text-[var(--text)]/80">
+        <Section title="F. Notas">
+          {proyecto.notas ? (
+            <p className="col-span-full whitespace-pre-wrap text-sm text-[var(--text)]/75">
               {proyecto.notas}
-            </div>
-          </Section>
-        ) : null}
+            </p>
+          ) : (
+            <p className="col-span-full text-sm text-[var(--text)]/45">Sin notas capturadas.</p>
+          )}
+        </Section>
       </div>
+
+      <aside className="space-y-4">
+        <Section title="G. Origen">
+          {proyecto.anteproyecto_id ? (
+            <div className="col-span-full text-sm text-[var(--text)]/70">
+              <p>
+                Este proyecto nació al convertir un anteproyecto. El anteproyecto sigue siendo
+                &ldquo;qué se planeó&rdquo;; el proyecto es &ldquo;qué se está ejecutando&rdquo;.
+              </p>
+              <Link
+                href={`/dilesa/anteproyectos/${proyecto.anteproyecto_id}`}
+                className="mt-2 inline-flex items-center gap-1 text-[var(--accent)] hover:underline"
+              >
+                <Link2 className="size-3.5" />
+                Ver anteproyecto origen
+              </Link>
+            </div>
+          ) : (
+            <div className="col-span-full text-sm text-[var(--text)]/55">
+              Proyecto creado manualmente sin anteproyecto de origen (caso legacy).
+            </div>
+          )}
+        </Section>
+
+        <Section title="H. Metadata">
+          <Field label="Creado">{formatDateShort(proyecto.created_at)}</Field>
+          <Field label="Actualizado">{formatDateShort(proyecto.updated_at)}</Field>
+        </Section>
+
+        <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--card)]/40 p-4 text-xs text-[var(--text)]/55">
+          La edición inline del expediente llega en iteraciones siguientes. Por ahora v1 es
+          read-only.
+        </div>
+      </aside>
     </div>
   );
 }
@@ -289,25 +509,40 @@ function Field({
   );
 }
 
-function FaseBadge({ fase }: { fase: string | null }) {
-  if (!fase) {
+function FaseBadgeLarge({ fase }: { fase: string | null }) {
+  if (!fase) return null;
+  const cfg = PROYECTO_FASE_CONFIG[fase as ProyectoFase];
+  if (!cfg) {
     return (
-      <span className="inline-flex items-center rounded-lg border border-[var(--border)] px-3 py-1 text-xs text-[var(--text)]/55">
-        Sin fase
+      <span className="inline-flex items-center rounded-lg border border-[var(--border)] px-3 py-1 text-xs text-[var(--text)]/65">
+        {fase}
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center rounded-lg border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-400">
-      {fase}
+    <span
+      className={`inline-flex items-center rounded-lg border px-3 py-1 text-xs font-medium ${cfg.cls}`}
+    >
+      {cfg.label}
     </span>
+  );
+}
+
+function PlaceholderPanel({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--card)]/40 p-8 text-center">
+      <h3 className="text-base font-semibold text-[var(--text)]">{title}</h3>
+      <p className="mt-2 text-sm text-[var(--text)]/55">{description}</p>
+    </div>
   );
 }
 
 export default function ProyectoDetailPage() {
   return (
     <RequireAccess empresa="dilesa">
-      <ProyectoDetailInner />
+      <Suspense fallback={<div className="p-6 text-sm text-[var(--text)]/55">Cargando…</div>}>
+        <ProyectoDetailInner />
+      </Suspense>
     </RequireAccess>
   );
 }
