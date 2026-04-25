@@ -6,6 +6,7 @@
  */
 
 import { RequireAccess } from '@/components/require-access';
+import { InventarioTabs } from '@/components/inventario/inventario-tabs';
 import { useCallback, useEffect, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import {
@@ -938,6 +939,8 @@ export default function InventarioPage() {
   return (
     <RequireAccess empresa="rdb" modulo="rdb.inventario">
       <div className="space-y-6">
+        <InventarioTabs activeKey="overview" />
+
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div>
