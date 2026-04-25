@@ -6,6 +6,7 @@
 import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import type { Json } from '@/types/supabase';
 import {
   RDB_EMPRESA_ID,
@@ -197,4 +198,82 @@ export async function getLineasParaRevisar(
 
   if (error) return { ok: false, error: error.message };
   return { ok: true, data: (data ?? []) as LineaParaRevisar[] };
+}
+
+// ─── Notas de diferencia ──────────────────────────────────────────────────────
+//
+// El UPDATE directo a `inventario_levantamiento_lineas.notas_diferencia` está
+// bloqueado por la RLS de la tabla (solo el trigger de `fn_guardar_conteo` tiene
+// permiso de escritura). Para que el contador pueda anotar la justificación
+// post-captura, esta acción usa el cliente service-role tras validar:
+//   1. Hay sesión.
+//   2. El levantamiento existe, está en estado `capturado` y la línea le
+//      pertenece.
+//   3. El usuario es el contador del levantamiento.
+//
+// Migrar a una RPC dedicada queda como follow-up (sub-PR de DB) si el patrón
+// se repite — por ahora B2 lo absorbe acá para no bloquear la UI de revisión.
+export async function actualizarNotaDiferencia(
+  linea_id: string,
+  nota: string
+): Promise<ActionResult> {
+  const supabase = await createSupabaseServerClient();
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.user) {
+    return { ok: false, error: 'No autenticado. Vuelve a iniciar sesión.' };
+  }
+
+  // 1) Lookup de la línea + levantamiento (RLS de levantamientos permite SELECT
+  //    por miembros de la empresa; lineas no — por eso buscamos vía join al
+  //    levantamiento usando service-role).
+  const admin = getSupabaseAdminClient();
+  if (!admin) {
+    return { ok: false, error: 'Cliente service-role no disponible en este entorno.' };
+  }
+
+  const { data: linea, error: lineaErr } = await admin
+    .schema('erp')
+    .from('inventario_levantamiento_lineas')
+    .select('id, levantamiento_id')
+    .eq('id', linea_id)
+    .maybeSingle();
+
+  if (lineaErr) return { ok: false, error: lineaErr.message };
+  if (!linea) return { ok: false, error: 'Línea no encontrada.' };
+
+  const { data: lev, error: levErr } = await admin
+    .schema('erp')
+    .from('inventario_levantamientos')
+    .select('id, estado, contador_id')
+    .eq('id', linea.levantamiento_id)
+    .maybeSingle();
+
+  if (levErr) return { ok: false, error: levErr.message };
+  if (!lev) return { ok: false, error: 'Levantamiento no encontrado.' };
+
+  if (lev.estado !== 'capturado') {
+    return {
+      ok: false,
+      error: `Solo se pueden editar notas mientras el levantamiento está en revisión (estado actual: ${lev.estado}).`,
+    };
+  }
+  if (lev.contador_id !== session.user.id) {
+    return { ok: false, error: 'Solo el contador puede editar las notas de diferencia.' };
+  }
+
+  const trimmed = nota.trim();
+  const { error: updErr } = await admin
+    .schema('erp')
+    .from('inventario_levantamiento_lineas')
+    .update({ notas_diferencia: trimmed.length > 0 ? trimmed : null })
+    .eq('id', linea_id);
+
+  if (updErr) return { ok: false, error: updErr.message };
+
+  revalidatePath(`/rdb/inventario/levantamientos/${linea.levantamiento_id}`);
+  revalidatePath(`/rdb/inventario/levantamientos/${linea.levantamiento_id}/diferencias`);
+  return { ok: true };
 }

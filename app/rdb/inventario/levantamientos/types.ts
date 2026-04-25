@@ -34,8 +34,9 @@ export type LineaParaCapturar = {
   producto_codigo: string;
   producto_nombre: string;
   unidad: string;
-  categoria: string;
-  cantidad_contada: number;
+  categoria: string | null;
+  /** NULL hasta que el contador la captura. Use `contado_at` como fuente de verdad de "ya contada". */
+  cantidad_contada: number | null;
   contado_at: string | null;
   recontada: boolean;
 };
@@ -46,14 +47,15 @@ export type LineaParaRevisar = {
   producto_codigo: string;
   producto_nombre: string;
   unidad: string;
-  categoria: string;
-  costo_unitario: number;
+  categoria: string | null;
+  costo_unitario: number | null;
   stock_inicial: number;
   salidas_durante_captura: number;
   stock_efectivo: number;
-  cantidad_contada: number;
-  diferencia: number;
-  diferencia_valor: number;
+  /** Puede ser NULL si la línea quedó sin contar al cerrar la captura. */
+  cantidad_contada: number | null;
+  diferencia: number | null;
+  diferencia_valor: number | null;
   fuera_de_tolerancia: boolean;
   notas_diferencia: string | null;
   contado_at: string | null;
