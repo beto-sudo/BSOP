@@ -109,6 +109,7 @@ export type Database = {
           color_primario_dark: string | null
           color_secundario: string | null
           color_texto_titulo: string | null
+          config_inventario: Json
           created_at: string | null
           csf_fecha_emision: string | null
           csf_url: string | null
@@ -163,6 +164,7 @@ export type Database = {
           color_primario_dark?: string | null
           color_secundario?: string | null
           color_texto_titulo?: string | null
+          config_inventario?: Json
           created_at?: string | null
           csf_fecha_emision?: string | null
           csf_url?: string | null
@@ -217,6 +219,7 @@ export type Database = {
           color_primario_dark?: string | null
           color_secundario?: string | null
           color_texto_titulo?: string | null
+          config_inventario?: Json
           created_at?: string | null
           csf_fecha_emision?: string | null
           csf_url?: string | null
@@ -4788,6 +4791,220 @@ export type Database = {
           },
         ]
       }
+      inventario_levantamiento_firmas: {
+        Row: {
+          comentario: string | null
+          empresa_id: string
+          firmado_at: string
+          firmante_id: string
+          firmante_nombre: string
+          id: string
+          ip: unknown
+          levantamiento_id: string
+          paso: number
+          rol: string
+          total_diferencia: number | null
+          total_lineas: number
+          total_lineas_fuera: number
+          user_agent: string | null
+        }
+        Insert: {
+          comentario?: string | null
+          empresa_id: string
+          firmado_at?: string
+          firmante_id: string
+          firmante_nombre: string
+          id?: string
+          ip?: unknown
+          levantamiento_id: string
+          paso: number
+          rol: string
+          total_diferencia?: number | null
+          total_lineas: number
+          total_lineas_fuera: number
+          user_agent?: string | null
+        }
+        Update: {
+          comentario?: string | null
+          empresa_id?: string
+          firmado_at?: string
+          firmante_id?: string
+          firmante_nombre?: string
+          id?: string
+          ip?: unknown
+          levantamiento_id?: string
+          paso?: number
+          rol?: string
+          total_diferencia?: number | null
+          total_lineas?: number
+          total_lineas_fuera?: number
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventario_levantamiento_firmas_levantamiento_id_fkey"
+            columns: ["levantamiento_id"]
+            isOneToOne: false
+            referencedRelation: "inventario_levantamientos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventario_levantamiento_lineas: {
+        Row: {
+          cantidad_contada: number | null
+          contado_at: string | null
+          contado_por: string | null
+          costo_unitario: number | null
+          created_at: string
+          diferencia: number | null
+          diferencia_valor: number | null
+          empresa_id: string
+          fuera_de_tolerancia: boolean
+          id: string
+          levantamiento_id: string
+          notas_diferencia: string | null
+          producto_id: string
+          recontada: boolean
+          salidas_durante_captura: number
+          stock_efectivo: number | null
+          stock_inicial: number
+          updated_at: string
+        }
+        Insert: {
+          cantidad_contada?: number | null
+          contado_at?: string | null
+          contado_por?: string | null
+          costo_unitario?: number | null
+          created_at?: string
+          diferencia?: number | null
+          diferencia_valor?: number | null
+          empresa_id: string
+          fuera_de_tolerancia?: boolean
+          id?: string
+          levantamiento_id: string
+          notas_diferencia?: string | null
+          producto_id: string
+          recontada?: boolean
+          salidas_durante_captura?: number
+          stock_efectivo?: number | null
+          stock_inicial: number
+          updated_at?: string
+        }
+        Update: {
+          cantidad_contada?: number | null
+          contado_at?: string | null
+          contado_por?: string | null
+          costo_unitario?: number | null
+          created_at?: string
+          diferencia?: number | null
+          diferencia_valor?: number | null
+          empresa_id?: string
+          fuera_de_tolerancia?: boolean
+          id?: string
+          levantamiento_id?: string
+          notas_diferencia?: string | null
+          producto_id?: string
+          recontada?: boolean
+          salidas_durante_captura?: number
+          stock_efectivo?: number | null
+          stock_inicial?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventario_levantamiento_lineas_levantamiento_id_fkey"
+            columns: ["levantamiento_id"]
+            isOneToOne: false
+            referencedRelation: "inventario_levantamientos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventario_levantamiento_lineas_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventario_levantamientos: {
+        Row: {
+          almacen_id: string
+          contador_id: string | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          empresa_id: string
+          estado: string
+          fecha_aplicado: string | null
+          fecha_cancelado: string | null
+          fecha_cierre: string | null
+          fecha_inicio: string | null
+          fecha_programada: string
+          folio: string | null
+          id: string
+          motivo_cancelacion: string | null
+          notas: string | null
+          tipo: string
+          tolerancia_monto_override: number | null
+          tolerancia_pct_override: number | null
+          updated_at: string
+        }
+        Insert: {
+          almacen_id: string
+          contador_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          empresa_id: string
+          estado?: string
+          fecha_aplicado?: string | null
+          fecha_cancelado?: string | null
+          fecha_cierre?: string | null
+          fecha_inicio?: string | null
+          fecha_programada?: string
+          folio?: string | null
+          id?: string
+          motivo_cancelacion?: string | null
+          notas?: string | null
+          tipo?: string
+          tolerancia_monto_override?: number | null
+          tolerancia_pct_override?: number | null
+          updated_at?: string
+        }
+        Update: {
+          almacen_id?: string
+          contador_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          empresa_id?: string
+          estado?: string
+          fecha_aplicado?: string | null
+          fecha_cancelado?: string | null
+          fecha_cierre?: string | null
+          fecha_inicio?: string | null
+          fecha_programada?: string
+          folio?: string | null
+          id?: string
+          motivo_cancelacion?: string | null
+          notas?: string | null
+          tipo?: string
+          tolerancia_monto_override?: number | null
+          tolerancia_pct_override?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventario_levantamientos_almacen_id_fkey"
+            columns: ["almacen_id"]
+            isOneToOne: false
+            referencedRelation: "almacenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       juntas: {
         Row: {
           creado_por: string | null
@@ -6780,6 +6997,84 @@ export type Database = {
       }
     }
     Functions: {
+      fn_aplicar_levantamiento: {
+        Args: { p_levantamiento_id: string }
+        Returns: number
+      }
+      fn_cancelar_levantamiento: {
+        Args: { p_levantamiento_id: string; p_motivo: string }
+        Returns: undefined
+      }
+      fn_cerrar_captura_levantamiento: {
+        Args: { p_levantamiento_id: string }
+        Returns: undefined
+      }
+      fn_firmar_levantamiento: {
+        Args: {
+          p_comentario?: string
+          p_ip?: unknown
+          p_levantamiento_id: string
+          p_paso: number
+          p_rol: string
+          p_user_agent?: string
+        }
+        Returns: Json
+      }
+      fn_get_empresa_tolerancia: {
+        Args: { p_empresa_id: string }
+        Returns: {
+          firmas_requeridas: number
+          tolerancia_monto: number
+          tolerancia_pct: number
+        }[]
+      }
+      fn_get_lineas_para_capturar: {
+        Args: { p_levantamiento_id: string }
+        Returns: {
+          cantidad_contada: number
+          categoria: string
+          contado_at: string
+          linea_id: string
+          producto_codigo: string
+          producto_id: string
+          producto_nombre: string
+          recontada: boolean
+          unidad: string
+        }[]
+      }
+      fn_get_lineas_para_revisar: {
+        Args: { p_levantamiento_id: string }
+        Returns: {
+          cantidad_contada: number
+          categoria: string
+          contado_at: string
+          costo_unitario: number
+          diferencia: number
+          diferencia_valor: number
+          fuera_de_tolerancia: boolean
+          linea_id: string
+          notas_diferencia: string
+          producto_codigo: string
+          producto_id: string
+          producto_nombre: string
+          salidas_durante_captura: number
+          stock_efectivo: number
+          stock_inicial: number
+          unidad: string
+        }[]
+      }
+      fn_guardar_conteo: {
+        Args: {
+          p_cantidad: number
+          p_levantamiento_id: string
+          p_producto_id: string
+        }
+        Returns: undefined
+      }
+      fn_iniciar_captura_levantamiento: {
+        Args: { p_levantamiento_id: string }
+        Returns: number
+      }
       search_documentos_by_embedding: {
         Args: {
           p_empresa_ids: string[]
