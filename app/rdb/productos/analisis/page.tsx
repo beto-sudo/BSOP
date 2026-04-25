@@ -86,7 +86,11 @@ function formatNumber(n: number | null | undefined, frac = 0) {
 
 function formatDate(at: string | null) {
   if (!at) return 'Nunca';
-  return new Date(at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+  return new Date(at).toLocaleDateString('es-MX', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
 }
 
 function CategoriaBadge({ nombre, color }: { nombre: string | null; color: string | null }) {
@@ -136,7 +140,11 @@ function escapeCsv(v: unknown): string {
   return s;
 }
 
-function downloadCsv(filename: string, headers: string[], rows: (string | number | null | undefined)[][]) {
+function downloadCsv(
+  filename: string,
+  headers: string[],
+  rows: (string | number | null | undefined)[][]
+) {
   const csv = [headers.join(','), ...rows.map((r) => r.map(escapeCsv).join(','))].join('\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -170,7 +178,9 @@ function KpiCard({
           : 'border-border';
   return (
     <div className={`rounded-xl border ${toneCls} p-4`}>
-      <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium">{label}</div>
+      <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+        {label}
+      </div>
       <div className="mt-2 text-2xl font-semibold tabular-nums">{value}</div>
       {hint && <div className="mt-1 text-xs text-muted-foreground">{hint}</div>}
     </div>
@@ -315,10 +325,7 @@ export default function ProductosAnalisisPage() {
   const sinMovimiento = useMemo(
     () =>
       metricas
-        .filter(
-          (m) =>
-            m.activo && m.inventariable && m.stock_actual > 0 && m.dias_sin_venta > 30
-        )
+        .filter((m) => m.activo && m.inventariable && m.stock_actual > 0 && m.dias_sin_venta > 30)
         .sort((a, b) => b.valor_stock - a.valor_stock),
     [metricas]
   );
@@ -328,11 +335,7 @@ export default function ProductosAnalisisPage() {
     () =>
       metricas
         .filter(
-          (m) =>
-            m.activo &&
-            m.unidades_30d >= 30 &&
-            m.margen_pct !== null &&
-            m.margen_pct >= 30
+          (m) => m.activo && m.unidades_30d >= 30 && m.margen_pct !== null && m.margen_pct >= 30
         )
         .sort((a, b) => b.utilidad_30d - a.utilidad_30d),
     [metricas]
@@ -343,11 +346,7 @@ export default function ProductosAnalisisPage() {
     () =>
       metricas
         .filter(
-          (m) =>
-            m.activo &&
-            m.unidades_30d >= 30 &&
-            m.margen_pct !== null &&
-            m.margen_pct < 20
+          (m) => m.activo && m.unidades_30d >= 30 && m.margen_pct !== null && m.margen_pct < 20
         )
         .sort((a, b) => b.unidades_30d - a.unidades_30d),
     [metricas]
@@ -377,15 +376,7 @@ export default function ProductosAnalisisPage() {
   const exportEstrellas = () =>
     downloadCsv(
       'estrellas.csv',
-      [
-        'Producto',
-        'Categoría',
-        'Unidades 30d',
-        'Importe 30d',
-        'Margen %',
-        'Utilidad 30d',
-        'Stock',
-      ],
+      ['Producto', 'Categoría', 'Unidades 30d', 'Importe 30d', 'Margen %', 'Utilidad 30d', 'Stock'],
       estrellas.map((m) => [
         m.nombre,
         m.categoria_nombre ?? '',
@@ -569,7 +560,10 @@ export default function ProductosAnalisisPage() {
                   ))
                 ) : sinMovimiento.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-10 text-center text-muted-foreground text-sm">
+                    <TableCell
+                      colSpan={6}
+                      className="py-10 text-center text-muted-foreground text-sm"
+                    >
                       Ningún producto inventariable con stock y sin venta en &gt;30 días. ✓
                     </TableCell>
                   </TableRow>
@@ -634,7 +628,10 @@ export default function ProductosAnalisisPage() {
                   ))
                 ) : estrellas.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground text-sm">
+                    <TableCell
+                      colSpan={7}
+                      className="py-10 text-center text-muted-foreground text-sm"
+                    >
                       Sin estrellas que cumplan el criterio. Revisa precios y costos.
                     </TableCell>
                   </TableRow>
@@ -703,7 +700,10 @@ export default function ProductosAnalisisPage() {
                   ))
                 ) : margenBajo.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="py-10 text-center text-muted-foreground text-sm">
+                    <TableCell
+                      colSpan={8}
+                      className="py-10 text-center text-muted-foreground text-sm"
+                    >
                       Ningún producto con alta rotación y margen bajo. ✓
                     </TableCell>
                   </TableRow>
@@ -816,8 +816,8 @@ export default function ProductosAnalisisPage() {
             )}
             <p className="mt-4 text-xs text-muted-foreground">
               Barra de color = importe vendido. Sombra verde = porción atribuible a utilidad
-              estimada. Charts más detallados (tendencia 12 semanas, drill-down por producto)
-              quedan pendientes hasta integrar lib de charts.
+              estimada. Charts más detallados (tendencia 12 semanas, drill-down por producto) quedan
+              pendientes hasta integrar lib de charts.
             </p>
           </div>
         </section>
