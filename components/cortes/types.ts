@@ -6,6 +6,21 @@ export const TZ = 'America/Matamoros';
 
 // ─── Data shapes ──────────────────────────────────────────────────────────────
 
+// Catálogo de bancos (seed en core.bancos). Cargado al montar el panel.
+export type Banco = {
+  id: string;
+  codigo: string;        // 'BBVA', 'BANORTE', etc.
+  nombre: string;        // 'BBVA México', 'Banorte', etc.
+  patron_ocr: string | null;
+  activo: boolean;
+};
+
+// Categoría de la foto subida.
+// - voucher_tarjeta: cierre de lote de terminal bancaria
+// - comprobante_movimiento: foto ligada a un movimiento_caja (ej. sobre de caja negra)
+// - otro: sin clasificar
+export type VoucherCategoria = 'voucher_tarjeta' | 'comprobante_movimiento' | 'otro';
+
 // rdb.cortes columns (plus v_cortes_totales columns via v_cortes_completo).
 export type Corte = {
   id: string;
@@ -89,6 +104,18 @@ export type Voucher = {
   monto_reportado: number | null;
   uploaded_by_nombre: string | null;
   uploaded_at: string | null;
+  // Nuevos en migración 20260425153136. Opcionales en el tipo (no en DB) para
+  // tolerar el mock optimista en voucher-uploader.tsx que se construye antes de
+  // que se actualicen sus consumidores en fases siguientes. El SELECT del server
+  // action sí los hidrata (la columna `categoria` es NOT NULL DEFAULT).
+  categoria?: VoucherCategoria;
+  banco_id?: string | null;
+  banco_nombre?: string | null;       // resuelto via JOIN en server action; opcional para UI
+  movimiento_caja_id?: string | null;
+  ocr_texto_crudo?: string | null;
+  ocr_monto_sugerido?: number | null;
+  ocr_banco_sugerido_id?: string | null;
+  ocr_confianza?: number | null;
 };
 
 // Validación client-side antes de llamar al server action.
