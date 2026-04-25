@@ -16,10 +16,10 @@
 
 PR [#181](https://github.com/beto-sudo/BSOP/pull/181) ("Ruta A") aplicó el fix de `/cortes` timeout: envolvió los helpers RLS (`core.fn_is_admin()`, `core.fn_has_empresa(...)`) en `(SELECT …)` para forzar `InitPlan`. Resultado medido el 2026-04-24 (3 cortes del 2026-04-22, LIMIT 300):
 
-|                              | Antes (Laisha viewer) | Después (#181) |
-| ---------------------------- | --------------------: | -------------: |
-| Execution time               | 2 157 ms              | 108 ms         |
-| Buffers shared hit           | 143 615               | 4 608          |
+|                    | Antes (Laisha viewer) | Después (#181) |
+| ------------------ | --------------------: | -------------: |
+| Execution time     |              2 157 ms |         108 ms |
+| Buffers shared hit |               143 615 |          4 608 |
 
 Eso desbloqueó la pantalla. Pero queda un problema **estructural** detrás del fix.
 
@@ -34,7 +34,7 @@ Eso desbloqueó la pantalla. Pero queda un problema **estructural** detrás del 
   - HashAggregate de 444 cortes (988 ms)
 - **Total: 993 ms, Buffers shared hit: 4 621**
 
-Es decir: la mejora del 108 ms del PR #181 fue real para *ese* día, pero el costo absoluto crece linealmente con el histórico. A 6 meses, con más cortes acumulados, esto vuelve a chocar contra el `statement_timeout = 8s` de PostgREST. Es **deuda estructural**, no un fluke temporal.
+Es decir: la mejora del 108 ms del PR #181 fue real para _ese_ día, pero el costo absoluto crece linealmente con el histórico. A 6 meses, con más cortes acumulados, esto vuelve a chocar contra el `statement_timeout = 8s` de PostgREST. Es **deuda estructural**, no un fluke temporal.
 
 ### Por qué `v_cortes_totales` no expone `fecha_operativa`
 
@@ -48,25 +48,27 @@ Decisión histórica al consolidar `rdb.cortes` legacy → `erp.cortes_caja` en 
 
 Agregar `c.fecha_operativa` al `SELECT` y al `GROUP BY` de `v_cortes_totales`. Ajustar `v_cortes_lista` para joinear por `(vt.corte_id = c.id AND vt.fecha_operativa = c.fecha_operativa)`.
 
-**Mecánica del push-down:** cuando el cliente filtra `WHERE c.fecha_operativa = '2026-04-22'` sobre `v_cortes_lista`, Postgres propaga el predicado vía equi-join (`vt.fecha_operativa = c.fecha_operativa`). Como `c.fecha_operativa` está en el `GROUP BY` de la vista interior, el planner aplica el filtro al `cortes_caja c_1` *dentro* de `v_cortes_totales`, reduciendo el outer scan a las 3 cortes del día. Los `LEFT JOIN` con las CTEs de pagos/pedidos/movimientos se invierten a Nested Loop con Index Scan en `rdb_waitry_pedidos_corte_id_idx (corte_id)`, que ya existe.
+**Mecánica del push-down:** cuando el cliente filtra `WHERE c.fecha_operativa = '2026-04-22'` sobre `v_cortes_lista`, Postgres propaga el predicado vía equi-join (`vt.fecha_operativa = c.fecha_operativa`). Como `c.fecha_operativa` está en el `GROUP BY` de la vista interior, el planner aplica el filtro al `cortes_caja c_1` _dentro_ de `v_cortes_totales`, reduciendo el outer scan a las 3 cortes del día. Los `LEFT JOIN` con las CTEs de pagos/pedidos/movimientos se invierten a Nested Loop con Index Scan en `rdb_waitry_pedidos_corte_id_idx (corte_id)`, que ya existe.
 
 **Validación dry-run (en transacción ROLLBACK, 2026-04-25):**
 
-| Métrica                  | Antes      | Después   | Mejora  |
-| ------------------------ | ---------: | --------: | ------: |
-| Execution time (Laisha)  | 993 ms     | 11.8 ms   | 84×     |
-| Buffers shared hit       | 4 621      | 1 710     | 2.7×    |
+| Métrica                   |       Antes |                           Después |  Mejora |
+| ------------------------- | ----------: | --------------------------------: | ------: |
+| Execution time (Laisha)   |      993 ms |                           11.8 ms |     84× |
+| Buffers shared hit        |       4 621 |                             1 710 |    2.7× |
 | `Seq Scan` waitry_pedidos | 11 026 rows | 11 026 rows (en 1 lugar, no en 2) | parcial |
 
 El `Seq Scan` que queda es el del CTE `pedidos_por_corte` (count distinto de pedidos por corte). Sigue tocando 11 026 filas pero el HashAggregate cuesta 7 ms total — no es el bottleneck. El verdadero ahorro viene de `pagos_por_corte`, que pasa de "Seq Scan + Hash Join 11 150 × 11 026" (820 ms) a "3 Index lookups + Nested Loop ~50 rows" (2.3 ms).
 
 **Pros:**
-- Cero cambios en la app — la signature pública de `v_cortes_lista` no cambia, solo se *agrega* `fecha_operativa` (que ya estaba expuesta de `c.fecha_operativa`, no rompe orden).
+
+- Cero cambios en la app — la signature pública de `v_cortes_lista` no cambia, solo se _agrega_ `fecha_operativa` (que ya estaba expuesta de `c.fecha_operativa`, no rompe orden).
 - Mínima cirugía SQL — `CREATE OR REPLACE VIEW` con la columna agregada al final.
 - Push-down validado empíricamente en dry-run.
 - Rollback trivial: revertir el `ADD` con otra migración.
 
 **Contras:**
+
 - Depende de un comportamiento del query planner (predicate pushdown a través de equi-join + GROUP BY). Postgres 17.6 lo soporta y se midió. Si futuras versiones cambian heurística, podría regresar — riesgo bajo, recuperable.
 - El `pedidos_por_corte` CTE sigue full-scan de `waitry_pedidos`. Costo actual 7 ms; a 100 K rows seguiría siendo barato. Si crece a millones, hacer un §4 separado.
 
@@ -77,10 +79,12 @@ El `Seq Scan` que queda es el del CTE `pedidos_por_corte` (count distinto de ped
 Reemplazar la vista por una función SQL/PLPGSQL que reciba el rango de fechas y filtre el inner WHERE. `v_cortes_lista` deja de ser una vista que joinea con `vt`; pasa a llamar la función vía RPC.
 
 **Pros:**
+
 - Push-down garantizado (es código procedural).
 - Control total del plan.
 
 **Contras:**
+
 - Cambia signature pública: el cliente PostgREST/`supabase-js` debe llamar `rpc('fn_cortes_totales', { p_from, p_to })` en lugar de `from('v_cortes_lista').select()`. Implica cambios en `components/cortes/data.ts` y todos los callers.
 - Coordinación entre lanes Cowork-Supabase y BSOP-UI.
 - Más invasivo, mayor riesgo de regresión funcional.
@@ -94,6 +98,7 @@ Convertir en `MATERIALIZED VIEW` con `REFRESH MATERIALIZED VIEW CONCURRENTLY` pe
 **Pros:** queries instantáneas.
 
 **Contras:**
+
 - Latencia de actualización (no real-time). Cierres recientes pueden no reflejarse hasta el siguiente refresh.
 - Ops overhead: schedule de refresh, monitoreo de staleness, posible bloqueo en `REFRESH ... CONCURRENTLY` si hay write contention.
 - Mayor complejidad operacional para un caso que no la justifica (los datos cambian seguido — apertura/cierre de cortes, registro de pagos en tiempo real).
