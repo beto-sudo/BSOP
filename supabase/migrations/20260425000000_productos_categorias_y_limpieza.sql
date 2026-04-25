@@ -86,19 +86,29 @@ DO $do$ BEGIN
 END $do$;
 
 -- 3) Categorías iniciales para RDB ----------------------------
-INSERT INTO erp.categorias_producto (empresa_id, nombre, color, orden) VALUES
-  ('e52ac307-9373-4115-b65e-1178f0c4e1aa','Cervezas',     '#f59e0b', 10),
-  ('e52ac307-9373-4115-b65e-1178f0c4e1aa','Licores',      '#7c3aed', 20),
-  ('e52ac307-9373-4115-b65e-1178f0c4e1aa','Refrescos',    '#ef4444', 30),
-  ('e52ac307-9373-4115-b65e-1178f0c4e1aa','Aguas',        '#3b82f6', 40),
-  ('e52ac307-9373-4115-b65e-1178f0c4e1aa','Bebidas Prep.','#06b6d4', 50),
-  ('e52ac307-9373-4115-b65e-1178f0c4e1aa','Comida',       '#84cc16', 60),
-  ('e52ac307-9373-4115-b65e-1178f0c4e1aa','Snacks',       '#eab308', 70),
-  ('e52ac307-9373-4115-b65e-1178f0c4e1aa','Cigarros',     '#64748b', 80),
-  ('e52ac307-9373-4115-b65e-1178f0c4e1aa','Servicios',    '#0ea5e9', 90),
-  ('e52ac307-9373-4115-b65e-1178f0c4e1aa','Merchandise',  '#d946ef',100),
-  ('e52ac307-9373-4115-b65e-1178f0c4e1aa','Insumos',      '#94a3b8',110),
-  ('e52ac307-9373-4115-b65e-1178f0c4e1aa','Otros',        '#475569',999)
+-- Guarded against branch DBs (Supabase preview branches) that don't
+-- seed core.empresas. WHERE EXISTS makes the seed a no-op when the
+-- RDB empresa row is absent, instead of raising the FK violation that
+-- aborts the whole migration. Production has the row, so the seed
+-- runs as before.
+INSERT INTO erp.categorias_producto (empresa_id, nombre, color, orden)
+SELECT v.empresa_id, v.nombre, v.color, v.orden
+FROM (
+  VALUES
+    ('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid,'Cervezas',     '#f59e0b', 10),
+    ('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid,'Licores',      '#7c3aed', 20),
+    ('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid,'Refrescos',    '#ef4444', 30),
+    ('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid,'Aguas',        '#3b82f6', 40),
+    ('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid,'Bebidas Prep.','#06b6d4', 50),
+    ('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid,'Comida',       '#84cc16', 60),
+    ('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid,'Snacks',       '#eab308', 70),
+    ('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid,'Cigarros',     '#64748b', 80),
+    ('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid,'Servicios',    '#0ea5e9', 90),
+    ('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid,'Merchandise',  '#d946ef',100),
+    ('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid,'Insumos',      '#94a3b8',110),
+    ('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid,'Otros',        '#475569',999)
+) AS v(empresa_id, nombre, color, orden)
+WHERE EXISTS (SELECT 1 FROM core.empresas e WHERE e.id = v.empresa_id)
 ON CONFLICT (empresa_id, nombre) DO NOTHING;
 
 -- 4) Asignación heurística (best-effort) ----------------------
