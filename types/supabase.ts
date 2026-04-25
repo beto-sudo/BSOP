@@ -71,6 +71,33 @@ export type Database = {
           },
         ]
       }
+      bancos: {
+        Row: {
+          activo: boolean
+          codigo: string
+          created_at: string
+          id: string
+          nombre: string
+          patron_ocr: string | null
+        }
+        Insert: {
+          activo?: boolean
+          codigo: string
+          created_at?: string
+          id?: string
+          nombre: string
+          patron_ocr?: string | null
+        }
+        Update: {
+          activo?: boolean
+          codigo?: string
+          created_at?: string
+          id?: string
+          nombre?: string
+          patron_ocr?: string | null
+        }
+        Relationships: []
+      }
       empresas: {
         Row: {
           activa: boolean | null
@@ -4009,12 +4036,19 @@ export type Database = {
       cortes_vouchers: {
         Row: {
           afiliacion: string | null
+          banco_id: string | null
+          categoria: string
           corte_id: string
           empresa_id: string
           id: string
           mime_type: string | null
           monto_reportado: number | null
+          movimiento_caja_id: string | null
           nombre_original: string | null
+          ocr_banco_sugerido_id: string | null
+          ocr_confianza: number | null
+          ocr_monto_sugerido: number | null
+          ocr_texto_crudo: string | null
           storage_path: string
           tamano_bytes: number | null
           uploaded_at: string
@@ -4023,12 +4057,19 @@ export type Database = {
         }
         Insert: {
           afiliacion?: string | null
+          banco_id?: string | null
+          categoria?: string
           corte_id: string
           empresa_id: string
           id?: string
           mime_type?: string | null
           monto_reportado?: number | null
+          movimiento_caja_id?: string | null
           nombre_original?: string | null
+          ocr_banco_sugerido_id?: string | null
+          ocr_confianza?: number | null
+          ocr_monto_sugerido?: number | null
+          ocr_texto_crudo?: string | null
           storage_path: string
           tamano_bytes?: number | null
           uploaded_at?: string
@@ -4037,12 +4078,19 @@ export type Database = {
         }
         Update: {
           afiliacion?: string | null
+          banco_id?: string | null
+          categoria?: string
           corte_id?: string
           empresa_id?: string
           id?: string
           mime_type?: string | null
           monto_reportado?: number | null
+          movimiento_caja_id?: string | null
           nombre_original?: string | null
+          ocr_banco_sugerido_id?: string | null
+          ocr_confianza?: number | null
+          ocr_monto_sugerido?: number | null
+          ocr_texto_crudo?: string | null
           storage_path?: string
           tamano_bytes?: number | null
           uploaded_at?: string
@@ -4055,6 +4103,13 @@ export type Database = {
             columns: ["corte_id"]
             isOneToOne: false
             referencedRelation: "cortes_caja"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cortes_vouchers_movimiento_caja_id_fkey"
+            columns: ["movimiento_caja_id"]
+            isOneToOne: false
+            referencedRelation: "movimientos_caja"
             referencedColumns: ["id"]
           },
         ]
@@ -8315,6 +8370,7 @@ export type Database = {
           efectivo_inicial: number | null
           empresa_id: string | null
           estado: string | null
+          fecha_operativa: string | null
           hora_fin: string | null
           hora_inicio: string | null
           ingresos_efectivo: number | null
