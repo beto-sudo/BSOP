@@ -30,6 +30,7 @@ Que `supabase db push` corra limpio sin warnings ni errores en la próxima migra
 ### 1. Mapear el drift completo
 
 Producir `docs/db-migration-drift-map.csv` con columnas:
+
 - `local_filename` (o vacío si solo existe remoto)
 - `local_version` (extraído del filename, vacío si no hay local)
 - `remote_version` (vacío si no hay row remoto)
@@ -37,6 +38,7 @@ Producir `docs/db-migration-drift-map.csv` con columnas:
 - `action` — uno de: `keep` (ya matchea), `realign-remote` (renombrar version remota al filename local), `realign-local` (renombrar archivo local al version remoto), `delete-remote-orphan` (row remoto sin local file), `add-local-stub` (file local faltante para row remoto válido)
 
 Querys útiles:
+
 ```sql
 -- Lado remoto
 SELECT version, name FROM supabase_migrations.schema_migrations ORDER BY version;
@@ -47,10 +49,12 @@ ls supabase/migrations/ | sed -E 's/^([0-9]+)_(.+)\.sql$/\1\t\2/'
 ### 2. Decidir estrategia
 
 **Opción 1 — Realinear remoto al local (preserva filenames git):**
+
 - Por cada par `(local_version, remote_version, name)` donde versions difieren pero name matchea: `UPDATE schema_migrations SET version = '<local_version>' WHERE version = '<remote_version>'`.
 - Riesgo: bajo. La columna `version` no tiene FKs salidas. Pero es escritura directa al tracking de Supabase — testear en branch antes.
 
 **Opción 2 — Realinear local al remoto (preserva tracking actual):**
+
 - Renombrar archivos locales a `<remote_version>_<name>.sql`.
 - Riesgo: bajo, pero rompe el orden cronológico legible del repo (los timestamps ya no representan cuándo se escribió la migration).
 
@@ -89,10 +93,12 @@ Esta PR de reconciliación misma debe usar `supabase db push` para la migration 
 ## Riesgo
 
 **Medio.** Tocar `supabase_migrations.schema_migrations` es escritura directa al tracking interno de Supabase. Aunque la tabla solo tracking metadata (no afecta schema real), un mistake puede:
+
 - Hacer que el CLI re-aplique migrations (idempotencia salva pero ruidoso)
 - Romper el `db pull` de Supabase si el usuario lo corre
 
 **Mitigación:**
+
 - Tomar snapshot: `pg_dump --schema=supabase_migrations -f /tmp/migrations_backup.sql $SUPABASE_DB_URL`
 - Aplicar UPDATEs uno por uno, verificando `migration list` después de cada batch
 - Tener rollback list a la mano
