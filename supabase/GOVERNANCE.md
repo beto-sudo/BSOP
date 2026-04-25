@@ -143,35 +143,50 @@ desde antes del migration tracking. El GH Action de filename↔version los
 whitelista por consistencia con el patrón histórico, aunque ya no tienen
 divergencia disco↔DB.
 
-### Histórico legacy-refs (whitelist permanente, DB-only)
+### Histórico legacy-refs (no-op stubs en disco)
 
 14 migrations Mar–Abr 2026 (`20260325_waitry_inbound_processing`,
-`20260405-20260408_*`, `20260417105758_legacy_cleanup_*`) viven SOLO en
-`schema_migrations` — su SQL referencia schemas legacy (`waitry.*`,
-`caja.*`, `inventario.*`, `rdb.*_legacy`) que fueron consolidados a
-`rdb.*` por `20260408000000_rdb_consolidation`. Si esos archivos viven
-en disco, fallan al re-correr en una Preview Branch fresca porque las
-tablas legacy nunca existieron en el bootstrap moderno (que crea
-`rdb.waitry_*` directo). El SQL completo está en
-`schema_migrations.statements` como audit trail. El GH Action los whitelista
-para que la divergencia "DB-only" no triggeree warning.
+`20260405-20260408_*`, `20260417105758_legacy_cleanup_*`) viven en disco
+como **no-op stubs** (`SELECT 1 WHERE false;`) con header explicativo. Su
+SQL real referencia schemas legacy (`waitry.*`, `caja.*`, `inventario.*`,
+`rdb.*_legacy`) que fueron consolidados a `rdb.*` por
+`20260408000000_rdb_consolidation`. Re-correrlo en Preview Branch fresca
+falla porque las tablas legacy nunca existieron en el bootstrap moderno
+(que crea `rdb.waitry_*` directo).
+
+El SQL original completo vive en `supabase_migrations.schema_migrations.statements`
+como audit trail. Para auditar:
+
+```sql
+SELECT statements FROM supabase_migrations.schema_migrations
+WHERE version = '20260408000000';
+```
+
+Filename↔version matchea en ambos lados (disk + DB), así que no requiere whitelist.
 
 ## §5 — Sprint histórico de cleanup filename↔version
 
-- **drift-3** (2026-04-25): erradicación del drift filename↔version. 58
-  archivos renombrados con `git mv` para que filename matchee el `version`
-  registrado en `schema_migrations`. 16 huérfanos históricos
-  (Mar–Abr/2026) recuperados desde `schema_migrations.statements`. 14 de
-  ellos referencian schemas legacy droppeados (`waitry.*`, `caja.*`,
-  `inventario.*`, `rdb.*_legacy`) que fueron consolidados por
-  `20260408000000_rdb_consolidation` — al fallar en Preview Branch fresh,
-  se mantienen solo en `schema_migrations` (audit trail) y NO en disco; el
-  GH Action los whitelista. Los 2 modernos (`add_personas_contacto_*`,
-  `dilesa_consolidate_permissive_policies`) sí viven en disco porque
-  referencian schemas modernos que existen post-bootstrap. 2 archivos cuyo
-  SQL ya estaba aplicado en prod sin tracker
-  (`dedup_movimientos_caja_name_refs`, `dilesa_maquinaria_expose_schema`)
-  registrados con su version del filename. 4 bootstrap files registrados
-  como applied en prod (idempotentes, no-op). `config.toml` completado
-  para que `db push` funcione desde local. Governance §4 + drift-check §7
-  agregados para evitar regresión.
+- **drift-3** (2026-04-25): erradicación del drift filename↔version.
+  - **58 archivos renombrados** con `git mv` para que filename matchee el
+    `version` registrado en `schema_migrations`.
+  - **16 huérfanos históricos** (Mar–Abr/2026) recuperados desde
+    `schema_migrations.statements`. 14 de ellos viven como **no-op stubs**
+    en disco (referencian schemas legacy `waitry.*` / `caja.*` /
+    `inventario.*` / `rdb.*_legacy` que fueron consolidados por
+    `20260408000000_rdb_consolidation` — re-correrlos rompería Preview
+    Branch). Los 2 modernos (`add_personas_contacto_y_empleados_notas`,
+    `dilesa_consolidate_permissive_policies`) viven con su SQL real porque
+    referencian schemas modernos que existen post-bootstrap.
+  - **2 archivos** cuyo SQL ya estaba aplicado en prod sin tracker
+    (`dedup_movimientos_caja_name_refs`, `dilesa_maquinaria_expose_schema`)
+    registrados con su `version` del filename.
+  - **4 bootstrap files** registrados como applied en prod (idempotentes,
+    no-op en prod, sí corren en Preview/DR/local).
+  - **4 dilesa_lotes** rebautizados en `schema_migrations` para limpiar el
+    bug del MCP que registró `name` con timestamp embedded
+    (`20260423230504_20260423110100_dilesa_lotes` →
+    `20260423110100_dilesa_lotes`). Sin esta corrección, el orden de
+    aplicación dejaba `dilesa.inventario_vivienda` (FK → construccion_lote)
+    corriendo antes que `dilesa.construccion_lote`.
+  - `config.toml` completado para que `db push` funcione desde local.
+  - Governance §4 + drift-check §7 agregados para evitar regresión.
