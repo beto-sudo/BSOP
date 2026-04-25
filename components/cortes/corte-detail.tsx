@@ -17,7 +17,7 @@ import { CorteConciliacion } from './corte-conciliacion';
 import { CortePrintMarbete } from './corte-print-marbete';
 import { estadoVariant, formatCurrency, formatDate, formatDateTime } from './helpers';
 import { RegistrarMovimientoDialog } from './registrar-movimiento-dialog';
-import type { Corte, CorteTotales, Movimiento, Voucher } from './types';
+import type { Banco, Corte, CorteTotales, Movimiento, Voucher } from './types';
 import { VoucherLightbox } from './voucher-lightbox';
 
 function DetailSkeleton() {
@@ -38,6 +38,7 @@ export function CorteDetail({
   totales,
   movimientos,
   vouchers,
+  bancos,
   loadingDetail,
   open,
   onClose,
@@ -48,6 +49,7 @@ export function CorteDetail({
   totales: CorteTotales | null;
   movimientos: Movimiento[];
   vouchers: Voucher[];
+  bancos: Banco[];
   loadingDetail: boolean;
   open: boolean;
   onClose: () => void;
@@ -273,45 +275,65 @@ export function CorteDetail({
               )}
             </div>
 
-            {vouchers.length > 0 && (
-              <>
-                <Separator />
-                <div>
-                  <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Vouchers de terminal ({vouchers.length})
+            {(() => {
+              // Fallback `?? 'voucher_tarjeta'` por compat con vouchers viejos cuyo
+              // SELECT preexistente no incluía `categoria` (bug fix Fase 3 §1).
+              const vouchersTarjeta = vouchers.filter(
+                (v) => (v.categoria ?? 'voucher_tarjeta') === 'voucher_tarjeta'
+              );
+              if (vouchersTarjeta.length === 0) return null;
+              return (
+                <>
+                  <Separator />
+                  <div>
+                    <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Vouchers de tarjeta ({vouchersTarjeta.length})
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {vouchersTarjeta.map((v) => {
+                        const capturado = v.monto_reportado != null;
+                        return (
+                          <button
+                            key={v.id}
+                            type="button"
+                            className="group relative aspect-square overflow-hidden rounded-md border bg-muted hover:border-primary"
+                            onClick={() => setLightboxVoucher(v)}
+                          >
+                            {v.signed_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={v.signed_url}
+                                alt={v.nombre_original ?? 'voucher'}
+                                className="h-full w-full object-cover"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                                Sin preview
+                              </div>
+                            )}
+                            <span
+                              className={`absolute right-1 top-1 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-medium ${
+                                capturado
+                                  ? 'bg-emerald-500/90 text-white'
+                                  : 'bg-yellow-500/90 text-zinc-900'
+                              }`}
+                            >
+                              {capturado ? '✓' : 'Capturar'}
+                            </span>
+                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-1">
+                              <span className="block truncate text-xs text-white">
+                                {v.afiliacion ?? formatDateTime(v.uploaded_at)}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {vouchers.map((v) => (
-                      <button
-                        key={v.id}
-                        type="button"
-                        className="group relative aspect-square overflow-hidden rounded-md border bg-muted hover:border-primary"
-                        onClick={() => setLightboxVoucher(v)}
-                      >
-                        {v.signed_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={v.signed_url}
-                            alt={v.nombre_original ?? 'voucher'}
-                            className="h-full w-full object-cover"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                            Sin preview
-                          </div>
-                        )}
-                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-1">
-                          <span className="block truncate text-xs text-white">
-                            {v.afiliacion ?? formatDateTime(v.uploaded_at)}
-                          </span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
+                </>
+              );
+            })()}
           </div>
         </ScrollArea>
 
@@ -324,7 +346,16 @@ export function CorteDetail({
           />
         )}
 
-        <VoucherLightbox voucher={lightboxVoucher} onClose={() => setLightboxVoucher(null)} />
+        <VoucherLightbox
+          voucher={lightboxVoucher}
+          bancos={bancos}
+          movimientos={movimientos}
+          onClose={() => setLightboxVoucher(null)}
+          onSaved={() => {
+            setLightboxVoucher(null);
+            onMovimientoRegistered();
+          }}
+        />
       </SheetContent>
     </Sheet>
   );
