@@ -82,3 +82,43 @@ export async function upsertReceta(input: UpsertRecetaInput): Promise<UpsertRece
   revalidatePath('/rdb/productos');
   return { ok: true };
 }
+
+export type UpdateCategoriaInput = {
+  producto_id: string;
+  categoria_id: string | null;
+};
+
+export type UpdateCategoriaResult = { ok: true } | { ok: false; error: string };
+
+export async function updateCategoria(input: UpdateCategoriaInput): Promise<UpdateCategoriaResult> {
+  const supabase = await createSupabaseServerClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'No autenticado.' };
+
+  if (input.categoria_id) {
+    const { data: cat, error: catErr } = await supabase
+      .schema('erp')
+      .from('categorias_producto')
+      .select('id')
+      .eq('id', input.categoria_id)
+      .eq('empresa_id', RDB_EMPRESA_ID)
+      .maybeSingle();
+    if (catErr) return { ok: false, error: `Error validando categoría: ${catErr.message}` };
+    if (!cat) return { ok: false, error: 'Categoría no pertenece a RDB.' };
+  }
+
+  const { error } = await supabase
+    .schema('erp')
+    .from('productos')
+    .update({ categoria_id: input.categoria_id, updated_at: new Date().toISOString() })
+    .eq('empresa_id', RDB_EMPRESA_ID)
+    .eq('id', input.producto_id);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath('/rdb/productos');
+  return { ok: true };
+}
