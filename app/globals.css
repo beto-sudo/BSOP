@@ -201,6 +201,13 @@ textarea {
 }
 
 @media print {
+  /* NO definir `@page` aquí — Chrome/Safari ocultan el control de "Escala"
+     en el diálogo de impresión cuando hay reglas `@page` en CSS. Para que el
+     marbete quepa en una sola hoja sin perder ese control, basta con que el
+     componente impreso (CortePrintMarbete) ya esté compactado con tamaños de
+     fuente chicos y `pageBreakInside: avoid` en cada bloque. Si un corte
+     puntual necesita un ajuste extra, el usuario puede usar Escala 90/95%. */
+
   html,
   body {
     background: white !important;

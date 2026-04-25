@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
-import type { Voucher } from '@/components/cortes/types';
+import type { Banco, Voucher, VoucherCategoria } from '@/components/cortes/types';
 
 const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
 const VOUCHERS_BUCKET = 'cortes-vouchers';
@@ -340,11 +340,19 @@ export async function eliminarVoucher(voucher_id: string): Promise<void> {
 export async function obtenerVouchersDelCorte(corte_id: string): Promise<Voucher[]> {
   const supabase = await createSupabaseServerClient();
 
+  // Plan B: dos queries en lugar de un JOIN cross-schema. PostgREST sólo expone
+  // el FK `cortes_vouchers.banco_id → core.bancos.id` cuando el schema activo
+  // de la query es `core`; con `.schema('erp')` no se materializa el embed.
+  // Resolver con un `.in()` separado es más predecible y mantiene los tipos
+  // generados limpios.
   const { data, error } = await supabase
     .schema('erp')
     .from('cortes_vouchers')
     .select(
-      'id, corte_id, storage_path, nombre_original, tamano_bytes, mime_type, afiliacion, monto_reportado, uploaded_by_nombre, uploaded_at'
+      `id, corte_id, storage_path, nombre_original, tamano_bytes, mime_type,
+       afiliacion, monto_reportado, uploaded_by_nombre, uploaded_at,
+       categoria, banco_id, movimiento_caja_id,
+       ocr_texto_crudo, ocr_monto_sugerido, ocr_banco_sugerido_id, ocr_confianza`
     )
     .eq('corte_id', corte_id)
     .order('uploaded_at', { ascending: true });
@@ -352,6 +360,27 @@ export async function obtenerVouchersDelCorte(corte_id: string): Promise<Voucher
 
   const rows = data ?? [];
   if (rows.length === 0) return [];
+
+  // Resolver banco_nombre con un único SELECT a core.bancos.
+  const bancoIds = Array.from(
+    new Set(
+      rows
+        .flatMap((r) => [r.banco_id, r.ocr_banco_sugerido_id])
+        .filter((v): v is string => typeof v === 'string')
+    )
+  );
+
+  const bancosById = new Map<string, { id: string; codigo: string; nombre: string }>();
+  if (bancoIds.length > 0) {
+    const { data: bancos } = await supabase
+      .schema('core')
+      .from('bancos')
+      .select('id, codigo, nombre')
+      .in('id', bancoIds);
+    for (const b of bancos ?? []) {
+      bancosById.set(b.id, b);
+    }
+  }
 
   // createSignedUrls hace un solo round-trip — más barato que N createSignedUrl.
   const paths = rows.map((r) => r.storage_path);
@@ -366,6 +395,93 @@ export async function obtenerVouchersDelCorte(corte_id: string): Promise<Voucher
 
   return rows.map((r) => ({
     ...r,
+    categoria: (r.categoria ?? 'voucher_tarjeta') as VoucherCategoria,
     signed_url: urlByPath.get(r.storage_path) ?? null,
+    banco_nombre: r.banco_id ? (bancosById.get(r.banco_id)?.nombre ?? null) : null,
   })) as Voucher[];
+}
+
+// ─── Catálogo de bancos (lectura) ─────────────────────────────────────────────
+
+export async function cargarBancos(): Promise<Banco[]> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .schema('core')
+    .from('bancos')
+    .select('id, codigo, nombre, patron_ocr, activo')
+    .eq('activo', true)
+    .order('codigo');
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Banco[];
+}
+
+// ─── Confirmación / reclasificación de vouchers ───────────────────────────────
+
+export type ConfirmarVoucherInput = {
+  voucher_id: string;
+  banco_id: string | null;
+  monto: number;
+  afiliacion: string | null;
+};
+
+export async function confirmarVoucher(input: ConfirmarVoucherInput): Promise<void> {
+  const supabase = await createSupabaseServerClient();
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error('No autenticado');
+
+  if (input.monto == null || Number.isNaN(input.monto)) {
+    throw new Error('El monto es requerido para confirmar el voucher');
+  }
+  if (input.monto < 0) throw new Error('El monto no puede ser negativo');
+
+  const { error } = await supabase
+    .schema('erp')
+    .from('cortes_vouchers')
+    .update({
+      banco_id: input.banco_id,
+      monto_reportado: input.monto,
+      afiliacion: input.afiliacion?.trim() || null,
+    })
+    .eq('id', input.voucher_id);
+
+  if (error) throw new Error(error.message);
+  revalidatePath('/rdb/cortes');
+}
+
+export type ActualizarCategoriaVoucherInput = {
+  voucher_id: string;
+  categoria: VoucherCategoria;
+  movimiento_caja_id: string | null; // requerido si categoria === 'comprobante_movimiento'
+};
+
+export async function actualizarCategoriaVoucher(
+  input: ActualizarCategoriaVoucherInput
+): Promise<void> {
+  const supabase = await createSupabaseServerClient();
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error('No autenticado');
+
+  if (input.categoria === 'comprobante_movimiento' && !input.movimiento_caja_id) {
+    throw new Error('Comprobante de movimiento requiere seleccionar el movimiento ligado');
+  }
+
+  const { error } = await supabase
+    .schema('erp')
+    .from('cortes_vouchers')
+    .update({
+      categoria: input.categoria,
+      // Limpiar FK si la categoría dejó de ser comprobante_movimiento.
+      movimiento_caja_id:
+        input.categoria === 'comprobante_movimiento' ? input.movimiento_caja_id : null,
+    })
+    .eq('id', input.voucher_id);
+
+  if (error) throw new Error(error.message);
+  revalidatePath('/rdb/cortes');
 }

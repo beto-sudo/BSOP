@@ -7,6 +7,7 @@
 
 import { PlusCircle } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { cargarBancos } from '@/app/rdb/cortes/actions';
 import { RequireAccess } from '@/components/require-access';
 import { Button } from '@/components/ui/button';
 import { useSortableTable } from '@/hooks/use-sortable-table';
@@ -19,7 +20,7 @@ import { fetchCorteDetail, fetchCortesList } from './data';
 import { resolvePresetRange } from './date-presets';
 import { todayRange } from './helpers';
 import { SummaryBar } from './summary-bar';
-import type { Corte, CorteProducto, CorteTotales, Movimiento, Voucher } from './types';
+import type { Banco, Corte, CorteProducto, CorteTotales, Movimiento, Voucher } from './types';
 import { useAbrirCaja } from './use-abrir-caja';
 import { useCerrarCorte } from './use-cerrar-corte';
 
@@ -58,6 +59,7 @@ export function CortesView() {
   const [selectedMovimientos, setSelectedMovimientos] = useState<Movimiento[]>([]);
   const [, setSelectedProductos] = useState<CorteProducto[]>([]);
   const [selectedVouchers, setSelectedVouchers] = useState<Voucher[]>([]);
+  const [bancos, setBancos] = useState<Banco[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -80,6 +82,15 @@ export function CortesView() {
     if (saved && saved !== 'hoy') {
       handlePreset(saved);
     }
+  }, []);
+
+  // Catálogo de bancos: estable, se carga una sola vez al montar.
+  useEffect(() => {
+    cargarBancos()
+      .then(setBancos)
+      .catch((e) => {
+        console.error('[cortes] cargarBancos:', e);
+      });
   }, []);
 
   const fetchCortes = useCallback(async () => {
@@ -205,6 +216,7 @@ export function CortesView() {
           totales={selectedTotales}
           movimientos={selectedMovimientos}
           vouchers={selectedVouchers}
+          bancos={bancos}
           loadingDetail={loadingDetail}
           open={drawerOpen}
           onClose={() => setDrawerOpen(false)}
