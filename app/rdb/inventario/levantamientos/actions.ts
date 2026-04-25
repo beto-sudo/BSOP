@@ -1,27 +1,23 @@
 'use server';
 
+// Next.js requires `'use server'` modules to export only async functions —
+// constants, types and helpers live in ./types.ts.
+
 import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import type { Json } from '@/types/supabase';
-
-export const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
-
-export type ActionResult<T = void> =
-  | (T extends void ? { ok: true } : { ok: true; data: T })
-  | { ok: false; error: string };
+import {
+  RDB_EMPRESA_ID,
+  type ActionResult,
+  type CrearLevantamientoInput,
+  type FirmarPasoData,
+  type FirmarPasoInput,
+  type LineaParaCapturar,
+  type LineaParaRevisar,
+} from './types';
 
 // ─── Crear ────────────────────────────────────────────────────────────────────
-
-export type CrearLevantamientoInput = {
-  almacen_id: string;
-  fecha_programada: string; // YYYY-MM-DD
-  notas?: string;
-  tolerancia_pct_override?: number | null;
-  tolerancia_monto_override?: number | null;
-  /** 'fisico' (default) — el schema permite otros tipos a futuro. */
-  tipo?: string;
-};
 
 export async function crearLevantamiento(
   input: CrearLevantamientoInput
@@ -109,20 +105,6 @@ export async function cerrarCaptura(levantamiento_id: string): Promise<ActionRes
 
 // ─── Firma ────────────────────────────────────────────────────────────────────
 
-export type FirmarPasoInput = {
-  levantamiento_id: string;
-  paso: number;
-  rol: string;
-  comentario?: string;
-};
-
-export type FirmarPasoData = {
-  firmas_actuales: number;
-  firmas_requeridas: number;
-  aplicado: boolean;
-  movimientos_generados: number;
-};
-
 export async function firmarPaso(input: FirmarPasoInput): Promise<ActionResult<FirmarPasoData>> {
   const supabase = await createSupabaseServerClient();
   const hdrs = await headers();
@@ -191,18 +173,6 @@ export async function cancelarLevantamiento(
 
 // ─── Lecturas (RPC, RLS-safe) ─────────────────────────────────────────────────
 
-export type LineaParaCapturar = {
-  linea_id: string;
-  producto_id: string;
-  producto_codigo: string;
-  producto_nombre: string;
-  unidad: string;
-  categoria: string;
-  cantidad_contada: number;
-  contado_at: string | null;
-  recontada: boolean;
-};
-
 export async function getLineasParaCapturar(
   levantamiento_id: string
 ): Promise<ActionResult<LineaParaCapturar[]>> {
@@ -215,25 +185,6 @@ export async function getLineasParaCapturar(
   if (error) return { ok: false, error: error.message };
   return { ok: true, data: (data ?? []) as LineaParaCapturar[] };
 }
-
-export type LineaParaRevisar = {
-  linea_id: string;
-  producto_id: string;
-  producto_codigo: string;
-  producto_nombre: string;
-  unidad: string;
-  categoria: string;
-  costo_unitario: number;
-  stock_inicial: number;
-  salidas_durante_captura: number;
-  stock_efectivo: number;
-  cantidad_contada: number;
-  diferencia: number;
-  diferencia_valor: number;
-  fuera_de_tolerancia: boolean;
-  notas_diferencia: string | null;
-  contado_at: string | null;
-};
 
 export async function getLineasParaRevisar(
   levantamiento_id: string

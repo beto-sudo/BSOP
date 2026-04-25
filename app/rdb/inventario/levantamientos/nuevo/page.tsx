@@ -19,7 +19,8 @@ import { Combobox } from '@/components/ui/combobox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { TolerancePanel, type ToleranciaConfig } from '@/components/inventario/tolerance-panel';
-import { crearLevantamiento, iniciarCaptura, type CrearLevantamientoInput } from '../actions';
+import { crearLevantamiento, iniciarCaptura } from '../actions';
+import type { CrearLevantamientoInput } from '../types';
 
 const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
 
