@@ -246,6 +246,7 @@ export function CortesView() {
           onNext={cerrar.goNext}
           onBack={cerrar.goBack}
           vouchers={cerrar.vouchers}
+          bancos={bancos}
           onVoucherUploaded={cerrar.onVoucherUploaded}
           onVoucherRemoved={cerrar.onVoucherRemoved}
         />

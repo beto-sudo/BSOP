@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { formatCurrency } from './helpers';
-import type { Corte, Voucher } from './types';
+import type { Banco, Corte, Voucher } from './types';
 import { VoucherUploader } from './voucher-uploader';
 
 type Props = {
@@ -33,6 +33,7 @@ type Props = {
   onNext: () => void;
   onBack: () => void;
   vouchers: Voucher[];
+  bancos: Banco[];
   onVoucherUploaded: (v: Voucher) => void;
   onVoucherRemoved: (id: string) => void;
 };
@@ -83,6 +84,7 @@ export function CerrarCorteDialog({
   onNext,
   onBack,
   vouchers,
+  bancos,
   onVoucherUploaded,
   onVoucherRemoved,
 }: Props) {
@@ -266,6 +268,7 @@ export function CerrarCorteDialog({
               <VoucherUploader
                 corteId={corte.id}
                 vouchers={vouchers}
+                bancos={bancos}
                 onUploaded={onVoucherUploaded}
                 onRemoved={onVoucherRemoved}
                 disabled={isPending}
