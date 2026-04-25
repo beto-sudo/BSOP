@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { conciliarEfectivo, conciliarTarjeta } from './conciliacion';
 import { CorteConciliacion } from './corte-conciliacion';
 import { estadoVariant, formatCurrency, formatDate, formatDateTime } from './helpers';
+import { MarbeteConciliacion } from './marbete-conciliacion';
 import { RegistrarMovimientoDialog } from './registrar-movimiento-dialog';
 import type { Banco, Corte, CorteTotales, Movimiento, Voucher } from './types';
 import { VoucherLightbox } from './voucher-lightbox';
@@ -65,6 +66,14 @@ export function CorteDetail({
 
   const tarjeta = conciliarTarjeta(totales, vouchers);
   const efectivo = conciliarEfectivo(corte, totales);
+
+  const vouchersTarjeta = vouchers.filter(
+    (v) => (v.categoria ?? 'voucher_tarjeta') === 'voucher_tarjeta'
+  );
+  const bancoNombrePor = (id: string | null) => {
+    if (!id) return null;
+    return bancos.find((b) => b.id === id)?.nombre ?? null;
+  };
 
   return (
     <Sheet
@@ -156,12 +165,26 @@ export function CorteDetail({
             )}
 
             {!loadingDetail && (
-              <CorteConciliacion
-                tarjeta={tarjeta}
-                efectivo={efectivo}
-                ingresosStripe={totales?.ingresos_stripe ?? 0}
-                ingresosTransferencias={totales?.ingresos_transferencias ?? 0}
-              />
+              <>
+                <div className="print:hidden">
+                  <CorteConciliacion
+                    tarjeta={tarjeta}
+                    efectivo={efectivo}
+                    ingresosStripe={totales?.ingresos_stripe ?? 0}
+                    ingresosTransferencias={totales?.ingresos_transferencias ?? 0}
+                  />
+                </div>
+                <div className="hidden print:block">
+                  <MarbeteConciliacion
+                    tarjeta={tarjeta}
+                    efectivo={efectivo}
+                    ingresosStripe={totales?.ingresos_stripe ?? 0}
+                    ingresosTransferencias={totales?.ingresos_transferencias ?? 0}
+                    vouchersTarjeta={vouchersTarjeta}
+                    bancoNombrePor={bancoNombrePor}
+                  />
+                </div>
+              </>
             )}
 
             <Separator className="print:my-1" />
@@ -284,6 +307,9 @@ export function CorteDetail({
                           <span className="block text-xs text-muted-foreground print:text-[9px]">
                             {formatDate(m.fecha_hora)}
                             {m.registrado_por ? ` · ${m.registrado_por}` : ''}
+                            {comprobantes.length > 0 ? (
+                              <span className="hidden print:inline"> · 📎 c/comprobante</span>
+                            ) : null}
                           </span>
                           {comprobantes.length > 0 && (
                             <div className="mt-1.5 flex flex-wrap gap-1 print:hidden">
