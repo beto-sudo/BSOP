@@ -1,6 +1,13 @@
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
+/**
+ * @deprecated ADR-004 R1 (un solo nivel de tabs). El módulo Inventario ya no usa
+ * este componente — sus tabs internos (Stock | Movimientos) se renderizan vía
+ * `<ModuleTabs>` (components/module-page). `Levantamientos` sigue importándolo
+ * temporalmente; se eliminará junto con la migración de Levantamientos a la
+ * anatomía de `<ModulePage>` (Fase 2 + actualización de sidebar).
+ */
 export type InventarioTabKey = 'overview' | 'levantamientos' | 'analisis';
 
 const TABS: { key: InventarioTabKey; label: string; href: string }[] = [
@@ -18,6 +25,7 @@ export interface InventarioTabsProps {
   className?: string;
 }
 
+/** @deprecated Ver ADR-004 R1. Será eliminado en Fase 2. */
 export function InventarioTabs({ activeKey, className }: InventarioTabsProps) {
   return (
     <nav
