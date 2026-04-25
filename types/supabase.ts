@@ -3548,6 +3548,39 @@ export type Database = {
           },
         ]
       }
+      categorias_producto: {
+        Row: {
+          activo: boolean
+          color: string | null
+          created_at: string
+          empresa_id: string
+          id: string
+          nombre: string
+          orden: number
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          color?: string | null
+          created_at?: string
+          empresa_id: string
+          id?: string
+          nombre: string
+          orden?: number
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          color?: string | null
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          nombre?: string
+          orden?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       citas: {
         Row: {
           cliente_id: string | null
@@ -5506,6 +5539,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "productos_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias_producto"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "productos_parent_id_fkey"
             columns: ["parent_id"]
@@ -8293,6 +8333,16 @@ export type Database = {
         }
         Relationships: []
       }
+      v_producto_ultima_venta: {
+        Row: {
+          producto_id: string | null
+          total_importe_vendido: number | null
+          total_unidades_vendidas: number | null
+          total_ventas: number | null
+          ultima_venta_at: string | null
+        }
+        Relationships: []
+      }
       v_productos_grupo: {
         Row: {
           categoria: string | null
@@ -8302,6 +8352,30 @@ export type Database = {
           padre_nombre: string | null
           total_hijos: number | null
           unidad: string | null
+        }
+        Relationships: []
+      }
+      v_productos_tabla: {
+        Row: {
+          activo: boolean | null
+          categoria_color: string | null
+          categoria_id: string | null
+          categoria_nombre: string | null
+          codigo: string | null
+          created_at: string | null
+          descripcion: string | null
+          id: string | null
+          inventariable: boolean | null
+          margen_pct: number | null
+          nombre: string | null
+          stock_actual: number | null
+          tipo: string | null
+          total_unidades_vendidas: number | null
+          ultima_venta_at: string | null
+          ultimo_costo: number | null
+          ultimo_precio_venta: number | null
+          unidad: string | null
+          updated_at: string | null
         }
         Relationships: []
       }

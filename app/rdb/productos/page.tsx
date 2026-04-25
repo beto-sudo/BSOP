@@ -1,7 +1,7 @@
 'use client';
 
 import { RequireAccess } from '@/components/require-access';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import {
   Table,
@@ -26,8 +26,8 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import { Package, RefreshCw, Search, Tag, Box, Settings2, Save, X } from 'lucide-react';
-import { upsertReceta } from './actions';
+import { RefreshCw, Search, Settings2, Save, X } from 'lucide-react';
+import { upsertReceta, updateCategoria } from './actions';
 
 const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
 
@@ -38,13 +38,26 @@ type Producto = {
   codigo: string | null;
   nombre: string;
   descripcion: string | null;
-  precio: number;
-  categoria: string | null;
-  activo: boolean;
+  tipo: string | null;
   unidad: string | null;
-  created_at: string | null;
-  updated_at: string | null;
+  activo: boolean;
   inventariable: boolean;
+  categoria_id: string | null;
+  categoria_nombre: string | null;
+  categoria_color: string | null;
+  ultimo_costo: number | null;
+  ultimo_precio_venta: number | null;
+  margen_pct: number | null;
+  stock_actual: number;
+  ultima_venta_at: string | null;
+  total_unidades_vendidas: number;
+};
+
+type Categoria = {
+  id: string;
+  nombre: string;
+  color: string | null;
+  orden: number;
 };
 
 type RecetaRow = {
@@ -68,37 +81,96 @@ function formatCurrency(amount: number | null | undefined) {
   return amount.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
 }
 
+function formatNumber(n: number | null | undefined, frac = 0) {
+  if (n == null) return '—';
+  return n.toLocaleString('es-MX', { minimumFractionDigits: frac, maximumFractionDigits: frac });
+}
+
+function MargenBadge({ pct }: { pct: number | null }) {
+  if (pct === null || pct === undefined)
+    return <span className="text-muted-foreground text-xs">—</span>;
+  const cls =
+    pct >= 30
+      ? 'text-emerald-600 bg-emerald-50 border-emerald-200'
+      : pct >= 10
+        ? 'text-amber-600 bg-amber-50 border-amber-200'
+        : 'text-red-600 bg-red-50 border-red-200';
+  return (
+    <Badge variant="outline" className={cls}>
+      {pct.toFixed(1)}%
+    </Badge>
+  );
+}
+
+function UltimaVentaCell({ at, now }: { at: string | null; now: number }) {
+  if (!at) return <span className="text-muted-foreground text-xs">Nunca</span>;
+  const days = Math.floor((now - new Date(at).getTime()) / 86400000);
+  if (days === 0) return <span className="text-emerald-600 text-xs">Hoy</span>;
+  if (days <= 7) return <span className="text-emerald-600 text-xs">Hace {days}d</span>;
+  if (days <= 30) return <span className="text-amber-600 text-xs">Hace {days}d</span>;
+  return <span className="text-red-600 text-xs">Hace {days}d</span>;
+}
+
+function CategoriaBadge({ nombre, color }: { nombre: string | null; color: string | null }) {
+  if (!nombre) return <span className="text-muted-foreground text-xs">—</span>;
+  if (!color)
+    return (
+      <Badge variant="outline" className="text-xs">
+        {nombre}
+      </Badge>
+    );
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium"
+      style={{
+        borderColor: `${color}40`,
+        backgroundColor: `${color}10`,
+        color,
+      }}
+    >
+      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
+      {nombre}
+    </span>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ProductosPage() {
   const [productos, setProductos] = useState<Producto[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState<number>(() => Date.now());
 
   const [search, setSearch] = useState('');
   const [categoriaFilter, setCategoriaFilter] = useState('all');
   const [activoFilter, setActivoFilter] = useState('all');
   const [inventariableFilter, setInventariableFilter] = useState('all');
+  const [margenFilter, setMargenFilter] = useState('all'); // all | low | mid | high | sinprecio
+  const [sinMovimientoFilter, setSinMovimientoFilter] = useState(false);
 
   const [selectedProducto, setSelectedProducto] = useState<Producto | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Form State
-  const [formCategoria, setFormCategoria] = useState('');
+  // Form state (edit drawer)
+  const [formTipo, setFormTipo] = useState('producto');
+  const [formCategoriaId, setFormCategoriaId] = useState<string>('');
   const [formInventariable, setFormInventariable] = useState(false);
 
-  // Receta state (drawer de edit)
+  // Receta state
   const [recetaRows, setRecetaRows] = useState<RecetaRow[]>([]);
   const [insumosDisponibles, setInsumosDisponibles] = useState<InsumoDisponible[]>([]);
   const [recetaLoading, setRecetaLoading] = useState(false);
   const [insumoToAdd, setInsumoToAdd] = useState('');
 
-  // Create Form State
+  // Create form state
   const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
   const [newNombre, setNewNombre] = useState('');
   const [newPrecio, setNewPrecio] = useState('0');
-  const [newCategoria, setNewCategoria] = useState('');
+  const [newTipo, setNewTipo] = useState('producto');
+  const [newCategoriaId, setNewCategoriaId] = useState('');
   const [newInventariable, setNewInventariable] = useState(true);
   const [creating, setCreating] = useState(false);
 
@@ -107,32 +179,46 @@ export default function ProductosPage() {
     setError(null);
     try {
       const supabase = createSupabaseBrowserClient();
-      const { data, error: err } = await supabase
-        .schema('erp')
-        .from('productos')
-        .select(
-          'id, codigo, nombre, descripcion, tipo, activo, unidad, inventariable, created_at, updated_at, productos_precios(precio_venta)'
-        )
-        .eq('empresa_id', RDB_EMPRESA_ID)
-        .order('nombre');
-      if (err) throw err;
-      const mapped: Producto[] = (data ?? []).map((p) => {
-        const precios = p.productos_precios as { precio_venta: number | null }[] | null;
-        return {
-          id: p.id,
-          codigo: p.codigo ?? null,
-          nombre: p.nombre,
-          descripcion: p.descripcion ?? null,
-          precio: precios?.[0]?.precio_venta ?? 0,
-          categoria: p.tipo ?? null,
-          activo: p.activo,
-          unidad: p.unidad ?? null,
-          created_at: p.created_at ?? null,
-          updated_at: p.updated_at ?? null,
-          inventariable: p.inventariable,
-        };
-      });
+      const [prodRes, catRes] = await Promise.all([
+        supabase.schema('rdb').from('v_productos_tabla').select('*').order('nombre'),
+        supabase
+          .schema('erp')
+          .from('categorias_producto')
+          .select('id, nombre, color, orden')
+          .eq('empresa_id', RDB_EMPRESA_ID)
+          .eq('activo', true)
+          .order('orden'),
+      ]);
+      if (prodRes.error) throw prodRes.error;
+      if (catRes.error) throw catRes.error;
+      const mapped: Producto[] = (prodRes.data ?? []).map((p) => ({
+        id: p.id as string,
+        codigo: (p.codigo as string | null) ?? null,
+        nombre: p.nombre as string,
+        descripcion: (p.descripcion as string | null) ?? null,
+        tipo: (p.tipo as string | null) ?? null,
+        unidad: (p.unidad as string | null) ?? null,
+        activo: p.activo as boolean,
+        inventariable: p.inventariable as boolean,
+        categoria_id: (p.categoria_id as string | null) ?? null,
+        categoria_nombre: (p.categoria_nombre as string | null) ?? null,
+        categoria_color: (p.categoria_color as string | null) ?? null,
+        ultimo_costo: p.ultimo_costo == null ? null : Number(p.ultimo_costo),
+        ultimo_precio_venta: p.ultimo_precio_venta == null ? null : Number(p.ultimo_precio_venta),
+        margen_pct: p.margen_pct == null ? null : Number(p.margen_pct),
+        stock_actual: Number(p.stock_actual ?? 0),
+        ultima_venta_at: (p.ultima_venta_at as string | null) ?? null,
+        total_unidades_vendidas: Number(p.total_unidades_vendidas ?? 0),
+      }));
       setProductos(mapped);
+      setCategorias(
+        (catRes.data ?? []).map((c) => ({
+          id: c.id as string,
+          nombre: c.nombre as string,
+          color: (c.color as string | null) ?? null,
+          orden: c.orden as number,
+        }))
+      );
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error al cargar productos');
     } finally {
@@ -143,6 +229,10 @@ export default function ProductosPage() {
   useEffect(() => {
     void fetchProductos();
   }, [fetchProductos]);
+
+  useEffect(() => {
+    setNow(Date.now());
+  }, [productos]);
 
   useEffect(() => {
     if (!drawerOpen || !selectedProducto) {
@@ -201,7 +291,8 @@ export default function ProductosPage() {
 
   const openDrawer = (p: Producto) => {
     setSelectedProducto(p);
-    setFormCategoria(p.categoria || '');
+    setFormTipo(p.tipo || 'producto');
+    setFormCategoriaId(p.categoria_id ?? '');
     setFormInventariable(p.inventariable ?? true);
     setDrawerOpen(true);
   };
@@ -215,14 +306,23 @@ export default function ProductosPage() {
         .schema('erp')
         .from('productos')
         .update({
-          tipo: formCategoria.trim() || 'producto',
+          tipo: formTipo.trim() || 'producto',
           inventariable: formInventariable,
           updated_at: new Date().toISOString(),
         })
         .eq('empresa_id', RDB_EMPRESA_ID)
         .eq('id', selectedProducto.id);
-
       if (err) throw err;
+
+      // Categoría via server action (revalida path)
+      const catResult = await updateCategoria({
+        producto_id: selectedProducto.id,
+        categoria_id: formCategoriaId || null,
+      });
+      if (!catResult.ok) {
+        alert(`Error al guardar la categoría: ${catResult.error}`);
+        return;
+      }
 
       const recetaResult = await upsertReceta({
         producto_venta_id: selectedProducto.id,
@@ -261,13 +361,13 @@ export default function ProductosPage() {
         .insert({
           empresa_id: RDB_EMPRESA_ID,
           nombre: newNombre.trim(),
-          tipo: newCategoria.trim() || 'producto',
+          tipo: newTipo.trim() || 'producto',
           inventariable: newInventariable,
+          categoria_id: newCategoriaId || null,
           activo: true,
         })
         .select('id')
         .single();
-
       if (err) throw err;
 
       const precioNum = parseFloat(newPrecio) || 0;
@@ -283,7 +383,8 @@ export default function ProductosPage() {
       setCreateDrawerOpen(false);
       setNewNombre('');
       setNewPrecio('0');
-      setNewCategoria('');
+      setNewTipo('producto');
+      setNewCategoriaId('');
       setNewInventariable(true);
       void fetchProductos();
     } catch (e) {
@@ -294,25 +395,50 @@ export default function ProductosPage() {
     }
   };
 
-  const categorias = Array.from(
-    new Set(productos.map((p) => p.categoria).filter((c): c is string => !!c))
-  ).sort();
+  const filtered = useMemo(() => {
+    return productos.filter((p) => {
+      if (activoFilter !== 'all' && String(p.activo) !== activoFilter) return false;
+      if (categoriaFilter !== 'all' && p.categoria_id !== categoriaFilter) return false;
+      if (inventariableFilter !== 'all' && String(p.inventariable ?? true) !== inventariableFilter)
+        return false;
 
-  const filtered = productos.filter((p) => {
-    if (activoFilter !== 'all' && String(p.activo) !== activoFilter) return false;
-    if (categoriaFilter !== 'all' && p.categoria !== categoriaFilter) return false;
-    if (inventariableFilter !== 'all' && String(p.inventariable ?? true) !== inventariableFilter)
-      return false;
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      p.nombre.toLowerCase().includes(q) ||
-      (p.categoria ?? '').toLowerCase().includes(q) ||
-      (p.descripcion ?? '').toLowerCase().includes(q)
-    );
-  });
+      if (margenFilter === 'sinprecio' && p.margen_pct !== null) return false;
+      if (margenFilter === 'low' && (p.margen_pct === null || p.margen_pct >= 10)) return false;
+      if (
+        margenFilter === 'mid' &&
+        (p.margen_pct === null || p.margen_pct < 10 || p.margen_pct >= 30)
+      )
+        return false;
+      if (margenFilter === 'high' && (p.margen_pct === null || p.margen_pct < 30)) return false;
+
+      if (sinMovimientoFilter) {
+        if (!p.ultima_venta_at) return true; // nunca vendido = sin movimiento
+        const days = Math.floor((now - new Date(p.ultima_venta_at).getTime()) / 86400000);
+        if (days <= 30) return false;
+      }
+
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return (
+        p.nombre.toLowerCase().includes(q) ||
+        (p.codigo ?? '').toLowerCase().includes(q) ||
+        (p.categoria_nombre ?? '').toLowerCase().includes(q) ||
+        (p.descripcion ?? '').toLowerCase().includes(q)
+      );
+    });
+  }, [
+    productos,
+    activoFilter,
+    categoriaFilter,
+    inventariableFilter,
+    margenFilter,
+    sinMovimientoFilter,
+    search,
+    now,
+  ]);
 
   const { sortKey, sortDir, onSort, sortData } = useSortableTable<Producto>('nombre', 'asc');
+
   return (
     <RequireAccess empresa="rdb" modulo="rdb.productos">
       <div className="space-y-6">
@@ -320,7 +446,9 @@ export default function ProductosPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Productos</h1>
-            <p className="text-sm text-muted-foreground">Catálogo de productos y servicios</p>
+            <p className="text-sm text-muted-foreground">
+              Catálogo de productos y servicios — costo, precio, margen, stock y última venta.
+            </p>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-sm text-muted-foreground">
@@ -335,7 +463,7 @@ export default function ProductosPage() {
           <div className="relative min-w-52">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Buscar por nombre o categoría…"
+              placeholder="Buscar por nombre, código o categoría…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
@@ -345,23 +473,38 @@ export default function ProductosPage() {
           <FilterCombobox
             value={categoriaFilter}
             onChange={setCategoriaFilter}
-            options={categorias.map((cat) => ({ id: cat, label: cat }))}
+            options={categorias.map((c) => ({ id: c.id, label: c.nombre }))}
             placeholder="Categoría"
             searchPlaceholder="Buscar categoría..."
             clearLabel="Todas las categorías"
-            className="w-44"
+            className="w-48"
           />
 
           <FilterCombobox
             value={inventariableFilter}
             onChange={setInventariableFilter}
             options={[
-              { id: 'true', label: 'Inventariable' },
-              { id: 'false', label: 'Servicio / Varios' },
+              { id: 'true', label: 'Producto físico' },
+              { id: 'false', label: 'Servicio' },
             ]}
-            placeholder="Tipo"
-            searchPlaceholder="Buscar tipo..."
-            clearLabel="Todos los tipos"
+            placeholder="Inventario"
+            searchPlaceholder="Buscar..."
+            clearLabel="Todos"
+            className="w-44"
+          />
+
+          <FilterCombobox
+            value={margenFilter}
+            onChange={setMargenFilter}
+            options={[
+              { id: 'high', label: 'Margen ≥ 30%' },
+              { id: 'mid', label: 'Margen 10–30%' },
+              { id: 'low', label: 'Margen < 10%' },
+              { id: 'sinprecio', label: 'Sin precio' },
+            ]}
+            placeholder="Margen"
+            searchPlaceholder="Buscar..."
+            clearLabel="Todos"
             className="w-40"
           />
 
@@ -375,8 +518,17 @@ export default function ProductosPage() {
             placeholder="Activos"
             searchPlaceholder="Buscar..."
             clearLabel="Todos (Activos)"
-            className="w-36"
+            className="w-40"
           />
+
+          <Button
+            variant={sinMovimientoFilter ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setSinMovimientoFilter((v) => !v)}
+            className="h-9"
+          >
+            Sin movimiento &gt;30d
+          </Button>
 
           <Button
             variant="outline"
@@ -408,26 +560,64 @@ export default function ProductosPage() {
                   onSort={onSort}
                 />
                 <SortableHead
-                  sortKey="tipo"
-                  label="Tipo"
+                  sortKey="codigo"
+                  label="Código"
                   currentSort={sortKey}
                   currentDir={sortDir}
                   onSort={onSort}
                 />
                 <SortableHead
-                  sortKey="categoria"
+                  sortKey="inventariable"
+                  label="Inventario"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                />
+                <SortableHead
+                  sortKey="categoria_nombre"
                   label="Categoría"
                   currentSort={sortKey}
                   currentDir={sortDir}
                   onSort={onSort}
                 />
                 <SortableHead
-                  sortKey="precio"
+                  sortKey="ultimo_costo"
+                  label="Costo"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                  className="text-right"
+                />
+                <SortableHead
+                  sortKey="ultimo_precio_venta"
                   label="Precio"
                   currentSort={sortKey}
                   currentDir={sortDir}
                   onSort={onSort}
                   className="text-right"
+                />
+                <SortableHead
+                  sortKey="margen_pct"
+                  label="Margen"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                  className="text-right"
+                />
+                <SortableHead
+                  sortKey="stock_actual"
+                  label="Stock"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
+                  className="text-right"
+                />
+                <SortableHead
+                  sortKey="ultima_venta_at"
+                  label="Última venta"
+                  currentSort={sortKey}
+                  currentDir={sortDir}
+                  onSort={onSort}
                 />
                 <SortableHead
                   sortKey="activo"
@@ -443,7 +633,7 @@ export default function ProductosPage() {
               {loading ? (
                 Array.from({ length: 8 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 7 }).map((__, j) => (
+                    {Array.from({ length: 11 }).map((__, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-4 w-full" />
                       </TableCell>
@@ -452,7 +642,7 @@ export default function ProductosPage() {
                 ))
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
+                  <TableCell colSpan={11} className="py-12 text-center text-muted-foreground">
                     No se encontraron productos.
                   </TableCell>
                 </TableRow>
@@ -469,13 +659,16 @@ export default function ProductosPage() {
                         <div className="text-xs text-muted-foreground">{p.descripcion}</div>
                       )}
                     </TableCell>
+                    <TableCell className="text-xs text-muted-foreground tabular-nums">
+                      {p.codigo ?? '—'}
+                    </TableCell>
                     <TableCell>
                       {(p.inventariable ?? true) ? (
                         <Badge
                           variant="outline"
                           className="text-emerald-600 border-emerald-200 bg-emerald-50"
                         >
-                          Producto
+                          Producto físico
                         </Badge>
                       ) : (
                         <Badge
@@ -486,11 +679,23 @@ export default function ProductosPage() {
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {p.categoria ?? '—'}
+                    <TableCell>
+                      <CategoriaBadge nombre={p.categoria_nombre} color={p.categoria_color} />
                     </TableCell>
-                    <TableCell className="text-right font-medium tabular-nums">
-                      {formatCurrency(p.precio)}
+                    <TableCell className="text-right text-sm tabular-nums">
+                      {formatCurrency(p.ultimo_costo)}
+                    </TableCell>
+                    <TableCell className="text-right text-sm tabular-nums font-medium">
+                      {formatCurrency(p.ultimo_precio_venta)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <MargenBadge pct={p.margen_pct} />
+                    </TableCell>
+                    <TableCell className="text-right text-sm tabular-nums">
+                      {p.inventariable ? formatNumber(p.stock_actual, 0) : '—'}
+                    </TableCell>
+                    <TableCell>
+                      <UltimaVentaCell at={p.ultima_venta_at} now={now} />
                     </TableCell>
                     <TableCell>
                       <Badge variant={p.activo ? 'default' : 'secondary'}>
@@ -523,17 +728,32 @@ export default function ProductosPage() {
             <SheetHeader>
               <SheetTitle>Configurar Producto</SheetTitle>
               <SheetDescription>
-                Ajusta las reglas de inventario, agrupaciones y categorías.
+                Ajusta categoría, tipo, reglas de inventario y receta de insumos.
               </SheetDescription>
             </SheetHeader>
 
             {selectedProducto && (
               <div className="mt-8 space-y-6">
-                <div className="rounded-lg border bg-muted/30 p-4">
+                <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
                   <div className="font-semibold text-lg">{selectedProducto.nombre}</div>
-                  <div className="text-sm text-muted-foreground mt-1">
-                    Precio: {formatCurrency(selectedProducto.precio)} •{' '}
+                  <div className="text-sm text-muted-foreground">
+                    {selectedProducto.codigo && (
+                      <>
+                        Código <span className="font-mono">{selectedProducto.codigo}</span> ·{' '}
+                      </>
+                    )}
+                    Precio: {formatCurrency(selectedProducto.ultimo_precio_venta)} · Costo:{' '}
+                    {formatCurrency(selectedProducto.ultimo_costo)} ·{' '}
                     {selectedProducto.unidad || 'pieza'}
+                  </div>
+                  <div className="flex items-center gap-3 pt-1">
+                    <MargenBadge pct={selectedProducto.margen_pct} />
+                    {selectedProducto.inventariable && (
+                      <span className="text-xs text-muted-foreground">
+                        Stock: {formatNumber(selectedProducto.stock_actual, 0)}
+                      </span>
+                    )}
+                    <UltimaVentaCell at={selectedProducto.ultima_venta_at} now={now} />
                   </div>
                 </div>
 
@@ -541,9 +761,7 @@ export default function ProductosPage() {
                   {/* Inventariable Toggle */}
                   <div className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
                     <div className="space-y-0.5">
-                      <label className="text-base font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                        Es inventariable
-                      </label>
+                      <label className="text-base font-medium leading-none">Es inventariable</label>
                       <p className="text-sm text-muted-foreground">
                         Actívalo para llevar control de stock y kardex en RDB. Apágalo para
                         servicios, rentas, cortesías.
@@ -560,14 +778,12 @@ export default function ProductosPage() {
                     </label>
                   </div>
 
-                  {/* Tipo / Categoría */}
+                  {/* Tipo */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                      Tipo
-                    </label>
+                    <label className="text-sm font-medium leading-none">Tipo</label>
                     <Combobox
-                      value={formCategoria || 'producto'}
-                      onChange={(v) => setFormCategoria(v || 'producto')}
+                      value={formTipo || 'producto'}
+                      onChange={(v) => setFormTipo(v || 'producto')}
                       options={[
                         { value: 'producto', label: 'Producto' },
                         { value: 'servicio', label: 'Servicio' },
@@ -577,9 +793,20 @@ export default function ProductosPage() {
                       placeholder="Seleccionar tipo..."
                     />
                   </div>
+
+                  {/* Categoría */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">Categoría</label>
+                    <Combobox
+                      value={formCategoriaId}
+                      onChange={(v) => setFormCategoriaId(v)}
+                      options={categorias.map((c) => ({ value: c.id, label: c.nombre }))}
+                      placeholder="Sin categoría"
+                    />
+                  </div>
                 </div>
 
-                {/* Receta — insumos por venta */}
+                {/* Receta */}
                 <div className="space-y-3 border-t pt-4">
                   <div>
                     <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
@@ -719,8 +946,8 @@ export default function ProductosPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium leading-none">Tipo</label>
                   <Combobox
-                    value={newCategoria || 'producto'}
-                    onChange={(v) => setNewCategoria(v || 'producto')}
+                    value={newTipo || 'producto'}
+                    onChange={(v) => setNewTipo(v || 'producto')}
                     options={[
                       { value: 'producto', label: 'Producto' },
                       { value: 'servicio', label: 'Servicio' },
@@ -728,6 +955,16 @@ export default function ProductosPage() {
                       { value: 'refaccion', label: 'Refacción' },
                     ]}
                     placeholder="Seleccionar tipo..."
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium leading-none">Categoría</label>
+                  <Combobox
+                    value={newCategoriaId}
+                    onChange={setNewCategoriaId}
+                    options={categorias.map((c) => ({ value: c.id, label: c.nombre }))}
+                    placeholder="Sin categoría"
                   />
                 </div>
 
