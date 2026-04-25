@@ -132,6 +132,31 @@ FROM supabase_migrations.schema_migrations
 ORDER BY version DESC
 LIMIT 5;
 
+-- ─────────────── 7. Versions con shape inesperada ───────────────
+\echo ''
+\echo '## §7 Versions con shape inesperada en schema_migrations'
+-- Detecta `version` que no son YYYYMMDDhhmmss puro (14 dígitos):
+--   * 20260325 sin padding (legacy histórico)         → INFO
+--   * 20260423230504_20260423110100_... (double-prefixed por MCP-apply
+--     que pasó el filename completo como `name`)      → INFO
+--   * Cualquier otra forma rara                        → ALERT
+WITH bad AS (
+  SELECT version, name
+  FROM supabase_migrations.schema_migrations
+  WHERE version !~ '^[0-9]{14}$'
+     OR name LIKE '20260______%' -- name comienza con un timestamp embedded
+)
+SELECT CASE
+  WHEN count(*) = 0 THEN 'INFO  all versions are 14-digit timestamps with clean names'
+  ELSE 'INFO  ' || count(*) || ' versions con shape histórica (legacy, no-op): ' ||
+       string_agg(version || '_' || name, ', ' ORDER BY version)
+END
+FROM bad;
+
+-- El check exacto filename↔version (comparar disco contra DB) requiere
+-- acceso al filesystem. Vive en el GH Action `drift-check.yml` step
+-- "Check filename↔version alignment". Si fail, ver GOVERNANCE.md §4.
+
 \echo ''
 \echo '════════════════════════════════════════════════════════════════════════'
 \echo ' drift-check completed'

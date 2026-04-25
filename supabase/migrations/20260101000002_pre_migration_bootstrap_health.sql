@@ -2,7 +2,7 @@
 -- PRE-MIGRATION BOOTSTRAP — health_* (drift-1.5, 2026-04-23)
 -- ════════════════════════════════════════════════════════════════════════════
 --
--- Continuación de 20260408000000_pre_migration_bootstrap.sql. Este archivo
+-- Continuación de 20260101000001_pre_migration_bootstrap.sql. Este archivo
 -- existe como migración separada porque el primero ya estaba marcado como
 -- aplicado en el Preview Branch antes de incluir las health_* — Supabase
 -- tracker no re-aplica versiones existentes, así que necesitamos un nuevo

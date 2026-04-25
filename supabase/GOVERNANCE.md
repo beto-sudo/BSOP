@@ -83,3 +83,73 @@ Sin Docker: dejarlo en manos de Supabase Preview Branch. Si el PR
 levanta una DB fresca y aplica migraciones limpias, está bien.
 Si aparece "relation X does not exist" en el primer apply de un PR que
 no creó X, hay drift nuevo — tratar como bloqueante y aplicar §1.
+
+## §4 — Aplicar migrations: `db push`, no MCP
+
+**Regla dura:** las migrations se aplican vía `supabase db push` desde local
+o desde GH Action. **Nunca** vía `mcp__supabase__apply_migration` excepto
+emergencia.
+
+### Por qué
+
+`apply_migration` y `psql` directo no respetan el `version` del filename:
+registran la entry en `supabase_migrations.schema_migrations` con un timestamp
+generado al momento del apply. Resultado: el `version` en DB diverge del
+prefijo del filename y el Supabase CLI emite el warning
+`Applied out-of-order migrations: [...]` en cada `supabase db push` siguiente
+— ensucia el output del drift-check en cada PR de DB.
+
+`config.toml` debe tener `project_id`, `[db].major_version` y `[api].schemas`
+completos (ya está en este repo, ver el archivo). Si falta algo, `db push`
+no arranca sin flags y la gente se va al MCP por default — ahí empieza el
+drift.
+
+### Procedimiento normal
+
+1. Editar archivo en `supabase/migrations/<timestamp>_<name>.sql`. El
+   `<timestamp>` debe ser estrictamente mayor al último aplicado en prod.
+   Para forzar el ordenamiento usá `date -u +%Y%m%d%H%M%S`.
+2. `supabase db push` (CLI valida sintaxis y aplica).
+3. `npm run schema:ref` (regenera `SCHEMA_REF.md`).
+4. Commit + PR.
+
+### Procedimiento de emergencia (apply directo en prod sin push)
+
+Solo si hay un fix urgente que no puede esperar al ciclo de PR:
+
+1. Aplicar via MCP `apply_migration` o `psql` directo a prod.
+2. **Inmediatamente después**, identificar la `version` que registró
+   Supabase:
+   ```sql
+   SELECT version FROM supabase_migrations.schema_migrations
+   WHERE name = '<name>' ORDER BY version DESC LIMIT 1;
+   ```
+3. Crear/renombrar el archivo en `supabase/migrations/` con esa `version`
+   exacta como prefijo del filename. El SQL en disco debe matchear lo que
+   se aplicó (no la versión "limpia" que hubieras querido aplicar).
+4. Commit + PR para sincronizar el repo.
+
+Si saltás el paso 3, el siguiente PR de DB va a tener divergencia
+filename↔version, el drift-check va a flaggear, y el cleanup posterior
+es ~10x más caro que documentarlo bien al momento.
+
+### Bootstrap files (excepción permanente)
+
+Los archivos `20260101000000_bootstrap_schemas.sql` y los tres
+`20260408000000*_pre_migration_bootstrap*.sql` viven en disco **sin**
+counterpart en `schema_migrations`. Son baseline para entornos nuevos
+(Preview Branch, dev local, DR) — corren desde fresh DB para crear los
+schemas/tablas ambient que en prod existen desde antes del migration
+tracking. El GH Action de filename↔version (§7 de drift-check) los whitelista.
+
+## §5 — Sprint histórico de cleanup filename↔version
+
+- **drift-3** (2026-04-25): erradicación del drift filename↔version. 58
+  archivos renombrados con `git mv` para que filename matchee el `version`
+  registrado en `schema_migrations`. 16 huérfanos históricos
+  (Mar–Abr/2026) recuperados desde `schema_migrations.statements` y
+  commiteados como archivos en disco. 2 archivos cuyo SQL ya estaba
+  aplicado en prod sin tracker (`dedup_movimientos_caja_name_refs`,
+  `dilesa_maquinaria_expose_schema`) registrados con su version del
+  filename. `config.toml` completado para que `db push` funcione desde
+  local. Governance §4 + drift-check §7 agregados para evitar regresión.

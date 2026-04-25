@@ -50,6 +50,60 @@ jobs:
       - name: Install postgresql-client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
+      - name: Check filename↔version alignment
+        # Compara los archivos en supabase/migrations/ contra
+        # supabase_migrations.schema_migrations. Whitelist: archivos
+        # bootstrap que viven en disco sin counterpart en DB
+        # (corren solo en Preview/DR/local, ver GOVERNANCE.md §4).
+        # ::warning:: no falla el job — para hacerlo bloqueante cambiar
+        # a ::error:: + exit 1.
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Secret SUPABASE_DB_URL is not configured."
+            exit 1
+          fi
+
+          # Disk
+          ls supabase/migrations/*.sql 2>/dev/null \
+            | xargs -I{} basename {} .sql \
+            | sort -u > /tmp/disk.txt
+
+          # DB
+          psql "$SUPABASE_DB_URL" -tAc \
+            "SELECT version || '_' || name FROM supabase_migrations.schema_migrations ORDER BY 1" \
+            | sort -u > /tmp/db.txt
+
+          # Whitelist: bootstrap files con NO db record por diseño
+          cat > /tmp/whitelist.txt <<'BOOTSTRAP_EOF'
+          20260101000000_bootstrap_schemas
+          20260101000001_pre_migration_bootstrap
+          20260101000002_pre_migration_bootstrap_health
+          20260101000003_pre_migration_bootstrap_public
+          BOOTSTRAP_EOF
+          # strip leading whitespace (heredoc indents)
+          sed -i 's/^ *//' /tmp/whitelist.txt
+
+          # Disk-only que NO esté en whitelist
+          comm -23 /tmp/disk.txt /tmp/db.txt | grep -v -F -x -f /tmp/whitelist.txt > /tmp/disk-only.txt || true
+          # DB-only (cualquiera)
+          comm -13 /tmp/disk.txt /tmp/db.txt > /tmp/db-only.txt || true
+
+          if [ -s /tmp/disk-only.txt ] || [ -s /tmp/db-only.txt ]; then
+            echo "::warning::Filename↔version mismatch detected. Ver GOVERNANCE.md §4."
+            if [ -s /tmp/disk-only.txt ]; then
+              echo "::warning::Disk files sin DB record (no whitelisted):"
+              sed 's/^/::warning::  /' /tmp/disk-only.txt
+            fi
+            if [ -s /tmp/db-only.txt ]; then
+              echo "::warning::DB records sin archivo en disk:"
+              sed 's/^/::warning::  /' /tmp/db-only.txt
+            fi
+          else
+            echo "Filename↔version: clean."
+          fi
+
       - name: Run drift-check
         id: drift
         env:
