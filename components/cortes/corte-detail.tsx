@@ -12,6 +12,8 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
+import { conciliarEfectivo, conciliarTarjeta } from './conciliacion';
+import { CorteConciliacion } from './corte-conciliacion';
 import { CortePrintMarbete } from './corte-print-marbete';
 import { estadoVariant, formatCurrency, formatDate, formatDateTime } from './helpers';
 import { RegistrarMovimientoDialog } from './registrar-movimiento-dialog';
@@ -59,6 +61,9 @@ export function CorteDetail({
   const efectivoEsperado = totales?.efectivo_esperado ?? corte.efectivo_esperado ?? 0;
   const efectivoContado = corte.efectivo_contado ?? 0;
   const diferencia = efectivoContado - efectivoEsperado;
+
+  const tarjeta = conciliarTarjeta(totales, vouchers);
+  const efectivo = conciliarEfectivo(corte, totales);
 
   return (
     <Sheet
@@ -136,6 +141,15 @@ export function CorteDetail({
                 <span className="mb-1 block font-semibold">Observaciones</span>
                 {corte.observaciones}
               </div>
+            )}
+
+            {!loadingDetail && (
+              <CorteConciliacion
+                tarjeta={tarjeta}
+                efectivo={efectivo}
+                ingresosStripe={totales?.ingresos_stripe ?? 0}
+                ingresosTransferencias={totales?.ingresos_transferencias ?? 0}
+              />
             )}
 
             <Separator />
