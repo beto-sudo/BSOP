@@ -90,9 +90,7 @@ export type UpdateCategoriaInput = {
 
 export type UpdateCategoriaResult = { ok: true } | { ok: false; error: string };
 
-export async function updateCategoria(
-  input: UpdateCategoriaInput
-): Promise<UpdateCategoriaResult> {
+export async function updateCategoria(input: UpdateCategoriaInput): Promise<UpdateCategoriaResult> {
   const supabase = await createSupabaseServerClient();
 
   const {
