@@ -8213,6 +8213,21 @@ export type Database = {
         }
         Relationships: []
       }
+      v_categoria_resumen: {
+        Row: {
+          categoria: string | null
+          categoria_id: string | null
+          color: string | null
+          importe_total_30d: number | null
+          margen_promedio_pct: number | null
+          orden: number | null
+          productos_con_venta_30d: number | null
+          total_productos: number | null
+          utilidad_total_30d: number | null
+          valor_stock_total: number | null
+        }
+        Relationships: []
+      }
       v_corte_conteo_totales: {
         Row: {
           corte_id: string | null
@@ -8332,6 +8347,64 @@ export type Database = {
           valor_inventario: number | null
         }
         Relationships: []
+      }
+      v_producto_metricas: {
+        Row: {
+          activo: boolean | null
+          categoria_color: string | null
+          categoria_id: string | null
+          categoria_nombre: string | null
+          codigo: string | null
+          costo: number | null
+          dias_sin_venta: number | null
+          id: string | null
+          importe_30d: number | null
+          importe_90d: number | null
+          inventariable: boolean | null
+          margen_pct: number | null
+          nombre: string | null
+          precio_venta: number | null
+          stock_actual: number | null
+          ultima_venta_at: string | null
+          unidades_30d: number | null
+          unidades_90d: number | null
+          utilidad_30d: number | null
+          valor_stock: number | null
+        }
+        Relationships: []
+      }
+      v_producto_tendencia_semanal: {
+        Row: {
+          categoria_id: string | null
+          importe: number | null
+          nombre: string | null
+          producto_id: string | null
+          semana_inicio: string | null
+          unidades: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "productos_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "v_categoria_resumen"
+            referencedColumns: ["categoria_id"]
+          },
+          {
+            foreignKeyName: "productos_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "v_producto_metricas"
+            referencedColumns: ["categoria_id"]
+          },
+          {
+            foreignKeyName: "productos_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "v_productos_tabla"
+            referencedColumns: ["categoria_id"]
+          },
+        ]
       }
       v_producto_ultima_venta: {
         Row: {

@@ -1,6 +1,7 @@
 'use client';
 
 import { RequireAccess } from '@/components/require-access';
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import {
@@ -26,7 +27,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import { RefreshCw, Search, Settings2, Save, X } from 'lucide-react';
+import { RefreshCw, Search, Settings2, Save, X, BarChart3 } from 'lucide-react';
 import { upsertReceta, updateCategoria } from './actions';
 
 const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
@@ -454,6 +455,12 @@ export default function ProductosPage() {
             <div className="text-sm text-muted-foreground">
               Total: <span className="font-semibold text-foreground">{filtered.length}</span>
             </div>
+            <Link href="/rdb/productos/analisis">
+              <Button variant="outline" className="gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Análisis
+              </Button>
+            </Link>
             <Button onClick={() => setCreateDrawerOpen(true)}>+ Nuevo Producto</Button>
           </div>
         </div>
