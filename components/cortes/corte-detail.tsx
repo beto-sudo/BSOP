@@ -1,4 +1,4 @@
-import { Plus, Printer, XCircle } from 'lucide-react';
+import { ChevronDown, Paperclip, Plus, Printer, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -267,25 +267,47 @@ export function CorteDetail({
                 </p>
               ) : (
                 <div className="space-y-2 text-sm print:space-y-0.5 print:text-[10px]">
-                  {movimientos.map((m) => (
-                    <div key={m.id} className="flex items-start justify-between gap-4">
-                      <div>
-                        <span className="font-medium capitalize">{m.tipo ?? 'Movimiento'}</span>
-                        {m.nota && (
-                          <span className="block text-xs text-muted-foreground print:inline print:text-[10px] print:text-gray-700">
-                            {m.nota ? ` · ${m.nota}` : ''}
+                  {movimientos.map((m) => {
+                    const comprobantes = vouchers.filter(
+                      (v) =>
+                        v.categoria === 'comprobante_movimiento' && v.movimiento_caja_id === m.id
+                    );
+                    return (
+                      <div key={m.id} className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <span className="font-medium capitalize">{m.tipo ?? 'Movimiento'}</span>
+                          {m.nota && (
+                            <span className="block text-xs text-muted-foreground print:inline print:text-[10px] print:text-gray-700">
+                              {m.nota ? ` · ${m.nota}` : ''}
+                            </span>
+                          )}
+                          <span className="block text-xs text-muted-foreground print:text-[9px]">
+                            {formatDate(m.fecha_hora)}
+                            {m.registrado_por ? ` · ${m.registrado_por}` : ''}
                           </span>
-                        )}
-                        <span className="block text-xs text-muted-foreground print:text-[9px]">
-                          {formatDate(m.fecha_hora)}
-                          {m.registrado_por ? ` · ${m.registrado_por}` : ''}
+                          {comprobantes.length > 0 && (
+                            <div className="mt-1.5 flex flex-wrap gap-1 print:hidden">
+                              {comprobantes.map((c) => (
+                                <button
+                                  key={c.id}
+                                  type="button"
+                                  onClick={() => setLightboxVoucher(c)}
+                                  className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-foreground hover:bg-muted-foreground/10"
+                                  aria-label={`Ver comprobante ${c.nombre_original ?? ''}`}
+                                >
+                                  <Paperclip className="h-2.5 w-2.5" />
+                                  Comprobante
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <span className="shrink-0 font-medium tabular-nums">
+                          {formatCurrency(m.monto)}
                         </span>
                       </div>
-                      <span className="shrink-0 font-medium tabular-nums">
-                        {formatCurrency(m.monto)}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -351,6 +373,51 @@ export function CorteDetail({
                       })}
                     </div>
                   </div>
+                </>
+              );
+            })()}
+
+            {(() => {
+              const otras = vouchers.filter((v) => v.categoria === 'otro');
+              if (otras.length === 0) return null;
+              return (
+                <>
+                  <Separator className="print:hidden" />
+                  <details className="group print:hidden">
+                    <summary className="flex cursor-pointer list-none items-center justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      <span>Otras evidencias ({otras.length})</span>
+                      <ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" />
+                    </summary>
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {otras.map((v) => (
+                        <button
+                          key={v.id}
+                          type="button"
+                          className="group/btn relative aspect-square overflow-hidden rounded-md border bg-muted hover:border-primary"
+                          onClick={() => setLightboxVoucher(v)}
+                        >
+                          {v.signed_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={v.signed_url}
+                              alt={v.nombre_original ?? 'evidencia'}
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                              Sin preview
+                            </div>
+                          )}
+                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-1">
+                            <span className="block truncate text-xs text-white">
+                              {v.nombre_original ?? formatDateTime(v.uploaded_at)}
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </details>
                 </>
               );
             })()}
