@@ -1,3 +1,17 @@
+# BSOP — supabase config
+#
+# Mantener completo es requisito para que `supabase db push` corra desde local
+# sin pedir flags extras. Si está incompleto, los devs caen al MCP
+# `apply_migration` y eso desincroniza filename↔version (ver GOVERNANCE.md §4).
+
+project_id = "ybklderteyhuugzfmxbi"
+
+[db]
+major_version = 17
+
+[api]
+enabled = true
+schemas = ["public", "core", "erp", "rdb", "health", "playtomic", "dilesa", "maquinaria"]
 
 [functions.playtomic-sync]
 enabled = true

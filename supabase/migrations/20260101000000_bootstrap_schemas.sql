@@ -12,7 +12,7 @@
 --   de existir migration tracking. Migraciones que los referencian asumen que
 --   ya existen — rompen con "schema X does not exist" en branches frescas.
 --
---   El bootstrap anterior (20260408000000_pre_migration_bootstrap.sql) sólo
+--   El bootstrap anterior (20260101000001_pre_migration_bootstrap.sql) sólo
 --   cubre `core`, `shared`, `rdb`, `playtomic`. Esta migración garantiza los
 --   11 schemas existan desde el primer tick de la cadena.
 --

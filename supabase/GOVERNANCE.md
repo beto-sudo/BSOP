@@ -83,3 +83,110 @@ Sin Docker: dejarlo en manos de Supabase Preview Branch. Si el PR
 levanta una DB fresca y aplica migraciones limpias, está bien.
 Si aparece "relation X does not exist" en el primer apply de un PR que
 no creó X, hay drift nuevo — tratar como bloqueante y aplicar §1.
+
+## §4 — Aplicar migrations: `db push`, no MCP
+
+**Regla dura:** las migrations se aplican vía `supabase db push` desde local
+o desde GH Action. **Nunca** vía `mcp__supabase__apply_migration` excepto
+emergencia.
+
+### Por qué
+
+`apply_migration` y `psql` directo no respetan el `version` del filename:
+registran la entry en `supabase_migrations.schema_migrations` con un timestamp
+generado al momento del apply. Resultado: el `version` en DB diverge del
+prefijo del filename y el Supabase CLI emite el warning
+`Applied out-of-order migrations: [...]` en cada `supabase db push` siguiente
+— ensucia el output del drift-check en cada PR de DB.
+
+`config.toml` debe tener `project_id`, `[db].major_version` y `[api].schemas`
+completos (ya está en este repo, ver el archivo). Si falta algo, `db push`
+no arranca sin flags y la gente se va al MCP por default — ahí empieza el
+drift.
+
+### Procedimiento normal
+
+1. Editar archivo en `supabase/migrations/<timestamp>_<name>.sql`. El
+   `<timestamp>` debe ser estrictamente mayor al último aplicado en prod.
+   Para forzar el ordenamiento usá `date -u +%Y%m%d%H%M%S`.
+2. `supabase db push` (CLI valida sintaxis y aplica).
+3. `npm run schema:ref` (regenera `SCHEMA_REF.md`).
+4. Commit + PR.
+
+### Procedimiento de emergencia (apply directo en prod sin push)
+
+Solo si hay un fix urgente que no puede esperar al ciclo de PR:
+
+1. Aplicar via MCP `apply_migration` o `psql` directo a prod.
+2. **Inmediatamente después**, identificar la `version` que registró
+   Supabase:
+   ```sql
+   SELECT version FROM supabase_migrations.schema_migrations
+   WHERE name = '<name>' ORDER BY version DESC LIMIT 1;
+   ```
+3. Crear/renombrar el archivo en `supabase/migrations/` con esa `version`
+   exacta como prefijo del filename. El SQL en disco debe matchear lo que
+   se aplicó (no la versión "limpia" que hubieras querido aplicar).
+4. Commit + PR para sincronizar el repo.
+
+Si saltás el paso 3, el siguiente PR de DB va a tener divergencia
+filename↔version, el drift-check va a flaggear, y el cleanup posterior
+es ~10x más caro que documentarlo bien al momento.
+
+### Bootstrap files (whitelist permanente)
+
+Los 4 archivos `20260101000000-3_*` viven en disco **y** en `schema_migrations`
+(registrados como applied en prod sin re-ejecutar SQL — son idempotentes
+con `IF NOT EXISTS`). En entornos nuevos (Preview Branch, dev local, DR)
+son los primeros que aplican y crean schemas/tablas ambient que prod tenía
+desde antes del migration tracking. El GH Action de filename↔version los
+whitelista por consistencia con el patrón histórico, aunque ya no tienen
+divergencia disco↔DB.
+
+### Histórico legacy-refs (no-op stubs en disco)
+
+14 migrations Mar–Abr 2026 (`20260325_waitry_inbound_processing`,
+`20260405-20260408_*`, `20260417105758_legacy_cleanup_*`) viven en disco
+como **no-op stubs** (`SELECT 1 WHERE false;`) con header explicativo. Su
+SQL real referencia schemas legacy (`waitry.*`, `caja.*`, `inventario.*`,
+`rdb.*_legacy`) que fueron consolidados a `rdb.*` por
+`20260408000000_rdb_consolidation`. Re-correrlo en Preview Branch fresca
+falla porque las tablas legacy nunca existieron en el bootstrap moderno
+(que crea `rdb.waitry_*` directo).
+
+El SQL original completo vive en `supabase_migrations.schema_migrations.statements`
+como audit trail. Para auditar:
+
+```sql
+SELECT statements FROM supabase_migrations.schema_migrations
+WHERE version = '20260408000000';
+```
+
+Filename↔version matchea en ambos lados (disk + DB), así que no requiere whitelist.
+
+## §5 — Sprint histórico de cleanup filename↔version
+
+- **drift-3** (2026-04-25): erradicación del drift filename↔version.
+  - **58 archivos renombrados** con `git mv` para que filename matchee el
+    `version` registrado en `schema_migrations`.
+  - **16 huérfanos históricos** (Mar–Abr/2026) recuperados desde
+    `schema_migrations.statements`. 14 de ellos viven como **no-op stubs**
+    en disco (referencian schemas legacy `waitry.*` / `caja.*` /
+    `inventario.*` / `rdb.*_legacy` que fueron consolidados por
+    `20260408000000_rdb_consolidation` — re-correrlos rompería Preview
+    Branch). Los 2 modernos (`add_personas_contacto_y_empleados_notas`,
+    `dilesa_consolidate_permissive_policies`) viven con su SQL real porque
+    referencian schemas modernos que existen post-bootstrap.
+  - **2 archivos** cuyo SQL ya estaba aplicado en prod sin tracker
+    (`dedup_movimientos_caja_name_refs`, `dilesa_maquinaria_expose_schema`)
+    registrados con su `version` del filename.
+  - **4 bootstrap files** registrados como applied en prod (idempotentes,
+    no-op en prod, sí corren en Preview/DR/local).
+  - **4 dilesa_lotes** rebautizados en `schema_migrations` para limpiar el
+    bug del MCP que registró `name` con timestamp embedded
+    (`20260423230504_20260423110100_dilesa_lotes` →
+    `20260423110100_dilesa_lotes`). Sin esta corrección, el orden de
+    aplicación dejaba `dilesa.inventario_vivienda` (FK → construccion_lote)
+    corriendo antes que `dilesa.construccion_lote`.
+  - `config.toml` completado para que `db push` funcione desde local.
+  - Governance §4 + drift-check §7 agregados para evitar regresión.
