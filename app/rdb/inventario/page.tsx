@@ -6,9 +6,17 @@
  */
 
 import { RequireAccess } from '@/components/require-access';
-import { InventarioTabs } from '@/components/inventario/inventario-tabs';
 import { useCallback, useEffect, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import {
+  ModulePage,
+  ModuleHeader,
+  ModuleTabs,
+  ModuleKpiStrip,
+  ModuleFilters,
+  ModuleContent,
+} from '@/components/module-page';
+import { CategoryFilterStrip } from '@/components/inventario/category-filter-strip';
 import {
   Table,
   TableBody,
@@ -54,7 +62,6 @@ import {
   Boxes,
   Check,
   ChevronsUpDown,
-  ClipboardList,
   Plus,
   Printer,
   RefreshCw,
@@ -156,55 +163,16 @@ function tipoColorClass(tipo: string, cantidad: number): string {
     : 'border-red-500/40 text-red-600 dark:text-red-400';
 }
 
-// ─── Summary Bar ──────────────────────────────────────────────────────────────
+// ─── Stock Stats Helper ───────────────────────────────────────────────────────
 
 const CLASIFICACION_INVENTARIO = ['inventariable', 'merchandising'];
 
-function SummaryBar({ items }: { items: StockItem[] }) {
+function computeStockStats(items: StockItem[]) {
   const valorables = items.filter((i) => CLASIFICACION_INVENTARIO.includes(i.clasificacion ?? ''));
   const bajosMinimo = valorables.filter((i) => i.bajo_minimo).length;
   const sinStock = valorables.filter((i) => i.stock_actual <= 0).length;
   const totalValue = valorables.reduce((acc, curr) => acc + (curr.valor_inventario || 0), 0);
-  return (
-    <div className="grid grid-cols-4 gap-3">
-      <div className="rounded-xl border bg-card px-4 py-3">
-        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          <Boxes className="h-3.5 w-3.5" />
-          Productos
-        </div>
-        <div className="mt-1 text-2xl font-semibold tabular-nums">{valorables.length}</div>
-      </div>
-      <div className="rounded-xl border bg-card px-4 py-3">
-        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-          Bajo mínimo
-        </div>
-        <div
-          className={`mt-1 text-2xl font-semibold tabular-nums${bajosMinimo > 0 ? ' text-amber-500' : ''}`}
-        >
-          {bajosMinimo}
-        </div>
-      </div>
-      <div className="rounded-xl border bg-card px-4 py-3">
-        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          <TrendingDown className="h-3.5 w-3.5 text-destructive" />
-          Sin stock
-        </div>
-        <div
-          className={`mt-1 text-2xl font-semibold tabular-nums${sinStock > 0 ? ' text-destructive' : ''}`}
-        >
-          {sinStock}
-        </div>
-      </div>
-      <div className="rounded-xl border bg-card px-4 py-3">
-        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          <TrendingUp className="h-3.5 w-3.5" />
-          Valor Inventario
-        </div>
-        <div className="mt-1 text-2xl font-semibold tabular-nums">{formatCurrency(totalValue)}</div>
-      </div>
-    </div>
-  );
+  return { productos: valorables.length, bajosMinimo, sinStock, totalValue };
 }
 
 // ─── Stock Detail Drawer ──────────────────────────────────────────────────────
@@ -938,112 +906,96 @@ export default function InventarioPage() {
 
   return (
     <RequireAccess empresa="rdb" modulo="rdb.inventario">
-      <div className="space-y-6">
-        <InventarioTabs activeKey="overview" />
+      <ModulePage>
+        <ModuleHeader
+          title="Inventario"
+          subtitle="Control de stock y movimientos"
+          action={
+            <Button className="gap-2" onClick={() => setDialogOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Registrar Movimiento
+            </Button>
+          }
+        />
 
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Inventario</h1>
-            <p className="text-sm text-muted-foreground">Control de stock y movimientos</p>
-          </div>
-          <Button className="shrink-0 gap-2" onClick={() => setDialogOpen(true)}>
-            <Plus className="h-4 w-4" />
-            Registrar Movimiento
-          </Button>
-        </div>
+        <ModuleTabs
+          tabs={[
+            { key: 'stock', label: 'Stock' },
+            { key: 'movimientos', label: 'Movimientos' },
+          ]}
+          value={tab}
+          onChange={handleTabChange}
+        />
 
-        {/* Summary (stock tab only) */}
-        {tab === 'stock' && !loadingStock && !errorStock && <SummaryBar items={filteredStock} />}
-
-        {/* KPI cards por categoría */}
         {tab === 'stock' &&
           !loadingStock &&
           !errorStock &&
           (() => {
-            const cats = [
-              'Alimentos',
-              'Bebidas',
-              'Licores',
-              'Artículos',
-              'Deportes',
-              'Consumibles',
-              'Propinas',
-            ];
-            type CatStat = { count: number; valor: number };
-            const stats = cats.reduce<Record<string, CatStat>>((acc, c) => {
-              acc[c] = { count: 0, valor: 0 };
-              return acc;
-            }, {});
-            for (const item of filteredStock) {
-              const c = item.categoria ?? 'Otros';
-              if (!stats[c]) stats[c] = { count: 0, valor: 0 };
-              stats[c].count++;
-              stats[c].valor += Number(item.valor_inventario) || 0;
-            }
-            const sorted = Object.entries(stats)
-              .filter(([, s]) => s.count > 0)
-              .sort((a, b) => b[1].valor - a[1].valor);
-            if (sorted.length === 0) return null;
+            const s = computeStockStats(filteredStock);
             return (
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
-                {sorted.map(([cat, s]) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setCategoriaFiltro(categoriaFiltro === cat ? '' : cat)}
-                    className={[
-                      'rounded-lg border px-3 py-2 text-left transition-colors hover:bg-muted/60',
-                      categoriaFiltro === cat ? 'border-primary bg-primary/10' : 'bg-card',
-                    ].join(' ')}
-                  >
-                    <div className="text-xs font-medium text-muted-foreground truncate">{cat}</div>
-                    <div className="mt-0.5 text-sm font-semibold tabular-nums">
-                      {new Intl.NumberFormat('es-MX', {
-                        style: 'currency',
-                        currency: 'MXN',
-                        maximumFractionDigits: 0,
-                      }).format(s.valor)}
-                    </div>
-                    <div className="text-xs text-muted-foreground">{s.count} prod.</div>
-                  </button>
-                ))}
-              </div>
+              <ModuleKpiStrip
+                stats={[
+                  {
+                    key: 'productos',
+                    label: 'Productos',
+                    value: s.productos,
+                    icon: <Boxes className="h-3.5 w-3.5" />,
+                  },
+                  {
+                    key: 'bajo',
+                    label: 'Bajo mínimo',
+                    value: s.bajosMinimo,
+                    icon: <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />,
+                    valueClassName: s.bajosMinimo > 0 ? 'text-amber-500' : '',
+                  },
+                  {
+                    key: 'sin',
+                    label: 'Sin stock',
+                    value: s.sinStock,
+                    icon: <TrendingDown className="h-3.5 w-3.5 text-destructive" />,
+                    valueClassName: s.sinStock > 0 ? 'text-destructive' : '',
+                  },
+                  {
+                    key: 'valor',
+                    label: 'Valor Inventario',
+                    value: formatCurrency(s.totalValue),
+                    icon: <TrendingUp className="h-3.5 w-3.5" />,
+                  },
+                ]}
+              />
             );
           })()}
 
-        {/* Tab toggle */}
-        <div className="flex w-fit gap-1 rounded-lg border bg-muted/30 p-1">
-          <button
-            type="button"
-            onClick={() => handleTabChange('stock')}
-            className={[
-              'flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-              tab === 'stock'
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground',
-            ].join(' ')}
-          >
-            <Boxes className="h-4 w-4" />
-            Stock Actual
-          </button>
-          <button
-            type="button"
-            onClick={() => handleTabChange('movimientos')}
-            className={[
-              'flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-              tab === 'movimientos'
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground',
-            ].join(' ')}
-          >
-            <ClipboardList className="h-4 w-4" />
-            Movimientos
-          </button>
-        </div>
+        {tab === 'stock' && !loadingStock && !errorStock && (
+          <CategoryFilterStrip
+            items={filteredStock}
+            activeCategory={categoriaFiltro}
+            onSelect={setCategoriaFiltro}
+          />
+        )}
 
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-3">
+        <ModuleFilters
+          count={
+            isLoading
+              ? 'Cargando…'
+              : tab === 'stock'
+                ? `${filteredStock.length} producto${filteredStock.length !== 1 ? 's' : ''}`
+                : `${filteredMovimientos.length} movimiento${filteredMovimientos.length !== 1 ? 's' : ''}`
+          }
+          actions={
+            tab === 'stock' ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePrintLista(filteredStock)}
+                className="gap-2"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                Imprimir lista
+              </Button>
+            ) : null
+          }
+        >
           <div className="relative min-w-52">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -1150,36 +1102,14 @@ export default function InventarioPage() {
           <Button variant="outline" size="icon" onClick={handleRefresh} aria-label="Actualizar">
             <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
           </Button>
+        </ModuleFilters>
 
-          {tab === 'stock' && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handlePrintLista(filteredStock)}
-              className="gap-2"
-            >
-              <Printer className="h-3.5 w-3.5" />
-              Imprimir lista
-            </Button>
-          )}
-
-          <span className="text-sm text-muted-foreground">
-            {isLoading
-              ? 'Cargando…'
-              : tab === 'stock'
-                ? `${filteredStock.length} producto${filteredStock.length !== 1 ? 's' : ''}`
-                : `${filteredMovimientos.length} movimiento${filteredMovimientos.length !== 1 ? 's' : ''}`}
-          </span>
-        </div>
-
-        {/* Error */}
         {currentError && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {currentError}
           </div>
         )}
 
-        {/* Historical date banner */}
         {fechaCorte && tab === 'stock' && (
           <div className="flex items-center gap-2 rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-2 text-sm text-blue-600 dark:text-blue-400">
             <span>📅</span>
@@ -1187,253 +1117,253 @@ export default function InventarioPage() {
           </div>
         )}
 
-        {/* ── Stock Table ────────────────────────────────────────────────────── */}
-        {tab === 'stock' && (
-          <div className="rounded-xl border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <SortableHead
-                    sortKey="nombre"
-                    label="Producto"
-                    currentSort={sortKey}
-                    currentDir={sortDir}
-                    onSort={onSort}
-                  />
-                  <SortableHead
-                    sortKey="clasificacion"
-                    label="Clasif."
-                    currentSort={sortKey}
-                    currentDir={sortDir}
-                    onSort={onSort}
-                  />
-                  <SortableHead
-                    sortKey="categoria"
-                    label="Categoría"
-                    currentSort={sortKey}
-                    currentDir={sortDir}
-                    onSort={onSort}
-                  />
-                  <SortableHead
-                    sortKey="stock_actual"
-                    label="Stock Actual"
-                    currentSort={sortKey}
-                    currentDir={sortDir}
-                    onSort={onSort}
-                    className="text-right"
-                  />
-                  <SortableHead
-                    sortKey="stock_minimo"
-                    label="Mínimo"
-                    currentSort={sortKey}
-                    currentDir={sortDir}
-                    onSort={onSort}
-                    className="text-right"
-                  />
-                  <SortableHead
-                    sortKey="ultimo_costo"
-                    label="Último Costo"
-                    currentSort={sortKey}
-                    currentDir={sortDir}
-                    onSort={onSort}
-                    className="text-right"
-                  />
-                  <SortableHead
-                    sortKey="valor_inventario"
-                    label="Valor Total"
-                    currentSort={sortKey}
-                    currentDir={sortDir}
-                    onSort={onSort}
-                    className="text-right"
-                  />
-                  <SortableHead
-                    sortKey="bajo_minimo"
-                    label="Estado"
-                    currentSort={sortKey}
-                    currentDir={sortDir}
-                    onSort={onSort}
-                  />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loadingStock ? (
-                  Array.from({ length: 8 }).map((_, i) => (
-                    <TableRow key={i}>
-                      {Array.from({ length: 8 }).map((__, j) => (
-                        <TableCell key={j}>
-                          <Skeleton className="h-4 w-full" />
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : filteredStock.length === 0 ? (
+        <ModuleContent>
+          {tab === 'stock' && (
+            <div className="rounded-xl border bg-card">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
-                      No se encontraron productos.
-                    </TableCell>
+                    <SortableHead
+                      sortKey="nombre"
+                      label="Producto"
+                      currentSort={sortKey}
+                      currentDir={sortDir}
+                      onSort={onSort}
+                    />
+                    <SortableHead
+                      sortKey="clasificacion"
+                      label="Clasif."
+                      currentSort={sortKey}
+                      currentDir={sortDir}
+                      onSort={onSort}
+                    />
+                    <SortableHead
+                      sortKey="categoria"
+                      label="Categoría"
+                      currentSort={sortKey}
+                      currentDir={sortDir}
+                      onSort={onSort}
+                    />
+                    <SortableHead
+                      sortKey="stock_actual"
+                      label="Stock Actual"
+                      currentSort={sortKey}
+                      currentDir={sortDir}
+                      onSort={onSort}
+                      className="text-right"
+                    />
+                    <SortableHead
+                      sortKey="stock_minimo"
+                      label="Mínimo"
+                      currentSort={sortKey}
+                      currentDir={sortDir}
+                      onSort={onSort}
+                      className="text-right"
+                    />
+                    <SortableHead
+                      sortKey="ultimo_costo"
+                      label="Último Costo"
+                      currentSort={sortKey}
+                      currentDir={sortDir}
+                      onSort={onSort}
+                      className="text-right"
+                    />
+                    <SortableHead
+                      sortKey="valor_inventario"
+                      label="Valor Total"
+                      currentSort={sortKey}
+                      currentDir={sortDir}
+                      onSort={onSort}
+                      className="text-right"
+                    />
+                    <SortableHead
+                      sortKey="bajo_minimo"
+                      label="Estado"
+                      currentSort={sortKey}
+                      currentDir={sortDir}
+                      onSort={onSort}
+                    />
                   </TableRow>
-                ) : (
-                  sortData(filteredStock).map((item) => (
-                    <TableRow
-                      key={item.id}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => {
-                        setSelectedItem(item);
-                        setDrawerOpen(true);
-                      }}
-                    >
-                      <TableCell>
-                        <span className="font-medium">{item.nombre}</span>
+                </TableHeader>
+                <TableBody>
+                  {loadingStock ? (
+                    Array.from({ length: 8 }).map((_, i) => (
+                      <TableRow key={i}>
+                        {Array.from({ length: 8 }).map((__, j) => (
+                          <TableCell key={j}>
+                            <Skeleton className="h-4 w-full" />
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))
+                  ) : filteredStock.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
+                        No se encontraron productos.
                       </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs font-normal">
-                          {item.clasificacion ?? '—'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {item.categoria ?? '—'}
-                      </TableCell>
-                      <TableCell
-                        className={[
-                          'text-right font-semibold tabular-nums',
-                          item.stock_actual <= 0
-                            ? 'text-destructive'
-                            : item.bajo_minimo
-                              ? 'text-amber-500'
-                              : '',
-                        ].join(' ')}
+                    </TableRow>
+                  ) : (
+                    sortData(filteredStock).map((item) => (
+                      <TableRow
+                        key={item.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => {
+                          setSelectedItem(item);
+                          setDrawerOpen(true);
+                        }}
                       >
-                        {item.stock_actual} {item.unidad ?? 'pzs'}
-                      </TableCell>
-                      <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
-                        {item.stock_minimo ?? '—'} {item.unidad ?? 'pzs'}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatCurrency(item.costo_unitario ?? item.ultimo_costo)}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold tabular-nums">
-                        {formatCurrency(item.valor_inventario)}
-                      </TableCell>
-                      <TableCell>
-                        {item.stock_actual <= 0 ? (
-                          <Badge variant="destructive">Sin stock</Badge>
-                        ) : item.bajo_minimo ? (
-                          <Badge variant="outline" className="border-amber-500/50 text-amber-500">
-                            Bajo mínimo
-                          </Badge>
-                        ) : (
-                          <Badge variant="default">OK</Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-
-        {/* ── Movimientos Table (Kardex) ─────────────────────────────────────── */}
-        {tab === 'movimientos' && (
-          <div className="rounded-xl border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Producto</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead className="text-right">Cantidad</TableHead>
-                  <TableHead className="text-right">Costo Unit.</TableHead>
-                  <TableHead>Detalle / Referencia</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loadingMovimientos ? (
-                  Array.from({ length: 8 }).map((_, i) => (
-                    <TableRow key={i}>
-                      {Array.from({ length: 6 }).map((__, j) => (
-                        <TableCell key={j}>
-                          <Skeleton className="h-4 w-full" />
+                        <TableCell>
+                          <span className="font-medium">{item.nombre}</span>
                         </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : filteredMovimientos.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">
-                      No se encontraron movimientos.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredMovimientos.map((mov) => (
-                    <TableRow key={mov.id}>
-                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                        {formatDate(mov.created_at)}
-                      </TableCell>
-                      <TableCell className="font-medium">{mov.productos?.nombre ?? '—'}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1.5">
-                          {mov.tipo_movimiento === 'entrada' ||
-                          (mov.tipo_movimiento === 'ajuste' && mov.cantidad >= 0) ? (
-                            <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs font-normal">
+                            {item.clasificacion ?? '—'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {item.categoria ?? '—'}
+                        </TableCell>
+                        <TableCell
+                          className={[
+                            'text-right font-semibold tabular-nums',
+                            item.stock_actual <= 0
+                              ? 'text-destructive'
+                              : item.bajo_minimo
+                                ? 'text-amber-500'
+                                : '',
+                          ].join(' ')}
+                        >
+                          {item.stock_actual} {item.unidad ?? 'pzs'}
+                        </TableCell>
+                        <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
+                          {item.stock_minimo ?? '—'} {item.unidad ?? 'pzs'}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatCurrency(item.costo_unitario ?? item.ultimo_costo)}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold tabular-nums">
+                          {formatCurrency(item.valor_inventario)}
+                        </TableCell>
+                        <TableCell>
+                          {item.stock_actual <= 0 ? (
+                            <Badge variant="destructive">Sin stock</Badge>
+                          ) : item.bajo_minimo ? (
+                            <Badge variant="outline" className="border-amber-500/50 text-amber-500">
+                              Bajo mínimo
+                            </Badge>
                           ) : (
-                            <TrendingDown className="h-3.5 w-3.5 text-destructive" />
+                            <Badge variant="default">OK</Badge>
                           )}
-                          <Badge
-                            variant="outline"
-                            className={tipoColorClass(mov.tipo_movimiento, mov.cantidad)}
-                          >
-                            {tipoLabel(mov.tipo_movimiento, mov.cantidad)}
-                          </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell
-                        className={[
-                          'text-right font-semibold tabular-nums',
-                          mov.tipo_movimiento === 'entrada' ||
-                          (mov.tipo_movimiento === 'ajuste' && mov.cantidad >= 0)
-                            ? 'text-emerald-600 dark:text-emerald-400'
-                            : 'text-destructive',
-                        ].join(' ')}
-                      >
-                        {mov.tipo_movimiento === 'entrada' ||
-                        (mov.tipo_movimiento === 'ajuste' && mov.cantidad >= 0)
-                          ? '+'
-                          : '\u2212'}
-                        {Math.abs(mov.cantidad)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-sm">
-                        {formatCurrency(mov.costo_unitario)}
-                      </TableCell>
-                      <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">
-                        <div className="font-medium text-foreground">
-                          {mov.referencia_tipo === 'orden_compra' ? 'OC' : 'Manual'}
-                        </div>
-                        <div className="truncate">{mov.notas ?? '—'}</div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {tab === 'movimientos' && (
+            <div className="rounded-xl border bg-card">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Producto</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead className="text-right">Cantidad</TableHead>
+                    <TableHead className="text-right">Costo Unit.</TableHead>
+                    <TableHead>Detalle / Referencia</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loadingMovimientos ? (
+                    Array.from({ length: 8 }).map((_, i) => (
+                      <TableRow key={i}>
+                        {Array.from({ length: 6 }).map((__, j) => (
+                          <TableCell key={j}>
+                            <Skeleton className="h-4 w-full" />
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))
+                  ) : filteredMovimientos.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">
+                        No se encontraron movimientos.
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+                  ) : (
+                    filteredMovimientos.map((mov) => (
+                      <TableRow key={mov.id}>
+                        <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                          {formatDate(mov.created_at)}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {mov.productos?.nombre ?? '—'}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            {mov.tipo_movimiento === 'entrada' ||
+                            (mov.tipo_movimiento === 'ajuste' && mov.cantidad >= 0) ? (
+                              <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                            ) : (
+                              <TrendingDown className="h-3.5 w-3.5 text-destructive" />
+                            )}
+                            <Badge
+                              variant="outline"
+                              className={tipoColorClass(mov.tipo_movimiento, mov.cantidad)}
+                            >
+                              {tipoLabel(mov.tipo_movimiento, mov.cantidad)}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell
+                          className={[
+                            'text-right font-semibold tabular-nums',
+                            mov.tipo_movimiento === 'entrada' ||
+                            (mov.tipo_movimiento === 'ajuste' && mov.cantidad >= 0)
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : 'text-destructive',
+                          ].join(' ')}
+                        >
+                          {mov.tipo_movimiento === 'entrada' ||
+                          (mov.tipo_movimiento === 'ajuste' && mov.cantidad >= 0)
+                            ? '+'
+                            : '\u2212'}
+                          {Math.abs(mov.cantidad)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-sm">
+                          {formatCurrency(mov.costo_unitario)}
+                        </TableCell>
+                        <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">
+                          <div className="font-medium text-foreground">
+                            {mov.referencia_tipo === 'orden_compra' ? 'OC' : 'Manual'}
+                          </div>
+                          <div className="truncate">{mov.notas ?? '—'}</div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </ModuleContent>
 
-        {/* Stock detail drawer */}
         <StockDetailDrawer
           item={selectedItem}
           open={drawerOpen}
           onClose={() => setDrawerOpen(false)}
         />
 
-        {/* Registrar movimiento dialog */}
         <RegistrarMovimientoDialog
           open={dialogOpen}
           onClose={() => setDialogOpen(false)}
           productos={items}
           onSuccess={handleSuccess}
         />
-      </div>
+      </ModulePage>
     </RequireAccess>
   );
 }
