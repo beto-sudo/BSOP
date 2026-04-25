@@ -75,20 +75,36 @@ jobs:
             "SELECT version || '_' || name FROM supabase_migrations.schema_migrations ORDER BY 1" \
             | sort -u > /tmp/db.txt
 
-          # Whitelist: bootstrap files con NO db record por diseño
-          cat > /tmp/whitelist.txt <<'BOOTSTRAP_EOF'
+          # Whitelist: archivos esperados en uno solo de los dos lados.
+          # Ver GOVERNANCE.md §4 / §5.
+          cat > /tmp/whitelist.txt <<'WHITELIST_EOF'
           20260101000000_bootstrap_schemas
           20260101000001_pre_migration_bootstrap
           20260101000002_pre_migration_bootstrap_health
           20260101000003_pre_migration_bootstrap_public
-          BOOTSTRAP_EOF
+          20260325_waitry_inbound_processing
+          20260405185048_fix_views_timezone
+          20260405185144_fix_views_timezone_v2
+          20260405192805_fix_views_duplicates
+          20260406153055_fix_view_op_date
+          20260406153837_create_30d_window_views_for_coda
+          20260407004101_fix_v_cortes_totales_30d_v4
+          20260407005923_fix_v_cortes_totales_30d_v5
+          20260407022322_cortes_schema_updates
+          20260407022500_create_upsert_corte_fn
+          20260407024912_setup_sync_cortes_cron
+          20260407025300_upsert_corte_with_caja_id
+          20260408000000_rdb_consolidation
+          20260417105758_legacy_cleanup_plan_a_archive_tables_and_drop_30d_views_2026_04_17
+          WHITELIST_EOF
           # strip leading whitespace (heredoc indents)
           sed -i 's/^ *//' /tmp/whitelist.txt
 
-          # Disk-only que NO esté en whitelist
+          # Disk-only que NO esté en whitelist (bootstrap files no aparecen
+          # acá porque ya están registrados en schema_migrations).
           comm -23 /tmp/disk.txt /tmp/db.txt | grep -v -F -x -f /tmp/whitelist.txt > /tmp/disk-only.txt || true
-          # DB-only (cualquiera)
-          comm -13 /tmp/disk.txt /tmp/db.txt > /tmp/db-only.txt || true
+          # DB-only que NO esté en whitelist (los 14 históricos legacy-refs sí).
+          comm -13 /tmp/disk.txt /tmp/db.txt | grep -v -F -x -f /tmp/whitelist.txt > /tmp/db-only.txt || true
 
           if [ -s /tmp/disk-only.txt ] || [ -s /tmp/db-only.txt ]; then
             echo "::warning::Filename↔version mismatch detected. Ver GOVERNANCE.md §4."

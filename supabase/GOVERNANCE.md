@@ -133,23 +133,45 @@ Si saltás el paso 3, el siguiente PR de DB va a tener divergencia
 filename↔version, el drift-check va a flaggear, y el cleanup posterior
 es ~10x más caro que documentarlo bien al momento.
 
-### Bootstrap files (excepción permanente)
+### Bootstrap files (whitelist permanente)
 
-Los archivos `20260101000000_bootstrap_schemas.sql` y los tres
-`20260408000000*_pre_migration_bootstrap*.sql` viven en disco **sin**
-counterpart en `schema_migrations`. Son baseline para entornos nuevos
-(Preview Branch, dev local, DR) — corren desde fresh DB para crear los
-schemas/tablas ambient que en prod existen desde antes del migration
-tracking. El GH Action de filename↔version (§7 de drift-check) los whitelista.
+Los 4 archivos `20260101000000-3_*` viven en disco **y** en `schema_migrations`
+(registrados como applied en prod sin re-ejecutar SQL — son idempotentes
+con `IF NOT EXISTS`). En entornos nuevos (Preview Branch, dev local, DR)
+son los primeros que aplican y crean schemas/tablas ambient que prod tenía
+desde antes del migration tracking. El GH Action de filename↔version los
+whitelista por consistencia con el patrón histórico, aunque ya no tienen
+divergencia disco↔DB.
+
+### Histórico legacy-refs (whitelist permanente, DB-only)
+
+14 migrations Mar–Abr 2026 (`20260325_waitry_inbound_processing`,
+`20260405-20260408_*`, `20260417105758_legacy_cleanup_*`) viven SOLO en
+`schema_migrations` — su SQL referencia schemas legacy (`waitry.*`,
+`caja.*`, `inventario.*`, `rdb.*_legacy`) que fueron consolidados a
+`rdb.*` por `20260408000000_rdb_consolidation`. Si esos archivos viven
+en disco, fallan al re-correr en una Preview Branch fresca porque las
+tablas legacy nunca existieron en el bootstrap moderno (que crea
+`rdb.waitry_*` directo). El SQL completo está en
+`schema_migrations.statements` como audit trail. El GH Action los whitelista
+para que la divergencia "DB-only" no triggeree warning.
 
 ## §5 — Sprint histórico de cleanup filename↔version
 
 - **drift-3** (2026-04-25): erradicación del drift filename↔version. 58
   archivos renombrados con `git mv` para que filename matchee el `version`
   registrado en `schema_migrations`. 16 huérfanos históricos
-  (Mar–Abr/2026) recuperados desde `schema_migrations.statements` y
-  commiteados como archivos en disco. 2 archivos cuyo SQL ya estaba
-  aplicado en prod sin tracker (`dedup_movimientos_caja_name_refs`,
-  `dilesa_maquinaria_expose_schema`) registrados con su version del
-  filename. `config.toml` completado para que `db push` funcione desde
-  local. Governance §4 + drift-check §7 agregados para evitar regresión.
+  (Mar–Abr/2026) recuperados desde `schema_migrations.statements`. 14 de
+  ellos referencian schemas legacy droppeados (`waitry.*`, `caja.*`,
+  `inventario.*`, `rdb.*_legacy`) que fueron consolidados por
+  `20260408000000_rdb_consolidation` — al fallar en Preview Branch fresh,
+  se mantienen solo en `schema_migrations` (audit trail) y NO en disco; el
+  GH Action los whitelista. Los 2 modernos (`add_personas_contacto_*`,
+  `dilesa_consolidate_permissive_policies`) sí viven en disco porque
+  referencian schemas modernos que existen post-bootstrap. 2 archivos cuyo
+  SQL ya estaba aplicado en prod sin tracker
+  (`dedup_movimientos_caja_name_refs`, `dilesa_maquinaria_expose_schema`)
+  registrados con su version del filename. 4 bootstrap files registrados
+  como applied en prod (idempotentes, no-op). `config.toml` completado
+  para que `db push` funcione desde local. Governance §4 + drift-check §7
+  agregados para evitar regresión.
