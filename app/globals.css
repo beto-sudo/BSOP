@@ -201,6 +201,14 @@ textarea {
 }
 
 @media print {
+  /* Forzar tamaño de hoja y márgenes compactos para que el marbete del corte
+     (y otros impresos basados en el sheet) quepan en una sola página carta.
+     0.4in en cada borde es ~10mm y deja sitio para el contenido sin recortes. */
+  @page {
+    size: letter;
+    margin: 0.4in;
+  }
+
   html,
   body {
     background: white !important;
