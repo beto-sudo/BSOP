@@ -9,8 +9,8 @@ export const TZ = 'America/Matamoros';
 // Catálogo de bancos (seed en core.bancos). Cargado al montar el panel.
 export type Banco = {
   id: string;
-  codigo: string;        // 'BBVA', 'BANORTE', etc.
-  nombre: string;        // 'BBVA México', 'Banorte', etc.
+  codigo: string; // 'BBVA', 'BANORTE', etc.
+  nombre: string; // 'BBVA México', 'Banorte', etc.
   patron_ocr: string | null;
   activo: boolean;
 };
@@ -110,7 +110,7 @@ export type Voucher = {
   // action sí los hidrata (la columna `categoria` es NOT NULL DEFAULT).
   categoria?: VoucherCategoria;
   banco_id?: string | null;
-  banco_nombre?: string | null;       // resuelto via JOIN en server action; opcional para UI
+  banco_nombre?: string | null; // resuelto via JOIN en server action; opcional para UI
   movimiento_caja_id?: string | null;
   ocr_texto_crudo?: string | null;
   ocr_monto_sugerido?: number | null;

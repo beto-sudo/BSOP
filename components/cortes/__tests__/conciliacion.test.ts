@@ -126,17 +126,13 @@ describe('conciliarTarjeta', () => {
   });
 
   it('cuadra_aprox: diferencia exactamente $5 (tolerancia inclusiva)', () => {
-    const r = conciliarTarjeta(totales({ ingresos_tarjeta: 5354 }), [
-      v({ monto_reportado: 5359 }),
-    ]);
+    const r = conciliarTarjeta(totales({ ingresos_tarjeta: 5354 }), [v({ monto_reportado: 5359 })]);
     expect(r.estado).toBe('cuadra_aprox');
     expect(r.diferencia).toBe(5);
   });
 
   it('cuadra_aprox: diferencia $4.99', () => {
-    const r = conciliarTarjeta(totales({ ingresos_tarjeta: 100 }), [
-      v({ monto_reportado: 95.01 }),
-    ]);
+    const r = conciliarTarjeta(totales({ ingresos_tarjeta: 100 }), [v({ monto_reportado: 95.01 })]);
     expect(r.estado).toBe('cuadra_aprox');
     expect(Math.abs(r.diferencia)).toBeLessThanOrEqual(TOLERANCIA_MXN);
   });
@@ -150,25 +146,19 @@ describe('conciliarTarjeta', () => {
   });
 
   it('diferencia: vouchers menores que ingresos por mucho', () => {
-    const r = conciliarTarjeta(totales({ ingresos_tarjeta: 5354 }), [
-      v({ monto_reportado: 1200 }),
-    ]);
+    const r = conciliarTarjeta(totales({ ingresos_tarjeta: 5354 }), [v({ monto_reportado: 1200 })]);
     expect(r.estado).toBe('diferencia');
     expect(r.diferencia).toBe(-4154);
   });
 
   it('diferencia: vouchers mayores que ingresos (positivo)', () => {
-    const r = conciliarTarjeta(totales({ ingresos_tarjeta: 5354 }), [
-      v({ monto_reportado: 5360 }),
-    ]);
+    const r = conciliarTarjeta(totales({ ingresos_tarjeta: 5354 }), [v({ monto_reportado: 5360 })]);
     expect(r.estado).toBe('diferencia');
     expect(r.diferencia).toBe(6);
   });
 
   it('voucher monto=0 cuenta como capturado, no pendiente', () => {
-    const r = conciliarTarjeta(totales({ ingresos_tarjeta: 0 }), [
-      v({ monto_reportado: 0 }),
-    ]);
+    const r = conciliarTarjeta(totales({ ingresos_tarjeta: 0 }), [v({ monto_reportado: 0 })]);
     // No es sin_actividad porque hay un voucher; no es pendiente_captura porque
     // 0 cuenta como capturado; ingresos=0 y total=0 → cuadra exacto.
     expect(r.estado).toBe('cuadra');
@@ -297,10 +287,7 @@ describe('conciliarEfectivo', () => {
   });
 
   it('totales=null se trata como esperado=0', () => {
-    const r = conciliarEfectivo(
-      corte({ estado: 'cerrado', efectivo_contado: 0 }),
-      null
-    );
+    const r = conciliarEfectivo(corte({ estado: 'cerrado', efectivo_contado: 0 }), null);
     expect(r.estado).toBe('cuadra');
     expect(r.esperado).toBe(0);
     expect(r.diferencia).toBe(0);

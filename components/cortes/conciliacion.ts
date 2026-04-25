@@ -5,29 +5,29 @@ import type { Corte, CorteTotales, Voucher } from './types';
 export const TOLERANCIA_MXN = 5;
 
 export type ConciliacionEstado =
-  | 'sin_actividad'        // ingresos = 0 y sin evidencia
-  | 'cuadra'               // diferencia exactamente 0
-  | 'cuadra_aprox'         // |diferencia| <= TOLERANCIA_MXN
-  | 'diferencia'           // |diferencia| > TOLERANCIA_MXN
-  | 'sin_voucher'          // ingresos > 0 pero sin vouchers de tarjeta
-  | 'pendiente_captura'    // hay vouchers sin monto_reportado todavía
-  | 'pendiente_cierre';    // efectivo: corte abierto o contado nulo
+  | 'sin_actividad' // ingresos = 0 y sin evidencia
+  | 'cuadra' // diferencia exactamente 0
+  | 'cuadra_aprox' // |diferencia| <= TOLERANCIA_MXN
+  | 'diferencia' // |diferencia| > TOLERANCIA_MXN
+  | 'sin_voucher' // ingresos > 0 pero sin vouchers de tarjeta
+  | 'pendiente_captura' // hay vouchers sin monto_reportado todavía
+  | 'pendiente_cierre'; // efectivo: corte abierto o contado nulo
 
 export type ConciliacionTarjeta = {
   metodo: 'tarjeta';
   ingresos_pedidos: number;
-  total_evidencia: number;        // suma de monto_reportado de vouchers de tarjeta confirmados
-  evidencia_count: number;        // # vouchers con categoria='voucher_tarjeta'
-  evidencia_pendiente: number;    // # vouchers tarjeta sin monto_reportado
-  diferencia: number;             // total_evidencia - ingresos_pedidos
+  total_evidencia: number; // suma de monto_reportado de vouchers de tarjeta confirmados
+  evidencia_count: number; // # vouchers con categoria='voucher_tarjeta'
+  evidencia_pendiente: number; // # vouchers tarjeta sin monto_reportado
+  diferencia: number; // total_evidencia - ingresos_pedidos
   estado: ConciliacionEstado;
 };
 
 export type ConciliacionEfectivo = {
   metodo: 'efectivo';
   esperado: number;
-  contado: number | null;         // null si corte abierto o efectivo_contado nulo
-  diferencia: number | null;      // null si contado es null
+  contado: number | null; // null si corte abierto o efectivo_contado nulo
+  diferencia: number | null; // null si contado es null
   estado: ConciliacionEstado;
 };
 
