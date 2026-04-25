@@ -307,6 +307,15 @@ export function CorteDetail({
                     <div className="grid grid-cols-3 gap-2">
                       {vouchersTarjeta.map((v) => {
                         const capturado = v.monto_reportado != null;
+                        const tieneOCR =
+                          !capturado &&
+                          (v.ocr_monto_sugerido != null || v.ocr_banco_sugerido_id != null);
+                        const badgeText = capturado ? '✓' : tieneOCR ? 'OCR' : 'Capturar';
+                        const badgeClass = capturado
+                          ? 'bg-emerald-500/90 text-white'
+                          : tieneOCR
+                            ? 'bg-blue-500/90 text-white'
+                            : 'bg-yellow-500/90 text-zinc-900';
                         return (
                           <button
                             key={v.id}
@@ -328,13 +337,9 @@ export function CorteDetail({
                               </div>
                             )}
                             <span
-                              className={`absolute right-1 top-1 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-medium ${
-                                capturado
-                                  ? 'bg-emerald-500/90 text-white'
-                                  : 'bg-yellow-500/90 text-zinc-900'
-                              }`}
+                              className={`absolute right-1 top-1 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-medium ${badgeClass}`}
                             >
-                              {capturado ? '✓' : 'Capturar'}
+                              {badgeText}
                             </span>
                             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-1">
                               <span className="block truncate text-xs text-white">

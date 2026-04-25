@@ -5,12 +5,14 @@ import { useCallback, useRef, useState } from 'react';
 import { eliminarVoucher, subirVoucher } from '@/app/rdb/cortes/actions';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
-import type { Voucher } from './types';
+import type { Banco, Voucher } from './types';
 import { VOUCHER_ALLOWED_MIMES, VOUCHER_MAX_BYTES } from './types';
+import { useVoucherOCR } from './use-voucher-ocr';
 
 type Props = {
   corteId: string;
   vouchers: Voucher[];
+  bancos: Banco[];
   onUploaded: (voucher: Voucher) => void;
   onRemoved: (id: string) => void;
   disabled?: boolean;
@@ -20,6 +22,7 @@ type PendingItem = {
   key: string;
   name: string;
   progress: number;
+  label?: string;
   error?: string;
 };
 
@@ -77,12 +80,20 @@ function validateClientSide(file: File): string | null {
   return null;
 }
 
-export function VoucherUploader({ corteId, vouchers, onUploaded, onRemoved, disabled }: Props) {
+export function VoucherUploader({
+  corteId,
+  vouchers,
+  bancos,
+  onUploaded,
+  onRemoved,
+  disabled,
+}: Props) {
   const toast = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<PendingItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const runOCR = useVoucherOCR(bancos);
 
   const processFiles = useCallback(
     async (files: FileList | File[]) => {
@@ -96,16 +107,36 @@ export function VoucherUploader({ corteId, vouchers, onUploaded, onRemoved, disa
         }
 
         const key = crypto.randomUUID();
-        setPending((p) => [...p, { key, name: raw.name, progress: 5 }]);
+        setPending((p) => [...p, { key, name: raw.name, progress: 5, label: 'Preparando…' }]);
 
         try {
-          setPending((p) => p.map((it) => (it.key === key ? { ...it, progress: 20 } : it)));
+          setPending((p) =>
+            p.map((it) => (it.key === key ? { ...it, progress: 20, label: 'Convirtiendo…' } : it))
+          );
           const converted = await convertIfHeic(raw);
-          setPending((p) => p.map((it) => (it.key === key ? { ...it, progress: 50 } : it)));
+          setPending((p) =>
+            p.map((it) => (it.key === key ? { ...it, progress: 40, label: 'Comprimiendo…' } : it))
+          );
           const prepared = await compressIfLarge(converted);
-          setPending((p) => p.map((it) => (it.key === key ? { ...it, progress: 70 } : it)));
+          setPending((p) =>
+            p.map((it) =>
+              it.key === key ? { ...it, progress: 55, label: 'Analizando con OCR…' } : it
+            )
+          );
 
-          const { id, signed_url } = await subirVoucher({ corte_id: corteId, file: prepared });
+          const ocr = await runOCR(prepared);
+          setPending((p) =>
+            p.map((it) => (it.key === key ? { ...it, progress: 75, label: 'Subiendo…' } : it))
+          );
+
+          const { id, signed_url } = await subirVoucher({
+            corte_id: corteId,
+            file: prepared,
+            ocr_texto_crudo: ocr.texto_crudo,
+            ocr_monto_sugerido: ocr.monto_sugerido,
+            ocr_banco_sugerido_id: ocr.banco_sugerido_id,
+            ocr_confianza: ocr.confianza,
+          });
 
           onUploaded({
             id,
@@ -119,6 +150,13 @@ export function VoucherUploader({ corteId, vouchers, onUploaded, onRemoved, disa
             monto_reportado: null,
             uploaded_by_nombre: null,
             uploaded_at: new Date().toISOString(),
+            categoria: 'voucher_tarjeta',
+            banco_id: null,
+            movimiento_caja_id: null,
+            ocr_texto_crudo: ocr.texto_crudo,
+            ocr_monto_sugerido: ocr.monto_sugerido,
+            ocr_banco_sugerido_id: ocr.banco_sugerido_id,
+            ocr_confianza: ocr.confianza,
           });
 
           setPending((p) => p.filter((it) => it.key !== key));
@@ -129,7 +167,7 @@ export function VoucherUploader({ corteId, vouchers, onUploaded, onRemoved, disa
         }
       }
     },
-    [corteId, disabled, onUploaded, toast]
+    [corteId, disabled, onUploaded, runOCR, toast]
   );
 
   async function handleRemove(voucher: Voucher) {
@@ -254,7 +292,9 @@ export function VoucherUploader({ corteId, vouchers, onUploaded, onRemoved, disa
                         style={{ width: `${p.progress}%` }}
                       />
                     </div>
-                    <span className="line-clamp-1 text-[10px] text-muted-foreground">{p.name}</span>
+                    <span className="line-clamp-1 text-[10px] text-muted-foreground">
+                      {p.label ?? p.name}
+                    </span>
                   </>
                 )}
               </div>

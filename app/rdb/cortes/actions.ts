@@ -230,6 +230,10 @@ export async function registrarMovimiento(
 export type SubirVoucherInput = {
   corte_id: string;
   file: File;
+  ocr_texto_crudo?: string | null;
+  ocr_monto_sugerido?: number | null;
+  ocr_banco_sugerido_id?: string | null;
+  ocr_confianza?: number | null;
 };
 
 export async function subirVoucher(
@@ -287,6 +291,10 @@ export async function subirVoucher(
       mime_type: input.file.type,
       uploaded_by: session.user.id,
       uploaded_by_nombre: uploadedByNombre,
+      ocr_texto_crudo: input.ocr_texto_crudo ?? null,
+      ocr_monto_sugerido: input.ocr_monto_sugerido ?? null,
+      ocr_banco_sugerido_id: input.ocr_banco_sugerido_id ?? null,
+      ocr_confianza: input.ocr_confianza ?? null,
     })
     .select('id')
     .single();

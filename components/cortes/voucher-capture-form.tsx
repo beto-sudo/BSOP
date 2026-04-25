@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
+import { AlertTriangle, Loader2, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { actualizarCategoriaVoucher, confirmarVoucher } from '@/app/rdb/cortes/actions';
 import { Button } from '@/components/ui/button';
@@ -32,17 +32,29 @@ const CATEGORIA_OPTIONS: { value: VoucherCategoria; label: string }[] = [
 export function VoucherCaptureForm({ voucher, bancos, movimientos, onSaved }: Props) {
   const toast = useToast();
   const initialCategoria: VoucherCategoria = voucher.categoria ?? 'voucher_tarjeta';
+  // Pre-llenado: si hay valor humano confirmado, usa ese. Si no, sugerencia OCR.
+  const initialBancoId = voucher.banco_id ?? voucher.ocr_banco_sugerido_id ?? null;
+  const initialMonto =
+    voucher.monto_reportado != null
+      ? String(voucher.monto_reportado)
+      : voucher.ocr_monto_sugerido != null
+        ? String(voucher.ocr_monto_sugerido)
+        : '';
   const [categoria, setCategoria] = useState<VoucherCategoria>(initialCategoria);
-  const [bancoId, setBancoId] = useState<string | null>(voucher.banco_id ?? null);
-  const [monto, setMonto] = useState<string>(
-    voucher.monto_reportado != null ? String(voucher.monto_reportado) : ''
-  );
+  const [bancoId, setBancoId] = useState<string | null>(initialBancoId);
+  const [monto, setMonto] = useState<string>(initialMonto);
   const [afiliacion, setAfiliacion] = useState<string>(voucher.afiliacion ?? '');
   const [movimientoId, setMovimientoId] = useState<string | null>(
     voucher.movimiento_caja_id ?? null
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Indicación visual: ¿el form arrancó pre-llenado por OCR (sin confirmación humana previa)?
+  const esSugeridoPorOCR =
+    voucher.monto_reportado == null &&
+    (voucher.ocr_monto_sugerido != null || voucher.ocr_banco_sugerido_id != null);
+  const confianzaBaja = esSugeridoPorOCR && (voucher.ocr_confianza ?? 1) < 0.4;
 
   const montoNum = parseFloat(monto);
   const montoValido =
@@ -116,6 +128,21 @@ export function VoucherCaptureForm({ voucher, bancos, movimientos, onSaved }: Pr
         void handleSubmit();
       }}
     >
+      {esSugeridoPorOCR && categoria === 'voucher_tarjeta' && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-300/60 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-200">
+          <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+          <div className="space-y-0.5">
+            <div className="font-medium">OCR sugiere — verifica los datos antes de confirmar.</div>
+            {confianzaBaja && (
+              <div className="flex items-center gap-1 text-amber-700 dark:text-amber-300">
+                <AlertTriangle className="h-3 w-3" aria-hidden />
+                Confianza baja — revisa con cuidado.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Selector segmentado de categoría */}
       <div className="flex gap-1 rounded-lg border bg-muted/40 p-1">
         {CATEGORIA_OPTIONS.map((opt) => {
