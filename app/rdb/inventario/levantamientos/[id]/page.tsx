@@ -38,6 +38,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
+import { usePermissions } from '@/components/providers';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -54,6 +55,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { SignatureDialog } from '@/components/ui/signature-dialog';
 import { useToast } from '@/components/ui/toast';
 import {
   LevantamientoStatusBadge,
@@ -71,6 +73,7 @@ import {
 import {
   actualizarNotaDiferencia,
   cerrarCaptura,
+  firmarPaso,
   getLineasParaCapturar,
   getLineasParaRevisar,
   guardarConteo,
@@ -122,6 +125,8 @@ function DetailInner() {
   const id = params.id;
   const router = useRouter();
   const toast = useToast();
+  const { permissions } = usePermissions();
+  const isAdmin = permissions.isAdmin;
 
   const [lev, setLev] = useState<LevantamientoFull | null>(null);
   const [tolerancia, setTolerancia] = useState<ToleranciaConfig | null>(null);
@@ -201,7 +206,9 @@ function DetailInner() {
       if (r.ok) setRevisarLineas(r.data);
     }
 
-    if (levantamiento.estado === 'aplicado') {
+    // Firmas: necesarias en `capturado` para saber qué paso falta y en
+    // `aplicado` para mostrar la lista final.
+    if (levantamiento.estado === 'capturado' || levantamiento.estado === 'aplicado') {
       const fRes = await supabase
         .schema('erp')
         .from('inventario_levantamiento_firmas')
@@ -355,9 +362,22 @@ function DetailInner() {
         <CapturadoSection
           lev={lev}
           esContador={esContador}
+          isAdmin={isAdmin}
           tolerancia={tolerancia}
           lineas={revisarLineas}
+          firmas={firmas}
           onLineasChange={setRevisarLineas}
+          onFirmaSuccess={(aplicado) => {
+            if (aplicado) {
+              router.push(`/rdb/inventario/levantamientos/${lev.id}/reporte`);
+            } else {
+              void load();
+            }
+          }}
+          onError={(msg) =>
+            toast.add({ title: 'No se pudo firmar', description: msg, type: 'error' })
+          }
+          onFirmaToast={(title, description) => toast.add({ title, description, type: 'success' })}
         />
       )}
 
@@ -545,15 +565,25 @@ function CapturandoSection({
 function CapturadoSection({
   lev,
   esContador,
+  isAdmin,
   tolerancia,
   lineas,
+  firmas,
   onLineasChange,
+  onFirmaSuccess,
+  onError,
+  onFirmaToast,
 }: {
   lev: LevantamientoFull;
   esContador: boolean;
+  isAdmin: boolean;
   tolerancia: ToleranciaConfig | null;
   lineas: LineaParaRevisar[] | null;
+  firmas: FirmaRow[] | null;
   onLineasChange: (next: LineaParaRevisar[]) => void;
+  onFirmaSuccess: (aplicado: boolean) => void;
+  onError: (msg: string) => void;
+  onFirmaToast: (title: string, description?: string) => void;
 }) {
   const kpis = useMemo(() => {
     const all = lineas ?? [];
@@ -621,10 +651,229 @@ function CapturadoSection({
               Ver diferencias detalladas
             </Button>
           </Link>
-          <FirmarPlaceholderButton />
+          <FirmarSection
+            lev={lev}
+            esContador={esContador}
+            isAdmin={isAdmin}
+            tolerancia={tolerancia}
+            lineas={lineas}
+            firmas={firmas}
+            kpis={kpis}
+            onSuccess={onFirmaSuccess}
+            onError={onError}
+            onToast={onFirmaToast}
+          />
         </div>
+
+        {firmas && firmas.length > 0 && (
+          <FirmasParcialesList firmas={firmas} firmasRequeridas={tolerancia?.firmas_requeridas} />
+        )}
       </section>
     </>
+  );
+}
+
+// ─── Firma electrónica (B3) ──────────────────────────────────────────────────
+
+const PASO_ROL_3_FIRMAS = ['contador', 'revisor', 'autorizador'] as const;
+const PASO_ROL_2_FIRMAS = ['contador', 'autorizador'] as const;
+const PASO_ROL_1_FIRMA = ['contador'] as const;
+
+const ROL_LABEL: Record<string, 'Contador' | 'Revisor' | 'Autorizador'> = {
+  contador: 'Contador',
+  revisor: 'Revisor',
+  autorizador: 'Autorizador',
+};
+
+/**
+ * Mapea (paso, firmas_requeridas) → rol, replicando la convención de la
+ * función SQL `fn_firmar_levantamiento` y del config por empresa.
+ */
+function rolForPaso(paso: number, firmasRequeridas: number): string | null {
+  let arr: readonly string[];
+  if (firmasRequeridas <= 1) arr = PASO_ROL_1_FIRMA;
+  else if (firmasRequeridas === 2) arr = PASO_ROL_2_FIRMAS;
+  else arr = PASO_ROL_3_FIRMAS;
+  return arr[paso - 1] ?? null;
+}
+
+function FirmarSection({
+  lev,
+  esContador,
+  isAdmin,
+  tolerancia,
+  lineas,
+  firmas,
+  kpis,
+  onSuccess,
+  onError,
+  onToast,
+}: {
+  lev: LevantamientoFull;
+  esContador: boolean;
+  isAdmin: boolean;
+  tolerancia: ToleranciaConfig | null;
+  lineas: LineaParaRevisar[] | null;
+  firmas: FirmaRow[] | null;
+  kpis: { total: number; conDiff: number; fuera: number; ajusteNeto: number };
+  onSuccess: (aplicado: boolean) => void;
+  onError: (msg: string) => void;
+  onToast: (title: string, description?: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const firmasRequeridas = tolerancia?.firmas_requeridas ?? 3;
+  const firmasActuales = firmas?.length ?? 0;
+  const pasoActual = firmasActuales + 1;
+  const rolActual = rolForPaso(pasoActual, firmasRequeridas);
+  const completas = firmasActuales >= firmasRequeridas;
+
+  // Pre-condición: toda línea fuera de tolerancia debe tener nota.
+  const fueraSinNota = useMemo(() => {
+    if (!lineas) return 0;
+    return lineas.filter(
+      (l) =>
+        l.fuera_de_tolerancia && (l.notas_diferencia == null || l.notas_diferencia.trim() === '')
+    ).length;
+  }, [lineas]);
+
+  // Permisos del paso actual.
+  const puedeFirmarPasoActual = useMemo(() => {
+    if (rolActual == null) return false;
+    if (isAdmin) return true;
+    if (rolActual === 'contador') return esContador;
+    // revisor/autorizador: cualquier miembro de la empresa con acceso al módulo.
+    // RequireAccess ya gateó el módulo, así que basta con tener sesión.
+    return true;
+  }, [rolActual, esContador, isAdmin]);
+
+  // Mensaje de tooltip / disabled.
+  const disabledReason = useMemo(() => {
+    if (completas) return 'Levantamiento ya tiene todas las firmas requeridas.';
+    if (fueraSinNota > 0) {
+      return `Hay ${fueraSinNota} línea${fueraSinNota === 1 ? '' : 's'} fuera de tolerancia sin justificación — captura las notas antes de firmar.`;
+    }
+    if (!puedeFirmarPasoActual && rolActual === 'contador') {
+      return 'Solo el contador asignado puede firmar el paso 1.';
+    }
+    return null;
+  }, [completas, fueraSinNota, puedeFirmarPasoActual, rolActual]);
+
+  const disabled = disabledReason != null;
+
+  if (completas || rolActual == null) {
+    // Si llegamos al máximo de firmas en estado=capturado, está pendiente la
+    // próxima carga: no mostramos botón.
+    return null;
+  }
+
+  const roleLabel = ROL_LABEL[rolActual];
+  const requireConfirmText =
+    pasoActual === 1 ? 'He contado físicamente cada producto declarado.' : null;
+
+  async function handleSign(comment: string) {
+    const res = await firmarPaso({
+      levantamiento_id: lev.id,
+      paso: pasoActual,
+      rol: rolActual!,
+      comentario: comment || undefined,
+    });
+    if (!res.ok) {
+      // Errores de la RPC los propagamos al dialog (inline) y al toast.
+      onError(res.error);
+      return { error: res.error };
+    }
+
+    if (res.data.aplicado) {
+      onToast(
+        'Levantamiento aplicado',
+        `${res.data.movimientos_generados} movimiento${res.data.movimientos_generados === 1 ? '' : 's'} de ajuste generado${res.data.movimientos_generados === 1 ? '' : 's'}.`
+      );
+    } else {
+      const faltan = res.data.firmas_requeridas - res.data.firmas_actuales;
+      onToast(
+        'Firma registrada',
+        `Faltan ${faltan} firma${faltan === 1 ? '' : 's'} para aplicar el levantamiento.`
+      );
+    }
+    onSuccess(res.data.aplicado);
+    return {
+      aplicado: res.data.aplicado,
+      firmasActuales: res.data.firmas_actuales,
+      firmasRequeridas: res.data.firmas_requeridas,
+      movimientosGenerados: res.data.movimientos_generados,
+    };
+  }
+
+  // El total de "diferencia" que mostramos en el dialog es el ajuste neto.
+  const summary = {
+    totalLineas: kpis.total,
+    totalDiferencia: kpis.ajusteNeto,
+    totalLineasFuera: kpis.fuera,
+  };
+
+  return (
+    <>
+      <Button
+        onClick={() => setOpen(true)}
+        disabled={disabled}
+        title={disabledReason ?? `Firmar como ${roleLabel}`}
+        data-testid="firmar-button"
+      >
+        <FileSignature className="size-4" />
+        Firmar como {roleLabel}
+      </Button>
+      {disabled && disabledReason && (
+        <p className="basis-full text-xs text-amber-700 dark:text-amber-400">{disabledReason}</p>
+      )}
+      <SignatureDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        step={pasoActual}
+        totalSteps={firmasRequeridas}
+        roleLabel={roleLabel}
+        summary={summary}
+        requireConfirmText={requireConfirmText}
+        onSign={handleSign}
+      />
+    </>
+  );
+}
+
+function FirmasParcialesList({
+  firmas,
+  firmasRequeridas,
+}: {
+  firmas: FirmaRow[];
+  firmasRequeridas: number | undefined;
+}) {
+  if (firmas.length === 0) return null;
+  return (
+    <div className="mt-4 border-t pt-3">
+      <div className="text-xs uppercase tracking-wider text-muted-foreground">
+        Firmas registradas ({firmas.length}
+        {firmasRequeridas ? ` / ${firmasRequeridas}` : ''})
+      </div>
+      <ul className="mt-2 space-y-1.5">
+        {firmas.map((f) => (
+          <li
+            key={f.id}
+            className="flex flex-wrap items-baseline justify-between gap-2 rounded-md bg-muted/30 px-2 py-1.5 text-xs"
+          >
+            <div>
+              <Badge variant="outline" className="mr-2 capitalize">
+                {f.rol}
+              </Badge>
+              <span className="font-medium">{f.firmante_nombre}</span>
+              {f.comentario && <span className="ml-1 text-muted-foreground">— {f.comentario}</span>}
+            </div>
+            <span className="tabular-nums text-muted-foreground">
+              Paso {f.paso} · {formatDateTime(f.firmado_at)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -755,33 +1004,6 @@ function FueraLineaRow({
         )}
       </div>
     </li>
-  );
-}
-
-function FirmarPlaceholderButton() {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <Button onClick={() => setOpen(true)}>
-        <FileSignature className="size-4" />
-        Firmar
-      </Button>
-      <AlertDialog open={open} onOpenChange={setOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Firma electrónica — próximamente</AlertDialogTitle>
-            <AlertDialogDescription>
-              La firma del levantamiento se implementa en el sub-PR B3. Mientras tanto, el
-              levantamiento puede seguir consultándose y editando notas. Si necesitas firmar antes
-              de B3, escribe a soporte para hacerlo manualmente.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Entendido</AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
   );
 }
 

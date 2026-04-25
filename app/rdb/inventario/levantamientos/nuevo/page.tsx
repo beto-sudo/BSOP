@@ -177,7 +177,9 @@ function NuevoLevantamientoForm() {
       } sembrado${startRes.data.lineasSembradas === 1 ? '' : 's'}.`,
       type: 'success',
     });
-    router.push('/rdb/inventario/levantamientos');
+    // Si pidió "Iniciar captura ahora", llevamos directo a la captura mobile —
+    // ahorra un hop por la lista cuando ya sabe lo que va a hacer.
+    router.push(`/rdb/inventario/levantamientos/${result.data.id}/capturar`);
   };
 
   return (
