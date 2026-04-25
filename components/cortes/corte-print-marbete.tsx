@@ -1,29 +1,50 @@
+import type { ConciliacionEfectivo, ConciliacionEstado, ConciliacionTarjeta } from './conciliacion';
 import { formatCurrency, formatDate, formatDateTime } from './helpers';
 import type { Corte, CorteTotales, Movimiento } from './types';
 
 /**
  * Print-only marbete (voucher) for a corte de caja.
  * Rendered inside the detail Sheet but hidden except when the user presses
- * "Imprimir" (Marbete) — then a `print:block` rule reveals it and the rest of
- * the Sheet is hidden via `print:hidden`. Matches the layout operations use
- * when reconciling cash drawers.
+ * "Imprimir" (Marbete) — then `print:block` lo revela y el ScrollArea con el
+ * detalle de pantalla queda `print:hidden`.
  *
- * Diseñado para caber en UNA SOLA hoja carta. Los `print:` modifiers reducen
- * tamaños y márgenes; el `@page { size: letter; margin: 0.4in }` global limita
- * el área de impresión. `page-break-inside: avoid` en cada bloque impide
- * cortes feos a media tabla. Si el corte tiene más de ~12 movimientos, podría
- * desbordar — en ese caso ajustar `print:text-[8px]` o usar 2 hojas.
+ * Diseñado para caber en UNA SOLA hoja carta sin reglas `@page` (para no
+ * romper el control "Escala" del diálogo de impresión). Texto base 10px,
+ * headers 9px, fechas 8px, padding mínimo y `pageBreakInside: avoid` por
+ * bloque. Si un corte tiene >12 movimientos puede desbordar — el usuario
+ * puede ajustar manualmente con Escala 90/95% en el diálogo.
  */
+
+// Etiquetas en texto plano para impresión (los íconos / colores de los badges
+// no pintan bien en B&W). Coincide con `ESTADO_BADGE` de corte-conciliacion.tsx.
+const ESTADO_LABEL_PRINT: Record<ConciliacionEstado, string> = {
+  cuadra: 'Cuadra',
+  cuadra_aprox: 'Cuadra ±',
+  diferencia: 'Diferencia',
+  sin_voucher: 'Sin voucher',
+  pendiente_captura: 'Pendiente captura',
+  pendiente_cierre: 'Pendiente cierre',
+  sin_actividad: 'Sin actividad',
+};
+
 export function CortePrintMarbete({
   corte,
   totales,
   movimientos,
+  tarjeta,
+  efectivo,
+  ingresosStripe,
+  ingresosTransferencias,
   efectivoEsperado,
   diferencia,
 }: {
   corte: Corte;
   totales: CorteTotales | null;
   movimientos: Movimiento[];
+  tarjeta: ConciliacionTarjeta;
+  efectivo: ConciliacionEfectivo;
+  ingresosStripe: number;
+  ingresosTransferencias: number;
   efectivoEsperado: number;
   diferencia: number;
 }) {
@@ -141,6 +162,76 @@ export function CortePrintMarbete({
           </table>
         </div>
       )}
+
+      {/* CONCILIACIÓN */}
+      <div style={{ pageBreakInside: 'avoid' }}>
+        <div className="text-[9px] font-semibold uppercase tracking-wider text-gray-400 mb-0.5 mt-1">
+          Conciliación
+        </div>
+        <table className="w-full border-collapse text-[10px] mb-1">
+          <colgroup>
+            <col style={{ width: '14%' }} />
+            <col />
+            <col style={{ width: '20%' }} />
+            <col style={{ width: '14%' }} />
+          </colgroup>
+          <tbody>
+            <tr className="border-t">
+              <td className="py-0 align-top text-gray-500">Tarjeta</td>
+              <td className="py-0 align-top text-gray-700">
+                Pedidos {formatCurrency(tarjeta.ingresos_pedidos)} · Σ Vouchers{' '}
+                {formatCurrency(tarjeta.total_evidencia)} ({tarjeta.evidencia_count})
+                {tarjeta.evidencia_pendiente > 0
+                  ? `, faltan ${tarjeta.evidencia_pendiente} ${tarjeta.evidencia_pendiente === 1 ? 'monto' : 'montos'}`
+                  : ''}
+              </td>
+              <td className="py-0 align-top text-right text-[9px] italic text-gray-600">
+                {ESTADO_LABEL_PRINT[tarjeta.estado]}
+              </td>
+              <td className="py-0 align-top text-right font-medium tabular-nums">
+                {tarjeta.evidencia_pendiente > 0 ? '—' : formatCurrency(tarjeta.diferencia)}
+              </td>
+            </tr>
+            <tr className="border-t">
+              <td className="py-0 align-top text-gray-500">Efectivo</td>
+              <td className="py-0 align-top text-gray-700">
+                Esperado {formatCurrency(efectivo.esperado)} · Contado{' '}
+                {efectivo.contado != null ? formatCurrency(efectivo.contado) : '—'}
+              </td>
+              <td className="py-0 align-top text-right text-[9px] italic text-gray-600">
+                {ESTADO_LABEL_PRINT[efectivo.estado]}
+              </td>
+              <td className="py-0 align-top text-right font-medium tabular-nums">
+                {efectivo.diferencia != null ? formatCurrency(efectivo.diferencia) : '—'}
+              </td>
+            </tr>
+            {ingresosStripe > 0 && (
+              <tr className="border-t">
+                <td className="py-0 text-gray-500">Stripe</td>
+                <td className="py-0 text-[9px] italic text-gray-400">
+                  Conciliación contra liquidación Stripe — pendiente
+                </td>
+                <td className="py-0" />
+                <td className="py-0 text-right font-medium tabular-nums">
+                  {formatCurrency(ingresosStripe)}
+                </td>
+              </tr>
+            )}
+            {ingresosTransferencias > 0 && (
+              <tr className="border-t">
+                <td className="py-0 text-gray-500">Transferencias</td>
+                <td className="py-0 text-[9px] italic text-gray-400">
+                  Conciliación contra estado de cuenta — pendiente
+                </td>
+                <td className="py-0" />
+                <td className="py-0 text-right font-medium tabular-nums">
+                  {formatCurrency(ingresosTransferencias)}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
       {/* CIERRE */}
       <div style={{ pageBreakInside: 'avoid' }}>

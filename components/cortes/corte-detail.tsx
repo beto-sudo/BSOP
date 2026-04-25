@@ -79,6 +79,10 @@ export function CorteDetail({
           corte={corte}
           totales={totales}
           movimientos={movimientos}
+          tarjeta={tarjeta}
+          efectivo={efectivo}
+          ingresosStripe={totales?.ingresos_stripe ?? 0}
+          ingresosTransferencias={totales?.ingresos_transferencias ?? 0}
           efectivoEsperado={efectivoEsperado}
           diferencia={diferencia}
         />
