@@ -14,7 +14,6 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { conciliarEfectivo, conciliarTarjeta } from './conciliacion';
 import { CorteConciliacion } from './corte-conciliacion';
-import { CortePrintMarbete } from './corte-print-marbete';
 import { estadoVariant, formatCurrency, formatDate, formatDateTime } from './helpers';
 import { RegistrarMovimientoDialog } from './registrar-movimiento-dialog';
 import type { Banco, Corte, CorteTotales, Movimiento, Voucher } from './types';
@@ -75,22 +74,19 @@ export function CorteDetail({
       }}
     >
       <SheetContent className="sm:max-w-[600px]">
-        <CortePrintMarbete
-          corte={corte}
-          totales={totales}
-          movimientos={movimientos}
-          tarjeta={tarjeta}
-          efectivo={efectivo}
-          ingresosStripe={totales?.ingresos_stripe ?? 0}
-          ingresosTransferencias={totales?.ingresos_transferencias ?? 0}
-          efectivoEsperado={efectivoEsperado}
-          diferencia={diferencia}
-        />
+        {/* Print-only logo strip — el SheetHeader ya queda visible en print
+            con el nombre del corte; este sólo agrega la marca arriba. */}
+        <div className="hidden print:mb-1 print:flex print:items-baseline print:justify-between print:border-b print:pb-1 print:text-[10px]">
+          <span className="font-bold">Rincón del Bosque</span>
+          <span className="text-gray-500">Corte de Caja</span>
+        </div>
 
-        {/* ── HEADER (pantalla) ──────────────────────────────── */}
-        <SheetHeader className="print:hidden">
-          <SheetTitle>{corte.corte_nombre ?? `Corte ${corte.id}`}</SheetTitle>
-          <SheetDescription>
+        {/* ── HEADER ─────────────────────────────────────────── */}
+        <SheetHeader className="print:gap-0 print:p-0">
+          <SheetTitle className="print:text-sm">
+            {corte.corte_nombre ?? `Corte ${corte.id}`}
+          </SheetTitle>
+          <SheetDescription className="print:text-[10px]">
             {corte.caja_nombre ?? '—'} · {formatDateTime(corte.hora_inicio)} a{' '}
             {formatDateTime(corte.hora_fin)}
           </SheetDescription>
@@ -108,42 +104,52 @@ export function CorteDetail({
           </div>
         </SheetHeader>
 
-        <ScrollArea className="min-h-0 flex-1 pr-1 print:hidden">
-          <div className="mt-6 space-y-6 pb-6">
+        <ScrollArea className="min-h-0 flex-1 pr-1 print:h-auto print:overflow-visible">
+          <div className="mt-6 space-y-6 pb-6 print:mt-2 print:space-y-3 print:pb-2 print:text-[11px]">
             {/* Estado + responsable */}
             <div className="flex items-center justify-between">
-              <Badge variant={estadoVariant(corte.estado)}>{corte.estado ?? 'Sin estado'}</Badge>
-              <span className="text-sm text-muted-foreground">
+              <Badge variant={estadoVariant(corte.estado)} className="print:text-[10px]">
+                {corte.estado ?? 'Sin estado'}
+              </Badge>
+              <span className="text-sm text-muted-foreground print:text-[10px]">
                 {corte.responsable_apertura ?? corte.responsable_cierre ?? ''}
               </span>
             </div>
 
             {/* Horario */}
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-2 gap-4 text-sm print:gap-x-4 print:gap-y-0.5 print:text-[10px]">
               <div>
-                <span className="block text-xs text-muted-foreground">Apertura</span>
+                <span className="block text-xs text-muted-foreground print:inline print:text-[9px]">
+                  Apertura{' '}
+                </span>
                 <span className="font-medium">{formatDate(corte.hora_inicio)}</span>
               </div>
               <div>
-                <span className="block text-xs text-muted-foreground">Cierre</span>
+                <span className="block text-xs text-muted-foreground print:inline print:text-[9px]">
+                  Cierre{' '}
+                </span>
                 <span className="font-medium">{formatDate(corte.hora_fin)}</span>
               </div>
               {corte.turno && (
                 <div>
-                  <span className="block text-xs text-muted-foreground">Turno</span>
+                  <span className="block text-xs text-muted-foreground print:inline print:text-[9px]">
+                    Turno{' '}
+                  </span>
                   <span className="font-medium">{corte.turno}</span>
                 </div>
               )}
               {corte.tipo && (
                 <div>
-                  <span className="block text-xs text-muted-foreground">Tipo</span>
+                  <span className="block text-xs text-muted-foreground print:inline print:text-[9px]">
+                    Tipo{' '}
+                  </span>
                   <span className="font-medium">{corte.tipo}</span>
                 </div>
               )}
             </div>
 
             {corte.observaciones && (
-              <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-yellow-600 dark:text-yellow-400">
+              <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-yellow-600 print:p-1.5 print:text-[10px] print:text-gray-700 dark:text-yellow-400">
                 <span className="mb-1 block font-semibold">Observaciones</span>
                 {corte.observaciones}
               </div>
@@ -158,17 +164,17 @@ export function CorteDetail({
               />
             )}
 
-            <Separator />
+            <Separator className="print:my-1" />
 
             {/* Resumen Financiero */}
             <div>
-              <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground print:mb-1 print:text-[9px] print:text-gray-500">
                 Resumen Financiero
               </div>
               {loadingDetail ? (
                 <DetailSkeleton />
               ) : totales ? (
-                <div className="space-y-2 text-sm">
+                <div className="space-y-2 text-sm print:space-y-0 print:text-[10px]">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Efectivo inicial</span>
                     <span className="font-medium tabular-nums">
@@ -232,12 +238,12 @@ export function CorteDetail({
               )}
             </div>
 
-            <Separator />
+            <Separator className="print:my-1" />
 
             {/* Movimientos */}
             <div>
-              <div className="mb-3 flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="mb-3 flex items-center justify-between print:mb-1">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground print:text-[9px] print:text-gray-500">
                   Movimientos
                 </span>
                 {estaAbierto && (
@@ -246,6 +252,7 @@ export function CorteDetail({
                     variant="outline"
                     onClick={() => setRegistrarOpen(true)}
                     aria-label="Registrar movimiento de caja"
+                    className="print:hidden"
                   >
                     <Plus className="mr-1.5 h-3.5 w-3.5" />
                     Registrar
@@ -255,17 +262,21 @@ export function CorteDetail({
               {loadingDetail ? (
                 <DetailSkeleton />
               ) : movimientos.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Sin movimientos registrados.</p>
+                <p className="text-sm text-muted-foreground print:text-[10px]">
+                  Sin movimientos registrados.
+                </p>
               ) : (
-                <div className="space-y-2 text-sm">
+                <div className="space-y-2 text-sm print:space-y-0.5 print:text-[10px]">
                   {movimientos.map((m) => (
                     <div key={m.id} className="flex items-start justify-between gap-4">
                       <div>
                         <span className="font-medium capitalize">{m.tipo ?? 'Movimiento'}</span>
                         {m.nota && (
-                          <span className="block text-xs text-muted-foreground">{m.nota}</span>
+                          <span className="block text-xs text-muted-foreground print:inline print:text-[10px] print:text-gray-700">
+                            {m.nota ? ` · ${m.nota}` : ''}
+                          </span>
                         )}
-                        <span className="block text-xs text-muted-foreground">
+                        <span className="block text-xs text-muted-foreground print:text-[9px]">
                           {formatDate(m.fecha_hora)}
                           {m.registrado_por ? ` · ${m.registrado_por}` : ''}
                         </span>
@@ -288,8 +299,8 @@ export function CorteDetail({
               if (vouchersTarjeta.length === 0) return null;
               return (
                 <>
-                  <Separator />
-                  <div>
+                  <Separator className="print:hidden" />
+                  <div className="print:hidden">
                     <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Vouchers de tarjeta ({vouchersTarjeta.length})
                     </div>
@@ -338,6 +349,17 @@ export function CorteDetail({
                 </>
               );
             })()}
+
+            {/* Firmas (sólo impresión) — bloque al final del marbete para los
+                responsables de apertura y cierre. */}
+            <div className="hidden print:mt-4 print:grid print:grid-cols-2 print:gap-6 print:border-t print:pt-2 print:text-[9px]">
+              <div className="border-t border-gray-400 pt-0.5 text-center text-gray-500">
+                Responsable de apertura
+              </div>
+              <div className="border-t border-gray-400 pt-0.5 text-center text-gray-500">
+                Responsable de cierre
+              </div>
+            </div>
           </div>
         </ScrollArea>
 

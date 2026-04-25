@@ -28,16 +28,18 @@ export function CorteConciliacion({
   ingresosTransferencias,
 }: Props) {
   return (
-    <section className="space-y-4">
+    <section className="space-y-4 print:space-y-2">
       <HealthBanner tarjeta={tarjeta} efectivo={efectivo} />
       <div>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="mb-3 flex items-center justify-between print:mb-1">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground print:text-[9px] print:text-gray-500">
             Conciliación
           </h3>
-          <span className="text-[10px] text-muted-foreground/70">Ingresos vs evidencia</span>
+          <span className="text-[10px] text-muted-foreground/70 print:text-[9px]">
+            Ingresos vs evidencia
+          </span>
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 print:gap-2">
           <CardTarjeta tarjeta={tarjeta} />
           <CardEfectivo efectivo={efectivo} />
           <CardInformativa
@@ -152,16 +154,16 @@ function BannerShell({
 }) {
   const t = BANNER_TONES[tone];
   return (
-    <div className={`rounded-lg border p-3.5 ${t.wrapper}`}>
-      <div className="flex items-start gap-3">
+    <div className={`rounded-lg border p-3.5 print:p-1.5 ${t.wrapper}`}>
+      <div className="flex items-start gap-3 print:gap-2">
         <div
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${t.bubble}`}
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full print:hidden ${t.bubble}`}
         >
           <Icon className={`h-4 w-4 ${t.icon}`} />
         </div>
         <div className="min-w-0 flex-1">
-          <div className={`text-sm font-semibold ${t.titulo}`}>{titulo}</div>
-          <div className={`mt-0.5 text-xs ${t.descripcion}`}>{descripcion}</div>
+          <div className={`text-sm font-semibold print:text-[11px] ${t.titulo}`}>{titulo}</div>
+          <div className={`mt-0.5 text-xs print:text-[10px] ${t.descripcion}`}>{descripcion}</div>
         </div>
       </div>
     </div>
@@ -206,7 +208,7 @@ function EstadoBadge({ estado }: { estado: ConciliacionEstado }) {
   const meta = ESTADO_BADGE[estado];
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${meta.className}`}
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium print:px-1 print:py-0 print:text-[8px] ${meta.className}`}
     >
       {meta.label}
     </span>
@@ -235,20 +237,20 @@ function CardTarjeta({ tarjeta }: { tarjeta: ConciliacionTarjeta }) {
   const difLabel = pendientes > 0 ? '—' : formatDiferencia(tarjeta.diferencia);
 
   return (
-    <div className="rounded-lg border bg-card p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-muted">
+    <div className="rounded-lg border bg-card p-4 print:p-2" style={{ pageBreakInside: 'avoid' }}>
+      <div className="mb-3 flex items-center justify-between print:mb-1">
+        <div className="flex items-center gap-2 print:gap-1">
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-muted print:hidden">
             <CreditCard className="h-4 w-4 text-muted-foreground" />
           </div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-foreground">
+          <span className="text-xs font-semibold uppercase tracking-wider text-foreground print:text-[9px]">
             Tarjeta
           </span>
         </div>
         <EstadoBadge estado={tarjeta.estado} />
       </div>
 
-      <dl className="space-y-1 text-sm">
+      <dl className="space-y-1 text-sm print:space-y-0 print:text-[10px]">
         <div className="flex justify-between">
           <dt className="text-muted-foreground">Pedidos</dt>
           <dd className="font-medium tabular-nums">{formatCurrency(tarjeta.ingresos_pedidos)}</dd>
@@ -266,8 +268,8 @@ function CardTarjeta({ tarjeta }: { tarjeta: ConciliacionTarjeta }) {
             {sumaPendienteLabel}
           </dd>
         </div>
-        <hr className="my-1 border-muted" />
-        <div className="flex justify-between text-sm font-semibold">
+        <hr className="my-1 border-muted print:my-0.5" />
+        <div className="flex justify-between text-sm font-semibold print:text-[10px]">
           <dt>Diferencia</dt>
           <dd className={`tabular-nums ${diferenciaColor(tarjeta.estado)}`}>{difLabel}</dd>
         </div>
@@ -281,7 +283,7 @@ function CardTarjeta({ tarjeta }: { tarjeta: ConciliacionTarjeta }) {
 function CardTarjetaMensaje({ tarjeta }: { tarjeta: ConciliacionTarjeta }) {
   if (tarjeta.estado === 'sin_voucher') {
     return (
-      <p className="mt-3 rounded border border-destructive/20 bg-destructive/10 p-2 text-[11px] text-destructive">
+      <p className="mt-3 rounded border border-destructive/20 bg-destructive/10 p-2 text-[11px] text-destructive print:mt-1 print:p-1 print:text-[9px] print:text-gray-700">
         ⚠ Hay ingresos por tarjeta sin voucher de respaldo.
       </p>
     );
@@ -289,7 +291,7 @@ function CardTarjetaMensaje({ tarjeta }: { tarjeta: ConciliacionTarjeta }) {
   if (tarjeta.estado === 'pendiente_captura') {
     const n = tarjeta.evidencia_pendiente;
     return (
-      <p className="mt-3 rounded border border-yellow-500/20 bg-yellow-500/10 p-2 text-[11px] text-yellow-700 dark:text-yellow-400">
+      <p className="mt-3 rounded border border-yellow-500/20 bg-yellow-500/10 p-2 text-[11px] text-yellow-700 print:mt-1 print:p-1 print:text-[9px] print:text-gray-700 dark:text-yellow-400">
         • Faltan {n} {n === 1 ? 'monto' : 'montos'} por capturar para confirmar el cuadre.
       </p>
     );
@@ -297,7 +299,7 @@ function CardTarjetaMensaje({ tarjeta }: { tarjeta: ConciliacionTarjeta }) {
   if (tarjeta.estado === 'diferencia') {
     const verbo = tarjeta.diferencia > 0 ? 'exceden' : 'son menores que';
     return (
-      <p className="mt-3 rounded border border-destructive/20 bg-destructive/10 p-2 text-[11px] text-destructive">
+      <p className="mt-3 rounded border border-destructive/20 bg-destructive/10 p-2 text-[11px] text-destructive print:mt-1 print:p-1 print:text-[9px] print:text-gray-700">
         ⚠ Vouchers {verbo} ingresos por {formatCurrency(Math.abs(tarjeta.diferencia))}.
       </p>
     );
@@ -314,20 +316,20 @@ function CardEfectivo({ efectivo }: { efectivo: ConciliacionEfectivo }) {
       : formatDiferencia(efectivo.diferencia);
 
   return (
-    <div className="rounded-lg border bg-card p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-muted">
+    <div className="rounded-lg border bg-card p-4 print:p-2" style={{ pageBreakInside: 'avoid' }}>
+      <div className="mb-3 flex items-center justify-between print:mb-1">
+        <div className="flex items-center gap-2 print:gap-1">
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-muted print:hidden">
             <Banknote className="h-4 w-4 text-muted-foreground" />
           </div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-foreground">
+          <span className="text-xs font-semibold uppercase tracking-wider text-foreground print:text-[9px]">
             Efectivo
           </span>
         </div>
         <EstadoBadge estado={efectivo.estado} />
       </div>
 
-      <dl className="space-y-1 text-sm">
+      <dl className="space-y-1 text-sm print:space-y-0 print:text-[10px]">
         <div className="flex justify-between">
           <dt
             className="inline-flex items-center gap-1 text-muted-foreground"
@@ -343,8 +345,8 @@ function CardEfectivo({ efectivo }: { efectivo: ConciliacionEfectivo }) {
             {efectivo.contado == null ? '—' : formatCurrency(efectivo.contado)}
           </dd>
         </div>
-        <hr className="my-1 border-muted" />
-        <div className="flex justify-between text-sm font-semibold">
+        <hr className="my-1 border-muted print:my-0.5" />
+        <div className="flex justify-between text-sm font-semibold print:text-[10px]">
           <dt>Diferencia</dt>
           <dd className={`tabular-nums ${diferenciaColor(efectivo.estado)}`}>{difLabel}</dd>
         </div>
@@ -358,7 +360,7 @@ function CardEfectivo({ efectivo }: { efectivo: ConciliacionEfectivo }) {
 function CardEfectivoMensaje({ efectivo }: { efectivo: ConciliacionEfectivo }) {
   if (efectivo.estado === 'pendiente_cierre') {
     return (
-      <p className="mt-3 rounded border border-border bg-muted p-2 text-[11px] text-muted-foreground">
+      <p className="mt-3 rounded border border-border bg-muted p-2 text-[11px] text-muted-foreground print:mt-1 print:p-1 print:text-[9px]">
         ○ Falta capturar el conteo de efectivo al cerrar el corte.
       </p>
     );
@@ -366,7 +368,7 @@ function CardEfectivoMensaje({ efectivo }: { efectivo: ConciliacionEfectivo }) {
   if (efectivo.estado === 'diferencia' && efectivo.diferencia != null) {
     const verbo = efectivo.diferencia < 0 ? 'Falta' : 'Sobra';
     return (
-      <p className="mt-3 rounded border border-destructive/20 bg-destructive/10 p-2 text-[11px] text-destructive">
+      <p className="mt-3 rounded border border-destructive/20 bg-destructive/10 p-2 text-[11px] text-destructive print:mt-1 print:p-1 print:text-[9px] print:text-gray-700">
         ⚠ {verbo} efectivo en caja por {formatCurrency(Math.abs(efectivo.diferencia))}.
       </p>
     );
@@ -388,19 +390,24 @@ function CardInformativa({
   descripcion: string;
 }) {
   return (
-    <div className="rounded-lg border bg-card p-4 opacity-90">
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-muted">
+    <div
+      className="rounded-lg border bg-card p-4 opacity-90 print:p-2"
+      style={{ pageBreakInside: 'avoid' }}
+    >
+      <div className="mb-2 flex items-center justify-between print:mb-0.5">
+        <div className="flex items-center gap-2 print:gap-1">
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-muted print:hidden">
             <Icon className="h-4 w-4 text-muted-foreground" />
           </div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-foreground">
+          <span className="text-xs font-semibold uppercase tracking-wider text-foreground print:text-[9px]">
             {metodo}
           </span>
         </div>
-        <span className="text-sm font-semibold tabular-nums">{formatCurrency(monto)}</span>
+        <span className="text-sm font-semibold tabular-nums print:text-[10px]">
+          {formatCurrency(monto)}
+        </span>
       </div>
-      <p className="text-[11px] text-muted-foreground">{descripcion}</p>
+      <p className="text-[11px] text-muted-foreground print:text-[9px]">{descripcion}</p>
     </div>
   );
 }
