@@ -142,6 +142,92 @@ CI normal tarda ~1-2 min en este repo. Si después de 5 min sigue
 3. Si el workflow falló al setup, leerlo. Si nunca arrancó, alertar al
    usuario antes de seguir esperando.
 
+### Trabajando con múltiples PRs en paralelo
+
+Cuando hay 2+ PRs abiertos al mismo tiempo, los archivos compartidos
+(`docs/strategy/INITIATIVES.md`, y `docs/strategy/ROADMAP.md` cuando
+exista) son hotspots de conflicto: ambos PRs editan la misma tabla, el
+primero que mergea le gana la línea al segundo, y el segundo termina
+con `This branch has conflicts that must be resolved`.
+
+Dos reglas para mantener la fricción baja sin infraestructura nueva:
+
+#### Regla 1: minimizar ediciones a `INITIATIVES.md`
+
+Toco `docs/strategy/INITIATIVES.md` solo en **transiciones de estado
+mayores** de la iniciativa:
+
+- `proposed → planned` (alcance v1 cerrado).
+- `planned → in_progress` (primer PR de ejecución abierto).
+- `in_progress → done` (última fase mergeada — la fila se mueve a la
+  sección `## Done`).
+- `* → blocked` o `blocked → *`.
+
+**NO toco `INITIATIVES.md` en cada commit/PR intermedio del mismo
+estado.** Si una iniciativa está `in_progress` y cierro un hito menor,
+solo actualizo `docs/planning/<slug>.md` (que casi nunca conflicta —
+un archivo por iniciativa). El próximo hito y la última actividad se
+infieren del header del planning doc.
+
+Resultado: ~70% menos ediciones al archivo hotspot. Cowork edita
+`INITIATIVES.md` cuando crea iniciativas y cuando ajusta alcance; yo
+edito solo en transiciones mayores. Los dos roles raramente coinciden
+en el mismo PR.
+
+#### Regla 2: rebase preventivo sobre `origin/main`
+
+**Antes de cada `git push`** que toca `docs/strategy/*` o cualquier
+archivo que sé que es hotspot, correr:
+
+```bash
+git fetch origin
+git rebase origin/main
+```
+
+Si hay conflicto, resolverlo en local antes de pushear:
+
+- **Para `INITIATIVES.md`** (datos de estado): tomar la versión de
+  `origin/main` (`git checkout --theirs docs/strategy/INITIATIVES.md`)
+  como verdad por orden de merge, luego reaplicar mi edición encima
+  si todavía aplica. Si mi edición ya quedó obsoleta (ej. otro PR ya
+  movió la fila a `done`), la descarto.
+- **Para cualquier otro archivo**: resolver manualmente y verificar
+  con `npm run format:check` + `npm run typecheck` antes de seguir.
+
+Si el PR ya tiene revisores con comentarios, usar `git merge
+origin/main` (más feo pero no rompe referencias) en lugar de rebase.
+
+Si el conflicto aparece en GitHub porque no rebaseé antes, el flujo
+es el mismo:
+
+```bash
+git fetch origin
+git checkout <my-branch>
+git merge origin/main                  # o rebase si seguro
+# resolver conflictos
+git checkout --theirs <hotspot-file>   # o resolución manual
+npm run format:check && npm run typecheck && npm run test:run && npm run lint
+git add . && git -c core.editor=true merge --continue
+git push
+gh pr checks <PR> --watch --interval 15
+```
+
+#### Cuándo escalar a auto-generación
+
+Si después de ~2 semanas con Reglas 1+2 seguimos teniendo conflicts en
+`INITIATIVES.md` con frecuencia, escalar a una alternativa:
+
+1. Cada `docs/planning/<slug>.md` ya tiene un header parseable.
+2. Crear `npm run initiatives:gen` que lea todos los headers y
+   regenere `INITIATIVES.md` automáticamente.
+3. CI valida con `npm run initiatives:check` que el archivo está en
+   sync.
+4. Resultado: cero edits manuales a `INITIATIVES.md`. Conflicts solo
+   posibles si dos PRs tocan el mismo planning doc — extremadamente
+   raro.
+
+Hasta entonces, Reglas 1+2 deberían ser suficientes.
+
 ---
 
 ## Reglas DB
