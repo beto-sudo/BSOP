@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   Boxes,
@@ -19,11 +19,13 @@ import {
   EmptyState,
   TableSkeleton,
   ErrorBanner,
+  ActiveFiltersChip,
 } from '@/components/module-page';
 import { CategoryFilterStrip } from '@/components/inventario/category-filter-strip';
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { SortableHead } from '@/components/ui/sortable-head';
 import { useSortableTable } from '@/hooks/use-sortable-table';
+import { useUrlFilters } from '@/hooks/use-url-filters';
 import { Combobox } from '@/components/ui/combobox';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -33,6 +35,15 @@ import { RegistrarMovimientoDialog } from '@/components/inventario/registrar-mov
 import { printStockList } from '@/components/inventario/print-stock-list';
 import { type StockItem } from '@/components/inventario/types';
 import { computeStockStats, formatCurrency } from '@/components/inventario/utils';
+
+const FILTER_DEFAULTS = {
+  search: '',
+  showServicios: false,
+  showBajoMinimo: false,
+  categoriaFiltro: '',
+  clasificacionFiltro: '',
+  fechaCorte: '',
+};
 
 /**
  * Inventario · tab "Stock" (default landing del módulo).
@@ -50,16 +61,21 @@ export default function InventarioStockPage() {
   const [errorStock, setErrorStock] = useState<string | null>(null);
   const { sortKey, sortDir, onSort, sortData } = useSortableTable('nombre', 'asc');
 
-  // UI state
-  const [search, setSearch] = useState('');
-  const [showServicios, setShowServicios] = useState(false);
-  const [showBajoMinimo, setShowBajoMinimo] = useState(false);
+  // URL-synced filters
+  const { filters, setFilter, clearAll, activeCount } = useUrlFilters(FILTER_DEFAULTS);
+  const {
+    search,
+    showServicios,
+    showBajoMinimo,
+    categoriaFiltro,
+    clasificacionFiltro,
+    fechaCorte,
+  } = filters;
+
+  // UI-only state (drawers / dialogs are not URL-synced)
   const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [fechaCorte, setFechaCorte] = useState<string | null>(null);
-  const [categoriaFiltro, setCategoriaFiltro] = useState<string>('');
-  const [clasificacionFiltro, setClasificacionFiltro] = useState<string>('');
 
   const fetchStock = useCallback(async () => {
     setLoadingStock(true);
@@ -100,8 +116,9 @@ export default function InventarioStockPage() {
   }, []);
 
   useEffect(() => {
-    void fetchStock();
-  }, [fetchStock]);
+    if (fechaCorte) void fetchStockHistorico(fechaCorte);
+    else void fetchStock();
+  }, [fechaCorte, fetchStock, fetchStockHistorico]);
 
   const handleRefresh = () => {
     if (fechaCorte) void fetchStockHistorico(fechaCorte);
@@ -112,13 +129,17 @@ export default function InventarioStockPage() {
     void fetchStock();
   };
 
-  const fechaLabel = fechaCorte
-    ? new Date(fechaCorte + 'T12:00:00').toLocaleDateString('es-MX', {
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric',
-      })
-    : null;
+  const fechaLabel = useMemo(
+    () =>
+      fechaCorte
+        ? new Date(fechaCorte + 'T12:00:00').toLocaleDateString('es-MX', {
+            day: '2-digit',
+            month: 'long',
+            year: 'numeric',
+          })
+        : null,
+    [fechaCorte]
+  );
 
   const filteredStock = items.filter((i) => {
     if (showServicios && i.inventariable) return false;
@@ -175,7 +196,7 @@ export default function InventarioStockPage() {
         <CategoryFilterStrip
           items={filteredStock}
           activeCategory={categoriaFiltro}
-          onSelect={setCategoriaFiltro}
+          onSelect={(value) => setFilter('categoriaFiltro', value)}
         />
       )}
 
@@ -190,7 +211,7 @@ export default function InventarioStockPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => printStockList(filteredStock, fechaCorte)}
+              onClick={() => printStockList(filteredStock, fechaCorte || null)}
               className="gap-2"
             >
               <Printer className="h-3.5 w-3.5" />
@@ -208,7 +229,7 @@ export default function InventarioStockPage() {
           <Input
             placeholder="Buscar producto…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => setFilter('search', e.target.value)}
             className="pl-9"
           />
         </div>
@@ -216,7 +237,7 @@ export default function InventarioStockPage() {
         <Button
           variant={showServicios ? 'default' : 'outline'}
           size="sm"
-          onClick={() => setShowServicios((v) => !v)}
+          onClick={() => setFilter('showServicios', !showServicios)}
           className="gap-2"
         >
           <Boxes className="h-3.5 w-3.5" />
@@ -226,7 +247,7 @@ export default function InventarioStockPage() {
         <Button
           variant={showBajoMinimo ? 'default' : 'outline'}
           size="sm"
-          onClick={() => setShowBajoMinimo((v) => !v)}
+          onClick={() => setFilter('showBajoMinimo', !showBajoMinimo)}
           className="gap-2"
         >
           <AlertTriangle className="h-3.5 w-3.5" />
@@ -235,7 +256,7 @@ export default function InventarioStockPage() {
 
         <Combobox
           value={categoriaFiltro}
-          onChange={setCategoriaFiltro}
+          onChange={(value) => setFilter('categoriaFiltro', value ?? '')}
           options={[
             'Alimentos',
             'Bebidas',
@@ -253,7 +274,7 @@ export default function InventarioStockPage() {
 
         <Combobox
           value={clasificacionFiltro}
-          onChange={setClasificacionFiltro}
+          onChange={(value) => setFilter('clasificacionFiltro', value ?? '')}
           options={['inventariable', 'consumible', 'merchandising', 'activo_fijo'].map((c) => ({
             value: c,
             label: c,
@@ -269,32 +290,23 @@ export default function InventarioStockPage() {
           <input
             type="date"
             max={new Date().toISOString().split('T')[0]}
-            value={fechaCorte ?? ''}
-            onChange={(e) => {
-              if (!e.target.value) {
-                setFechaCorte(null);
-                void fetchStock();
-              } else {
-                setFechaCorte(e.target.value);
-                void fetchStockHistorico(e.target.value);
-              }
-            }}
+            value={fechaCorte}
+            onChange={(e) => setFilter('fechaCorte', e.target.value)}
             className="rounded-md border border-input bg-transparent px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
           {fechaCorte && (
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => {
-                setFechaCorte(null);
-                void fetchStock();
-              }}
+              onClick={() => setFilter('fechaCorte', '')}
               className="text-xs h-7 px-2"
             >
               × Hoy
             </Button>
           )}
         </div>
+
+        <ActiveFiltersChip count={activeCount} onClearAll={clearAll} />
 
         <Button variant="outline" size="icon" onClick={handleRefresh} aria-label="Actualizar">
           <RefreshCw className={`h-4 w-4 ${loadingStock ? 'animate-spin' : ''}`} />
@@ -386,20 +398,12 @@ export default function InventarioStockPage() {
                     <EmptyState
                       icon={<Boxes className="h-8 w-8" />}
                       title={
-                        search ||
-                        showBajoMinimo ||
-                        showServicios ||
-                        categoriaFiltro ||
-                        clasificacionFiltro
+                        activeCount > 0
                           ? 'Ningún producto coincide con los filtros'
                           : 'Aún no hay productos'
                       }
                       description={
-                        search ||
-                        showBajoMinimo ||
-                        showServicios ||
-                        categoriaFiltro ||
-                        clasificacionFiltro
+                        activeCount > 0
                           ? 'Limpia los filtros para ver el inventario completo.'
                           : 'Registra el primer movimiento para que aparezca aquí.'
                       }

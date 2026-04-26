@@ -5,6 +5,7 @@ import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, RefreshCw, CalendarDays } from 'lucide-react';
+import { ActiveFiltersChip } from '@/components/module-page';
 import type { CorteOption } from './types';
 import { STATUS_OPTIONS } from './types';
 import { formatDate } from './utils';
@@ -26,6 +27,8 @@ export type VentasFiltersProps = {
   loading: boolean;
   onRefresh: () => void;
   count: number;
+  activeCount: number;
+  onClearAll: () => void;
 };
 
 export function VentasFilters({
@@ -45,6 +48,8 @@ export function VentasFilters({
   loading,
   onRefresh,
   count,
+  activeCount,
+  onClearAll,
 }: VentasFiltersProps) {
   return (
     <div className="flex flex-wrap items-end gap-3">
@@ -118,6 +123,8 @@ export function VentasFilters({
       <Button variant="outline" size="icon" onClick={onRefresh} aria-label="Actualizar">
         <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
       </Button>
+
+      <ActiveFiltersChip count={activeCount} onClearAll={onClearAll} />
 
       <span className="text-sm text-muted-foreground">
         {loading ? 'Cargando…' : `${count} pedido${count !== 1 ? 's' : ''}`}
