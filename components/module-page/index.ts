@@ -4,6 +4,8 @@ export { ModuleHeader } from './module-header';
 export type { ModuleHeaderProps } from './module-header';
 export { ModuleTabs } from './module-tabs';
 export type { ModuleTab, ModuleTabsProps } from './module-tabs';
+export { RoutedModuleTabs } from './routed-module-tabs';
+export type { RoutedModuleTab, RoutedModuleTabsProps } from './routed-module-tabs';
 export { ModuleKpiStrip } from './module-kpi-strip';
 export type { ModuleKpi, ModuleKpiStripProps } from './module-kpi-strip';
 export { ModuleFilters } from './module-filters';

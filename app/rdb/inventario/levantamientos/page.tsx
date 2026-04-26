@@ -21,7 +21,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { InventarioTabs } from '@/components/inventario/inventario-tabs';
 import {
   LevantamientoStatusBadge,
   type LevantamientoEstado,
@@ -91,9 +90,7 @@ function LevantamientosListaInner() {
   const cerrados = items.filter((i) => i.estado === 'aplicado' || i.estado === 'cancelado');
 
   return (
-    <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
-      <InventarioTabs activeKey="levantamientos" />
-
+    <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Levantamientos físicos</h1>
