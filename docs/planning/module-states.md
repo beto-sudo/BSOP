@@ -3,10 +3,10 @@
 **Slug:** `module-states`
 **Empresas:** todas
 **Schemas afectados:** n/a (UI)
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-04-26
-**Última actualización:** 2026-04-26
+**Última actualización:** 2026-04-26 (cerrada)
 
 ## Problema
 
@@ -133,7 +133,7 @@ decisiones repetidas + drift visual + copy disperso.
 
 ## Sprints / hitos
 
-- **Fase 1 — componentes + adopción inicial.** ⏳ **En curso (PR abierto).** Salida: 3 componentes compartidos (`<EmptyState>`, `<TableSkeleton>`, `<ErrorBanner>`) + ADR-006 + adopción en Ventas (`<VentasTable>`) e Inventario (`/rdb/inventario`) + checks en `ui-rubric.md` Sections 1-2. Próximo hito: Beto smoke + merge.
+- **Fase 1 — componentes + adopción inicial.** ✅ **Cerrada 2026-04-26.** PR [#214](https://github.com/beto-sudo/BSOP/pull/214) mergeado. Salida: 3 componentes compartidos (`<EmptyState>`, `<TableSkeleton>`, `<ErrorBanner>`) + ADR-006 + adopción en Ventas (`<VentasTable>`) e Inventario (`/rdb/inventario`) + checks en `ui-rubric.md` Sections 1-2.
 - **Fase 2 — adopción incremental en módulos restantes.** ⏸️ Sin PR único. Cada migración futura a `<ModulePage>` (parte de la iniciativa `module-page` Fase 2) trae los 3 componentes por construcción.
 
 ## Decisiones registradas
@@ -145,3 +145,4 @@ decisiones repetidas + drift visual + copy disperso.
 ## Bitácora
 
 - **2026-04-26 (CC)** — Fase 1 implementada. Branch `feat/ui-module-states`. Componentes nuevos: `components/module-page/empty-state.tsx`, `components/module-page/table-skeleton.tsx`, `components/module-page/error-banner.tsx`, exportados desde el barrel. Migraciones: `<ErrorBanner>` en `components/ventas/ventas-view.tsx` con `onRetry={() => fetchPedidos()}`; `<TableSkeleton rows={8} columns={6}>` + `<EmptyState>` con copy de "filtros activos" en `components/ventas/ventas-table.tsx`; `<ErrorBanner onRetry={handleRefresh}>` + `<TableSkeleton rows={8} columns={8}>` + `<EmptyState>` (copy condicional virgen/filtros) en `app/rdb/inventario/page.tsx`. ADR-006 (`docs/adr/006_module_states.md`) creado con 5 reglas (S1-S5). `docs/qa/ui-rubric.md` Sections 1-2 actualizadas con checks específicos a los 3 componentes. INITIATIVES.md: `module-states` planned → in_progress.
+- **2026-04-26 (CC)** — Fase 1 cerrada. PR [#214](https://github.com/beto-sudo/BSOP/pull/214) mergeado a main vía squash (`7909f72`). Iniciativa movida a `## Done` en INITIATIVES.md. Fase 2 queda como adopción incremental por construcción en cada migración futura — sin PR único asociado.

@@ -18,3 +18,5 @@ export { TableSkeleton } from './table-skeleton';
 export type { TableSkeletonProps } from './table-skeleton';
 export { ErrorBanner } from './error-banner';
 export type { ErrorBannerProps } from './error-banner';
+export { ActiveFiltersChip } from './active-filters-chip';
+export type { ActiveFiltersChipProps } from './active-filters-chip';

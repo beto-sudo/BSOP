@@ -16,10 +16,11 @@
  * Behavior preserved 1:1 — no data-fetching, routing, or UI semantics changed.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getLocalDayBoundsUtc } from '@/lib/timezone';
 import { useSortableTable } from '@/hooks/use-sortable-table';
+import { useUrlFilters } from '@/hooks/use-url-filters';
 import { ErrorBanner } from '@/components/module-page';
 import { OrderDetail } from './order-detail';
 import { SummaryBar } from './summary-bar';
@@ -37,37 +38,40 @@ export function VentasView() {
   const [loading, setLoading] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
   const [productoSearch, setProductoSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [corteFilter, setCorteFilter] = useState<string>('all');
   const { sortKey, sortDir, onSort, sortData } = useSortableTable<Pedido>('timestamp', 'desc');
   const [cortes, setCortes] = useState<CorteOption[]>([]);
-  const [dateFrom, setDateFrom] = useState(() => todayRange().from);
-  const [dateTo, setDateTo] = useState(() => todayRange().to);
-  const [presetKey, setPresetKey] = useState<string>('hoy');
+
+  // URL-synced filter defaults are captured once at mount (today's date range).
+  // Re-opening a stale tab the next day keeps the previous defaults; that's
+  // accepted v1 behavior — the user sees an explicit `?date_from=…` and can
+  // hit "Limpiar filtros" to snap back to today.
+  const filterDefaults = useMemo(() => {
+    const today = todayRange();
+    return {
+      search: '',
+      statusFilter: 'all',
+      corteFilter: 'all',
+      dateFrom: today.from,
+      dateTo: today.to,
+      presetKey: 'hoy',
+    };
+  }, []);
+  const { filters, setFilter, setFilters, clearAll, activeCount } = useUrlFilters(filterDefaults);
+  const { search, statusFilter, corteFilter, dateFrom, dateTo, presetKey } = filters;
 
   const handlePreset = (preset: string | null) => {
     if (!preset) return;
-    setPresetKey(preset);
-    localStorage.setItem('rdb_preset_ventas', preset);
-    if (!preset) return;
     const range = rangeForPreset(preset);
     if (range) {
-      setDateFrom(range.from);
-      setDateTo(range.to);
+      setFilters({ presetKey: preset, dateFrom: range.from, dateTo: range.to });
+    } else {
+      setFilter('presetKey', preset);
     }
   };
   const [selected, setSelected] = useState<Pedido | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    const saved = localStorage.getItem('rdb_preset_ventas');
-    if (saved && saved !== 'hoy') {
-      handlePreset(saved);
-    }
-  }, []);
 
   // Fetch cortes for the selected date range
   const fetchCortes = useCallback(async () => {
@@ -233,27 +237,23 @@ export function VentasView() {
       {/* Filters */}
       <VentasFilters
         search={tab === 'pedidos' ? search : ''}
-        onSearchChange={setSearch}
+        onSearchChange={(value) => setFilter('search', value)}
         statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
+        onStatusFilterChange={(value) => setFilter('statusFilter', value)}
         corteFilter={corteFilter}
-        onCorteFilterChange={setCorteFilter}
+        onCorteFilterChange={(value) => setFilter('corteFilter', value)}
         cortes={cortes}
         dateFrom={dateFrom}
         dateTo={dateTo}
-        onDateFromChange={(value) => {
-          setDateFrom(value);
-          setPresetKey('custom');
-        }}
-        onDateToChange={(value) => {
-          setDateTo(value);
-          setPresetKey('custom');
-        }}
+        onDateFromChange={(value) => setFilters({ dateFrom: value, presetKey: 'custom' })}
+        onDateToChange={(value) => setFilters({ dateTo: value, presetKey: 'custom' })}
         presetKey={presetKey}
         onPresetChange={handlePreset}
         loading={loading}
         onRefresh={() => void fetchPedidos()}
         count={filtered.length}
+        activeCount={activeCount}
+        onClearAll={clearAll}
       />
 
       {/* Error */}
