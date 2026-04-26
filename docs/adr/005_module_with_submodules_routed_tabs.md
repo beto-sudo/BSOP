@@ -95,7 +95,7 @@ Tabs en el page con estilo distinto al strip principal (pills), tratando de evit
 
 ### Aclaración a ADR-004 R1
 
-R1 originalmente decía: *"Un solo nivel de tabs por página. Si necesitas otro nivel, son módulos hermanos en el sidebar."*
+R1 originalmente decía: _"Un solo nivel de tabs por página. Si necesitas otro nivel, son módulos hermanos en el sidebar."_
 
 Se aclara: **"Un solo nivel de tabs visible por página."** Los tabs pueden vivir en un `layout.tsx` compartido entre rutas hermanas siempre que solo se vea un strip — la fuente del strip (page o layout) es indistinta para el usuario. Sub-detalles profundos heredan el strip por consistencia, manteniendo "un strip visible".
 

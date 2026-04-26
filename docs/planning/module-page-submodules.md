@@ -3,10 +3,10 @@
 **Slug:** `module-page-submodules`
 **Empresas:** RDB (primero), todas (el patrón es cross-empresa)
 **Schemas afectados:** n/a (UI)
-**Estado:** proposed
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-25
-**Última actualización:** 2026-04-25
+**Última actualización:** 2026-04-26
 
 ## Problema
 
@@ -71,12 +71,44 @@ El patrón que necesitamos resuelve esto en general: cualquier módulo con sub-m
 
 ## Sprints / hitos
 
-_(se llena cuando arranque ejecución, vía Claude Code)_
+### Sprint 1 — Refactor de RDB Inventario al patrón routed tabs (en review)
+
+Owner: Claude Code (ejecución) → Beto (review/merge)
+Branch: `feat/module-page-submodules-rdb-inventario`
+
+Entregables del alcance v1:
+
+- [x] Revertir entry `Levantamientos` del sidebar (`nav-config.ts`).
+- [x] Crear `app/rdb/inventario/layout.tsx` con `<ModulePage>`, `<ModuleHeader>`, `<RoutedModuleTabs>` y `<RequireAccess>` compartidos.
+- [x] Crear `<RoutedModuleTabs>` reusable (`components/module-page/routed-module-tabs.tsx`) con paridad visual a `<ModuleTabs>` pero basado en `next/link` + `usePathname()`.
+- [x] Splittear page.tsx: Stock view en `app/rdb/inventario/page.tsx` (default landing), Movimientos view en `app/rdb/inventario/movimientos/page.tsx` (nuevo).
+- [x] Extraer helpers compartidos a `components/inventario/`: `types.ts`, `utils.ts`, `stock-detail-drawer.tsx`, `registrar-movimiento-dialog.tsx`, `print-stock-list.ts`. Permite reuso entre Stock, Movimientos y futuros consumers; reduce el page.tsx de Stock de 1369 líneas a ~450.
+- [x] Editar `levantamientos/page.tsx`: quitar import + render de `<InventarioTabs>` y wrapper `container max-w-6xl` (ahora hereda layout).
+- [x] Borrar `components/inventario/inventario-tabs.tsx`. `git grep` confirmó cero consumidores externos.
+- [x] Sub-detalles `levantamientos/[id]`, `[id]/capturar`, `[id]/diferencias`, `[id]/reporte`, `nuevo` heredan layout sin cambios — ya tenían comentarios "NO renderiza `<InventarioTabs>`".
+- [x] A11y: `role="tablist"` + `role="tab"` + `aria-current="page"` + `aria-selected` en `<RoutedModuleTabs>`.
+
+Validación local antes de PR:
+
+- `npm run typecheck` → 0 errors.
+- `npm run lint` → 0 errors, 57 warnings (todas preexistentes; las 2 que sumé al inicio se eliminaron al quitar `eslint-disable` directives no usadas en los pages nuevos).
+- `npm run test:run` → 161/161 passing.
+- `npx prettier --check` → clean en todos los archivos tocados.
+
+Pendiente post-merge:
+
+- [ ] Smoke manual: refresh sobre `/rdb/inventario`, `/rdb/inventario/movimientos`, `/rdb/inventario/levantamientos` y un sub-detalle (`/levantamientos/[id]`). Browser back/forward navega entre tabs.
+- [ ] Validar responsive ≤375px — 3 tabs underline con texto debe entrar sin truncar.
+- [ ] Validar que el flujo "Registrar Movimiento" sigue funcionando desde Stock (donde ahora vive el botón en el filter bar).
+- [ ] Confirmar visualmente con Beto que el header del page de Levantamientos ("Levantamientos físicos" + descripción) bajo el header del layout ("Inventario") no luce redundante. Si se ve mal, abrir sub-PR para limpiar el header interno del page de Levantamientos.
 
 ## Decisiones registradas
 
-_(append-only, fechadas — escrito por Claude Code)_
+- **2026-04-26 — `<RoutedModuleTabs>` como componente nuevo, no extensión de `<ModuleTabs>`.** `<ModuleTabs>` es state-based (`value` + `onChange`) y se mantiene para casos no-routed (cualquier page con tabs internos sin URL distinta). `<RoutedModuleTabs>` es Link-based. Razón: APIs muy distintas, mezclarlas con un union type confunde callers. Costo: ~50 líneas duplicadas de estilos (acceptable).
+- **2026-04-26 — Botón "Registrar Movimiento" se mueve del header al filter bar de Stock (no aparece en Movimientos).** El header del layout es genérico ("Inventario"); poner action ahí lo acopla a una page específica. El page de Movimientos no carga `productos` (no los necesita para mostrar la tabla); habilitar el dialog desde ahí requeriría duplicar fetch o levantar state al layout. Tradeoff aceptable: usuario en Movimientos hace 1 click extra para ir a Stock y registrar. Si se vuelve fricción real, levantar el dialog al layout en sub-PR.
+- **2026-04-26 — Helpers extraídos a `components/inventario/` (no a `app/rdb/inventario/_shared/`).** El dir `components/inventario/` ya existía y aloja UI específico del dominio inventario. Mantener la convención. Los archivos `_*` con underscore son para co-location en App Router (rutas privadas), pero estos helpers no son ruta-locales — se reusarán desde Movimientos también, y potencialmente desde Cortes/Productos en el futuro.
+- **2026-04-26 — `<RequireAccess>` se levanta al layout.** Antes vivía en cada page. Hacerlo en el layout reduce duplicación y garantiza que sub-detalles profundos (que también heredan el layout) tengan el access check. Los pages internos NO repiten el `<RequireAccess>` para evitar doble check.
 
 ## Bitácora
 
-_(append-only, escrita por Claude Code al ejecutar)_
+- **2026-04-26** — Branch `feat/module-page-submodules-rdb-inventario` creada desde `origin/main` fresco. Implementado el alcance v1 completo (12 archivos: 4 modified, 1 deleted, 7 new). Validación local pasa. PR abierto: pendiente de smoke manual de Beto en navegador antes de mergear.

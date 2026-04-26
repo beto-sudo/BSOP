@@ -23,12 +23,12 @@
 
 ## Activas
 
-| Iniciativa               | Slug                 | Empresas | Schemas                     | Estado      | Próximo hito                                                                                             | Última actualización |
-| ------------------------ | -------------------- | -------- | --------------------------- | ----------- | -------------------------------------------------------------------------------------------------------- | -------------------- |
-| Analytics (BI externo)   | `analytics`          | todas    | analytics, erp, dilesa, rdb | blocked     | Sprint 0 — desbloquear export del bootstrap (Metabase + Caddy + Postgres) desde Cowork al repo Analytics | 2026-04-25           |
-| DILESA UI Terrenos       | `dilesa-ui-terrenos` | DILESA   | dilesa                      | in_progress | Cerrar `feat/dilesa-ui-terrenos` y abrir PR                                                              | 2026-04-??           |
-| Module Page (UI ADR-004) | `module-page`        | todas    | n/a (UI)                    | in_progress | Fase 2 — migrar segunda página al componente `<ModulePage>`                                              | 2026-04-25           |
-| Module-page sub-módulos  | `module-page-submodules` | RDB (primero), todas | n/a (UI)                    | proposed    | Plan + ADR-005 aprobados → CC ejecuta refactor de Inventario                                             | 2026-04-25           |
+| Iniciativa               | Slug                     | Empresas             | Schemas                     | Estado      | Próximo hito                                                                                             | Última actualización |
+| ------------------------ | ------------------------ | -------------------- | --------------------------- | ----------- | -------------------------------------------------------------------------------------------------------- | -------------------- |
+| Analytics (BI externo)   | `analytics`              | todas                | analytics, erp, dilesa, rdb | blocked     | Sprint 0 — desbloquear export del bootstrap (Metabase + Caddy + Postgres) desde Cowork al repo Analytics | 2026-04-25           |
+| DILESA UI Terrenos       | `dilesa-ui-terrenos`     | DILESA               | dilesa                      | in_progress | Cerrar `feat/dilesa-ui-terrenos` y abrir PR                                                              | 2026-04-??           |
+| Module Page (UI ADR-004) | `module-page`            | todas                | n/a (UI)                    | in_progress | Fase 2 — migrar segunda página al componente `<ModulePage>`                                              | 2026-04-25           |
+| Module-page sub-módulos  | `module-page-submodules` | RDB (primero), todas | n/a (UI)                    | in_progress | PR de refactor RDB Inventario abierto → smoke manual + merge (Beto)                                      | 2026-04-26           |
 
 ## Done (referencia histórica)
 
