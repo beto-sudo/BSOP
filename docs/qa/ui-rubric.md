@@ -29,33 +29,37 @@ Role tested: [admin / user / no-access]
 
 ## Section 1 — Page Load & Structure
 
-| Check                                             | Result | Notes |
-| ------------------------------------------------- | ------ | ----- |
-| Page loads without console errors                 |        |       |
-| No blank/white flash before content               |        |       |
-| Skeleton loading states visible during fetch      |        |       |
-| Page title / heading matches sidebar label        |        |       |
-| Correct empresa icon / context shown              |        |       |
-| "Acceso restringido" shows for unauthorized users |        |       |
-| Breadcrumb or back navigation present (if nested) |        |       |
+| Check                                                                         | Result | Notes |
+| ----------------------------------------------------------------------------- | ------ | ----- |
+| Page loads without console errors                                             |        |       |
+| No blank/white flash before content                                           |        |       |
+| First-load skeleton uses `<TableSkeleton>` (not ad-hoc Array.map of Skeleton) |        |       |
+| Refetch with data already loaded does NOT replace table with skeleton (S4)    |        |       |
+| Fetch error renders `<ErrorBanner>` between filters and content (ADR-004 R10) |        |       |
+| `<ErrorBanner>` has Reintentar button when fetch is idempotent (S5)           |        |       |
+| Page title / heading matches sidebar label                                    |        |       |
+| Correct empresa icon / context shown                                          |        |       |
+| "Acceso restringido" shows for unauthorized users                             |        |       |
+| Breadcrumb or back navigation present (if nested)                             |        |       |
 
 ---
 
 ## Section 2 — Table / List View
 
-| Check                                                   | Result | Notes |
-| ------------------------------------------------------- | ------ | ----- |
-| Table renders with column headers                       |        |       |
-| Column headers are labeled and readable                 |        |       |
-| Data rows render correctly                              |        |       |
-| Row hover state is visible                              |        |       |
-| Rows are clickable (cursor changes)                     |        |       |
-| Clicking a row opens the expected Sheet or navigates    |        |       |
-| Empty state message shown when 0 results                |        |       |
-| Loading skeleton shown while fetching                   |        |       |
-| Badge statuses (activo/inactivo etc.) render with color |        |       |
-| Currency / date formats are correct (es-MX locale)      |        |       |
-| Long text truncates (no layout breakage)                |        |       |
+| Check                                                                                   | Result | Notes |
+| --------------------------------------------------------------------------------------- | ------ | ----- |
+| Table renders with column headers                                                       |        |       |
+| Column headers are labeled and readable                                                 |        |       |
+| Data rows render correctly                                                              |        |       |
+| Row hover state is visible                                                              |        |       |
+| Rows are clickable (cursor changes)                                                     |        |       |
+| Clicking a row opens the expected Sheet or navigates                                    |        |       |
+| Empty state uses `<EmptyState>` (not ad-hoc `<TableCell colSpan>` text)                 |        |       |
+| Empty state distinguishes "módulo virgen" vs "filtros activos" with different copy (S3) |        |       |
+| Loading uses `<TableSkeleton>` with column count matching the real table shape (S2)     |        |       |
+| Badge statuses (activo/inactivo etc.) render with color                                 |        |       |
+| Currency / date formats are correct (es-MX locale)                                      |        |       |
+| Long text truncates (no layout breakage)                                                |        |       |
 
 ---
 

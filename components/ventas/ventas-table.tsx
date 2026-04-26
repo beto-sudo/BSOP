@@ -1,9 +1,10 @@
 'use client';
 
+import { Inbox } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { SortableHead } from '@/components/ui/sortable-head';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState, TableSkeleton } from '@/components/module-page';
 import type { Pedido } from './types';
 import { formatCurrency, formatDate, statusVariant } from './utils';
 
@@ -80,19 +81,15 @@ export function VentasTable({
         </TableHeader>
         <TableBody>
           {loading ? (
-            Array.from({ length: 8 }).map((_, i) => (
-              <TableRow key={i}>
-                {Array.from({ length: 4 }).map((__, j) => (
-                  <TableCell key={j}>
-                    <Skeleton className="h-4 w-full" />
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))
+            <TableSkeleton rows={8} columns={6} />
           ) : pedidos.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={4} className="py-12 text-center text-muted-foreground">
-                No se encontraron pedidos para el rango seleccionado.
+              <TableCell colSpan={6} className="p-0">
+                <EmptyState
+                  icon={<Inbox className="h-8 w-8" />}
+                  title="Sin pedidos en el rango seleccionado"
+                  description="Ajusta las fechas, el corte o los filtros activos para ver pedidos."
+                />
               </TableCell>
             </TableRow>
           ) : (

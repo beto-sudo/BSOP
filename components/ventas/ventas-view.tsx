@@ -20,6 +20,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getLocalDayBoundsUtc } from '@/lib/timezone';
 import { useSortableTable } from '@/hooks/use-sortable-table';
+import { ErrorBanner } from '@/components/module-page';
 import { OrderDetail } from './order-detail';
 import { SummaryBar } from './summary-bar';
 import { VentasFilters } from './ventas-filters';
@@ -256,11 +257,7 @@ export function VentasView() {
       />
 
       {/* Error */}
-      {error ? (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
-      ) : null}
+      {error ? <ErrorBanner error={error} onRetry={() => void fetchPedidos()} /> : null}
 
       {tab === 'pedidos' ? (
         <>
