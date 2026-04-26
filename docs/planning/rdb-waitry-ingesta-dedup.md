@@ -2,7 +2,7 @@
 
 **Slug:** `rdb-waitry-ingesta-dedup`
 **Empresas:** RDB
-**Schemas afectados:** rdb (waitry\_\*), erp (cortes_caja, cortes_movimientos)
+**Schemas afectados:** rdb (waitry\_\*), erp (cortes_caja, movimientos_caja, movimientos_inventario)
 **Estado:** proposed
 **Dueño:** Beto
 **Creada:** 2026-04-26
@@ -84,12 +84,20 @@ Mientras esto no se entienda y se cierre, los cortes RDB siguen requiriendo reco
 
 ## Sprints / hitos
 
-_(se llena cuando arranque ejecución, vía Claude Code)_
+- **Fase 1 — investigación read-only.** ✅ **Cerrada 2026-04-26.** Salida: [ADR-005](../../supabase/adr/005_rdb_waitry_dedup_root_cause.md) con causa raíz, cifra histórica y 3 opciones de fix.
+- **Fase 2 — fix + UI de resolución.** ⏸️ Pendiente decisión de Beto sobre opción del ADR (A/B/C).
 
 ## Decisiones registradas
 
-_(append-only, fechadas — escrito por Claude Code)_
+- **2026-04-26 (CC) — Causa raíz NO está en pipeline DB.** Verificado read-only: `waitry_inbound.order_id` y `waitry_pedidos.order_id` ya tienen `UNIQUE`; trigger `process_waitry_inbound` usa `INSERT … ON CONFLICT DO UPDATE` (idempotente). Para los 6 `order_id`s sospechosos del corte ancla: 6 filas `waitry_inbound` con `payload_hash` distinto y `attempts=0` → no es replay ni retry. Origen real: doble-tap del operador en POS Waitry (no controlamos su código).
+- **2026-04-26 (CC) — Errores en doc planning corregidos al investigar:**
+  - El doc decía `erp.cortes_movimientos`; la tabla real es `erp.movimientos_caja` (movimientos manuales del cajero, ej. retiros). El esquema afectado por el dup es `erp.movimientos_inventario` vía `erp.fn_trg_waitry_to_movimientos`.
+  - El doc decía "Laisha (cajero RDB) reportó"; el corte fue cerrado por **Juan Pablo Hernández Martínez** según `realizado_por_nombre` de `movimientos_caja`. `cortes_caja.cajero_id` está NULL. Laisha pudo escalar verbalmente.
+  - El cajero anotó "$60 dup folio #17055382"; el order `17055382` realmente tiene total $0 + 0 productos. El dup REAL de $60 es `17055503/04`. Confusión visual de UI del corte.
+  - El cajero anotó "sobran $180 en tarjeta"; el delta real es **$180 FALTAN en EFECTIVO** (ver tabla en ADR sección 5).
+- **2026-04-26 (CC) — Bug latente independiente del dedup.** `rdb.v_cortes_totales` filtra `status <> 'order_cancelled'` (doble L, británico) cuando el status real escrito por el trigger es `'order_canceled'` (una L, americano). Resultado: pedidos cancelados se SIGUEN sumando en ingresos del corte. Afecta TODOS los cortes RDB con cancelaciones, no solo este. Recomendado fix en Opción C del ADR.
+- **2026-04-26 (CC) — Código muerto en DB.** `rdb.trg_procesar_venta_waitry()` referencia `rdb.inventario_movimientos` (tabla inexistente, fue reemplazada por `erp.movimientos_inventario`). Ningún trigger la usa. Recomendado drop en migración separada (no urgente).
 
 ## Bitácora
 
-_(append-only, escrita por Claude Code al ejecutar)_
+- **2026-04-26 (CC)** — Investigación Fase 1 completa. Branch `docs/rdb-waitry-ingesta-dedup-init`, commits `394e1d5` (alta de iniciativa por Cowork) + `ff60842` (chore format). Push a origin. ADR-005 creado con causa raíz, cifra histórica ($163k impacto en abril, 949 pares, 180 cortes afectados) y 3 opciones de fix (A descartada, B recomendada, C como mínimo viable). Próximo hito: Beto revisa ADR y decide alcance v2.
