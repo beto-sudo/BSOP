@@ -27,7 +27,7 @@ Se compararon los payloads JSON crudos de los dos miembros de un par dup confirm
 
 Cada par dup en el sistema replica este patrón: **dos órdenes con identidad propia en Waitry, no una orden enviada dos veces**. Confirmado adicionalmente para `17055503` (latest detected dup): mismo operador `pablo.hm@dilesa.mx`, dos cobros consecutivos de credit_card_visa $60 con ~3 segundos de diferencia, cada uno con su propia secuencia y `externalDeliveryId` único.
 
-**Implicación para la conversación con Waitry**: NO podemos reclamarles "el POS está duplicando órdenes". Eso es falso. Lo que podemos pedirles legítimamente: **agregar warning/double-confirm en el POS cuando el operador intenta crear una orden con productos+monto+mesa idénticos a una creada en los últimos N minutos**. Esto es UX preventiva que ataja el caso 95% sin afectar el caso del cliente legítimo que pide lo mismo dos veces seguidas (ese caso podría confirmar el warning).
+**Implicación para la conversación con Waitry**: NO podemos reclamarles "el POS está duplicando órdenes". Eso es falso. **Importante**: la magnitud real del doble-tap operacional es mucho menor de lo que el detector reporta — ver sección "El detector está sobre-estimando" más abajo, donde se concluye que las cifras crudas inflan ~5–10× el problema real. Cualquier conversación con Waitry debe esperar a que arreglemos primero nuestro detector para llevarles datos honestos.
 
 ## Patrón temporal — picos en horas de cierre, no aleatorio
 
@@ -67,7 +67,7 @@ hora | dups
 | Pádel 2                |           4 | 0.3%  |
 | Pádel 9                |           2 | 0.2%  |
 
-**El 97% del problema vive en la tablet de mostrador "Tiendita"** (layout `MOSTRADOR`, `tableId 94034`). Las tablets de Pádel (que son para reservación de canchas, no cobro rápido en línea) prácticamente no presentan el problema. Esto refuerza que el contexto operativo —cobro rápido a clientes en fila— es el factor principal.
+**El 97% del "problema" vive en la tablet de mostrador "Tiendita"** (layout `MOSTRADOR`, `tableId 94034`). **Importante** (ver sección "El detector está sobre-estimando" abajo): esta concentración refleja en gran parte un sesgo del detector — todas las ventas de mostrador comparten `table_name = "Tiendita"` y el `content_hash` no incluye `tableId`, así que ventas legítimas a clientes distintos en mostrador colisionan en el hash. La concentración real del doble-tap operacional en Tiendita probablemente es menor que la cifra cruda sugiere.
 
 ## Patrón humano — quién está haciendo doble-tap
 
@@ -94,19 +94,106 @@ Distribución del operador POS en pedidos B duplicados (1,247 pedidos B / pedido
 
 Los 139 pares con mismo operador son **doble-tap inequívoco**. Los 61 pares con operadores distintos son más interesantes: probables cambios de turno donde el siguiente cajero rehace la orden sin saber que ya estaba hecha — caso para resolución manual con contexto.
 
-## Severidad — cuántos pares involucran dinero realmente cobrado
+## Distinción crítica — "pago registrado en sistema" no es lo mismo que "cobro real al cliente"
+
+**Esta sección corrige una afirmación temprana de la forense que sobreestimaba la severidad.**
+
+El campo `paid` en `rdb.waitry_pedidos` y los rows de `rdb.waitry_pagos` con `amount > 0` provienen del payload JSON de Waitry — específicamente de `(p ->> 'paid')::boolean` y `payments[].amount`. **Reflejan lo que el operador del POS marcó como cobrado**, no necesariamente lo que la terminal de tarjeta procesó ni lo que el cliente físicamente entregó.
+
+Evidencia interna que ya lo confirmaba: la vista `rdb.v_waitry_pedidos_reversa_sospechosa` existe precisamente para detectar casos donde un mismo `order_id` tiene `payments[].amount` positivo y negativo compensándose (cancelación no marcada, reverso, refund). Su existencia es admisión tácita de que `paid=true` no implica cobro firme.
+
+Para los pares dup detectados, sin embargo: solo **6 pares (0.6%)** tienen alguna reversa interna, y **0 pedidos dup** caen en `v_waitry_pedidos_reversa_sospechosa` (esa vista solo dispara cuando + y − conviven en el MISMO `order_id`; los dups son `order_id`s distintos por construcción).
+
+## Severidad real — desglose por combinación de método de pago
 
 De los 949 pares pendientes:
 
-| Característica                                  | Pares | %     |
-| ----------------------------------------------- | ----: | ----- |
-| **Ambos miembros con `payment.amount > 0`**     |   936 | 98.6% |
-| Solo uno con pago (otro es orden vacía/anulada) |     3 | 0.3%  |
-| Ninguno con pago                                |    10 | 1.1%  |
-| Ambos con productos en `waitry_productos`       |   939 | 98.9% |
-| Status distinto entre los dos miembros          |    32 | 3.4%  |
+| Combinación de métodos en el par    | Pares | $ mínimo en par | ¿Doble cargo al cliente?                                                                                                                              |
+| ----------------------------------- | ----: | --------------: | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Algún miembro sin pago registrado   |    13 |              $0 | No aplica                                                                                                                                             |
+| **cash + cash**                     |   244 |         $47,032 | **NO** — cliente pagó cash 1 vez, segundo registro es fantasma. Faltante en cash al cierre.                                                           |
+| **cash + tarjeta**                  |   395 |         $91,518 | **NO** — cliente pagó por 1 método. El otro es fantasma. Descuadre cash o tarjeta al cierre.                                                          |
+| cash + STRIPE                       |     1 |            $100 | NO                                                                                                                                                    |
+| **tarjeta + tarjeta** (credit_card) |   275 |         $81,800 | **POSIBLE** — requiere reconciliar contra cierre de lote del banco. Subset incluye también falsos positivos: 2 clientes distintos comprando lo mismo. |
+| STRIPE + STRIPE                     |    10 |          $1,035 | POSIBLE — reconciliar contra Stripe dashboard                                                                                                         |
+| Otro / mixto                        |    11 |          $4,940 | Mixto                                                                                                                                                 |
 
-**98.6% de los pares involucran doble cobro real**, no son solo "fantasmas" de captura. Esto valida que la cifra de impacto $163k del ADR-005 es real, no inflada por orders vacías.
+### Recálculo del impacto financiero (preliminar — ver siguiente sección sobre falsos positivos)
+
+- **640 pares ($138,650) garantizado NO involucran doble cargo al cliente.** Son descuadres operativos puros: el operador marcó cobrado en una orden que ya estaba pagada en otra, el cliente solo entregó dinero una vez. El cajero al cierre nota el delta y atribuye la causa a la fuente equivocada (como vimos en el ADR-005 con "$180 sobran tarjeta" siendo en realidad "$180 faltan efectivo").
+- **285 pares ($82,835) son candidatos a doble cargo real al cliente.** De estos, una porción son falsos positivos del detector (siguiente sección).
+
+## El detector está sobre-estimando — falsos positivos sistémicos en mostrador
+
+Las cifras anteriores asumen que cada par detectado es un dup real. Después del desglose por método encontramos que la mayoría no son doble cobro al cliente. Pero hay **un problema más profundo**: muchos de los pares detectados ni siquiera son operacionalmente duplicados — son ventas legítimas distintas que el detector no sabe distinguir.
+
+### Causa: el `content_hash` es insuficiente
+
+`rdb.compute_content_hash(products, total_amount, table_name)` hashea SHA-256 sobre:
+
+```
+product_name + quantity (por ítem, ordenados)
++ total_amount
++ table_name  ← texto, no ID
+```
+
+**Lo que NO incluye**: `tableId` (mesa física), `orderUserId` (cliente identificado), `discountPrice` (descuentos por ítem), modifiers, secuencia interna del POS, ni nada que distinga clientes distintos.
+
+**Implicación crítica**: en el mostrador todas las ventas comparten `table_name = "Tiendita"` (es nombre del MOSTRADOR, no de mesa por cliente). Dos clientes distintos comprando lo mismo en la fila del mostrador dentro de 3 minutos generan **content_hash idéntico**. El detector marca dup donde no lo hay.
+
+### Evidencia — distribución de dups por mesa
+
+Del total de pedidos en abril 2026 con su tasa de pares dup detectados:
+
+| Mesa               | Pedidos abr | Marcados dup | % dup   |
+| ------------------ | ----------: | -----------: | ------- |
+| **Tiendita**       |   **1,730** |      **242** | **14%** |
+| Pádel 5            |          20 |            2 | 10.0%   |
+| Pádel 1            |          58 |            2 | 3.4%    |
+| Pádel 3            |          60 |            2 | 3.3%    |
+| Pádel 2/4/6/7/8/10 |      varios |            0 | 0%      |
+
+En las tablets de Pádel (donde el operador distingue mesa por reservación: `Pádel 1`, `Pádel 2`, etc., cada una con su propio `table_name` único por cancha y reserva) la tasa de dup es 3–4%, consistente con doble-tap operacional real. **En Tiendita es 14% — 4× más alta**, casi seguro porque el hash colisiona entre clientes distintos.
+
+Si la tasa "real" en Tiendita fuera comparable (3–4%), el conteo real de doble-tap en Tiendita sería ~60–70 pedidos al mes, no 242. Los otros ~170 son falsos positivos.
+
+### Evidencia — concentración en pocos hashes
+
+Solo dentro de Tiendita, agrupando los 949 pares por (`total_amount`, `content_hash`):
+
+| `total_amount` | Pares en par_a | Hashes distintos |
+| -------------- | -------------: | ---------------: |
+| $200           |        **360** |            **4** |
+| $300           |            184 |                2 |
+| $250           |             84 |                2 |
+| $800           |             16 |                1 |
+| $1,000         |              4 |                1 |
+| $425           |              7 |                1 |
+
+**360 "duplicados" de $200 con solo 4 productos distintos** no son 360 doble-taps. Son 4 productos populares (probablemente cubetas, combos o paquetes promocionales — Beto confirmó que las "cubetas de botellas" se facturan con `total_discount = total_amount` y precio individual descontado a 0) vendidos repetidamente a clientes distintos a lo largo del mes, donde cualquier 2 ventas en ventana de 3 minutos comparten hash.
+
+### Recálculo realista del impacto
+
+Combinando los dos sesgos detectados (pago registrado ≠ cobro real + falsos positivos por hash):
+
+| Estimación                                                                           | Pares       | $            |
+| ------------------------------------------------------------------------------------ | ----------- | ------------ |
+| Cifra cruda del detector (ADR-005, antes de refinar)                                 | 949         | $163,078     |
+| Pares con potencial doble cargo (después del análisis método de pago)                | 285         | $82,835      |
+| **Estimación honesta de pares operacionalmente reales (extrapolando tasa de Pádel)** | **~50–100** | **~$10–20k** |
+| Doble cargo confirmado al cliente (sin datos de reconciliación bancaria)             | desconocido | desconocido  |
+
+**El problema operacional es 5–10× más chico de lo que el detector reporta.** Sigue existiendo doble-tap real, pero la magnitud no justifica una conversación urgente con Waitry sobre "su POS está duplicando $163k al mes". Sí justifica un fix del detector y una UI mejor de cuadre para Laisha.
+
+### Cómo distinguir caso por caso (para Fase 2)
+
+Para los 285 pares "tarjeta+tarjeta" o "stripe+stripe", el flujo de resolución manual debería:
+
+1. **Cruzar contra `cortes_vouchers` con OCR procesado**. Si el voucher de la terminal del corte muestra un cierre de lote por monto X y la suma de tarjeta del sistema dice X+ delta, esos pares son fantasmas. Si los montos calzan, hubo doble cargo real.
+2. **Cuando OCR no esté disponible**, asumir conservadoramente como "fantasma" si el cajero no registró reclamo del cliente. Si hay reclamo, escalar a reconciliación bancaria.
+3. **Para STRIPE**, cruzar contra Stripe dashboard (cobro real al PAN del cliente). Más fácil que tarjeta porque tenemos visibilidad directa.
+
+Esto significa que la Opción B (UI de resolución) debe **integrar el voucher OCR** en el flujo, no ser solo "marcar resuelto".
 
 ## Cómo elegir "el bueno" — criterios para la UI de resolución (Fase 2)
 
@@ -120,36 +207,85 @@ Para que la UI de Opción B (resolución manual de duplicados) sugiera automáti
 
 UI debería mostrar: ambos pedidos lado a lado con sus diferencias resaltadas, sugerir el "bueno" según los criterios arriba, y permitir override manual con campo de razón obligatorio (audit trail).
 
-## Recomendaciones — qué reportar a Waitry, en qué orden
+## Recomendaciones — replanteadas con la nueva información
 
-### Para reportar a Waitry (cuando Beto decida)
+La prioridad cambia significativamente respecto a la versión inicial de este ADR. Antes de hablar con Waitry, debemos **arreglar el detector** porque sin datos confiables no podemos llevar una conversación honesta con ellos.
 
-Mensaje propuesto, basado en los datos arriba:
+### Prioridad 1 — arreglar `compute_content_hash` (nueva, antes era prioridad 2)
 
-> Detectamos un patrón sostenido en nuestro POS Waitry de Rincón del Bosque (placeId `11145`, tableId `94034` "Tiendita"): los operadores están creando órdenes idénticas (mismos productos, mismo total, misma mesa) con segundos de diferencia, presumiblemente por doble-tap en el flujo de cobro. En abril 2026 detectamos **949 pares de órdenes duplicadas, $163,078 de impacto en doble cobro**, concentradas 73% en horas pico (19:00–23:00) y 97% en una sola tablet de mostrador.
->
-> Verificamos que cada par tiene IDs internos completamente distintos en su sistema (`orderId`, `orderItemId`, `orderPaymentId`, `orderActionId`, `externalDeliveryId` todos únicos), por lo que no es un bug de transmisión ni replay del webhook — es operacional.
->
-> **Solicitud**: ¿es factible agregar un warning/double-confirm en el flujo de creación de orden cuando se detecta una orden idéntica (mismos productos + monto + mesa) creada en los últimos 5 minutos por el mismo o distinto operador? Eso atajaría >95% del problema.
->
-> Adjuntamos detalle de pares para diagnóstico si quieren reproducir.
+El hash actual es insuficiente para mostrador (`Tiendita`). Cambios propuestos para reducir falsos positivos:
 
-### Para nosotros — orden recomendado
+- **Incluir `tableId` (entero único por mesa física en Waitry)** en vez de `table_name` (texto). Resuelve el caso "todo Tiendita comparte nombre".
+- **Considerar incluir `orderUserId`** (cliente identificado) cuando esté presente. Cuando no está, no agrava — el caso degenerado sigue siendo igual de ruidoso.
+- **Reducir la ventana de 3 minutos a 60–90 segundos** para que doble-tap real (típicamente segundos) siga capturado pero ventas legítimas separadas no caigan.
 
-1. **Mergear PR #209** (alta de iniciativa + ADR-005). En revisión.
-2. **Mergear este PR (ADR-006)**. Forense lista, no toca código.
-3. **PR Opción C** (rama y PR aparte): corregir typo `order_cancelled` → `order_canceled` en `v_cortes_totales`, drop `rdb.trg_procesar_venta_waitry()`, mejorar `match_reason` del detector para incluir `seconds_apart` y `payment_methods`. PR chico, mergeable rápido.
-4. **Planning detallado de Opción B** en `docs/planning/rdb-waitry-ingesta-dedup.md` o promover iniciativa hermana `rdb-waitry-conciliacion-reversa`. UI de resolución, criterios de "el bueno", backfill controlado, métricas.
-5. **Beto contacta a Waitry** con el mensaje arriba (o equivalente). Independiente de B — atajan el flujo en producción.
+Esto requiere:
+
+1. Migración para nueva versión de `compute_content_hash` y `check_duplicates`.
+2. Backfill: recalcular `content_hash` de pedidos abril–mayo (~5,000 filas) y limpiar `waitry_duplicate_candidates` no resueltos (porque fueron generados con el algoritmo viejo).
+3. Re-detectar contra los nuevos hashes.
+
+Tras esto, **la cifra real de duplicados será visible**. Si confirma 50–100 pares/mes (no 949), el siguiente paso es muy distinto.
+
+### Prioridad 2 — Opción C original sigue válida
+
+- Fix typo `'order_cancelled'` → `'order_canceled'` en `v_cortes_totales`.
+- Drop `rdb.trg_procesar_venta_waitry()` (función huérfana).
+- Mejorar `match_reason` del detector para incluir `seconds_apart` y `payment_methods` cuando existan.
+
+Independiente del fix del hash. Mergeable en cualquier orden.
+
+### Prioridad 3 — Conversación con Waitry (NO urgente)
+
+Si el detector arreglado revela que el doble-tap real es ~50–100 pares/mes (~$10–20k de descuadre operativo, no doble cobro), **no es urgente reportarlo**. Podemos:
+
+- Pedir a Waitry confirmar el comportamiento del campo `paid` (¿la terminal procesó realmente o solo el operador marcó?).
+- Pedir confirmar quién genera los pedidos sin `orderActions[].user` (el 75% NULL — son web/QR del cliente final?).
+- Si el dato confirma que el doble-tap es operacional y no marginal, entonces sí pedir UX preventiva.
+
+**No corresponde la conversación "su POS duplica $163k al mes"**. Esa cifra incluye sesgo del detector y de la métrica de pago.
+
+### Prioridad 4 — Opción B (UI de resolución) replanteada
+
+Con un detector honesto, los pares pendientes a resolver bajan de 949 a ~50–100. La UI ya no necesita ser un sistema masivo de triage — alcanza con:
+
+- Un chip en cada corte con `n_dups_pendientes` (sigue válido).
+- Modal con los 1–2 pares del corte (no decenas).
+- Cruce con OCR del voucher para sugerir el "bueno".
+- Acción "marcar resuelto" + opcional `status='order_canceled'` del descartado.
+
+El backfill de los 180 cortes históricos también se vuelve manejable.
+
+### Para Laisha en lo inmediato
+
+Independiente de todo el código: la causa real de su descuadre del corte ancla `271aff6e` está identificada (faltante de $180 en cash, no sobrante en tarjeta — explicado por dup `17055334/35` que registró $400 cash fantasma). Vale la pena explicarle esto verbalmente para que sepa que no fue su error y para validar la hipótesis con su memoria del turno (¿recuerda haber cobrado dos veces la cancha de pádel? ¿el cliente fue uno solo o dos?).
+
+### Orden de ejecución recomendado
+
+1. **Mergear PR #209** ✅ (ya hecho)
+2. **Mergear este PR ADR-006** una vez Beto valide la corrección.
+3. **PR de prioridad 1** (fix del hash + backfill + re-detección). Toca producción → coordinar fuera de horario operativo (≤6am o >11pm Matamoros) y validar con Laisha post-deploy.
+4. **PR de prioridad 2** (Opción C original) en paralelo o después.
+5. **Planning de prioridad 4** (UI de resolución).
+6. **Solo entonces** decidir si vale la pena escalar a Waitry.
 
 ## Decisiones registradas (de esta forense)
 
-- **No reportar a Waitry como "su POS está duplicando".** Es falso. Reportar como "su flujo permite doble-tap del operador y pedimos UX preventiva".
-- **No identificar a Laisha como "la responsable" en la conversación con el negocio**. Es la operadora con mayor volumen reportable, sí, pero (a) puede ser efecto de mayor volumen total no de error rate más alto y (b) el 75% NULL en el path de operador hace la cifra direccional, no absoluta. Tratar como dato técnico, no señalamiento.
-- **Criterio default del "bueno"**: el de `timestamp` menor cuando `payment_method` y monto coinciden; humano decide cuando difiere o cuando el caso es edge.
+- **No reportar a Waitry como "su POS está duplicando".** Es falso. Y la cifra honesta es mucho menor de lo que pensábamos.
+- **El detector actual está sobre-estimando masivamente** por el hash insuficiente (`table_name` en lugar de `tableId`). Antes de tomar cualquier decisión basada en el conteo de duplicados, hay que arreglar el hash.
+- **No identificar a Laisha como "la responsable"** en la conversación con el negocio. Su 199 dups/mes contiene proporción significativa de falsos positivos del mostrador, no error operativo desproporcionado. Cuando la conversación interna ocurra, debe basarse en cifras post-fix del hash, no en las actuales.
+- **Pago registrado en `waitry_pagos` ≠ cobro real al cliente**. Esto es ya conocido por la existencia de `v_waitry_pedidos_reversa_sospechosa`, pero el ADR-005 inicial lo había olvidado.
+- **Criterio default del "bueno" en la UI**: el de `timestamp` menor cuando `payment_method` y monto coinciden; humano decide cuando difiere o cuando el caso es edge. Cruzar con voucher OCR cuando esté disponible.
 
 ## Preguntas abiertas
 
-1. **Sobre el 75% NULL en operador**: necesitamos validar con Waitry si los pedidos sin `orderActions[].user` son web/QR del cliente final, o si es un bug del propio payload. Sin esto, las cifras de operador son direccionales.
-2. **Backfill de los 180 cortes históricos afectados**: ¿se ataca todo, o solo de aquí en adelante? El backfill manual con UI tomaría tiempo significativo a Laisha/Juan Pablo. Alternativa: aceptar que los reportes históricos son lo que son y solo limpiar de aquí en adelante.
-3. **Contacto con Waitry**: ¿hay alguien del lado RDB o externo (consultor) ya en touch con su soporte/CSM? Si no, Beto decide canal.
+1. **Sobre el 75% NULL en operador**: necesitamos validar con Waitry si los pedidos sin `orderActions[].user` son web/QR del cliente final, o si es un bug del propio payload.
+2. **Backfill de cortes históricos**: tras arreglar el hash, los pares "verdaderos" probablemente bajan de 949 a ~50–100/mes. El backfill se vuelve manejable.
+3. **Definición de la nueva versión de `compute_content_hash`**: ¿agregar `tableId`? ¿incluir también `orderUserId` o eso sub-detecta cuando varios clientes compran lo mismo en mostrador? Decisión a tomar antes de migración (en planning de prioridad 1).
+4. **Contacto con Waitry**: ya no urgente. Si después del fix queda un bug operacional real y consistente, se decide canal en su momento.
+
+## Lecciones de proceso
+
+- **Cifras crudas de un detector existente NO son la verdad** — en este caso el detector de duplicados estaba diseñado para un patrón distinto (mesas con `tableId` único) y se aplicó a mostrador donde la suposición no se cumple. Validar los supuestos antes de usar las cifras.
+- **El campo `paid` y `payment.amount` reflejan lo que el operador marcó, no lo que cobró**. Cualquier métrica financiera derivada de estos campos sin reconciliación contra banco / cash físico es indicativa, no firme.
+- **Siempre cruzar conteos de "anomalía" contra volumen total** (tasa, no cantidad absoluta). Si el rate en una mesa es 4× el de otras, es probable que la mesa sea anómala, no que el problema sea masivo.
