@@ -67,7 +67,6 @@ export const NAV_ITEMS: NavItem[] = [
       { label: 'Cortes', href: '/rdb/cortes' },
       { label: 'Productos', href: '/rdb/productos' },
       { label: 'Inventario', href: '/rdb/inventario' },
-      { label: 'Levantamientos', href: '/rdb/inventario/levantamientos' },
       { label: 'Proveedores', href: '/rdb/proveedores' },
       { label: 'Requisiciones', href: '/rdb/requisiciones' },
       { label: 'Órdenes de Compra', href: '/rdb/ordenes-compra' },
