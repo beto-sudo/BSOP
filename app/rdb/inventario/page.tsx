@@ -12,7 +12,14 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import { ModuleKpiStrip, ModuleFilters, ModuleContent } from '@/components/module-page';
+import {
+  ModuleKpiStrip,
+  ModuleFilters,
+  ModuleContent,
+  EmptyState,
+  TableSkeleton,
+  ErrorBanner,
+} from '@/components/module-page';
 import { CategoryFilterStrip } from '@/components/inventario/category-filter-strip';
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { SortableHead } from '@/components/ui/sortable-head';
@@ -21,7 +28,6 @@ import { Combobox } from '@/components/ui/combobox';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { StockDetailDrawer } from '@/components/inventario/stock-detail-drawer';
 import { RegistrarMovimientoDialog } from '@/components/inventario/registrar-movimiento-dialog';
 import { printStockList } from '@/components/inventario/print-stock-list';
@@ -295,11 +301,7 @@ export default function InventarioStockPage() {
         </Button>
       </ModuleFilters>
 
-      {errorStock && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {errorStock}
-        </div>
-      )}
+      {errorStock && <ErrorBanner error={errorStock} onRetry={handleRefresh} />}
 
       {fechaCorte && (
         <div className="flex items-center gap-2 rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-2 text-sm text-blue-600 dark:text-blue-400">
@@ -377,19 +379,31 @@ export default function InventarioStockPage() {
             </TableHeader>
             <TableBody>
               {loadingStock ? (
-                Array.from({ length: 8 }).map((_, i) => (
-                  <TableRow key={i}>
-                    {Array.from({ length: 8 }).map((__, j) => (
-                      <TableCell key={j}>
-                        <Skeleton className="h-4 w-full" />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
+                <TableSkeleton rows={8} columns={8} />
               ) : filteredStock.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
-                    No se encontraron productos.
+                  <TableCell colSpan={8} className="p-0">
+                    <EmptyState
+                      icon={<Boxes className="h-8 w-8" />}
+                      title={
+                        search ||
+                        showBajoMinimo ||
+                        showServicios ||
+                        categoriaFiltro ||
+                        clasificacionFiltro
+                          ? 'Ningún producto coincide con los filtros'
+                          : 'Aún no hay productos'
+                      }
+                      description={
+                        search ||
+                        showBajoMinimo ||
+                        showServicios ||
+                        categoriaFiltro ||
+                        clasificacionFiltro
+                          ? 'Limpia los filtros para ver el inventario completo.'
+                          : 'Registra el primer movimiento para que aparezca aquí.'
+                      }
+                    />
                   </TableCell>
                 </TableRow>
               ) : (

@@ -3,7 +3,7 @@
 **Slug:** `module-states`
 **Empresas:** todas
 **Schemas afectados:** n/a (UI)
-**Estado:** planned
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-26
 **Última actualización:** 2026-04-26
@@ -133,12 +133,15 @@ decisiones repetidas + drift visual + copy disperso.
 
 ## Sprints / hitos
 
-_(se llena cuando arranque ejecución, vía Claude Code)_
+- **Fase 1 — componentes + adopción inicial.** ⏳ **En curso (PR abierto).** Salida: 3 componentes compartidos (`<EmptyState>`, `<TableSkeleton>`, `<ErrorBanner>`) + ADR-006 + adopción en Ventas (`<VentasTable>`) e Inventario (`/rdb/inventario`) + checks en `ui-rubric.md` Sections 1-2. Próximo hito: Beto smoke + merge.
+- **Fase 2 — adopción incremental en módulos restantes.** ⏸️ Sin PR único. Cada migración futura a `<ModulePage>` (parte de la iniciativa `module-page` Fase 2) trae los 3 componentes por construcción.
 
 ## Decisiones registradas
 
-_(append-only, fechadas — escrito por Claude Code)_
+- **2026-04-26 (CC) — Alcance v1 acotado a estados, no a `<ModulePage>` completo.** El doc menciona "Migrar Ventas como golden path"; se interpretó como "Ventas adopta los 3 componentes" — `<ErrorBanner>` en `ventas-view.tsx`, `<TableSkeleton>` y `<EmptyState>` en `<VentasTable>`. La migración del wrapper Ventas a `<ModulePage>` + `<ModuleHeader>` + `<ModuleTabs>` queda para la iniciativa `module-page` Fase 2 (otro PR), porque mezclarla acá expandiría el blast radius más allá de "estados". Inventario sí queda con los 3 estados activos porque ya usa `<ModulePage>` vía layout.
+- **2026-04-26 (CC) — `<EmptyState>` agnóstico al copy, callers eligen "virgen vs filtros activos".** Se evaluó hacer un componente con un enum `variant="empty" | "no-results"` interno; se descartó porque cada módulo tiene matices ("Limpia los filtros para ver el inventario completo" vs "Ajusta las fechas, el corte o los filtros"). El componente queda presentacional y la convención de copy se documenta en ADR-006 §S3 + `ui-rubric.md` Section 2.
+- **2026-04-26 (CC) — Bug heredado de columnas en `<VentasTable>` skeleton.** Encontrado durante migración: el `Array.from({length:8}).map(...Array.from({length:4})...)` de skeleton renderizaba 4 cells para una tabla de 6 columnas (Folio, Fecha/Hora, Área, Mesa, Total, Estado). El reemplazo por `<TableSkeleton columns={6} />` lo corrige incidentalmente. Mismo fix al `colSpan={4}` del empty inline → `colSpan={6}` en el `<TableCell>` que envuelve `<EmptyState>`.
 
 ## Bitácora
 
-_(append-only, escrita por Claude Code al ejecutar)_
+- **2026-04-26 (CC)** — Fase 1 implementada. Branch `feat/ui-module-states`. Componentes nuevos: `components/module-page/empty-state.tsx`, `components/module-page/table-skeleton.tsx`, `components/module-page/error-banner.tsx`, exportados desde el barrel. Migraciones: `<ErrorBanner>` en `components/ventas/ventas-view.tsx` con `onRetry={() => fetchPedidos()}`; `<TableSkeleton rows={8} columns={6}>` + `<EmptyState>` con copy de "filtros activos" en `components/ventas/ventas-table.tsx`; `<ErrorBanner onRetry={handleRefresh}>` + `<TableSkeleton rows={8} columns={8}>` + `<EmptyState>` (copy condicional virgen/filtros) en `app/rdb/inventario/page.tsx`. ADR-006 (`docs/adr/006_module_states.md`) creado con 5 reglas (S1-S5). `docs/qa/ui-rubric.md` Sections 1-2 actualizadas con checks específicos a los 3 componentes. INITIATIVES.md: `module-states` planned → in_progress.

@@ -4,7 +4,7 @@
 > abre `docs/planning/<slug>.md`. Mantenido por Cowork (cuando se crea o
 > cambia el alcance) y por Claude Code (cuando ejecuta y cierra hitos).
 >
-> **Última actualización:** 2026-04-26 (UI roadmap inicial — 8 iniciativas agregadas en cola: `module-states` planned + 7 proposed)
+> **Última actualización:** 2026-04-26 (`module-states` planned → in_progress: 3 componentes compartidos creados + adopción en Ventas/Inventario + ADR-006)
 
 ## Convenciones
 
@@ -35,7 +35,7 @@
 | Filters URL-sync (UI)       | `filters-url-sync`         | todas                | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (post-`module-states`)                                                               | 2026-04-26           |
 | Module Page (UI ADR-004)    | `module-page`              | todas                | n/a (UI)                    | in_progress | Fase 2 — migrar segunda página al componente `<ModulePage>`                                                        | 2026-04-25           |
 | Module-page sub-módulos     | `module-page-submodules`   | RDB (primero), todas | n/a (UI)                    | in_progress | PR de refactor RDB Inventario abierto → smoke manual + merge (Beto)                                                | 2026-04-26           |
-| Module States (UI)          | `module-states`            | todas                | n/a (UI)                    | planned     | CC implementa `<EmptyState>` + `<TableSkeleton>` + `<ErrorBanner>` y migra Ventas/Inventario como prueba           | 2026-04-26           |
+| Module States (UI)          | `module-states`            | todas                | n/a (UI)                    | in_progress | PR `feat/ui-module-states` abierto — Beto revisa, smoke en Ventas/Inventario y mergea                              | 2026-04-26           |
 | Waitry ingesta + dedup      | `rdb-waitry-ingesta-dedup` | RDB                  | rdb (waitry\_\*), erp       | in_progress | Fase 2.B — fix de `compute_content_hash` (incluir `tableId`) + backfill + re-detección, fuera de horario operativo | 2026-04-26           |
 | Responsive Policy (UI)      | `responsive-policy`        | todas                | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (post-`data-table`)                                                                  | 2026-04-26           |
 
