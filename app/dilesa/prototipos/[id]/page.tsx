@@ -26,6 +26,8 @@ import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Archive, Loader2, ExternalLink, ImageOff } from 'lucide-react';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
+import { useActionFeedback } from '@/hooks/use-action-feedback';
 import {
   DILESA_EMPRESA_ID,
   formatCurrency,
@@ -115,12 +117,11 @@ function PrototipoDetailInner() {
     };
   }, [load]);
 
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const feedback = useActionFeedback();
+
   const handleArchive = async () => {
     if (!prototipo) return;
-    const ok = window.confirm(
-      `¿Archivar el prototipo "${prototipo.nombre}"? No se elimina de la DB; se puede restaurar quitando deleted_at por SQL.`
-    );
-    if (!ok) return;
     setArchiving(true);
     const { error: err } = await supabase
       .schema('dilesa')
@@ -129,9 +130,10 @@ function PrototipoDetailInner() {
       .eq('id', prototipo.id);
     setArchiving(false);
     if (err) {
-      alert(`Error al archivar: ${err.message}`);
+      feedback.error(err, { title: 'No se pudo archivar el prototipo' });
       return;
     }
+    feedback.success('Prototipo archivado');
     router.push('/dilesa/prototipos');
   };
 
@@ -202,7 +204,7 @@ function PrototipoDetailInner() {
           <Button
             variant="outline"
             size="sm"
-            onClick={handleArchive}
+            onClick={() => setArchiveOpen(true)}
             disabled={archiving}
             className="text-red-400"
           >
@@ -215,6 +217,14 @@ function PrototipoDetailInner() {
           </Button>
         </div>
       </div>
+      <ConfirmDialog
+        open={archiveOpen}
+        onOpenChange={setArchiveOpen}
+        onConfirm={handleArchive}
+        title={`¿Archivar el prototipo "${prototipo.nombre}"?`}
+        description="No se elimina de la base de datos; se puede restaurar quitando deleted_at por SQL."
+        confirmLabel="Archivar"
+      />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
