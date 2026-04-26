@@ -23,13 +23,13 @@
 
 ## Activas
 
-| Iniciativa               | Slug                     | Empresas             | Schemas                     | Estado      | Próximo hito                                                                                             | Última actualización |
-| ------------------------ | ------------------------ | -------------------- | --------------------------- | ----------- | -------------------------------------------------------------------------------------------------------- | -------------------- |
-| Analytics (BI externo)   | `analytics`              | todas                | analytics, erp, dilesa, rdb | blocked     | Sprint 0 — desbloquear export del bootstrap (Metabase + Caddy + Postgres) desde Cowork al repo Analytics | 2026-04-25           |
-| DILESA UI Terrenos       | `dilesa-ui-terrenos`     | DILESA               | dilesa                      | in_progress | Cerrar `feat/dilesa-ui-terrenos` y abrir PR                                                              | 2026-04-??           |
-| Module Page (UI ADR-004) | `module-page`            | todas                | n/a (UI)                    | in_progress | Fase 2 — migrar segunda página al componente `<ModulePage>`                                              | 2026-04-25           |
-| Module-page sub-módulos  | `module-page-submodules` | RDB (primero), todas | n/a (UI)                    | in_progress | PR de refactor RDB Inventario abierto → smoke manual + merge (Beto)                                      | 2026-04-26           |
-| Waitry ingesta + dedup   | `rdb-waitry-ingesta-dedup` | RDB                | rdb (waitry\_\*), erp       | proposed    | Fase 1 — investigación read-only del Corte-271aff6e (CC reproduce caso y abre ADR de causa raíz)         | 2026-04-26           |
+| Iniciativa               | Slug                       | Empresas             | Schemas                     | Estado      | Próximo hito                                                                                             | Última actualización |
+| ------------------------ | -------------------------- | -------------------- | --------------------------- | ----------- | -------------------------------------------------------------------------------------------------------- | -------------------- |
+| Analytics (BI externo)   | `analytics`                | todas                | analytics, erp, dilesa, rdb | blocked     | Sprint 0 — desbloquear export del bootstrap (Metabase + Caddy + Postgres) desde Cowork al repo Analytics | 2026-04-25           |
+| DILESA UI Terrenos       | `dilesa-ui-terrenos`       | DILESA               | dilesa                      | in_progress | Cerrar `feat/dilesa-ui-terrenos` y abrir PR                                                              | 2026-04-??           |
+| Module Page (UI ADR-004) | `module-page`              | todas                | n/a (UI)                    | in_progress | Fase 2 — migrar segunda página al componente `<ModulePage>`                                              | 2026-04-25           |
+| Module-page sub-módulos  | `module-page-submodules`   | RDB (primero), todas | n/a (UI)                    | in_progress | PR de refactor RDB Inventario abierto → smoke manual + merge (Beto)                                      | 2026-04-26           |
+| Waitry ingesta + dedup   | `rdb-waitry-ingesta-dedup` | RDB                  | rdb (waitry\_\*), erp       | proposed    | Fase 1 — investigación read-only del Corte-271aff6e (CC reproduce caso y abre ADR de causa raíz)         | 2026-04-26           |
 
 ## Done (referencia histórica)
 
