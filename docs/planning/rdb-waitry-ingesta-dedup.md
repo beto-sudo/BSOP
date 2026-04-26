@@ -3,7 +3,7 @@
 **Slug:** `rdb-waitry-ingesta-dedup`
 **Empresas:** RDB
 **Schemas afectados:** rdb (waitry\_\*), erp (cortes_caja, movimientos_caja, movimientos_inventario)
-**Estado:** proposed
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-26
 **Última actualización:** 2026-04-26
@@ -85,7 +85,11 @@ Mientras esto no se entienda y se cierre, los cortes RDB siguen requiriendo reco
 ## Sprints / hitos
 
 - **Fase 1 — investigación read-only.** ✅ **Cerrada 2026-04-26.** Salida: [ADR-005](../../supabase/adr/005_rdb_waitry_dedup_root_cause.md) con causa raíz, cifra histórica y 3 opciones de fix.
-- **Fase 2 — fix + UI de resolución.** ⏸️ Pendiente decisión de Beto sobre opción del ADR (A/B/C).
+- **Fase 1.5 — forense del doble-tap antes de reportar a Waitry.** ✅ **Cerrada 2026-04-26.** Salida: [ADR-006](../../supabase/adr/006_rdb_waitry_forense_doble_tap.md) con prueba definitiva (no es defecto del POS), patrones (97% en una tablet, 73% en horas pico), corrección de impacto (~$10–20k reales, no $163k crudos) y replanteo de prioridades.
+- **Fase 2.A — Opción C (cleanup mínimo).** ⏳ **En curso (PR abierto):** migración `20260426120000_rdb_waitry_c_cleanup.sql` con typo fix `'order_canceled'`, drop de `rdb.trg_procesar_venta_waitry`, mejora de `match_reason` en detector. Aplicada a DB live antes del PR.
+- **Fase 2.B — Fix del hash (compute_content_hash + backfill + re-detección).** ⏸️ Próximo. Toca producción en horario sensible → coordinar fuera de ventana operativa de Laisha (≤6am o >11pm Matamoros).
+- **Fase 2.C — UI de resolución (Opción B).** ⏸️ Después del fix del hash, cuando los pares pendientes bajen a magnitud manejable.
+- **Fase 3 — Conversación con Waitry (NO urgente).** ⏸️ Solo si después del fix del hash queda un bug operacional consistente.
 
 ## Decisiones registradas
 
@@ -97,7 +101,14 @@ Mientras esto no se entienda y se cierre, los cortes RDB siguen requiriendo reco
   - El cajero anotó "sobran $180 en tarjeta"; el delta real es **$180 FALTAN en EFECTIVO** (ver tabla en ADR sección 5).
 - **2026-04-26 (CC) — Bug latente independiente del dedup.** `rdb.v_cortes_totales` filtra `status <> 'order_cancelled'` (doble L, británico) cuando el status real escrito por el trigger es `'order_canceled'` (una L, americano). Resultado: pedidos cancelados se SIGUEN sumando en ingresos del corte. Afecta TODOS los cortes RDB con cancelaciones, no solo este. Recomendado fix en Opción C del ADR.
 - **2026-04-26 (CC) — Código muerto en DB.** `rdb.trg_procesar_venta_waitry()` referencia `rdb.inventario_movimientos` (tabla inexistente, fue reemplazada por `erp.movimientos_inventario`). Ningún trigger la usa. Recomendado drop en migración separada (no urgente).
+- **2026-04-26 (CC, Fase 1.5) — Pago registrado ≠ cobro real al cliente.** Aclaración por observación de Beto. El campo `paid` y `waitry_pagos.amount` reflejan lo que el operador del POS marcó, no necesariamente lo que la terminal procesó ni lo que el cliente entregó físicamente. Esto invalidó la métrica de "98.6% de pares con doble cobro real" del ADR-005. Desglose por método de pago: 640 pares ($138k) NO involucran doble cargo al cliente; 285 pares ($82k) son los únicos candidatos.
+- **2026-04-26 (CC, Fase 1.5) — `compute_content_hash` tiene falsos positivos sistémicos.** Hashea `product_name + quantity + total_amount + table_name (texto)`. NO incluye `tableId`. En el mostrador todas las ventas comparten `table_name = "Tiendita"`, así que ventas legítimas a clientes distintos colisionan. Tasa de dup en Tiendita: 14% vs ~3% en Pádel (donde cada cancha tiene `table_name` único). Ejemplo extremo: 360 "duplicados" de $200 con solo 4 hashes distintos = 4 productos populares (cubetas, combos) vendidos repetidamente. Impacto real estimado: ~50–100 pares/mes (no 949), ~$10–20k (no $163k).
+- **2026-04-26 (CC, Fase 1.5) — Promos con `total_discount = total_amount` son la regla, no la excepción.** Beto observó. Verificado: 99% de pares tienen descuento, 98% promo full. No es discriminante para distinguir dups, pero contribuye a falsos positivos cuando productos populares vendidos a clientes distintos comparten hash.
+- **2026-04-26 (CC, Fase 1.5) — No reportar a Waitry como "su POS duplica".** Es falso. Cada par dup tiene IDs internos completamente distintos en Waitry (`orderId`, `orderItemId`, `orderPaymentId`, `orderActionId`, `externalDeliveryId`). Son operaciones legítimamente independientes ejecutadas por el operador. Lo legítimo que se les puede pedir es UX preventiva (warning si se intenta crear orden idéntica en ventana corta). Pero no es urgente — primero arreglar nuestro detector para no llevarles cifras infladas.
+- **2026-04-26 (CC, Fase 1.5) — No identificar a Laisha como "responsable" del descuadre.** Sus 199 dups en datos crudos contiene proporción significativa de falsos positivos del mostrador, no error operativo desproporcionado. Cuando la conversación interna ocurra, debe basarse en cifras post-fix del hash.
 
 ## Bitácora
 
 - **2026-04-26 (CC)** — Investigación Fase 1 completa. Branch `docs/rdb-waitry-ingesta-dedup-init`, commits `394e1d5` (alta de iniciativa por Cowork) + `ff60842` (chore format). Push a origin. ADR-005 creado con causa raíz, cifra histórica ($163k impacto en abril, 949 pares, 180 cortes afectados) y 3 opciones de fix (A descartada, B recomendada, C como mínimo viable). Próximo hito: Beto revisa ADR y decide alcance v2.
+- **2026-04-26 (CC)** — Forense Fase 1.5 completa. Beto pidió validar 100% que el problema es de Waitry antes de reportarles. Branch `docs/rdb-waitry-forense-pos`, PR [#210](https://github.com/beto-sudo/BSOP/pull/210) mergeado. ADR-006 creado con prueba definitiva (IDs internos del POS son distintos, es operacional), patrones (97% Tiendita, 73% horas pico, Laisha 199 dups en datos crudos), y dos correcciones materiales tras observaciones de Beto: (1) "pago registrado ≠ cobro real" — ningún cliente paga 2 veces sin reclamar, mucho del impacto inicial era inflado; (2) `compute_content_hash` con `table_name` texto causa falsos positivos sistémicos en mostrador. Recálculo honesto del impacto: ~$10–20k de descuadre operativo, no $163k.
+- **2026-04-26 (CC)** — Fase 2.A (Opción C) en curso. Branch `feat/rdb-waitry-c-cleanup`. Migración `20260426120000_rdb_waitry_c_cleanup.sql` con 3 cambios: typo fix `'order_canceled'` en `v_cortes_totales`, drop de `rdb.trg_procesar_venta_waitry()`, mejora del `match_reason` en `rdb.check_duplicates` para incluir `seconds_apart` y `payment_methods`. Aplicada vía `mcp__supabase__apply_migration` antes del PR. Verificado: view filtra correctamente por `'order_canceled'`, función dropeada, match_reason ejemplo: `"same products + amount + table (3s apart, methods=credit_card_visa+credit_card_visa)"`. SCHEMA_REF.md regenerado (solo cambia timestamp). Próximo hito: Fase 2.B — fix del `compute_content_hash` (incluir `tableId`, ventana 60–90s, considerar `orderUserId`) + backfill + re-detección. Coordinar fuera de horario operativo.

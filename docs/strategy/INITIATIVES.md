@@ -4,7 +4,7 @@
 > abre `docs/planning/<slug>.md`. Mantenido por Cowork (cuando se crea o
 > cambia el alcance) y por Claude Code (cuando ejecuta y cierra hitos).
 >
-> **Última actualización:** 2026-04-26 (cierre Fase 1 `rdb-waitry-ingesta-dedup` con ADR-005)
+> **Última actualización:** 2026-04-26 (`rdb-waitry-ingesta-dedup` arranca Fase 2.A Opción C)
 
 ## Convenciones
 
@@ -23,13 +23,13 @@
 
 ## Activas
 
-| Iniciativa               | Slug                       | Empresas             | Schemas                     | Estado      | Próximo hito                                                                                                   | Última actualización |
-| ------------------------ | -------------------------- | -------------------- | --------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------- | -------------------- |
-| Analytics (BI externo)   | `analytics`                | todas                | analytics, erp, dilesa, rdb | blocked     | Sprint 0 — desbloquear export del bootstrap (Metabase + Caddy + Postgres) desde Cowork al repo Analytics       | 2026-04-25           |
-| DILESA UI Terrenos       | `dilesa-ui-terrenos`       | DILESA               | dilesa                      | in_progress | Cerrar `feat/dilesa-ui-terrenos` y abrir PR                                                                    | 2026-04-??           |
-| Module Page (UI ADR-004) | `module-page`              | todas                | n/a (UI)                    | in_progress | Fase 2 — migrar segunda página al componente `<ModulePage>`                                                    | 2026-04-25           |
-| Module-page sub-módulos  | `module-page-submodules`   | RDB (primero), todas | n/a (UI)                    | in_progress | PR de refactor RDB Inventario abierto → smoke manual + merge (Beto)                                            | 2026-04-26           |
-| Waitry ingesta + dedup   | `rdb-waitry-ingesta-dedup` | RDB                  | rdb (waitry\_\*), erp       | proposed    | Beto revisa [ADR-005](../../supabase/adr/005_rdb_waitry_dedup_root_cause.md) y decide opción A/B/C para Fase 2 | 2026-04-26           |
+| Iniciativa               | Slug                       | Empresas             | Schemas                     | Estado      | Próximo hito                                                                                                       | Última actualización |
+| ------------------------ | -------------------------- | -------------------- | --------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------ | -------------------- |
+| Analytics (BI externo)   | `analytics`                | todas                | analytics, erp, dilesa, rdb | blocked     | Sprint 0 — desbloquear export del bootstrap (Metabase + Caddy + Postgres) desde Cowork al repo Analytics           | 2026-04-25           |
+| DILESA UI Terrenos       | `dilesa-ui-terrenos`       | DILESA               | dilesa                      | in_progress | Cerrar `feat/dilesa-ui-terrenos` y abrir PR                                                                        | 2026-04-??           |
+| Module Page (UI ADR-004) | `module-page`              | todas                | n/a (UI)                    | in_progress | Fase 2 — migrar segunda página al componente `<ModulePage>`                                                        | 2026-04-25           |
+| Module-page sub-módulos  | `module-page-submodules`   | RDB (primero), todas | n/a (UI)                    | in_progress | PR de refactor RDB Inventario abierto → smoke manual + merge (Beto)                                                | 2026-04-26           |
+| Waitry ingesta + dedup   | `rdb-waitry-ingesta-dedup` | RDB                  | rdb (waitry\_\*), erp       | in_progress | Fase 2.B — fix de `compute_content_hash` (incluir `tableId`) + backfill + re-detección, fuera de horario operativo | 2026-04-26           |
 
 ## Done (referencia histórica)
 
