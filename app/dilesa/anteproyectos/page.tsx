@@ -28,16 +28,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { SortableHead } from '@/components/ui/sortable-head';
-import { useSortableTable } from '@/hooks/use-sortable-table';
+import { DataTable, type Column } from '@/components/module-page';
 import {
   Sheet,
   SheetContent,
@@ -315,12 +306,6 @@ function AnteproyectosInner() {
     });
   }, [rows, search, filterEstado]);
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable<Row>('created_at', 'desc');
-  const sorted = useMemo(
-    () => sortData(filtered as unknown as Record<string, unknown>[]) as unknown as Row[],
-    [filtered, sortData]
-  );
-
   const terrenoOptions: ComboboxOption[] = useMemo(
     () =>
       terrenos.map((t) => ({
@@ -375,16 +360,14 @@ function AnteproyectosInner() {
 
       <TabPanel tabKey="consulta" active={active}>
         <ConsultaPanel
-          rows={sorted}
+          data={filtered}
+          universeCount={rows.length}
           loading={loading}
           error={error}
           search={search}
           setSearch={setSearch}
           filterEstado={filterEstado}
           setFilterEstado={setFilterEstado}
-          sortKey={sortKey}
-          sortDir={sortDir}
-          onSort={onSort}
           onOpenCreate={openCreate}
           onOpenDetail={(id) => router.push(`/dilesa/anteproyectos/${id}`)}
         />
@@ -560,33 +543,135 @@ function AnteproyectosInner() {
 }
 
 function ConsultaPanel(props: {
-  rows: Row[];
+  data: Row[];
+  universeCount: number;
   loading: boolean;
   error: string | null;
   search: string;
   setSearch: (v: string) => void;
   filterEstado: string;
   setFilterEstado: (v: string) => void;
-  sortKey: string;
-  sortDir: 'asc' | 'desc';
-  onSort: (key: string) => void;
   onOpenCreate: () => void;
   onOpenDetail: (id: string) => void;
 }) {
   const {
-    rows,
+    data,
+    universeCount,
     loading,
     error,
     search,
     setSearch,
     filterEstado,
     setFilterEstado,
-    sortKey,
-    sortDir,
-    onSort,
     onOpenCreate,
     onOpenDetail,
   } = props;
+
+  const columns: Column<Row>[] = [
+    {
+      key: 'nombre',
+      label: 'Nombre',
+      render: (r) => (
+        <div className="flex min-w-0 flex-col">
+          <span className="truncate font-medium text-[var(--text)]">{r.nombre}</span>
+          {r.clave_interna ? (
+            <span className="font-mono text-[10px] uppercase tracking-wide text-[var(--text)]/45">
+              {r.clave_interna}
+            </span>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      key: 'terreno',
+      label: 'Terreno',
+      sortable: false,
+      render: (r) => (
+        <div className="flex min-w-0 flex-col text-xs">
+          <span className="truncate text-[var(--text)]/80">{r.terreno?.nombre ?? '—'}</span>
+          {r.terreno?.municipio ? (
+            <span className="truncate text-[var(--text)]/45">{r.terreno.municipio}</span>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      key: 'tipo_proyecto',
+      label: 'Tipo',
+      sortable: false,
+      cellClassName: 'text-xs text-[var(--text)]/70',
+      render: (r) => r.tipo_proyecto?.nombre ?? <span className="text-[var(--text)]/35">—</span>,
+    },
+    {
+      key: 'cantidad_lotes',
+      label: 'Lotes',
+      type: 'number',
+      cellClassName: 'text-xs text-[var(--text)]/75',
+      render: (r) => r.cantidad_lotes ?? '—',
+    },
+    {
+      key: 'area_vendible_m2',
+      label: 'Área vendible',
+      type: 'number',
+      cellClassName: 'text-xs text-[var(--text)]/75',
+      render: (r) => formatM2(r.area_vendible_m2),
+    },
+    {
+      key: 'aprovechamiento_pct',
+      label: 'Aprov. %',
+      type: 'number',
+      cellClassName: 'text-xs text-[var(--text)]/75',
+      render: (r) => formatPercent(r.aprovechamiento_pct),
+    },
+    {
+      key: 'utilidad_proyecto',
+      label: 'Utilidad',
+      type: 'currency',
+      render: (r) => (
+        <span
+          className={
+            r.utilidad_proyecto != null && r.utilidad_proyecto < 0
+              ? 'text-red-400'
+              : 'text-[var(--text)]/75'
+          }
+        >
+          {formatCurrency(r.utilidad_proyecto, { compact: true })}
+        </span>
+      ),
+    },
+    {
+      key: 'margen_pct',
+      label: 'Margen %',
+      type: 'number',
+      render: (r) => (
+        <span
+          className={
+            r.margen_pct != null && r.margen_pct < 0 ? 'text-red-400' : 'text-[var(--text)]/75'
+          }
+        >
+          {formatPercent(r.margen_pct)}
+        </span>
+      ),
+    },
+    {
+      key: 'estado',
+      label: 'Estado',
+      sortable: false,
+      render: (r) => <EstadoBadge estado={r.estado} />,
+    },
+    {
+      key: 'prioridad',
+      label: 'Prioridad',
+      sortable: false,
+      render: (r) => <PrioridadDot prioridad={r.prioridad} />,
+    },
+    {
+      key: 'fecha_ultima_revision',
+      label: 'Última revisión',
+      cellClassName: 'whitespace-nowrap text-xs text-[var(--text)]/60',
+      render: (r) => formatDateShort(r.fecha_ultima_revision),
+    },
+  ];
 
   return (
     <div className="space-y-3">
@@ -615,154 +700,25 @@ function ConsultaPanel(props: {
         </select>
       </div>
 
-      {loading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-10 w-full" />
-          ))}
-        </div>
-      ) : error ? (
-        <div
-          role="alert"
-          className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400"
-        >
-          No se pudieron cargar los anteproyectos: {error}
-        </div>
-      ) : rows.length === 0 ? (
+      {universeCount === 0 && !loading && !error ? (
         <EmptyStateImported
           entityLabel="Anteproyectos"
           description="Crea el primer anteproyecto para evaluar un terreno. Necesitarás al menos un terreno capturado."
           onCreate={onOpenCreate}
         />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--card)]">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <SortableHead
-                  sortKey="nombre"
-                  label="Nombre"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <TableHead>Terreno</TableHead>
-                <TableHead>Tipo</TableHead>
-                <SortableHead
-                  sortKey="cantidad_lotes"
-                  label="Lotes"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="area_vendible_m2"
-                  label="Área vendible"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="aprovechamiento_pct"
-                  label="Aprov. %"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="utilidad_proyecto"
-                  label="Utilidad"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="margen_pct"
-                  label="Margen %"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <TableHead>Estado</TableHead>
-                <TableHead>Prioridad</TableHead>
-                <SortableHead
-                  sortKey="fecha_ultima_revision"
-                  label="Última revisión"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((r) => (
-                <TableRow key={r.id} onClick={() => onOpenDetail(r.id)} className="cursor-pointer">
-                  <TableCell>
-                    <div className="flex min-w-0 flex-col">
-                      <span className="truncate font-medium text-[var(--text)]">{r.nombre}</span>
-                      {r.clave_interna ? (
-                        <span className="font-mono text-[10px] uppercase tracking-wide text-[var(--text)]/45">
-                          {r.clave_interna}
-                        </span>
-                      ) : null}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex min-w-0 flex-col text-xs">
-                      <span className="truncate text-[var(--text)]/80">
-                        {r.terreno?.nombre ?? '—'}
-                      </span>
-                      {r.terreno?.municipio ? (
-                        <span className="truncate text-[var(--text)]/45">
-                          {r.terreno.municipio}
-                        </span>
-                      ) : null}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-xs text-[var(--text)]/70">
-                    {r.tipo_proyecto?.nombre ?? <span className="text-[var(--text)]/35">—</span>}
-                  </TableCell>
-                  <TableCell className="text-xs tabular-nums text-[var(--text)]/75">
-                    {r.cantidad_lotes ?? '—'}
-                  </TableCell>
-                  <TableCell className="text-xs tabular-nums text-[var(--text)]/75">
-                    {formatM2(r.area_vendible_m2)}
-                  </TableCell>
-                  <TableCell className="text-xs tabular-nums text-[var(--text)]/75">
-                    {formatPercent(r.aprovechamiento_pct)}
-                  </TableCell>
-                  <TableCell
-                    className={`text-xs tabular-nums ${
-                      r.utilidad_proyecto != null && r.utilidad_proyecto < 0
-                        ? 'text-red-400'
-                        : 'text-[var(--text)]/75'
-                    }`}
-                  >
-                    {formatCurrency(r.utilidad_proyecto, { compact: true })}
-                  </TableCell>
-                  <TableCell
-                    className={`text-xs tabular-nums ${
-                      r.margen_pct != null && r.margen_pct < 0
-                        ? 'text-red-400'
-                        : 'text-[var(--text)]/75'
-                    }`}
-                  >
-                    {formatPercent(r.margen_pct)}
-                  </TableCell>
-                  <TableCell>
-                    <EstadoBadge estado={r.estado} />
-                  </TableCell>
-                  <TableCell>
-                    <PrioridadDot prioridad={r.prioridad} />
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-xs text-[var(--text)]/60">
-                    {formatDateShort(r.fecha_ultima_revision)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable<Row>
+          data={data}
+          columns={columns}
+          rowKey="id"
+          loading={loading}
+          error={error}
+          onRowClick={(r) => onOpenDetail(r.id)}
+          initialSort={{ key: 'nombre', dir: 'asc' }}
+          showDensityToggle={false}
+          emptyTitle="Sin resultados"
+          emptyDescription="Limpia los filtros para ver todos los anteproyectos."
+        />
       )}
     </div>
   );

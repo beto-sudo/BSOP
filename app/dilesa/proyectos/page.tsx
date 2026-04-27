@@ -30,16 +30,7 @@ import { RequireAccess } from '@/components/require-access';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { SortableHead } from '@/components/ui/sortable-head';
-import { useSortableTable } from '@/hooks/use-sortable-table';
+import { DataTable, type Column } from '@/components/module-page';
 import {
   Sheet,
   SheetContent,
@@ -304,12 +295,6 @@ function ProyectosInner() {
     });
   }, [proyectos, search, filterFase]);
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable<Proyecto>('created_at', 'desc');
-  const sorted = useMemo(
-    () => sortData(filtered as unknown as Record<string, unknown>[]) as unknown as Proyecto[],
-    [filtered, sortData]
-  );
-
   const terrenoOptions = useMemo<ComboboxOption[]>(
     () =>
       terrenos.map((t) => ({
@@ -362,16 +347,14 @@ function ProyectosInner() {
 
       <TabPanel tabKey="consulta" active={active}>
         <ConsultaPanel
-          proyectos={sorted}
+          data={filtered}
+          universeCount={proyectos.length}
           loading={loading}
           error={error}
           search={search}
           setSearch={setSearch}
           filterFase={filterFase}
           setFilterFase={setFilterFase}
-          sortKey={sortKey}
-          sortDir={sortDir}
-          onSort={onSort}
           onOpenCreate={openCreate}
           onOpenDetail={(id) => router.push(`/dilesa/proyectos/${id}`)}
         />
@@ -509,33 +492,169 @@ function ProyectosInner() {
 }
 
 function ConsultaPanel(props: {
-  proyectos: Proyecto[];
+  data: Proyecto[];
+  universeCount: number;
   loading: boolean;
   error: string | null;
   search: string;
   setSearch: (v: string) => void;
   filterFase: string;
   setFilterFase: (v: string) => void;
-  sortKey: string;
-  sortDir: 'asc' | 'desc';
-  onSort: (key: string) => void;
   onOpenCreate: () => void;
   onOpenDetail: (id: string) => void;
 }) {
   const {
-    proyectos,
+    data,
+    universeCount,
     loading,
     error,
     search,
     setSearch,
     filterFase,
     setFilterFase,
-    sortKey,
-    sortDir,
-    onSort,
     onOpenCreate,
     onOpenDetail,
   } = props;
+
+  const columns: Column<Proyecto>[] = [
+    {
+      key: 'nombre',
+      label: 'Nombre',
+      render: (p) => (
+        <div className="flex min-w-0 flex-col">
+          <span className="truncate font-medium text-[var(--text)]">{p.nombre}</span>
+          {p.codigo ? (
+            <span className="font-mono text-[10px] uppercase tracking-wide text-[var(--text)]/45">
+              {p.codigo}
+            </span>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      key: 'terreno',
+      label: 'Terreno',
+      sortable: false,
+      cellClassName: 'text-xs text-[var(--text)]/70',
+      render: (p) =>
+        p.terreno ? (
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate">{p.terreno.nombre}</span>
+            {p.terreno.clave_interna ? (
+              <span className="font-mono text-[10px] uppercase tracking-wide text-[var(--text)]/40">
+                {p.terreno.clave_interna}
+              </span>
+            ) : null}
+          </div>
+        ) : (
+          <span className="text-[var(--text)]/40">—</span>
+        ),
+    },
+    {
+      key: 'anteproyecto',
+      label: 'Anteproyecto',
+      sortable: false,
+      render: (p) =>
+        p.anteproyecto_id ? (
+          <span
+            className="inline-flex items-center gap-1 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent)]/10 px-2 py-0.5 text-[10px] font-medium text-[var(--accent)]"
+            title={
+              p.anteproyecto?.nombre
+                ? `← Desde anteproyecto: ${p.anteproyecto.nombre}`
+                : '← Desde anteproyecto'
+            }
+          >
+            <Link2 className="size-3" />
+            {p.anteproyecto?.clave_interna ?? p.anteproyecto?.nombre?.slice(0, 22) ?? 'origen'}
+          </span>
+        ) : (
+          <span className="text-[10px] uppercase tracking-wide text-[var(--text)]/40">manual</span>
+        ),
+    },
+    {
+      key: 'tipo_proyecto',
+      label: 'Tipo',
+      sortable: false,
+      cellClassName: 'text-xs text-[var(--text)]/70',
+      render: (p) => p.tipo_proyecto?.nombre ?? <span className="text-[var(--text)]/40">—</span>,
+    },
+    {
+      key: 'fase',
+      label: 'Fase',
+      render: (p) => <FaseBadge fase={p.fase} />,
+    },
+    {
+      key: 'fecha_inicio',
+      label: 'Inicio',
+      cellClassName: 'whitespace-nowrap text-xs text-[var(--text)]/70',
+      render: (p) => formatDateShort(p.fecha_inicio),
+    },
+    {
+      key: 'fecha_estimada_cierre',
+      label: 'Cierre est.',
+      cellClassName: 'whitespace-nowrap text-xs text-[var(--text)]/70',
+      render: (p) => formatDateShort(p.fecha_estimada_cierre),
+    },
+    {
+      key: 'cantidad_lotes_total',
+      label: 'Lotes',
+      type: 'number',
+      cellClassName: 'text-xs text-[var(--text)]/75',
+      render: (p) => p.cantidad_lotes_total ?? '—',
+    },
+    {
+      key: 'area_vendible_m2',
+      label: 'Área vendible',
+      type: 'number',
+      cellClassName: 'text-xs text-[var(--text)]/75',
+      render: (p) => formatM2(p.area_vendible_m2),
+    },
+    {
+      key: 'presupuesto_total',
+      label: 'Presupuesto',
+      type: 'currency',
+      cellClassName: 'text-xs text-[var(--text)]/75',
+      render: (p) => formatCurrency(p.presupuesto_total, { compact: true }),
+    },
+    {
+      key: 'inversion_total',
+      label: 'Inversión',
+      type: 'currency',
+      cellClassName: 'text-xs text-[var(--text)]/75',
+      render: (p) => formatCurrency(p.inversion_total, { compact: true }),
+    },
+    {
+      key: 'etapa',
+      label: 'Etapa',
+      sortable: false,
+      cellClassName: 'text-xs text-[var(--text)]/70',
+      render: (p) => p.etapa ?? '—',
+    },
+    {
+      key: 'prioridad',
+      label: 'Prioridad',
+      sortable: false,
+      render: (p) => <PrioridadDot prioridad={p.prioridad} />,
+    },
+    {
+      key: 'responsable_id',
+      label: 'Responsable',
+      sortable: false,
+      cellClassName: 'text-xs text-[var(--text)]/60',
+      render: (p) =>
+        p.responsable_id ? (
+          <span className="font-mono text-[10px]">{p.responsable_id.slice(0, 8)}…</span>
+        ) : (
+          '—'
+        ),
+    },
+    {
+      key: 'fecha_ultima_revision',
+      label: 'Última rev.',
+      cellClassName: 'whitespace-nowrap text-xs text-[var(--text)]/60',
+      render: (p) => formatDateShort(p.fecha_ultima_revision),
+    },
+  ];
 
   return (
     <div className="space-y-3">
@@ -564,186 +683,25 @@ function ConsultaPanel(props: {
         </select>
       </div>
 
-      {loading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-10 w-full" />
-          ))}
-        </div>
-      ) : error ? (
-        <div
-          role="alert"
-          className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400"
-        >
-          No se pudieron cargar los proyectos: {error}
-        </div>
-      ) : proyectos.length === 0 ? (
+      {universeCount === 0 && !loading && !error ? (
         <EmptyStateImported
           entityLabel="Proyectos"
           description="Convierte un anteproyecto desde su detalle, o captura manualmente un proyecto legacy si no tiene origen en anteproyectos."
           onCreate={onOpenCreate}
         />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--card)]">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <SortableHead
-                  sortKey="nombre"
-                  label="Nombre"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <TableHead>Terreno</TableHead>
-                <TableHead>Anteproyecto</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Fase</TableHead>
-                <SortableHead
-                  sortKey="fecha_inicio"
-                  label="Inicio"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="fecha_estimada_cierre"
-                  label="Cierre est."
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="cantidad_lotes_total"
-                  label="Lotes"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="area_vendible_m2"
-                  label="Área vendible"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="presupuesto_total"
-                  label="Presupuesto"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="inversion_total"
-                  label="Inversión"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <TableHead>Etapa</TableHead>
-                <TableHead>Prioridad</TableHead>
-                <TableHead>Responsable</TableHead>
-                <SortableHead
-                  sortKey="fecha_ultima_revision"
-                  label="Última rev."
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {proyectos.map((p) => (
-                <TableRow key={p.id} onClick={() => onOpenDetail(p.id)} className="cursor-pointer">
-                  <TableCell>
-                    <div className="flex min-w-0 flex-col">
-                      <span className="truncate font-medium text-[var(--text)]">{p.nombre}</span>
-                      {p.codigo ? (
-                        <span className="font-mono text-[10px] uppercase tracking-wide text-[var(--text)]/45">
-                          {p.codigo}
-                        </span>
-                      ) : null}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-xs text-[var(--text)]/70">
-                    {p.terreno ? (
-                      <div className="flex min-w-0 flex-col">
-                        <span className="truncate">{p.terreno.nombre}</span>
-                        {p.terreno.clave_interna ? (
-                          <span className="font-mono text-[10px] uppercase tracking-wide text-[var(--text)]/40">
-                            {p.terreno.clave_interna}
-                          </span>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <span className="text-[var(--text)]/40">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {p.anteproyecto_id ? (
-                      <span
-                        className="inline-flex items-center gap-1 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent)]/10 px-2 py-0.5 text-[10px] font-medium text-[var(--accent)]"
-                        title={
-                          p.anteproyecto?.nombre
-                            ? `← Desde anteproyecto: ${p.anteproyecto.nombre}`
-                            : '← Desde anteproyecto'
-                        }
-                      >
-                        <Link2 className="size-3" />
-                        {p.anteproyecto?.clave_interna ??
-                          p.anteproyecto?.nombre?.slice(0, 22) ??
-                          'origen'}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] uppercase tracking-wide text-[var(--text)]/40">
-                        manual
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-xs text-[var(--text)]/70">
-                    {p.tipo_proyecto?.nombre ?? <span className="text-[var(--text)]/40">—</span>}
-                  </TableCell>
-                  <TableCell>
-                    <FaseBadge fase={p.fase} />
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-xs text-[var(--text)]/70">
-                    {formatDateShort(p.fecha_inicio)}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-xs text-[var(--text)]/70">
-                    {formatDateShort(p.fecha_estimada_cierre)}
-                  </TableCell>
-                  <TableCell className="text-xs tabular-nums text-[var(--text)]/75">
-                    {p.cantidad_lotes_total ?? '—'}
-                  </TableCell>
-                  <TableCell className="text-xs tabular-nums text-[var(--text)]/75">
-                    {formatM2(p.area_vendible_m2)}
-                  </TableCell>
-                  <TableCell className="text-xs tabular-nums text-[var(--text)]/75">
-                    {formatCurrency(p.presupuesto_total, { compact: true })}
-                  </TableCell>
-                  <TableCell className="text-xs tabular-nums text-[var(--text)]/75">
-                    {formatCurrency(p.inversion_total, { compact: true })}
-                  </TableCell>
-                  <TableCell className="text-xs text-[var(--text)]/70">{p.etapa ?? '—'}</TableCell>
-                  <TableCell>
-                    <PrioridadDot prioridad={p.prioridad} />
-                  </TableCell>
-                  <TableCell className="text-xs text-[var(--text)]/60">
-                    {p.responsable_id ? (
-                      <span className="font-mono text-[10px]">{p.responsable_id.slice(0, 8)}…</span>
-                    ) : (
-                      '—'
-                    )}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-xs text-[var(--text)]/60">
-                    {formatDateShort(p.fecha_ultima_revision)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable<Proyecto>
+          data={data}
+          columns={columns}
+          rowKey="id"
+          loading={loading}
+          error={error}
+          onRowClick={(p) => onOpenDetail(p.id)}
+          initialSort={{ key: 'fecha_inicio', dir: 'desc' }}
+          showDensityToggle={false}
+          emptyTitle="Sin resultados"
+          emptyDescription="Limpia los filtros para ver todos los proyectos."
+        />
       )}
     </div>
   );
