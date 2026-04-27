@@ -709,17 +709,13 @@ function JuntaDetailInner() {
           setTasks(tasksData as JuntaTask[]);
         }
 
-        // Refresh avances — toda la empresa dentro de la ventana de la junta.
-        let updPollBuilder = supabase
-          .schema('erp')
-          .from('task_updates')
-          .select('*')
-          .eq('empresa_id', junta.empresa_id)
-          .gte('created_at', junta.fecha_hora);
-        if (junta.fecha_terminada) {
-          updPollBuilder = updPollBuilder.lte('created_at', junta.fecha_terminada);
-        }
-        const { data: updData } = await updPollBuilder.order('created_at', { ascending: false });
+        // Refresh avances — ligados explícitamente por junta_id (mismo
+        // criterio que el fetchAll inicial). Antes este polling filtraba por
+        // empresa_id + ventana de tiempo, lo que provocaba que el primer
+        // tick borrara avances que sí estaban ligados a la junta pero
+        // creados fuera de la ventana (junta futura, o avances anteriores
+        // a fecha_hora).
+        const { data: updData } = await fetchJuntaUpdates(supabase as any, { juntaId });
         if (updData) {
           const uIds = [...new Set(updData.map((u: any) => u.creado_por).filter(Boolean))];
           const tIds = [...new Set(updData.map((u: any) => u.task_id).filter(Boolean))];
