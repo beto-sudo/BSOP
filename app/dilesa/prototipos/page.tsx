@@ -29,16 +29,7 @@ import { RequireAccess } from '@/components/require-access';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { SortableHead } from '@/components/ui/sortable-head';
-import { useSortableTable } from '@/hooks/use-sortable-table';
+import { DataTable, type Column } from '@/components/module-page';
 import {
   Sheet,
   SheetContent,
@@ -260,12 +251,6 @@ function PrototiposInner() {
     });
   }, [prototipos, search, filterEtapa]);
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable<Prototipo>('created_at', 'desc');
-  const sorted = useMemo(
-    () => sortData(filtered as unknown as Record<string, unknown>[]) as unknown as Prototipo[],
-    [filtered, sortData]
-  );
-
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -304,16 +289,14 @@ function PrototiposInner() {
 
       <TabPanel tabKey="consulta" active={active}>
         <ConsultaPanel
-          prototipos={sorted}
+          data={filtered}
+          universeCount={prototipos.length}
           loading={loading}
           error={error}
           search={search}
           setSearch={setSearch}
           filterEtapa={filterEtapa}
           setFilterEtapa={setFilterEtapa}
-          sortKey={sortKey}
-          sortDir={sortDir}
-          onSort={onSort}
           onOpenCreate={openCreate}
           onOpenDetail={(id) => router.push(`/dilesa/prototipos/${id}`)}
         />
@@ -551,33 +534,146 @@ function PrototiposInner() {
 }
 
 function ConsultaPanel(props: {
-  prototipos: Prototipo[];
+  data: Prototipo[];
+  universeCount: number;
   loading: boolean;
   error: string | null;
   search: string;
   setSearch: (v: string) => void;
   filterEtapa: string;
   setFilterEtapa: (v: string) => void;
-  sortKey: string;
-  sortDir: 'asc' | 'desc';
-  onSort: (key: string) => void;
   onOpenCreate: () => void;
   onOpenDetail: (id: string) => void;
 }) {
   const {
-    prototipos,
+    data,
+    universeCount,
     loading,
     error,
     search,
     setSearch,
     filterEtapa,
     setFilterEtapa,
-    sortKey,
-    sortDir,
-    onSort,
     onOpenCreate,
     onOpenDetail,
   } = props;
+
+  const columns: Column<Prototipo>[] = [
+    {
+      key: 'nombre',
+      label: 'Nombre',
+      render: (p) => (
+        <div className="flex min-w-0 flex-col">
+          <span className="truncate font-medium text-[var(--text)]">{p.nombre}</span>
+          {p.codigo ? (
+            <span className="font-mono text-[10px] uppercase tracking-wide text-[var(--text)]/45">
+              {p.codigo}
+            </span>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      key: 'clasificacion_inmobiliaria',
+      label: 'Clasificación',
+      sortable: false,
+      cellClassName: 'text-xs text-[var(--text)]/70',
+      render: (p) =>
+        p.clasificacion_inmobiliaria?.nombre ?? (
+          <span className="text-[var(--text)]/40">(sin clasificar)</span>
+        ),
+    },
+    {
+      key: 'superficie_construida_m2',
+      label: 'Sup. construida',
+      type: 'number',
+      cellClassName: 'text-xs text-[var(--text)]/75',
+      render: (p) => formatM2(p.superficie_construida_m2),
+    },
+    {
+      key: 'recamaras',
+      label: 'Rec.',
+      type: 'number',
+      cellClassName: 'text-xs text-[var(--text)]/75',
+      render: (p) => p.recamaras ?? '—',
+    },
+    {
+      key: 'banos',
+      label: 'Baños',
+      type: 'number',
+      cellClassName: 'text-xs text-[var(--text)]/75',
+      render: (p) => p.banos ?? '—',
+    },
+    {
+      key: 'valor_comercial',
+      label: 'Valor comercial',
+      type: 'currency',
+      cellClassName: 'text-xs font-medium text-[var(--text)]',
+      render: (p) => formatCurrency(p.valor_comercial),
+    },
+    {
+      key: 'costo_total_unitario',
+      label: 'Costo total',
+      type: 'currency',
+      cellClassName: 'text-xs text-[var(--text)]/75',
+      render: (p) => formatCurrency(p.costo_total_unitario),
+    },
+    {
+      key: 'margen',
+      label: 'Margen',
+      type: 'currency',
+      sortable: false,
+      accessor: (p) =>
+        p.valor_comercial != null && p.costo_total_unitario != null
+          ? p.valor_comercial - p.costo_total_unitario
+          : null,
+      render: (p) => {
+        const margen =
+          p.valor_comercial != null && p.costo_total_unitario != null
+            ? p.valor_comercial - p.costo_total_unitario
+            : null;
+        return (
+          <span
+            className={
+              margen != null && margen < 0 ? 'font-semibold text-red-400' : 'text-[var(--text)]/75'
+            }
+          >
+            {margen != null ? formatCurrency(margen) : '—'}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'etapa',
+      label: 'Etapa',
+      sortable: false,
+      render: (p) => <EtapaBadge etapa={p.etapa} />,
+    },
+    {
+      key: 'prioridad',
+      label: 'Prioridad',
+      sortable: false,
+      render: (p) => <PrioridadDot prioridad={p.prioridad} />,
+    },
+    {
+      key: 'responsable_id',
+      label: 'Responsable',
+      sortable: false,
+      cellClassName: 'text-xs text-[var(--text)]/60',
+      render: (p) =>
+        p.responsable_id ? (
+          <span className="font-mono text-[10px]">{p.responsable_id.slice(0, 8)}…</span>
+        ) : (
+          '—'
+        ),
+    },
+    {
+      key: 'fecha_ultima_revision',
+      label: 'Última revisión',
+      cellClassName: 'whitespace-nowrap text-xs text-[var(--text)]/60',
+      render: (p) => formatDateShort(p.fecha_ultima_revision),
+    },
+  ];
 
   return (
     <div className="space-y-3">
@@ -606,161 +702,25 @@ function ConsultaPanel(props: {
         </select>
       </div>
 
-      {loading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-10 w-full" />
-          ))}
-        </div>
-      ) : error ? (
-        <div
-          role="alert"
-          className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400"
-        >
-          No se pudieron cargar los prototipos: {error}
-        </div>
-      ) : prototipos.length === 0 ? (
+      {universeCount === 0 && !loading && !error ? (
         <EmptyStateImported
           entityLabel="Prototipos"
           description="Captura el primer prototipo para arrancar el catálogo o importa desde Coda cuando esté disponible."
           onCreate={onOpenCreate}
         />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--card)]">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <SortableHead
-                  sortKey="nombre"
-                  label="Nombre"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <TableHead>Clasificación</TableHead>
-                <SortableHead
-                  sortKey="superficie_construida_m2"
-                  label="Sup. construida"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="recamaras"
-                  label="Rec."
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="banos"
-                  label="Baños"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="valor_comercial"
-                  label="Valor comercial"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="costo_total_unitario"
-                  label="Costo total"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <TableHead>Margen</TableHead>
-                <TableHead>Etapa</TableHead>
-                <TableHead>Prioridad</TableHead>
-                <TableHead>Responsable</TableHead>
-                <SortableHead
-                  sortKey="fecha_ultima_revision"
-                  label="Última revisión"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {prototipos.map((p) => {
-                const margen =
-                  p.valor_comercial != null && p.costo_total_unitario != null
-                    ? p.valor_comercial - p.costo_total_unitario
-                    : null;
-                return (
-                  <TableRow
-                    key={p.id}
-                    onClick={() => onOpenDetail(p.id)}
-                    className="cursor-pointer"
-                  >
-                    <TableCell>
-                      <div className="flex min-w-0 flex-col">
-                        <span className="truncate font-medium text-[var(--text)]">{p.nombre}</span>
-                        {p.codigo ? (
-                          <span className="font-mono text-[10px] uppercase tracking-wide text-[var(--text)]/45">
-                            {p.codigo}
-                          </span>
-                        ) : null}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-xs text-[var(--text)]/70">
-                      {p.clasificacion_inmobiliaria?.nombre ?? (
-                        <span className="text-[var(--text)]/40">(sin clasificar)</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs tabular-nums text-[var(--text)]/75">
-                      {formatM2(p.superficie_construida_m2)}
-                    </TableCell>
-                    <TableCell className="text-xs tabular-nums text-[var(--text)]/75">
-                      {p.recamaras ?? '—'}
-                    </TableCell>
-                    <TableCell className="text-xs tabular-nums text-[var(--text)]/75">
-                      {p.banos ?? '—'}
-                    </TableCell>
-                    <TableCell className="text-xs font-medium tabular-nums text-[var(--text)]">
-                      {formatCurrency(p.valor_comercial)}
-                    </TableCell>
-                    <TableCell className="text-xs tabular-nums text-[var(--text)]/75">
-                      {formatCurrency(p.costo_total_unitario)}
-                    </TableCell>
-                    <TableCell
-                      className={`text-xs tabular-nums ${
-                        margen != null && margen < 0
-                          ? 'font-semibold text-red-400'
-                          : 'text-[var(--text)]/75'
-                      }`}
-                    >
-                      {margen != null ? formatCurrency(margen) : '—'}
-                    </TableCell>
-                    <TableCell>
-                      <EtapaBadge etapa={p.etapa} />
-                    </TableCell>
-                    <TableCell>
-                      <PrioridadDot prioridad={p.prioridad} />
-                    </TableCell>
-                    <TableCell className="text-xs text-[var(--text)]/60">
-                      {p.responsable_id ? (
-                        <span className="font-mono text-[10px]">
-                          {p.responsable_id.slice(0, 8)}…
-                        </span>
-                      ) : (
-                        '—'
-                      )}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-xs text-[var(--text)]/60">
-                      {formatDateShort(p.fecha_ultima_revision)}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable<Prototipo>
+          data={data}
+          columns={columns}
+          rowKey="id"
+          loading={loading}
+          error={error}
+          onRowClick={(p) => onOpenDetail(p.id)}
+          initialSort={{ key: 'nombre', dir: 'asc' }}
+          showDensityToggle={false}
+          emptyTitle="Sin resultados"
+          emptyDescription="Limpia los filtros para ver todos los prototipos."
+        />
       )}
     </div>
   );
