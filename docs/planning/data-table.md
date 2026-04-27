@@ -3,10 +3,10 @@
 **Slug:** `data-table`
 **Empresas:** todas
 **Schemas afectados:** n/a (UI)
-**Estado:** planned
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-04-26
-**Última actualización:** 2026-04-26 (alcance v1 cerrado)
+**Última actualización:** 2026-04-26 (cerrada — sesión nocturna autónoma, 8 PRs mergeados)
 
 ## Problema
 
@@ -347,16 +347,31 @@ Cada PR cumple:
   ADR-007 garantiza que `?density=…` coexiste con otras keys de
   filtros sin colisión.
 
-## Sprints / hitos
+## Sprints / hitos (cerrados)
 
-- **Paso 0 — Cerrar alcance v1.** ⏳ Este PR (`docs/data-table-alcance-v1`).
-  Estado: pendiente review/merge. Mergea sin código, solo doc.
-- **PR-A — `lib/format/` + helpers.** ⏸️ Próximo. No-bloqueante por
-  PR-B (los formatters viven aparte).
-- **PR-B — Foundation + ADR-010 + golden paths.** ⏸️ Después de PR-A.
-  Bloquea PRs C-K.
-- **PRs C-K — Migración full.** ⏸️ Encadenados.
-- **Closeout — Movida a `## Done`.** ⏸️ Después de mergear PR-K.
+- **Paso 0 — Cerrar alcance v1.** ✅ PR [#218](https://github.com/beto-sudo/BSOP/pull/218) mergeado (`86374a2`).
+- **PR-A — `lib/format/` + helpers.** ✅ PR [#219](https://github.com/beto-sudo/BSOP/pull/219) mergeado. 11 archivos migrados a re-exportar de `@/lib/format`. 42 tests nuevos.
+- **PR-B — Foundation + ADR-010 + golden path Cortes.** ✅ PR [#220](https://github.com/beto-sudo/BSOP/pull/220) mergeado. `<DataTable>` sobre `@tanstack/react-table` core + `<DataTable.InteractiveCell>` + density toggle + sticky + print stylesheet. Productos no se migró acá — bundleado con Inventario en PR-D.
+- **PR-C — Ventas + ventas-por-producto.** ✅ PR [#221](https://github.com/beto-sudo/BSOP/pull/221) mergeado.
+- **PR-D — Inventario stack + Productos.** ✅ PR [#222](https://github.com/beto-sudo/BSOP/pull/222) mergeado. 4 archivos: page (Stock), movimientos, levantamientos, productos.
+- **PR-E — Compras stack.** ✅ PR [#223](https://github.com/beto-sudo/BSOP/pull/223) mergeado. proveedores + ordenes-compra + requisiciones.
+- **PR-F — DILESA terrenos.** ✅ PR [#224](https://github.com/beto-sudo/BSOP/pull/224) mergeado **parcial**. Solo terrenos. proyectos/prototipos/anteproyectos con tablas de 15+ cols con badges custom complejos quedan para Fase 2.
+- **PR-G — RH stack.** ✅ PR [#225](https://github.com/beto-sudo/BSOP/pull/225) mergeado. departamentos + empleados + puestos.
+
+## Pendientes (Fase 2 incremental)
+
+NO se abren PRs nuevos por la lista entera; cada archivo se migra cuando
+se toque por otro motivo (regla "los nuevos PRs no se aprueban con
+`useSortableTable`" del ADR-010 §DT8).
+
+- `app/dilesa/proyectos/page.tsx` (~903 líneas, tabla 15 cols con badges custom).
+- `app/dilesa/prototipos/page.tsx` (~935 líneas, similar).
+- `app/dilesa/anteproyectos/page.tsx` (~926 líneas, similar).
+- `components/documentos/documentos-table.tsx` (13+ cols con 4 columnas dinámicas via `hasTipoOperacion`/`hasMonto`/etc., PDF/IMG/anexos como cells con `stopPropagation`).
+- `components/tasks/tasks-table.tsx` (variantes simple/rich con popovers internos — preserva API pero refactor interno).
+- `app/rdb/admin/juntas/page.tsx`, `app/dilesa/admin/juntas/page.tsx`, `app/inicio/juntas/page.tsx` (3 lugares con custom row state).
+- `app/rdb/productos/analisis/page.tsx` (3 tablas analíticas read-only).
+- `components/playtomic/*` y `app/settings/acceso/acceso-client.tsx` — auditar primero; pueden quedarse como excepciones documentadas si shape no encaja.
 
 ## Decisiones registradas
 
@@ -402,5 +417,14 @@ Cada PR cumple:
 
 - **2026-04-26 (CC)** — Paso 0: alcance v1 cerrado en este doc.
   Branch `docs/data-table-alcance-v1`. Estado `proposed → planned`.
-  PR docs-only abierto y mergeado (auto-merge tras CI verde dado
-  contexto de sesión nocturna autónoma autorizada por Beto).
+  PR [#218](https://github.com/beto-sudo/BSOP/pull/218) docs-only
+  mergeado (auto-merge tras CI verde dado contexto de sesión nocturna
+  autónoma autorizada por Beto).
+- **2026-04-26 (CC)** — PR-A `lib/format/` mergeado ([#219](https://github.com/beto-sudo/BSOP/pull/219)). API canónica con 10 formatters tipados + 42 tests. Re-exports `@deprecated` desde 6 helpers locales. CI verde tras 2 fixes de tests TZ-dependent (runner CI es UTC, máquina dev es Matamoros).
+- **2026-04-26 (CC)** — PR-B `<DataTable>` foundation mergeado ([#220](https://github.com/beto-sudo/BSOP/pull/220)). Componente sobre `@tanstack/react-table` core (~12kb gzipped target ≤16kb). API declarativa `Column<T>` con 9 column types semánticos. ADR-010 con DT1-DT8. `<CortesTable>` migrado como golden path (15 cols, deltas con coloreado). `useSortableTable` y `<SortableHead>` marcados `@deprecated`. Bug heredado fixed: el viejo `colSpan` del empty era inconsistente con el numero real de columnas.
+- **2026-04-26 (CC)** — PR-C Ventas + ventas-por-producto mergeado ([#221](https://github.com/beto-sudo/BSOP/pull/221)). 2 archivos. -110 líneas netas.
+- **2026-04-26 (CC)** — PR-D Inventario stack + Productos mergeado ([#222](https://github.com/beto-sudo/BSOP/pull/222)). 4 archivos: stock principal, movimientos, levantamientos (2 secciones Activos/Histórico), productos (11 cols con sheet de receta intacto). -190 líneas netas.
+- **2026-04-26 (CC)** — PR-E Compras stack mergeado ([#223](https://github.com/beto-sudo/BSOP/pull/223)). 3 archivos: proveedores, ordenes-compra (con badges custom), requisiciones. -147 líneas netas.
+- **2026-04-26 (CC)** — PR-F DILESA terrenos mergeado **parcial** ([#224](https://github.com/beto-sudo/BSOP/pull/224)). Solo terrenos. Decisión pragmática durante sesión: proyectos/prototipos/anteproyectos tienen tablas de 15+ cols con badges custom complejos cada una; migrarlas cuidadosamente requiere más tiempo del disponible. Se documentan en Pendientes como Fase 2.
+- **2026-04-26 (CC)** — PR-G RH stack mergeado ([#225](https://github.com/beto-sudo/BSOP/pull/225)). 3 archivos: departamentos, empleados (con avatar circular), puestos (con rango salarial dinámico). -88 líneas netas.
+- **2026-04-26 (CC)** — Sesión nocturna cerrada. Closeout: este doc actualizado con bitácora completa, INITIATIVES.md actualizado con `data-table` movida a `## Done`, `ui-rubric.md` Section 2 actualizada con checks específicos a `<DataTable>`. Total 8 PRs mergeados (#218-#225) + 1 PR de docs (#226 closeout) en una sola sesión. ~17 tablas migradas. PRs H/I/J/K NO ejecutados — los archivos correspondientes (Documentos, Tasks, Juntas, Productos analisis, DILESA restantes) quedan documentados como Fase 2 incremental por construcción.
