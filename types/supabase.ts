@@ -5640,6 +5640,7 @@ export type Database = {
           telefono: string | null
           telefono_casa: string | null
           tipo: string
+          tipo_persona: string
           updated_at: string | null
         }
         Insert: {
@@ -5667,6 +5668,7 @@ export type Database = {
           telefono?: string | null
           telefono_casa?: string | null
           tipo?: string
+          tipo_persona?: string
           updated_at?: string | null
         }
         Update: {
@@ -5694,9 +5696,100 @@ export type Database = {
           telefono?: string | null
           telefono_casa?: string | null
           tipo?: string
+          tipo_persona?: string
           updated_at?: string | null
         }
         Relationships: []
+      }
+      personas_datos_fiscales: {
+        Row: {
+          created_at: string
+          csf_adjunto_id: string | null
+          csf_fecha_emision: string | null
+          domicilio_calle: string | null
+          domicilio_colonia: string | null
+          domicilio_cp: string | null
+          domicilio_estado: string | null
+          domicilio_municipio: string | null
+          domicilio_num_ext: string | null
+          domicilio_num_int: string | null
+          domicilio_pais: string | null
+          empresa_id: string
+          fecha_inicio_operaciones: string | null
+          id: string
+          nombre_comercial: string | null
+          obligaciones: Json | null
+          persona_id: string
+          razon_social: string | null
+          regimen_fiscal_codigo: string | null
+          regimen_fiscal_nombre: string | null
+          regimenes_adicionales: Json | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          csf_adjunto_id?: string | null
+          csf_fecha_emision?: string | null
+          domicilio_calle?: string | null
+          domicilio_colonia?: string | null
+          domicilio_cp?: string | null
+          domicilio_estado?: string | null
+          domicilio_municipio?: string | null
+          domicilio_num_ext?: string | null
+          domicilio_num_int?: string | null
+          domicilio_pais?: string | null
+          empresa_id: string
+          fecha_inicio_operaciones?: string | null
+          id?: string
+          nombre_comercial?: string | null
+          obligaciones?: Json | null
+          persona_id: string
+          razon_social?: string | null
+          regimen_fiscal_codigo?: string | null
+          regimen_fiscal_nombre?: string | null
+          regimenes_adicionales?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          csf_adjunto_id?: string | null
+          csf_fecha_emision?: string | null
+          domicilio_calle?: string | null
+          domicilio_colonia?: string | null
+          domicilio_cp?: string | null
+          domicilio_estado?: string | null
+          domicilio_municipio?: string | null
+          domicilio_num_ext?: string | null
+          domicilio_num_int?: string | null
+          domicilio_pais?: string | null
+          empresa_id?: string
+          fecha_inicio_operaciones?: string | null
+          id?: string
+          nombre_comercial?: string | null
+          obligaciones?: Json | null
+          persona_id?: string
+          razon_social?: string | null
+          regimen_fiscal_codigo?: string | null
+          regimen_fiscal_nombre?: string | null
+          regimenes_adicionales?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personas_datos_fiscales_csf_adjunto_id_fkey"
+            columns: ["csf_adjunto_id"]
+            isOneToOne: false
+            referencedRelation: "adjuntos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personas_datos_fiscales_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: true
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       producto_receta: {
         Row: {

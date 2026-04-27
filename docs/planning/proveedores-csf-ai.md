@@ -3,7 +3,7 @@
 **Slug:** `proveedores-csf-ai`
 **Empresas:** todas (RDB ya tiene módulo, DILESA segundo, resto conforme se desarrollen)
 **Schemas afectados:** `erp` (expansión de modelo de personas/datos fiscales) + UI
-**Estado:** planned
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-27
 **Última actualización:** 2026-04-27
@@ -62,10 +62,16 @@ El módulo de Documentos ya tiene el patrón de extracción IA con Claude (`/api
 
 ## Sprints / hitos
 
-### Sprint 1 — Modelo DB + endpoint de extracción
+### Sprint 1.A — Modelo DB ✅
 
-- [ ] Migración `supabase/migrations/<ts>_personas_datos_fiscales.sql` siguiendo ADR-007: agrega columna `tipo_persona` a `erp.personas`, crea tabla anexa `erp.personas_datos_fiscales` con RLS por empresa y trigger `updated_at`.
-- [ ] Regenerar `supabase/SCHEMA_REF.md` (`npm run schema:ref`).
+- [x] Migración `supabase/migrations/20260427103620_personas_datos_fiscales.sql` siguiendo ADR-007. Aplicada a la DB.
+- [x] Columna `tipo_persona` en `erp.personas` (default 'fisica', check fisica|moral).
+- [x] Tabla `erp.personas_datos_fiscales` 1:1 con personas + RLS + trigger updated_at.
+- [x] `supabase/SCHEMA_REF.md` regenerado con `npm run schema:ref`.
+- [x] `types/supabase.ts` actualizado con los nuevos types (manualmente, `npm run db:types` bloqueado en sandbox).
+
+### Sprint 1.B — Endpoint de extracción IA
+
 - [ ] `POST /api/proveedores/extract-csf` que reciba PDF, lo procese con Claude usando schema dedicado a CSF (todos los campos del ADR-007), y devuelva los datos pre-llenados sin persistir. Reutiliza `lib/documentos/extraction-core.ts`.
 - [ ] Tests unitarios del schema de extracción con CSFs reales (3-5 PDFs de ejemplo, físicas y morales).
 
@@ -98,4 +104,5 @@ El módulo de Documentos ya tiene el patrón de extracción IA con Claude (`/api
 
 ## Bitácora
 
-- **2026-04-27 — Sesión de arranque.** Se registra la iniciativa en `INITIATIVES.md` (PR [#234](https://github.com/beto-sudo/BSOP/pull/234)). Beto aprueba alcance v1 inmediatamente. Se promueve estado `proposed → planned` y se cierra la decisión de modelo DB con [ADR-007](../../supabase/adr/007_personas_datos_fiscales.md). El próximo hito real es Sprint 1: migración DB + endpoint de extracción.
+- **2026-04-27 — Sesión de arranque.** Se registra la iniciativa en `INITIATIVES.md` (PR [#234](https://github.com/beto-sudo/BSOP/pull/234)). Beto aprueba alcance v1 inmediatamente. Se promueve estado `proposed → planned` y se cierra la decisión de modelo DB con [ADR-007](../../supabase/adr/007_personas_datos_fiscales.md).
+- **2026-04-27 — Sprint 1.A cerrado (PR [#235](https://github.com/beto-sudo/BSOP/pull/235)).** Migración aplicada a la DB: columna `tipo_persona` en `erp.personas` + tabla `erp.personas_datos_fiscales` con RLS y trigger updated_at. SCHEMA_REF y types regenerados. CI verde (typecheck/lint/test/format/drift-check). Estado `planned → in_progress`. Próximo: Sprint 1.B (endpoint extract-csf).

@@ -4,7 +4,7 @@
 > abre `docs/planning/<slug>.md`. Mantenido por Cowork (cuando se crea o
 > cambia el alcance) y por Claude Code (cuando ejecuta y cierra hitos).
 >
-> **Última actualización:** 2026-04-27 (`proveedores-csf-ai` arranca — alcance aprobado, ADR-007 cierra modelo DB con tabla anexa `erp.personas_datos_fiscales` + columna `tipo_persona` en `erp.personas`. Estado promovido a `planned`, próximo hito = Sprint 1.)
+> **Última actualización:** 2026-04-27 (`proveedores-csf-ai` Sprint 1.A mergeable — migración DB aplicada [PR #235], `erp.personas_datos_fiscales` + `tipo_persona` en producción. Estado `planned → in_progress`, próximo hito = Sprint 1.B endpoint extract-csf.)
 
 ## Convenciones
 
@@ -23,16 +23,16 @@
 
 ## Activas
 
-| Iniciativa                  | Slug                       | Empresas             | Schemas                     | Estado      | Próximo hito                                                                                                        | Última actualización |
-| --------------------------- | -------------------------- | -------------------- | --------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| Accessibility Baseline (UI) | `a11y-baseline`            | todas                | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (post-`responsive-policy`)                                                            | 2026-04-26           |
-| Access Denied UX (UI)       | `access-denied-ux`         | todas                | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (post-`a11y-baseline`)                                                                | 2026-04-26           |
-| Analytics (BI externo)      | `analytics`                | todas                | analytics, erp, dilesa, rdb | blocked     | Sprint 0 — desbloquear export del bootstrap (Metabase + Caddy + Postgres) desde Cowork al repo Analytics            | 2026-04-25           |
-| Module Page (UI ADR-004)    | `module-page`              | todas                | n/a (UI)                    | in_progress | Fase 2 — migrar segunda página al componente `<ModulePage>`                                                         | 2026-04-25           |
-| Module-page sub-módulos     | `module-page-submodules`   | RDB (primero), todas | n/a (UI)                    | in_progress | PR de refactor RDB Inventario abierto → smoke manual + merge (Beto)                                                 | 2026-04-26           |
-| Proveedores · CSF AI        | `proveedores-csf-ai`       | todas                | erp                         | planned     | Sprint 1 — migración DB (`personas_datos_fiscales` + `tipo_persona`) + endpoint `POST /api/proveedores/extract-csf` | 2026-04-27           |
-| Waitry ingesta + dedup      | `rdb-waitry-ingesta-dedup` | RDB                  | rdb (waitry\_\*), erp       | in_progress | Fase 2.B — fix de `compute_content_hash` (incluir `tableId`) + backfill + re-detección, fuera de horario operativo  | 2026-04-26           |
-| Responsive Policy (UI)      | `responsive-policy`        | todas                | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (post-`data-table`)                                                                   | 2026-04-26           |
+| Iniciativa                  | Slug                       | Empresas             | Schemas                     | Estado      | Próximo hito                                                                                                       | Última actualización |
+| --------------------------- | -------------------------- | -------------------- | --------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------ | -------------------- |
+| Accessibility Baseline (UI) | `a11y-baseline`            | todas                | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (post-`responsive-policy`)                                                           | 2026-04-26           |
+| Access Denied UX (UI)       | `access-denied-ux`         | todas                | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (post-`a11y-baseline`)                                                               | 2026-04-26           |
+| Analytics (BI externo)      | `analytics`                | todas                | analytics, erp, dilesa, rdb | blocked     | Sprint 0 — desbloquear export del bootstrap (Metabase + Caddy + Postgres) desde Cowork al repo Analytics           | 2026-04-25           |
+| Module Page (UI ADR-004)    | `module-page`              | todas                | n/a (UI)                    | in_progress | Fase 2 — migrar segunda página al componente `<ModulePage>`                                                        | 2026-04-25           |
+| Module-page sub-módulos     | `module-page-submodules`   | RDB (primero), todas | n/a (UI)                    | in_progress | PR de refactor RDB Inventario abierto → smoke manual + merge (Beto)                                                | 2026-04-26           |
+| Proveedores · CSF AI        | `proveedores-csf-ai`       | todas                | erp                         | in_progress | Sprint 1.B — endpoint `POST /api/proveedores/extract-csf` reutilizando `lib/documentos/extraction-core` + tests    | 2026-04-27           |
+| Waitry ingesta + dedup      | `rdb-waitry-ingesta-dedup` | RDB                  | rdb (waitry\_\*), erp       | in_progress | Fase 2.B — fix de `compute_content_hash` (incluir `tableId`) + backfill + re-detección, fuera de horario operativo | 2026-04-26           |
+| Responsive Policy (UI)      | `responsive-policy`        | todas                | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (post-`data-table`)                                                                  | 2026-04-26           |
 
 ## Roadmap UI (orden de ejecución secuencial)
 
