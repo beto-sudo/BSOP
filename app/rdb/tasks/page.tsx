@@ -10,16 +10,7 @@ import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { SortableHead } from '@/components/ui/sortable-head';
-import { useSortableTable } from '@/hooks/use-sortable-table';
+import { DataTable, type Column } from '@/components/module-page';
 import {
   Dialog,
   DialogContent,
@@ -39,13 +30,11 @@ import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { FieldLabel } from '@/components/ui/field-label';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Plus,
   Search,
   RefreshCw,
-  ChevronRight,
   Loader2,
   TicketCheck,
   MessageSquarePlus,
@@ -365,9 +354,71 @@ function TasksInner() {
     return true;
   });
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable<
-    ErpTask & { prioridad_peso: number | null; asignado_nombre: string | null }
-  >('created_at', 'desc');
+  const tasksColumns: Column<ErpTask>[] = [
+    {
+      key: 'titulo',
+      label: 'Título',
+      render: (task) => (
+        <>
+          <span className="line-clamp-1 font-medium text-[var(--text)]">{task.titulo}</span>
+          {task.entidad_tipo && (
+            <span className="mt-0.5 block text-xs text-[var(--text-subtle)]">
+              {task.entidad_tipo}
+            </span>
+          )}
+        </>
+      ),
+    },
+    {
+      key: 'estado',
+      label: 'Estado',
+      width: 'w-28',
+      render: (task) => <EstadoBadge estado={task.estado} />,
+    },
+    {
+      key: 'prioridad',
+      label: 'Prioridad',
+      width: 'w-28',
+      accessor: (t) => {
+        const idx = (PRIORIDAD_OPTIONS as readonly string[]).indexOf(t.prioridad ?? '');
+        return idx === -1 ? null : idx;
+      },
+      render: (task) => <PrioridadBadge prioridad={task.prioridad} />,
+    },
+    {
+      key: 'asignado_a',
+      label: 'Asignado a',
+      width: 'w-40',
+      accessor: (t) => empleadoMap.get(t.asignado_a ?? '')?.nombre ?? null,
+      cellClassName: 'text-sm text-[var(--text)]/70',
+      render: (task) => empleadoMap.get(task.asignado_a ?? '')?.nombre ?? '—',
+    },
+    {
+      key: 'fecha_vence',
+      label: 'Vence',
+      width: 'w-28',
+      cellClassName: 'text-sm text-[var(--text)]/70',
+      render: (task) => formatDate(task.fecha_vence),
+    },
+    {
+      key: 'updates',
+      label: '',
+      sortable: false,
+      width: 'w-10',
+      render: (task) => (
+        <DataTable.InteractiveCell>
+          <button
+            type="button"
+            title="Ver / agregar avances"
+            onClick={() => handleOpenUpdatesSheet(task.id)}
+            className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 text-[var(--accent)] transition hover:bg-[var(--accent)]/20"
+          >
+            <MessageSquarePlus className="h-3 w-3" />
+          </button>
+        </DataTable.InteractiveCell>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -445,147 +496,34 @@ function TasksInner() {
 
       {/* Table */}
       <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)]">
-        {error ? (
-          <div className="flex items-center justify-center p-16 text-red-400">Error: {error}</div>
-        ) : loading ? (
-          <div className="space-y-0 divide-y divide-[var(--border)]">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-4 p-4">
-                <Skeleton className="h-4 w-64" />
-                <Skeleton className="h-5 w-20 ml-auto" />
-                <Skeleton className="h-5 w-20" />
-                <Skeleton className="h-4 w-28" />
-              </div>
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-16 text-center">
-            <TicketCheck className="mb-3 h-10 w-10 text-[var(--text)]/20" />
-            <p className="text-sm text-[var(--text-muted)]">
-              {tasks.length === 0
-                ? 'No hay tareas creadas aún'
-                : 'No hay tareas que coincidan con los filtros'}
-            </p>
-            {tasks.length === 0 && (
+        <DataTable<ErpTask>
+          data={filtered}
+          columns={tasksColumns}
+          rowKey="id"
+          loading={loading}
+          error={error}
+          onRowClick={(task) => router.push(`/rdb/tasks/${task.id}`)}
+          initialSort={{ key: 'created_at', dir: 'desc' }}
+          showDensityToggle={false}
+          emptyIcon={<TicketCheck className="h-10 w-10 text-[var(--text)]/20" />}
+          emptyTitle={
+            tasks.length === 0
+              ? 'No hay tareas creadas aún'
+              : 'No hay tareas que coincidan con los filtros'
+          }
+          emptyAction={
+            tasks.length === 0 ? (
               <Button
                 size="sm"
                 onClick={() => setShowCreate(true)}
-                className="mt-4 gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90"
+                className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90"
               >
                 <Plus className="h-4 w-4" />
                 Crear primera tarea
               </Button>
-            )}
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="border-[var(--border)] hover:bg-transparent">
-                <SortableHead
-                  sortKey="titulo"
-                  label="Título"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="estado"
-                  label="Estado"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="w-28"
-                />
-                <SortableHead
-                  sortKey="prioridad_peso"
-                  label="Prioridad"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="w-28"
-                />
-                <SortableHead
-                  sortKey="asignado_nombre"
-                  label="Asignado a"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="w-40"
-                />
-                <SortableHead
-                  sortKey="fecha_vence"
-                  label="Vence"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="w-28"
-                />
-                <TableHead className="w-10" />
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortData(
-                filtered.map((t) => ({
-                  ...t,
-                  prioridad_peso: t.prioridad
-                    ? PRIORIDAD_OPTIONS.indexOf(t.prioridad as any)
-                    : null,
-                  asignado_nombre: empleadoMap.get(t.asignado_a ?? '')?.nombre ?? null,
-                }))
-              ).map((task) => {
-                const empleado = empleadoMap.get(task.asignado_a ?? '');
-                return (
-                  <TableRow
-                    key={task.id}
-                    className="cursor-pointer border-[var(--border)] transition-colors hover:bg-[var(--panel)]"
-                    onClick={() => router.push(`/rdb/tasks/${task.id}`)}
-                  >
-                    <TableCell>
-                      <span className="line-clamp-1 font-medium text-[var(--text)]">
-                        {task.titulo}
-                      </span>
-                      {task.entidad_tipo && (
-                        <span className="mt-0.5 block text-xs text-[var(--text-subtle)]">
-                          {task.entidad_tipo}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <EstadoBadge estado={task.estado} />
-                    </TableCell>
-                    <TableCell>
-                      <PrioridadBadge prioridad={task.prioridad} />
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-[var(--text)]/70">
-                        {empleado ? empleado.nombre : '—'}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-[var(--text)]/70">
-                        {formatDate(task.fecha_vence)}
-                      </span>
-                    </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        title="Ver / agregar avances"
-                        onClick={() => handleOpenUpdatesSheet(task.id)}
-                        className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 text-[var(--accent)] transition hover:bg-[var(--accent)]/20"
-                      >
-                        <MessageSquarePlus className="h-3 w-3" />
-                      </button>
-                    </TableCell>
-                    <TableCell>
-                      <ChevronRight className="h-4 w-4 text-[var(--text)]/30" />
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        )}
+            ) : undefined
+          }
+        />
       </div>
 
       {/* Summary */}
