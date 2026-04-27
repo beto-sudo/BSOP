@@ -1,5 +1,21 @@
 'use client';
 
+/**
+ * Migration to `<DataTable>` (ADR-010) not applied.
+ *
+ * Reason: this is a settings state-machine UI with three tabs (empresas,
+ * roles, usuarios), a sidebar+matrix pattern for role permissions, and
+ * inline-edit checkboxes. The value `<DataTable>` adds (sort, density
+ * toggle, sticky, ADR-006 empty/loading) does not apply here:
+ *   - No sortable columns. The order is intrinsic to the state machine.
+ *   - No filters or density preference — settings UIs render once.
+ *   - The permissions matrix has a sidebar (role list) coupled to the
+ *     content (per-module checkboxes), which is not a tabular contract.
+ *
+ * Decision logged in docs/planning/data-table.md bitácora 2026-04-27 as
+ * a permanent exception.
+ */
+
 import { type ReactNode, useState, useTransition } from 'react';
 import { usePermissions } from '@/components/providers';
 import {
