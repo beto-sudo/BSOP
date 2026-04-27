@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import { normalizeHtmlImagesToPaths, rewriteHtmlImagesToSigned } from '@/lib/adjuntos';
+import { htmlHasCodaImages, importCodaImagesInHtml } from '@/lib/coda-paste-import';
 import { fetchJuntaUpdates } from '@/lib/juntas/fetch-updates';
 import { TasksCreateForm } from '@/components/tasks/tasks-create-form';
 import { emptyTaskForm, type TaskFormValues } from '@/components/tasks/tasks-shared';
@@ -134,23 +135,32 @@ const ESTADO_TASK: Record<string, { label: string; cls: string }> = {
 
 const PRIORIDAD_OPTIONS = ['Urgente', 'Alta', 'Media', 'Baja'] as const;
 
-const TIPO_CONFIG: Record<string, string> = {
-  operativa: '⚙️ Operativa',
-  directiva: '🏛️ Directiva',
-  seguimiento: '📊 Seguimiento',
-  emergencia: '🚨 Emergencia',
-  Consejo: '🏢 Consejo',
-  'Comite Ejecutivo': '👔 Comité Ejecutivo',
-  Ventas: '💰 Ventas',
-  'Atención PosVenta': '🔧 Atención PosVenta',
-  Administración: '📁 Administración',
-  Mercadotecnia: '📣 Mercadotecnia',
-  Construcción: '🏗️ Construcción',
-  'Compras y Admon. Inventario': '📦 Compras y Admon. Inventario',
-  Maquinaria: '🚜 Maquinaria',
-  Proyectos: '🗂️ Proyectos',
-  'Rincón del Bosque': '🌲 Rincón del Bosque',
-};
+const TIPO_OPTIONS: { value: string; label: string; icon: string }[] = [
+  { value: 'Comité Ejecutivo', label: 'Comité Ejecutivo', icon: '👔' },
+  { value: 'Consejo', label: 'Consejo', icon: '🏢' },
+  { value: 'Ventas', label: 'Ventas', icon: '💰' },
+  { value: 'Atención PosVenta', label: 'Atención PosVenta', icon: '🔧' },
+  { value: 'Administración', label: 'Administración', icon: '📁' },
+  { value: 'Mercadotecnia', label: 'Mercadotecnia', icon: '📣' },
+  { value: 'Construcción', label: 'Construcción', icon: '🏗️' },
+  { value: 'Compras y Admon. Inventario', label: 'Compras y Admon. Inv.', icon: '📦' },
+  { value: 'Maquinaria', label: 'Maquinaria', icon: '🚜' },
+  { value: 'Proyectos', label: 'Proyectos', icon: '🗂️' },
+  { value: 'Rincón del Bosque', label: 'Rincón del Bosque', icon: '🌲' },
+  { value: 'Extraordinaria', label: 'Extraordinaria', icon: '🚨' },
+  { value: 'Otro', label: 'Otro', icon: '📌' },
+];
+
+const TIPO_CONFIG: Record<string, string> = Object.fromEntries([
+  ...TIPO_OPTIONS.map((t) => [t.value, `${t.icon} ${t.label}`]),
+  ['Comite Ejecutivo', '👔 Comité Ejecutivo'],
+  ['Junta Operativa', '⚙️ Junta Operativa'],
+  ['Junta de Área', '📋 Junta de Área'],
+  ['operativa', '⚙️ Operativa'],
+  ['directiva', '🏛️ Directiva'],
+  ['seguimiento', '📊 Seguimiento'],
+  ['emergencia', '🚨 Emergencia'],
+]);
 
 function toDatetimeLocal(iso: string) {
   const d = new Date(iso);
@@ -162,6 +172,19 @@ function formatDate(s: string | null) {
   if (!s) return '—';
   const d = new Date(s.includes('T') ? s : `${s}T00:00:00`);
   return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function formatDateTime(s: string | null) {
+  if (!s) return '—';
+  const d = new Date(s);
+  return d.toLocaleString('es-MX', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -177,6 +200,7 @@ function JuntaDetailInner() {
   const router = useRouter();
   const id = params.id as string;
   const supabase = createSupabaseERPClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [junta, setJunta] = useState<Junta | null>(null);
   const [asistencia, setAsistencia] = useState<Asistencia[]>([]);
@@ -186,6 +210,7 @@ function JuntaDetailInner() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const [titulo, setTitulo] = useState('');
   const [fechaHora, setFechaHora] = useState('');
@@ -199,6 +224,9 @@ function JuntaDetailInner() {
   const [showTerminarDialog, setShowTerminarDialog] = useState(false);
   const [reenviando, setReenviando] = useState(false);
   const [showReenviarDialog, setShowReenviarDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [isDireccion, setIsDireccion] = useState(false);
 
   const editor = useEditor({
     // TipTap v3 exige `immediatelyRender: false` para Next.js SSR/RSC; evita
@@ -207,7 +235,7 @@ function JuntaDetailInner() {
     extensions: [
       StarterKit,
       Underline,
-      Image,
+      Image.configure({ inline: false, allowBase64: false }),
       Table.configure({ resizable: true }),
       TableRow,
       TableHeader,
@@ -217,6 +245,37 @@ function JuntaDetailInner() {
     editorProps: {
       attributes: {
         class: 'prose prose-sm max-w-none focus:outline-none min-h-[200px] p-4 text-[var(--text)]',
+      },
+      handleDrop(view, event, _slice, moved) {
+        if (moved || !event.dataTransfer?.files.length) return false;
+        const file = event.dataTransfer.files[0];
+        if (!file?.type.startsWith('image/')) return false;
+        event.preventDefault();
+        void handleImageUpload(file);
+        return true;
+      },
+      handlePaste(view, event) {
+        // 1) Single image blob (right-click → Copy image in Coda, or screenshot)
+        const items = event.clipboardData?.items;
+        if (items) {
+          for (const item of Array.from(items)) {
+            if (item.type.startsWith('image/')) {
+              event.preventDefault();
+              const file = item.getAsFile();
+              if (file) void handleImageUpload(file);
+              return true;
+            }
+          }
+        }
+        // 2) HTML paste with external Coda <img> URLs (Cmd+A + Cmd+C from Coda junta).
+        //    Intercept only when we actually see Coda-hosted image references.
+        const html = event.clipboardData?.getData('text/html') || '';
+        if (htmlHasCodaImages(html)) {
+          event.preventDefault();
+          void handlePasteWithCodaImages(html);
+          return true;
+        }
+        return false;
       },
     },
   });
@@ -234,6 +293,82 @@ function JuntaDetailInner() {
   const [showAddUpdate, setShowAddUpdate] = useState<string | null>(null);
   const [updateForm, setUpdateForm] = useState({ contenido: '', nuevoEstado: '', nuevaFecha: '' });
   const [savingUpdate, setSavingUpdate] = useState(false);
+
+  const handlePasteWithCodaImages = async (html: string) => {
+    if (!editor) return;
+    setUploadingImage(true);
+    try {
+      const { html: rewritten, imported, failed } = await importCodaImagesInHtml(html, id);
+      editor.chain().focus().insertContent(rewritten).run();
+      if (failed > 0) {
+        alert(
+          `Imágenes importadas: ${imported}. Fallaron ${failed} — revisa la consola del navegador.`
+        );
+      }
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleImageUpload = async (file: File) => {
+    if (!editor || uploadingImage) return;
+    setUploadingImage(true);
+    try {
+      const ext = file.name.split('.').pop() ?? 'png';
+      const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const path = `juntas/${id}/${filename}`;
+      const { error: uploadErr } = await supabase.storage
+        .from('adjuntos')
+        .upload(path, file, { upsert: false });
+      if (uploadErr) {
+        alert(`Error al subir imagen: ${uploadErr.message}`);
+        return;
+      }
+      editor
+        .chain()
+        .focus()
+        .setImage({ src: `/api/adjuntos/${path}` })
+        .run();
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleInsertImageClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) void handleImageUpload(file);
+    e.target.value = '';
+  };
+
+  const handleDelete = async () => {
+    if (!junta) return;
+    setDeleting(true);
+    try {
+      await supabase.schema('erp').from('juntas_asistencia').delete().eq('junta_id', junta.id);
+      await supabase
+        .schema('erp')
+        .from('tasks')
+        .update({ entidad_tipo: null, entidad_id: null })
+        .eq('entidad_tipo', 'junta')
+        .eq('entidad_id', junta.id);
+      const { error: err } = await supabase
+        .schema('erp')
+        .from('juntas')
+        .delete()
+        .eq('id', junta.id);
+      if (err) {
+        alert(`Error al eliminar: ${err.message}`);
+        return;
+      }
+      router.push('/rdb/admin/juntas');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const fetchAll = useCallback(async () => {
     const { data: juntaData, error: jErr } = await supabase
@@ -357,6 +492,19 @@ function JuntaDetailInner() {
         nombre: [e.persona?.nombre, e.persona?.apellido_paterno].filter(Boolean).join(' '),
       }))
     );
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user?.email) {
+      const { data: coreUser } = await supabase
+        .schema('core')
+        .from('usuarios')
+        .select('rol')
+        .eq('email', user.email)
+        .maybeSingle();
+      if (coreUser?.rol === 'admin') setIsDireccion(true);
+    }
 
     setLoading(false);
   }, [id, supabase, editor]);
@@ -874,6 +1022,14 @@ function JuntaDetailInner() {
 
   return (
     <div className="space-y-6 pb-12">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-3">
           <Button
@@ -902,6 +1058,17 @@ function JuntaDetailInner() {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {isDireccion && (
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteDialog(true)}
+              disabled={deleting}
+              className="gap-1.5 rounded-xl border-red-500/40 text-red-500 hover:bg-red-500/10 hover:border-red-500/60"
+            >
+              <Trash2 className="h-4 w-4" />
+              Eliminar
+            </Button>
+          )}
           {estado !== 'completada' && estado !== 'cancelada' && (
             <Button
               variant="outline"
@@ -998,9 +1165,9 @@ function JuntaDetailInner() {
             <Combobox
               value={tipo ?? ''}
               onChange={(v) => setTipo(v)}
-              options={Object.entries(TIPO_CONFIG).map(([k, v]) => ({
-                value: k,
-                label: String(v),
+              options={TIPO_OPTIONS.map((t) => ({
+                value: t.value,
+                label: `${t.icon} ${t.label}`,
               }))}
               placeholder="Sin tipo"
               allowClear
@@ -1023,24 +1190,32 @@ function JuntaDetailInner() {
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
         <SectionTitle>Notas y minuta</SectionTitle>
         <div className="rounded-xl border border-[var(--border)]">
-          <EditorToolbar editor={editor} />
+          <EditorToolbar editor={editor} onInsertImage={handleInsertImageClick} />
           <div className="rounded-b-xl bg-[var(--panel)]">
             <style>{MINUTA_EDITOR_STYLES}</style>
             <EditorContent editor={editor} />
           </div>
         </div>
-        <p className="mt-2 text-[10px] text-[var(--text-subtle)]">
-          {estado !== 'completada' && estado !== 'cancelada'
-            ? autoSaveStatus === 'saving'
-              ? '⏳ Guardando notas...'
-              : autoSaveStatus === 'saved'
-                ? '✅ Notas guardadas'
-                : 'Las notas se auto-guardan mientras escribes'
-            : 'Las notas se guardan al presionar "Guardar cambios"'}
-        </p>
-        {lastPoll && estado !== 'completada' && estado !== 'cancelada' && (
-          <span className="text-[10px] text-[var(--text)]/30">• Sync: {lastPoll}</span>
-        )}
+        <div className="flex items-center gap-2 mt-2">
+          <p className="text-[10px] text-[var(--text-subtle)] flex-1">
+            {estado !== 'completada' && estado !== 'cancelada'
+              ? autoSaveStatus === 'saving'
+                ? '⏳ Guardando notas...'
+                : autoSaveStatus === 'saved'
+                  ? '✅ Notas guardadas'
+                  : 'Las notas se auto-guardan mientras escribes'
+              : 'Las notas se guardan al presionar "Guardar cambios"'}
+          </p>
+          {uploadingImage && (
+            <span className="text-[10px] text-[var(--accent)] flex items-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Subiendo imagen...
+            </span>
+          )}
+          {lastPoll && estado !== 'completada' && estado !== 'cancelada' && (
+            <span className="text-[10px] text-[var(--text)]/30">• Sync: {lastPoll}</span>
+          )}
+        </div>
       </div>
 
       {/* ── Actualizaciones de tareas ─────────────────────────── */}
@@ -1054,77 +1229,102 @@ function JuntaDetailInner() {
             </div>
           ) : (
             (() => {
+              // Agrupar actualizaciones por tarea y ordenar ASC dentro del
+              // grupo para que se lea como timeline (antigua → reciente).
               const grouped = new Map<string, TaskUpdate[]>();
               for (const u of taskUpdates) {
                 const arr = grouped.get(u.task_id) ?? [];
                 arr.push(u);
                 grouped.set(u.task_id, arr);
               }
+              for (const arr of grouped.values()) {
+                arr.sort(
+                  (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                );
+              }
+              const tipoCfg: Record<string, { label: string; cls: string }> = {
+                avance: {
+                  label: 'Avance',
+                  cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
+                },
+                cambio_estado: {
+                  label: 'Estado',
+                  cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
+                },
+                cambio_fecha: {
+                  label: 'Fecha',
+                  cls: 'bg-purple-500/15 text-purple-400 border-purple-500/20',
+                },
+                nota: {
+                  label: 'Nota',
+                  cls: 'bg-[var(--border)]/60 text-[var(--text)]/60 border-[var(--border)]',
+                },
+                cambio_responsable: {
+                  label: 'Responsable',
+                  cls: 'bg-teal-500/15 text-teal-400 border-teal-500/20',
+                },
+              };
               return (
-                <div className="space-y-4">
+                <div className="divide-y divide-[var(--border)]">
                   {Array.from(grouped.entries()).map(([taskId, updates]) => {
                     const task = updates[0]?.task ?? tasks.find((t) => t.id === taskId);
                     if (!task) return null;
+                    const estadoCfg = ESTADO_TASK[task.estado] ?? {
+                      label: task.estado,
+                      cls: '',
+                    };
+                    const asignado = empleadoMap.get(task.asignado_a ?? '');
                     return (
-                      <div key={taskId} className="space-y-2">
-                        <p className="text-xs font-semibold text-[var(--text)]/50 uppercase tracking-wide">
-                          {task.titulo}
-                        </p>
-                        {updates.map((u) => {
-                          const tipoCfg: Record<string, { label: string; cls: string }> = {
-                            avance: {
-                              label: 'Avance',
-                              cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
-                            },
-                            cambio_estado: {
-                              label: 'Estado',
-                              cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
-                            },
-                            cambio_fecha: {
-                              label: 'Fecha',
-                              cls: 'bg-purple-500/15 text-purple-400 border-purple-500/20',
-                            },
-                            nota: {
-                              label: 'Nota',
-                              cls: 'bg-[var(--border)]/60 text-[var(--text)]/60 border-[var(--border)]',
-                            },
-                            cambio_responsable: {
-                              label: 'Responsable',
-                              cls: 'bg-teal-500/15 text-teal-400 border-teal-500/20',
-                            },
-                          };
-                          const tc = tipoCfg[u.tipo] ?? { label: u.tipo, cls: '' };
-                          return (
-                            <div
-                              key={u.id}
-                              className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2.5"
-                            >
-                              <div className="flex items-center gap-2 mb-1">
-                                <span
-                                  className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[10px] font-medium ${tc.cls}`}
-                                >
-                                  {tc.label}
-                                </span>
-                                <span className="text-[10px] text-[var(--text-subtle)]">
-                                  {u.usuario?.nombre ?? 'Sistema'}
-                                </span>
-                                <span className="text-[10px] text-[var(--text)]/30 ml-auto">
-                                  {formatDate(u.created_at)}
-                                </span>
-                              </div>
-                              {u.contenido && (
-                                <p className="text-sm text-[var(--text)]/80">{u.contenido}</p>
-                              )}
-                              {u.valor_anterior != null && u.valor_nuevo != null && (
-                                <p className="text-xs text-[var(--text)]/50">
-                                  {u.tipo === 'cambio_estado'
-                                    ? `${ESTADO_TASK[u.valor_anterior]?.label ?? u.valor_anterior} → ${ESTADO_TASK[u.valor_nuevo]?.label ?? u.valor_nuevo}`
-                                    : `${u.valor_anterior || '—'} → ${u.valor_nuevo || '—'}`}
-                                </p>
-                              )}
-                            </div>
-                          );
-                        })}
+                      <div key={taskId} className="py-2.5 first:pt-0 last:pb-0">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mb-1.5">
+                          <span className="text-sm font-medium text-[var(--text)]">
+                            {task.titulo}
+                          </span>
+                          <span
+                            className={`inline-flex items-center rounded-md border px-1.5 py-px text-[10px] font-medium ${estadoCfg.cls}`}
+                          >
+                            {estadoCfg.label}
+                          </span>
+                          <span className="text-[10px] text-[var(--text)]/45">
+                            {asignado?.nombre ?? '—'}
+                            {task.fecha_vence && ` · vence ${formatDate(task.fecha_vence)}`}
+                            {` · ${updates.length} ${updates.length === 1 ? 'nota' : 'notas'}`}
+                          </span>
+                        </div>
+                        <ul className="space-y-1 pl-2 border-l-2 border-[var(--border)]">
+                          {updates.map((u) => {
+                            const tc = tipoCfg[u.tipo] ?? { label: u.tipo, cls: '' };
+                            const hasDelta = u.valor_anterior != null && u.valor_nuevo != null;
+                            return (
+                              <li key={u.id} className="text-xs leading-snug text-[var(--text)]/80">
+                                <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-[var(--text)]/45">
+                                  <span
+                                    className={`inline-flex items-center rounded border px-1.5 py-px font-medium ${tc.cls}`}
+                                  >
+                                    {tc.label}
+                                  </span>
+                                  <span className="text-[var(--text)]/65">
+                                    {u.usuario?.nombre ?? 'Sistema'}
+                                  </span>
+                                  <span>·</span>
+                                  <span>{formatDateTime(u.created_at)}</span>
+                                </div>
+                                {u.contenido && (
+                                  <p className="text-xs text-[var(--text)]/80 whitespace-pre-wrap">
+                                    {u.contenido}
+                                  </p>
+                                )}
+                                {hasDelta && (
+                                  <p className="text-[11px] text-[var(--text)]/50">
+                                    {u.tipo === 'cambio_estado'
+                                      ? `${ESTADO_TASK[u.valor_anterior!]?.label ?? u.valor_anterior} → ${ESTADO_TASK[u.valor_nuevo!]?.label ?? u.valor_nuevo}`
+                                      : `${u.valor_anterior || '—'} → ${u.valor_nuevo || '—'}`}
+                                  </p>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
                       </div>
                     );
                   })}
@@ -1479,7 +1679,7 @@ function JuntaDetailInner() {
       </Sheet>
 
       <TasksCreateForm
-        variant="simple"
+        variant="rich"
         open={showAddTask}
         onOpenChange={setShowAddTask}
         value={taskForm}
@@ -1553,6 +1753,40 @@ function JuntaDetailInner() {
                 <CheckCircle2 className="h-4 w-4" />
               )}
               Sí, terminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="max-w-sm rounded-3xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]">
+          <DialogHeader>
+            <DialogTitle className="text-red-400">Eliminar junta</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-[var(--text)]/70 pb-2">
+            Esta acción es <strong>irreversible</strong>. Se eliminará la junta, su asistencia y se
+            desvincularán las tareas asociadas. ¿Estás seguro?
+          </p>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteDialog(false)}
+              disabled={deleting}
+              className="rounded-xl border-[var(--border)] text-[var(--text)]"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="gap-1.5 rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+            >
+              {deleting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              Sí, eliminar
             </Button>
           </DialogFooter>
         </DialogContent>
