@@ -89,6 +89,21 @@ export function formatPercent(value: number | null | undefined, opts: PercentOpt
 
 // ─── Dates ─────────────────────────────────────────────────────────────────
 
+const MESES_ES_CORTO = [
+  'ene',
+  'feb',
+  'mar',
+  'abr',
+  'may',
+  'jun',
+  'jul',
+  'ago',
+  'sep',
+  'oct',
+  'nov',
+  'dic',
+];
+
 function parseInput(input: string | Date | null | undefined): Date | null {
   if (input == null) return null;
   if (input instanceof Date) {
@@ -105,11 +120,22 @@ function parseInput(input: string | Date | null | undefined): Date | null {
 }
 
 /**
- * Formato corto: "23 abr 2026". Usa TZ America/Matamoros para timestamps con
- * hora; para date-only ISO, mantiene la fecha local sin conversión.
+ * Formato corto: "23 abr 2026".
+ *
+ * Para date-only ISO (`'2026-04-23'`), no se aplica TZ — se trata como
+ * "fecha calendar" pura, sin shift. Esto evita bugs cross-TZ donde el
+ * runner UTC interpreta el día como medianoche y formatear con TZ
+ * Matamoros (UTC-5) lo regresa al día anterior.
+ *
+ * Para timestamps con hora, se usa TZ America/Matamoros.
  */
 export function formatDate(input: string | Date | null | undefined): string {
   if (input == null) return DASH;
+  // Date-only: formato manual TZ-agnostic.
+  if (typeof input === 'string' && DATE_ONLY_RE.test(input)) {
+    const [y, m, d] = input.split('-').map(Number);
+    return `${String(d).padStart(2, '0')} ${MESES_ES_CORTO[m - 1]} ${y}`;
+  }
   const d = parseInput(input);
   if (!d) return typeof input === 'string' ? input : DASH;
   return new Intl.DateTimeFormat(LOCALE, {
