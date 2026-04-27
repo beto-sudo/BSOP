@@ -3,7 +3,7 @@
 **Slug:** `proveedores-csf-ai`
 **Empresas:** todas (RDB ya tiene módulo, DILESA segundo, resto conforme se desarrollen)
 **Schemas afectados:** `erp` (expansión de modelo de personas/datos fiscales) + UI
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-04-27
 **Última actualización:** 2026-04-27
@@ -105,11 +105,13 @@ El módulo de Documentos ya tiene el patrón de extracción IA con Claude (`/api
 - [ ] Manejo de tres outcomes: (a) aceptan todo, (b) aceptan algunos, (c) rechazan todo (PDF queda archivado igual).
 - [ ] Vista "Ver históricos" lista CSFs anteriores con fecha (opcional para v1).
 
-### Sprint 4 — Rollout DILESA y cierre
+### Sprint 4 — Rollout DILESA y cierre ✅
 
-- [ ] Replicar el flujo en módulo de Proveedores DILESA (módulo nuevo si no existe).
-- [ ] Smoke manual end-to-end en RDB y DILESA con CSFs reales de proveedores actuales.
-- [ ] Closeout: medir tiempo medio de alta vs baseline manual; documentar en bitácora.
+- [x] Crear `app/dilesa/proveedores/page.tsx` (módulo nuevo) — copia del de RDB con `DILESA_EMPRESA_ID`, membrete `/logos/dilesa-header.jpg`, `RequireAccess empresa="dilesa" modulo="dilesa.proveedores"`.
+- [x] Habilitar en sidebar bajo nueva sección "Operaciones" de DILESA (nav-config.ts).
+- [x] Registrar `/dilesa/proveedores → 'dilesa.proveedores'` en `ROUTE_TO_MODULE` (`lib/permissions.ts`).
+- [ ] Smoke manual end-to-end en RDB y DILESA con CSFs reales (queda para Beto en producción tras merge).
+- [ ] Closeout: medir tiempo medio de alta vs baseline manual (observacional, mide en uso real).
 
 ## Decisiones registradas
 
@@ -125,3 +127,6 @@ El módulo de Documentos ya tiene el patrón de extracción IA con Claude (`/api
 - **2026-04-27 — Sprint 2.A cerrado (PR [#241](https://github.com/beto-sudo/BSOP/pull/241)).** Endpoint `POST /api/proveedores/create-with-csf` que recibe FormData (PDF + payload) y persiste persona + proveedor + adjunto + datos_fiscales en orden recuperable. Dedup por RFC con 409 + `existing_persona_id`. `CreateProveedorPayloadSchema` (Zod) compartido con cliente; 5 tests nuevos.
 - **2026-04-27 — Sprint 2.B cerrado (PR [#242](https://github.com/beto-sudo/BSOP/pull/242)).** UI del drawer "+ Nuevo Proveedor" en RDB con sección "Sube CSF (recomendado)" arriba del form. File input + botón "Procesar CSF" → spinner → form pre-llenado (tipo_persona toggle, identidad, RFC, CURP, régimen, domicilio fiscal). Submit dual: con CSF llama `create-with-csf`, sin CSF preserva el flujo manual existente. Modal Sheet de RFC duplicado con CTAs "Ir al existente" / "Volver al form". Solo modifica `app/rdb/proveedores/page.tsx`. 217 tests pasando.
 - **2026-04-27 — Sprint 3.A arranque.** Backend `POST /api/proveedores/[persona_id]/update-csf` con aplicación selectiva por `accepted_fields`. Mapeo `FIELD_MAP` decide qué campo va a `personas` vs `personas_datos_fiscales`. PDF siempre archivado; `csf_adjunto_id` se actualiza solo si hay aceptados. Maneja edge case de persona legacy sin `personas_datos_fiscales` (INSERT en lugar de UPDATE). `UpdateCsfPayloadSchema` con enum de campos válidos (`CSF_UPDATABLE_FIELDS`); 5 tests del schema. Próximo: Sprint 3.B (UI con modal de diff).
+- **2026-04-27 — Sprint 3.A cerrado (PR [#243](https://github.com/beto-sudo/csf-ai/pull/243)).** Endpoint update-csf en producción.
+- **2026-04-27 — Sprint 3.B cerrado (PR [#244](https://github.com/beto-sudo/BSOP/pull/244)).** UI completa del modal de diff campo-por-campo en `app/rdb/proveedores/page.tsx`. Botón "Cargar / Actualizar CSF" en el detalle del proveedor (resuelve feedback de Beto en preview de #242). Helpers `valuesEqual` + `formatDiffValue` + `CSF_DIFF_FIELDS` + `FIELD_LABELS` a nivel módulo. Cierra el alcance v1 del Sprint 3.
+- **2026-04-27 — Sprint 4 cerrado.** Rollout DILESA: nuevo `app/dilesa/proveedores/page.tsx` (clon adaptado del de RDB con `DILESA_EMPRESA_ID`, membrete dilesa, módulo `dilesa.proveedores`). Habilitado en sidebar bajo nueva sección "Operaciones" de DILESA + registrado en `ROUTE_TO_MODULE`. **Iniciativa cerrada (`in_progress → done`).** Smoke manual end-to-end + medición de tiempo de alta vs baseline quedan como observación en producción.

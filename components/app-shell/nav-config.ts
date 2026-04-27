@@ -47,6 +47,8 @@ export const NAV_ITEMS: NavItem[] = [
       { label: 'Prototipos', href: '/dilesa/prototipos' },
       { label: 'Anteproyectos', href: '/dilesa/anteproyectos' },
       { label: 'Proyectos', href: '/dilesa/proyectos' },
+      { label: 'Operaciones', href: '#', divider: true },
+      { label: 'Proveedores', href: '/dilesa/proveedores' },
     ],
   },
   {

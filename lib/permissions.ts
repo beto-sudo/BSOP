@@ -32,6 +32,7 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   '/dilesa/rh/empleados': 'dilesa.rh.empleados',
   '/dilesa/rh/puestos': 'dilesa.rh.puestos',
   '/dilesa/rh/departamentos': 'dilesa.rh.departamentos',
+  '/dilesa/proveedores': 'dilesa.proveedores',
 
   // RDB — home + operaciones
   '/rdb': 'rdb.home',
