@@ -38,8 +38,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { SortableHead } from '@/components/ui/sortable-head';
-import { useSortableTable } from '@/hooks/use-sortable-table';
+import { DataTable } from '@/components/module-page';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet';
 import {
   Dialog,
@@ -322,8 +321,6 @@ export function DepartamentosModule({
 
   const parentOptions = departamentos.filter((d) => d.id !== editingId && d.activo);
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable('nombre', 'asc');
-
   // Form body shared between Sheet and Dialog variants
   const FormBody = (
     <div className="space-y-4 py-2">
@@ -430,96 +427,72 @@ export function DepartamentosModule({
             <p className="text-sm text-[var(--text-muted)]">No hay departamentos registrados</p>
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="border-[var(--border)] hover:bg-transparent">
-                <SortableHead
-                  sortKey="nombre"
-                  label="Nombre"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="codigo"
-                  label="Código"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="w-24"
-                />
-                <SortableHead
-                  sortKey="reporta_a_nombre"
-                  label="Reporta a"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="w-36"
-                />
-                {showEmpleadosCount && (
-                  <SortableHead
-                    sortKey="emp_count"
-                    label="Empleados"
-                    currentSort={sortKey}
-                    currentDir={sortDir}
-                    onSort={onSort}
-                    className="w-24"
-                  />
-                )}
-                <SortableHead
-                  sortKey="activo"
-                  label="Estado"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="w-20"
-                />
-                <TableHead className="w-20" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortData(
-                departamentos.map((d) => ({
-                  ...d,
-                  reporta_a_nombre: d.padre?.nombre ?? null,
-                  emp_count: empleadoCounts.get(d.id) ?? 0,
-                }))
-              ).map((d) => (
-                <TableRow key={d.id} className="border-[var(--border)]">
-                  <TableCell>
-                    <span className="font-medium text-[var(--text)]">
-                      {d.padre_id ? '  └ ' : ''}
-                      {d.nombre}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm font-mono text-[var(--text)]/60">
-                      {d.codigo ?? '—'}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-[var(--text)]/70">{d.padre?.nombre ?? '—'}</span>
-                  </TableCell>
-                  {showEmpleadosCount && (
-                    <TableCell>
-                      <span className="text-sm text-[var(--text)]/60">
-                        {empleadoCounts.get(d.id) ?? 0}
-                      </span>
-                    </TableCell>
-                  )}
-                  <TableCell>
-                    <span
-                      className={[
-                        'inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium',
-                        d.activo
-                          ? 'border-green-500/20 bg-green-500/10 text-green-400'
-                          : 'border-[var(--border)] bg-[var(--panel)] text-[var(--text-subtle)]',
-                      ].join(' ')}
-                    >
-                      {d.activo ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </TableCell>
-                  <TableCell>
+          <DataTable<Departamento>
+            data={departamentos}
+            columns={[
+              {
+                key: 'nombre',
+                label: 'Nombre',
+                cellClassName: 'font-medium text-[var(--text)]',
+                render: (d) => (
+                  <span>
+                    {d.padre_id ? '  └ ' : ''}
+                    {d.nombre}
+                  </span>
+                ),
+              },
+              {
+                key: 'codigo',
+                label: 'Código',
+                width: 'w-24',
+                cellClassName: 'text-sm font-mono text-[var(--text)]/60',
+                render: (d) => d.codigo ?? '—',
+              },
+              {
+                key: 'reporta_a_nombre',
+                label: 'Reporta a',
+                width: 'w-36',
+                cellClassName: 'text-sm text-[var(--text)]/70',
+                accessor: (d) => d.padre?.nombre ?? '',
+                render: (d) => d.padre?.nombre ?? '—',
+              },
+              ...(showEmpleadosCount
+                ? [
+                    {
+                      key: 'emp_count',
+                      label: 'Empleados',
+                      type: 'number' as const,
+                      width: 'w-24',
+                      cellClassName: 'text-sm text-[var(--text)]/60',
+                      accessor: (d: Departamento) => empleadoCounts.get(d.id) ?? 0,
+                      render: (d: Departamento) => empleadoCounts.get(d.id) ?? 0,
+                    },
+                  ]
+                : []),
+              {
+                key: 'activo',
+                label: 'Estado',
+                width: 'w-20',
+                render: (d) => (
+                  <span
+                    className={[
+                      'inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium',
+                      d.activo
+                        ? 'border-green-500/20 bg-green-500/10 text-green-400'
+                        : 'border-[var(--border)] bg-[var(--panel)] text-[var(--text-subtle)]',
+                    ].join(' ')}
+                  >
+                    {d.activo ? 'Activo' : 'Inactivo'}
+                  </span>
+                ),
+              },
+              {
+                key: 'acciones',
+                label: '',
+                sortable: false,
+                width: 'w-20',
+                render: (d) => (
+                  <DataTable.InteractiveCell>
                     <RowActions
                       ariaLabel={`Acciones para ${d.nombre}`}
                       onEdit={{ onClick: () => openEdit(d) }}
@@ -532,11 +505,15 @@ export function DepartamentosModule({
                           'Los empleados asignados conservarán su historial y podrá restaurarse desde auditoría.',
                       }}
                     />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  </DataTable.InteractiveCell>
+                ),
+              },
+            ]}
+            rowKey="id"
+            initialSort={{ key: 'nombre', dir: 'asc' }}
+            emptyTitle="No hay departamentos registrados"
+            showDensityToggle={false}
+          />
         )}
       </div>
 

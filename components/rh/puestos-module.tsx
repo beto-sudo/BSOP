@@ -37,8 +37,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { SortableHead } from '@/components/ui/sortable-head';
-import { useSortableTable } from '@/hooks/use-sortable-table';
+import { DataTable } from '@/components/module-page';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet';
 import {
   Dialog,
@@ -369,8 +368,6 @@ export function PuestosModule({
     (p) => !showDeptoFilter || filterDepto === 'all' || p.departamento?.nombre === filterDepto
   );
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable('nombre', 'asc');
-
   // Form body shared between Sheet and Dialog variants
   const FormBody = (
     <div className="space-y-4 py-2">
@@ -557,144 +554,108 @@ export function PuestosModule({
             <p className="text-sm text-[var(--text-muted)]">No hay puestos registrados</p>
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="border-[var(--border)] hover:bg-transparent">
-                <SortableHead
-                  sortKey="nombre"
-                  label="Nombre"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="nivel"
-                  label="Nivel"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="w-32"
-                />
-                <SortableHead
-                  sortKey="departamento_nombre"
-                  label="Departamento"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="w-36"
-                />
-                {showSalaryColumn && (
-                  <SortableHead
-                    sortKey="sueldo_min"
-                    label="Rango salarial"
-                    currentSort={sortKey}
-                    currentDir={sortDir}
-                    onSort={onSort}
-                    className="w-40"
-                  />
-                )}
-                {showEmpleadoCountColumn && (
-                  <SortableHead
-                    sortKey="emp_count"
-                    label="Empleados"
-                    currentSort={sortKey}
-                    currentDir={sortDir}
-                    onSort={onSort}
-                    className="w-24"
-                  />
-                )}
-                <SortableHead
-                  sortKey="esquema_pago"
-                  label="Esquema pago"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="w-32"
-                />
-                <SortableHead
-                  sortKey="activo"
-                  label="Estado"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="w-20"
-                />
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortData(
-                visible.map((p) => ({
-                  ...p,
-                  departamento_nombre: p.departamento?.nombre ?? null,
-                  emp_count: empleadoCounts.get(p.id) ?? 0,
-                }))
-              ).map((p) => {
-                const salaryRange =
-                  p.sueldo_min != null || p.sueldo_max != null
-                    ? `$${(p.sueldo_min ?? 0).toLocaleString('es-MX')} – $${(p.sueldo_max ?? 0).toLocaleString('es-MX')}`
-                    : '—';
-                return (
-                  <TableRow key={p.id} className="border-[var(--border)]">
-                    <TableCell>
-                      <span className="font-medium text-[var(--text)]">{p.nombre}</span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-[var(--text)]/70">{p.nivel ?? '—'}</span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-[var(--text)]/70">
-                        {p.departamento?.nombre ?? '—'}
-                      </span>
-                    </TableCell>
-                    {showSalaryColumn && (
-                      <TableCell>
-                        <span className="text-xs font-mono text-[var(--text)]/60">
-                          {salaryRange}
-                        </span>
-                      </TableCell>
-                    )}
-                    {showEmpleadoCountColumn && (
-                      <TableCell>
-                        <span className="text-sm text-[var(--text)]/60">
-                          {empleadoCounts.get(p.id) ?? 0}
-                        </span>
-                      </TableCell>
-                    )}
-                    <TableCell>
-                      <span className="text-sm text-[var(--text)]/70">{p.esquema_pago ?? '—'}</span>
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={[
-                          'inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium',
-                          p.activo
-                            ? 'border-green-500/20 bg-green-500/10 text-green-400'
-                            : 'border-[var(--border)] bg-[var(--panel)] text-[var(--text-subtle)]',
-                        ].join(' ')}
-                      >
-                        {p.activo ? 'Activo' : 'Inactivo'}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <RowActions
-                        ariaLabel={`Acciones para ${p.nombre}`}
-                        onEdit={{ onClick: () => openEdit(p) }}
-                        onToggle={{ activo: p.activo, onClick: () => handleToggleActivo(p) }}
-                        onDelete={{
-                          onConfirm: () => handleSoftDelete(p),
-                          confirmTitle: `¿Eliminar "${p.nombre}"?`,
-                          confirmDescription:
-                            'Esta acción marcará el puesto como eliminado. ' +
-                            'Los empleados asignados conservarán su historial y podrá restaurarse desde auditoría.',
-                        }}
-                      />
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+          <DataTable<Puesto>
+            data={visible}
+            columns={[
+              {
+                key: 'nombre',
+                label: 'Nombre',
+                cellClassName: 'font-medium text-[var(--text)]',
+              },
+              {
+                key: 'nivel',
+                label: 'Nivel',
+                width: 'w-32',
+                cellClassName: 'text-sm text-[var(--text)]/70',
+                render: (p) => p.nivel ?? '—',
+              },
+              {
+                key: 'departamento_nombre',
+                label: 'Departamento',
+                width: 'w-36',
+                cellClassName: 'text-sm text-[var(--text)]/70',
+                accessor: (p) => p.departamento?.nombre ?? '',
+                render: (p) => p.departamento?.nombre ?? '—',
+              },
+              ...(showSalaryColumn
+                ? [
+                    {
+                      key: 'sueldo_min',
+                      label: 'Rango salarial',
+                      width: 'w-40',
+                      cellClassName: 'text-xs font-mono text-[var(--text)]/60',
+                      render: (p: Puesto) =>
+                        p.sueldo_min != null || p.sueldo_max != null
+                          ? `$${(p.sueldo_min ?? 0).toLocaleString('es-MX')} – $${(p.sueldo_max ?? 0).toLocaleString('es-MX')}`
+                          : '—',
+                    },
+                  ]
+                : []),
+              ...(showEmpleadoCountColumn
+                ? [
+                    {
+                      key: 'emp_count',
+                      label: 'Empleados',
+                      type: 'number' as const,
+                      width: 'w-24',
+                      cellClassName: 'text-sm text-[var(--text)]/60',
+                      accessor: (p: Puesto) => empleadoCounts.get(p.id) ?? 0,
+                      render: (p: Puesto) => empleadoCounts.get(p.id) ?? 0,
+                    },
+                  ]
+                : []),
+              {
+                key: 'esquema_pago',
+                label: 'Esquema pago',
+                width: 'w-32',
+                cellClassName: 'text-sm text-[var(--text)]/70',
+                render: (p) => p.esquema_pago ?? '—',
+              },
+              {
+                key: 'activo',
+                label: 'Estado',
+                width: 'w-20',
+                render: (p) => (
+                  <span
+                    className={[
+                      'inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium',
+                      p.activo
+                        ? 'border-green-500/20 bg-green-500/10 text-green-400'
+                        : 'border-[var(--border)] bg-[var(--panel)] text-[var(--text-subtle)]',
+                    ].join(' ')}
+                  >
+                    {p.activo ? 'Activo' : 'Inactivo'}
+                  </span>
+                ),
+              },
+              {
+                key: 'acciones',
+                label: '',
+                sortable: false,
+                width: 'w-10',
+                render: (p) => (
+                  <DataTable.InteractiveCell>
+                    <RowActions
+                      ariaLabel={`Acciones para ${p.nombre}`}
+                      onEdit={{ onClick: () => openEdit(p) }}
+                      onToggle={{ activo: p.activo, onClick: () => handleToggleActivo(p) }}
+                      onDelete={{
+                        onConfirm: () => handleSoftDelete(p),
+                        confirmTitle: `¿Eliminar "${p.nombre}"?`,
+                        confirmDescription:
+                          'Esta acción marcará el puesto como eliminado. ' +
+                          'Los empleados asignados conservarán su historial y podrá restaurarse desde auditoría.',
+                      }}
+                    />
+                  </DataTable.InteractiveCell>
+                ),
+              },
+            ]}
+            rowKey="id"
+            initialSort={{ key: 'nombre', dir: 'asc' }}
+            emptyTitle="No hay puestos registrados"
+            showDensityToggle={false}
+          />
         )}
       </div>
 
