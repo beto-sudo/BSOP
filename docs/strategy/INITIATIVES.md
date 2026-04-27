@@ -4,7 +4,7 @@
 > abre `docs/planning/<slug>.md`. Mantenido por Cowork (cuando se crea o
 > cambia el alcance) y por Claude Code (cuando ejecuta y cierra hitos).
 >
-> **Última actualización:** 2026-04-27 (`proveedores-csf-ai` cerrada — Sprint 4 mergeado, módulo Proveedores DILESA habilitado en sidebar. Total 7 PRs: #234 docs + #235 DB + #236 extract + #239 fix workflow + #241/#242 create + #243/#244 update + Sprint 4. `forms-pattern` queda como siguiente en la cola UI.)
+> **Última actualización:** 2026-04-27 (auditoría cross-empresa detectó deuda crítica de duplicación; `shared-modules-refactor` agregada como `planned` con prioridad antes de `forms-pattern`. Tabla de auditoría y alcance v1 en `docs/planning/shared-modules-refactor.md`. ADR-011 codificará la convención cuando arranque ejecución.)
 
 ## Convenciones
 
@@ -35,6 +35,7 @@
 | Forms pattern (UI)          | `forms-pattern`            | todas    | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar — **siguiente en cola UI tras `data-table`**                                         | 2026-04-27           |
 | Print pattern (UI)          | `print-pattern`            | todas    | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (cola UI — orden en §Roadmap UI)                                                     | 2026-04-27           |
 | Responsive Policy (UI)      | `responsive-policy`        | todas    | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (cola UI — orden en §Roadmap UI)                                                     | 2026-04-27           |
+| Shared Modules Refactor     | `shared-modules-refactor`  | todas    | n/a (UI)                    | planned     | Sub-PR 1 — extraer `<ProveedoresModule>` (1535 líneas duplicadas literal entre RDB y DILESA)                       | 2026-04-27           |
 | Waitry ingesta + dedup      | `rdb-waitry-ingesta-dedup` | RDB      | rdb (waitry\_\*), erp       | in_progress | Fase 2.B — fix de `compute_content_hash` (incluir `tableId`) + backfill + re-detección, fuera de horario operativo | 2026-04-26           |
 
 ## Roadmap UI (orden de ejecución secuencial)
@@ -62,7 +63,14 @@
 
 ### Pendientes (orden propuesto, post-2026-04-27)
 
-6. `forms-pattern` — `<Form>` + react-hook-form + zod. **Arranca primero** por dependencia con `proveedores-csf-ai`.
+> **Precedencia 2026-04-27:** `shared-modules-refactor` (no-UI, refactor
+> cross-cutting) arranca **antes** que `forms-pattern`. Razón: el módulo
+> Proveedores está duplicado al 100% entre RDB y DILESA (1535 líneas
+> espejo). Si `forms-pattern` arranca primero, hay que migrar 2 lugares
+> en vez de 1, y la deuda de duplicación sigue activa. Ver
+> `docs/planning/shared-modules-refactor.md`.
+
+6. `forms-pattern` — `<Form>` + react-hook-form + zod. Arranca después de `shared-modules-refactor` Sub-PR 1 (proveedores extraído).
 7. `badge-system` — tokens semánticos para badges; deuda dispersa.
 8. `drawer-anatomy` — `<DetailDrawer>` paralelo a `<DetailPage>` (ADR-009).
 9. `responsive-policy` — mobile-first vs desktop-only por módulo.
