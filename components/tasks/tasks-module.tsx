@@ -35,7 +35,6 @@ import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import type { TablesInsert, TablesUpdate } from '@/types/supabase';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
-import { useSortableTable } from '@/hooks/use-sortable-table';
 
 import { emptyTaskForm } from './tasks-shared';
 import type { Empleado, ErpTask, TaskEstado, TaskFormValues, TaskUpdateRow } from './tasks-shared';
@@ -711,8 +710,6 @@ export function TasksModule({
     [empleados]
   );
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable('created_at', 'desc');
-
   const visibleTasks = useMemo(() => {
     if (onlyMine) {
       // While resolving ids, hide everything (avoid flashing all tasks).
@@ -856,17 +853,12 @@ export function TasksModule({
         <TasksTable
           variant={isRich ? 'rich' : 'simple'}
           tasks={filtered}
-          filteredCount={filtered.length}
           totalCount={visibleTasks.length}
           empleadoMap={empleadoMap}
           loading={loading}
           error={error}
           onRowClick={openEdit}
           onCreateEmpty={() => setShowCreate(true)}
-          sortKey={sortKey}
-          sortDir={sortDir}
-          onSort={onSort}
-          sortData={sortData}
           canEditInline={canEditInline}
           completingTaskId={completingTaskId}
           onQuickComplete={handleQuickComplete}
