@@ -165,12 +165,15 @@ Role tested: [admin / user / no-access]
 
 ## Section 10 — Delete / Deactivate Flow
 
-| Check                                                          | Result | Notes |
-| -------------------------------------------------------------- | ------ | ----- |
-| Delete / deactivate action is discoverable                     |        |       |
-| Confirmation dialog shown before irreversible action           |        |       |
-| After deletion, item is removed from list (or marked inactive) |        |       |
-| Error message shown if deletion fails                          |        |       |
+| Check                                                                              | Result | Notes |
+| ---------------------------------------------------------------------------------- | ------ | ----- |
+| Delete / deactivate action is discoverable                                         |        |       |
+| Confirmation uses `<ConfirmDialog>` (NOT `window.confirm`) — ADR-008 T2            |        |       |
+| Title is a question ("¿Eliminar X?"); description explains effect — T3             |        |       |
+| Soft-delete uses `feedback.undoable({undo})` instead of confirm-then-toast — T4    |        |       |
+| After deletion, item is removed from list (or marked inactive)                     |        |       |
+| Mutation error uses `feedback.error(err)` toast (NOT `alert()` or `<ErrorBanner>`) |        |       |
+| Mutation success uses `feedback.success(...)` toast                                |        |       |
 
 ---
 

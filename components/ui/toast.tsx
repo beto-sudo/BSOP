@@ -9,7 +9,14 @@ import { cn } from '@/lib/utils';
 /**
  * Toast — shadcn-style wrapper over @base-ui/react/toast.
  *
- * Standard usage (from any client component):
+ * Provider is mounted once in components/providers.tsx via <ToastProvider>.
+ *
+ * Prefer the `useActionFeedback()` hook (hooks/use-action-feedback.ts) over
+ * calling `useToast()` directly — it provides ergonomic helpers (`success`,
+ * `error`, `info`, `warning`, `undoable`) and infers the message from Error
+ * objects automatically. See ADR-008.
+ *
+ * Direct usage (rare — prefer the helper above):
  *
  *   const toast = useToast()
  *   toast.add({ title: 'Departamento desactivado', type: 'success' })
@@ -19,15 +26,14 @@ import { cn } from '@/lib/utils';
  *     type: 'error',
  *   })
  *
- * For destructive actions with undo:
+ * For destructive actions with undo, the action label goes via `actionProps`
+ * (HTML button props from @base-ui/react/toast):
  *
  *   toast.add({
  *     title: 'Departamento eliminado',
- *     action: { label: 'Deshacer', onClick: () => restore(id) },
  *     timeout: 5000,
+ *     actionProps: { onClick: () => restore(id), children: 'Deshacer' },
  *   })
- *
- * Provider is mounted once in components/providers.tsx via <ToastProvider>.
  */
 
 type ToastType = 'default' | 'success' | 'error' | 'warning' | 'info';

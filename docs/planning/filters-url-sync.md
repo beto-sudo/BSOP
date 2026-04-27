@@ -3,10 +3,10 @@
 **Slug:** `filters-url-sync`
 **Empresas:** todas
 **Schemas afectados:** n/a (UI)
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-04-26
-**Última actualización:** 2026-04-26 (alcance v1 cerrado al arrancar)
+**Última actualización:** 2026-04-26 (cerrada — PR #215 mergeado)
 
 ## Problema
 
@@ -60,7 +60,7 @@ de "N filtros activos" por su cuenta — duplicación y deriva.
 
 ## Sprints / hitos
 
-- **Fase 1 — hook + chip + adopción inicial.** ⏳ **En curso (PR abierto).** Salida: `useUrlFilters<T>` (`hooks/use-url-filters.ts`) + `<ActiveFiltersChip>` (`components/module-page/`) + ADR-007 con 6 reglas (F1-F6) + adopción en Ventas (`<VentasFilters>`) e Inventario (`/rdb/inventario`). Próximo hito: Beto smoke + merge.
+- **Fase 1 — hook + chip + adopción inicial.** ✅ **Cerrada 2026-04-26.** PR [#215](https://github.com/beto-sudo/BSOP/pull/215) mergeado. Salida: `useUrlFilters<T>` (`hooks/use-url-filters.ts`) + `<ActiveFiltersChip>` (`components/module-page/`) + ADR-007 con 6 reglas (F1-F6) + adopción en Ventas (`<VentasFilters>`) e Inventario (`/rdb/inventario`).
 - **Fase 2 — adopción incremental en módulos restantes.** ⏸️ Sin PR único. Cada futura migración a `<ModulePage>` adopta `useUrlFilters` por construcción.
 
 ## Decisiones registradas
@@ -75,3 +75,4 @@ de "N filtros activos" por su cuenta — duplicación y deriva.
 ## Bitácora
 
 - **2026-04-26 (CC)** — Fase 1 implementada. Branch `feat/ui-filters-url-sync`. Hook nuevo `hooks/use-url-filters.ts` con API `{ filters, setFilter, setFilters, clearAll, activeCount }`, encoding camelCase↔snake_case + bool→1/0 + arrays→CSV + defaults no serializados + preservación de query params no-relacionados. Componente nuevo `components/module-page/active-filters-chip.tsx` (renderiza nada cuando count=0). Migraciones: `components/ventas/ventas-view.tsx` migra search/statusFilter/corteFilter/dateFrom/dateTo/presetKey a URL (tab y productoSearch quedan locales); `components/ventas/ventas-filters.tsx` recibe `activeCount` + `onClearAll` y renderiza `<ActiveFiltersChip>`; `app/rdb/inventario/page.tsx` migra los 6 filtros a URL (search, showServicios, showBajoMinimo, categoriaFiltro, clasificacionFiltro, fechaCorte); el useEffect de fetch ahora reacciona a `fechaCorte` directamente (antes era manual en cada handler). Empty con `activeCount > 0` para distinguir filtros activos de módulo virgen (alineado con ADR-006 §S3). ADR-007 creado con 6 reglas (F1-F6). INITIATIVES.md: `filters-url-sync` proposed → in_progress; `module-states` movida a `## Done`.
+- **2026-04-26 (CC)** — Fase 1 cerrada. PR [#215](https://github.com/beto-sudo/BSOP/pull/215) mergeado a main vía squash (`836b18a`). Iniciativa movida a `## Done` en INITIATIVES.md. Fase 2 queda como adopción incremental por construcción en cada migración futura — sin PR único asociado.

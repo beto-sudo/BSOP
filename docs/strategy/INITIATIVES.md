@@ -4,7 +4,7 @@
 > abre `docs/planning/<slug>.md`. Mantenido por Cowork (cuando se crea o
 > cambia el alcance) y por Claude Code (cuando ejecuta y cierra hitos).
 >
-> **Última actualización:** 2026-04-26 (`module-states` → done [PR #214 mergeado]; `filters-url-sync` proposed → in_progress: hook `useUrlFilters` + `<ActiveFiltersChip>` + adopción en Ventas/Inventario + ADR-007)
+> **Última actualización:** 2026-04-26 (`filters-url-sync` → done [PR #215 mergeado]; `action-feedback` proposed → in_progress: hook `useActionFeedback` + ADR-008 + migración de 3 holdouts de `window.confirm`)
 
 ## Convenciones
 
@@ -27,12 +27,11 @@
 | --------------------------- | -------------------------- | -------------------- | --------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------ | -------------------- |
 | Accessibility Baseline (UI) | `a11y-baseline`            | todas                | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (post-`responsive-policy`)                                                           | 2026-04-26           |
 | Access Denied UX (UI)       | `access-denied-ux`         | todas                | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (post-`a11y-baseline`)                                                               | 2026-04-26           |
-| Action Feedback (UI)        | `action-feedback`          | todas                | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (post-`filters-url-sync`)                                                            | 2026-04-26           |
+| Action Feedback (UI)        | `action-feedback`          | todas                | n/a (UI)                    | in_progress | PR `feat/ui-action-feedback` abierto — Beto revisa y mergea                                                        | 2026-04-26           |
 | Analytics (BI externo)      | `analytics`                | todas                | analytics, erp, dilesa, rdb | blocked     | Sprint 0 — desbloquear export del bootstrap (Metabase + Caddy + Postgres) desde Cowork al repo Analytics           | 2026-04-25           |
 | Data Table compartido (UI)  | `data-table`               | todas                | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (post-`detail-page`)                                                                 | 2026-04-26           |
 | Detail Page anatomy (UI)    | `detail-page`              | todas                | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (post-`action-feedback`)                                                             | 2026-04-26           |
 | DILESA UI Terrenos          | `dilesa-ui-terrenos`       | DILESA               | dilesa                      | in_progress | Cerrar `feat/dilesa-ui-terrenos` y abrir PR                                                                        | 2026-04-??           |
-| Filters URL-sync (UI)       | `filters-url-sync`         | todas                | n/a (UI)                    | in_progress | PR `feat/ui-filters-url-sync` abierto — Beto revisa, smoke en Ventas/Inventario y mergea                           | 2026-04-26           |
 | Module Page (UI ADR-004)    | `module-page`              | todas                | n/a (UI)                    | in_progress | Fase 2 — migrar segunda página al componente `<ModulePage>`                                                        | 2026-04-25           |
 | Module-page sub-módulos     | `module-page-submodules`   | RDB (primero), todas | n/a (UI)                    | in_progress | PR de refactor RDB Inventario abierto → smoke manual + merge (Beto)                                                | 2026-04-26           |
 | Waitry ingesta + dedup      | `rdb-waitry-ingesta-dedup` | RDB                  | rdb (waitry\_\*), erp       | in_progress | Fase 2.B — fix de `compute_content_hash` (incluir `tableId`) + backfill + re-detección, fuera de horario operativo | 2026-04-26           |
@@ -60,6 +59,7 @@
 | Iniciativa                           | Slug                  | Cerrada    | Outcome                                                                                                                                                                       |
 | ------------------------------------ | --------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Cortes / Conciliación / OCR Vouchers | `cortes-conciliacion` | 2026-04-25 | Fases 1-6 mergeadas (PRs #176, #189, #191, #193, #194, #197, #199, #200). OCR client-side con Tesseract.js, marbete impreso, chip 📎 en movimientos, conciliación end-to-end. |
+| Filters URL-sync (UI)                | `filters-url-sync`    | 2026-04-26 | PR #215 mergeado. Hook `useUrlFilters` + `<ActiveFiltersChip>` en `components/module-page/` + ADR-007 + adopción en Ventas e Inventario.                                      |
 | Module States (UI)                   | `module-states`       | 2026-04-26 | PR #214 mergeado. `<EmptyState>` + `<TableSkeleton>` + `<ErrorBanner>` compartidos en `components/module-page/` + ADR-006 + adopción en Ventas e Inventario.                  |
 | RDB Inventario Levantamientos        | `rdb-inventario`      | 2026-04-25 | Sub-PRs B1 (#195), B2 (#196), B3 (#198) mergeados. UI completo de levantamientos físicos: alta, captura mobile, diferencias, firma electrónica, auto-aplicación, e2e tests.   |
 

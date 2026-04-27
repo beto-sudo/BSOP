@@ -35,6 +35,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ArrowLeft, Archive, Loader2, MoreVertical, Link2 } from 'lucide-react';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
+import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { cn } from '@/lib/utils';
 import {
   DILESA_EMPRESA_ID,
@@ -165,12 +167,11 @@ function ProyectoDetailInner() {
     [searchParams, pathname, router]
   );
 
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const feedback = useActionFeedback();
+
   const handleArchive = async () => {
     if (!proyecto) return;
-    const ok = window.confirm(
-      `¿Archivar el proyecto "${proyecto.nombre}"? No se elimina de la DB; se puede restaurar quitando deleted_at por SQL.`
-    );
-    if (!ok) return;
     setArchiving(true);
     const { error: err } = await supabase
       .schema('dilesa')
@@ -179,9 +180,10 @@ function ProyectoDetailInner() {
       .eq('id', proyecto.id);
     setArchiving(false);
     if (err) {
-      alert(`Error al archivar: ${err.message}`);
+      feedback.error(err, { title: 'No se pudo archivar el proyecto' });
       return;
     }
+    feedback.success('Proyecto archivado');
     router.push('/dilesa/proyectos');
   };
 
@@ -274,7 +276,11 @@ function ProyectoDetailInner() {
               )}
             />
             <DropdownMenuContent align="end">
-              <DropdownMenuItem variant="destructive" onClick={handleArchive} disabled={archiving}>
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => setArchiveOpen(true)}
+                disabled={archiving}
+              >
                 {archiving ? (
                   <Loader2 className="size-4 animate-spin" />
                 ) : (
@@ -286,6 +292,14 @@ function ProyectoDetailInner() {
           </DropdownMenu>
         </div>
       </div>
+      <ConfirmDialog
+        open={archiveOpen}
+        onOpenChange={setArchiveOpen}
+        onConfirm={handleArchive}
+        title={`¿Archivar el proyecto "${proyecto.nombre}"?`}
+        description="No se elimina de la base de datos; se puede restaurar quitando deleted_at por SQL."
+        confirmLabel="Archivar"
+      />
 
       <div
         role="tablist"

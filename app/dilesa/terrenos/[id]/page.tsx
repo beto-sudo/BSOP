@@ -23,6 +23,8 @@ import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Archive, Loader2, MapPin, ExternalLink } from 'lucide-react';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
+import { useActionFeedback } from '@/hooks/use-action-feedback';
 import {
   DILESA_EMPRESA_ID,
   formatCurrency,
@@ -125,12 +127,11 @@ function TerrenoDetailInner() {
     };
   }, [load]);
 
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const feedback = useActionFeedback();
+
   const handleArchive = async () => {
     if (!terreno) return;
-    const ok = window.confirm(
-      `¿Archivar el terreno "${terreno.nombre}"? No se elimina de la DB; se puede restaurar quitando deleted_at por SQL.`
-    );
-    if (!ok) return;
     setArchiving(true);
     const { error: err } = await supabase
       .schema('dilesa')
@@ -139,9 +140,10 @@ function TerrenoDetailInner() {
       .eq('id', terreno.id);
     setArchiving(false);
     if (err) {
-      alert(`Error al archivar: ${err.message}`);
+      feedback.error(err, { title: 'No se pudo archivar el terreno' });
       return;
     }
+    feedback.success('Terreno archivado');
     router.push('/dilesa/terrenos');
   };
 
@@ -210,7 +212,7 @@ function TerrenoDetailInner() {
           <Button
             variant="outline"
             size="sm"
-            onClick={handleArchive}
+            onClick={() => setArchiveOpen(true)}
             disabled={archiving}
             className="text-red-400"
           >
@@ -223,6 +225,14 @@ function TerrenoDetailInner() {
           </Button>
         </div>
       </div>
+      <ConfirmDialog
+        open={archiveOpen}
+        onOpenChange={setArchiveOpen}
+        onConfirm={handleArchive}
+        title={`¿Archivar el terreno "${terreno.nombre}"?`}
+        description="No se elimina de la base de datos; se puede restaurar quitando deleted_at por SQL."
+        confirmLabel="Archivar"
+      />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
