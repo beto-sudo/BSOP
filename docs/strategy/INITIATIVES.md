@@ -4,7 +4,7 @@
 > abre `docs/planning/<slug>.md`. Mantenido por Cowork (cuando se crea o
 > cambia el alcance) y por Claude Code (cuando ejecuta y cierra hitos).
 >
-> **Última actualización:** 2026-04-27 (auditoría cross-empresa detectó deuda crítica de duplicación; `shared-modules-refactor` agregada como `planned` con prioridad antes de `forms-pattern`. Tabla de auditoría y alcance v1 en `docs/planning/shared-modules-refactor.md`. ADR-011 codificará la convención cuando arranque ejecución.)
+> **Última actualización:** 2026-04-27 (`shared-modules-refactor` arrancó: Sub-PR 1 extrajo `<ProveedoresModule>` cross-empresa + ADR-011 codifica la convención SM1-SM5. Estado `planned → in_progress`. Próximo hito: Sub-PR 3 `juntas-detail-shared`.)
 
 ## Convenciones
 
@@ -23,20 +23,20 @@
 
 ## Activas
 
-| Iniciativa                  | Slug                       | Empresas | Schemas                     | Estado      | Próximo hito                                                                                                       | Última actualización |
-| --------------------------- | -------------------------- | -------- | --------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------ | -------------------- |
-| Accessibility Baseline (UI) | `a11y-baseline`            | todas    | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (cola UI — orden en §Roadmap UI)                                                     | 2026-04-27           |
-| Access Denied UX (UI)       | `access-denied-ux`         | todas    | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (cola UI — orden en §Roadmap UI)                                                     | 2026-04-27           |
-| Activity Log pattern (UI)   | `activity-log-pattern`     | todas    | n/a (UI; consume audit_log) | proposed    | Cerrar alcance v1 al arrancar (cola UI — orden en §Roadmap UI)                                                     | 2026-04-27           |
-| Analytics (BI externo)      | `analytics`                | todas    | analytics, erp, dilesa, rdb | blocked     | Sprint 0 — desbloquear export del bootstrap (Metabase + Caddy + Postgres) desde Cowork al repo Analytics           | 2026-04-25           |
-| Badge system (UI)           | `badge-system`             | todas    | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (cola UI — orden en §Roadmap UI)                                                     | 2026-04-27           |
-| Drawer anatomy (UI)         | `drawer-anatomy`           | todas    | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (cola UI — orden en §Roadmap UI)                                                     | 2026-04-27           |
-| File attachments (UI)       | `file-attachments`         | todas    | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (cola UI — orden en §Roadmap UI)                                                     | 2026-04-27           |
-| Forms pattern (UI)          | `forms-pattern`            | todas    | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar — **siguiente en cola UI tras `data-table`**                                         | 2026-04-27           |
-| Print pattern (UI)          | `print-pattern`            | todas    | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (cola UI — orden en §Roadmap UI)                                                     | 2026-04-27           |
-| Responsive Policy (UI)      | `responsive-policy`        | todas    | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (cola UI — orden en §Roadmap UI)                                                     | 2026-04-27           |
-| Shared Modules Refactor     | `shared-modules-refactor`  | todas    | n/a (UI)                    | planned     | Sub-PR 1 — extraer `<ProveedoresModule>` (1535 líneas duplicadas literal entre RDB y DILESA)                       | 2026-04-27           |
-| Waitry ingesta + dedup      | `rdb-waitry-ingesta-dedup` | RDB      | rdb (waitry\_\*), erp       | in_progress | Fase 2.B — fix de `compute_content_hash` (incluir `tableId`) + backfill + re-detección, fuera de horario operativo | 2026-04-26           |
+| Iniciativa                  | Slug                       | Empresas | Schemas                     | Estado      | Próximo hito                                                                                                                   | Última actualización |
+| --------------------------- | -------------------------- | -------- | --------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------ | -------------------- |
+| Accessibility Baseline (UI) | `a11y-baseline`            | todas    | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (cola UI — orden en §Roadmap UI)                                                                 | 2026-04-27           |
+| Access Denied UX (UI)       | `access-denied-ux`         | todas    | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (cola UI — orden en §Roadmap UI)                                                                 | 2026-04-27           |
+| Activity Log pattern (UI)   | `activity-log-pattern`     | todas    | n/a (UI; consume audit_log) | proposed    | Cerrar alcance v1 al arrancar (cola UI — orden en §Roadmap UI)                                                                 | 2026-04-27           |
+| Analytics (BI externo)      | `analytics`                | todas    | analytics, erp, dilesa, rdb | blocked     | Sprint 0 — desbloquear export del bootstrap (Metabase + Caddy + Postgres) desde Cowork al repo Analytics                       | 2026-04-25           |
+| Badge system (UI)           | `badge-system`             | todas    | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (cola UI — orden en §Roadmap UI)                                                                 | 2026-04-27           |
+| Drawer anatomy (UI)         | `drawer-anatomy`           | todas    | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (cola UI — orden en §Roadmap UI)                                                                 | 2026-04-27           |
+| File attachments (UI)       | `file-attachments`         | todas    | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (cola UI — orden en §Roadmap UI)                                                                 | 2026-04-27           |
+| Forms pattern (UI)          | `forms-pattern`            | todas    | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar — **siguiente en cola UI tras `data-table`**                                                     | 2026-04-27           |
+| Print pattern (UI)          | `print-pattern`            | todas    | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (cola UI — orden en §Roadmap UI)                                                                 | 2026-04-27           |
+| Responsive Policy (UI)      | `responsive-policy`        | todas    | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (cola UI — orden en §Roadmap UI)                                                                 | 2026-04-27           |
+| Shared Modules Refactor     | `shared-modules-refactor`  | todas    | n/a (UI)                    | in_progress | Sub-PR 3 — `juntas-detail-shared` (Tier A, ~1346 líneas duplicadas entre `rdb/admin/juntas/[id]` y `dilesa/admin/juntas/[id]`) | 2026-04-27           |
+| Waitry ingesta + dedup      | `rdb-waitry-ingesta-dedup` | RDB      | rdb (waitry\_\*), erp       | in_progress | Fase 2.B — fix de `compute_content_hash` (incluir `tableId`) + backfill + re-detección, fuera de horario operativo             | 2026-04-26           |
 
 ## Roadmap UI (orden de ejecución secuencial)
 

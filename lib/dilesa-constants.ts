@@ -1,13 +1,13 @@
 /**
  * Constantes compartidas de los módulos Dilesa (sprint dilesa-1 UI).
  *
- * Cuando el app soporte multi-empresa activa, EMPRESA_ID se reemplaza por el
- * valor del context de permisos. Por ahora usamos el id fijo — mismo patrón
- * que `app/dilesa/admin/juntas/page.tsx` y el resto del panel.
- *
- * Fuente única para no repetir el literal en cada página.
+ * @deprecated DILESA_EMPRESA_ID se re-exporta desde `@/lib/empresa-constants`
+ * — fuente única de verdad para los UUIDs de empresa (ADR-011 / convención
+ * SM3). Los call sites pueden migrar a importar directamente de
+ * `@/lib/empresa-constants` cuando convenga; este archivo mantiene los
+ * helpers `formatM2`, `formatCurrency`, etc.
  */
-export const DILESA_EMPRESA_ID = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479';
+export { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 
 /**
  * @deprecated Use `formatCurrency` from `@/lib/format`.

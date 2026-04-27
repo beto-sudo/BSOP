@@ -3,7 +3,7 @@
 **Slug:** `shared-modules-refactor`
 **Empresas:** todas (ANSA, DILESA, RDB, COAGAN — y futuras)
 **Schemas afectados:** n/a (UI)
-**Estado:** planned
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-27
 **Última actualización:** 2026-04-27
@@ -271,12 +271,69 @@ extracción.
 
 ## Sprints / hitos
 
-_(se llena cuando arranque ejecución, vía Claude Code)_
+- **Sub-PR 1 — `proveedores-shared`** (2026-04-27): mergeado en PR
+  pendiente. Componente `<ProveedoresModule>` extraído a
+  `components/proveedores/proveedores-module.tsx`. Pages reducidos a
+  ~17 líneas. Constantes centralizadas en `lib/empresa-constants.ts`.
+  Incluye ADR-011 (convención SM1-SM5).
+- **Sub-PR 2 — ADR-011** (2026-04-27): incluido en el mismo PR del Sub-PR 1
+  (decisión: mismo PR para que la convención salga junto al primer ejemplo
+  cumplido — ver §Decisiones registradas).
+- **Sub-PR 3 — `juntas-detail-shared`** (Tier A, pendiente): próximo hito
+  cuando arranque la siguiente sesión de la iniciativa.
+- **Sub-PR 4 — `juntas-list-shared`** (Tier B, pendiente).
+- **Sub-PR 5 — `empleados-detail-audit`** (Tier C, pendiente).
 
 ## Decisiones registradas
 
-_(append-only, fechadas — escrito por Claude Code)_
+- **2026-04-27 — Sub-PR 2 (ADR-011) en el mismo PR que Sub-PR 1.** Razón:
+  el ADR codifica la convención y el código demuestra cumplimiento. Mismo
+  PR = audit trail directo + reviewer ve la convención y su primer
+  ejemplo en una sola pasada. La alternativa (PR aparte) hubiera sido más
+  reviewable pero introduce orden de mergeo (qué entra primero) sin
+  beneficio claro.
+- **2026-04-27 — `lib/empresa-constants.ts` solo exporta IDs reales.**
+  ANSA y COAGAN no se exportan como placeholders (UUID de ceros) porque
+  un import prematuro compilaría pero apuntaría a un UUID inválido,
+  generando bugs sutiles si alguien lo usa antes de que la empresa entre
+  al repo. Cuando ANSA/COAGAN entren, se agregan las constantes con sus
+  UUIDs reales en ese momento.
+- **2026-04-27 — `lib/dilesa-constants.ts` re-exporta el const desde
+  `lib/empresa-constants.ts` y queda marcado como legacy.** Razón: 30+
+  call sites del repo importan de `@/lib/dilesa-constants` (incluye
+  componentes, scripts, e2e tests). Cambiar todos en este PR sería churn
+  fuera del alcance del Sub-PR 1 y aumentaría la superficie de revisión.
+  La re-exportación garantiza single source of truth para el UUID; los
+  call sites pueden migrar gradualmente sin un PR mecánico masivo.
+- **2026-04-27 — `permissionSlug` no entra como prop del componente
+  shared.** Razón: el `<RequireAccess empresa="..." modulo="...">` ya
+  vive en el page (responsabilidad del routing). Pasarlo también como
+  prop al componente shared introduce ruido (prop unused triggerea
+  warning de lint) sin valor agregado. Queda reflejado en SM3 del
+  ADR-011 ("Permisos no se duplican como prop").
+- **2026-04-27 — Bug encontrado y arreglado durante extracción:** el
+  modal de RFC duplicado en `app/dilesa/proveedores/page.tsx` decía
+  hardcoded "ya está registrado como proveedor activo en RDB" — texto
+  copy-pasteado del page de RDB sin actualizar. Resuelto en el componente
+  shared usando `empresaSlug.toUpperCase()` como label dinámico ("RDB" o
+  "DILESA"). Es exactamente el tipo de drift accidental que SM5 quiere
+  evitar a futuro.
 
 ## Bitácora
 
-_(append-only, escrita por Claude Code al ejecutar)_
+- **2026-04-27 — Sub-PR 1 + ADR-011** (Claude Code, branch
+  `feat/proveedores-shared`):
+  - Creado `lib/empresa-constants.ts` (RDB + DILESA).
+  - Modificado `lib/dilesa-constants.ts` para re-exportar desde el archivo
+    centralizado (legacy, marcado en JSDoc).
+  - Creado `components/proveedores/proveedores-module.tsx` (1098 líneas
+    parametrizadas) con todo el flujo de Proveedores: lista, alta con
+    CSF (drag PDF + diff + acepta), edit, archivar/restaurar, dedup por
+    RFC, update CSF con diff selectivo.
+  - Reducido `app/rdb/proveedores/page.tsx` de 1579 → 17 líneas.
+  - Reducido `app/dilesa/proveedores/page.tsx` de 1578 → 17 líneas.
+  - Creado `docs/adr/011_shared_modules_cross_empresa.md` codificando la
+    convención SM1-SM5.
+  - 4 checks de CI verde local (typecheck, lint warnings pre-existentes
+    solamente, format, 222 tests). Pendiente smoke manual en RDB y
+    DILESA antes de mergeo.
