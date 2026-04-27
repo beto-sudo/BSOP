@@ -19,7 +19,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getLocalDayBoundsUtc } from '@/lib/timezone';
-import { useSortableTable } from '@/hooks/use-sortable-table';
 import { useUrlFilters } from '@/hooks/use-url-filters';
 import { ErrorBanner } from '@/components/module-page';
 import { OrderDetail } from './order-detail';
@@ -39,7 +38,6 @@ export function VentasView() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [productoSearch, setProductoSearch] = useState('');
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable<Pedido>('timestamp', 'desc');
   const [cortes, setCortes] = useState<CorteOption[]>([]);
 
   // URL-synced filter defaults are captured once at mount (today's date range).
@@ -264,10 +262,6 @@ export function VentasView() {
           <VentasTable
             pedidos={filtered}
             loading={loading}
-            sortKey={sortKey}
-            sortDir={sortDir}
-            onSort={onSort}
-            sortData={sortData}
             onRowClick={(pedido) => void openDetail(pedido)}
           />
           <OrderDetail
