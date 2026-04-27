@@ -38,8 +38,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { SortableHead } from '@/components/ui/sortable-head';
-import { useSortableTable } from '@/hooks/use-sortable-table';
+import { DataTable, type Column } from '@/components/module-page';
 import {
   Sheet,
   SheetContent,
@@ -122,6 +121,97 @@ const ORIGEN_OPTIONS = [
   'Ofrecido por corredor',
   'Prospección interna',
   'Otro',
+];
+
+const terrenoColumns: Column<Terreno>[] = [
+  {
+    key: 'nombre',
+    label: 'Nombre',
+    render: (t) => (
+      <div className="flex min-w-0 flex-col">
+        <span className="truncate font-medium text-[var(--text)]">{t.nombre}</span>
+        {t.clave_interna ? (
+          <span className="font-mono text-[10px] uppercase tracking-wide text-[var(--text)]/45">
+            {t.clave_interna}
+          </span>
+        ) : null}
+      </div>
+    ),
+  },
+  {
+    key: 'ubicacion',
+    label: 'Ubicación',
+    sortable: false,
+    accessor: (t) => t.municipio ?? '',
+    render: (t) => (
+      <div className="flex items-start gap-1 text-xs text-[var(--text)]/70">
+        <MapPin className="mt-0.5 size-3.5 shrink-0 text-[var(--text)]/40" />
+        <div className="min-w-0">
+          <div className="truncate">{t.municipio ?? '—'}</div>
+          {t.zona_sector ? (
+            <div className="truncate text-[var(--text)]/50">{t.zona_sector}</div>
+          ) : null}
+        </div>
+      </div>
+    ),
+  },
+  {
+    key: 'area_terreno_m2',
+    label: 'Área',
+    type: 'number',
+    cellClassName: 'text-xs text-[var(--text)]/75',
+    render: (t) => formatM2(t.area_terreno_m2),
+  },
+  {
+    key: 'precio_solicitado_m2',
+    label: 'Precio /m²',
+    type: 'currency',
+    cellClassName: 'text-xs text-[var(--text)]/75',
+    render: (t) => (
+      <>
+        {formatCurrency(t.precio_solicitado_m2)}
+        {t.pct_diferencia_solicitado_oferta != null ? (
+          <div
+            className="text-[10px] text-[var(--text)]/45"
+            title="% diferencia solicitado vs ofertado"
+          >
+            {formatPercent(t.pct_diferencia_solicitado_oferta)}
+          </div>
+        ) : null}
+      </>
+    ),
+  },
+  {
+    key: 'valor_predio',
+    label: 'Valor predio',
+    type: 'currency',
+    cellClassName: 'text-xs text-[var(--text)]/75',
+    render: (t) => formatCurrency(t.valor_predio, { compact: true }),
+  },
+  {
+    key: 'etapa',
+    label: 'Etapa',
+    sortable: false,
+    render: (t) => <EtapaBadge etapa={t.etapa} />,
+  },
+  {
+    key: 'estatus_propiedad',
+    label: 'Estatus',
+    sortable: false,
+    render: (t) => <StatusPropiedadLabel value={t.estatus_propiedad} />,
+  },
+  {
+    key: 'prioridad',
+    label: 'Prioridad',
+    sortable: false,
+    render: (t) => <PrioridadDot prioridad={t.prioridad} />,
+  },
+  {
+    key: 'fecha_ultima_revision',
+    label: 'Última revisión',
+    cellClassName: 'whitespace-nowrap text-xs text-[var(--text)]/60',
+    render: (t) => formatDateShort(t.fecha_ultima_revision),
+  },
 ];
 
 function EtapaBadge({ etapa }: { etapa: string | null }) {
@@ -283,12 +373,6 @@ function TerrenosInner() {
     });
   }, [terrenos, search, filterEtapa, filterEstatus]);
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable<Terreno>('fecha_captura', 'desc');
-  const sorted = useMemo(
-    () => sortData(filtered as unknown as Record<string, unknown>[]) as unknown as Terreno[],
-    [filtered, sortData]
-  );
-
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -326,7 +410,7 @@ function TerrenosInner() {
 
       <TabPanel tabKey="consulta" active={active}>
         <ConsultaPanel
-          terrenos={sorted}
+          terrenos={filtered}
           loading={loading}
           error={error}
           search={search}
@@ -335,9 +419,6 @@ function TerrenosInner() {
           setFilterEtapa={setFilterEtapa}
           filterEstatus={filterEstatus}
           setFilterEstatus={setFilterEstatus}
-          sortKey={sortKey}
-          sortDir={sortDir}
-          onSort={onSort}
           onOpenCreate={openCreate}
           onOpenDetail={(id) => router.push(`/dilesa/terrenos/${id}`)}
         />
@@ -530,9 +611,6 @@ function ConsultaPanel(props: {
   setFilterEtapa: (v: string) => void;
   filterEstatus: string;
   setFilterEstatus: (v: string) => void;
-  sortKey: string;
-  sortDir: 'asc' | 'desc';
-  onSort: (key: string) => void;
   onOpenCreate: () => void;
   onOpenDetail: (id: string) => void;
 }) {
@@ -546,9 +624,6 @@ function ConsultaPanel(props: {
     setFilterEtapa,
     filterEstatus,
     setFilterEstatus,
-    sortKey,
-    sortDir,
-    onSort,
     onOpenCreate,
     onOpenDetail,
   } = props;
@@ -613,109 +688,15 @@ function ConsultaPanel(props: {
           onCreate={onOpenCreate}
         />
       ) : (
-        <div className="rounded-lg border border-[var(--border)] bg-[var(--card)]">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <SortableHead
-                  sortKey="nombre"
-                  label="Nombre"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <TableHead>Ubicación</TableHead>
-                <SortableHead
-                  sortKey="area_terreno_m2"
-                  label="Área"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="precio_solicitado_m2"
-                  label="Precio /m²"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="valor_predio"
-                  label="Valor predio"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <TableHead>Etapa</TableHead>
-                <TableHead>Estatus</TableHead>
-                <TableHead>Prioridad</TableHead>
-                <SortableHead
-                  sortKey="fecha_ultima_revision"
-                  label="Última revisión"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {terrenos.map((t) => (
-                <TableRow key={t.id} onClick={() => onOpenDetail(t.id)} className="cursor-pointer">
-                  <TableCell>
-                    <div className="flex min-w-0 flex-col">
-                      <span className="truncate font-medium text-[var(--text)]">{t.nombre}</span>
-                      {t.clave_interna ? (
-                        <span className="font-mono text-[10px] uppercase tracking-wide text-[var(--text)]/45">
-                          {t.clave_interna}
-                        </span>
-                      ) : null}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-start gap-1 text-xs text-[var(--text)]/70">
-                      <MapPin className="mt-0.5 size-3.5 shrink-0 text-[var(--text)]/40" />
-                      <div className="min-w-0">
-                        <div className="truncate">{t.municipio ?? '—'}</div>
-                        {t.zona_sector ? (
-                          <div className="truncate text-[var(--text)]/50">{t.zona_sector}</div>
-                        ) : null}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-xs tabular-nums text-[var(--text)]/75">
-                    {formatM2(t.area_terreno_m2)}
-                  </TableCell>
-                  <TableCell className="text-xs tabular-nums text-[var(--text)]/75">
-                    {formatCurrency(t.precio_solicitado_m2)}
-                    {t.pct_diferencia_solicitado_oferta != null ? (
-                      <div
-                        className="text-[10px] text-[var(--text)]/45"
-                        title="% diferencia solicitado vs ofertado"
-                      >
-                        {formatPercent(t.pct_diferencia_solicitado_oferta)}
-                      </div>
-                    ) : null}
-                  </TableCell>
-                  <TableCell className="text-xs tabular-nums text-[var(--text)]/75">
-                    {formatCurrency(t.valor_predio, { compact: true })}
-                  </TableCell>
-                  <TableCell>
-                    <EtapaBadge etapa={t.etapa} />
-                  </TableCell>
-                  <TableCell>
-                    <StatusPropiedadLabel value={t.estatus_propiedad} />
-                  </TableCell>
-                  <TableCell>
-                    <PrioridadDot prioridad={t.prioridad} />
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-xs text-[var(--text)]/60">
-                    {formatDateShort(t.fecha_ultima_revision)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable<Terreno>
+          data={terrenos}
+          columns={terrenoColumns}
+          rowKey="id"
+          onRowClick={(t) => onOpenDetail(t.id)}
+          initialSort={{ key: 'fecha_captura', dir: 'desc' }}
+          emptyTitle="Sin resultados"
+          showDensityToggle={false}
+        />
       )}
     </div>
   );
