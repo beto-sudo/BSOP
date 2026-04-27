@@ -1,25 +1,43 @@
 /**
  * Pure helpers for the DocumentosModule feature — date parsing/formatting,
  * status badges, upload-threshold constants, and form<->record conversion.
+ *
+ * Formatters genéricos viven en `@/lib/format`. Este archivo re-exporta los
+ * que se usaban localmente (deprecados) y mantiene los específicos del
+ * dominio de documentos (parseLocalDate, getVencStatus, etc.).
  */
 
 import * as tus from 'tus-js-client';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { formatBytes, formatCurrency, formatDate as formatDateFromLib } from '@/lib/format';
 import type { DocForm, Documento } from './types';
+
+/** @deprecated Use `formatDate` from `@/lib/format`. */
+export const formatDate = formatDateFromLib;
+
+/** @deprecated Use `formatBytes` from `@/lib/format`. */
+export const fmtBytes = formatBytes;
+
+/** @deprecated Use `formatSuperficie` from `@/lib/format`. */
+export { formatSuperficie, formatPrecioM2 } from '@/lib/format';
+
+/**
+ * Currency formatter para Documentos: max 0 decimales (a diferencia del
+ * default 2). Acepta moneda variable.
+ *
+ * @deprecated Use `formatCurrency(monto, { decimals: 0, currency: moneda })`
+ * de `@/lib/format` directamente.
+ */
+export function formatMonto(monto: number | null, moneda: string | null = 'MXN') {
+  if (monto == null) return '—';
+  return formatCurrency(monto, { decimals: 0, currency: moneda || 'MXN' });
+}
 
 export function parseLocalDate(s: string | null): Date | null {
   if (!s) return null;
   const [y, m, d] = s.split('-').map(Number);
   return new Date(y, m - 1, d);
-}
-
-export function formatDate(s: string | null) {
-  if (!s) return '—';
-  const d = parseLocalDate(s);
-  return d
-    ? d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
-    : '—';
 }
 
 export function getVencStatus(s: string | null): 'expired' | 'soon' | 'ok' | null {
@@ -32,49 +50,6 @@ export function getVencStatus(s: string | null): 'expired' | 'soon' | 'ok' | nul
   if (diff < 0) return 'expired';
   if (diff <= 60) return 'soon';
   return 'ok';
-}
-
-export function fmtBytes(b: number | null | undefined) {
-  if (!b) return '';
-  if (b < 1024) return `${b} B`;
-  if (b < 1048576) return `${(b / 1024).toFixed(0)} KB`;
-  return `${(b / 1048576).toFixed(1)} MB`;
-}
-
-export function formatMonto(monto: number | null, moneda: string | null = 'MXN') {
-  if (monto == null) return '—';
-  try {
-    return new Intl.NumberFormat('es-MX', {
-      style: 'currency',
-      currency: moneda || 'MXN',
-      maximumFractionDigits: 0,
-    }).format(monto);
-  } catch {
-    return `${moneda ?? 'MXN'} ${monto.toLocaleString('es-MX')}`;
-  }
-}
-
-export function formatSuperficie(m2: number | null) {
-  if (m2 == null) return '—';
-  if (m2 >= 10000) {
-    const ha = m2 / 10000;
-    return `${ha.toLocaleString('es-MX', { maximumFractionDigits: 2 })} ha`;
-  }
-  return `${m2.toLocaleString('es-MX', { maximumFractionDigits: 0 })} m²`;
-}
-
-export function formatPrecioM2(precio: number | null, moneda: string | null = 'MXN') {
-  if (precio == null) return '—';
-  try {
-    const formatted = new Intl.NumberFormat('es-MX', {
-      style: 'currency',
-      currency: moneda || 'MXN',
-      maximumFractionDigits: precio < 10 ? 2 : 0,
-    }).format(precio);
-    return `${formatted}/m²`;
-  } catch {
-    return `${moneda ?? 'MXN'} ${precio.toLocaleString('es-MX')}/m²`;
-  }
 }
 
 export function emptyForm(): DocForm {

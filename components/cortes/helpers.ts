@@ -1,5 +1,21 @@
 import { TZ } from './types';
 
+/**
+ * Re-exports de `@/lib/format` para compat con call sites de Cortes.
+ *
+ * @deprecated Use `formatCurrency` from `@/lib/format` directamente en código nuevo.
+ */
+export { formatCurrency } from '@/lib/format';
+
+/**
+ * Cortes maneja `formatDate` y `formatDateTime` con su propio formato (incluye
+ * hora siempre, normalizado al estilo del marbete impreso). NO se reemplaza
+ * por `lib/format/formatDate` que es date-only short. Mantener local.
+ *
+ * @deprecated En código nuevo, usar `formatDateTime` de `@/lib/format` (formato
+ * locale-corto). Las dos viejas funciones de acá se mantienen porque su
+ * formato custom es semánticamente parte del print stylesheet de Cortes.
+ */
 export function formatDateTime(ts: string | null | undefined) {
   if (!ts) return '—';
 
@@ -26,6 +42,7 @@ export function formatDateTime(ts: string | null | undefined) {
     .replace(',', ' -');
 }
 
+/** @deprecated Same as {@link formatDateTime}. Mantener para compat. */
 export function formatDate(ts: string | null | undefined) {
   if (!ts) return '—';
 
@@ -48,11 +65,6 @@ export function formatDate(ts: string | null | undefined) {
     minute: '2-digit',
     hour12: true,
   });
-}
-
-export function formatCurrency(amount: number | null | undefined) {
-  if (amount == null) return '—';
-  return amount.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
 }
 
 export function todayRange() {

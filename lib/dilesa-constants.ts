@@ -9,46 +9,26 @@
  */
 export const DILESA_EMPRESA_ID = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479';
 
-/** Mexican peso currency formatter. Compact y siempre con 2 decimales. */
-export function formatCurrency(value: number | null | undefined, opts?: { compact?: boolean }) {
-  if (value == null || Number.isNaN(value)) return '—';
-  const { compact = false } = opts ?? {};
-  return new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: 'MXN',
-    notation: compact ? 'compact' : 'standard',
-    maximumFractionDigits: compact ? 1 : 2,
-    minimumFractionDigits: compact ? 0 : 2,
-  }).format(value);
-}
+/**
+ * @deprecated Use `formatCurrency` from `@/lib/format`.
+ * Re-exportado por compat con call sites de `dilesa-1 UI`.
+ */
+export { formatCurrency, formatPercent } from '@/lib/format';
+export { formatDate as formatDateShort } from '@/lib/format';
 
-/** Format a numeric m² with thousands separators + suffix. */
+import { formatNumber } from '@/lib/format';
+
+/**
+ * Format a numeric m² with thousands separators + suffix. NO se convierte a
+ * hectáreas (a diferencia de `formatSuperficie` de `@/lib/format`). Útil
+ * cuando el módulo siempre quiere unidades en m² independientemente del
+ * tamaño.
+ *
+ * @deprecated Para superficies que pueden usar ha cuando son grandes,
+ * preferir `formatSuperficie` de `@/lib/format`. Mantener éste solo cuando
+ * se necesita forzar m² siempre.
+ */
 export function formatM2(value: number | null | undefined) {
   if (value == null || Number.isNaN(value)) return '—';
-  return `${new Intl.NumberFormat('es-MX', {
-    maximumFractionDigits: 2,
-  }).format(value)} m²`;
-}
-
-/** Percent formatter. Accepts 0–1 range, renders as xx.y%. */
-export function formatPercent(value: number | null | undefined, fractionDigits = 1) {
-  if (value == null || Number.isNaN(value)) return '—';
-  return new Intl.NumberFormat('es-MX', {
-    style: 'percent',
-    minimumFractionDigits: fractionDigits,
-    maximumFractionDigits: fractionDigits,
-  }).format(value);
-}
-
-export function formatDateShort(iso: string | null | undefined) {
-  if (!iso) return '—';
-  try {
-    return new Date(iso).toLocaleDateString('es-MX', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
-  } catch {
-    return '—';
-  }
+  return `${formatNumber(value, { decimals: 2 })} m²`;
 }
