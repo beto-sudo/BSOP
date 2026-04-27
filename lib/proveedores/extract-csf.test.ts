@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 
-import { CsfExtraccionSchema, RegimenSchema, ObligacionSchema } from './extract-csf';
+import {
+  CsfExtraccionSchema,
+  CreateProveedorPayloadSchema,
+  RegimenSchema,
+  ObligacionSchema,
+} from './extract-csf';
 
 /**
  * Tests del schema Zod para la extracción CSF.
@@ -299,5 +304,87 @@ describe('RegimenSchema y ObligacionSchema standalone', () => {
         fecha_fin: null,
       })
     ).toMatchObject({ descripcion: 'DIOT' });
+  });
+});
+
+describe('CreateProveedorPayloadSchema', () => {
+  const validExtraccion = {
+    tipo_persona: 'moral',
+    rfc: 'ABC010101AB1',
+    curp: null,
+    nombre: null,
+    apellido_paterno: null,
+    apellido_materno: null,
+    razon_social: 'EJEMPLO SA DE CV',
+    nombre_comercial: null,
+    regimen_fiscal_codigo: '601',
+    regimen_fiscal_nombre: 'General de Ley Personas Morales',
+    regimenes_adicionales: [
+      {
+        codigo: '601',
+        nombre: 'General de Ley Personas Morales',
+        fecha_inicio: '2020-01-01',
+        fecha_fin: null,
+      },
+    ],
+    domicilio_calle: null,
+    domicilio_num_ext: null,
+    domicilio_num_int: null,
+    domicilio_colonia: null,
+    domicilio_cp: null,
+    domicilio_municipio: null,
+    domicilio_estado: null,
+    obligaciones: [],
+    fecha_inicio_operaciones: null,
+    fecha_emision: null,
+  };
+
+  it('parsea payload completo con proveedor_extras', () => {
+    const payload = {
+      empresa_id: 'e52ac307-9373-4115-b65e-1178f0c4e1aa',
+      extraccion: validExtraccion,
+      proveedor_extras: {
+        codigo: 'PROV-001',
+        condiciones_pago: '30 días',
+        limite_credito: 50000,
+        categoria: 'Ferretería',
+      },
+    };
+    expect(CreateProveedorPayloadSchema.parse(payload)).toMatchObject({
+      empresa_id: 'e52ac307-9373-4115-b65e-1178f0c4e1aa',
+      proveedor_extras: { codigo: 'PROV-001' },
+    });
+  });
+
+  it('parsea payload sin proveedor_extras (opcional)', () => {
+    const payload = {
+      empresa_id: 'e52ac307-9373-4115-b65e-1178f0c4e1aa',
+      extraccion: validExtraccion,
+    };
+    const parsed = CreateProveedorPayloadSchema.parse(payload);
+    expect(parsed.proveedor_extras).toBeUndefined();
+  });
+
+  it('rechaza empresa_id que no es UUID', () => {
+    const payload = {
+      empresa_id: 'no-es-uuid',
+      extraccion: validExtraccion,
+    };
+    expect(() => CreateProveedorPayloadSchema.parse(payload)).toThrow();
+  });
+
+  it('rechaza si extraccion es inválida (RFC faltante)', () => {
+    const { rfc: _rfc, ...extraccionSinRfc } = validExtraccion;
+    void _rfc;
+    const payload = {
+      empresa_id: 'e52ac307-9373-4115-b65e-1178f0c4e1aa',
+      extraccion: extraccionSinRfc,
+    };
+    expect(() => CreateProveedorPayloadSchema.parse(payload)).toThrow();
+  });
+
+  it('rechaza si falta empresa_id', () => {
+    const payload = { extraccion: validExtraccion };
+    expect(() => CreateProveedorPayloadSchema.parse(payload)).toThrow();
   });
 });
