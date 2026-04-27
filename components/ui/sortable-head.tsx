@@ -3,6 +3,12 @@
 import { TableHead } from '@/components/ui/table';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 
+/**
+ * @deprecated Usar `<DataTable>` de `@/components/module-page` que absorbe
+ * el rendering del header sortable. Este componente se conserva para los
+ * call sites residuales (excepciones documentadas o tablas no migradas
+ * todavía). Ver ADR-010.
+ */
 interface SortableHeadProps {
   sortKey: string;
   label: string;

@@ -4,6 +4,12 @@ import { useState, useCallback } from 'react';
 
 type SortDir = 'asc' | 'desc';
 
+/**
+ * @deprecated Usar `<DataTable>` de `@/components/module-page` que absorbe
+ * sort + paginación + sticky + density. Este hook se conserva para los call
+ * sites residuales (excepciones documentadas o tablas no migradas todavía).
+ * Ver ADR-010.
+ */
 // The optional type parameter _T is accepted for call-site annotation (e.g.
 // useSortableTable<MyType>('key', 'asc')) but is not used at runtime.
 // sortData infers its own <T> independently so the explicit annotation is

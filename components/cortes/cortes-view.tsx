@@ -10,7 +10,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { cargarBancos } from '@/app/rdb/cortes/actions';
 import { RequireAccess } from '@/components/require-access';
 import { Button } from '@/components/ui/button';
-import { useSortableTable } from '@/hooks/use-sortable-table';
 import { AbrirCajaDialog } from './abrir-caja-dialog';
 import { CerrarCorteDialog } from './cerrar-corte-dialog';
 import { CorteDetail } from './corte-detail';
@@ -155,7 +154,6 @@ export function CortesView() {
     setDrawerOpen(false);
   }
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable('created_at', 'desc');
   return (
     <RequireAccess empresa="rdb" modulo="rdb.cortes">
       <div className="space-y-6">
@@ -207,7 +205,6 @@ export function CortesView() {
           cortes={filtered}
           loading={loading}
           onRowClick={(corte) => void openDetail(corte)}
-          sortable={{ sortKey, sortDir, onSort, sortData }}
         />
 
         {/* Detail drawer */}
