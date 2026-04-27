@@ -3,26 +3,92 @@
 import { useCallback, useEffect, useState } from 'react';
 import { RefreshCw, Search, TrendingDown, TrendingUp } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import { ModuleFilters, ModuleContent } from '@/components/module-page';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  ModuleFilters,
+  ModuleContent,
+  ErrorBanner,
+  DataTable,
+  type Column,
+} from '@/components/module-page';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { RDB_EMPRESA_ID, type MovimientoRow } from '@/components/inventario/types';
-import {
-  formatCurrency,
-  formatDate,
-  tipoColorClass,
-  tipoLabel,
-} from '@/components/inventario/utils';
+import { tipoColorClass, tipoLabel } from '@/components/inventario/utils';
+import { formatCurrency, formatDateTime } from '@/lib/format';
+
+const movimientoColumns: Column<MovimientoRow>[] = [
+  {
+    key: 'created_at',
+    label: 'Fecha',
+    cellClassName: 'whitespace-nowrap text-sm text-muted-foreground',
+    render: (m) => formatDateTime(m.created_at),
+  },
+  {
+    key: 'producto',
+    label: 'Producto',
+    cellClassName: 'font-medium',
+    accessor: (m) => m.productos?.nombre ?? '',
+    render: (m) => m.productos?.nombre ?? '—',
+  },
+  {
+    key: 'tipo_movimiento',
+    label: 'Tipo',
+    render: (m) => {
+      const isPositive =
+        m.tipo_movimiento === 'entrada' || (m.tipo_movimiento === 'ajuste' && m.cantidad >= 0);
+      return (
+        <div className="flex items-center gap-1.5">
+          {isPositive ? (
+            <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+          ) : (
+            <TrendingDown className="h-3.5 w-3.5 text-destructive" />
+          )}
+          <Badge variant="outline" className={tipoColorClass(m.tipo_movimiento, m.cantidad)}>
+            {tipoLabel(m.tipo_movimiento, m.cantidad)}
+          </Badge>
+        </div>
+      );
+    },
+  },
+  {
+    key: 'cantidad',
+    label: 'Cantidad',
+    type: 'number',
+    render: (m) => {
+      const isPositive =
+        m.tipo_movimiento === 'entrada' || (m.tipo_movimiento === 'ajuste' && m.cantidad >= 0);
+      const color = isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive';
+      return (
+        <span className={`font-semibold ${color}`}>
+          {isPositive ? '+' : '−'}
+          {Math.abs(m.cantidad)}
+        </span>
+      );
+    },
+  },
+  {
+    key: 'costo_unitario',
+    label: 'Costo Unit.',
+    type: 'currency',
+    cellClassName: 'text-sm',
+    render: (m) => formatCurrency(m.costo_unitario),
+  },
+  {
+    key: 'detalle',
+    label: 'Detalle / Referencia',
+    sortable: false,
+    cellClassName: 'max-w-[200px] truncate text-sm text-muted-foreground',
+    render: (m) => (
+      <>
+        <div className="font-medium text-foreground">
+          {m.referencia_tipo === 'orden_compra' ? 'OC' : 'Manual'}
+        </div>
+        <div className="truncate">{m.notas ?? '—'}</div>
+      </>
+    ),
+  },
+];
 
 /**
  * Inventario · tab "Movimientos" (kardex consolidado).
@@ -107,95 +173,19 @@ export default function InventarioMovimientosPage() {
         </Button>
       </ModuleFilters>
 
-      {error && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
-      )}
+      {error && <ErrorBanner error={error} onRetry={() => void fetchMovimientos()} />}
 
       <ModuleContent>
-        <div className="rounded-xl border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Producto</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead className="text-right">Cantidad</TableHead>
-                <TableHead className="text-right">Costo Unit.</TableHead>
-                <TableHead>Detalle / Referencia</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                Array.from({ length: 8 }).map((_, i) => (
-                  <TableRow key={i}>
-                    {Array.from({ length: 6 }).map((__, j) => (
-                      <TableCell key={j}>
-                        <Skeleton className="h-4 w-full" />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              ) : filteredMovimientos.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">
-                    No se encontraron movimientos.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredMovimientos.map((mov) => (
-                  <TableRow key={mov.id}>
-                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                      {formatDate(mov.created_at)}
-                    </TableCell>
-                    <TableCell className="font-medium">{mov.productos?.nombre ?? '—'}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1.5">
-                        {mov.tipo_movimiento === 'entrada' ||
-                        (mov.tipo_movimiento === 'ajuste' && mov.cantidad >= 0) ? (
-                          <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
-                        ) : (
-                          <TrendingDown className="h-3.5 w-3.5 text-destructive" />
-                        )}
-                        <Badge
-                          variant="outline"
-                          className={tipoColorClass(mov.tipo_movimiento, mov.cantidad)}
-                        >
-                          {tipoLabel(mov.tipo_movimiento, mov.cantidad)}
-                        </Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell
-                      className={[
-                        'text-right font-semibold tabular-nums',
-                        mov.tipo_movimiento === 'entrada' ||
-                        (mov.tipo_movimiento === 'ajuste' && mov.cantidad >= 0)
-                          ? 'text-emerald-600 dark:text-emerald-400'
-                          : 'text-destructive',
-                      ].join(' ')}
-                    >
-                      {mov.tipo_movimiento === 'entrada' ||
-                      (mov.tipo_movimiento === 'ajuste' && mov.cantidad >= 0)
-                        ? '+'
-                        : '−'}
-                      {Math.abs(mov.cantidad)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-sm">
-                      {formatCurrency(mov.costo_unitario)}
-                    </TableCell>
-                    <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">
-                      <div className="font-medium text-foreground">
-                        {mov.referencia_tipo === 'orden_compra' ? 'OC' : 'Manual'}
-                      </div>
-                      <div className="truncate">{mov.notas ?? '—'}</div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable<MovimientoRow>
+          data={filteredMovimientos}
+          columns={movimientoColumns}
+          rowKey="id"
+          loading={loading}
+          initialSort={{ key: 'created_at', dir: 'desc' }}
+          emptyTitle={search ? 'Ningún movimiento coincide' : 'Sin movimientos registrados'}
+          emptyDescription={search ? 'Limpia la búsqueda para ver todo.' : undefined}
+          showDensityToggle={false}
+        />
       </ModuleContent>
     </>
   );

@@ -16,15 +16,12 @@ import {
   ModuleKpiStrip,
   ModuleFilters,
   ModuleContent,
-  EmptyState,
-  TableSkeleton,
   ErrorBanner,
   ActiveFiltersChip,
+  DataTable,
+  type Column,
 } from '@/components/module-page';
 import { CategoryFilterStrip } from '@/components/inventario/category-filter-strip';
-import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
-import { SortableHead } from '@/components/ui/sortable-head';
-import { useSortableTable } from '@/hooks/use-sortable-table';
 import { useUrlFilters } from '@/hooks/use-url-filters';
 import { Combobox } from '@/components/ui/combobox';
 import { Badge } from '@/components/ui/badge';
@@ -34,7 +31,8 @@ import { StockDetailDrawer } from '@/components/inventario/stock-detail-drawer';
 import { RegistrarMovimientoDialog } from '@/components/inventario/registrar-movimiento-dialog';
 import { printStockList } from '@/components/inventario/print-stock-list';
 import { type StockItem } from '@/components/inventario/types';
-import { computeStockStats, formatCurrency } from '@/components/inventario/utils';
+import { computeStockStats } from '@/components/inventario/utils';
+import { formatCurrency } from '@/lib/format';
 
 const FILTER_DEFAULTS = {
   search: '',
@@ -44,6 +42,77 @@ const FILTER_DEFAULTS = {
   clasificacionFiltro: '',
   fechaCorte: '',
 };
+
+const stockColumns: Column<StockItem>[] = [
+  {
+    key: 'nombre',
+    label: 'Producto',
+    cellClassName: 'font-medium',
+  },
+  {
+    key: 'clasificacion',
+    label: 'Clasif.',
+    render: (i) => (
+      <Badge variant="outline" className="text-xs font-normal">
+        {i.clasificacion ?? '—'}
+      </Badge>
+    ),
+  },
+  {
+    key: 'categoria',
+    label: 'Categoría',
+    cellClassName: 'text-sm text-muted-foreground',
+    render: (i) => i.categoria ?? '—',
+  },
+  {
+    key: 'stock_actual',
+    label: 'Stock Actual',
+    type: 'number',
+    render: (i) => {
+      const color =
+        i.stock_actual <= 0 ? 'text-destructive' : i.bajo_minimo ? 'text-amber-500' : '';
+      return (
+        <span className={`font-semibold ${color}`}>
+          {i.stock_actual} {i.unidad ?? 'pzs'}
+        </span>
+      );
+    },
+  },
+  {
+    key: 'stock_minimo',
+    label: 'Mínimo',
+    type: 'number',
+    cellClassName: 'text-sm text-muted-foreground',
+    render: (i) => `${i.stock_minimo ?? '—'} ${i.unidad ?? 'pzs'}`,
+  },
+  {
+    key: 'ultimo_costo',
+    label: 'Último Costo',
+    type: 'currency',
+    render: (i) => formatCurrency(i.costo_unitario ?? i.ultimo_costo),
+  },
+  {
+    key: 'valor_inventario',
+    label: 'Valor Total',
+    type: 'currency',
+    cellClassName: 'font-semibold',
+  },
+  {
+    key: 'bajo_minimo',
+    label: 'Estado',
+    render: (i) =>
+      i.stock_actual <= 0 ? (
+        <Badge variant="destructive">Sin stock</Badge>
+      ) : i.bajo_minimo ? (
+        <Badge variant="outline" className="border-amber-500/50 text-amber-500">
+          Bajo mínimo
+        </Badge>
+      ) : (
+        <Badge variant="default">OK</Badge>
+      ),
+    accessor: (i) => (i.stock_actual <= 0 ? 0 : i.bajo_minimo ? 1 : 2),
+  },
+];
 
 /**
  * Inventario · tab "Stock" (default landing del módulo).
@@ -59,7 +128,6 @@ export default function InventarioStockPage() {
   const [items, setItems] = useState<StockItem[]>([]);
   const [loadingStock, setLoadingStock] = useState(true);
   const [errorStock, setErrorStock] = useState<string | null>(null);
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable('nombre', 'asc');
 
   // URL-synced filters
   const { filters, setFilter, clearAll, activeCount } = useUrlFilters(FILTER_DEFAULTS);
@@ -323,152 +391,27 @@ export default function InventarioStockPage() {
       )}
 
       <ModuleContent>
-        <div className="rounded-xl border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <SortableHead
-                  sortKey="nombre"
-                  label="Producto"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="clasificacion"
-                  label="Clasif."
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="categoria"
-                  label="Categoría"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="stock_actual"
-                  label="Stock Actual"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="text-right"
-                />
-                <SortableHead
-                  sortKey="stock_minimo"
-                  label="Mínimo"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="text-right"
-                />
-                <SortableHead
-                  sortKey="ultimo_costo"
-                  label="Último Costo"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="text-right"
-                />
-                <SortableHead
-                  sortKey="valor_inventario"
-                  label="Valor Total"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="text-right"
-                />
-                <SortableHead
-                  sortKey="bajo_minimo"
-                  label="Estado"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loadingStock ? (
-                <TableSkeleton rows={8} columns={8} />
-              ) : filteredStock.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="p-0">
-                    <EmptyState
-                      icon={<Boxes className="h-8 w-8" />}
-                      title={
-                        activeCount > 0
-                          ? 'Ningún producto coincide con los filtros'
-                          : 'Aún no hay productos'
-                      }
-                      description={
-                        activeCount > 0
-                          ? 'Limpia los filtros para ver el inventario completo.'
-                          : 'Registra el primer movimiento para que aparezca aquí.'
-                      }
-                    />
-                  </TableCell>
-                </TableRow>
-              ) : (
-                sortData(filteredStock).map((item) => (
-                  <TableRow
-                    key={item.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => {
-                      setSelectedItem(item);
-                      setDrawerOpen(true);
-                    }}
-                  >
-                    <TableCell>
-                      <span className="font-medium">{item.nombre}</span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-xs font-normal">
-                        {item.clasificacion ?? '—'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {item.categoria ?? '—'}
-                    </TableCell>
-                    <TableCell
-                      className={[
-                        'text-right font-semibold tabular-nums',
-                        item.stock_actual <= 0
-                          ? 'text-destructive'
-                          : item.bajo_minimo
-                            ? 'text-amber-500'
-                            : '',
-                      ].join(' ')}
-                    >
-                      {item.stock_actual} {item.unidad ?? 'pzs'}
-                    </TableCell>
-                    <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
-                      {item.stock_minimo ?? '—'} {item.unidad ?? 'pzs'}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatCurrency(item.costo_unitario ?? item.ultimo_costo)}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums">
-                      {formatCurrency(item.valor_inventario)}
-                    </TableCell>
-                    <TableCell>
-                      {item.stock_actual <= 0 ? (
-                        <Badge variant="destructive">Sin stock</Badge>
-                      ) : item.bajo_minimo ? (
-                        <Badge variant="outline" className="border-amber-500/50 text-amber-500">
-                          Bajo mínimo
-                        </Badge>
-                      ) : (
-                        <Badge variant="default">OK</Badge>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable<StockItem>
+          data={filteredStock}
+          columns={stockColumns}
+          rowKey="id"
+          loading={loadingStock}
+          onRowClick={(item) => {
+            setSelectedItem(item);
+            setDrawerOpen(true);
+          }}
+          initialSort={{ key: 'nombre', dir: 'asc' }}
+          emptyIcon={<Boxes className="h-8 w-8" />}
+          emptyTitle={
+            activeCount > 0 ? 'Ningún producto coincide con los filtros' : 'Aún no hay productos'
+          }
+          emptyDescription={
+            activeCount > 0
+              ? 'Limpia los filtros para ver el inventario completo.'
+              : 'Registra el primer movimiento para que aparezca aquí.'
+          }
+          showDensityToggle={false}
+        />
       </ModuleContent>
 
       <StockDetailDrawer
