@@ -3,14 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getLocalDayBoundsUtc } from '@/lib/timezone';
-import { useSortableTable } from '@/hooks/use-sortable-table';
-import { SortableHead } from '@/components/ui/sortable-head';
-import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { DataTable, type Column } from '@/components/module-page';
+import { formatCurrency } from '@/lib/format';
 import { Download, Package, Search } from 'lucide-react';
-import { TZ, formatCurrency } from './utils';
+import { TZ } from './utils';
 
 type ProductoAgg = {
   product_id: string;
@@ -150,8 +148,6 @@ export function VentasPorProducto({
     void fetchData();
   }, [fetchData]);
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable<ProductoAgg>('importe', 'desc');
-
   const filtered = useMemo(() => {
     if (!search) return rows;
     const q = search.toLowerCase();
@@ -170,7 +166,9 @@ export function VentasPorProducto({
   const exportCsv = () => {
     const header = ['Producto', 'Unidades', 'Importe', 'Pedidos', 'Ticket prom.', '% del total'];
     const lines = [header.join(',')];
-    for (const r of sortData(filtered)) {
+    // Sort by importe desc to match the visible table default sort.
+    const sorted = [...filtered].sort((a, b) => b.importe - a.importe);
+    for (const r of sorted) {
       lines.push(
         [
           `"${r.product_name.replace(/"/g, '""')}"`,
@@ -239,116 +237,68 @@ export function VentasPorProducto({
         </Button>
       </div>
 
-      {error ? (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
-      ) : null}
-
-      <div className="rounded-xl border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <SortableHead
-                sortKey="product_name"
-                label="Producto"
-                currentSort={sortKey}
-                currentDir={sortDir}
-                onSort={onSort}
-              />
-              <SortableHead
-                sortKey="unidades"
-                label="Unidades"
-                currentSort={sortKey}
-                currentDir={sortDir}
-                onSort={onSort}
-                className="text-right"
-              />
-              <SortableHead
-                sortKey="importe"
-                label="Importe"
-                currentSort={sortKey}
-                currentDir={sortDir}
-                onSort={onSort}
-                className="text-right"
-              />
-              <SortableHead
-                sortKey="pedidos"
-                label="Pedidos"
-                currentSort={sortKey}
-                currentDir={sortDir}
-                onSort={onSort}
-                className="text-right"
-              />
-              <SortableHead
-                sortKey="ticket_prom"
-                label="Ticket prom."
-                currentSort={sortKey}
-                currentDir={sortDir}
-                onSort={onSort}
-                className="text-right"
-              />
-              <SortableHead
-                sortKey="pct_total"
-                label="% del total"
-                currentSort={sortKey}
-                currentDir={sortDir}
-                onSort={onSort}
-                className="text-right"
-              />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              Array.from({ length: 8 }).map((_, i) => (
-                <TableRow key={i}>
-                  {Array.from({ length: 6 }).map((__, j) => (
-                    <TableCell key={j}>
-                      <Skeleton className="h-4 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : filtered.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">
-                  <Package className="mx-auto mb-2 h-5 w-5 opacity-50" />
-                  Sin ventas en el rango seleccionado.
-                </TableCell>
-              </TableRow>
-            ) : (
-              sortData(filtered).map((r) => (
-                <TableRow key={r.product_id}>
-                  <TableCell className="font-medium">{r.product_name}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {r.unidades.toLocaleString('es-MX')}
-                  </TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">
-                    {formatCurrency(r.importe)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-muted-foreground">
-                    {r.pedidos}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-muted-foreground">
-                    {formatCurrency(r.ticket_prom)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    <div className="flex items-center justify-end gap-2">
-                      <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full bg-emerald-500/70"
-                          style={{ width: `${Math.min(100, r.pct_total)}%` }}
-                        />
-                      </div>
-                      <span className="w-12 text-right">{r.pct_total.toFixed(1)}%</span>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <DataTable<ProductoAgg>
+        data={filtered}
+        columns={productoColumns}
+        rowKey="product_id"
+        loading={loading}
+        error={error}
+        onRetry={() => void fetchData()}
+        initialSort={{ key: 'importe', dir: 'desc' }}
+        emptyIcon={<Package className="h-8 w-8 opacity-50" />}
+        emptyTitle="Sin ventas en el rango seleccionado"
+        showDensityToggle={false}
+      />
     </div>
   );
 }
+
+const productoColumns: Column<ProductoAgg>[] = [
+  {
+    key: 'product_name',
+    label: 'Producto',
+    cellClassName: 'font-medium',
+  },
+  {
+    key: 'unidades',
+    label: 'Unidades',
+    type: 'number',
+    render: (r) => r.unidades.toLocaleString('es-MX'),
+  },
+  {
+    key: 'importe',
+    label: 'Importe',
+    type: 'currency',
+    cellClassName: 'font-medium',
+  },
+  {
+    key: 'pedidos',
+    label: 'Pedidos',
+    type: 'number',
+    cellClassName: 'text-muted-foreground',
+    render: (r) => r.pedidos,
+  },
+  {
+    key: 'ticket_prom',
+    label: 'Ticket prom.',
+    type: 'currency',
+    cellClassName: 'text-muted-foreground',
+  },
+  {
+    key: 'pct_total',
+    label: '% del total',
+    align: 'right',
+    cellClassName: 'tabular-nums',
+    render: (r) => (
+      <div className="flex items-center justify-end gap-2">
+        <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+          <div
+            className="h-full bg-emerald-500/70"
+            style={{ width: `${Math.min(100, r.pct_total)}%` }}
+          />
+        </div>
+        <span className="w-12 text-right">{r.pct_total.toFixed(1)}%</span>
+      </div>
+    ),
+  },
+];
