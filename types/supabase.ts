@@ -1,3 +1,14 @@
+// ==============================================================================
+// Auto-generated Supabase database types.
+// Last regenerated: 2026-04-27T17:21:12Z
+// Project ref: ybklderteyhuugzfmxbi
+// Schemas: public, core, erp, rdb, health, playtomic, dilesa, maquinaria
+//
+// DO NOT EDIT BY HAND. Regenerate via:
+//   - GitHub Actions: trigger 'DB Types' workflow manually
+//   - Local: npm run db:types (requiere supabase CLI + SUPABASE_ACCESS_TOKEN)
+// ==============================================================================
+
 export type Json =
   | string
   | number
@@ -5789,6 +5800,13 @@ export type Database = {
             referencedRelation: "personas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "personas_datos_fiscales_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: true
+            referencedRelation: "v_empleados_full"
+            referencedColumns: ["persona_id"]
+          },
         ]
       }
       producto_receta: {
@@ -8341,6 +8359,7 @@ export type Database = {
           place_name: string | null
           service_charge: number | null
           status: string | null
+          table_id: number | null
           table_name: string | null
           tax: number | null
           timestamp: string | null
@@ -8363,6 +8382,7 @@ export type Database = {
           place_name?: string | null
           service_charge?: number | null
           status?: string | null
+          table_id?: number | null
           table_name?: string | null
           tax?: number | null
           timestamp?: string | null
@@ -8385,6 +8405,7 @@ export type Database = {
           place_name?: string | null
           service_charge?: number | null
           status?: string | null
+          table_id?: number | null
           table_name?: string | null
           tax?: number | null
           timestamp?: string | null
