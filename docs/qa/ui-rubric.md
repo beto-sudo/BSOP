@@ -46,26 +46,31 @@ Role tested: [admin / user / no-access]
 
 ## Section 2 — Table / List View
 
-| Check                                                                                   | Result | Notes |
-| --------------------------------------------------------------------------------------- | ------ | ----- |
-| Table uses `<DataTable>` (NOT `<Table>` + `<SortableHead>` + `useSortableTable`)        |        |       |
-| Columns defined via declarative `Column<T>[]` array (DT1)                               |        |       |
-| Column types semánticos (`currency` / `number` / `date` / `delta` / `badge`) usados     |        |       |
-| Currency / number columns auto-align right (no se hardcodea `text-right`)               |        |       |
-| Sort funciona en columnas marcadas como sortable; aria-sort presente                    |        |       |
-| Sticky header se mantiene al scrollear (default true)                                   |        |       |
-| Density toggle visible y persistido en URL (DT4) si `onDensityChange` definido          |        |       |
-| Row hover state visible cuando `onRowClick` definido                                    |        |       |
-| Rows clickeables (cursor-pointer)                                                       |        |       |
-| Clicking row abre Sheet o navega (no se dispara desde celdas con popovers — DT5)        |        |       |
-| Celdas con popovers/inline-edit usan `<DataTable.InteractiveCell>` (DT5)                |        |       |
-| Empty state usa props `emptyTitle` / `emptyDescription` / `emptyAction` (no inline JSX) |        |       |
-| Empty state distingue "módulo virgen" vs "filtros activos" via `activeCount` (S3)       |        |       |
-| Loading state hereda `<TableSkeleton>` automático del `<DataTable>` con `loading` prop  |        |       |
-| Print: tabla cae a `display: table` plano sin sticky/virt (DT3) — verificar con Cmd+P   |        |       |
-| Badge statuses (activo/inactivo etc.) render con color                                  |        |       |
-| Currency / date formats usan `lib/format/format*` (no formatters locales)               |        |       |
-| Long text truncates (no layout breakage)                                                |        |       |
+| Check                                                                                             | Result | Notes |
+| ------------------------------------------------------------------------------------------------- | ------ | ----- |
+| Table uses `<DataTable>` (NOT `<Table>` + `<SortableHead>` + `useSortableTable`)                  |        |       |
+| Columns defined via declarative `Column<T>[]` array (DT1)                                         |        |       |
+| Column types semánticos (`currency` / `number` / `date` / `delta` / `badge`) usados               |        |       |
+| Currency / number columns auto-align right (no se hardcodea `text-right`)                         |        |       |
+| Sort funciona en columnas marcadas como sortable; aria-sort presente                              |        |       |
+| Sticky header se mantiene al scrollear (default true)                                             |        |       |
+| Density toggle visible y persistido en URL (DT4) si `onDensityChange` definido                    |        |       |
+| Row hover state visible cuando `onRowClick` definido                                              |        |       |
+| Rows clickeables (cursor-pointer)                                                                 |        |       |
+| Clicking row abre Sheet o navega (no se dispara desde celdas con popovers — DT5)                  |        |       |
+| Celdas con popovers/inline-edit usan `<DataTable.InteractiveCell>` (DT5)                          |        |       |
+| Empty state usa props `emptyTitle` / `emptyDescription` / `emptyAction` (no inline JSX)           |        |       |
+| Empty state distingue "módulo virgen" vs "filtros activos" via `activeCount` (S3)                 |        |       |
+| Loading state hereda `<TableSkeleton>` automático del `<DataTable>` con `loading` prop            |        |       |
+| Print: tabla cae a `display: table` plano sin sticky/virt (DT3) — verificar con Cmd+P             |        |       |
+| Badge statuses (activo/inactivo etc.) render con color                                            |        |       |
+| Currency / date formats usan `lib/format/format*` (no formatters locales)                         |        |       |
+| Long text truncates (no layout breakage)                                                          |        |       |
+| Columnas dinámicas (aparecen/se ocultan según data) usan `column.showIf(rows)` (DT2)              |        |       |
+| Columnas con valor derivado (computed) declaran `accessor` para sort numérico correcto            |        |       |
+| Si hay sort externo previo (rank semántico, peso, custom), pre-sort el array y omit `initialSort` |        |       |
+| Caller que distingue universe-empty vs filtered-empty mantiene su EmptyState fuera del DataTable  |        |       |
+| Excepciones a `<DataTable>` documentan razón con JSDoc al inicio del archivo                      |        |       |
 
 ---
 

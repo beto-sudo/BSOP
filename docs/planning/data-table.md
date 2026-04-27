@@ -6,7 +6,7 @@
 **Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-04-26
-**Última actualización:** 2026-04-26 (cerrada — sesión nocturna autónoma, 8 PRs mergeados)
+**Última actualización:** 2026-04-27 (Fase 2 incremental cerrada — 5 PRs adicionales H–L mergeados, 4 excepciones permanentes documentadas)
 
 ## Problema
 
@@ -360,18 +360,31 @@ Cada PR cumple:
 
 ## Pendientes (Fase 2 incremental)
 
-NO se abren PRs nuevos por la lista entera; cada archivo se migra cuando
-se toque por otro motivo (regla "los nuevos PRs no se aprueban con
-`useSortableTable`" del ADR-010 §DT8).
+✅ **Cerrado 2026-04-27.** Toda la lista resuelta — ver §Excepciones
+permanentes para los archivos que quedaron documentados como no-encaja.
 
-- `app/dilesa/proyectos/page.tsx` (~903 líneas, tabla 15 cols con badges custom).
-- `app/dilesa/prototipos/page.tsx` (~935 líneas, similar).
-- `app/dilesa/anteproyectos/page.tsx` (~926 líneas, similar).
-- `components/documentos/documentos-table.tsx` (13+ cols con 4 columnas dinámicas via `hasTipoOperacion`/`hasMonto`/etc., PDF/IMG/anexos como cells con `stopPropagation`).
-- `components/tasks/tasks-table.tsx` (variantes simple/rich con popovers internos — preserva API pero refactor interno).
-- `app/rdb/admin/juntas/page.tsx`, `app/dilesa/admin/juntas/page.tsx`, `app/inicio/juntas/page.tsx` (3 lugares con custom row state).
-- `app/rdb/productos/analisis/page.tsx` (3 tablas analíticas read-only).
-- `components/playtomic/*` y `app/settings/acceso/acceso-client.tsx` — auditar primero; pueden quedarse como excepciones documentadas si shape no encaja.
+## Excepciones permanentes
+
+Cada archivo lleva un JSDoc al inicio justificando por qué no encaja en
+`<DataTable>` v1. La razón está documentada en código y referenciada
+desde la bitácora.
+
+- `app/settings/acceso/acceso-client.tsx` — settings state-machine UI con
+  3 tabs (empresas, roles, usuarios) y patrón sidebar+matriz para
+  permisos. Las 3 tablas no se benefician de sort/density/sticky; los
+  inline-edit checkboxes están acoplados al state machine.
+- `components/playtomic/reconciliation-table.tsx` — tabla con footer
+  "totals" row agregado. DataTable v1 no soporta footer de totales
+  (Fuera de alcance v1).
+- `components/playtomic/players-section.tsx` — dos tablas tightly
+  coupled en grid `xl:grid-cols-[1.4fr_1fr]`, sort externo via
+  `<Combobox>` (gasto/reservas/name/sport), `slice(0,10)` truncation
+  que rompe el modelo "show all matching".
+- `components/playtomic/pending-payments-section.tsx` — totals row en la
+  primera tabla + sort externo compartido con el parent.
+
+`useSortableTable` y `<SortableHead>` se conservan deprecados (no se
+borran) — los call sites residuales están en estas excepciones.
 
 ## Decisiones registradas
 
@@ -412,6 +425,46 @@ se toque por otro motivo (regla "los nuevos PRs no se aprueban con
   Playtomic agregaciones especiales, settings/acceso si tiene shape
   raro de permisos. Cada excepción se queda con un comentario al inicio
   del archivo justificando por qué no encaja en `<DataTable>`.
+- **2026-04-27 (CC) — DocumentosTable: pre-sort por rank semántico
+  fuera de DataTable.** El módulo aplicaba el rank de búsqueda
+  semántica como override de `sortData` en el sortCtx externo. Con
+  DataTable manejando sort interno, el pre-sort se aplica directamente
+  sobre el array `filtered` antes de pasarlo a la tabla, y el caller
+  pasa `initialSort={undefined}` cuando hay rank activo para que
+  DataTable respete el orden recibido. Si el usuario clickea una
+  columna, el rank se pierde — comportamiento esperado para un
+  ranking por similitud.
+- **2026-04-27 (CC) — TasksTable: API externa preservada con dos
+  column-builders internos.** El componente sigue exponiendo el prop
+  `variant: 'simple' | 'rich'` pero internamente compone columns con
+  `buildSimpleColumns` o `buildRichColumns`. Las props
+  `sortKey/sortDir/onSort/sortData` y `filteredCount` se eliminan del
+  tipo — DataTable maneja sort interno y los callers que muestran
+  contadores los calculan independientemente.
+- **2026-04-27 (CC) — Juntas: 3 archivos sin componente compartido.**
+  Auditados los 3 lugares (rdb/admin, dilesa/admin, inicio): cada uno
+  tiene un set de columnas distinto (5–9 cols) con counts derivados
+  diferentes. Migrar como `<JuntasTable>` compartido fuerza
+  abstracciones débiles. Decisión: 3 archivos independientes, cada
+  uno con su columns array.
+- **2026-04-27 (CC) — DILESA proyectos/prototipos/anteproyectos:
+  ConsultaPanel signature simplificada.** El panel ahora recibe `data`
+  (filtered) + `universeCount` en lugar de la versión `sorted` y las
+  props de sort externo. `EmptyStateImported` se preserva afuera
+  cuando `universeCount === 0` para mantener su mensaje específico
+  del dominio inmobiliario; DataTable solo se renderea cuando hay
+  proyectos en el universo.
+- **2026-04-27 (CC) — Productos analisis: 3 tablas read-only sin
+  filtros.** Se migran las 3 con `initialSort` específico por
+  relevancia (valor_stock desc, utilidad_30d desc, unidades_30d
+  desc). La 4ta sección "Comparativa por categoría" es bar chart CSS
+  — no es tabla, no se migra.
+- **2026-04-27 (CC) — Cleanup PR-M no se ejecuta.** Quedan 2 callers
+  de `useSortableTable`/`<SortableHead>` en archivos de excepción
+  permanente (Playtomic). Borrar el hook y el componente requeriría
+  inline-ear el sort en los callers, lo cual es trabajo aparte sin
+  beneficio claro. Se mantienen `@deprecated` con JSDoc apuntando a
+  `<DataTable>`.
 
 ## Bitácora
 
@@ -428,3 +481,9 @@ se toque por otro motivo (regla "los nuevos PRs no se aprueban con
 - **2026-04-26 (CC)** — PR-F DILESA terrenos mergeado **parcial** ([#224](https://github.com/beto-sudo/BSOP/pull/224)). Solo terrenos. Decisión pragmática durante sesión: proyectos/prototipos/anteproyectos tienen tablas de 15+ cols con badges custom complejos cada una; migrarlas cuidadosamente requiere más tiempo del disponible. Se documentan en Pendientes como Fase 2.
 - **2026-04-26 (CC)** — PR-G RH stack mergeado ([#225](https://github.com/beto-sudo/BSOP/pull/225)). 3 archivos: departamentos, empleados (con avatar circular), puestos (con rango salarial dinámico). -88 líneas netas.
 - **2026-04-26 (CC)** — Sesión nocturna cerrada. Closeout: este doc actualizado con bitácora completa, INITIATIVES.md actualizado con `data-table` movida a `## Done`, `ui-rubric.md` Section 2 actualizada con checks específicos a `<DataTable>`. Total 8 PRs mergeados (#218-#225) + 1 PR de docs (#226 closeout) en una sola sesión. ~17 tablas migradas. PRs H/I/J/K NO ejecutados — los archivos correspondientes (Documentos, Tasks, Juntas, Productos analisis, DILESA restantes) quedan documentados como Fase 2 incremental por construcción.
+- **2026-04-27 (CC)** — PR-H Documentos mergeado ([#228](https://github.com/beto-sudo/BSOP/pull/228)). `documentos-table.tsx` reescrito sobre `<DataTable>` con 4 columnas dinámicas via `column.showIf` (operación/monto/superficie/$/m²) y celdas PDF/IMG/anexos en `<DataTable.InteractiveCell>`. `documentos-module.tsx` simplificado: rank semántico se aplica como pre-sort sobre el array antes de pasar a la tabla. -79 líneas netas.
+- **2026-04-27 (CC)** — PR-I Tasks mergeado ([#229](https://github.com/beto-sudo/BSOP/pull/229)). `tasks-table.tsx` reescrito sobre `<DataTable>` preservando la API externa de variantes simple/rich con dos column-builders internos. `tasks-module.tsx` elimina `useSortableTable` + props de sort externo. `app/rdb/tasks/page.tsx` (mini-tasks duplicado) también migrado. -488 líneas netas (incluye eliminación de scaffolding manual).
+- **2026-04-27 (CC)** — PR-J Juntas mergeado ([#230](https://github.com/beto-sudo/BSOP/pull/230)). 3 archivos: `app/inicio/juntas/page.tsx` (5 cols), `app/rdb/admin/juntas/page.tsx` (6 cols con counts), `app/dilesa/admin/juntas/page.tsx` (9 cols con TEMP "Contenido" + Avanz/Term counts). Cada uno con columns array independiente — los 3 lugares tienen sets de columnas distintos, no encajan en componente compartido. -210 líneas netas.
+- **2026-04-27 (CC)** — PR-K DILESA proyectos/prototipos/anteproyectos mergeado ([#231](https://github.com/beto-sudo/BSOP/pull/231)). 3 archivos pesados (~900 líneas cada uno). ConsultaPanel signature unificada: recibe `data` (filtered) + `universeCount`. EmptyStateImported preservado para universe-empty con mensaje específico de dominio. Margen derivado en prototipos via `accessor` para sort numérico. -126 líneas netas.
+- **2026-04-27 (CC)** — PR-L Productos analisis + excepciones mergeado ([#232](https://github.com/beto-sudo/BSOP/pull/232)). `app/rdb/productos/analisis/page.tsx` con 3 tablas read-only migradas. 4 archivos documentados como excepciones permanentes con JSDoc al inicio: `acceso-client.tsx` (state-machine UI), `playtomic/reconciliation-table.tsx` (totals row), `playtomic/players-section.tsx` (sort externo + slice), `playtomic/pending-payments-section.tsx` (totals + sort externo). -28 líneas netas (la migración de analisis compensa los JSDoc agregados).
+- **2026-04-27 (CC)** — Sesión Fase 2 cerrada. Total 5 PRs adicionales mergeados (#228–#232). 13 archivos resueltos (9 migrados + 4 excepciones documentadas). `useSortableTable` + `<SortableHead>` se conservan @deprecated por callers residuales en Playtomic. Cleanup PR-M no aplica.
