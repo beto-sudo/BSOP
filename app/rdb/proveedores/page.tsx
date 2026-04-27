@@ -23,7 +23,12 @@ import {
   Pencil,
   Ban,
   RotateCcw,
+  Upload,
+  Sparkles,
+  AlertTriangle,
+  ExternalLink,
 } from 'lucide-react';
+import type { CsfExtraccion } from '@/lib/proveedores/extract-csf';
 
 const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
 
@@ -230,6 +235,100 @@ export default function ProveedoresPage() {
   const [editEmail, setEditEmail] = useState('');
   const [editRFC, setEditRFC] = useState('');
 
+  // ─── CSF flow state (Sprint 2.B) ────────────────────────────────────────────
+  const [csfFile, setCsfFile] = useState<File | null>(null);
+  const [csfProcessing, setCsfProcessing] = useState(false);
+  const [csfError, setCsfError] = useState<string | null>(null);
+  const [csfExtraccion, setCsfExtraccion] = useState<CsfExtraccion | null>(null);
+
+  // Campos adicionales del modelo CSF (ADR-007), editables tras la extracción
+  const [newTipoPersona, setNewTipoPersona] = useState<'fisica' | 'moral'>('fisica');
+  const [newRazonSocial, setNewRazonSocial] = useState('');
+  const [newNombreComercial, setNewNombreComercial] = useState('');
+  const [newCurp, setNewCurp] = useState('');
+  const [newRegimenCodigo, setNewRegimenCodigo] = useState('');
+  const [newRegimenNombre, setNewRegimenNombre] = useState('');
+  const [newDomCalle, setNewDomCalle] = useState('');
+  const [newDomNumExt, setNewDomNumExt] = useState('');
+  const [newDomNumInt, setNewDomNumInt] = useState('');
+  const [newDomColonia, setNewDomColonia] = useState('');
+  const [newDomCp, setNewDomCp] = useState('');
+  const [newDomMunicipio, setNewDomMunicipio] = useState('');
+  const [newDomEstado, setNewDomEstado] = useState('');
+
+  // Modal de duplicado por RFC
+  const [duplicadoOpen, setDuplicadoOpen] = useState(false);
+  const [duplicadoInfo, setDuplicadoInfo] = useState<{
+    persona_id: string;
+    proveedor_id: string | null;
+    rfc: string;
+  } | null>(null);
+
+  const resetCreateForm = () => {
+    setNewNombre('');
+    setNewApellidoPaterno('');
+    setNewApellidoMaterno('');
+    setNewContacto('');
+    setNewTelefono('');
+    setNewEmail('');
+    setNewRFC('');
+    setNewDireccion('');
+    setNewNotas('');
+    setCsfFile(null);
+    setCsfProcessing(false);
+    setCsfError(null);
+    setCsfExtraccion(null);
+    setNewTipoPersona('fisica');
+    setNewRazonSocial('');
+    setNewNombreComercial('');
+    setNewCurp('');
+    setNewRegimenCodigo('');
+    setNewRegimenNombre('');
+    setNewDomCalle('');
+    setNewDomNumExt('');
+    setNewDomNumInt('');
+    setNewDomColonia('');
+    setNewDomCp('');
+    setNewDomMunicipio('');
+    setNewDomEstado('');
+  };
+
+  const handleProcessCsf = async () => {
+    if (!csfFile) return;
+    setCsfProcessing(true);
+    setCsfError(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', csfFile);
+      const res = await fetch('/api/proveedores/extract-csf', { method: 'POST', body: fd });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Error al procesar CSF');
+      const e = json.extraccion as CsfExtraccion;
+      setCsfExtraccion(e);
+      setNewTipoPersona(e.tipo_persona);
+      setNewRazonSocial(e.razon_social ?? '');
+      setNewNombreComercial(e.nombre_comercial ?? '');
+      setNewNombre(e.tipo_persona === 'fisica' ? (e.nombre ?? '') : (e.razon_social ?? ''));
+      setNewApellidoPaterno(e.tipo_persona === 'fisica' ? (e.apellido_paterno ?? '') : '');
+      setNewApellidoMaterno(e.tipo_persona === 'fisica' ? (e.apellido_materno ?? '') : '');
+      setNewRFC(e.rfc);
+      setNewCurp(e.curp ?? '');
+      setNewRegimenCodigo(e.regimen_fiscal_codigo ?? '');
+      setNewRegimenNombre(e.regimen_fiscal_nombre ?? '');
+      setNewDomCalle(e.domicilio_calle ?? '');
+      setNewDomNumExt(e.domicilio_num_ext ?? '');
+      setNewDomNumInt(e.domicilio_num_int ?? '');
+      setNewDomColonia(e.domicilio_colonia ?? '');
+      setNewDomCp(e.domicilio_cp ?? '');
+      setNewDomMunicipio(e.domicilio_municipio ?? '');
+      setNewDomEstado(e.domicilio_estado ?? '');
+    } catch (err) {
+      setCsfError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCsfProcessing(false);
+    }
+  };
+
   const handleCreate = async () => {
     if (!newNombre.trim()) {
       alert('El nombre es obligatorio');
@@ -237,6 +336,63 @@ export default function ProveedoresPage() {
     }
     setCreating(true);
     try {
+      // ── Flujo con CSF ──────────────────────────────────────────────
+      if (csfFile && csfExtraccion) {
+        const editedExtraccion: CsfExtraccion = {
+          ...csfExtraccion,
+          tipo_persona: newTipoPersona,
+          razon_social: newTipoPersona === 'moral' ? newRazonSocial.trim() || null : null,
+          nombre_comercial: newNombreComercial.trim() || null,
+          nombre: newTipoPersona === 'fisica' ? newNombre.trim() || null : null,
+          apellido_paterno: newTipoPersona === 'fisica' ? newApellidoPaterno.trim() || null : null,
+          apellido_materno: newTipoPersona === 'fisica' ? newApellidoMaterno.trim() || null : null,
+          rfc: newRFC.trim().toUpperCase(),
+          curp: newCurp.trim() || null,
+          regimen_fiscal_codigo: newRegimenCodigo.trim() || null,
+          regimen_fiscal_nombre: newRegimenNombre.trim() || null,
+          domicilio_calle: newDomCalle.trim() || null,
+          domicilio_num_ext: newDomNumExt.trim() || null,
+          domicilio_num_int: newDomNumInt.trim() || null,
+          domicilio_colonia: newDomColonia.trim() || null,
+          domicilio_cp: newDomCp.trim() || null,
+          domicilio_municipio: newDomMunicipio.trim() || null,
+          domicilio_estado: newDomEstado.trim() || null,
+        };
+
+        const fd = new FormData();
+        fd.append('file', csfFile);
+        fd.append(
+          'payload',
+          JSON.stringify({
+            empresa_id: RDB_EMPRESA_ID,
+            extraccion: editedExtraccion,
+          })
+        );
+
+        const res = await fetch('/api/proveedores/create-with-csf', {
+          method: 'POST',
+          body: fd,
+        });
+        const json = await res.json();
+
+        if (res.status === 409 && json.error === 'rfc_duplicado') {
+          setDuplicadoInfo({
+            persona_id: json.existing_persona_id,
+            proveedor_id: json.existing_proveedor_id,
+            rfc: editedExtraccion.rfc,
+          });
+          setDuplicadoOpen(true);
+          return;
+        }
+        if (!res.ok) throw new Error(json.error ?? 'Error al crear proveedor con CSF');
+
+        setCreateDrawerOpen(false);
+        resetCreateForm();
+        void fetchProveedores();
+        return;
+      }
+
+      // ── Flujo manual (sin CSF) — preserva el flujo previo ─────────
       const supabase = createSupabaseBrowserClient();
       const { data: persona, error: personaErr } = await supabase
         .schema('erp')
@@ -265,19 +421,11 @@ export default function ProveedoresPage() {
       if (err) throw err;
 
       setCreateDrawerOpen(false);
-      setNewNombre('');
-      setNewApellidoPaterno('');
-      setNewApellidoMaterno('');
-      setNewContacto('');
-      setNewTelefono('');
-      setNewEmail('');
-      setNewRFC('');
-      setNewDireccion('');
-      setNewNotas('');
+      resetCreateForm();
       void fetchProveedores();
     } catch (e) {
       console.error(e);
-      alert('Error al crear el proveedor');
+      alert(e instanceof Error ? e.message : 'Error al crear el proveedor');
     } finally {
       setCreating(false);
     }
@@ -588,102 +736,340 @@ export default function ProveedoresPage() {
         </Sheet>
 
         {/* Create Proveedor Drawer */}
-        <Sheet open={createDrawerOpen} onOpenChange={setCreateDrawerOpen}>
-          <SheetContent className="sm:max-w-[600px] overflow-y-auto">
+        <Sheet
+          open={createDrawerOpen}
+          onOpenChange={(v) => {
+            setCreateDrawerOpen(v);
+            if (!v) resetCreateForm();
+          }}
+        >
+          <SheetContent className="sm:max-w-[640px] overflow-y-auto">
             <SheetHeader>
               <SheetTitle>Nuevo Proveedor</SheetTitle>
             </SheetHeader>
 
             <div className="mt-8 space-y-6">
+              {/* ── Sección CSF (Sprint 2.B) ────────────────────────── */}
+              <div className="rounded-lg border border-emerald-300/40 bg-emerald-50/40 p-4 dark:bg-emerald-950/20">
+                <div className="flex items-start gap-3">
+                  <Sparkles className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <div className="flex-1 space-y-3">
+                    <div>
+                      <h3 className="text-sm font-medium">Sube CSF (recomendado)</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Auto-llena el formulario con los datos extraídos de la Constancia de
+                        Situación Fiscal del SAT. Soporta personas físicas y morales.
+                      </p>
+                    </div>
+
+                    {!csfExtraccion && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          type="file"
+                          accept="application/pdf"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0] ?? null;
+                            setCsfFile(f);
+                            setCsfError(null);
+                          }}
+                          className="text-xs file:mr-3 file:rounded-md file:border-0 file:bg-emerald-600 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-white hover:file:bg-emerald-700"
+                          disabled={csfProcessing}
+                        />
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={handleProcessCsf}
+                          disabled={!csfFile || csfProcessing}
+                          className="gap-1.5"
+                        >
+                          {csfProcessing ? (
+                            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Upload className="h-3.5 w-3.5" />
+                          )}
+                          {csfProcessing ? 'Procesando…' : 'Procesar CSF'}
+                        </Button>
+                      </div>
+                    )}
+
+                    {csfProcessing && (
+                      <p className="text-xs text-muted-foreground">
+                        Claude está leyendo el PDF — puede tardar 30-90 segundos.
+                      </p>
+                    )}
+
+                    {csfError && (
+                      <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+                        <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                        <div>
+                          <strong>Error al procesar:</strong> {csfError}
+                          <div className="mt-1 text-muted-foreground">
+                            Puedes reintentar o capturar manualmente abajo.
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {csfExtraccion && (
+                      <div className="flex items-center justify-between rounded-md border border-emerald-300/60 bg-white/60 p-2 text-xs dark:bg-emerald-900/20">
+                        <span className="text-emerald-700 dark:text-emerald-400">
+                          ✓ CSF procesada — {csfFile?.name}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setCsfFile(null);
+                            setCsfExtraccion(null);
+                            setCsfError(null);
+                          }}
+                          className="h-6 px-2 text-xs"
+                        >
+                          Cambiar PDF
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Form ────────────────────────────────────────────── */}
               <div className="space-y-4">
+                {/* Tipo de persona */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium leading-none">
-                    Nombre / Razón Social <span className="text-destructive">*</span>
-                  </label>
-                  <Input
-                    value={newNombre}
-                    onChange={(e) => setNewNombre(e.target.value)}
-                    placeholder="Persona física: nombre de pila. Moral: razón social."
-                  />
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium leading-none">Apellido paterno</label>
-                    <Input
-                      value={newApellidoPaterno}
-                      onChange={(e) => setNewApellidoPaterno(e.target.value)}
-                      placeholder="Sólo personas físicas"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium leading-none">Apellido materno</label>
-                    <Input
-                      value={newApellidoMaterno}
-                      onChange={(e) => setNewApellidoMaterno(e.target.value)}
-                      placeholder="Sólo personas físicas"
-                    />
+                  <label className="text-sm font-medium leading-none">Tipo de persona</label>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant={newTipoPersona === 'fisica' ? 'default' : 'outline'}
+                      onClick={() => setNewTipoPersona('fisica')}
+                    >
+                      Física
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={newTipoPersona === 'moral' ? 'default' : 'outline'}
+                      onClick={() => setNewTipoPersona('moral')}
+                    >
+                      Moral
+                    </Button>
                   </div>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium leading-none">Contacto</label>
-                    <Input
-                      value={newContacto}
-                      onChange={(e) => setNewContacto(e.target.value)}
-                      placeholder="Ej. Juan Pérez"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium leading-none">Teléfono</label>
-                    <Input
-                      value={newTelefono}
-                      onChange={(e) => setNewTelefono(e.target.value)}
-                      placeholder="Ej. 878 123 4567"
-                    />
-                  </div>
-                </div>
+                {/* Identidad: depende de tipo_persona */}
+                {newTipoPersona === 'moral' ? (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium leading-none">
+                        Razón social <span className="text-destructive">*</span>
+                      </label>
+                      <Input
+                        value={newRazonSocial}
+                        onChange={(e) => {
+                          setNewRazonSocial(e.target.value);
+                          setNewNombre(e.target.value); // morales: nombre = razón social
+                        }}
+                        placeholder="EJEMPLO SA DE CV"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium leading-none">Nombre comercial</label>
+                      <Input
+                        value={newNombreComercial}
+                        onChange={(e) => setNewNombreComercial(e.target.value)}
+                        placeholder="Opcional"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium leading-none">
+                        Nombre <span className="text-destructive">*</span>
+                      </label>
+                      <Input
+                        value={newNombre}
+                        onChange={(e) => setNewNombre(e.target.value)}
+                        placeholder="Nombre de pila"
+                      />
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium leading-none">Apellido paterno</label>
+                        <Input
+                          value={newApellidoPaterno}
+                          onChange={(e) => setNewApellidoPaterno(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium leading-none">Apellido materno</label>
+                        <Input
+                          value={newApellidoMaterno}
+                          onChange={(e) => setNewApellidoMaterno(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
 
+                {/* Identificadores fiscales */}
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium leading-none">Email</label>
-                    <Input
-                      value={newEmail}
-                      onChange={(e) => setNewEmail(e.target.value)}
-                      placeholder="Ej. ventas@empresa.com"
-                    />
-                  </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium leading-none">RFC</label>
                     <Input
                       value={newRFC}
                       onChange={(e) => setNewRFC(e.target.value)}
-                      placeholder="Ej. XAXX010101000"
-                      className="uppercase"
+                      placeholder={newTipoPersona === 'moral' ? '12 caracteres' : '13 caracteres'}
+                      className="uppercase font-mono"
                     />
+                  </div>
+                  {newTipoPersona === 'fisica' && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium leading-none">CURP</label>
+                      <Input
+                        value={newCurp}
+                        onChange={(e) => setNewCurp(e.target.value)}
+                        className="uppercase font-mono"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Régimen fiscal — solo si hubo CSF */}
+                {csfExtraccion && (
+                  <>
+                    <Separator />
+                    <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Régimen fiscal
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-[100px_1fr]">
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium leading-none">Código</label>
+                        <Input
+                          value={newRegimenCodigo}
+                          onChange={(e) => setNewRegimenCodigo(e.target.value)}
+                          placeholder="601"
+                          className="font-mono"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium leading-none">Descripción</label>
+                        <Input
+                          value={newRegimenNombre}
+                          onChange={(e) => setNewRegimenNombre(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Domicilio fiscal
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-[1fr_120px_120px]">
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium leading-none">Calle</label>
+                        <Input
+                          value={newDomCalle}
+                          onChange={(e) => setNewDomCalle(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium leading-none">Núm. ext.</label>
+                        <Input
+                          value={newDomNumExt}
+                          onChange={(e) => setNewDomNumExt(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium leading-none">Núm. int.</label>
+                        <Input
+                          value={newDomNumInt}
+                          onChange={(e) => setNewDomNumInt(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-[1fr_100px]">
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium leading-none">Colonia</label>
+                        <Input
+                          value={newDomColonia}
+                          onChange={(e) => setNewDomColonia(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium leading-none">CP</label>
+                        <Input
+                          value={newDomCp}
+                          onChange={(e) => setNewDomCp(e.target.value)}
+                          className="font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium leading-none">Municipio</label>
+                        <Input
+                          value={newDomMunicipio}
+                          onChange={(e) => setNewDomMunicipio(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium leading-none">Estado</label>
+                        <Input
+                          value={newDomEstado}
+                          onChange={(e) => setNewDomEstado(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Contacto (común a ambos flujos) */}
+                <Separator />
+                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Contacto
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">Teléfono</label>
+                    <Input value={newTelefono} onChange={(e) => setNewTelefono(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">Email</label>
+                    <Input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium leading-none">Dirección</label>
-                  <Input
-                    value={newDireccion}
-                    onChange={(e) => setNewDireccion(e.target.value)}
-                    placeholder="Calle, Número, Colonia, Ciudad..."
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium leading-none">
-                    Notas / Detalles adicionales
-                  </label>
-                  <Input
-                    value={newNotas}
-                    onChange={(e) => setNewNotas(e.target.value)}
-                    placeholder="Ej. Días de entrega, condiciones de crédito..."
-                  />
-                </div>
+                {/* Solo flujo manual: contacto + dirección legacy + notas */}
+                {!csfExtraccion && (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium leading-none">Contacto</label>
+                      <Input
+                        value={newContacto}
+                        onChange={(e) => setNewContacto(e.target.value)}
+                        placeholder="Ej. Juan Pérez"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium leading-none">Dirección</label>
+                      <Input
+                        value={newDireccion}
+                        onChange={(e) => setNewDireccion(e.target.value)}
+                        placeholder="Calle, número, colonia, ciudad…"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium leading-none">
+                        Notas / Detalles adicionales
+                      </label>
+                      <Input
+                        value={newNotas}
+                        onChange={(e) => setNewNotas(e.target.value)}
+                        placeholder="Ej. Días de entrega, condiciones de crédito…"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="flex justify-end pt-6 border-t">
@@ -696,6 +1082,64 @@ export default function ProveedoresPage() {
                   Crear Proveedor
                 </Button>
               </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Modal: RFC duplicado */}
+        <Sheet open={duplicadoOpen} onOpenChange={setDuplicadoOpen}>
+          <SheetContent className="sm:max-w-[480px]">
+            <SheetHeader>
+              <SheetTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-amber-500" />
+                RFC ya registrado
+              </SheetTitle>
+            </SheetHeader>
+            <div className="mt-8 space-y-6">
+              <p className="text-sm">
+                El RFC{' '}
+                <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                  {duplicadoInfo?.rfc}
+                </code>{' '}
+                ya está registrado como proveedor activo en RDB. Para evitar duplicados, elige una
+                acción:
+              </p>
+              <div className="space-y-2">
+                <Button
+                  className="w-full justify-start gap-2"
+                  variant="outline"
+                  onClick={() => {
+                    setDuplicadoOpen(false);
+                    setCreateDrawerOpen(false);
+                    if (duplicadoInfo) {
+                      const target = proveedores.find(
+                        (p) => p.persona_id === duplicadoInfo.persona_id
+                      );
+                      if (target) {
+                        setSelected(target);
+                        setDrawerOpen(true);
+                      } else {
+                        void fetchProveedores();
+                      }
+                    }
+                  }}
+                  disabled={!duplicadoInfo?.proveedor_id}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Ir al proveedor existente
+                </Button>
+                <Button
+                  className="w-full justify-start gap-2"
+                  variant="ghost"
+                  onClick={() => setDuplicadoOpen(false)}
+                >
+                  Volver al formulario y editar RFC
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Si necesitas actualizar la CSF del proveedor existente, usa el botón &ldquo;Cargar /
+                Actualizar CSF&rdquo; en su detalle (Sprint 3 — próximamente).
+              </p>
             </div>
           </SheetContent>
         </Sheet>
