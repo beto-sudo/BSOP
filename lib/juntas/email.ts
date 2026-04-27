@@ -11,9 +11,52 @@ import { fetchJuntaUpdates } from '@/lib/juntas/fetch-updates';
 // La firma es server-side con service role, sin costo por TTLs largos.
 export const EMAIL_IMAGE_TTL_SECONDS = 365 * 24 * 60 * 60;
 
-export const CONSEJO_EMAIL = 'consejo@dilesa.mx';
+// Asset base para resolver rutas relativas (/logos/foo.jpg) en correos enviados.
+const ASSET_BASE_URL = 'https://bsop.io';
 
-const HEADER_IMAGE_URL = 'https://bsop.io/logos/dilesa-header.jpg';
+// Header de fallback cuando la empresa no tiene `header_url` configurado en
+// `core.empresas`. Mantener apuntando a DILESA hasta que cada empresa cargue
+// su propio asset.
+const FALLBACK_HEADER_URL = `${ASSET_BASE_URL}/logos/dilesa-header.jpg`;
+
+// Mientras cada empresa configura su propio buzón de consejo, todas usan el de
+// DILESA. Agregar entradas aquí cuando una empresa estrene el suyo.
+const CONSEJO_EMAIL_DEFAULT = 'consejo@dilesa.mx';
+const CONSEJO_EMAIL_BY_EMPRESA: Record<string, string> = {
+  'f5942ed4-7a6b-4c39-af18-67b9fbf7f479': 'consejo@dilesa.mx', // DILESA
+};
+
+// Override del display name del "From"; preserva la identidad histórica
+// (razón social) que ya estaba en uso para DILESA. Si una empresa no tiene
+// override aquí, se cae a `nombre_comercial || nombre`.
+const FROM_DISPLAY_OVERRIDE: Record<string, string> = {
+  'f5942ed4-7a6b-4c39-af18-67b9fbf7f479': 'Desarrollo Inmobiliario los Encinos', // DILESA
+};
+
+// Compat: callers externos importaban `CONSEJO_EMAIL`. Hoy nadie lo usa pero
+// se exporta para no romper integraciones futuras que lo busquen.
+export const CONSEJO_EMAIL = CONSEJO_EMAIL_DEFAULT;
+
+function resolveAssetUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${ASSET_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
+function consejoEmailFor(empresaId: string | null | undefined): string {
+  if (!empresaId) return CONSEJO_EMAIL_DEFAULT;
+  return CONSEJO_EMAIL_BY_EMPRESA[empresaId] ?? CONSEJO_EMAIL_DEFAULT;
+}
+
+function fromAddressFor(empresa: {
+  id: string;
+  nombre: string;
+  nombre_comercial: string | null;
+}): string {
+  const display =
+    FROM_DISPLAY_OVERRIDE[empresa.id] || empresa.nombre_comercial?.trim() || empresa.nombre;
+  return `${display} <noreply@bsop.io>`;
+}
 
 function formatDateCST(iso: string): string {
   return new Date(iso).toLocaleString('es-MX', {
@@ -55,6 +98,8 @@ export function generateMinutaHtml(opts: {
   tareasCreadas: { titulo: string; responsable: string; fecha_compromiso: string | null }[];
   tareasCompletadas: { titulo: string; responsable: string }[];
   actualizaciones?: { tarea: string; contenido: string; tipo: string; autor: string }[];
+  empresaNombre: string;
+  headerImageUrl: string;
 }): string {
   const {
     titulo,
@@ -65,6 +110,8 @@ export function generateMinutaHtml(opts: {
     tareasCreadas,
     tareasCompletadas,
     actualizaciones,
+    empresaNombre,
+    headerImageUrl,
   } = opts;
 
   const asistentesStr =
@@ -106,7 +153,7 @@ export function generateMinutaHtml(opts: {
 
     <!-- Header Image -->
     <div style="background:#1a1a2e;">
-      <img src="${HEADER_IMAGE_URL}" alt="DILESA" style="display:block;width:100%;height:auto;" />
+      <img src="${headerImageUrl}" alt="${empresaNombre}" style="display:block;width:100%;height:auto;" />
     </div>
 
     <!-- Title Bar -->
@@ -229,6 +276,7 @@ export async function buildMinutaEmailPayload(
       ok: true;
       html: string;
       subject: string;
+      from: string;
       recipients: string[];
       asistentesCount: number;
     }
@@ -246,6 +294,35 @@ export async function buildMinutaEmailPayload(
   if (jErr || !junta) {
     return { ok: false, status: 404, error: jErr?.message ?? 'Junta not found' };
   }
+
+  // Branding por empresa: logo del header + display name del "From".
+  const empresaId = (junta as any).empresa_id as string | null;
+  const { data: empresaRow } = empresaId
+    ? await supabase
+        .schema('core')
+        .from('empresas')
+        .select('id, nombre, nombre_comercial, header_url, logo_url')
+        .eq('id', empresaId)
+        .single()
+    : { data: null };
+
+  const empresa = (empresaRow ?? {
+    id: empresaId ?? '',
+    nombre: 'BSOP',
+    nombre_comercial: null,
+    header_url: null,
+    logo_url: null,
+  }) as {
+    id: string;
+    nombre: string;
+    nombre_comercial: string | null;
+    header_url: string | null;
+    logo_url: string | null;
+  };
+
+  const headerImageUrl =
+    resolveAssetUrl(empresa.header_url) ?? resolveAssetUrl(empresa.logo_url) ?? FALLBACK_HEADER_URL;
+  const fromAddress = fromAddressFor(empresa);
 
   const { data: asistencia } = await supabase
     .schema('erp')
@@ -265,7 +342,7 @@ export async function buildMinutaEmailPayload(
     .map((a) => (a.email as string).toLowerCase());
   const enviarAConsejo = (junta as any).enviar_a_consejo ?? true;
   const recipients = enviarAConsejo
-    ? Array.from(new Set([...attendeeEmails, CONSEJO_EMAIL]))
+    ? Array.from(new Set([...attendeeEmails, consejoEmailFor(empresaId)]))
     : attendeeEmails;
 
   const { data: tasksData } = await supabase
@@ -369,12 +446,15 @@ export async function buildMinutaEmailPayload(
     tareasCreadas,
     tareasCompletadas,
     actualizaciones,
+    empresaNombre: empresa.nombre_comercial?.trim() || empresa.nombre,
+    headerImageUrl,
   });
 
   return {
     ok: true,
     html,
     subject: junta.titulo as string,
+    from: fromAddress,
     recipients,
     asistentesCount: asistentes.length,
   };
@@ -382,7 +462,7 @@ export async function buildMinutaEmailPayload(
 
 export async function sendMinutaEmail(
   resendKey: string,
-  payload: { html: string; subject: string; recipients: string[] }
+  payload: { html: string; subject: string; from: string; recipients: string[] }
 ): Promise<{ ok: true; emailId: string } | { ok: false; emailError: unknown }> {
   const emailRes = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -391,7 +471,7 @@ export async function sendMinutaEmail(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'Desarrollo Inmobiliario los Encinos <noreply@bsop.io>',
+      from: payload.from,
       to: payload.recipients,
       subject: payload.subject,
       html: payload.html,
