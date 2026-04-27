@@ -4,16 +4,7 @@ import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { SortableHead } from '@/components/ui/sortable-head';
-import { useSortableTable } from '@/hooks/use-sortable-table';
+import { DataTable, type Column } from '@/components/module-page';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
@@ -55,6 +46,44 @@ type Proveedor = {
   created_at: string | null;
   updated_at: string | null;
 };
+
+const proveedorColumns: Column<Proveedor>[] = [
+  {
+    key: 'nombre',
+    label: 'Nombre',
+    render: (p) => (
+      <div className="flex items-center gap-2">
+        <Truck className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <span className="font-medium">{p.nombre}</span>
+      </div>
+    ),
+  },
+  {
+    key: 'contacto',
+    label: 'Contacto',
+    cellClassName: 'text-sm text-muted-foreground',
+    render: (p) => p.contacto ?? '—',
+  },
+  {
+    key: 'telefono',
+    label: 'Teléfono',
+    cellClassName: 'font-mono text-sm text-muted-foreground',
+    render: (p) => p.telefono ?? '—',
+  },
+  {
+    key: 'rfc',
+    label: 'RFC',
+    cellClassName: 'font-mono text-xs text-muted-foreground',
+    render: (p) => p.rfc ?? '—',
+  },
+  {
+    key: 'activo',
+    label: 'Estado',
+    render: (p) => (
+      <Badge variant={p.activo ? 'default' : 'secondary'}>{p.activo ? 'Activo' : 'Inactivo'}</Badge>
+    ),
+  },
+];
 
 // ─── Provider Detail Drawer ───────────────────────────────────────────────────
 
@@ -407,7 +436,6 @@ export default function ProveedoresPage() {
     }
   };
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable<Proveedor>('nombre', 'asc');
   return (
     <RequireAccess empresa="rdb" modulo="rdb.proveedores">
       <div className="space-y-6">
@@ -469,100 +497,19 @@ export default function ProveedoresPage() {
         )}
 
         {/* Table */}
-        <div className="rounded-xl border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <SortableHead
-                  sortKey="nombre"
-                  label="Nombre"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="contacto"
-                  label="Contacto"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="telefono"
-                  label="Teléfono"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="rfc"
-                  label="RFC"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="activo"
-                  label="Estado"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                Array.from({ length: 6 }).map((_, i) => (
-                  <TableRow key={i}>
-                    {Array.from({ length: 5 }).map((__, j) => (
-                      <TableCell key={j}>
-                        <Skeleton className="h-4 w-full" />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              ) : filtered.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="py-12 text-center text-muted-foreground">
-                    No se encontraron proveedores.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                sortData(filtered).map((p) => (
-                  <TableRow
-                    key={p.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => {
-                      setSelected(p);
-                      setDrawerOpen(true);
-                    }}
-                  >
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Truck className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        <span className="font-medium">{p.nombre}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {p.contacto ?? '—'}
-                    </TableCell>
-                    <TableCell className="font-mono text-sm text-muted-foreground">
-                      {p.telefono ?? '—'}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {p.rfc ?? '—'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={p.activo ? 'default' : 'secondary'}>
-                        {p.activo ? 'Activo' : 'Inactivo'}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable<Proveedor>
+          data={filtered}
+          columns={proveedorColumns}
+          rowKey="id"
+          loading={loading}
+          onRowClick={(p) => {
+            setSelected(p);
+            setDrawerOpen(true);
+          }}
+          initialSort={{ key: 'nombre', dir: 'asc' }}
+          emptyTitle="No se encontraron proveedores"
+          showDensityToggle={false}
+        />
 
         {/* Detail drawer */}
         <ProveedorDetail
