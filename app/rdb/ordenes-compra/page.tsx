@@ -16,8 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { SortableHead } from '@/components/ui/sortable-head';
-import { useSortableTable } from '@/hooks/use-sortable-table';
+import { DataTable, type Column } from '@/components/module-page';
 import {
   Sheet,
   SheetContent,
@@ -72,6 +71,77 @@ type OrdenCompra = {
 
 const TZ = 'America/Matamoros';
 const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
+
+const ordenColumns: Column<OrdenCompra>[] = [
+  {
+    key: 'folio',
+    label: 'OC / Folio',
+    cellClassName: 'font-mono text-xs font-medium',
+    render: (o) => o.folio ?? '—',
+  },
+  {
+    key: 'requisicion_folio',
+    label: 'Requisición',
+    accessor: (o) => getRequisicionFolio(o.requisicion) ?? '',
+    render: (o) => {
+      const f = getRequisicionFolio(o.requisicion);
+      return f ? (
+        <span className="font-mono text-xs text-muted-foreground">{f}</span>
+      ) : (
+        <span className="text-xs text-muted-foreground/40">—</span>
+      );
+    },
+  },
+  {
+    key: 'proveedor_nombre',
+    label: 'Proveedor',
+    accessor: (o) => getProveedorNombre(o.proveedor) ?? '',
+    render: (o) => {
+      const nombre = getProveedorNombre(o.proveedor);
+      return nombre ? (
+        <div className="flex items-center gap-2 text-sm">
+          <Truck className="h-3.5 w-3.5 text-muted-foreground" />
+          {nombre}
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5 text-sm text-amber-600">
+          <AlertTriangle className="h-3.5 w-3.5" />
+          Sin proveedor
+        </div>
+      );
+    },
+  },
+  {
+    key: 'estatus',
+    label: 'Estatus',
+    render: (o) => (
+      <Badge variant={getBadgeVariant(o.estatus, o.proveedor_id)}>
+        {getEstatusLabel(o.estatus, o.proveedor_id)}
+      </Badge>
+    ),
+  },
+  {
+    key: 'fecha_emision',
+    label: 'Fecha',
+    cellClassName: 'text-sm text-muted-foreground',
+    render: (o) => formatDate(o.fecha_emision),
+  },
+  {
+    key: 'total',
+    label: 'Total',
+    type: 'currency',
+    accessor: (o) => o.total_real ?? o.total_estimado ?? 0,
+    render: (o) => {
+      const total = o.total_real ?? o.total_estimado;
+      return total != null && total > 0 ? (
+        formatCurrency(total)
+      ) : (
+        <span className="text-xs text-muted-foreground/50">Sin precios</span>
+      );
+    },
+    cellClassName: 'font-medium',
+  },
+];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -964,7 +1034,6 @@ export default function OrdenesCompraPage() {
     });
   }, [ordenes, search]);
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable('fecha_emision', 'desc');
   return (
     <RequireAccess empresa="rdb" modulo="rdb.ordenes_compra">
       <div className="space-y-6">
@@ -1050,137 +1119,16 @@ export default function OrdenesCompraPage() {
           </div>
         ) : null}
 
-        <div className="rounded-xl border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <SortableHead
-                  sortKey="folio"
-                  label="OC / Folio"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="requisicion_folio"
-                  label="Requisición"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="proveedor_nombre"
-                  label="Proveedor"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="estatus"
-                  label="Estatus"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="fecha_emision"
-                  label="Fecha"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="total"
-                  label="Total"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="text-right"
-                />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                Array.from({ length: 6 }).map((_, i) => (
-                  <TableRow key={i}>
-                    {Array.from({ length: 6 }).map((__, j) => (
-                      <TableCell key={j}>
-                        <Skeleton className="h-4 w-full" />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              ) : filtered.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">
-                    No se encontraron órdenes de compra.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                sortData(
-                  filtered.map((o) => ({
-                    ...o,
-                    proveedor_nombre: getProveedorNombre(o.proveedor) ?? null,
-                    requisicion_folio: getRequisicionFolio(o.requisicion) ?? null,
-                    total: o.total_real ?? o.total_estimado ?? null,
-                  }))
-                ).map((orden) => {
-                  const reqFolio = getRequisicionFolio(orden.requisicion);
-                  const nombre = getProveedorNombre(orden.proveedor);
-                  const total = orden.total_real ?? orden.total_estimado;
-                  return (
-                    <TableRow
-                      key={orden.id}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => void openDetail(orden)}
-                    >
-                      <TableCell className="font-mono text-xs font-medium">
-                        {orden.folio ?? '—'}
-                      </TableCell>
-                      <TableCell>
-                        {reqFolio ? (
-                          <span className="font-mono text-xs text-muted-foreground">
-                            {reqFolio}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground/40">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {nombre ? (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Truck className="h-3.5 w-3.5 text-muted-foreground" />
-                            {nombre}
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1.5 text-sm text-amber-600">
-                            <AlertTriangle className="h-3.5 w-3.5" />
-                            Sin proveedor
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getBadgeVariant(orden.estatus, orden.proveedor_id)}>
-                          {getEstatusLabel(orden.estatus, orden.proveedor_id)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {formatDate(orden.fecha_emision)}
-                      </TableCell>
-                      <TableCell className="text-right font-medium tabular-nums">
-                        {total != null && total > 0 ? (
-                          formatCurrency(total)
-                        ) : (
-                          <span className="text-xs text-muted-foreground/50">Sin precios</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable<(typeof filtered)[number]>
+          data={filtered}
+          columns={ordenColumns}
+          rowKey="id"
+          loading={loading}
+          onRowClick={(o) => void openDetail(o)}
+          initialSort={{ key: 'fecha_emision', dir: 'desc' }}
+          emptyTitle="No se encontraron órdenes de compra"
+          showDensityToggle={false}
+        />
 
         <OrdenDetail
           orden={selected}

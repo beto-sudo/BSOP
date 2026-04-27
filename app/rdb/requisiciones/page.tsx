@@ -18,8 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { SortableHead } from '@/components/ui/sortable-head';
-import { useSortableTable } from '@/hooks/use-sortable-table';
+import { DataTable, type Column } from '@/components/module-page';
 import {
   Sheet,
   SheetContent,
@@ -84,6 +83,47 @@ type Requisicion = {
   items?: RequisicionItem[];
   oc_folio?: string | null;
 };
+
+const requisicionColumns: Column<Requisicion>[] = [
+  {
+    key: 'folio',
+    label: 'Folio',
+    cellClassName: 'font-mono text-xs font-medium',
+    render: (r) => r.folio || '—',
+  },
+  {
+    key: 'fecha_solicitud',
+    label: 'Fecha Solicitud',
+    cellClassName: 'text-sm text-muted-foreground',
+    render: (r) => formatDate(r.fecha_solicitud),
+  },
+  {
+    key: 'solicitado_por_nombre',
+    label: 'Solicitante',
+    cellClassName: 'text-sm',
+    accessor: (r) => r.solicitado_por_nombre ?? r.solicitado_por ?? '',
+    render: (r) => requesterName(r.solicitado_por_nombre ?? r.solicitado_por),
+  },
+  {
+    key: 'estatus',
+    label: 'Estatus',
+    render: (r) => <StatusBadge status={normalizeStatus(r.estatus)} />,
+  },
+  {
+    key: 'item_count',
+    label: 'Ítems',
+    cellClassName: 'max-w-64 text-sm text-muted-foreground',
+    accessor: (r) => r.items?.length ?? r.item_count ?? 0,
+    render: (r) => {
+      const items = r.items ?? [];
+      return items.length > 0
+        ? summarizeItems(items)
+        : (r.item_count ?? 0) > 0
+          ? safeCountLabel(r.item_count ?? 0)
+          : 'Sin artículos';
+    },
+  },
+];
 
 type DraftItem = {
   id: string;
@@ -1193,10 +1233,6 @@ export default function RequisicionesPage() {
     </TableRow>
   );
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable<Requisicion>(
-    'fecha_solicitud',
-    'desc'
-  );
   return (
     <RequireAccess empresa="rdb" modulo="rdb.requisiciones">
       <div className="space-y-6">
@@ -1304,94 +1340,16 @@ export default function RequisicionesPage() {
           </div>
         ) : null}
 
-        <div className="rounded-xl border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <SortableHead
-                  sortKey="folio"
-                  label="Folio"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="fecha_solicitud"
-                  label="Fecha Solicitud"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="solicitado_por_nombre"
-                  label="Solicitante"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="estatus"
-                  label="Estatus"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="item_count"
-                  label="Ítems"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading
-                ? Array.from({ length: 6 }).map((_, rowIndex) => (
-                    <TableRow key={rowIndex}>
-                      {Array.from({ length: 5 }).map((__, cellIndex) => (
-                        <TableCell key={cellIndex}>
-                          <Skeleton className="h-4 w-full" />
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                : filtered.length === 0
-                  ? emptyState
-                  : sortData(filtered).map((req) => {
-                      const normalizedStatus = normalizeStatus(req.estatus);
-                      const items = req.items ?? [];
-                      return (
-                        <TableRow
-                          key={req.id}
-                          className="cursor-pointer hover:bg-muted/50"
-                          onClick={() => void openDetail(req)}
-                        >
-                          <TableCell className="font-mono text-xs font-medium">
-                            {req.folio || '—'}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {formatDate(req.fecha_solicitud)}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {requesterName(req.solicitado_por_nombre ?? req.solicitado_por)}
-                          </TableCell>
-                          <TableCell>
-                            <StatusBadge status={normalizedStatus} />
-                          </TableCell>
-                          <TableCell className="max-w-64 text-sm text-muted-foreground">
-                            {items.length > 0
-                              ? summarizeItems(items)
-                              : (req.item_count ?? 0) > 0
-                                ? safeCountLabel(req.item_count ?? 0)
-                                : 'Sin artículos'}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable<Requisicion>
+          data={filtered}
+          columns={requisicionColumns}
+          rowKey="id"
+          loading={loading}
+          onRowClick={(req) => void openDetail(req)}
+          initialSort={{ key: 'fecha_solicitud', dir: 'desc' }}
+          emptyTitle="Sin requisiciones para los filtros seleccionados"
+          showDensityToggle={false}
+        />
 
         <ExistingRequestSheet
           requisicion={selected}
