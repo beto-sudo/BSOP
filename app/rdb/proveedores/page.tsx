@@ -32,6 +32,95 @@ import type { CsfExtraccion } from '@/lib/proveedores/extract-csf';
 
 const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
 
+// ─── CSF diff helpers (Sprint 3.B) ───────────────────────────────────────────
+
+const CSF_DIFF_FIELDS = [
+  'tipo_persona',
+  'rfc',
+  'curp',
+  'nombre',
+  'apellido_paterno',
+  'apellido_materno',
+  'razon_social',
+  'nombre_comercial',
+  'regimen_fiscal_codigo',
+  'regimen_fiscal_nombre',
+  'regimenes_adicionales',
+  'domicilio_calle',
+  'domicilio_num_ext',
+  'domicilio_num_int',
+  'domicilio_colonia',
+  'domicilio_cp',
+  'domicilio_municipio',
+  'domicilio_estado',
+  'obligaciones',
+  'fecha_inicio_operaciones',
+  'fecha_emision',
+] as const;
+
+const FIELD_LABELS: Record<(typeof CSF_DIFF_FIELDS)[number], string> = {
+  tipo_persona: 'Tipo de persona',
+  rfc: 'RFC',
+  curp: 'CURP',
+  nombre: 'Nombre',
+  apellido_paterno: 'Apellido paterno',
+  apellido_materno: 'Apellido materno',
+  razon_social: 'Razón social',
+  nombre_comercial: 'Nombre comercial',
+  regimen_fiscal_codigo: 'Régimen — código',
+  regimen_fiscal_nombre: 'Régimen — descripción',
+  regimenes_adicionales: 'Regímenes adicionales',
+  domicilio_calle: 'Domicilio — calle',
+  domicilio_num_ext: 'Domicilio — núm. ext.',
+  domicilio_num_int: 'Domicilio — núm. int.',
+  domicilio_colonia: 'Domicilio — colonia',
+  domicilio_cp: 'Domicilio — CP',
+  domicilio_municipio: 'Domicilio — municipio',
+  domicilio_estado: 'Domicilio — estado',
+  obligaciones: 'Obligaciones',
+  fecha_inicio_operaciones: 'Fecha inicio operaciones',
+  fecha_emision: 'Fecha emisión CSF',
+};
+
+function valuesEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a == null && b == null) return true;
+  if (a == null || b == null) {
+    // Trata "" y null como equivalentes (común en datos de SAT).
+    if (a === '' && b == null) return true;
+    if (b === '' && a == null) return true;
+    return false;
+  }
+  if (typeof a === 'string' && typeof b === 'string') {
+    return a.trim() === b.trim();
+  }
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return JSON.stringify(a) === JSON.stringify(b);
+  }
+  if (typeof a === 'object' && typeof b === 'object') {
+    return JSON.stringify(a) === JSON.stringify(b);
+  }
+  return false;
+}
+
+function formatDiffValue(v: unknown): string {
+  if (v == null || v === '') return '—';
+  if (Array.isArray(v)) {
+    if (v.length === 0) return '— (vacío)';
+    return v
+      .map((item: unknown) => {
+        if (item && typeof item === 'object') {
+          const obj = item as Record<string, unknown>;
+          if ('codigo' in obj && 'nombre' in obj) return `${obj.codigo} · ${obj.nombre}`;
+          if ('descripcion' in obj) return String(obj.descripcion);
+        }
+        return String(item);
+      })
+      .join('\n');
+  }
+  return String(v);
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Proveedor = {
@@ -98,6 +187,7 @@ function ProveedorDetail({
   onClose,
   onEdit,
   onToggleActivo,
+  onUpdateCsf,
   saving,
 }: {
   proveedor: Proveedor | null;
@@ -105,6 +195,7 @@ function ProveedorDetail({
   onClose: () => void;
   onEdit: (p: Proveedor) => void;
   onToggleActivo: (p: Proveedor) => void;
+  onUpdateCsf: (p: Proveedor) => void;
   saving: boolean;
 }) {
   if (!proveedor) return null;
@@ -134,6 +225,10 @@ function ProveedorDetail({
         <SheetHeader>
           <SheetTitle>{proveedor.nombre}</SheetTitle>
           <div className="absolute right-12 top-4 hidden sm:flex gap-2 print:hidden">
+            <Button variant="outline" size="sm" onClick={() => onUpdateCsf(proveedor)}>
+              <Sparkles className="mr-2 h-4 w-4" />
+              Cargar / Actualizar CSF
+            </Button>
             <Button variant="outline" size="sm" onClick={() => onEdit(proveedor)}>
               <Pencil className="mr-2 h-4 w-4" />
               Editar
@@ -264,6 +359,17 @@ export default function ProveedoresPage() {
     rfc: string;
   } | null>(null);
 
+  // ─── Update CSF flow state (Sprint 3.B) ─────────────────────────────────────
+  const [updateCsfTarget, setUpdateCsfTarget] = useState<Proveedor | null>(null);
+  const [updateCsfFile, setUpdateCsfFile] = useState<File | null>(null);
+  const [updateCsfProcessing, setUpdateCsfProcessing] = useState(false);
+  const [updateCsfError, setUpdateCsfError] = useState<string | null>(null);
+  const [updateCsfExtraccion, setUpdateCsfExtraccion] = useState<CsfExtraccion | null>(null);
+  const [currentDatos, setCurrentDatos] = useState<Partial<CsfExtraccion> | null>(null);
+  const [diffOpen, setDiffOpen] = useState(false);
+  const [acceptedFields, setAcceptedFields] = useState<Set<string>>(new Set());
+  const [applyingDiff, setApplyingDiff] = useState(false);
+
   const resetCreateForm = () => {
     setNewNombre('');
     setNewApellidoPaterno('');
@@ -291,6 +397,133 @@ export default function ProveedoresPage() {
     setNewDomCp('');
     setNewDomMunicipio('');
     setNewDomEstado('');
+  };
+
+  // ─── Update CSF handlers (Sprint 3.B) ──────────────────────────────────────
+
+  const fetchCurrentDatos = async (personaId: string): Promise<Partial<CsfExtraccion>> => {
+    const supabase = createSupabaseBrowserClient();
+    const [pRes, dfRes] = await Promise.all([
+      supabase
+        .schema('erp')
+        .from('personas')
+        .select('tipo_persona, rfc, curp, nombre, apellido_paterno, apellido_materno')
+        .eq('id', personaId)
+        .single(),
+      supabase
+        .schema('erp')
+        .from('personas_datos_fiscales')
+        .select(
+          'razon_social, nombre_comercial, regimen_fiscal_codigo, regimen_fiscal_nombre, regimenes_adicionales, domicilio_calle, domicilio_num_ext, domicilio_num_int, domicilio_colonia, domicilio_cp, domicilio_municipio, domicilio_estado, obligaciones, fecha_inicio_operaciones, csf_fecha_emision'
+        )
+        .eq('persona_id', personaId)
+        .maybeSingle(),
+    ]);
+    const p = (pRes.data ?? {}) as Record<string, unknown>;
+    const df = (dfRes.data ?? {}) as Record<string, unknown>;
+    return {
+      tipo_persona: (p.tipo_persona as 'fisica' | 'moral' | undefined) ?? 'fisica',
+      rfc: (p.rfc as string | null) ?? '',
+      curp: (p.curp as string | null) ?? null,
+      nombre: (p.nombre as string | null) ?? null,
+      apellido_paterno: (p.apellido_paterno as string | null) ?? null,
+      apellido_materno: (p.apellido_materno as string | null) ?? null,
+      razon_social: (df.razon_social as string | null) ?? null,
+      nombre_comercial: (df.nombre_comercial as string | null) ?? null,
+      regimen_fiscal_codigo: (df.regimen_fiscal_codigo as string | null) ?? null,
+      regimen_fiscal_nombre: (df.regimen_fiscal_nombre as string | null) ?? null,
+      regimenes_adicionales:
+        (df.regimenes_adicionales as CsfExtraccion['regimenes_adicionales'] | null) ?? [],
+      domicilio_calle: (df.domicilio_calle as string | null) ?? null,
+      domicilio_num_ext: (df.domicilio_num_ext as string | null) ?? null,
+      domicilio_num_int: (df.domicilio_num_int as string | null) ?? null,
+      domicilio_colonia: (df.domicilio_colonia as string | null) ?? null,
+      domicilio_cp: (df.domicilio_cp as string | null) ?? null,
+      domicilio_municipio: (df.domicilio_municipio as string | null) ?? null,
+      domicilio_estado: (df.domicilio_estado as string | null) ?? null,
+      obligaciones: (df.obligaciones as CsfExtraccion['obligaciones'] | null) ?? [],
+      fecha_inicio_operaciones: (df.fecha_inicio_operaciones as string | null) ?? null,
+      fecha_emision: (df.csf_fecha_emision as string | null) ?? null,
+    };
+  };
+
+  const handleStartUpdateCsf = (p: Proveedor) => {
+    setUpdateCsfTarget(p);
+    setUpdateCsfFile(null);
+    setUpdateCsfExtraccion(null);
+    setUpdateCsfError(null);
+    setCurrentDatos(null);
+    setAcceptedFields(new Set());
+    // Trigger file picker via hidden input
+    document.getElementById('update-csf-file-input')?.click();
+  };
+
+  const handleUpdateCsfFileChosen = async (file: File | null) => {
+    if (!file || !updateCsfTarget?.persona_id) return;
+    setUpdateCsfFile(file);
+    setUpdateCsfProcessing(true);
+    setUpdateCsfError(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const [extractRes, current] = await Promise.all([
+        fetch('/api/proveedores/extract-csf', { method: 'POST', body: fd }),
+        fetchCurrentDatos(updateCsfTarget.persona_id),
+      ]);
+      const extractJson = await extractRes.json();
+      if (!extractRes.ok) throw new Error(extractJson.error ?? 'Error al procesar CSF');
+
+      const ex = extractJson.extraccion as CsfExtraccion;
+      setUpdateCsfExtraccion(ex);
+      setCurrentDatos(current);
+
+      // Pre-marca todos los campos que difieren.
+      const initial = new Set<string>();
+      for (const key of CSF_DIFF_FIELDS) {
+        const cur = (current as Record<string, unknown>)[key];
+        const nu = (ex as Record<string, unknown>)[key];
+        if (!valuesEqual(cur, nu)) initial.add(key);
+      }
+      setAcceptedFields(initial);
+      setDiffOpen(true);
+    } catch (err) {
+      setUpdateCsfError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setUpdateCsfProcessing(false);
+    }
+  };
+
+  const handleApplyDiff = async () => {
+    if (!updateCsfFile || !updateCsfExtraccion || !updateCsfTarget?.persona_id) return;
+    setApplyingDiff(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', updateCsfFile);
+      fd.append(
+        'payload',
+        JSON.stringify({
+          empresa_id: RDB_EMPRESA_ID,
+          extraccion: updateCsfExtraccion,
+          accepted_fields: Array.from(acceptedFields),
+        })
+      );
+      const res = await fetch(`/api/proveedores/${updateCsfTarget.persona_id}/update-csf`, {
+        method: 'POST',
+        body: fd,
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Error al aplicar cambios');
+      setDiffOpen(false);
+      setUpdateCsfFile(null);
+      setUpdateCsfExtraccion(null);
+      setCurrentDatos(null);
+      setUpdateCsfTarget(null);
+      void fetchProveedores();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al aplicar cambios');
+    } finally {
+      setApplyingDiff(false);
+    }
   };
 
   const handleProcessCsf = async () => {
@@ -659,6 +892,19 @@ export default function ProveedoresPage() {
           showDensityToggle={false}
         />
 
+        {/* Hidden file input for the "Cargar / Actualizar CSF" flow */}
+        <input
+          id="update-csf-file-input"
+          type="file"
+          accept="application/pdf"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0] ?? null;
+            void handleUpdateCsfFileChosen(f);
+            e.target.value = ''; // permite re-elegir el mismo archivo después
+          }}
+        />
+
         {/* Detail drawer */}
         <ProveedorDetail
           proveedor={selected}
@@ -666,6 +912,7 @@ export default function ProveedoresPage() {
           onClose={() => setDrawerOpen(false)}
           onEdit={openEdit}
           onToggleActivo={handleToggleActivo}
+          onUpdateCsf={handleStartUpdateCsf}
           saving={savingEdit}
         />
 
@@ -1080,6 +1327,189 @@ export default function ProveedoresPage() {
                     <Save className="h-4 w-4" />
                   )}
                   Crear Proveedor
+                </Button>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Update CSF — overlay de procesamiento (mientras Claude lee el PDF) */}
+        {updateCsfProcessing && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="rounded-lg bg-background p-6 shadow-lg">
+              <div className="flex items-center gap-3">
+                <RefreshCw className="h-5 w-5 animate-spin text-emerald-600" />
+                <div>
+                  <div className="text-sm font-medium">Procesando CSF…</div>
+                  <div className="text-xs text-muted-foreground">
+                    Claude está leyendo el PDF (30-90 segundos).
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Update CSF — banner de error */}
+        {updateCsfError && !diffOpen && (
+          <div className="fixed bottom-4 right-4 z-50 max-w-md rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive shadow-lg">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <strong>Error al procesar CSF:</strong> {updateCsfError}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-mr-2 -mt-1 h-6 px-2"
+                onClick={() => setUpdateCsfError(null)}
+              >
+                ✕
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: diff campo-por-campo (Sprint 3.B) */}
+        <Sheet
+          open={diffOpen}
+          onOpenChange={(v) => {
+            if (!v) {
+              setDiffOpen(false);
+              // No limpiamos el target ni file aquí — usuario puede cancelar y
+              // re-abrir si decide aplicar después. Limpieza completa pasa al
+              // aplicar exitosamente o al iniciar un nuevo update.
+            }
+          }}
+        >
+          <SheetContent className="sm:max-w-[800px] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-emerald-600" />
+                Revisar cambios de la CSF
+              </SheetTitle>
+              <p className="text-xs text-muted-foreground">
+                {updateCsfTarget?.nombre} — marca los campos que quieras aplicar. La CSF nueva queda
+                archivada como histórico aunque rechaces todos los cambios.
+              </p>
+            </SheetHeader>
+
+            <div className="mt-6 space-y-4">
+              {/* Toolbar de selección */}
+              <div className="flex flex-wrap items-center gap-2 border-b pb-3">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (!updateCsfExtraccion || !currentDatos) return;
+                    const all = new Set<string>();
+                    for (const k of CSF_DIFF_FIELDS) {
+                      const cur = (currentDatos as Record<string, unknown>)[k];
+                      const nu = (updateCsfExtraccion as Record<string, unknown>)[k];
+                      if (!valuesEqual(cur, nu)) all.add(k);
+                    }
+                    setAcceptedFields(all);
+                  }}
+                >
+                  Seleccionar todos los cambios
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setAcceptedFields(new Set())}>
+                  Limpiar selección
+                </Button>
+                <span className="ml-auto text-xs text-muted-foreground">
+                  {acceptedFields.size} de {CSF_DIFF_FIELDS.length} campos seleccionados
+                </span>
+              </div>
+
+              {/* Lista de cambios */}
+              {updateCsfExtraccion && currentDatos && (
+                <div className="space-y-2">
+                  {(() => {
+                    const changes = CSF_DIFF_FIELDS.filter((k) => {
+                      const cur = (currentDatos as Record<string, unknown>)[k];
+                      const nu = (updateCsfExtraccion as Record<string, unknown>)[k];
+                      return !valuesEqual(cur, nu);
+                    });
+
+                    if (changes.length === 0) {
+                      return (
+                        <div className="rounded-md border border-emerald-300/40 bg-emerald-50/40 p-4 text-sm text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-300">
+                          ✓ La CSF nueva no trae cambios respecto a los datos actuales. Si la
+                          aplicas (o la cancelas), el PDF queda archivado igual como histórico.
+                        </div>
+                      );
+                    }
+
+                    return changes.map((k) => {
+                      const checked = acceptedFields.has(k);
+                      const cur = (currentDatos as Record<string, unknown>)[k];
+                      const nu = (updateCsfExtraccion as Record<string, unknown>)[k];
+                      return (
+                        <label
+                          key={k}
+                          className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors ${
+                            checked
+                              ? 'border-emerald-400/60 bg-emerald-50/40 dark:bg-emerald-950/20'
+                              : 'border-border'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              const next = new Set(acceptedFields);
+                              if (e.target.checked) next.add(k);
+                              else next.delete(k);
+                              setAcceptedFields(next);
+                            }}
+                            className="mt-0.5 h-4 w-4 shrink-0"
+                          />
+                          <div className="flex-1 space-y-2">
+                            <div className="text-sm font-medium">{FIELD_LABELS[k]}</div>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              <div className="space-y-1">
+                                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                  Actual
+                                </div>
+                                <div className="rounded bg-muted/50 px-2 py-1 text-xs font-mono whitespace-pre-wrap">
+                                  {formatDiffValue(cur)}
+                                </div>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                                  Nuevo
+                                </div>
+                                <div className="rounded bg-emerald-100/50 px-2 py-1 text-xs font-mono whitespace-pre-wrap dark:bg-emerald-950/30">
+                                  {formatDiffValue(nu)}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    });
+                  })()}
+                </div>
+              )}
+
+              {/* Footer de acciones */}
+              <div className="flex justify-end gap-2 border-t pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setDiffOpen(false)}
+                  disabled={applyingDiff}
+                >
+                  Cancelar
+                </Button>
+                <Button onClick={handleApplyDiff} disabled={applyingDiff} className="gap-2">
+                  {applyingDiff ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  {acceptedFields.size === 0
+                    ? 'Solo archivar PDF'
+                    : `Aplicar ${acceptedFields.size} cambio${acceptedFields.size === 1 ? '' : 's'}`}
                 </Button>
               </div>
             </div>
