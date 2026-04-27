@@ -39,8 +39,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { SortableHead } from '@/components/ui/sortable-head';
-import { useSortableTable } from '@/hooks/use-sortable-table';
+import { DataTable } from '@/components/module-page';
 import { FilterCombobox } from '@/components/ui/filter-combobox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -322,8 +321,6 @@ export function EmpleadosModule({
     return true;
   });
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable('nombre', 'asc');
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -425,117 +422,89 @@ export function EmpleadosModule({
             </p>
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="border-[var(--border)] hover:bg-transparent">
-                <SortableHead
-                  sortKey="nombre"
-                  label="Nombre"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                {showNumeroEmpleadoColumn && (
-                  <SortableHead
-                    sortKey="numero_empleado"
-                    label="No. Empleado"
-                    currentSort={sortKey}
-                    currentDir={sortDir}
-                    onSort={onSort}
-                    className="w-28"
-                  />
-                )}
-                <SortableHead
-                  sortKey="departamento_nombre"
-                  label="Departamento"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="w-36"
-                />
-                <SortableHead
-                  sortKey="puesto_nombre"
-                  label="Puesto"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="w-36"
-                />
-                <SortableHead
-                  sortKey="fecha_ingreso"
-                  label="Ingreso"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="w-28"
-                />
-                {showEstadoColumn && <TableHead className="w-16">Estado</TableHead>}
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortData(
-                visible.map((emp) => ({
-                  ...emp,
-                  nombre: fullName(emp) || null,
-                  departamento_nombre: emp.departamento?.nombre ?? null,
-                  puesto_nombre: emp.puesto?.nombre ?? null,
-                }))
-              ).map((emp) => (
-                <TableRow
-                  key={emp.id}
-                  className="cursor-pointer border-[var(--border)] hover:bg-[var(--panel)] transition-colors"
-                  onClick={() => router.push(detailHref(empresaSlug, emp.id))}
-                >
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent)]/15 text-xs font-semibold text-[var(--accent)]">
-                        {(titleCase(emp.persona?.nombre ?? '').charAt(0) || '?').toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="font-medium text-[var(--text)]">{fullName(emp)}</div>
-                        {emp.persona?.email && (
-                          <div className="text-xs text-[var(--text)]/50">{emp.persona.email}</div>
-                        )}
-                      </div>
+          <DataTable<Empleado>
+            data={visible}
+            columns={[
+              {
+                key: 'nombre',
+                label: 'Nombre',
+                accessor: (emp) => fullName(emp),
+                render: (emp) => (
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent)]/15 text-xs font-semibold text-[var(--accent)]">
+                      {(titleCase(emp.persona?.nombre ?? '').charAt(0) || '?').toUpperCase()}
                     </div>
-                  </TableCell>
-                  {showNumeroEmpleadoColumn && (
-                    <TableCell>
-                      <span className="text-sm font-mono text-[var(--text)]/60">
-                        {emp.numero_empleado ?? '—'}
-                      </span>
-                    </TableCell>
-                  )}
-                  <TableCell>
-                    <span className="text-sm text-[var(--text)]/70">
-                      {emp.departamento?.nombre ?? '—'}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-[var(--text)]/70">
-                      {emp.puesto?.nombre ?? '—'}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-[var(--text)]/70">
-                      {formatDate(emp.fecha_ingreso)}
-                    </span>
-                  </TableCell>
-                  {showEstadoColumn && (
-                    <TableCell>
-                      <span
-                        className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${
-                          emp.activo
-                            ? 'border-green-500/20 bg-green-500/10 text-green-400'
-                            : 'border-[var(--border)] bg-[var(--panel)] text-[var(--text-subtle)]'
-                        }`}
-                      >
-                        {emp.activo ? 'Activo' : 'Inactivo'}
-                      </span>
-                    </TableCell>
-                  )}
-                  <TableCell>
+                    <div>
+                      <div className="font-medium text-[var(--text)]">{fullName(emp)}</div>
+                      {emp.persona?.email && (
+                        <div className="text-xs text-[var(--text)]/50">{emp.persona.email}</div>
+                      )}
+                    </div>
+                  </div>
+                ),
+              },
+              ...(showNumeroEmpleadoColumn
+                ? [
+                    {
+                      key: 'numero_empleado',
+                      label: 'No. Empleado',
+                      width: 'w-28',
+                      cellClassName: 'text-sm font-mono text-[var(--text)]/60',
+                      render: (emp: Empleado) => emp.numero_empleado ?? '—',
+                    },
+                  ]
+                : []),
+              {
+                key: 'departamento_nombre',
+                label: 'Departamento',
+                width: 'w-36',
+                cellClassName: 'text-sm text-[var(--text)]/70',
+                accessor: (emp) => emp.departamento?.nombre ?? '',
+                render: (emp) => emp.departamento?.nombre ?? '—',
+              },
+              {
+                key: 'puesto_nombre',
+                label: 'Puesto',
+                width: 'w-36',
+                cellClassName: 'text-sm text-[var(--text)]/70',
+                accessor: (emp) => emp.puesto?.nombre ?? '',
+                render: (emp) => emp.puesto?.nombre ?? '—',
+              },
+              {
+                key: 'fecha_ingreso',
+                label: 'Ingreso',
+                width: 'w-28',
+                cellClassName: 'text-sm text-[var(--text)]/70',
+                render: (emp) => formatDate(emp.fecha_ingreso),
+              },
+              ...(showEstadoColumn
+                ? [
+                    {
+                      key: 'activo',
+                      label: 'Estado',
+                      width: 'w-16',
+                      sortable: false,
+                      render: (emp: Empleado) => (
+                        <span
+                          className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${
+                            emp.activo
+                              ? 'border-green-500/20 bg-green-500/10 text-green-400'
+                              : 'border-[var(--border)] bg-[var(--panel)] text-[var(--text-subtle)]'
+                          }`}
+                        >
+                          {emp.activo ? 'Activo' : 'Inactivo'}
+                        </span>
+                      ),
+                    },
+                  ]
+                : []),
+              {
+                key: 'acciones',
+                label: '',
+                sortable: false,
+                width: 'w-10',
+                render: (emp) => (
+                  <DataTable.InteractiveCell>
                     <RowActions
                       ariaLabel={`Acciones para ${fullName(emp)}`}
                       onEdit={{
@@ -551,11 +520,16 @@ export function EmpleadosModule({
                           'Su historial se preserva y podrá restaurarse desde auditoría.',
                       }}
                     />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  </DataTable.InteractiveCell>
+                ),
+              },
+            ]}
+            rowKey="id"
+            onRowClick={(emp) => router.push(detailHref(empresaSlug, emp.id))}
+            initialSort={{ key: 'nombre', dir: 'asc' }}
+            emptyTitle="No hay empleados registrados"
+            showDensityToggle={false}
+          />
         )}
       </div>
 
