@@ -49,7 +49,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { FilterCombobox } from '@/components/ui/filter-combobox';
 // Combobox queda disponible si se necesita en form fields (ver documento-form-fields.tsx).
-import { useSortableTable } from '@/hooks/use-sortable-table';
 
 import type { Adjunto, Documento, NotariaOption } from './types';
 import { getVencStatus } from './helpers';
@@ -397,28 +396,18 @@ export function DocumentosModule({
   ).length;
   const soonCount = documentos.filter((d) => getVencStatus(d.fecha_vencimiento) === 'soon').length;
 
-  const baseSortCtx = useSortableTable('fecha_emision', 'desc');
-
-  // Si hay búsqueda semántica activa, override sortData para respetar el rank
-  // devuelto por la API (el doc más similar primero). Los filtros, sorts por
-  // columna y reset siguen disponibles — el usuario puede ordenar por fecha
-  // si prefiere, pero el default mientras dure la búsqueda es el rank IA.
-  const sortCtx = useMemo(() => {
-    if (!semanticRankMap) return baseSortCtx;
-    return {
-      ...baseSortCtx,
-      sortData: <T extends Record<string, unknown>>(rows: T[]): T[] => {
-        if (baseSortCtx.sortKey !== 'fecha_emision' || baseSortCtx.sortDir !== 'desc') {
-          return baseSortCtx.sortData(rows);
-        }
-        return [...rows].sort((a, b) => {
-          const ra = semanticRankMap.get(a.id as string) ?? Number.MAX_SAFE_INTEGER;
-          const rb = semanticRankMap.get(b.id as string) ?? Number.MAX_SAFE_INTEGER;
-          return ra - rb;
-        });
-      },
-    };
-  }, [baseSortCtx, semanticRankMap]);
+  // Si hay búsqueda semántica activa, pre-orden por rank antes de pasar a la
+  // tabla (el doc más similar primero). DataTable respeta el orden recibido
+  // cuando no se pasa initialSort. El usuario puede re-ordenar clickeando una
+  // columna; el rank semántico se pierde al hacerlo (comportamiento esperado).
+  const displayed = useMemo(() => {
+    if (!semanticRankMap) return filtered;
+    return [...filtered].sort((a, b) => {
+      const ra = semanticRankMap.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+      const rb = semanticRankMap.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+      return ra - rb;
+    });
+  }, [filtered, semanticRankMap]);
 
   // Scope the detail sheet's update query by empresa_id for single-empresa
   // mounts (defense-in-depth). The cross-empresa admin view relies on RLS.
@@ -540,12 +529,12 @@ export function DocumentosModule({
       <DocumentosTable
         loading={loading}
         error={error}
-        filtered={filtered}
+        filtered={displayed}
         documentos={documentos}
         adjuntosPorDoc={adjuntosPorDoc}
         onSelect={setSelectedDoc}
         onCreate={() => setShowCreate(true)}
-        sort={sortCtx}
+        semanticActive={!!semanticRankMap}
       />
 
       {!loading && documentos.length > 0 && (
