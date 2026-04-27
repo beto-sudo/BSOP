@@ -85,7 +85,9 @@ describe('formatDate', () => {
     expect(formatDate('not-a-date')).toBe('not-a-date');
   });
   it('accepts Date objects', () => {
-    const d = new Date(2026, 3, 23); // 23 abr 2026 local
+    // Use UTC timestamp at midday to avoid TZ shift across runners.
+    // 15:00 UTC = 10:00 CDT (Matamoros), so still 23 abr.
+    const d = new Date('2026-04-23T15:00:00Z');
     expect(formatDate(d)).toMatch(/23 abr 2026/);
   });
 });
