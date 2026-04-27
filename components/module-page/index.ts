@@ -20,3 +20,13 @@ export { ErrorBanner } from './error-banner';
 export type { ErrorBannerProps } from './error-banner';
 export { ActiveFiltersChip } from './active-filters-chip';
 export type { ActiveFiltersChipProps } from './active-filters-chip';
+export { DataTable, InteractiveCell, DensityToggle } from './data-table';
+export type {
+  Column,
+  ColumnType,
+  ColumnAlign,
+  TitleWithMeta,
+  DataTableProps,
+  Density,
+  StickyConfig,
+} from './data-table';
