@@ -1,5 +1,18 @@
 export const TZ = 'America/Matamoros';
 
+/**
+ * Re-export desde `@/lib/format`.
+ *
+ * @deprecated Use `formatCurrency` from `@/lib/format` en código nuevo.
+ */
+export { formatCurrency } from '@/lib/format';
+
+/**
+ * `formatDate` de Ventas incluye fecha + hora (12h con am/pm). Conservado
+ * local porque cambia el formato del marbete impreso.
+ *
+ * @deprecated En código nuevo, usar `formatDateTime` de `@/lib/format`.
+ */
 export function formatDate(ts: string | null) {
   if (!ts) return '—';
 
@@ -22,11 +35,6 @@ export function formatDate(ts: string | null) {
     minute: '2-digit',
     hour12: true,
   });
-}
-
-export function formatCurrency(amount: number | null | undefined) {
-  if (amount == null) return '—';
-  return amount.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
 }
 
 export function todayRange(): { from: string; to: string } {

@@ -17,22 +17,11 @@ export function mapTipoToDb(
   }
 }
 
-export function formatCurrency(amount: number | null | undefined): string {
-  if (amount == null) return '—';
-  return new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: 'MXN',
-  }).format(amount);
-}
-
-export function formatDate(ts: string | null | undefined) {
-  if (!ts) return '—';
-  return new Date(ts).toLocaleString('es-MX', {
-    timeZone: 'America/Matamoros',
-    dateStyle: 'short',
-    timeStyle: 'short',
-  });
-}
+/**
+ * @deprecated Use `formatCurrency` / `formatDateTime` from `@/lib/format`.
+ */
+export { formatCurrency } from '@/lib/format';
+export { formatDateTime as formatDate } from '@/lib/format';
 
 export function tipoLabel(tipo: string, cantidad: number): string {
   if (tipo === 'entrada') return 'Entrada';

@@ -133,11 +133,10 @@ export const UPDATE_TIPO_CONFIG: Record<string, { label: string; cls: string }> 
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-export function formatDate(dateStr: string | null | undefined) {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr.includes('T') ? dateStr : `${dateStr}T00:00:00`);
-  return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
-}
+/**
+ * @deprecated Use `formatDate` from `@/lib/format` directamente.
+ */
+export { formatDate } from '@/lib/format';
 
 export function formatDateTime(dateStr: string | null | undefined) {
   if (!dateStr) return '—';
