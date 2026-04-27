@@ -9,16 +9,7 @@ import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { SortableHead } from '@/components/ui/sortable-head';
-import { useSortableTable } from '@/hooks/use-sortable-table';
+import { DataTable, type Column } from '@/components/module-page';
 import {
   Sheet,
   SheetContent,
@@ -31,8 +22,7 @@ import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { FieldLabel } from '@/components/ui/field-label';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, RefreshCw, Loader2, CalendarDays, ChevronRight, Play } from 'lucide-react';
+import { Plus, Search, RefreshCw, Loader2, CalendarDays, Play } from 'lucide-react';
 import { JUNTA_ESTADO_CONFIG as ESTADO_CONFIG, type JuntaEstado } from '@/lib/status-tokens';
 
 const EMPRESA_ID = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479';
@@ -382,7 +372,103 @@ function JuntasInner() {
     return true;
   });
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable('fecha_hora', 'desc');
+  const columns: Column<Junta>[] = [
+    {
+      key: 'titulo',
+      label: 'Título',
+      cellClassName: 'font-medium text-[var(--text)]',
+      render: (j) => <span className="line-clamp-1">{j.titulo}</span>,
+    },
+    {
+      key: 'tipo',
+      label: 'Tipo',
+      width: 'w-24',
+      cellClassName: 'text-sm text-[var(--text)]/70',
+      render: (j) =>
+        j.tipo ? (
+          <>
+            {TIPO_CONFIG[j.tipo]?.icon} {TIPO_CONFIG[j.tipo]?.label ?? j.tipo}
+          </>
+        ) : (
+          <span className="text-[var(--text-subtle)]">—</span>
+        ),
+    },
+    {
+      key: 'estado',
+      label: 'Estado',
+      width: 'w-28',
+      render: (j) => <EstadoBadge estado={j.estado} />,
+    },
+    {
+      key: 'fecha_hora',
+      label: 'Fecha y hora',
+      width: 'w-48',
+      cellClassName: 'text-sm text-[var(--text)]/70',
+      render: (j) => formatDateTime(j.fecha_hora),
+    },
+    {
+      // TEMP column to side-by-side compare with Coda during image
+      // backfill. Remove once post-2024 juntas are pasted over.
+      key: 'descripcion',
+      label: 'Contenido',
+      sortable: false,
+      width: 'min-w-[320px] max-w-[560px]',
+      render: (j) => <JuntaContentPreview descripcion={j.descripcion} />,
+    },
+    {
+      key: 'asistentes',
+      label: 'Asist.',
+      width: 'w-16',
+      type: 'number',
+      cellClassName: 'text-sm text-[var(--text)]/60',
+      accessor: (j) => asistenciaCounts.get(j.id) ?? 0,
+      render: (j) => asistenciaCounts.get(j.id) ?? 0,
+    },
+    {
+      key: 'tareas',
+      label: 'Tareas',
+      width: 'w-16',
+      type: 'number',
+      cellClassName: 'text-sm text-[var(--text)]/60',
+      accessor: (j) => taskCounts.get(j.id) ?? 0,
+      render: (j) => taskCounts.get(j.id) ?? 0,
+    },
+    {
+      key: 'avanzadas',
+      label: 'Avanz.',
+      width: 'w-16',
+      type: 'number',
+      accessor: (j) => taskAvanzadasCounts.get(j.id) ?? 0,
+      render: (j) => {
+        const n = taskAvanzadasCounts.get(j.id) ?? 0;
+        return (
+          <span
+            className={`text-sm ${n > 0 ? 'text-blue-400 font-medium' : 'text-[var(--text)]/30'}`}
+          >
+            {n}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'terminadas',
+      label: 'Term.',
+      width: 'w-16',
+      type: 'number',
+      accessor: (j) => taskTerminadasCounts.get(j.id) ?? 0,
+      render: (j) => {
+        const n = taskTerminadasCounts.get(j.id) ?? 0;
+        return (
+          <span
+            className={`text-sm ${n > 0 ? 'text-green-400 font-medium' : 'text-[var(--text)]/30'}`}
+          >
+            {n}
+          </span>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -470,194 +556,34 @@ function JuntasInner() {
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)]">
-        {error ? (
-          <div className="flex items-center justify-center p-16 text-red-400">Error: {error}</div>
-        ) : loading ? (
-          <div className="divide-y divide-[var(--border)]">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-4 p-4">
-                <Skeleton className="h-4 w-64" />
-                <Skeleton className="h-5 w-20 ml-auto" />
-                <Skeleton className="h-5 w-24" />
-                <Skeleton className="h-4 w-32" />
-              </div>
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-16 text-center">
-            <CalendarDays className="mb-3 h-10 w-10 text-[var(--text)]/20" />
-            <p className="text-sm text-[var(--text-muted)]">
-              {juntas.length === 0
-                ? 'No hay juntas registradas aún'
-                : 'No hay juntas que coincidan con los filtros'}
-            </p>
-            {juntas.length === 0 && (
+        <DataTable<Junta>
+          data={filtered}
+          columns={columns}
+          rowKey="id"
+          loading={loading}
+          error={error}
+          onRowClick={(junta) => router.push(`/dilesa/admin/juntas/${junta.id}`)}
+          initialSort={{ key: 'fecha_hora', dir: 'desc' }}
+          showDensityToggle={false}
+          emptyIcon={<CalendarDays className="h-10 w-10 text-[var(--text)]/20" />}
+          emptyTitle={
+            juntas.length === 0
+              ? 'No hay juntas registradas aún'
+              : 'No hay juntas que coincidan con los filtros'
+          }
+          emptyAction={
+            juntas.length === 0 ? (
               <Button
                 size="sm"
                 onClick={openCreateSheet}
-                className="mt-4 gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90"
+                className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90"
               >
                 <Plus className="h-4 w-4" />
                 Crear primera junta
               </Button>
-            )}
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="border-[var(--border)] hover:bg-transparent">
-                <SortableHead
-                  sortKey="titulo"
-                  label="Título"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="tipo"
-                  label="Tipo"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="w-24"
-                />
-                <SortableHead
-                  sortKey="estado"
-                  label="Estado"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="w-28"
-                />
-                <SortableHead
-                  sortKey="fecha_hora"
-                  label="Fecha y hora"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="w-48"
-                />
-                {/* TEMP column to side-by-side compare with Coda during image
-                    backfill. Remove once post-2024 juntas are pasted over. */}
-                <TableHead className="min-w-[320px] max-w-[560px]">Contenido</TableHead>
-                <SortableHead
-                  sortKey="asistentes"
-                  label="Asist."
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="w-16"
-                />
-                <SortableHead
-                  sortKey="tareas"
-                  label="Tareas"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="w-16"
-                />
-                <SortableHead
-                  sortKey="avanzadas"
-                  label="Avanz."
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="w-16"
-                />
-                <SortableHead
-                  sortKey="terminadas"
-                  label="Term."
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="w-16"
-                />
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortData(
-                filtered.map((j) => ({
-                  ...j,
-                  asistentes: asistenciaCounts.get(j.id) ?? 0,
-                  tareas: taskCounts.get(j.id) ?? 0,
-                  avanzadas: taskAvanzadasCounts.get(j.id) ?? 0,
-                  terminadas: taskTerminadasCounts.get(j.id) ?? 0,
-                }))
-              ).map((junta) => (
-                <TableRow
-                  key={junta.id}
-                  className="cursor-pointer border-[var(--border)] transition-colors hover:bg-[var(--panel)]"
-                  onClick={() => router.push(`/dilesa/admin/juntas/${junta.id}`)}
-                >
-                  <TableCell>
-                    <span className="line-clamp-1 font-medium text-[var(--text)]">
-                      {junta.titulo}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    {junta.tipo ? (
-                      <span className="text-sm text-[var(--text)]/70">
-                        {TIPO_CONFIG[junta.tipo]?.icon}{' '}
-                        {TIPO_CONFIG[junta.tipo]?.label ?? junta.tipo}
-                      </span>
-                    ) : (
-                      <span className="text-[var(--text-subtle)]">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <EstadoBadge estado={junta.estado} />
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-[var(--text)]/70">
-                      {formatDateTime(junta.fecha_hora)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="min-w-[320px] max-w-[560px]">
-                    <JuntaContentPreview descripcion={junta.descripcion} />
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-[var(--text)]/60">
-                      {asistenciaCounts.get(junta.id) ?? 0}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-[var(--text)]/60">
-                      {taskCounts.get(junta.id) ?? 0}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    {(() => {
-                      const n = taskAvanzadasCounts.get(junta.id) ?? 0;
-                      return (
-                        <span
-                          className={`text-sm ${n > 0 ? 'text-blue-400 font-medium' : 'text-[var(--text)]/30'}`}
-                        >
-                          {n}
-                        </span>
-                      );
-                    })()}
-                  </TableCell>
-                  <TableCell>
-                    {(() => {
-                      const n = taskTerminadasCounts.get(junta.id) ?? 0;
-                      return (
-                        <span
-                          className={`text-sm ${n > 0 ? 'text-green-400 font-medium' : 'text-[var(--text)]/30'}`}
-                        >
-                          {n}
-                        </span>
-                      );
-                    })()}
-                  </TableCell>
-                  <TableCell>
-                    <ChevronRight className="h-4 w-4 text-[var(--text)]/30" />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+            ) : undefined
+          }
+        />
       </div>
 
       {!loading && juntas.length > 0 && (
