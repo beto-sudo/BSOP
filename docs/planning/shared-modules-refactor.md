@@ -279,9 +279,16 @@ extracción.
 - **Sub-PR 2 — ADR-011** (2026-04-27): incluido en el mismo PR del Sub-PR 1
   (decisión: mismo PR para que la convención salga junto al primer ejemplo
   cumplido — ver §Decisiones registradas).
-- **Sub-PR 3 — `juntas-detail-shared`** (Tier A, pendiente): próximo hito
-  cuando arranque la siguiente sesión de la iniciativa.
-- **Sub-PR 4 — `juntas-list-shared`** (Tier B, pendiente).
+- **Sub-PR 3 — `juntas-detail-shared`** (2026-04-27): mergeado en PR
+  pendiente. Componente `<JuntaDetailModule>` extraído a
+  `components/juntas/junta-detail-module.tsx`. Pages reducidos a 12
+  líneas. Análisis previo clasificó las ~464 líneas de divergencia en
+  3 categorías (cosmético / lógica divergente legítima / drift
+  accidental) — ver §Decisiones registradas para cómo se resolvió cada
+  una.
+- **Sub-PR 4 — `juntas-list-shared`** (Tier B, pendiente): próximo hito.
+  Triángulo `inicio/juntas` ↔ `rdb/admin/juntas` ↔ `dilesa/admin/juntas`,
+  auditoría primero.
 - **Sub-PR 5 — `empleados-detail-audit`** (Tier C, pendiente).
 
 ## Decisiones registradas
@@ -319,6 +326,56 @@ extracción.
   "DILESA"). Es exactamente el tipo de drift accidental que SM5 quiere
   evitar a futuro.
 
+### Sub-PR 3 — juntas-detail-shared (2026-04-27)
+
+- **Sub-PR 3 — Validación estricta al crear tarea desde junta (opción A
+  del análisis previo).** Razón: el schema de `erp.tasks` permite NULL
+  para `prioridad`, `asignado_a`, `fecha_vence` (la única columna NOT
+  NULL es `titulo`). DILESA exigía los 3 campos al crear tarea desde
+  junta, RDB solo exigía `titulo`. Beto eligió adoptar DILESA → mejor
+  disciplina de datos: cada tarea creada desde una junta tiene dueño,
+  prioridad y fecha. RDB heredera la validación al unificar.
+- **Sub-PR 3 — Drift `fecha_vence` vs `fecha_compromiso` resuelto
+  escribiendo ambos en el insert.** Razón: `erp.tasks` tiene los dos
+  campos. El handler de _update_ ya escribía ambos en sync (RDB L965-966
+  y DILESA L911-913) — solo el _create_ había divergido (RDB → solo
+  `fecha_vence`, DILESA → solo `fecha_compromiso`). El componente shared
+  unifica al patrón del update: ambos campos siempre en sync, cero
+  pérdida funcional.
+- **Sub-PR 3 — Bugs en RDB arreglados oportunísticamente al adoptar
+  patrones de DILESA:**
+  - **Auto-save de notas no normalizaba URLs**: RDB persistía signed
+    URLs de Supabase (TTL 6h) en `juntas.descripcion`; al expirar, las
+    imágenes embebidas se rompían. DILESA llamaba
+    `normalizeHtmlImagesToPaths()` antes de persistir. El componente
+    shared adopta el patrón de DILESA — RDB hereda el fix.
+  - **Editor readiness con race condition**: RDB hidrataba el contenido
+    inicial dentro de `fetchAll`, lo que podía dispararse antes de que
+    el editor TipTap estuviera listo. DILESA lo había sacado a un
+    `useEffect` separado dependiente de `editor`. Adoptado en el
+    shared.
+  - **`selectedPersonaId` state local innecesario**: RDB tenía state
+    local para el ID del Combobox antes de agregar participante (paso
+    intermedio + click en botón). DILESA usaba el `onChange` del
+    Combobox directamente. Adoptado el patrón de DILESA — un click
+    menos.
+  - **Title del checkbox "Enviar a Consejo" decía hardcoded
+    `consejo@dilesa.mx` en ambos pages**, incluyendo RDB. Era drift
+    accidental por copy-paste. El componente shared usa mensaje
+    genérico ("al correo del consejo configurado para esta empresa")
+    porque el mapeo real de email vive server-side en
+    `lib/juntas/email.ts` (`CONSEJO_EMAIL_BY_EMPRESA`) y no es
+    apropiado importar al cliente.
+- **Sub-PR 3 — `useMemo` para opciones de combobox adoptado.**
+  DILESA optimizaba `empleadoOptions` y `availablePersonaOptions` con
+  `useMemo`; RDB no. El shared adopta — perf win neto en re-renders.
+- **Sub-PR 3 — `JuntaDetailModule` solo recibe `empresaSlug` como
+  prop.** Razón: el `empresa_id` se lee de `juntaData.empresa_id` (ya
+  está en la fila de juntas, no necesita hardcodearse), y no hay logo
+  ni branding visual específico por empresa en este módulo. Una sola
+  prop alcanza para construir la URL de retorno (`/${empresaSlug}/admin/juntas`).
+  Cumple SM3 con la API mínima posible.
+
 ## Bitácora
 
 - **2026-04-27 — Sub-PR 1 + ADR-011** (Claude Code, branch
@@ -334,6 +391,20 @@ extracción.
   - Reducido `app/dilesa/proveedores/page.tsx` de 1578 → 17 líneas.
   - Creado `docs/adr/011_shared_modules_cross_empresa.md` codificando la
     convención SM1-SM5.
-  - 4 checks de CI verde local (typecheck, lint warnings pre-existentes
-    solamente, format, 222 tests). Pendiente smoke manual en RDB y
-    DILESA antes de mergeo.
+  - PR #247 mergeado.
+- **2026-04-27 — Sub-PR 3** (Claude Code, branch
+  `feat/juntas-detail-shared`):
+  - Análisis previo del diff (606 líneas) clasificó las divergencias:
+    53 cosmético, 196 lógica divergente legítima, 215 drift accidental.
+  - Creado `components/juntas/junta-detail-module.tsx` (~1300 líneas)
+    con todo el flujo de detalle de junta: edición, participantes,
+    notas con TipTap (auto-save + emergency save + polling), tareas
+    con avances/diff, terminar/reenviar/eliminar.
+  - Reducido `app/rdb/admin/juntas/[id]/page.tsx` de 1801 → 12 líneas.
+  - Reducido `app/dilesa/admin/juntas/[id]/page.tsx` de 1817 → 12 líneas.
+  - Bugs heredados de RDB arreglados al unificar (auto-save sin
+    normalizar, race condition del editor, state innecesario, title
+    hardcoded con email de DILESA).
+  - 4 checks de CI verde local (typecheck, lint sin warnings nuevos,
+    format, 222 tests del repo + 222 tests de worktrees paralelos).
+    Pendiente smoke manual en RDB y DILESA antes de mergeo.
