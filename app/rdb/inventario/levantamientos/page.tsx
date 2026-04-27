@@ -12,20 +12,12 @@ import { ClipboardList, Plus, RefreshCw } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Skeleton } from '@/components/ui/skeleton';
+import { DataTable, ErrorBanner, type Column } from '@/components/module-page';
 import {
   LevantamientoStatusBadge,
   type LevantamientoEstado,
 } from '@/components/inventario/levantamiento-status-badge';
-import { formatDateShort, formatDateTime } from '@/lib/inventario/format';
+import { formatDate, formatDateTime } from '@/lib/format';
 
 const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
 
@@ -42,6 +34,57 @@ type LevantamientoRow = {
   created_at: string;
   almacenes: { nombre: string } | null;
 };
+
+const columns: Column<LevantamientoRow>[] = [
+  {
+    key: 'folio',
+    label: 'Folio',
+    cellClassName: 'font-medium tabular-nums',
+    render: (r) => r.folio ?? '—',
+  },
+  {
+    key: 'estado',
+    label: 'Estado',
+    render: (r) => <LevantamientoStatusBadge estado={r.estado as LevantamientoEstado} />,
+  },
+  {
+    key: 'almacen',
+    label: 'Almacén',
+    accessor: (r) => r.almacenes?.nombre ?? '',
+    render: (r) => r.almacenes?.nombre ?? '—',
+  },
+  {
+    key: 'fecha_programada',
+    label: 'Programado',
+    cellClassName: 'tabular-nums',
+    render: (r) => formatDate(r.fecha_programada),
+  },
+  {
+    key: 'ultima_actividad',
+    label: 'Última actividad',
+    cellClassName: 'tabular-nums text-muted-foreground',
+    accessor: (r) => r.fecha_aplicado ?? r.fecha_cierre ?? r.fecha_inicio ?? r.created_at,
+    render: (r) => {
+      const ultima = r.fecha_aplicado ?? r.fecha_cierre ?? r.fecha_inicio ?? r.created_at;
+      return formatDateTime(ultima);
+    },
+  },
+  {
+    key: 'accion',
+    label: 'Acción',
+    sortable: false,
+    align: 'right',
+    render: (r) => (
+      <DataTable.InteractiveCell>
+        <Link href={`/rdb/inventario/levantamientos/${r.id}`}>
+          <Button variant="outline" size="sm">
+            Abrir
+          </Button>
+        </Link>
+      </DataTable.InteractiveCell>
+    ),
+  },
+];
 
 export default function LevantamientosListaPage() {
   return (
@@ -118,128 +161,47 @@ function LevantamientosListaInner() {
         </div>
       </header>
 
-      {error && (
-        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
-          {error}
-        </div>
-      )}
+      {error && <ErrorBanner error={error} onRetry={() => void load()} />}
 
       <section>
         <h2 className="mb-2 text-sm font-medium uppercase tracking-wider text-muted-foreground">
           Activos
         </h2>
-        {loading ? (
-          <ListSkeleton />
-        ) : activos.length === 0 ? (
-          <EmptyState
-            title="No hay levantamientos activos"
-            description="Inicia uno nuevo para comenzar el conteo."
-            cta={
-              <Link href="/rdb/inventario/levantamientos/nuevo">
-                <Button>
-                  <Plus className="size-4" />
-                  Nuevo levantamiento
-                </Button>
-              </Link>
-            }
-          />
-        ) : (
-          <LevantamientosTable rows={activos} />
-        )}
+        <DataTable<LevantamientoRow>
+          data={activos}
+          columns={columns}
+          rowKey="id"
+          loading={loading}
+          initialSort={{ key: 'fecha_programada', dir: 'desc' }}
+          emptyIcon={<ClipboardList className="size-8" />}
+          emptyTitle="No hay levantamientos activos"
+          emptyDescription="Inicia uno nuevo para comenzar el conteo."
+          emptyAction={
+            <Link href="/rdb/inventario/levantamientos/nuevo">
+              <Button>
+                <Plus className="size-4" />
+                Nuevo levantamiento
+              </Button>
+            </Link>
+          }
+          showDensityToggle={false}
+        />
       </section>
 
       <section>
         <h2 className="mb-2 text-sm font-medium uppercase tracking-wider text-muted-foreground">
           Histórico reciente
         </h2>
-        {loading ? (
-          <ListSkeleton rows={3} />
-        ) : cerrados.length === 0 ? (
-          <p className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
-            Sin levantamientos cerrados todavía.
-          </p>
-        ) : (
-          <LevantamientosTable rows={cerrados} />
-        )}
+        <DataTable<LevantamientoRow>
+          data={cerrados}
+          columns={columns}
+          rowKey="id"
+          loading={loading}
+          initialSort={{ key: 'ultima_actividad', dir: 'desc' }}
+          emptyTitle="Sin levantamientos cerrados todavía"
+          showDensityToggle={false}
+        />
       </section>
-    </div>
-  );
-}
-
-function LevantamientosTable({ rows }: { rows: LevantamientoRow[] }) {
-  return (
-    <div className="rounded-lg border bg-card">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Folio</TableHead>
-            <TableHead>Estado</TableHead>
-            <TableHead>Almacén</TableHead>
-            <TableHead>Programado</TableHead>
-            <TableHead>Última actividad</TableHead>
-            <TableHead className="text-right">Acción</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row) => {
-            const ultima =
-              row.fecha_aplicado ?? row.fecha_cierre ?? row.fecha_inicio ?? row.created_at;
-            return (
-              <TableRow key={row.id}>
-                <TableCell className="font-medium tabular-nums">{row.folio ?? '—'}</TableCell>
-                <TableCell>
-                  <LevantamientoStatusBadge estado={row.estado as LevantamientoEstado} />
-                </TableCell>
-                <TableCell>{row.almacenes?.nombre ?? '—'}</TableCell>
-                <TableCell className="tabular-nums">
-                  {formatDateShort(row.fecha_programada)}
-                </TableCell>
-                <TableCell className="tabular-nums text-muted-foreground">
-                  {formatDateTime(ultima)}
-                </TableCell>
-                <TableCell className="text-right">
-                  <Link href={`/rdb/inventario/levantamientos/${row.id}`}>
-                    <Button variant="outline" size="sm">
-                      Abrir
-                    </Button>
-                  </Link>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </div>
-  );
-}
-
-function ListSkeleton({ rows = 4 }: { rows?: number }) {
-  return (
-    <div className="space-y-2">
-      {Array.from({ length: rows }).map((_, i) => (
-        <Skeleton key={i} className="h-12 w-full rounded-lg" />
-      ))}
-    </div>
-  );
-}
-
-function EmptyState({
-  title,
-  description,
-  cta,
-}: {
-  title: string;
-  description: string;
-  cta?: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-muted/30 p-10 text-center">
-      <ClipboardList className="size-10 text-muted-foreground/60" />
-      <div>
-        <div className="font-medium">{title}</div>
-        <div className="mt-1 text-sm text-muted-foreground">{description}</div>
-      </div>
-      {cta}
     </div>
   );
 }

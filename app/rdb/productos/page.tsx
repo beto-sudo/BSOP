@@ -4,16 +4,7 @@ import { RequireAccess } from '@/components/require-access';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { SortableHead } from '@/components/ui/sortable-head';
-import { useSortableTable } from '@/hooks/use-sortable-table';
+import { DataTable, type Column } from '@/components/module-page';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -77,15 +68,7 @@ type InsumoDisponible = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatCurrency(amount: number | null | undefined) {
-  if (amount == null) return '—';
-  return amount.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
-}
-
-function formatNumber(n: number | null | undefined, frac = 0) {
-  if (n == null) return '—';
-  return n.toLocaleString('es-MX', { minimumFractionDigits: frac, maximumFractionDigits: frac });
-}
+import { formatCurrency, formatNumber } from '@/lib/format';
 
 function MargenBadge({ pct }: { pct: number | null }) {
   if (pct === null || pct === undefined)
@@ -110,6 +93,103 @@ function UltimaVentaCell({ at, now }: { at: string | null; now: number }) {
   if (days <= 7) return <span className="text-emerald-600 text-xs">Hace {days}d</span>;
   if (days <= 30) return <span className="text-amber-600 text-xs">Hace {days}d</span>;
   return <span className="text-red-600 text-xs">Hace {days}d</span>;
+}
+
+function productoColumns(now: number, openDrawer: (p: Producto) => void): Column<Producto>[] {
+  return [
+    {
+      key: 'nombre',
+      label: 'Nombre',
+      render: (p) => (
+        <>
+          <div className="font-medium">{p.nombre}</div>
+          {p.descripcion && <div className="text-xs text-muted-foreground">{p.descripcion}</div>}
+        </>
+      ),
+    },
+    {
+      key: 'codigo',
+      label: 'Código',
+      cellClassName: 'text-xs text-muted-foreground tabular-nums',
+      render: (p) => p.codigo ?? '—',
+    },
+    {
+      key: 'inventariable',
+      label: 'Inventario',
+      render: (p) =>
+        (p.inventariable ?? true) ? (
+          <Badge variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50">
+            Producto físico
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">
+            Servicio
+          </Badge>
+        ),
+    },
+    {
+      key: 'categoria_nombre',
+      label: 'Categoría',
+      render: (p) => <CategoriaBadge nombre={p.categoria_nombre} color={p.categoria_color} />,
+    },
+    {
+      key: 'ultimo_costo',
+      label: 'Costo',
+      type: 'currency',
+      cellClassName: 'text-sm',
+    },
+    {
+      key: 'ultimo_precio_venta',
+      label: 'Precio',
+      type: 'currency',
+      cellClassName: 'text-sm font-medium',
+    },
+    {
+      key: 'margen_pct',
+      label: 'Margen',
+      align: 'right',
+      render: (p) => <MargenBadge pct={p.margen_pct} />,
+    },
+    {
+      key: 'stock_actual',
+      label: 'Stock',
+      type: 'number',
+      cellClassName: 'text-sm',
+      render: (p) => (p.inventariable ? formatNumber(p.stock_actual, { decimals: 0 }) : '—'),
+    },
+    {
+      key: 'ultima_venta_at',
+      label: 'Última venta',
+      render: (p) => <UltimaVentaCell at={p.ultima_venta_at} now={now} />,
+    },
+    {
+      key: 'activo',
+      label: 'Estado',
+      render: (p) => (
+        <Badge variant={p.activo ? 'default' : 'secondary'}>
+          {p.activo ? 'Activo' : 'Inactivo'}
+        </Badge>
+      ),
+    },
+    {
+      key: 'acciones',
+      label: '',
+      sortable: false,
+      align: 'right',
+      render: (p) => (
+        <DataTable.InteractiveCell>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground"
+            onClick={() => openDrawer(p)}
+          >
+            <Settings2 className="h-4 w-4" />
+          </Button>
+        </DataTable.InteractiveCell>
+      ),
+    },
+  ];
 }
 
 function CategoriaBadge({ nombre, color }: { nombre: string | null; color: string | null }) {
@@ -438,8 +518,6 @@ export default function ProductosPage() {
     now,
   ]);
 
-  const { sortKey, sortDir, onSort, sortData } = useSortableTable<Producto>('nombre', 'asc');
-
   return (
     <RequireAccess empresa="rdb" modulo="rdb.productos">
       <div className="space-y-6">
@@ -555,179 +633,16 @@ export default function ProductosPage() {
         )}
 
         {/* Table */}
-        <div className="rounded-xl border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <SortableHead
-                  sortKey="nombre"
-                  label="Nombre"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="codigo"
-                  label="Código"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="inventariable"
-                  label="Inventario"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="categoria_nombre"
-                  label="Categoría"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="ultimo_costo"
-                  label="Costo"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="text-right"
-                />
-                <SortableHead
-                  sortKey="ultimo_precio_venta"
-                  label="Precio"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="text-right"
-                />
-                <SortableHead
-                  sortKey="margen_pct"
-                  label="Margen"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="text-right"
-                />
-                <SortableHead
-                  sortKey="stock_actual"
-                  label="Stock"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                  className="text-right"
-                />
-                <SortableHead
-                  sortKey="ultima_venta_at"
-                  label="Última venta"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <SortableHead
-                  sortKey="activo"
-                  label="Estado"
-                  currentSort={sortKey}
-                  currentDir={sortDir}
-                  onSort={onSort}
-                />
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                Array.from({ length: 8 }).map((_, i) => (
-                  <TableRow key={i}>
-                    {Array.from({ length: 11 }).map((__, j) => (
-                      <TableCell key={j}>
-                        <Skeleton className="h-4 w-full" />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              ) : filtered.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={11} className="py-12 text-center text-muted-foreground">
-                    No se encontraron productos.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                sortData(filtered).map((p) => (
-                  <TableRow
-                    key={p.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => openDrawer(p)}
-                  >
-                    <TableCell>
-                      <div className="font-medium">{p.nombre}</div>
-                      {p.descripcion && (
-                        <div className="text-xs text-muted-foreground">{p.descripcion}</div>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground tabular-nums">
-                      {p.codigo ?? '—'}
-                    </TableCell>
-                    <TableCell>
-                      {(p.inventariable ?? true) ? (
-                        <Badge
-                          variant="outline"
-                          className="text-emerald-600 border-emerald-200 bg-emerald-50"
-                        >
-                          Producto físico
-                        </Badge>
-                      ) : (
-                        <Badge
-                          variant="outline"
-                          className="text-blue-600 border-blue-200 bg-blue-50"
-                        >
-                          Servicio
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <CategoriaBadge nombre={p.categoria_nombre} color={p.categoria_color} />
-                    </TableCell>
-                    <TableCell className="text-right text-sm tabular-nums">
-                      {formatCurrency(p.ultimo_costo)}
-                    </TableCell>
-                    <TableCell className="text-right text-sm tabular-nums font-medium">
-                      {formatCurrency(p.ultimo_precio_venta)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <MargenBadge pct={p.margen_pct} />
-                    </TableCell>
-                    <TableCell className="text-right text-sm tabular-nums">
-                      {p.inventariable ? formatNumber(p.stock_actual, 0) : '—'}
-                    </TableCell>
-                    <TableCell>
-                      <UltimaVentaCell at={p.ultima_venta_at} now={now} />
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={p.activo ? 'default' : 'secondary'}>
-                        {p.activo ? 'Activo' : 'Inactivo'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openDrawer(p);
-                        }}
-                      >
-                        <Settings2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable<Producto>
+          data={filtered}
+          columns={productoColumns(now, openDrawer)}
+          rowKey="id"
+          loading={loading}
+          onRowClick={openDrawer}
+          initialSort={{ key: 'nombre', dir: 'asc' }}
+          emptyTitle="No se encontraron productos"
+          showDensityToggle={false}
+        />
 
         {/* Detail/Config Drawer */}
         <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
@@ -757,7 +672,7 @@ export default function ProductosPage() {
                     <MargenBadge pct={selectedProducto.margen_pct} />
                     {selectedProducto.inventariable && (
                       <span className="text-xs text-muted-foreground">
-                        Stock: {formatNumber(selectedProducto.stock_actual, 0)}
+                        Stock: {formatNumber(selectedProducto.stock_actual, { decimals: 0 })}
                       </span>
                     )}
                     <UltimaVentaCell at={selectedProducto.ultima_venta_at} now={now} />
