@@ -146,6 +146,37 @@ export const CsfExtraccionSchema = z.object({
 
 export type CsfExtraccion = z.infer<typeof CsfExtraccionSchema>;
 
+// ─── Input para create-with-csf ──────────────────────────────────────────────
+
+/**
+ * Payload del endpoint `POST /api/proveedores/create-with-csf`.
+ *
+ * El cliente envía esto como JSON dentro del campo "payload" del multipart,
+ * más el PDF en el campo "file".
+ *
+ * - `extraccion` viene del flujo de Sprint 1.B: el cliente llama primero a
+ *   `/api/proveedores/extract-csf`, el usuario revisa/edita los campos en la
+ *   UI, y al guardar manda los campos finales (que pueden o no coincidir con
+ *   lo que Claude extrajo).
+ * - `proveedor_extras` es opcional — son atributos de `erp.proveedores` que no
+ *   vienen en la CSF (código interno, condiciones de pago, etc.). Si la UI no
+ *   los pide, se omiten y la fila de proveedor queda con defaults.
+ */
+export const CreateProveedorPayloadSchema = z.object({
+  empresa_id: z.string().uuid('empresa_id debe ser UUID'),
+  extraccion: CsfExtraccionSchema,
+  proveedor_extras: z
+    .object({
+      codigo: z.string().nullable().optional(),
+      condiciones_pago: z.string().nullable().optional(),
+      limite_credito: z.number().nullable().optional(),
+      categoria: z.string().nullable().optional(),
+    })
+    .optional(),
+});
+
+export type CreateProveedorPayload = z.infer<typeof CreateProveedorPayloadSchema>;
+
 // ─── Llamada al modelo ───────────────────────────────────────────────────────
 
 const PROMPT = `

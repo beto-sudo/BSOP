@@ -70,17 +70,25 @@ El módulo de Documentos ya tiene el patrón de extracción IA con Claude (`/api
 - [x] `supabase/SCHEMA_REF.md` regenerado con `npm run schema:ref`.
 - [x] `types/supabase.ts` actualizado con los nuevos types (manualmente, `npm run db:types` bloqueado en sandbox).
 
-### Sprint 1.B — Endpoint de extracción IA
+### Sprint 1.B — Endpoint de extracción IA ✅
 
-- [ ] `POST /api/proveedores/extract-csf` que reciba PDF, lo procese con Claude usando schema dedicado a CSF (todos los campos del ADR-007), y devuelva los datos pre-llenados sin persistir. Reutiliza `lib/documentos/extraction-core.ts`.
-- [ ] Tests unitarios del schema de extracción con CSFs reales (3-5 PDFs de ejemplo, físicas y morales).
+- [x] `POST /api/proveedores/extract-csf` que recibe PDF (multipart/form-data), lo procesa con Claude usando schema dedicado a CSF, devuelve los datos pre-llenados sin persistir. Reutiliza `lib/documentos/extraction-core.ts` (anthropic, MODELO_CLAUDE, ensurePdfFitsForClaude).
+- [x] Schema `CsfExtraccionSchema` (Zod) en `lib/proveedores/extract-csf.ts` cubre todos los campos del ADR-007.
+- [x] Tests unitarios del schema (9 tests pasando — moral, física, múltiples regímenes, rechazos).
+- _Smoke con CSFs reales pendiente para cuando exista UI Sprint 2 (alternativa: curl)._
 
-### Sprint 2 — UI de alta nueva (RDB primero)
+### Sprint 2.A — Backend de alta con CSF
 
-- [ ] Drawer `+ Nuevo Proveedor` con sección "Sube CSF (recomendado)" + link "Capturar manualmente".
-- [ ] Flujo upload → spinner ~60s → form pre-llenado → revisar/corregir → guardar.
-- [ ] Detección de duplicado por RFC al guardar (bloqueo + dos CTAs).
-- [ ] CSF archivada en `erp.adjuntos` con `entidad_tipo='persona', rol='csf'`; `csf_adjunto_id` apuntando al row creado.
+- [ ] `POST /api/proveedores/create-with-csf` que recibe FormData con PDF + JSON de campos editados + `empresa_id`. Persiste en orden: dedup RFC → `erp.personas` → `erp.proveedores` → upload PDF a storage → `erp.adjuntos` (rol='csf') → `erp.personas_datos_fiscales`.
+- [ ] Detección de duplicado por RFC al inicio (`empresa_id + rfc + activo=true` en `erp.personas`). Si existe, 409 con `existing_persona_id` y `existing_proveedor_id`.
+- [ ] Tests unitarios del schema de input + tests de la lógica de dedup.
+
+### Sprint 2.B — UI de alta nueva (RDB primero)
+
+- [ ] Drawer `+ Nuevo Proveedor` con sección "Sube CSF (recomendado)" + link "Capturar manualmente" (preserva flujo actual).
+- [ ] Flujo upload → spinner ~60s → form pre-llenado → revisar/corregir → guardar (llama `create-with-csf`).
+- [ ] UI de duplicado: cuando 409 con `existing_persona_id`, modal con dos CTAs ("Ir al proveedor existente" / "Actualizar su CSF con este PDF" — esto último vincula con Sprint 3).
+- [ ] Detección persona física vs moral: la extracción setea `tipo_persona`; UI muestra/oculta campos correspondientes.
 - [ ] Estados de error (Claude falla, PDF no es CSF, timeout) con CTA a captura manual.
 
 ### Sprint 3 — UI de update existente (diff campo-por-campo)
@@ -106,3 +114,4 @@ El módulo de Documentos ya tiene el patrón de extracción IA con Claude (`/api
 
 - **2026-04-27 — Sesión de arranque.** Se registra la iniciativa en `INITIATIVES.md` (PR [#234](https://github.com/beto-sudo/BSOP/pull/234)). Beto aprueba alcance v1 inmediatamente. Se promueve estado `proposed → planned` y se cierra la decisión de modelo DB con [ADR-007](../../supabase/adr/007_personas_datos_fiscales.md).
 - **2026-04-27 — Sprint 1.A cerrado (PR [#235](https://github.com/beto-sudo/BSOP/pull/235)).** Migración aplicada a la DB: columna `tipo_persona` en `erp.personas` + tabla `erp.personas_datos_fiscales` con RLS y trigger updated_at. SCHEMA_REF y types regenerados. CI verde (typecheck/lint/test/format/drift-check). Estado `planned → in_progress`. Próximo: Sprint 1.B (endpoint extract-csf).
+- **2026-04-27 — Sprint 1.B cerrado (PR [#236](https://github.com/beto-sudo/BSOP/pull/236)).** Endpoint `POST /api/proveedores/extract-csf` que recibe PDF y devuelve campos extraídos (sin persistir). `CsfExtraccionSchema` con todos los campos del ADR-007. 9 tests unitarios del schema pasando. Reutiliza `lib/documentos/extraction-core.ts`. Como efecto colateral, descubrimos un bug del workflow `db-types.yml` que regeneraba types sin schemas `dilesa`/`maquinaria` (causando typecheck fail en su PR auto-generado #227); arreglado en PR [#239](https://github.com/beto-sudo/BSOP/pull/239) y memoria `reference_db_types_workflow_sync.md` agregada. Próximo: Sprint 2.A (endpoint create-with-csf + dedup RFC).
