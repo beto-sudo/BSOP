@@ -3,7 +3,7 @@
 **Slug:** `proveedores-csf-ai`
 **Empresas:** todas (RDB ya tiene módulo, DILESA segundo, resto conforme se desarrollen)
 **Schemas afectados:** `erp` (expansión de modelo de personas/datos fiscales) + UI
-**Estado:** proposed
+**Estado:** planned
 **Dueño:** Beto
 **Creada:** 2026-04-27
 **Última actualización:** 2026-04-27
@@ -62,12 +62,40 @@ El módulo de Documentos ya tiene el patrón de extracción IA con Claude (`/api
 
 ## Sprints / hitos
 
-_(se llena cuando arranque ejecución, vía Claude Code)_
+### Sprint 1 — Modelo DB + endpoint de extracción
+
+- [ ] Migración `supabase/migrations/<ts>_personas_datos_fiscales.sql` siguiendo ADR-007: agrega columna `tipo_persona` a `erp.personas`, crea tabla anexa `erp.personas_datos_fiscales` con RLS por empresa y trigger `updated_at`.
+- [ ] Regenerar `supabase/SCHEMA_REF.md` (`npm run schema:ref`).
+- [ ] `POST /api/proveedores/extract-csf` que reciba PDF, lo procese con Claude usando schema dedicado a CSF (todos los campos del ADR-007), y devuelva los datos pre-llenados sin persistir. Reutiliza `lib/documentos/extraction-core.ts`.
+- [ ] Tests unitarios del schema de extracción con CSFs reales (3-5 PDFs de ejemplo, físicas y morales).
+
+### Sprint 2 — UI de alta nueva (RDB primero)
+
+- [ ] Drawer `+ Nuevo Proveedor` con sección "Sube CSF (recomendado)" + link "Capturar manualmente".
+- [ ] Flujo upload → spinner ~60s → form pre-llenado → revisar/corregir → guardar.
+- [ ] Detección de duplicado por RFC al guardar (bloqueo + dos CTAs).
+- [ ] CSF archivada en `erp.adjuntos` con `entidad_tipo='persona', rol='csf'`; `csf_adjunto_id` apuntando al row creado.
+- [ ] Estados de error (Claude falla, PDF no es CSF, timeout) con CTA a captura manual.
+
+### Sprint 3 — UI de update existente (diff campo-por-campo)
+
+- [ ] Botón "Cargar / Actualizar CSF" en drawer/detalle del proveedor.
+- [ ] Modal de diff: valor actual → valor nuevo, checkbox por campo, "Aplicar cambios".
+- [ ] CSF nueva queda archivada como histórico aunque el usuario rechace todos los cambios. `csf_adjunto_id` se actualiza al PDF nuevo solo si se aceptó al menos un cambio.
+- [ ] Vista "Ver históricos" lista CSFs anteriores con fecha.
+
+### Sprint 4 — Rollout DILESA y cierre
+
+- [ ] Replicar el flujo en módulo de Proveedores DILESA (módulo nuevo si no existe).
+- [ ] Smoke manual end-to-end en RDB y DILESA con CSFs reales de proveedores actuales.
+- [ ] Closeout: medir tiempo medio de alta vs baseline manual; documentar en bitácora.
 
 ## Decisiones registradas
 
-_(append-only, fechadas — escrito por Claude Code)_
+- **2026-04-27 — Modelo DB: tabla anexa 1:1.** Se cierra la pregunta del alcance "columnas vs tabla anexa" con [ADR-007](../../supabase/adr/007_personas_datos_fiscales.md): nueva tabla `erp.personas_datos_fiscales` con FK UNIQUE `persona_id` a `erp.personas`. La única columna que toca `personas` es `tipo_persona` ('fisica'|'moral') porque define el tratamiento UI desde antes de cualquier CSF. Razones principales: sigue el patrón establecido del repo (`proveedores`, `empleados`, `clientes` ya son anexas a `personas`), separa concerns (identidad vs datos fiscales formales), migración aditiva sin riesgo, espacio para versionado futuro sin re-trabajo.
+- **2026-04-27 — CSF como adjunto polimórfico, no campo del modelo fiscal.** El PDF se archiva en `erp.adjuntos` con `entidad_tipo='persona', rol='csf', entidad_id=persona_id`. Histórico nativo por `created_at`; `csf_adjunto_id` en `personas_datos_fiscales` apunta al vigente. Reutiliza el patrón ya usado por el módulo Documentos sin tabla nueva.
+- **2026-04-27 — Régimen fiscal denormalizado, no catálogo SAT.** Guardamos `(codigo, nombre)` como texto en la tabla. Crear catálogo SAT solo para esta iniciativa es over-engineering; si después hace falta filtrar estructuradamente, se normaliza en otro ADR.
 
 ## Bitácora
 
-_(append-only, escrita por Claude Code al ejecutar)_
+- **2026-04-27 — Sesión de arranque.** Se registra la iniciativa en `INITIATIVES.md` (PR [#234](https://github.com/beto-sudo/BSOP/pull/234)). Beto aprueba alcance v1 inmediatamente. Se promueve estado `proposed → planned` y se cierra la decisión de modelo DB con [ADR-007](../../supabase/adr/007_personas_datos_fiscales.md). El próximo hito real es Sprint 1: migración DB + endpoint de extracción.
