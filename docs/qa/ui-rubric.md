@@ -48,17 +48,23 @@ Role tested: [admin / user / no-access]
 
 | Check                                                                                   | Result | Notes |
 | --------------------------------------------------------------------------------------- | ------ | ----- |
-| Table renders with column headers                                                       |        |       |
-| Column headers are labeled and readable                                                 |        |       |
-| Data rows render correctly                                                              |        |       |
-| Row hover state is visible                                                              |        |       |
-| Rows are clickable (cursor changes)                                                     |        |       |
-| Clicking a row opens the expected Sheet or navigates                                    |        |       |
-| Empty state uses `<EmptyState>` (not ad-hoc `<TableCell colSpan>` text)                 |        |       |
-| Empty state distinguishes "módulo virgen" vs "filtros activos" with different copy (S3) |        |       |
-| Loading uses `<TableSkeleton>` with column count matching the real table shape (S2)     |        |       |
-| Badge statuses (activo/inactivo etc.) render with color                                 |        |       |
-| Currency / date formats are correct (es-MX locale)                                      |        |       |
+| Table uses `<DataTable>` (NOT `<Table>` + `<SortableHead>` + `useSortableTable`)        |        |       |
+| Columns defined via declarative `Column<T>[]` array (DT1)                               |        |       |
+| Column types semánticos (`currency` / `number` / `date` / `delta` / `badge`) usados     |        |       |
+| Currency / number columns auto-align right (no se hardcodea `text-right`)               |        |       |
+| Sort funciona en columnas marcadas como sortable; aria-sort presente                    |        |       |
+| Sticky header se mantiene al scrollear (default true)                                   |        |       |
+| Density toggle visible y persistido en URL (DT4) si `onDensityChange` definido          |        |       |
+| Row hover state visible cuando `onRowClick` definido                                    |        |       |
+| Rows clickeables (cursor-pointer)                                                       |        |       |
+| Clicking row abre Sheet o navega (no se dispara desde celdas con popovers — DT5)        |        |       |
+| Celdas con popovers/inline-edit usan `<DataTable.InteractiveCell>` (DT5)                |        |       |
+| Empty state usa props `emptyTitle` / `emptyDescription` / `emptyAction` (no inline JSX) |        |       |
+| Empty state distingue "módulo virgen" vs "filtros activos" via `activeCount` (S3)       |        |       |
+| Loading state hereda `<TableSkeleton>` automático del `<DataTable>` con `loading` prop  |        |       |
+| Print: tabla cae a `display: table` plano sin sticky/virt (DT3) — verificar con Cmd+P   |        |       |
+| Badge statuses (activo/inactivo etc.) render con color                                  |        |       |
+| Currency / date formats usan `lib/format/format*` (no formatters locales)               |        |       |
 | Long text truncates (no layout breakage)                                                |        |       |
 
 ---
