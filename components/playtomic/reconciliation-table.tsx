@@ -1,3 +1,16 @@
+/**
+ * Migration to `<DataTable>` (ADR-010) not applied.
+ *
+ * Reason: the table renders a footer "totals" row with aggregated values
+ * across all visible rows. `<DataTable>` v1 has no first-class API for
+ * footer/totals (out of scope per the §"Fuera de alcance v1" of the
+ * planning doc). Replicating the totals via a separate table or as a
+ * card footer would be visually inconsistent with the body rows.
+ *
+ * Decision logged in docs/planning/data-table.md bitácora 2026-04-27 as
+ * a permanent exception.
+ */
+
 import {
   Table,
   TableBody,

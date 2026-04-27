@@ -1,3 +1,18 @@
+/**
+ * Migration to `<DataTable>` (ADR-010) not applied.
+ *
+ * Reason: the section contains two tables. The first (resumen por jugador,
+ * top 20) renders an aggregated "Totales" footer row — same constraint as
+ * `reconciliation-table.tsx` (DataTable v1 has no totals API). The second
+ * (detalle de reservas pendientes) is gated by `showPendingDetails` toggle
+ * and uses external sort props (`pendingSortKey`/`pendingOnSort`/
+ * `pendingSortData`) shared with the parent — DataTable manages sort
+ * internally, which would break that contract.
+ *
+ * Decision logged in docs/planning/data-table.md bitácora 2026-04-27 as
+ * a permanent exception.
+ */
+
 import { Button } from '@/components/ui/button';
 import {
   Table,

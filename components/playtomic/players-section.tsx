@@ -1,3 +1,18 @@
+/**
+ * Migration to `<DataTable>` (ADR-010) not applied.
+ *
+ * Reason: this section renders two tightly-coupled tables (top jugadores +
+ * top canceladores) inside a single `xl:grid-cols-[1.4fr_1fr]` layout, and
+ * the sort of the top-jugadores table is driven by an external `<Combobox>`
+ * (gasto/reservas/name/sport), not by clicking column headers. The
+ * `slice(0,10)` truncation also conflicts with DataTable's "show all rows
+ * matching filter" model. Migrating would split the layout and break the
+ * external-sort contract.
+ *
+ * Decision logged in docs/planning/data-table.md bitácora 2026-04-27 as
+ * a permanent exception.
+ */
+
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Combobox } from '@/components/ui/combobox';

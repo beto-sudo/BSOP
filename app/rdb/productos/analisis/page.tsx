@@ -4,14 +4,7 @@ import { RequireAccess } from '@/components/require-access';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { DataTable, type Column } from '@/components/module-page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -535,63 +528,55 @@ export default function ProductosAnalisisPage() {
             subtitle="Candidatos a promoción urgente o baja. Ordenados por valor en stock."
             onExport={sinMovimiento.length > 0 ? exportSinMov : undefined}
           />
-          <div className="rounded-xl border bg-card overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Producto</TableHead>
-                  <TableHead>Categoría</TableHead>
-                  <TableHead className="text-right">Stock</TableHead>
-                  <TableHead className="text-right">Días sin venta</TableHead>
-                  <TableHead className="text-right">Valor en stock</TableHead>
-                  <TableHead>Última venta</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}>
-                      {Array.from({ length: 6 }).map((__, j) => (
-                        <TableCell key={j}>
-                          <Skeleton className="h-4 w-full" />
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : sinMovimiento.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={6}
-                      className="py-10 text-center text-muted-foreground text-sm"
-                    >
-                      Ningún producto inventariable con stock y sin venta en &gt;30 días. ✓
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  sinMovimiento.map((m) => (
-                    <TableRow key={m.id}>
-                      <TableCell className="font-medium">{m.nombre}</TableCell>
-                      <TableCell>
-                        <CategoriaBadge nombre={m.categoria_nombre} color={m.categoria_color} />
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatNumber(m.stock_actual, 0)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-red-600">
-                        {m.dias_sin_venta === 9999 ? 'Nunca' : `${m.dias_sin_venta}d`}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">
-                        {formatCurrency(m.valor_stock)}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {formatDate(m.ultima_venta_at)}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          <DataTable<Metrica>
+            data={sinMovimiento}
+            columns={[
+              {
+                key: 'nombre',
+                label: 'Producto',
+                cellClassName: 'font-medium',
+              },
+              {
+                key: 'categoria_nombre',
+                label: 'Categoría',
+                sortable: false,
+                render: (m) => (
+                  <CategoriaBadge nombre={m.categoria_nombre} color={m.categoria_color} />
+                ),
+              },
+              {
+                key: 'stock_actual',
+                label: 'Stock',
+                type: 'number',
+                render: (m) => formatNumber(m.stock_actual, 0),
+              },
+              {
+                key: 'dias_sin_venta',
+                label: 'Días sin venta',
+                type: 'number',
+                cellClassName: 'text-red-600',
+                render: (m) => (m.dias_sin_venta === 9999 ? 'Nunca' : `${m.dias_sin_venta}d`),
+              },
+              {
+                key: 'valor_stock',
+                label: 'Valor en stock',
+                type: 'currency',
+                cellClassName: 'font-medium',
+                render: (m) => formatCurrency(m.valor_stock),
+              },
+              {
+                key: 'ultima_venta_at',
+                label: 'Última venta',
+                cellClassName: 'text-xs text-muted-foreground',
+                render: (m) => formatDate(m.ultima_venta_at),
+              },
+            ]}
+            rowKey="id"
+            loading={loading}
+            initialSort={{ key: 'valor_stock', dir: 'desc' }}
+            showDensityToggle={false}
+            emptyTitle="Ningún producto inventariable con stock y sin venta en >30 días. ✓"
+          />
         </section>
 
         {/* Estrellas */}
@@ -602,67 +587,60 @@ export default function ProductosAnalisisPage() {
             subtitle="Productos rentables clave (≥30 unidades 30d, margen ≥30%). No te quedes sin stock."
             onExport={estrellas.length > 0 ? exportEstrellas : undefined}
           />
-          <div className="rounded-xl border bg-card overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Producto</TableHead>
-                  <TableHead>Categoría</TableHead>
-                  <TableHead className="text-right">Unidades 30d</TableHead>
-                  <TableHead className="text-right">Importe 30d</TableHead>
-                  <TableHead className="text-right">Margen</TableHead>
-                  <TableHead className="text-right">Utilidad 30d</TableHead>
-                  <TableHead className="text-right">Stock</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}>
-                      {Array.from({ length: 7 }).map((__, j) => (
-                        <TableCell key={j}>
-                          <Skeleton className="h-4 w-full" />
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : estrellas.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={7}
-                      className="py-10 text-center text-muted-foreground text-sm"
-                    >
-                      Sin estrellas que cumplan el criterio. Revisa precios y costos.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  estrellas.map((m) => (
-                    <TableRow key={m.id}>
-                      <TableCell className="font-medium">{m.nombre}</TableCell>
-                      <TableCell>
-                        <CategoriaBadge nombre={m.categoria_nombre} color={m.categoria_color} />
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatNumber(m.unidades_30d, 0)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatCurrency(m.importe_30d)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <MargenBadge pct={m.margen_pct} />
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium text-emerald-600">
-                        {formatCurrency(m.utilidad_30d)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {m.inventariable ? formatNumber(m.stock_actual, 0) : '—'}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          <DataTable<Metrica>
+            data={estrellas}
+            columns={[
+              {
+                key: 'nombre',
+                label: 'Producto',
+                cellClassName: 'font-medium',
+              },
+              {
+                key: 'categoria_nombre',
+                label: 'Categoría',
+                sortable: false,
+                render: (m) => (
+                  <CategoriaBadge nombre={m.categoria_nombre} color={m.categoria_color} />
+                ),
+              },
+              {
+                key: 'unidades_30d',
+                label: 'Unidades 30d',
+                type: 'number',
+                render: (m) => formatNumber(m.unidades_30d, 0),
+              },
+              {
+                key: 'importe_30d',
+                label: 'Importe 30d',
+                type: 'currency',
+                render: (m) => formatCurrency(m.importe_30d),
+              },
+              {
+                key: 'margen_pct',
+                label: 'Margen',
+                align: 'right',
+                render: (m) => <MargenBadge pct={m.margen_pct} />,
+              },
+              {
+                key: 'utilidad_30d',
+                label: 'Utilidad 30d',
+                type: 'currency',
+                cellClassName: 'font-medium text-emerald-600',
+                render: (m) => formatCurrency(m.utilidad_30d),
+              },
+              {
+                key: 'stock_actual',
+                label: 'Stock',
+                type: 'number',
+                render: (m) => (m.inventariable ? formatNumber(m.stock_actual, 0) : '—'),
+              },
+            ]}
+            rowKey="id"
+            loading={loading}
+            initialSort={{ key: 'utilidad_30d', dir: 'desc' }}
+            showDensityToggle={false}
+            emptyTitle="Sin estrellas que cumplan el criterio. Revisa precios y costos."
+          />
         </section>
 
         {/* Margen bajo */}
@@ -673,75 +651,69 @@ export default function ProductosAnalisisPage() {
             subtitle="Alta rotación (≥30 unidades 30d) + margen <20%."
             onExport={margenBajo.length > 0 ? exportMargenBajo : undefined}
           />
-          <div className="rounded-xl border bg-card overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Producto</TableHead>
-                  <TableHead>Categoría</TableHead>
-                  <TableHead className="text-right">Unidades 30d</TableHead>
-                  <TableHead className="text-right">Importe 30d</TableHead>
-                  <TableHead className="text-right">Costo</TableHead>
-                  <TableHead className="text-right">Precio</TableHead>
-                  <TableHead className="text-right">Margen</TableHead>
-                  <TableHead className="text-right">Utilidad 30d</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}>
-                      {Array.from({ length: 8 }).map((__, j) => (
-                        <TableCell key={j}>
-                          <Skeleton className="h-4 w-full" />
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : margenBajo.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={8}
-                      className="py-10 text-center text-muted-foreground text-sm"
-                    >
-                      Ningún producto con alta rotación y margen bajo. ✓
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  margenBajo.map((m) => (
-                    <TableRow key={m.id}>
-                      <TableCell className="font-medium">{m.nombre}</TableCell>
-                      <TableCell>
-                        <CategoriaBadge nombre={m.categoria_nombre} color={m.categoria_color} />
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatNumber(m.unidades_30d, 0)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatCurrency(m.importe_30d)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatCurrency(m.costo)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatCurrency(m.precio_venta)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <MargenBadge pct={m.margen_pct} />
-                      </TableCell>
-                      <TableCell
-                        className={`text-right tabular-nums font-medium ${
-                          m.utilidad_30d < 0 ? 'text-red-600' : ''
-                        }`}
-                      >
-                        {formatCurrency(m.utilidad_30d)}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          <DataTable<Metrica>
+            data={margenBajo}
+            columns={[
+              {
+                key: 'nombre',
+                label: 'Producto',
+                cellClassName: 'font-medium',
+              },
+              {
+                key: 'categoria_nombre',
+                label: 'Categoría',
+                sortable: false,
+                render: (m) => (
+                  <CategoriaBadge nombre={m.categoria_nombre} color={m.categoria_color} />
+                ),
+              },
+              {
+                key: 'unidades_30d',
+                label: 'Unidades 30d',
+                type: 'number',
+                render: (m) => formatNumber(m.unidades_30d, 0),
+              },
+              {
+                key: 'importe_30d',
+                label: 'Importe 30d',
+                type: 'currency',
+                render: (m) => formatCurrency(m.importe_30d),
+              },
+              {
+                key: 'costo',
+                label: 'Costo',
+                type: 'currency',
+                render: (m) => formatCurrency(m.costo),
+              },
+              {
+                key: 'precio_venta',
+                label: 'Precio',
+                type: 'currency',
+                render: (m) => formatCurrency(m.precio_venta),
+              },
+              {
+                key: 'margen_pct',
+                label: 'Margen',
+                align: 'right',
+                render: (m) => <MargenBadge pct={m.margen_pct} />,
+              },
+              {
+                key: 'utilidad_30d',
+                label: 'Utilidad 30d',
+                type: 'currency',
+                render: (m) => (
+                  <span className={m.utilidad_30d < 0 ? 'font-medium text-red-600' : 'font-medium'}>
+                    {formatCurrency(m.utilidad_30d)}
+                  </span>
+                ),
+              },
+            ]}
+            rowKey="id"
+            loading={loading}
+            initialSort={{ key: 'unidades_30d', dir: 'desc' }}
+            showDensityToggle={false}
+            emptyTitle="Ningún producto con alta rotación y margen bajo. ✓"
+          />
         </section>
 
         {/* Comparativa por categoría — bar chart CSS */}
