@@ -91,12 +91,19 @@ El módulo de Documentos ya tiene el patrón de extracción IA con Claude (`/api
 - [ ] Detección persona física vs moral: la extracción setea `tipo_persona`; UI muestra/oculta campos correspondientes.
 - [ ] Estados de error (Claude falla, PDF no es CSF, timeout) con CTA a captura manual.
 
-### Sprint 3 — UI de update existente (diff campo-por-campo)
+### Sprint 3.A — Backend de update con CSF
 
-- [ ] Botón "Cargar / Actualizar CSF" en drawer/detalle del proveedor.
+- [ ] `POST /api/proveedores/[persona_id]/update-csf` recibe FormData (PDF + payload con `accepted_fields[]`).
+- [ ] PDF siempre se archiva en `erp.adjuntos` como histórico; UPDATEs selectivos a `personas` y `personas_datos_fiscales` solo de los campos en `accepted_fields`. `csf_adjunto_id` se actualiza al nuevo solo si hay aceptados.
+- [ ] Edge case: persona legacy sin `personas_datos_fiscales` → primer "update" hace INSERT.
+- [ ] Tests del schema `UpdateCsfPayloadSchema` con `accepted_fields` enum.
+
+### Sprint 3.B — UI de update con diff (RDB primero)
+
+- [ ] Botón "Cargar / Actualizar CSF" en detalle del proveedor.
 - [ ] Modal de diff: valor actual → valor nuevo, checkbox por campo, "Aplicar cambios".
-- [ ] CSF nueva queda archivada como histórico aunque el usuario rechace todos los cambios. `csf_adjunto_id` se actualiza al PDF nuevo solo si se aceptó al menos un cambio.
-- [ ] Vista "Ver históricos" lista CSFs anteriores con fecha.
+- [ ] Manejo de tres outcomes: (a) aceptan todo, (b) aceptan algunos, (c) rechazan todo (PDF queda archivado igual).
+- [ ] Vista "Ver históricos" lista CSFs anteriores con fecha (opcional para v1).
 
 ### Sprint 4 — Rollout DILESA y cierre
 
@@ -115,3 +122,6 @@ El módulo de Documentos ya tiene el patrón de extracción IA con Claude (`/api
 - **2026-04-27 — Sesión de arranque.** Se registra la iniciativa en `INITIATIVES.md` (PR [#234](https://github.com/beto-sudo/BSOP/pull/234)). Beto aprueba alcance v1 inmediatamente. Se promueve estado `proposed → planned` y se cierra la decisión de modelo DB con [ADR-007](../../supabase/adr/007_personas_datos_fiscales.md).
 - **2026-04-27 — Sprint 1.A cerrado (PR [#235](https://github.com/beto-sudo/BSOP/pull/235)).** Migración aplicada a la DB: columna `tipo_persona` en `erp.personas` + tabla `erp.personas_datos_fiscales` con RLS y trigger updated_at. SCHEMA_REF y types regenerados. CI verde (typecheck/lint/test/format/drift-check). Estado `planned → in_progress`. Próximo: Sprint 1.B (endpoint extract-csf).
 - **2026-04-27 — Sprint 1.B cerrado (PR [#236](https://github.com/beto-sudo/BSOP/pull/236)).** Endpoint `POST /api/proveedores/extract-csf` que recibe PDF y devuelve campos extraídos (sin persistir). `CsfExtraccionSchema` con todos los campos del ADR-007. 9 tests unitarios del schema pasando. Reutiliza `lib/documentos/extraction-core.ts`. Como efecto colateral, descubrimos un bug del workflow `db-types.yml` que regeneraba types sin schemas `dilesa`/`maquinaria` (causando typecheck fail en su PR auto-generado #227); arreglado en PR [#239](https://github.com/beto-sudo/BSOP/pull/239) y memoria `reference_db_types_workflow_sync.md` agregada. Próximo: Sprint 2.A (endpoint create-with-csf + dedup RFC).
+- **2026-04-27 — Sprint 2.A cerrado (PR [#241](https://github.com/beto-sudo/BSOP/pull/241)).** Endpoint `POST /api/proveedores/create-with-csf` que recibe FormData (PDF + payload) y persiste persona + proveedor + adjunto + datos_fiscales en orden recuperable. Dedup por RFC con 409 + `existing_persona_id`. `CreateProveedorPayloadSchema` (Zod) compartido con cliente; 5 tests nuevos.
+- **2026-04-27 — Sprint 2.B cerrado (PR [#242](https://github.com/beto-sudo/BSOP/pull/242)).** UI del drawer "+ Nuevo Proveedor" en RDB con sección "Sube CSF (recomendado)" arriba del form. File input + botón "Procesar CSF" → spinner → form pre-llenado (tipo_persona toggle, identidad, RFC, CURP, régimen, domicilio fiscal). Submit dual: con CSF llama `create-with-csf`, sin CSF preserva el flujo manual existente. Modal Sheet de RFC duplicado con CTAs "Ir al existente" / "Volver al form". Solo modifica `app/rdb/proveedores/page.tsx`. 217 tests pasando.
+- **2026-04-27 — Sprint 3.A arranque.** Backend `POST /api/proveedores/[persona_id]/update-csf` con aplicación selectiva por `accepted_fields`. Mapeo `FIELD_MAP` decide qué campo va a `personas` vs `personas_datos_fiscales`. PDF siempre archivado; `csf_adjunto_id` se actualiza solo si hay aceptados. Maneja edge case de persona legacy sin `personas_datos_fiscales` (INSERT en lugar de UPDATE). `UpdateCsfPayloadSchema` con enum de campos válidos (`CSF_UPDATABLE_FIELDS`); 5 tests del schema. Próximo: Sprint 3.B (UI con modal de diff).

@@ -177,6 +177,62 @@ export const CreateProveedorPayloadSchema = z.object({
 
 export type CreateProveedorPayload = z.infer<typeof CreateProveedorPayloadSchema>;
 
+// ─── Input para update-csf (Sprint 3.A) ──────────────────────────────────────
+
+/**
+ * Conjunto canónico de campos del modelo CSF que el usuario puede elegir
+ * aplicar/ignorar en el flujo de update. Cada key del enum corresponde a un
+ * campo de `CsfExtraccionSchema`. El endpoint mapea estos keys a columnas en
+ * `erp.personas` o `erp.personas_datos_fiscales`.
+ */
+export const CSF_UPDATABLE_FIELDS = [
+  'tipo_persona',
+  'rfc',
+  'curp',
+  'nombre',
+  'apellido_paterno',
+  'apellido_materno',
+  'razon_social',
+  'nombre_comercial',
+  'regimen_fiscal_codigo',
+  'regimen_fiscal_nombre',
+  'regimenes_adicionales',
+  'domicilio_calle',
+  'domicilio_num_ext',
+  'domicilio_num_int',
+  'domicilio_colonia',
+  'domicilio_cp',
+  'domicilio_municipio',
+  'domicilio_estado',
+  'obligaciones',
+  'fecha_inicio_operaciones',
+  'fecha_emision',
+] as const;
+
+export type CsfUpdatableField = (typeof CSF_UPDATABLE_FIELDS)[number];
+
+/**
+ * Payload del endpoint `POST /api/proveedores/[persona_id]/update-csf`.
+ *
+ * El cliente arma esto tras revisar el diff entre la extracción nueva y el
+ * estado actual de la persona. `accepted_fields` lista los keys que el
+ * usuario marcó con checkbox en el modal.
+ *
+ * Comportamiento del endpoint según `accepted_fields`:
+ * - **Vacío:** solo archiva el PDF nuevo en `erp.adjuntos` como histórico.
+ *   No toca `personas` ni `personas_datos_fiscales`. `csf_adjunto_id` queda
+ *   apuntando al PDF anterior.
+ * - **No vacío:** archiva el PDF nuevo, aplica UPDATEs selectivos solo a los
+ *   campos listados, y actualiza `csf_adjunto_id` al nuevo adjunto.
+ */
+export const UpdateCsfPayloadSchema = z.object({
+  empresa_id: z.string().uuid('empresa_id debe ser UUID'),
+  extraccion: CsfExtraccionSchema,
+  accepted_fields: z.array(z.enum(CSF_UPDATABLE_FIELDS)),
+});
+
+export type UpdateCsfPayload = z.infer<typeof UpdateCsfPayloadSchema>;
+
 // ─── Llamada al modelo ───────────────────────────────────────────────────────
 
 const PROMPT = `
