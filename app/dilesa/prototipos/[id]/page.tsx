@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Archive, Loader2, ExternalLink, ImageOff } from 'lucide-react';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
+import { DetailPage, DetailHeader } from '@/components/detail-page';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import {
   DILESA_EMPRESA_ID,
@@ -174,33 +175,14 @@ function PrototipoDetailInner() {
       : null;
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-2">
-          <Button
-            variant="outline"
-            size="icon-sm"
-            onClick={() => router.push('/dilesa/prototipos')}
-            aria-label="Volver a Prototipos"
-          >
-            <ArrowLeft className="size-4" />
-          </Button>
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text)]/45">
-              DILESA · Prototipo
-            </div>
-            <h1 className="mt-0.5 text-2xl font-semibold tracking-tight text-[var(--text)]">
-              {prototipo.nombre}
-            </h1>
-            {prototipo.codigo ? (
-              <p className="mt-0.5 font-mono text-xs uppercase tracking-widest text-[var(--text)]/45">
-                {prototipo.codigo}
-              </p>
-            ) : null}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <EtapaBadgeLarge etapa={prototipo.etapa} />
+    <DetailPage>
+      <DetailHeader
+        back={{ onClick: () => router.push('/dilesa/prototipos'), label: 'Volver a Prototipos' }}
+        eyebrow="DILESA · Prototipo"
+        title={prototipo.nombre}
+        subtitle={prototipo.codigo ?? undefined}
+        meta={<EtapaBadgeLarge etapa={prototipo.etapa} />}
+        actions={
           <Button
             variant="outline"
             size="sm"
@@ -215,8 +197,8 @@ function PrototipoDetailInner() {
             )}
             Archivar
           </Button>
-        </div>
-      </div>
+        }
+      />
       <ConfirmDialog
         open={archiveOpen}
         onOpenChange={setArchiveOpen}
@@ -397,7 +379,7 @@ function PrototipoDetailInner() {
           </Section>
         </div>
       </div>
-    </div>
+    </DetailPage>
   );
 }
 

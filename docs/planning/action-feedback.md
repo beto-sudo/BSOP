@@ -3,10 +3,10 @@
 **Slug:** `action-feedback`
 **Empresas:** todas
 **Schemas afectados:** n/a (UI)
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-04-26
-**Última actualización:** 2026-04-26 (alcance v1 cerrado al arrancar)
+**Última actualización:** 2026-04-26 (cerrada — PR #216 mergeado)
 
 ## Problema
 
@@ -63,7 +63,7 @@ Síntomas:
 
 ## Sprints / hitos
 
-- **Fase 1 — hook + ADR + 3 migraciones golden.** ⏳ **En curso (PR abierto).** Salida: `useActionFeedback` (`hooks/use-action-feedback.ts`) + ADR-008 con 5 reglas (T1-T5) + migración de 3 holdouts de `window.confirm` (terrenos/[id], prototipos/[id], proyectos/[id] de DILESA) + checks en `ui-rubric.md` Section 10. Próximo hito: Beto smoke + merge.
+- **Fase 1 — hook + ADR + 3 migraciones golden.** ✅ **Cerrada 2026-04-26.** PR [#216](https://github.com/beto-sudo/BSOP/pull/216) mergeado (commit `2018c42`). Salida: `useActionFeedback` (`hooks/use-action-feedback.ts`) + ADR-008 con 5 reglas (T1-T5) + migración de 3 holdouts de `window.confirm` (terrenos/[id], prototipos/[id], proyectos/[id] de DILESA) + checks en `ui-rubric.md` Section 10.
 - **Fase 2 — adopción incremental.** ⏸️ Sin PR único. Cada toque futuro a un archivo con `window.confirm`/`alert` lo migra; los nuevos PRs no se aprueban con esos patterns. Mientras tanto, ~12 holdouts conviven con la convención hasta que se les toque por otro motivo.
 
 ## Decisiones registradas
@@ -78,3 +78,4 @@ Síntomas:
 ## Bitácora
 
 - **2026-04-26 (CC)** — Fase 1 implementada. Branch `feat/ui-action-feedback`. Hook nuevo `hooks/use-action-feedback.ts` con API `{ success, error, info, warning, undoable }`, error con inferencia automática de `Error.message`. ADR-008 (`docs/adr/008_action_feedback.md`) creado con 5 reglas (T1-T5). JSDoc de `components/ui/toast.tsx` actualizado para reflejar el shape real de `actionProps` y recomendar `useActionFeedback` como entry point preferido. Migración de 3 holdouts: `app/dilesa/terrenos/[id]/page.tsx`, `app/dilesa/prototipos/[id]/page.tsx`, `app/dilesa/proyectos/[id]/page.tsx` — los 3 reemplazan `window.confirm` + `alert(...)` por `<ConfirmDialog>` + `feedback.error(err, {title})` + `feedback.success(...)`. `docs/qa/ui-rubric.md` Section 10 actualizada con 4 checks específicos a la convención. INITIATIVES.md: `action-feedback` proposed → in_progress; `filters-url-sync` movida a `## Done`.
+- **2026-04-26 (CC)** — Fase 1 cerrada. PR [#216](https://github.com/beto-sudo/BSOP/pull/216) mergeado a main vía squash (`2018c42`). Iniciativa movida a `## Done` en INITIATIVES.md. Fase 2 queda como adopción incremental por construcción en cada toque futuro a archivos con `window.confirm`/`alert`.

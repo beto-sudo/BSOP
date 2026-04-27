@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Archive, Loader2, MapPin, ExternalLink } from 'lucide-react';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
+import { DetailPage, DetailHeader } from '@/components/detail-page';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import {
   DILESA_EMPRESA_ID,
@@ -182,33 +183,14 @@ function TerrenoDetailInner() {
   const mapSrc = mapQuery ? `https://www.google.com/maps?q=${mapQuery}&output=embed` : null;
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-2">
-          <Button
-            variant="outline"
-            size="icon-sm"
-            onClick={() => router.push('/dilesa/terrenos')}
-            aria-label="Volver a Terrenos"
-          >
-            <ArrowLeft className="size-4" />
-          </Button>
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text)]/45">
-              DILESA · Terreno
-            </div>
-            <h1 className="mt-0.5 text-2xl font-semibold tracking-tight text-[var(--text)]">
-              {terreno.nombre}
-            </h1>
-            {terreno.clave_interna ? (
-              <p className="mt-0.5 font-mono text-xs uppercase tracking-widest text-[var(--text)]/45">
-                {terreno.clave_interna}
-              </p>
-            ) : null}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <EtapaBadgeLarge etapa={terreno.etapa} />
+    <DetailPage>
+      <DetailHeader
+        back={{ onClick: () => router.push('/dilesa/terrenos'), label: 'Volver a Terrenos' }}
+        eyebrow="DILESA · Terreno"
+        title={terreno.nombre}
+        subtitle={terreno.clave_interna ?? undefined}
+        meta={<EtapaBadgeLarge etapa={terreno.etapa} />}
+        actions={
           <Button
             variant="outline"
             size="sm"
@@ -223,8 +205,8 @@ function TerrenoDetailInner() {
             )}
             Archivar
           </Button>
-        </div>
-      </div>
+        }
+      />
       <ConfirmDialog
         open={archiveOpen}
         onOpenChange={setArchiveOpen}
@@ -382,7 +364,7 @@ function TerrenoDetailInner() {
           </Section>
         </div>
       </div>
-    </div>
+    </DetailPage>
   );
 }
 
