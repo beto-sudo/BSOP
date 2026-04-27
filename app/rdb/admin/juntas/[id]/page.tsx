@@ -701,17 +701,13 @@ function JuntaDetailInner() {
           setTasks(tasksData as JuntaTask[]);
         }
 
-        // Refresh avances — toda la empresa dentro de la ventana de la junta.
-        let updPollBuilder = supabase
-          .schema('erp')
-          .from('task_updates')
-          .select('*')
-          .eq('empresa_id', junta.empresa_id)
-          .gte('created_at', junta.fecha_hora);
-        if (junta.fecha_terminada) {
-          updPollBuilder = updPollBuilder.lte('created_at', junta.fecha_terminada);
-        }
-        const { data: updData } = await updPollBuilder.order('created_at', { ascending: false });
+        // Refresh avances — ligados explícitamente por junta_id (mismo
+        // criterio que el fetchAll inicial). Antes este polling filtraba por
+        // empresa_id + ventana de tiempo, lo que provocaba que el primer
+        // tick borrara avances que sí estaban ligados a la junta pero
+        // creados fuera de la ventana (junta futura, o avances anteriores
+        // a fecha_hora).
+        const { data: updData } = await fetchJuntaUpdates(supabase as any, { juntaId });
         if (updData) {
           const uIds = [...new Set(updData.map((u: any) => u.creado_por).filter(Boolean))];
           const tIds = [...new Set(updData.map((u: any) => u.task_id).filter(Boolean))];
@@ -1185,6 +1181,135 @@ function JuntaDetailInner() {
             className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
           />
         </div>
+
+        {/* ── Participantes (inline dentro de info) ─────────────────── */}
+        <div className="pt-2 border-t border-[var(--border)]">
+          <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+            <SectionTitle>Participantes</SectionTitle>
+            <div className="flex items-center gap-3">
+              <label
+                className={`flex items-center gap-2 text-xs text-[var(--text)]/80 select-none ${
+                  estado === 'completada' || estado === 'cancelada'
+                    ? 'opacity-60 cursor-not-allowed'
+                    : 'cursor-pointer'
+                }`}
+                title="Al terminar la junta, enviar también la minuta a consejo@dilesa.mx"
+              >
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-[var(--border)] accent-[var(--accent)]"
+                  checked={enviarAConsejo}
+                  disabled={estado === 'completada' || estado === 'cancelada'}
+                  onChange={(e) => toggleEnviarAConsejo(e.target.checked)}
+                />
+                Enviar Junta a Consejo
+              </label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAddPersona(true)}
+                className="gap-1.5 rounded-xl border-[var(--border)] text-[var(--text)] hover:bg-[var(--panel)]"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Agregar
+              </Button>
+            </div>
+          </div>
+
+          {asistencia.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-6 text-center">
+              <Users className="mb-2 h-8 w-8 text-[var(--text)]/20" />
+              <p className="text-sm text-[var(--text)]/50">No hay participantes registrados</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {asistencia.map((a) => {
+                const nombre = a.persona
+                  ? [a.persona.nombre, a.persona.apellido_paterno].filter(Boolean).join(' ')
+                  : 'Persona desconocida';
+
+                return (
+                  <div
+                    key={a.id}
+                    className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2.5"
+                  >
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent)]/15 text-xs font-semibold text-[var(--accent)]">
+                      {nombre.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="flex-1 text-sm text-[var(--text)]">{nombre}</span>
+
+                    <button
+                      type="button"
+                      onClick={() => handleToggleAsistio(a.id, a.asistio)}
+                      title={
+                        a.asistio === null ? 'Sin confirmar' : a.asistio ? 'Asistió' : 'No asistió'
+                      }
+                      className={[
+                        'inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs transition',
+                        a.asistio === true
+                          ? 'border-green-500/50 bg-green-500/15 text-green-400'
+                          : a.asistio === false
+                            ? 'border-red-500/50 bg-red-500/15 text-red-400'
+                            : 'border-[var(--border)] bg-[var(--card)] text-[var(--text-subtle)]',
+                      ].join(' ')}
+                    >
+                      {a.asistio === true ? (
+                        <Check className="h-3 w-3" />
+                      ) : a.asistio === false ? (
+                        <X className="h-3 w-3" />
+                      ) : (
+                        '?'
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveParticipant(a.id)}
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[var(--text)]/30 hover:bg-red-500/10 hover:text-red-400 transition"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {showAddPersona && (
+            <div className="mt-3 flex items-center gap-2 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-3">
+              <Combobox
+                value={selectedPersonaId}
+                onChange={setSelectedPersonaId}
+                options={availablePersonas.map((p) => ({ value: p.id, label: p.nombre }))}
+                placeholder="Seleccionar persona..."
+                className="flex-1 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
+              <Button
+                size="sm"
+                onClick={handleAddParticipant}
+                disabled={addingPersona || !selectedPersonaId}
+                className="rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60"
+              >
+                {addingPersona ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setShowAddPersona(false);
+                  setSelectedPersonaId('');
+                }}
+                className="rounded-xl border-[var(--border)] text-[var(--text)]"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
@@ -1334,134 +1459,6 @@ function JuntaDetailInner() {
           )}
         </div>
       )}
-
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
-        <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
-          <SectionTitle>Participantes</SectionTitle>
-          <div className="flex items-center gap-3">
-            <label
-              className={`flex items-center gap-2 text-xs text-[var(--text)]/80 select-none ${
-                estado === 'completada' || estado === 'cancelada'
-                  ? 'opacity-60 cursor-not-allowed'
-                  : 'cursor-pointer'
-              }`}
-              title="Al terminar la junta, enviar también la minuta a consejo@dilesa.mx"
-            >
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded border-[var(--border)] accent-[var(--accent)]"
-                checked={enviarAConsejo}
-                disabled={estado === 'completada' || estado === 'cancelada'}
-                onChange={(e) => toggleEnviarAConsejo(e.target.checked)}
-              />
-              Enviar Junta a Consejo
-            </label>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowAddPersona(true)}
-              className="gap-1.5 rounded-xl border-[var(--border)] text-[var(--text)] hover:bg-[var(--panel)]"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Agregar
-            </Button>
-          </div>
-        </div>
-
-        {asistencia.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <Users className="mb-2 h-8 w-8 text-[var(--text)]/20" />
-            <p className="text-sm text-[var(--text)]/50">No hay participantes registrados</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {asistencia.map((a) => {
-              const nombre = a.persona
-                ? [a.persona.nombre, a.persona.apellido_paterno].filter(Boolean).join(' ')
-                : 'Persona desconocida';
-
-              return (
-                <div
-                  key={a.id}
-                  className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2.5"
-                >
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent)]/15 text-xs font-semibold text-[var(--accent)]">
-                    {nombre.charAt(0).toUpperCase()}
-                  </div>
-                  <span className="flex-1 text-sm text-[var(--text)]">{nombre}</span>
-
-                  <button
-                    type="button"
-                    onClick={() => handleToggleAsistio(a.id, a.asistio)}
-                    title={
-                      a.asistio === null ? 'Sin confirmar' : a.asistio ? 'Asistió' : 'No asistió'
-                    }
-                    className={[
-                      'inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs transition',
-                      a.asistio === true
-                        ? 'border-green-500/50 bg-green-500/15 text-green-400'
-                        : a.asistio === false
-                          ? 'border-red-500/50 bg-red-500/15 text-red-400'
-                          : 'border-[var(--border)] bg-[var(--card)] text-[var(--text-subtle)]',
-                    ].join(' ')}
-                  >
-                    {a.asistio === true ? (
-                      <Check className="h-3 w-3" />
-                    ) : a.asistio === false ? (
-                      <X className="h-3 w-3" />
-                    ) : (
-                      '?'
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveParticipant(a.id)}
-                    className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[var(--text)]/30 hover:bg-red-500/10 hover:text-red-400 transition"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {showAddPersona && (
-          <div className="mt-3 flex items-center gap-2 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-3">
-            <Combobox
-              value={selectedPersonaId}
-              onChange={setSelectedPersonaId}
-              options={availablePersonas.map((p) => ({ value: p.id, label: p.nombre }))}
-              placeholder="Seleccionar persona..."
-              className="flex-1 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-            />
-            <Button
-              size="sm"
-              onClick={handleAddParticipant}
-              disabled={addingPersona || !selectedPersonaId}
-              className="rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60"
-            >
-              {addingPersona ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Check className="h-4 w-4" />
-              )}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setShowAddPersona(false);
-                setSelectedPersonaId('');
-              }}
-              className="rounded-xl border-[var(--border)] text-[var(--text)]"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-      </div>
 
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
         <div className="flex items-center justify-between mb-3">
