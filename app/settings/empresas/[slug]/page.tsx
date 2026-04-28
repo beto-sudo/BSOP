@@ -7,7 +7,7 @@ import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Building2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Building2, Construction, RefreshCw } from 'lucide-react';
 import { EmpresaDetail, type Empresa } from '../_components/empresa-detail';
 import { EmpresaBranding } from '../_components/empresa-branding';
 
@@ -43,7 +43,25 @@ const SELECT_COLS = [
   'header_email_url, footer_doc_url, watermark_url, branding_updated_at',
 ].join(' ');
 
-type Tab = 'branding' | 'fiscal';
+type Tab = 'fiscal' | 'branding' | 'cuadro-accionario' | 'beneficiario-controlador';
+
+const TABS: ReadonlyArray<{ key: Tab; label: string }> = [
+  { key: 'fiscal', label: 'Datos fiscales y dirección' },
+  { key: 'branding', label: 'Branding' },
+  { key: 'cuadro-accionario', label: 'Cuadro accionario' },
+  { key: 'beneficiario-controlador', label: 'Beneficiario controlador' },
+];
+
+function PlaceholderTab({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center p-16 text-center rounded-2xl border border-dashed border-[var(--border)] bg-[var(--card)]/50">
+      <Construction className="mb-3 h-10 w-10 text-[var(--text)]/30" />
+      <h3 className="text-base font-semibold text-[var(--text)]">{title}</h3>
+      <p className="mt-2 max-w-md text-sm text-[var(--text-muted)]">{description}</p>
+      <p className="mt-3 text-xs uppercase tracking-wider text-[var(--text)]/30">Próximamente</p>
+    </div>
+  );
+}
 
 function EmpresaPageInner() {
   const supabase = createSupabaseBrowserClient();
@@ -54,7 +72,7 @@ function EmpresaPageInner() {
   const [empresa, setEmpresa] = useState<EmpresaWithBranding | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>('branding');
+  const [tab, setTab] = useState<Tab>('fiscal');
 
   const fetchEmpresa = useCallback(async () => {
     if (!slug) return;
@@ -150,16 +168,13 @@ function EmpresaPageInner() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-[var(--border)]">
-        {[
-          { key: 'branding' as const, label: 'Branding' },
-          { key: 'fiscal' as const, label: 'Datos fiscales y dirección' },
-        ].map((t) => (
+      <div className="flex border-b border-[var(--border)] overflow-x-auto">
+        {TABS.map((t) => (
           <button
             key={t.key}
             type="button"
             onClick={() => setTab(t.key)}
-            className={`px-4 py-2.5 text-sm font-medium transition border-b-2 -mb-px cursor-pointer ${
+            className={`px-4 py-2.5 text-sm font-medium transition border-b-2 -mb-px cursor-pointer whitespace-nowrap ${
               tab === t.key
                 ? 'border-[var(--accent)] text-[var(--text)]'
                 : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text)]/80'
@@ -170,8 +185,20 @@ function EmpresaPageInner() {
         ))}
       </div>
 
-      {tab === 'branding' && <EmpresaBranding branding={empresa} slug={empresa.slug} />}
       {tab === 'fiscal' && <EmpresaDetail empresa={empresa} onSaved={fetchEmpresa} />}
+      {tab === 'branding' && <EmpresaBranding branding={empresa} slug={empresa.slug} />}
+      {tab === 'cuadro-accionario' && (
+        <PlaceholderTab
+          title="Cuadro accionario"
+          description="Aquí vivirá la lista de accionistas con su % de participación, certificados de acciones y cambios históricos. Hoy esa información está en Coda."
+        />
+      )}
+      {tab === 'beneficiario-controlador' && (
+        <PlaceholderTab
+          title="Beneficiario controlador"
+          description="Identificación del beneficiario controlador (Art. 32-B Quáter del CFF) con su declaración, documentación soporte y bitácora de actualizaciones para auditoría SAT."
+        />
+      )}
     </div>
   );
 }
