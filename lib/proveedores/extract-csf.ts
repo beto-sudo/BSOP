@@ -55,6 +55,25 @@ export const ObligacionSchema = z.object({
     .describe('Fecha en que dejó de aplicar, formato YYYY-MM-DD. null si sigue vigente.'),
 });
 
+export const ActividadEconomicaSchema = z.object({
+  orden: z.number().int().describe('Número de orden tal como aparece en la CSF (1, 2, 3...).'),
+  actividad: z
+    .string()
+    .describe('Texto literal de la actividad económica tal como aparece en la CSF.'),
+  porcentaje: z
+    .string()
+    .nullable()
+    .describe('Porcentaje atribuido a la actividad (ej. "90%"). null si no aparece.'),
+  fecha_inicio: z
+    .string()
+    .nullable()
+    .describe('Fecha desde cuando aplica, formato YYYY-MM-DD. null si no aparece.'),
+  fecha_fin: z
+    .string()
+    .nullable()
+    .describe('Fecha en que dejó de aplicar, formato YYYY-MM-DD. null si sigue vigente.'),
+});
+
 export const CsfExtraccionSchema = z.object({
   // ─── Identidad fiscal ───────────────────────────────────────────────────
   tipo_persona: z
@@ -142,6 +161,38 @@ export const CsfExtraccionSchema = z.object({
     .string()
     .nullable()
     .describe('Fecha de emisión / generación de la CSF, formato YYYY-MM-DD. null si no aparece.'),
+
+  // ─── Campos extendidos (consumidos por empresas, opcionales) ────────────
+  // Los siguientes campos son opcionales — null por default para no romper
+  // consumidores existentes (proveedores). Empresas los lee cuando la CSF
+  // del SAT los expone (caso típico de personas morales del grupo).
+  id_cif: z
+    .string()
+    .nullable()
+    .default(null)
+    .describe(
+      'Identificador de Cédula de Identificación Fiscal (idCIF), 11 dígitos. null si no aparece.'
+    ),
+  estatus_sat: z
+    .string()
+    .nullable()
+    .default(null)
+    .describe('Estatus en el padrón del SAT (ej. "ACTIVO"). null si no aparece.'),
+  regimen_capital: z
+    .string()
+    .nullable()
+    .default(null)
+    .describe(
+      'Régimen de capital de personas morales (ej. "SOCIEDAD ANONIMA DE CAPITAL VARIABLE"). ' +
+        'null si es persona física o no aparece.'
+    ),
+  actividades_economicas: z
+    .array(ActividadEconomicaSchema)
+    .default([])
+    .describe(
+      'Lista de actividades económicas de la sección "Actividades Económicas" de la CSF, ' +
+        'con orden, descripción literal, porcentaje y fechas. Vacío si no aparece la sección.'
+    ),
 });
 
 export type CsfExtraccion = z.infer<typeof CsfExtraccionSchema>;
@@ -246,6 +297,10 @@ Reglas:
 - Para personas morales: razon_social se llena; nombre/apellidos quedan null; curp null.
 - En "regimenes_adicionales" pon TODOS los regímenes que veas en la sección "Regímenes" de la CSF (uno o varios). El "regimen_fiscal_codigo/nombre" debe ser el principal vigente (el más reciente sin fecha_fin, o si solo hay uno, ese).
 - "obligaciones" debe listar TODAS las que aparezcan, con su descripción literal y fechas si las hay.
+- "actividades_economicas" debe listar TODAS las actividades de la sección "Actividades Económicas" de la CSF, con orden, descripción literal, porcentaje y fechas. Si la CSF no expone esa sección, devuelve un array vacío.
+- "id_cif" es el "idCIF" o "Identificador de Cédula de Identificación Fiscal" (11 dígitos). Aparece en CSF de personas morales y de algunas físicas. null si no está.
+- "estatus_sat" es el estatus en el padrón ("ACTIVO" o equivalente). null si no aparece.
+- "regimen_capital" solo aplica a personas morales (ej. "SOCIEDAD ANONIMA DE CAPITAL VARIABLE"). Si la denominación social ya lo trae, extrae solo la parte de régimen de capital (sin la razón social). null si es física o no aparece.
 - Fechas siempre en formato YYYY-MM-DD (convierte si la CSF las muestra en otro formato).
 - Si un campo no se puede leer con certeza, devuelve null. NO inventes valores.
 - Si el RFC viene con guiones o espacios, devuélvelo limpio (solo letras y números, mayúsculas).

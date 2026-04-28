@@ -3,10 +3,10 @@
 **Slug:** `empresas-csf-config`
 **Empresas:** todas (las 4 SA de CV ya cargadas; UI nueva en `/settings/empresas`)
 **Schemas afectados:** `core` (lectura/escritura `core.empresas`; `audit_log`; `erp.adjuntos` para archivar PDF)
-**Estado:** planned
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-28
-**Última actualización:** 2026-04-28 (alcance v1 cerrado tras 5 decisiones de Beto: reuso directo del extractor de proveedores sin refactor previo, espejo simple de endpoints en `/api/empresas`, incluye flujo de alta nueva, drawer + campo registro patronal inline en `empresa-detail`, permisos solo admin)
+**Última actualización:** 2026-04-28 (Sprint 1 mergeado: extractor CSF extendido con `id_cif`/`estatus_sat`/`regimen_capital`/`actividades_economicas` opcionales, `lib/empresas/csf-mapping.ts` + 4 endpoints `/api/empresas` admin-only + tests; CI verde)
 
 ## Problema
 
@@ -98,13 +98,13 @@ Empresa es estructuralmente igual al proveedor moral: mismo PDF de SAT, mismos c
 
 ## Sprints / hitos
 
-| #   | Scope                                                                                                                                  | Estado    | PR  |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------- | --------- | --- |
-| 0   | Promoción: este doc + fila en INITIATIVES.md                                                                                           | _este PR_ | —   |
-| 1   | Endpoints `/api/empresas/extract-csf`, `create-with-csf`, `[id]/update-csf`, `PATCH [id]` (registro patronal) + tests con fixtures CSF | pending   | —   |
-| 2   | UI drawer "Actualizar CSF" en `/settings/empresas/[slug]` + campo `registro_patronal_imss` editable + reuso `<CsfDiffModal>`           | pending   | —   |
-| 3   | Botón "Nueva empresa" + drawer `create-with-csf` en lista `/settings/empresas`                                                         | pending   | —   |
-| 4   | Refresh operativo: subir CSF al día de RDB/DILESA/COAGAN/ANSA + capturar `registro_patronal_imss` faltantes                            | pending   | —   |
+| #   | Scope                                                                                                                                  | Estado  | PR   |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------- | ------- | ---- |
+| 0   | Promoción: este doc + fila en INITIATIVES.md                                                                                           | done    | #267 |
+| 1   | Endpoints `/api/empresas/extract-csf`, `create-with-csf`, `[id]/update-csf`, `PATCH [id]` (registro patronal) + tests con fixtures CSF | done    | TBD  |
+| 2   | UI drawer "Actualizar CSF" en `/settings/empresas/[slug]` + campo `registro_patronal_imss` editable + reuso `<CsfDiffModal>`           | pending | —    |
+| 3   | Botón "Nueva empresa" + drawer `create-with-csf` en lista `/settings/empresas`                                                         | pending | —    |
+| 4   | Refresh operativo: subir CSF al día de RDB/DILESA/COAGAN/ANSA + capturar `registro_patronal_imss` faltantes                            | pending | —    |
 
 ## Decisiones registradas
 
@@ -117,3 +117,27 @@ Empresa es estructuralmente igual al proveedor moral: mismo PDF de SAT, mismos c
 - **Permisos solo admin** (igual que la pantalla actual de `/settings/empresas`). No se introduce matriz de roles nueva. Si en el futuro se quiere "solo accionistas" o "solo consejeros", sub-iniciativa con su propio cambio de permisos.
 
 ## Bitácora
+
+### 2026-04-28 — Sprint 1: endpoints API empresas
+
+**Qué se hizo en esta sesión:**
+
+- Extendido `lib/proveedores/extract-csf.ts` con 4 campos opcionales que la CSF de empresa expone pero la de proveedor no usaba: `id_cif`, `estatus_sat`, `regimen_capital`, `actividades_economicas[]`. Backwards-compatible (defaults `null`/`[]`); proveedores no se rompe. Prompt actualizado para extraerlos.
+- Creado `lib/empresas/csf-mapping.ts` con `buildEmpresaInsertFromExtraccion` y `buildEmpresaUpdateFromAccepted` — mapean shape neutro del extractor (`domicilio_num_ext`) → shape de `core.empresas` (`domicilio_numero_ext`). Encapsulan también el mapeo `obligaciones[]` (extractor) → `obligaciones_fiscales` (jsonb empresa con `vencimiento` libre) y `actividades_economicas[]` con porcentaje string. Campos de personas físicas (`nombre`, `apellido_paterno`) se ignoran silenciosamente para empresa.
+- 4 endpoints admin-only en `/api/empresas/`:
+  - `POST extract-csf`: wrapper sobre el extractor compartido. No persiste.
+  - `POST create-with-csf`: alta de empresa nueva con dedup por RFC + slug, archive PDF en `erp.adjuntos` (`entidad_tipo='empresa'`, `rol='csf'`), apunta `csf_url` al path del adjunto.
+  - `POST [id]/update-csf`: diff selectivo sobre `accepted_fields[]` (acepta `CsfUpdatableField` + `EmpresaExtraField`). Archiva PDF siempre; UPDATE selectivo solo si `accepted_fields` no está vacío.
+  - `PATCH [id]`: body JSON estricto para `registro_patronal_imss` (regex `/^[A-Z]\d{10}$/`, cadena vacía/null limpian). Extensible a otros campos sueltos no-CSF.
+- Helper `lib/empresas/admin-guard.ts` para gate consistente en los 4 endpoints (lookup `core.usuarios.rol === 'admin'`, mismo patrón que `app/api/impersonate`).
+- Tests: 24 schema (extendido) + 15 mapper + 31 endpoints = +70 tests, suite completa 273 verdes.
+- CI local verde: `typecheck` ✓ `lint` ✓ `format:check` ✓ `test:run` ✓.
+
+**Decisiones tácticas registradas durante implementación:**
+
+- Sin migración DB: `core.empresas.rfc` ya tiene `UNIQUE` (constraint `empresas_rfc_key` desde `20260416000000_empresas_csf_fields.sql`); `erp.adjuntos.entidad_tipo` es `TEXT NOT NULL` sin `CHECK`, acepta `'empresa'` libremente.
+- `<CsfDiffModal>` no existe como componente standalone — vive inline dentro de `components/proveedores/proveedores-module.tsx` (1606 líneas). Sprint 2 espejará el patrón de diff inline en el detalle de empresa, sin extraer a componente compartido. La promoción a `components/csf/<CsfDiffModal>` queda como sub-iniciativa cuando ambos consumidores estén estables (mismo razonamiento que `lib/csf/`).
+
+**Links:**
+
+- PR Sprint 1: TBD (se agregará al merge).
