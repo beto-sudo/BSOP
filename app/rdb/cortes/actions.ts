@@ -445,7 +445,12 @@ export async function confirmarVoucher(input: ConfirmarVoucherInput): Promise<vo
   }
   if (input.monto < 0) throw new Error('El monto no puede ser negativo');
 
-  const { error } = await supabase
+  // `.select('id')` fuerza a PostgREST a devolver las filas afectadas. Si
+  // RLS bloquea el UPDATE, supabase-js no devuelve `error` — devuelve
+  // `data: []`. Sin esto, el UPDATE puede fallar silenciosamente y el UI
+  // muestra success mientras el dato nunca persiste (regresión histórica
+  // de cuando se agregaron columnas editables sin policy de UPDATE).
+  const { data, error } = await supabase
     .schema('erp')
     .from('cortes_vouchers')
     .update({
@@ -453,9 +458,15 @@ export async function confirmarVoucher(input: ConfirmarVoucherInput): Promise<vo
       monto_reportado: input.monto,
       afiliacion: input.afiliacion?.trim() || null,
     })
-    .eq('id', input.voucher_id);
+    .eq('id', input.voucher_id)
+    .select('id');
 
   if (error) throw new Error(error.message);
+  if (!data || data.length === 0) {
+    throw new Error(
+      'No se pudo guardar el voucher (posible RLS bloqueando UPDATE o voucher inexistente).'
+    );
+  }
   revalidatePath('/rdb/cortes');
 }
 
@@ -479,7 +490,7 @@ export async function actualizarCategoriaVoucher(
     throw new Error('Comprobante de movimiento requiere seleccionar el movimiento ligado');
   }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .schema('erp')
     .from('cortes_vouchers')
     .update({
@@ -488,8 +499,14 @@ export async function actualizarCategoriaVoucher(
       movimiento_caja_id:
         input.categoria === 'comprobante_movimiento' ? input.movimiento_caja_id : null,
     })
-    .eq('id', input.voucher_id);
+    .eq('id', input.voucher_id)
+    .select('id');
 
   if (error) throw new Error(error.message);
+  if (!data || data.length === 0) {
+    throw new Error(
+      'No se pudo actualizar la categoría (posible RLS bloqueando UPDATE o voucher inexistente).'
+    );
+  }
   revalidatePath('/rdb/cortes');
 }
