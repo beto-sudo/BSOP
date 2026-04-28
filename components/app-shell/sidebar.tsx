@@ -308,10 +308,6 @@ export function Sidebar({
           })
         )}
       </nav>
-
-      <div className="border-t border-[var(--border)] px-3 py-4 text-xs dark:text-white/38 text-[var(--text)]/50">
-        {!collapsed ? t('footer.built_by') : '🦞'}
-      </div>
     </aside>
   );
 }

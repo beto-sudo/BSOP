@@ -23,8 +23,6 @@
   "header.toggle_theme": "Toggle theme",
   "header.toggle_locale": "Switch language",
 
-  "footer.built_by": "Built with 🦞 by Claw & Beto",
-
   "greeting.morning": "Good morning",
   "greeting.afternoon": "Good afternoon",
   "greeting.evening": "Good evening",
