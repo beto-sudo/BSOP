@@ -241,3 +241,36 @@ Hasta entonces, Reglas 1+2 deberían ser suficientes.
 
 - Always refer to `supabase/SCHEMA_REF.md` for exact table and column names to prevent mapping errors. Date/timestamp columns are returned in UTC, so parse them with a proper timezone.
 - **After applying ANY DB migration** (via Supabase MCP, `psql`, dashboard, or SQL file in `supabase/migrations/`), regenerate the schema reference before committing: `npm run schema:ref`. The pre-commit hook and CI both enforce this when `SUPABASE_DB_URL` is set. Drift between `SCHEMA_REF.md` and the live DB leads to confusion in future sessions that read the MD instead of the live schema.
+
+### Liberación de módulo nuevo (RBAC sync)
+
+Cuando se libera un módulo nuevo (sea un page nuevo bajo `app/<empresa>/`
+con su URL en el sidebar, o se habilita un módulo existente para una
+empresa más), hay 4 lugares que deben actualizarse en el mismo PR:
+
+1. **Sidebar** — agregar la entrada en `NAV_ITEMS`
+   ([components/app-shell/nav-config.ts](components/app-shell/nav-config.ts))
+   bajo la sección que corresponda según ADR-014.
+2. **`ROUTE_TO_MODULE`** — agregar la URL → slug en
+   [lib/permissions.ts](lib/permissions.ts).
+3. **`EXPECTED_DB_MODULE_SLUGS`** en
+   [lib/permissions.test.ts](lib/permissions.test.ts) — agregar el slug
+   a la lista canónica. El test de sync falla si lo olvidas.
+4. **Migración SQL** en `supabase/migrations/` con:
+   - `INSERT INTO core.modulos (slug, nombre, descripcion, empresa_id, seccion)`
+     usando `ON CONFLICT (empresa_id, slug) DO NOTHING` para idempotencia.
+   - **Backfill defensivo de permisos**: por cada rol existente en la
+     empresa × cada módulo nuevo, `INSERT INTO core.permisos_rol
+(rol_id, modulo_id, acceso_lectura, acceso_escritura)` con valores que
+     preserven el comportamiento esperado para usuarios actuales.
+     Sin esto, agregar el slug **esconde** el módulo a no-admin users
+     (porque `canAccessModulo` retorna `false` cuando el slug no está en
+     `permissions.modulos`). Plantilla en
+     [supabase/migrations/20260428230000_modulos_dilesa_inmobiliario.sql](supabase/migrations/20260428230000_modulos_dilesa_inmobiliario.sql).
+   - `NOTIFY pgrst, 'reload schema';` al final.
+
+Tras aplicar la migración con psql, regenerar
+`supabase/SCHEMA_REF.md` y `types/supabase.ts`.
+
+Ver iniciativa `modulos-catalog` (cerrada 2026-04-28) para el contexto
+y ADR-014 para la taxonomía de secciones.
