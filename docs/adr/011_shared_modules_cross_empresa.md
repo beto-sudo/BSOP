@@ -80,7 +80,7 @@ export default function Page() {
 }
 ```
 
-### Las 5 reglas (SM1–SM5)
+### Las 6 reglas (SM1–SM6)
 
 #### SM1 — Page cross-empresa = wrapper de delegación
 
@@ -147,14 +147,20 @@ Esta convención **no aplica** cuando:
 - **Landings de empresa**. `app/<empresa>/page.tsx` es la home de la
   empresa, intencionalmente distinta entre empresas (cards, KPIs, branding
   específico).
-- **Excepciones legítimas con asimetría grande**. Ej: si DILESA tiene
-  detalle de empleados al doble por features extra (contrato/finiquito) y
-  la deuda real de duplicación literal queda < 200 líneas, se documenta
-  como excepción con JSDoc al inicio de cada page explicando la asimetría.
+- **Excepciones legítimas con asimetría grande**. Ej: si una empresa tiene
+  un page al doble por features extra y la deuda real de duplicación
+  literal queda < 200 líneas, se documenta como excepción con JSDoc al
+  inicio de cada page explicando la asimetría.
 
 Si la deuda asimétrica supera ~200 líneas duplicadas, la solución es
 extraer la base común a `<XModuleBase>` y dejar features extras en wrappers
-por empresa que extiendan la base.
+por empresa que extiendan la base. Una alternativa cuando las features
+extras son **funcionalmente válidas para todas las empresas** (no son una
+peculiaridad de una sola) es **escalarlas**: agregar las features faltantes
+a las empresas que no las tenían y consolidar a un solo componente shared.
+Sub-PR 5 (`empleado-detail-shared`, 2026-04-27) tomó esta vía: contrato y
+finiquito eran "solo DILESA" pero aplicaban legalmente a cualquier empresa
+con empleados, así que se rolloutó RDB en lugar de excepcionar.
 
 #### SM5 — Code review enforza
 
@@ -172,6 +178,36 @@ módulo que ya existe en RDB/DILESA, agregar la empresa cuesta ~30 líneas
 de page nuevo + extender props del componente shared si hay cosmética
 nueva.
 
+#### SM6 — Cero fallback hardcoded en módulos que generan documentos legales
+
+Cuando un módulo cross-empresa genera documentos con valor legal o fiscal
+(contratos, finiquitos, facturas, recibos) y necesita datos del patrón
+(razón social, RFC, registro patronal, escrituras notariales, domicilio
+fiscal), **esos datos vienen de `core.empresas` parametrizado por
+`empresaId`**. **No hay fallback hardcoded** apuntando a una empresa
+específica — un fallback corre el riesgo de generar un contrato de
+"DESARROLLO INMOBILIARIO LOS ENCINOS" en una empresa que no es DILESA si
+los datos están sin capturar.
+
+La regla práctica:
+
+- El componente shared lee de `core.empresas` y construye el patrón con
+  `lib/rh/datos-fiscales-empresa.ts` (`buildPatronFromDatos`).
+- Si los datos están incompletos, el módulo **bloquea la generación** y
+  muestra mensaje claro con la lista de campos faltantes y CTA a
+  Settings → Empresas. No genera placeholder con asteriscos ni warning
+  suave.
+- El componente que monta el alta del registro empresarial (ej. wizard
+  de empleado) **bloquea la creación** si la empresa origen no tiene los
+  datos. La razón: cualquier registro nuevo debe poder generar sus
+  documentos legales desde el día 1.
+
+Sub-PR 5 (`empleado-detail-shared`, 2026-04-27) aplicó esta regla: borró
+`PATRON_DILESA` (fallback hardcoded en
+`components/rh/contrato-printable.tsx`) y consolidó la lectura en el
+helper compartido. Cada empresa que use RH formal captura primero su CSF
+en Settings → Empresas.
+
 ## Implementación
 
 Este ADR se adopta como parte del Sub-PR 1 de la iniciativa
@@ -188,8 +224,8 @@ Este ADR se adopta como parte del Sub-PR 1 de la iniciativa
 
 Los siguientes Sub-PRs de la iniciativa aplican esta misma convención a
 `juntas-detail`, `juntas-list` (Tier B — auditoría primero) y
-`empleados-detail` (Tier C — decisión de excepción documentada vs
-extracción).
+`empleado-detail` (Sub-PR 5 — extracción + rollout de contrato/finiquito
+a RDB + regla SM6).
 
 ## Consecuencias
 

@@ -27,7 +27,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Search, RefreshCw, Users } from 'lucide-react';
+import { AlertCircle, Plus, Search, RefreshCw, Settings, Users } from 'lucide-react';
 
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import { composeFullName, titleCase } from '@/lib/name-case';
@@ -47,6 +47,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { RowActions } from '@/components/shared/row-actions';
 import { useToast } from '@/components/ui/toast';
 import { EmpleadoAltaWizard } from '@/components/rh/empleado-alta-wizard';
+import { useDatosFiscalesEmpresa } from '@/lib/rh/datos-fiscales-empresa';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -306,6 +307,30 @@ export function EmpleadosModule({
 
   const insertEmpresaId = empresaId ?? empresaIds[0] ?? null;
 
+  // Política (Beto, 2026-04-27): no hay alta de empleado sin que la empresa
+  // tenga datos fiscales completos en `core.empresas`. En scope multi-empresa
+  // el alta queda bloqueada porque no hay una sola empresa destino — el admin
+  // tiene que entrar a la página de la empresa específica.
+  const datosFiscalesEmpresa = useDatosFiscalesEmpresa(
+    scope === 'empresa' ? insertEmpresaId : null
+  );
+  const altaBloqueada =
+    scope === 'user-empresas' ||
+    !insertEmpresaId ||
+    (scope === 'empresa' && !datosFiscalesEmpresa.completo);
+  const altaTooltip = (() => {
+    if (scope === 'user-empresas') {
+      return 'Para crear empleados, abre la página de la empresa específica (/dilesa/rh/personal o /rdb/rh/personal).';
+    }
+    if (datosFiscalesEmpresa.loading) return 'Validando datos fiscales de la empresa…';
+    if (!datosFiscalesEmpresa.completo) {
+      const f = datosFiscalesEmpresa.faltantes.slice(0, 3).join(', ');
+      const more = datosFiscalesEmpresa.faltantes.length > 3 ? '…' : '';
+      return `Faltan datos fiscales de la empresa: ${f}${more}. Captúralos en Settings → Empresas.`;
+    }
+    return '';
+  })();
+
   const handleEmpleadoCreated = async (empleadoId: string) => {
     await fetchAll(empresaIds);
     router.push(detailHref(empresaSlug, empleadoId));
@@ -381,13 +406,40 @@ export function EmpleadosModule({
           <Button
             size="sm"
             onClick={() => setShowCreate(true)}
-            className="rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 gap-1.5"
+            disabled={altaBloqueada}
+            title={
+              altaBloqueada ? altaTooltip : 'Alta nueva (3 pasos: identidad, contrato, expediente)'
+            }
+            className="rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-50 disabled:cursor-not-allowed gap-1.5"
           >
             <Plus className="h-4 w-4" />
             Nuevo empleado
           </Button>
         </div>
       </div>
+
+      {/* Aviso de datos fiscales incompletos en modo single-empresa */}
+      {scope === 'empresa' &&
+        !datosFiscalesEmpresa.loading &&
+        !datosFiscalesEmpresa.completo &&
+        empresaSlug && (
+          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 text-xs text-amber-400 flex items-start gap-3">
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p>
+                <strong>No se pueden crear empleados todavía.</strong> La empresa tiene datos
+                fiscales incompletos en BSOP. Faltan:{' '}
+                <strong>{datosFiscalesEmpresa.faltantes.join(', ')}</strong>.
+              </p>
+              <a
+                href={`/settings/empresas/${empresaSlug}`}
+                className="mt-2 inline-flex items-center gap-1 underline underline-offset-2 hover:text-amber-300"
+              >
+                <Settings className="h-3 w-3" /> Ir a Settings → Empresas
+              </a>
+            </div>
+          </div>
+        )}
 
       {/* Tabs + search + optional depto filter */}
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">

@@ -19,7 +19,7 @@ import {
   type CausaTerminacion,
   type FiniquitoCalculado,
 } from '@/lib/hr/calcular-finiquito';
-import { PATRON_DILESA, type ContratoPatron } from './contrato-printable';
+import type { ContratoPatron } from './contrato-printable';
 
 export interface FiniquitoEmpleadoData {
   nombre: string;
@@ -41,13 +41,13 @@ export function FiniquitoPrintable({
   empleado,
   calculo,
   motivoDetalle,
-  patron = PATRON_DILESA,
+  patron,
   fechaConvenio,
 }: {
   empleado: FiniquitoEmpleadoData;
   calculo: FiniquitoCalculado;
   motivoDetalle?: string;
-  patron?: ContratoPatron;
+  patron: ContratoPatron;
   fechaConvenio?: string;
 }) {
   const fechaHoy = fechaConvenio ?? new Date().toISOString().split('T')[0];
