@@ -468,40 +468,41 @@ export function JuntaDetailModule({ empresaSlug }: JuntaDetailModuleProps) {
       setTaskUpdates([]);
     }
 
-    // Cargamos `personas` y `empleados` en paralelo, y filtramos
-    // `personas` a las que tienen un registro de `empleado` activo.
-    // Antes traíamos todas las personas activas, pero `erp.personas`
-    // también almacena proveedores y clientes (mismo registro maestro).
-    // Desde el rollout de CSF de proveedores los dropdowns de
-    // "Agregar participante" se llenaban de proveedores.
-    const [{ data: personasData }, { data: empData }] = await Promise.all([
-      supabase
-        .schema('erp')
-        .from('personas')
-        .select('id, nombre, apellido_paterno')
-        .eq('empresa_id', juntaData.empresa_id)
-        .eq('activo', true)
-        .is('deleted_at', null)
-        .order('nombre'),
-      supabase
-        .schema('erp')
-        .from('empleados')
-        .select('id, persona_id, persona:persona_id(nombre, apellido_paterno)')
-        .eq('empresa_id', juntaData.empresa_id)
-        .eq('activo', true)
-        .is('deleted_at', null),
-    ]);
+    // El dropdown de "Agregar participante" inserta en `juntas_asistencia`
+    // que requiere un `persona_id`. Antes traíamos todas las personas
+    // activas de la empresa, pero `erp.personas` es el registro maestro
+    // que también almacena proveedores y clientes — desde el rollout de
+    // CSF los dropdowns se llenaban de proveedores en RDB.
+    //
+    // Solución: derivar el dropdown directamente de `empleados` activos
+    // (la misma fuente que ya alimenta el dropdown de tareas y funciona).
+    // Como value usamos `persona_id` del empleado y como label el nombre
+    // de la persona unida. Si un empleado no tiene `persona_id` o su
+    // persona no se resolvió, queda fuera del dropdown (sin `persona_id`
+    // tampoco se puede insertar en `juntas_asistencia`).
+    //
+    // Cruzar con `erp.personas` activa fallaba en RDB porque algunas
+    // personas vinculadas a empleados activos están inactivas o no
+    // resuelven el join — el dropdown salía vacío. Empleados es la
+    // fuente correcta y suficiente.
+    const { data: empData } = await supabase
+      .schema('erp')
+      .from('empleados')
+      .select('id, persona_id, persona:persona_id(nombre, apellido_paterno)')
+      .eq('empresa_id', juntaData.empresa_id)
+      .eq('activo', true)
+      .is('deleted_at', null);
 
-    const empleadoPersonaIds = new Set(
-      (empData ?? []).map((e: any) => e.persona_id).filter(Boolean)
-    );
     setPersonas(
-      (personasData ?? [])
-        .filter((p: any) => empleadoPersonaIds.has(p.id))
-        .map((p: any) => ({
-          id: p.id,
-          nombre: [p.nombre, p.apellido_paterno].filter(Boolean).join(' '),
+      (empData ?? [])
+        .filter((e: any) => e.persona_id && e.persona)
+        .map((e: any) => ({
+          id: e.persona_id as string,
+          nombre: [e.persona?.nombre, e.persona?.apellido_paterno].filter(Boolean).join(' '),
         }))
+        .sort((a: { nombre: string }, b: { nombre: string }) =>
+          a.nombre.localeCompare(b.nombre, 'es')
+        )
     );
     setEmpleados(
       (empData ?? []).map((e: any) => ({
