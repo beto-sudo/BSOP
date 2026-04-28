@@ -93,11 +93,25 @@ export function MarbeteConciliacion({
               {SIMBOLO[tarjeta.estado]}
             </td>
             <td className="text-right tabular-nums">
-              {tarjeta.evidencia_pendiente > 0
-                ? '—'
-                : tarjeta.diferencia === 0
-                  ? '$0.00'
-                  : (tarjeta.diferencia > 0 ? '+' : '') + formatCurrency(tarjeta.diferencia)}
+              {(() => {
+                const capturados = tarjeta.evidencia_count - tarjeta.evidencia_pendiente;
+                const sinCapturados = tarjeta.evidencia_pendiente > 0 && capturados === 0;
+                if (sinCapturados) return '—';
+                const valor =
+                  tarjeta.diferencia === 0
+                    ? '$0.00'
+                    : (tarjeta.diferencia > 0 ? '+' : '') + formatCurrency(tarjeta.diferencia);
+                const sufijoParcial =
+                  tarjeta.evidencia_pendiente > 0 ? (
+                    <span className="ml-0.5 text-[8px] text-gray-500">parcial</span>
+                  ) : null;
+                return (
+                  <>
+                    {valor}
+                    {sufijoParcial}
+                  </>
+                );
+              })()}
             </td>
           </tr>
           <tr className="border-t border-gray-300">
