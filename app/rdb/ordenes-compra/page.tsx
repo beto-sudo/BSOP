@@ -6,7 +6,7 @@
  */
 
 import { RequireAccess } from '@/components/require-access';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getLocalDayBoundsUtc } from '@/lib/timezone';
@@ -886,6 +886,18 @@ function OrdenDetail({
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function OrdenesCompraPage() {
+  // useSearchParams (en OrdenesCompraContent) requiere boundary de Suspense
+  // para que Next.js no falle al prerender la página estática.
+  return (
+    <RequireAccess empresa="rdb" modulo="rdb.ordenes_compra">
+      <Suspense fallback={null}>
+        <OrdenesCompraContent />
+      </Suspense>
+    </RequireAccess>
+  );
+}
+
+function OrdenesCompraContent() {
   const feedback = useActionFeedback();
   const { permissions } = usePermissions();
   const isAdmin = permissions.isAdmin;
@@ -1424,125 +1436,123 @@ export default function OrdenesCompraPage() {
   }, [ordenes, search]);
 
   return (
-    <RequireAccess empresa="rdb" modulo="rdb.ordenes_compra">
-      <div className="space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Órdenes de Compra</h1>
-            <p className="text-sm text-muted-foreground">
-              Gestión operativa de compras a proveedores
-            </p>
-          </div>
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Órdenes de Compra</h1>
+          <p className="text-sm text-muted-foreground">
+            Gestión operativa de compras a proveedores
+          </p>
         </div>
-
-        {!loading && !error ? <SummaryBar ordenes={filtered} /> : null}
-
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="relative min-w-52">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Buscar folio, proveedor o requisición…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <Input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => {
-                setDateFrom(e.target.value);
-                setPresetKey('custom');
-              }}
-              className="w-36"
-            />
-            <span className="text-muted-foreground">—</span>
-            <Input
-              type="date"
-              value={dateTo}
-              onChange={(e) => {
-                setDateTo(e.target.value);
-                setPresetKey('custom');
-              }}
-              className="w-36"
-            />
-          </div>
-
-          <Combobox
-            value={presetKey}
-            onChange={handlePreset}
-            options={[
-              { value: 'hoy', label: 'Hoy' },
-              { value: 'ayer', label: 'Ayer' },
-              { value: 'semana', label: 'Esta semana' },
-              { value: '7dias', label: 'Últimos 7 días' },
-              { value: 'mes', label: 'Este mes' },
-              { value: '30dias', label: 'Últimos 30 días' },
-              { value: 'ano', label: 'Este año' },
-            ]}
-            placeholder="Rango..."
-            className="w-[140px]"
-          />
-
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => void fetchOrdenes()}
-            aria-label="Actualizar"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          </Button>
-
-          <span className="text-sm text-muted-foreground">
-            {loading ? 'Cargando…' : `${filtered.length} orden${filtered.length === 1 ? '' : 'es'}`}
-            {saving ? ' · guardando…' : ''}
-          </span>
-        </div>
-
-        {error ? (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {error}
-          </div>
-        ) : null}
-
-        <DataTable<(typeof filtered)[number]>
-          data={filtered}
-          columns={ordenColumns}
-          rowKey="id"
-          loading={loading}
-          onRowClick={(o) => void openDetail(o)}
-          initialSort={{ key: 'fecha_emision', dir: 'desc' }}
-          emptyTitle="No se encontraron órdenes de compra"
-          showDensityToggle={false}
-        />
-
-        <OrdenDetail
-          orden={selected}
-          proveedores={proveedores}
-          loadingItems={loadingItems}
-          open={drawerOpen}
-          editedReceipts={editedReceipts}
-          editedPrices={editedPrices}
-          isAdmin={isAdmin}
-          onClose={() => setDrawerOpen(false)}
-          onReceiveChange={handleReceiveChange}
-          onPriceChange={handlePriceChange}
-          onReceivePartial={async () => {
-            await persistReception(false);
-          }}
-          onReceiveAll={async () => {
-            await persistReception(true);
-          }}
-          onAsignarProveedor={handleAsignarProveedor}
-          onMarcarEnviada={handleSavePricesAndMarkEnviada}
-          onCancelarLinea={handleCancelarLinea}
-          onCerrarOrden={handleCerrarOrden}
-          onPriceOverride={handlePriceOverride}
-        />
       </div>
-    </RequireAccess>
+
+      {!loading && !error ? <SummaryBar ordenes={filtered} /> : null}
+
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="relative min-w-52">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar folio, proveedor o requisición…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <Input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => {
+              setDateFrom(e.target.value);
+              setPresetKey('custom');
+            }}
+            className="w-36"
+          />
+          <span className="text-muted-foreground">—</span>
+          <Input
+            type="date"
+            value={dateTo}
+            onChange={(e) => {
+              setDateTo(e.target.value);
+              setPresetKey('custom');
+            }}
+            className="w-36"
+          />
+        </div>
+
+        <Combobox
+          value={presetKey}
+          onChange={handlePreset}
+          options={[
+            { value: 'hoy', label: 'Hoy' },
+            { value: 'ayer', label: 'Ayer' },
+            { value: 'semana', label: 'Esta semana' },
+            { value: '7dias', label: 'Últimos 7 días' },
+            { value: 'mes', label: 'Este mes' },
+            { value: '30dias', label: 'Últimos 30 días' },
+            { value: 'ano', label: 'Este año' },
+          ]}
+          placeholder="Rango..."
+          className="w-[140px]"
+        />
+
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => void fetchOrdenes()}
+          aria-label="Actualizar"
+        >
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+        </Button>
+
+        <span className="text-sm text-muted-foreground">
+          {loading ? 'Cargando…' : `${filtered.length} orden${filtered.length === 1 ? '' : 'es'}`}
+          {saving ? ' · guardando…' : ''}
+        </span>
+      </div>
+
+      {error ? (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error}
+        </div>
+      ) : null}
+
+      <DataTable<(typeof filtered)[number]>
+        data={filtered}
+        columns={ordenColumns}
+        rowKey="id"
+        loading={loading}
+        onRowClick={(o) => void openDetail(o)}
+        initialSort={{ key: 'fecha_emision', dir: 'desc' }}
+        emptyTitle="No se encontraron órdenes de compra"
+        showDensityToggle={false}
+      />
+
+      <OrdenDetail
+        orden={selected}
+        proveedores={proveedores}
+        loadingItems={loadingItems}
+        open={drawerOpen}
+        editedReceipts={editedReceipts}
+        editedPrices={editedPrices}
+        isAdmin={isAdmin}
+        onClose={() => setDrawerOpen(false)}
+        onReceiveChange={handleReceiveChange}
+        onPriceChange={handlePriceChange}
+        onReceivePartial={async () => {
+          await persistReception(false);
+        }}
+        onReceiveAll={async () => {
+          await persistReception(true);
+        }}
+        onAsignarProveedor={handleAsignarProveedor}
+        onMarcarEnviada={handleSavePricesAndMarkEnviada}
+        onCancelarLinea={handleCancelarLinea}
+        onCerrarOrden={handleCerrarOrden}
+        onPriceOverride={handlePriceOverride}
+      />
+    </div>
   );
 }
