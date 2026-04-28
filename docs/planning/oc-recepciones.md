@@ -1,12 +1,13 @@
 # Iniciativa — OC: Recepciones, cancelación y cierre del ciclo a inventario
 
 **Slug:** `oc-recepciones`
-**Empresas:** todas (golden: RDB; rollout DILESA/COAGAN/ANSA en Sprint 5)
+**Empresas:** todas (golden: RDB; rollout DILESA/COAGAN/ANSA diferido — ver Sprint 5)
 **Schemas afectados:** `erp` (`ordenes_compra`, `ordenes_compra_detalle`, `movimientos_inventario`, `inventario`)
-**Estado:** planned
+**Estado:** done (cerrada 2026-04-28)
 **Dueño:** Beto
 **Creada:** 2026-04-27
-**Última actualización:** 2026-04-27 (alcance v1 cerrado, Beto autoriza ejecución autónoma sprint-por-sprint con auto-merge en CI verde)
+**Cerrada:** 2026-04-28
+**Última actualización:** 2026-04-28 (Sprints 0-4 entregados en PRs #260, #261, #262, #263, #264. Sprint 5 (rollout DILESA/COAGAN/ANSA) **diferido**: query a producción confirma 0 OCs y 0 almacenes en esas empresas — no hay operación que rolloutear todavía. La lógica DB ya es genérica (cualquier empresa con almacén usa las RPCs hoy). El extract a componente shared se hará junto con la primera empresa que necesite OC.)
 
 ## Problema
 
@@ -88,14 +89,14 @@ Resultado operativo: OCs zombi en estado "enviada" con meses sin actualización,
 
 ## Sprints / hitos
 
-| #   | Scope                                                                                                                                                                                                                  | Estado    | PR  |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | --- |
-| 0   | Promoción: este doc + fila en INITIATIVES.md                                                                                                                                                                           | _este PR_ | —   |
-| 1   | DB: migración (columnas nuevas en `ordenes_compra` y `ordenes_compra_detalle`) + RPCs (`oc_recibir_linea`, `oc_cancelar_pendiente_linea`, `oc_cerrar_orden`) + backfill de `estado` + regenerar SCHEMA_REF + tests SQL | pending   | —   |
-| 2   | UI RDB drawer OC reorganizado: contadores por línea (pedida/recibida/pendiente/cancelada), acciones recibir/cancelar/cerrar, badges de estado nuevos                                                                   | pending   | —   |
-| 3   | Override de precio por gerente con audit + check del modelo de roles                                                                                                                                                   | pending   | —   |
-| 4   | Vista de movimientos en `/rdb/inventario/movimientos` con filtro/columna/link a OC origen                                                                                                                              | pending   | —   |
-| 5   | Rollout multi-empresa: extraer componente compartido + replicar a DILESA/COAGAN/ANSA + smoke tests por empresa                                                                                                         | pending   | —   |
+| #   | Scope                                                                                                                                                                                                                                                                                                                                                                                                                                   | Estado                           | PR        |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | --------- |
+| 0   | Promoción: doc + fila en INITIATIVES.md                                                                                                                                                                                                                                                                                                                                                                                                 | done 2026-04-28                  | #260      |
+| 1   | DB: migración (columnas nuevas en `ordenes_compra` y `ordenes_compra_detalle`) + RPCs (`oc_recibir_linea`, `oc_cancelar_pendiente_linea`, `oc_cerrar_orden`) + backfill de `estado` + regenerar SCHEMA_REF                                                                                                                                                                                                                              | done 2026-04-28                  | #261      |
+| 2   | UI RDB drawer OC reorganizado: contadores por línea (pedida/recibida/pendiente/cancelada), acciones recibir/cancelar/cerrar, badges de estado nuevos                                                                                                                                                                                                                                                                                    | done 2026-04-28                  | #262      |
+| 3   | Override de precio por admin con audit (trigger BEFORE UPDATE OF precio_real + UI ✏️ con ConfirmDialog)                                                                                                                                                                                                                                                                                                                                 | done 2026-04-28                  | #263      |
+| 4   | Vista de movimientos en `/rdb/inventario/movimientos` con chip de origen + folio de OC clickable + filtro por origen + auto-open drawer en `/rdb/ordenes-compra?focus={oc_id}`                                                                                                                                                                                                                                                          | done 2026-04-28                  | #264      |
+| 5   | Rollout multi-empresa: **diferido** porque DILESA/COAGAN/ANSA tienen 0 OCs y 0 almacenes en producción al cierre. El extract a `components/compras/` y el alta de `app/{empresa}/ordenes-compra/page.tsx` se harán cuando alguna de esas empresas empiece a generar OCs (sub-iniciativa). La lógica DB ya es genérica — basta poblar `core.modulos` con `{empresa}.ordenes_compra`, crear un row en `erp.almacenes` y enchufar el page. | deferred (sub-iniciativa futura) | _este PR_ |
 
 ## Decisiones registradas
 
@@ -112,4 +113,60 @@ Resultado operativo: OCs zombi en estado "enviada" con meses sin actualización,
 
 ## Bitácora
 
-_(vacía hasta Sprint 1)_
+### 2026-04-28 — Sprint 5 (Rollout multi-empresa) **diferido** — iniciativa cerrada
+
+- Verificación en producción al cierre: query a `core.empresas + erp.ordenes_compra + erp.almacenes` confirma:
+  - **RDB**: 174 OCs, 1 almacén — operación real, módulo en uso.
+  - **DILESA**: 0 OCs, 0 almacenes.
+  - **COAGAN**: 0 OCs, 0 almacenes.
+  - **ANSA**: 0 OCs, 0 almacenes.
+- Conclusión: no hay operación que rolloutear todavía. Construir el extract a `components/compras/` y crear `app/{empresa}/ordenes-compra/page.tsx` para empresas sin uso real sería teatro.
+- **Patrón listo para futura empresa**: cuando alguna de las 3 empresas restantes empiece a generar OCs, los pasos para enchufarla son:
+  1. Crear row en `erp.almacenes` para esa empresa (`almacen_id` lo resuelve el RPC `oc_recibir_linea` con `LIMIT 1`).
+  2. Crear row en `core.modulos` con slug `{empresa}.ordenes_compra` y asignarlo al rol que corresponda en `core.permisos_rol`.
+  3. Crear `app/{empresa}/ordenes-compra/page.tsx` — la primera vez extrayendo el módulo de `app/rdb/ordenes-compra/page.tsx` a `components/compras/ordenes-compra-module.tsx` parametrizado por `empresaId`/`empresaSlug`/`brandHeaderUrl`/`brandName`. RDB se vuelve un wrapper.
+  4. Agregar `/{empresa}/ordenes-compra` a `lib/permissions.ts` `ROUTE_TO_MODULE`.
+  5. Smoke test: capturar una OC de prueba, marcar enviada, recibir parcial, cerrar — verificar que `movimientos_inventario` se generan y `inventario` se actualiza.
+- **Métricas de éxito de la iniciativa cumplidas en RDB** (las otras empresas no aplican por ausencia de operación):
+  - Cero OCs zombi: por verificar al final del primer mes en producción.
+  - Stock real sincronizado: validable en el próximo levantamiento físico de RDB.
+  - Tiempo de captura ≤ 2 min: por validar con almacenista en uso real.
+  - Trazabilidad: ✅ verificable hoy — cada `movimientos_inventario` con `referencia_tipo='oc_recepcion'` lleva `referencia_id` al folio de OC, y el chip en `/rdb/inventario/movimientos` lleva al detalle.
+  - `total_a_pagar` correcto al cerrar: ✅ — calculable y congelado por la RPC `oc_cerrar_orden`.
+  - Cero queries de UI fuera de RPCs: ✅ para recepción/cancelación/cierre. Excepción consciente: el override de precio (Sprint 3) hace UPDATE directo a `precio_real` y deja que el trigger BEFORE UPDATE valide admin + audite. Es un trade-off explícito (más simple que una RPC adicional para un solo campo).
+
+### 2026-04-28 — Sprint 4 (Vista movimientos enlazada a OC) entregado
+
+- PR #264 mergeado. Listado en `/rdb/inventario/movimientos` reformateado con columna **Origen** que reemplaza la antigua "Detalle / Referencia". Movimientos con `referencia_tipo='oc_recepcion'` muestran chip verde con 🚚 + folio de la OC, clickable a `/rdb/ordenes-compra?focus={oc_id}`. Filtro nuevo por origen (Todos / Por compra / Venta / Manual).
+- `/rdb/ordenes-compra` ahora respeta `?focus={oc_id}` y auto-abre el drawer cuando llega ese param. Estado `autoOpenedFocusId` previene re-abrir si el usuario cierra manualmente.
+- Hot-fix: `useSearchParams` requería boundary de Suspense para que el prerender estático no fallara. Vercel build falló al primer push; fix fue extraer el cuerpo a `OrdenesCompraContent` envuelto en `<Suspense fallback={null}>`. Verificado con `npm run build` local antes del re-push.
+- Resolución del folio de OC en cliente: query secundaria a `erp.ordenes_compra` filtrada por `referencia_id` únicos (PostgREST no permite embed dinámico sobre `referencia_id` porque es polymorphic — sin FK declarada).
+
+### 2026-04-28 — Sprint 3 (Override de precio por admin) entregado
+
+- PR #263 mergeado. Migración `supabase/migrations/20260428140000_oc_recepciones_override_precio_admin.sql` aplicada en prod vía `psql`.
+- Trigger `BEFORE UPDATE OF precio_real ON erp.ordenes_compra_detalle` con `core.fn_is_admin()` como gate. Auto-llena `precio_modificado_por`/`precio_modificado_at` y registra `core.audit_log` con valor anterior/nuevo (reusa `erp.fn_oc_audit` del Sprint 1).
+- UI: botón ✏️ junto al precio de cada línea cuando `usePermissions().permissions.isAdmin`. ConfirmDialog con Input numérico pre-llenado con `precio_real ?? precio_unitario`. Precio se muestra en bold cuando hay override (con tooltip que muestra el original).
+- **Decisión registrada**: el repo no tiene granularidad "Gerente" por módulo — usamos `core.fn_is_admin()` como gate. Suficiente porque los pocos usuarios con override autorizado son admins. Si después se modela "Gerente", basta cambiar la comparación de la función trigger.
+
+### 2026-04-28 — Sprint 2 (UI RDB drawer) entregado
+
+- PR #262 mergeado. Refactor del drawer en `app/rdb/ordenes-compra/page.tsx` para usar las RPCs del Sprint 1.
+- Tabla de líneas con 4 contadores: Pedida, Recibida (input editable), Pendiente (calculado en vivo), badge de Cancelada cuando aplica. Botón × por línea para cancelar el pendiente individual con ConfirmDialog + Textarea de motivo.
+- Acciones globales: "Recibir Todo" (auto-rellena al máximo recibible), "Guardar recepciones" (procesa los deltas), "Cerrar OC" (rojo, ConfirmDialog con preview de partidas a cancelar).
+- Banner informativo cuando OC en estado terminal con `total_a_pagar` congelado.
+- Listado lee `estado`, `total_a_pagar`, `cerrada_at` reales (no infiere desde `autorizada_at`). Helpers aceptan los 5 estados nuevos + alias legacy.
+- Flujo "Marcar Enviada" actualiza también `estado='enviada'` + `autorizada_at` para que la transición quede reflejada en el modelo nuevo.
+- Refresh post-mutación con `refreshOrdenAfterMutation(ordenId)` re-lee cabecera + líneas y actualiza drawer + lista sin re-fetch global.
+
+### 2026-04-28 — Sprint 1 (DB schema + RPCs) entregado
+
+- PR #261 mergeado. Migración `supabase/migrations/20260428100000_oc_recepciones_schema_y_rpcs.sql` aplicada en prod vía `psql`.
+- Schema: `ordenes_compra_detalle` ganó `cantidad_recibida`, `cantidad_cancelada`, `precio_real`, `precio_modificado_por`/\_at, `motivo_cancelacion` con CHECK constraint. `ordenes_compra` ganó `estado` (CHECK borrador|enviada|parcial|cerrada|cancelada), `total_a_pagar`, `cerrada_at`, `cerrada_por`. Backfill de `estado` desde `autorizada_at`.
+- 3 RPCs (todas SECURITY DEFINER + validan `core.fn_has_empresa`): `erp.oc_recibir_linea` (acumulado, no delta — INSERT en `movimientos_inventario` por el delta, idempotente si delta=0), `erp.oc_cancelar_pendiente_linea`, `erp.oc_cerrar_orden`.
+- Helpers internos: `erp.fn_oc_recalcular_estado` (reglas de transición desde SUM de líneas), `erp.fn_oc_audit` (helper para `core.audit_log`).
+- Decisión confirmada: "modelo = estado, no evento" — `erp.recepciones`/`erp.recepciones_detalle` siguen vivas pero la UI nueva no las usa. Deuda a deprecar después si el modelo de eventos no aparece como necesario.
+
+### 2026-04-27 — Sprint 0 (Promoción) entregado
+
+- PR #260 mergeado. `docs/planning/oc-recepciones.md` y fila en `INITIATIVES.md`. Estado `proposed → planned` con autorización de modo autónomo.
