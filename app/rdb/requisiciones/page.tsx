@@ -3,6 +3,7 @@
 import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { getLocalDayBoundsUtc } from '@/lib/timezone';
 import {
   guardarRequisicion,
   actualizarRequisicion,
@@ -987,10 +988,10 @@ export default function RequisicionesPage() {
         .limit(200);
 
       if (dateFrom) {
-        query = query.gte('created_at', `${dateFrom}T00:00:00`);
+        query = query.gte('created_at', getLocalDayBoundsUtc(dateFrom, TZ).start);
       }
       if (dateTo) {
-        query = query.lte('created_at', `${dateTo}T23:59:59`);
+        query = query.lte('created_at', getLocalDayBoundsUtc(dateTo, TZ).end);
       }
 
       const { data, error: fetchError } = await query;

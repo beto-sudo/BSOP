@@ -8,6 +8,7 @@
 import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { getLocalDayBoundsUtc } from '@/lib/timezone';
 import {
   Table,
   TableBody,
@@ -713,8 +714,8 @@ export default function OrdenesCompraPage() {
         .eq('empresa_id', RDB_EMPRESA_ID)
         .order('created_at', { ascending: false });
 
-      if (dateFrom) query = query.gte('created_at', `${dateFrom}T00:00:00`);
-      if (dateTo) query = query.lte('created_at', `${dateTo}T23:59:59`);
+      if (dateFrom) query = query.gte('created_at', getLocalDayBoundsUtc(dateFrom, TZ).start);
+      if (dateTo) query = query.lte('created_at', getLocalDayBoundsUtc(dateTo, TZ).end);
 
       const { data, error: queryError } = await query;
       if (queryError) throw queryError;
