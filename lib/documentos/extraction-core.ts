@@ -59,6 +59,81 @@ export const ParteSchema = z.object({
     .describe('Nombre del representante legal si la parte es una persona moral, si no null.'),
 });
 
+/**
+ * Metadata específica para escrituras notariales mexicanas (constitutivas,
+ * reformas, poderes, compraventas, etc.). Se persiste en
+ * `erp.documentos.subtipo_meta` (jsonb) y la consume:
+ *
+ *   - El sync_trigger de `core.empresa_documentos` (lo proyecta al jsonb
+ *     caché en `core.empresas.escritura_constitutiva` / `escritura_poder`).
+ *   - El validador de RH `lib/rh/datos-fiscales-empresa.ts` (vía caché).
+ *   - El printable de contrato laboral (vía caché).
+ *
+ * Solo se llena cuando el documento es una escritura/acta/poder. Para otros
+ * tipos (factura, contrato laboral, comprobante de domicilio), debe quedar
+ * null. La IA decide en función de `tipo_operacion`.
+ */
+export const SubtipoMetaEscrituraSchema = z
+  .object({
+    numero_escritura: z
+      .string()
+      .nullable()
+      .describe('Número de la escritura tal como aparece (ej. "12,345" o "12345"). null si no.'),
+    fecha_escritura: z
+      .string()
+      .nullable()
+      .describe('Fecha de otorgamiento en formato YYYY-MM-DD. null si no se puede determinar.'),
+    fecha_texto: z
+      .string()
+      .nullable()
+      .describe(
+        'Fecha en texto legible tal como aparece en el cuerpo del instrumento ' +
+          '(ej. "quince de mayo del dos mil diez"). Útil para reproducir literal en contratos. null si no.'
+      ),
+    notario_nombre: z
+      .string()
+      .nullable()
+      .describe(
+        'Nombre completo del notario público que da fe (ej. "JUAN PÉREZ LÓPEZ"). null si no.'
+      ),
+    notaria_numero: z
+      .string()
+      .nullable()
+      .describe('Número de la notaría (texto, ej. "5" o "Cinco"). null si no aparece.'),
+    distrito_notarial: z
+      .string()
+      .nullable()
+      .describe(
+        'Distrito notarial / municipio donde ejerce el notario ' +
+          '(ej. "PIEDRAS NEGRAS", "DISTRITO FEDERAL"). null si no aparece.'
+      ),
+    // Campos extras útiles para poderes (auto-sugerir rol al asignar en UI)
+    tipo_poder: z
+      .string()
+      .nullable()
+      .describe(
+        'Solo para poderes: clase de poder otorgado, en minúsculas y sin acentos: ' +
+          '"general para actos de administracion", "general para actos de dominio", ' +
+          '"general para pleitos y cobranzas", "especial para actos bancarios", etc. ' +
+          'null si no es poder o no se puede determinar.'
+      ),
+    alcance: z
+      .string()
+      .nullable()
+      .describe(
+        'Solo para poderes: resumen breve del alcance/facultades otorgadas ' +
+          '(ej. "contratación laboral, IMSS, SAT, contratos comerciales generales"). ' +
+          'null si no es poder.'
+      ),
+  })
+  .nullable()
+  .describe(
+    'Metadata específica de escrituras notariales (constitutiva, reforma, poder, ' +
+      'compraventa, etc.). Llenar SOLO si tipo_operacion es uno de estos: ' +
+      'escritura, constitutiva, reforma, acta, poder, compraventa, hipoteca, fideicomiso, ' +
+      'donacion, permuta. Para facturas, contratos laborales, comprobantes y demás → null.'
+  );
+
 export const ExtraccionSchema = z.object({
   descripcion: z
     .string()
@@ -111,6 +186,7 @@ export const ExtraccionSchema = z.object({
     .string()
     .nullable()
     .describe('Número del documento (escritura, acta, póliza, etc.) tal cual aparece. null si no.'),
+  subtipo_meta: SubtipoMetaEscrituraSchema,
 });
 
 export type Extraccion = z.infer<typeof ExtraccionSchema>;
@@ -267,7 +343,18 @@ export async function extractWithClaude(pdfBytes: Uint8Array, titulo: string): P
               `Para campos numéricos (monto, superficie_m2), si el valor aparece ` +
               `en letra o con formato raro, conviértelo a número o usa null si no es claro. ` +
               `Usa null para cualquier campo estructurado que no puedas determinar con ` +
-              `certeza, en vez de inventar o poner strings genéricas.`,
+              `certeza, en vez de inventar o poner strings genéricas. ` +
+              `\n\nIMPORTANTE — campo "subtipo_meta": ` +
+              `Si el documento es una escritura notarial mexicana (constitutiva, reforma, ` +
+              `poder, compraventa, hipoteca, fideicomiso, donación, permuta, acta), llena los ` +
+              `campos del subtipo_meta con los datos del notario y de la escritura: número de ` +
+              `escritura, fecha (en formato YYYY-MM-DD y también en texto legible cuando aparezca ` +
+              `en el cuerpo del instrumento), nombre del notario, número de notaría, distrito ` +
+              `notarial. Si es un PODER, además llena tipo_poder (en minúsculas, sin acentos: ` +
+              `"general para actos de administracion", "general para actos de dominio", ` +
+              `"general para pleitos y cobranzas", "especial para actos bancarios", etc.) y ` +
+              `alcance (resumen breve de facultades). Para documentos NO notariales (facturas, ` +
+              `contratos laborales, comprobantes, declaraciones, etc.), subtipo_meta debe ser null.`,
           },
           {
             type: 'file',
