@@ -5433,12 +5433,15 @@ export type Database = {
       ordenes_compra: {
         Row: {
           autorizada_at: string | null
+          cerrada_at: string | null
+          cerrada_por: string | null
           codigo: string | null
           condiciones_pago: string | null
           created_at: string
           deleted_at: string | null
           direccion_entrega: string | null
           empresa_id: string
+          estado: string
           estado_id: string | null
           fecha_entrega: string | null
           id: string
@@ -5448,16 +5451,20 @@ export type Database = {
           requisicion_id: string | null
           subtotal: number | null
           total: number | null
+          total_a_pagar: number | null
           updated_at: string | null
         }
         Insert: {
           autorizada_at?: string | null
+          cerrada_at?: string | null
+          cerrada_por?: string | null
           codigo?: string | null
           condiciones_pago?: string | null
           created_at?: string
           deleted_at?: string | null
           direccion_entrega?: string | null
           empresa_id: string
+          estado?: string
           estado_id?: string | null
           fecha_entrega?: string | null
           id?: string
@@ -5467,16 +5474,20 @@ export type Database = {
           requisicion_id?: string | null
           subtotal?: number | null
           total?: number | null
+          total_a_pagar?: number | null
           updated_at?: string | null
         }
         Update: {
           autorizada_at?: string | null
+          cerrada_at?: string | null
+          cerrada_por?: string | null
           codigo?: string | null
           condiciones_pago?: string | null
           created_at?: string
           deleted_at?: string | null
           direccion_entrega?: string | null
           empresa_id?: string
+          estado?: string
           estado_id?: string | null
           fecha_entrega?: string | null
           id?: string
@@ -5486,6 +5497,7 @@ export type Database = {
           requisicion_id?: string | null
           subtotal?: number | null
           total?: number | null
+          total_a_pagar?: number | null
           updated_at?: string | null
         }
         Relationships: [
@@ -5508,12 +5520,18 @@ export type Database = {
       ordenes_compra_detalle: {
         Row: {
           cantidad: number
+          cantidad_cancelada: number
+          cantidad_recibida: number
           created_at: string
           descripcion: string | null
           descuento: number | null
           empresa_id: string
           id: string
+          motivo_cancelacion: string | null
           orden_compra_id: string
+          precio_modificado_at: string | null
+          precio_modificado_por: string | null
+          precio_real: number | null
           precio_unitario: number | null
           producto_id: string | null
           subtotal: number | null
@@ -5521,12 +5539,18 @@ export type Database = {
         }
         Insert: {
           cantidad?: number
+          cantidad_cancelada?: number
+          cantidad_recibida?: number
           created_at?: string
           descripcion?: string | null
           descuento?: number | null
           empresa_id: string
           id?: string
+          motivo_cancelacion?: string | null
           orden_compra_id: string
+          precio_modificado_at?: string | null
+          precio_modificado_por?: string | null
+          precio_real?: number | null
           precio_unitario?: number | null
           producto_id?: string | null
           subtotal?: number | null
@@ -5534,12 +5558,18 @@ export type Database = {
         }
         Update: {
           cantidad?: number
+          cantidad_cancelada?: number
+          cantidad_recibida?: number
           created_at?: string
           descripcion?: string | null
           descuento?: number | null
           empresa_id?: string
           id?: string
+          motivo_cancelacion?: string | null
           orden_compra_id?: string
+          precio_modificado_at?: string | null
+          precio_modificado_por?: string | null
+          precio_real?: number | null
           precio_unitario?: number | null
           producto_id?: string | null
           subtotal?: number | null
@@ -7219,6 +7249,37 @@ export type Database = {
       fn_iniciar_captura_levantamiento: {
         Args: { p_levantamiento_id: string }
         Returns: number
+      }
+      fn_oc_audit: {
+        Args: {
+          p_accion: string
+          p_datos_anteriores: Json
+          p_datos_nuevos: Json
+          p_empresa_id: string
+          p_registro_id: string
+          p_tabla: string
+        }
+        Returns: undefined
+      }
+      fn_oc_recalcular_estado: {
+        Args: { p_orden_id: string }
+        Returns: undefined
+      }
+      oc_cancelar_pendiente_linea: {
+        Args: { p_detalle_id: string; p_motivo?: string }
+        Returns: Json
+      }
+      oc_cerrar_orden: {
+        Args: { p_motivo?: string; p_orden_id: string }
+        Returns: Json
+      }
+      oc_recibir_linea: {
+        Args: {
+          p_cantidad_recibida_total: number
+          p_costo_unitario?: number
+          p_detalle_id: string
+        }
+        Returns: Json
       }
       search_documentos_by_embedding: {
         Args: {
