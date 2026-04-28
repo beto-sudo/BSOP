@@ -233,8 +233,12 @@ function formatDiferencia(value: number) {
 
 function CardTarjeta({ tarjeta }: { tarjeta: ConciliacionTarjeta }) {
   const pendientes = tarjeta.evidencia_pendiente;
+  const capturados = tarjeta.evidencia_count - pendientes;
   const sumaPendienteLabel = pendientes > 0 ? ` +${pendientes} s/cap` : '';
-  const difLabel = pendientes > 0 ? '—' : formatDiferencia(tarjeta.diferencia);
+  // Cuando hay >=1 capturado, mostrar la diferencia parcial aunque queden pendientes —
+  // así el operador detecta discrepancias temprano sin esperar a capturar todo.
+  const difEsParcial = pendientes > 0 && capturados > 0;
+  const difLabel = pendientes > 0 && capturados === 0 ? '—' : formatDiferencia(tarjeta.diferencia);
 
   return (
     <div className="rounded-lg border bg-card p-4 print:p-2" style={{ pageBreakInside: 'avoid' }}>
@@ -271,7 +275,14 @@ function CardTarjeta({ tarjeta }: { tarjeta: ConciliacionTarjeta }) {
         <hr className="my-1 border-muted print:my-0.5" />
         <div className="flex justify-between text-sm font-semibold print:text-[10px]">
           <dt>Diferencia</dt>
-          <dd className={`tabular-nums ${diferenciaColor(tarjeta.estado)}`}>{difLabel}</dd>
+          <dd className={`tabular-nums ${diferenciaColor(tarjeta.estado)}`}>
+            {difLabel}
+            {difEsParcial && (
+              <span className="ml-1 text-[10px] font-normal text-muted-foreground print:text-[8px]">
+                parcial
+              </span>
+            )}
+          </dd>
         </div>
       </dl>
 
