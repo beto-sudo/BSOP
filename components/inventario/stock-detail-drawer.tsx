@@ -76,7 +76,7 @@ export function StockDetailDrawer({ item, open, onClose }: StockDetailDrawerProp
       <SheetContent className="sm:max-w-[600px]">
         {/* Membrete solo para impresión */}
         <img
-          src="/membrete-rdb.jpg"
+          src="/brand/rdb/header-email.png"
           alt="Membrete Rincón del Bosque"
           className="hidden print:block w-full object-contain mb-6"
         />

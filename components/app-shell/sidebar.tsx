@@ -37,8 +37,9 @@ const LOGO_BY_KEY: Record<
   'dilesa-logo' | 'rdb-logo' | 'sanren-logo',
   { src: string; alt: string }
 > = {
-  'dilesa-logo': { src: '/logos/dilesa.jpg', alt: 'DILESA' },
-  'rdb-logo': { src: '/logos/rdb.jpg', alt: 'RDB' },
+  'dilesa-logo': { src: '/brand/dilesa/isotipo.png', alt: 'DILESA' },
+  'rdb-logo': { src: '/brand/rdb/isotipo.png', alt: 'RDB' },
+  // SANREN se mantiene en `/logos/sanren.png` hasta que tenga assets en `/brand/sanren/`.
   'sanren-logo': { src: '/logos/sanren.png', alt: 'SANREN' },
 };
 

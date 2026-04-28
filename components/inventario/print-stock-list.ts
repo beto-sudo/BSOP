@@ -131,7 +131,7 @@ export function printStockList(stock: StockItem[], fechaCorte: string | null) {
 <body>
   <!-- Membrete empresa -->
   <div class="membrete">
-    <img src="/membrete-rdb.jpg" alt="Rincón del Bosque" />
+    <img src="/brand/rdb/header-email.png" alt="Rincón del Bosque" />
   </div>
   <div class="doc-meta">
     <span>${fechaCorte ? `Inventario al Corte: <strong>${fecha}</strong>` : `Inventario de Stock &mdash; <strong>${fecha}</strong>`}</span>

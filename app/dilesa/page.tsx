@@ -121,7 +121,7 @@ export default function DilesaPage() {
           <div className="flex items-center gap-4">
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-white p-1 shadow-sm ring-1 ring-inset ring-[var(--border)]">
               <img
-                src="/logos/dilesa-header.jpg"
+                src="/brand/dilesa/isotipo.png"
                 alt="DILESA"
                 className="h-full w-full rounded-lg object-contain"
               />

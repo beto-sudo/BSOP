@@ -323,7 +323,7 @@ function OrdenDetail({
         {/* ═══ PRINT: Header block ═══ */}
         <div className="hidden print:block">
           <img
-            src="/membrete-rdb.jpg"
+            src="/brand/rdb/header-email.png"
             alt="Membrete Rincón del Bosque"
             className="mb-4 max-h-28 w-full object-contain"
           />

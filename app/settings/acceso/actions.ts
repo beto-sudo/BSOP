@@ -319,9 +319,9 @@ export async function updateUsuarioEmpresaRol(
 // ── Welcome email via Resend ────────────────────────────────────────────────
 
 const LOGO_MAP: Record<string, string> = {
-  rdb: 'https://bsop.io/logos/rdb.jpg',
-  dilesa: 'https://bsop.io/logos/dilesa.jpg',
-  ansa: 'https://bsop.io/logos/ansa.jpg',
+  rdb: 'https://bsop.io/brand/rdb/isotipo.png',
+  dilesa: 'https://bsop.io/brand/dilesa/isotipo.png',
+  ansa: 'https://bsop.io/brand/ansa/isotipo.png',
 };
 
 async function sendWelcomeEmail(usuarioId: string): Promise<void> {
