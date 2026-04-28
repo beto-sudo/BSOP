@@ -136,3 +136,42 @@ La propuesta de Beto: en lugar de duplicar metadata en `core.empresas`, **ligar 
 - **F1 (permisos): solo admin v1**. Apertura a comité ejecutivo / accionistas queda como sub-iniciativa cross-cutting cuando se defina la matriz completa de "acciones admin-only" del repo.
 
 ## Bitácora
+
+### 2026-04-28 — Sprint 1: DB schema
+
+**Qué se hizo en esta sesión:**
+
+- Migración `supabase/migrations/20260428235000_empresa_documentos_legales.sql`:
+  - Tabla `core.empresa_documentos` con `(id, empresa_id, documento_id, rol, es_default, asignado_por, asignado_at, notas, created_at, updated_at)`. FK con `ON DELETE CASCADE` hacia `core.empresas` y `erp.documentos` (si se borra la empresa o el documento, las asignaciones desaparecen).
+  - **Constraint UNIQUE** `(empresa_id, documento_id, rol)` para evitar asignar el mismo doc al mismo rol dos veces.
+  - **Partial index UNIQUE** `(empresa_id, rol) WHERE es_default = true` — solo un default por rol.
+  - **CHECK constraint** `empresa_documentos_rol_check` con los 7 roles iniciales (B1). Para agregar un rol nuevo: `ALTER TABLE ... DROP CONSTRAINT ... ADD CONSTRAINT ... CHECK (rol IN (..., 'nuevo_rol'))`.
+  - **RLS**: SELECT abierto a `core.fn_has_empresa(empresa_id) OR core.fn_is_admin()`. INSERT/UPDATE/DELETE solo `core.fn_is_admin()` (F1).
+  - **Función `core.fn_empresa_documentos_sync_escrituras_cache(p_empresa_id, p_rol)`**: lee el `subtipo_meta` del documento default actual para el rol y proyecta los 5 campos canónicos al jsonb correspondiente en `core.empresas` (`escritura_constitutiva` para `acta_constitutiva`, `escritura_poder` para `poder_general_administracion`). Roles que no son esos dos no disparan sync — quedan como referencia pura.
+    - **Mapeo defensivo**: la extracción IA puede producir `numero_escritura` o `numero`, `fecha_escritura` o `fecha`, `notario_nombre` o `notario`, `distrito_notarial` o `distrito`. La función hace `COALESCE` de cada par. Sprint 2 audita y normaliza.
+    - Si no hay default vigente para el rol, el caché se setea a `NULL` (limpia la columna).
+  - **Triggers** AFTER INSERT/UPDATE/DELETE STATEMENT-level que llaman a la función de sync para cada `(empresa_id, rol)` tocado en la transición. Tres funciones (`_insert`, `_update`, `_delete`) porque Postgres exige que el SQL del trigger solo referencie las transition tables declaradas en `CREATE TRIGGER` (INSERT no tiene OLD; DELETE no tiene NEW).
+  - GRANTs a `authenticated` y `service_role` sobre las funciones; `NOTIFY pgrst, 'reload schema'` final.
+
+- `lib/empresa-documentos/cache-mapping.ts` (nuevo):
+  - `buildEscrituraCacheFromSubtipoMeta(subtipoMeta)` — espejo TypeScript de la lógica PL/pgSQL del trigger. Util para preview en UI antes del assign + cobertura de tests sin tocar DB.
+  - `ROL_TO_CACHE_COLUMN` — mapeo `rol → columna` de `core.empresas`.
+  - `EMPRESA_DOCUMENTOS_ROLES` — lista canónica de los 7 roles iniciales (espejo del CHECK constraint).
+- `lib/empresa-documentos/cache-mapping.test.ts` (nuevo): 13 tests verdes cubriendo nulls, ambas convenciones de naming, prevalencia de la convención "larga", strings vacíos/whitespace, valores no-string, parciales.
+
+**Decisiones tácticas registradas durante implementación:**
+
+- **Trigger STATEMENT-level (no ROW-level)**: si en una sola sentencia se actualiza `es_default` de varios rows, el trigger se ejecuta una vez y el sync agrupa por `(empresa_id, rol)` distintos. Evita cascada de N llamadas cuando el endpoint hace bulk-update.
+- **Tres funciones de trigger en lugar de una**: Postgres rechaza referenciar `OLD TABLE` en un trigger AFTER INSERT (no existe) y `NEW TABLE` en AFTER DELETE. La opción "una función polimorfa" no es viable; tres funciones específicas es lo idiomático.
+- **CHECK constraint vs ENUM**: CHECK es más fácil de extender (un solo `ALTER TABLE`) y suficiente para v1. Si la lista crece a 15+ roles consideramos ENUM.
+- **Mapeo defensivo `numero_escritura | numero`**: aceptar las dos convenciones evita bloquear v1 a que Sprint 2 normalice. Cuando Sprint 2 estandarice, simplificamos a una sola key.
+- **Espejo TS ↔ PL/pgSQL del mapeo**: ambos archivos tienen marcador "espejo de X" para que el próximo editor compare. Si una de las dos implementaciones cambia, el comentario apunta a la otra.
+
+**Pendiente operativo (lo hace Beto):**
+
+- **Aplicar la migración** con `psql -f supabase/migrations/20260428235000_empresa_documentos_legales.sql` en la DB de prod. La migración es idempotente (`IF NOT EXISTS`/`CREATE OR REPLACE`).
+- **Regenerar `SCHEMA_REF.md`** con `npm run schema:ref` y commitear el resultado en el siguiente PR (CC no puede correr `psql` directamente, regla operativa del repo).
+
+**Links:**
+
+- PR Sprint 1: TBD (se agregará al merge).
