@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { RefreshCw, Search, TrendingDown, TrendingUp } from 'lucide-react';
+import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Package, RefreshCw, Search, TrendingDown, TrendingUp, Truck } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import {
   ModuleFilters,
@@ -13,9 +14,22 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Combobox } from '@/components/ui/combobox';
 import { RDB_EMPRESA_ID, type MovimientoRow } from '@/components/inventario/types';
 import { tipoColorClass, tipoLabel } from '@/components/inventario/utils';
 import { formatCurrency, formatDateTime } from '@/lib/format';
+
+type OrigenKey = 'todos' | 'oc' | 'venta' | 'manual';
+
+function origenLabel(referenciaTipo: string | null): { key: OrigenKey; label: string } {
+  if (referenciaTipo === 'oc_recepcion' || referenciaTipo === 'orden_compra') {
+    return { key: 'oc', label: 'Por compra' };
+  }
+  if (referenciaTipo === 'venta_waitry' || referenciaTipo?.startsWith('venta')) {
+    return { key: 'venta', label: 'Venta' };
+  }
+  return { key: 'manual', label: 'Manual' };
+}
 
 const movimientoColumns: Column<MovimientoRow>[] = [
   {
@@ -75,18 +89,46 @@ const movimientoColumns: Column<MovimientoRow>[] = [
     render: (m) => formatCurrency(m.costo_unitario),
   },
   {
-    key: 'detalle',
-    label: 'Detalle / Referencia',
+    key: 'origen',
+    label: 'Origen',
     sortable: false,
-    cellClassName: 'max-w-[200px] truncate text-sm text-muted-foreground',
-    render: (m) => (
-      <>
-        <div className="font-medium text-foreground">
-          {m.referencia_tipo === 'orden_compra' ? 'OC' : 'Manual'}
-        </div>
-        <div className="truncate">{m.notas ?? '—'}</div>
-      </>
-    ),
+    accessor: (m) => origenLabel(m.referencia_tipo).label,
+    render: (m) => {
+      const origen = origenLabel(m.referencia_tipo);
+      if (origen.key === 'oc' && m.oc_codigo && m.referencia_id) {
+        return (
+          <Link
+            href={`/rdb/ordenes-compra?focus=${m.referencia_id}`}
+            className="inline-flex items-center gap-1 rounded border border-emerald-500/40 bg-emerald-500/5 px-1.5 py-0.5 text-xs font-medium text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-400"
+            title="Abrir OC origen"
+          >
+            <Truck className="h-3 w-3" />
+            <span className="font-mono">{m.oc_codigo}</span>
+          </Link>
+        );
+      }
+      if (origen.key === 'oc') {
+        return (
+          <Badge variant="outline" className="gap-1">
+            <Truck className="h-3 w-3" />
+            Por compra
+          </Badge>
+        );
+      }
+      return (
+        <Badge variant="outline" className="gap-1 text-muted-foreground">
+          <Package className="h-3 w-3" />
+          {origen.label}
+        </Badge>
+      );
+    },
+  },
+  {
+    key: 'notas',
+    label: 'Notas',
+    sortable: false,
+    cellClassName: 'max-w-[220px] truncate text-sm text-muted-foreground',
+    render: (m) => m.notas ?? '—',
   },
 ];
 
@@ -107,6 +149,7 @@ export default function InventarioMovimientosPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [origenFilter, setOrigenFilter] = useState<OrigenKey>('todos');
 
   const fetchMovimientos = useCallback(async () => {
     setLoading(true);
@@ -117,13 +160,44 @@ export default function InventarioMovimientosPage() {
         .schema('erp')
         .from('movimientos_inventario')
         .select(
-          'id, producto_id, tipo_movimiento, cantidad, costo_unitario, referencia_tipo, notas, created_at, productos(nombre)'
+          'id, producto_id, tipo_movimiento, cantidad, costo_unitario, referencia_tipo, referencia_id, notas, created_at, productos(nombre)'
         )
         .eq('empresa_id', RDB_EMPRESA_ID)
         .order('created_at', { ascending: false })
         .limit(300);
       if (queryError) throw queryError;
-      setMovimientos((data ?? []) as unknown as MovimientoRow[]);
+
+      const rows = ((data ?? []) as unknown as MovimientoRow[]).map((m) => ({
+        ...m,
+        oc_codigo: null as string | null,
+      }));
+
+      // Resolver codigo de OC para movimientos con referencia_tipo='oc_recepcion'
+      const ocIds = Array.from(
+        new Set(
+          rows
+            .filter((m) => m.referencia_tipo === 'oc_recepcion' && m.referencia_id)
+            .map((m) => m.referencia_id as string)
+        )
+      );
+      if (ocIds.length > 0) {
+        const { data: ocsData } = await supabase
+          .schema('erp')
+          .from('ordenes_compra')
+          .select('id, codigo')
+          .in('id', ocIds);
+        const ocMap = new Map<string, string>();
+        for (const oc of ocsData ?? []) {
+          if (oc.id && oc.codigo) ocMap.set(oc.id, oc.codigo);
+        }
+        for (const m of rows) {
+          if (m.referencia_id && ocMap.has(m.referencia_id)) {
+            m.oc_codigo = ocMap.get(m.referencia_id) ?? null;
+          }
+        }
+      }
+
+      setMovimientos(rows);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error al cargar movimientos');
     } finally {
@@ -135,14 +209,21 @@ export default function InventarioMovimientosPage() {
     void fetchMovimientos();
   }, [fetchMovimientos]);
 
-  const filteredMovimientos = movimientos.filter((m) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      (m.productos?.nombre ?? '').toLowerCase().includes(q) ||
-      (m.notas ?? '').toLowerCase().includes(q)
-    );
-  });
+  const filteredMovimientos = useMemo(() => {
+    return movimientos.filter((m) => {
+      if (origenFilter !== 'todos') {
+        const origen = origenLabel(m.referencia_tipo).key;
+        if (origen !== origenFilter) return false;
+      }
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return (
+        (m.productos?.nombre ?? '').toLowerCase().includes(q) ||
+        (m.notas ?? '').toLowerCase().includes(q) ||
+        (m.oc_codigo ?? '').toLowerCase().includes(q)
+      );
+    });
+  }, [movimientos, search, origenFilter]);
 
   return (
     <>
@@ -156,12 +237,25 @@ export default function InventarioMovimientosPage() {
         <div className="relative min-w-52">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Buscar producto o nota…"
+            placeholder="Buscar producto, nota u OC…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
           />
         </div>
+
+        <Combobox
+          value={origenFilter}
+          onChange={(v) => setOrigenFilter((v as OrigenKey) ?? 'todos')}
+          options={[
+            { value: 'todos', label: 'Todos los orígenes' },
+            { value: 'oc', label: 'Por compra (OC)' },
+            { value: 'venta', label: 'Venta' },
+            { value: 'manual', label: 'Manual' },
+          ]}
+          placeholder="Origen…"
+          className="w-[180px]"
+        />
 
         <Button
           variant="outline"

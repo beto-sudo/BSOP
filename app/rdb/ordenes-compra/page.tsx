@@ -7,6 +7,7 @@
 
 import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getLocalDayBoundsUtc } from '@/lib/timezone';
 import {
@@ -1089,6 +1090,11 @@ export default function OrdenesCompraPage() {
     void fetchOrdenes();
   }, [fetchOrdenes]);
 
+  // Auto-abrir drawer si llega ?focus={oc_id} (deep-link desde /inventario/movimientos)
+  const searchParams = useSearchParams();
+  const focusOcId = searchParams.get('focus');
+  const [autoOpenedFocusId, setAutoOpenedFocusId] = useState<string | null>(null);
+
   const openDetail = useCallback(async (orden: OrdenCompra) => {
     setSelected(orden);
     setDrawerOpen(true);
@@ -1131,6 +1137,15 @@ export default function OrdenesCompraPage() {
       setLoadingItems(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (!focusOcId || autoOpenedFocusId === focusOcId || ordenes.length === 0) return;
+    const target = ordenes.find((o) => o.id === focusOcId);
+    if (target) {
+      setAutoOpenedFocusId(focusOcId);
+      void openDetail(target);
+    }
+  }, [focusOcId, ordenes, autoOpenedFocusId, openDetail]);
 
   const handleReceiveChange = useCallback((itemId: string, value: string, max: number) => {
     const normalized = value === '' ? '' : String(Math.min(Math.max(Number(value) || 0, 0), max));

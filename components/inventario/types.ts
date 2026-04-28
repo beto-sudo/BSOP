@@ -26,9 +26,12 @@ export type MovimientoRow = {
   cantidad: number;
   costo_unitario: number | null;
   referencia_tipo: string | null;
+  referencia_id: string | null;
   notas: string | null;
   created_at: string | null;
   productos: { nombre: string } | null;
+  /** Resuelto en cliente: si referencia_tipo='oc_recepcion', el codigo de la OC origen. */
+  oc_codigo?: string | null;
 };
 
 export type TipoUI = 'ajuste_positivo' | 'ajuste_negativo' | 'merma' | 'consumo_interno';
