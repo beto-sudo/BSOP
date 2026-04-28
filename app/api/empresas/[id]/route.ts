@@ -48,6 +48,35 @@ const editableText = z
   .union([z.string(), z.null()])
   .transform((v) => (v === '' || v == null ? null : v));
 
+// Escritura (constitutiva o poder): jsonb con 5 campos básicos requeridos por
+// `lib/rh/datos-fiscales-empresa.ts` para alta de empleados y contratos LFT.
+// Acepta objeto literal o `null` para limpiar la escritura completa.
+const escrituraJsonbSchema = z
+  .union([
+    z
+      .object({
+        numero: z.union([z.string(), z.null()]).optional(),
+        fecha: z.union([z.string(), z.null()]).optional(),
+        fecha_texto: z.union([z.string(), z.null()]).optional(),
+        notario: z.union([z.string(), z.null()]).optional(),
+        notaria_numero: z.union([z.string(), z.null()]).optional(),
+        distrito: z.union([z.string(), z.null()]).optional(),
+      })
+      .strict(),
+    z.null(),
+  ])
+  .transform((obj) => {
+    if (obj == null) return null;
+    // Normaliza '' → null en cada campo y descarta la escritura completa si
+    // todos los campos quedaron vacíos (mejor null que jsonb con todo blank).
+    const norm: Record<string, string | null> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      norm[k] = v == null || v === '' ? null : v;
+    }
+    const allBlank = Object.values(norm).every((v) => v == null);
+    return allBlank ? null : norm;
+  });
+
 const PayloadSchema = z
   .object({
     registro_patronal_imss: RegistroPatronalSchema.optional(),
@@ -71,6 +100,11 @@ const PayloadSchema = z
     domicilio_municipio: editableText.optional(),
     domicilio_estado: editableText.optional(),
     domicilio_cp: editableText.optional(),
+    // Datos legales para alta de empleados (validados por
+    // `lib/rh/datos-fiscales-empresa.ts`).
+    representante_legal: editableText.optional(),
+    escritura_constitutiva: escrituraJsonbSchema.optional(),
+    escritura_poder: escrituraJsonbSchema.optional(),
   })
   .strict();
 
