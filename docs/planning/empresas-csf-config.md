@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-28
-**Última actualización:** 2026-04-28 (Sprint 2 mergeado: `EmpresaDetail` reescrito con CSF read-only + drawer "Actualizar CSF" inline (estados A→B→C→D + diff selectivo) + campo `registro_patronal_imss` editable con regex; SELECT del page extiende `tipo_contribuyente`, `curp`, `registro_patronal_imss`)
+**Última actualización:** 2026-04-28 (Sprint 3 mergeado: botón "Nueva empresa" + drawer `<NuevaEmpresaDrawer>` con flujo CSF→preview→create + agrupación de la lista por tipo de contribuyente — Morales / Físicas / Otros. Faltan solo Sprint 4 operativo)
 
 ## Problema
 
@@ -103,7 +103,7 @@ Empresa es estructuralmente igual al proveedor moral: mismo PDF de SAT, mismos c
 | 0   | Promoción: este doc + fila en INITIATIVES.md                                                                                           | done    | #267 |
 | 1   | Endpoints `/api/empresas/extract-csf`, `create-with-csf`, `[id]/update-csf`, `PATCH [id]` (registro patronal) + tests con fixtures CSF | done    | #269 |
 | 2   | UI drawer "Actualizar CSF" en `/settings/empresas/[slug]` + campo `registro_patronal_imss` editable + reuso `<CsfDiffModal>`           | done    | TBD  |
-| 3   | Botón "Nueva empresa" + drawer `create-with-csf` en lista `/settings/empresas`                                                         | pending | —    |
+| 3   | Botón "Nueva empresa" + drawer `create-with-csf` en lista `/settings/empresas` + agrupación por tipo (Morales/Físicas/Otros)           | done    | TBD  |
 | 4   | Refresh operativo: subir CSF al día de RDB/DILESA/COAGAN/ANSA + capturar `registro_patronal_imss` faltantes                            | pending | —    |
 
 ## Decisiones registradas
@@ -169,3 +169,30 @@ Empresa es estructuralmente igual al proveedor moral: mismo PDF de SAT, mismos c
 **Links:**
 
 - PR Sprint 2: TBD (se agregará al merge).
+
+### 2026-04-28 — Sprint 3: alta nueva + agrupación por tipo
+
+**Qué se hizo en esta sesión:**
+
+- `app/settings/empresas/_components/nueva-empresa-drawer.tsx` (nuevo componente):
+  - Estado A: drop PDF (dashed border).
+  - Estado B: procesando con loader.
+  - Estado C: preview tipo+RFC+razón social+régimen+idCIF + form para `nombre` (default = nombre comercial / razón social) y `slug` (default = slugify del nombre, editable; deja de auto-tracking si el usuario lo modifica). Toggle persona moral / física.
+  - Estado D: POST `create-with-csf`, redirige a `/settings/empresas/{nuevo-slug}`.
+  - Errores friendly: `409 rfc_duplicado` con link al detalle existente; `409 slug_duplicado` con sugerencia de editar.
+- `app/settings/empresas/page.tsx`:
+  - SELECT extendido con `tipo_contribuyente`.
+  - Botón header "Nueva empresa" abre el drawer.
+  - Lista agrupada: tres tablas (Personas Morales, Personas Físicas, Otros) con header de sección + contador. Empresas con `tipo_contribuyente = null` caen en "Otros". Si una sección no tiene empresas, no se renderiza.
+  - Empty state ahora invita a "Dar de alta la primera" empresa con el mismo botón.
+- Sprint 4 (operativo) queda como pendiente para Beto: subir CSF al día de RDB/DILESA/COAGAN/ANSA + capturar `registro_patronal_imss` faltantes.
+
+**Decisiones tácticas registradas durante implementación:**
+
+- **Slug auto-trackea al nombre solo hasta que el usuario lo edita manualmente** (`slugTouched` flag). Patrón estándar de UX para evitar pisar la edición del usuario.
+- **Tablas separadas por grupo en vez de un solo table con headers de sección**: encabezados de columna repetidos (más visual ruido) pero el costo es bajo con N=4-5 empresas, y mantiene el componente `<EmpresaGroupTable>` simple/reutilizable.
+- **Empresas sin `tipo_contribuyente` van a "Otros"** sin forzar default a moral. Las 4 actuales ya tienen el default `'persona_moral'` por DEFAULT del schema; el grupo "Otros" cubre futuras categorizaciones (fideicomisos, entidades extranjeras) sin romper la UI.
+
+**Links:**
+
+- PR Sprint 3: TBD (se agregará al merge).
