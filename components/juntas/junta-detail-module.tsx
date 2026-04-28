@@ -468,28 +468,41 @@ export function JuntaDetailModule({ empresaSlug }: JuntaDetailModuleProps) {
       setTaskUpdates([]);
     }
 
-    const { data: personasData } = await supabase
-      .schema('erp')
-      .from('personas')
-      .select('id, nombre, apellido_paterno')
-      .eq('empresa_id', juntaData.empresa_id)
-      .eq('activo', true)
-      .is('deleted_at', null)
-      .order('nombre');
-    setPersonas(
-      (personasData ?? []).map((p: any) => ({
-        id: p.id,
-        nombre: [p.nombre, p.apellido_paterno].filter(Boolean).join(' '),
-      }))
-    );
+    // Cargamos `personas` y `empleados` en paralelo, y filtramos
+    // `personas` a las que tienen un registro de `empleado` activo.
+    // Antes traíamos todas las personas activas, pero `erp.personas`
+    // también almacena proveedores y clientes (mismo registro maestro).
+    // Desde el rollout de CSF de proveedores los dropdowns de
+    // "Agregar participante" se llenaban de proveedores.
+    const [{ data: personasData }, { data: empData }] = await Promise.all([
+      supabase
+        .schema('erp')
+        .from('personas')
+        .select('id, nombre, apellido_paterno')
+        .eq('empresa_id', juntaData.empresa_id)
+        .eq('activo', true)
+        .is('deleted_at', null)
+        .order('nombre'),
+      supabase
+        .schema('erp')
+        .from('empleados')
+        .select('id, persona_id, persona:persona_id(nombre, apellido_paterno)')
+        .eq('empresa_id', juntaData.empresa_id)
+        .eq('activo', true)
+        .is('deleted_at', null),
+    ]);
 
-    const { data: empData } = await supabase
-      .schema('erp')
-      .from('empleados')
-      .select('id, persona:persona_id(nombre, apellido_paterno)')
-      .eq('empresa_id', juntaData.empresa_id)
-      .eq('activo', true)
-      .is('deleted_at', null);
+    const empleadoPersonaIds = new Set(
+      (empData ?? []).map((e: any) => e.persona_id).filter(Boolean)
+    );
+    setPersonas(
+      (personasData ?? [])
+        .filter((p: any) => empleadoPersonaIds.has(p.id))
+        .map((p: any) => ({
+          id: p.id,
+          nombre: [p.nombre, p.apellido_paterno].filter(Boolean).join(' '),
+        }))
+    );
     setEmpleados(
       (empData ?? []).map((e: any) => ({
         id: e.id,
