@@ -10,9 +10,15 @@
  *
  * ⚠️  DISCLAIMER LEGAL:
  *   La redacción base fue proporcionada por DILESA. Este render solo
- *   sustituye los placeholders del .docx con los datos del empleado.
- *   Cualquier cambio estructural a las cláusulas debe revisarse por
- *   abogado laboral antes de usarse en producción.
+ *   sustituye los placeholders del .docx con los datos del empleado y
+ *   del patrón (la empresa que está usando el módulo). Cualquier cambio
+ *   estructural a las cláusulas debe revisarse por abogado laboral
+ *   antes de usarse en producción.
+ *
+ * `patron` es requerido — se construye desde `core.empresas` con
+ * `buildPatronFromDatos` en `lib/rh/datos-fiscales-empresa.ts`. No hay
+ * fallback: si la empresa no tiene datos completos, el caller debe
+ * bloquear la generación y mostrar mensaje "captura tus datos fiscales".
  *
  * El CSS `@media print` oculta todo fuera del <article> al imprimir.
  */
@@ -83,32 +89,6 @@ export interface ContratoPatron {
   };
 }
 
-/**
- * Datos reales de DILESA extraídos del contrato vigente (dic-2025).
- */
-export const PATRON_DILESA: ContratoPatron = {
-  razonSocial: 'DESARROLLO INMOBILIARIO LOS ENCINOS, S.A. DE C.V.',
-  rfc: 'DIE030904866',
-  domicilio:
-    'Calle Magnolias #2440, Fraccionamiento Lomas del Valle, C.P. 26093, Piedras Negras, Coahuila de Zaragoza, México',
-  registroPatronalImss: 'A3226708107',
-  representanteLegal: 'C. Norberto Gutiérrez Infante',
-  escrituraConstitutiva: {
-    numero: '167',
-    fecha: '4 de septiembre de 2003',
-    notario: 'Lic. Raúl P. García Elizondo',
-    notariaNumero: '16',
-    distrito: 'Saltillo',
-  },
-  poderRepresentante: {
-    numero: '580',
-    fecha: '8 de diciembre de 2025',
-    notario: 'Lic. Guillermo Nicolás López Elizondo',
-    notariaNumero: '25',
-    distrito: 'Río Grande',
-  },
-};
-
 function formatDateLarga(iso: string | null): string {
   if (!iso) return '__________________';
   const d = new Date(iso.includes('T') ? iso : `${iso}T00:00:00`);
@@ -135,13 +115,13 @@ const TIPO_CONTRATO_TITULO: Record<string, string> = {
 
 export function ContratoPrintable({
   empleado,
-  patron = PATRON_DILESA,
+  patron,
   fechaContrato,
   vigenciaInicio,
   vigenciaFin,
 }: {
   empleado: ContratoEmpleado;
-  patron?: ContratoPatron;
+  patron: ContratoPatron;
   /** Fecha en que se firma el contrato (default hoy). */
   fechaContrato?: string;
   /** Fecha de inicio de vigencia (default = fecha_ingreso). */

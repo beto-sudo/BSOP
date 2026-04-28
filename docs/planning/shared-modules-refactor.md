@@ -3,10 +3,10 @@
 **Slug:** `shared-modules-refactor`
 **Empresas:** todas (ANSA, DILESA, RDB, COAGAN — y futuras)
 **Schemas afectados:** n/a (UI)
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-04-27
-**Última actualización:** 2026-04-27
+**Última actualización:** 2026-04-27 (cierre — Sub-PR 5 mergeado)
 
 ## Problema
 
@@ -295,8 +295,24 @@ extracción.
   Pages reducidos a ~14 líneas. Bug de `<RequireAccess empresa="rdb">`
   hardcoded en ambos pages de `/inicio/juntas` (lista + detalle)
   arreglado oportunísticamente.
-- **Sub-PR 5 — `empleados-detail-audit`** (Tier C, pendiente): próximo
-  hito.
+- **Sub-PR 5 — `empleado-detail-shared`** (2026-04-27): mergeado en PR
+  pendiente. La auditoría inicial (Tier C, "decidir si extraer o quedarse
+  separados") escaló al darnos cuenta de que **contrato y finiquito
+  aplicaban a todas las empresas, no solo a DILESA** (Beto). El alcance
+  cambió de Tier C a Tier A: extracción + rollout cross-empresa.
+  Componente `<EmpleadoDetailModule>` extraído a
+  `components/rh/empleado-detail-module.tsx` (~1100 líneas) adoptando
+  DILESA como base canónica — RDB hereda beneficiarios (Art. 501 LFT),
+  documentos/adjuntos, notas, contrato individual, finiquito y baja con
+  generación de finiquito. Componentes nuevos
+  `<EmpleadoContratoModule>` y `<EmpleadoFiniquitoModule>` con la misma
+  arquitectura. `PATRON_DILESA` (fallback hardcoded) eliminado de
+  `contrato-printable.tsx` y `finiquito-printable.tsx`. Validación
+  centralizada en `lib/rh/datos-fiscales-empresa.ts`. Pages reducidos a
+  ~5 líneas cada uno (DILESA y RDB × 3 rutas: detalle, contrato,
+  finiquito = 6 pages). RDB ganó las rutas `/contrato` y `/finiquito`
+  como ciudadano de primera clase. ADR-011 actualizado con SM6 (cero
+  fallback hardcoded en módulos legales).
 
 ## Decisiones registradas
 
@@ -419,6 +435,60 @@ extracción.
   completo, igualando el patrón de `/inicio/tasks` (proxy ya valida
   sesión). Comentario JSDoc explica por qué no hay RequireAccess.
 
+### Sub-PR 5 — empleado-detail-shared (2026-04-27)
+
+- **Sub-PR 5 — Cambio de alcance: de auditoría Tier C a extracción Tier
+  A.** Razón: el plan original era "decidir si la asimetría justifica
+  wrapper o se queda como excepción documentada (SM4)". Al revisar el
+  contrato/finiquito de DILESA con Beto, quedó claro que **contrato y
+  finiquito son features estándar para cualquier empresa con empleados
+  formales**, no peculiaridades de DILESA. La asimetría que existía era
+  porque RDB nunca se rolloutó, no porque la feature aplicara solo a
+  DILESA. La decisión fue rolloutear RDB en el mismo PR — más limpio que
+  documentar una excepción que iba a desaparecer en el siguiente sprint.
+- **Sub-PR 5 — Cero fallback hardcoded; datos fiscales obligatorios.**
+  `PATRON_DILESA` (constante hardcoded con datos fiscales reales de
+  DILESA en `contrato-printable.tsx`) se eliminó. Razón: era un fallback
+  silencioso que generaba contratos con datos de DILESA en empresas que
+  no eran DILESA si los datos no estaban capturados — riesgo legal alto.
+  Ahora el flujo es:
+  1. La empresa captura RFC, registro patronal, representante legal,
+     escrituras, domicilio fiscal en `core.empresas` (Settings →
+     Empresas).
+  2. Sin esos datos, el botón "Nuevo empleado" se deshabilita en RDB
+     y los botones "Contrato" / "Finiquito" se deshabilitan en el
+     detalle.
+  3. La página de contrato/finiquito muestra mensaje claro con la
+     lista de campos faltantes y CTA a Settings → Empresas si alguien
+     llega por URL directa.
+     Esta regla queda codificada como SM6 en ADR-011.
+- **Sub-PR 5 — DILESA como base canónica del detail page.** RDB tenía
+  679 líneas, DILESA 1441 — DILESA con todas las features (multi-tel,
+  contacto emergencia, beneficiarios, documentos, notas, contrato/
+  finiquito desde el detalle, baja con generación de finiquito, foto
+  con avatar, todos los campos LFT del contrato). RDB hereda todo. Las
+  features extras no eran asimetría legítima — eran deuda de
+  incompletitud en RDB.
+- **Sub-PR 5 — `<EmpleadoDetailModule>` recibe solo `empresaSlug`.**
+  Razón: el `empresaId` se lee de `empleado.empresa_id` (ya está en la
+  fila), y los datos fiscales se cargan via
+  `useDatosFiscalesEmpresa(empresaId)`. El page no necesita pasar más
+  contexto. API mínima alineada con SM3.
+- **Sub-PR 5 — Validador centralizado en
+  `lib/rh/datos-fiscales-empresa.ts`.** Single source of truth de qué
+  campos son obligatorios para usar RH formal. Funciones expuestas:
+  `camposFaltantes()` (lista de strings), `tieneDatosCompletos()`,
+  `buildPatronFromDatos()` (lanza si incompleto), `useDatosFiscalesEmpresa(empresaId)`
+  (hook React). Reutilizable por cualquier módulo futuro que necesite
+  los datos fiscales (ej. emisión de facturas, recibos de nómina).
+- **Sub-PR 5 — Guard de alta solo aplica en single-empresa.** En
+  `<EmpleadosModule>` con `scope='user-empresas'` (vista global
+  `/rh/personal`) el botón "Nuevo empleado" se deshabilita siempre con
+  tooltip "abre la página de la empresa específica". Razón: en multi-
+  empresa no hay una sola empresa destino — pasar el empleado a la
+  primera del array sería ambiguo. El admin va a `/dilesa/rh/personal`
+  o `/rdb/rh/personal` para crear. Es disciplina, no limitación.
+
 ## Bitácora
 
 - **2026-04-27 — Sub-PR 1 + ADR-011** (Claude Code, branch
@@ -468,3 +538,39 @@ extracción.
     los 4 warnings pre-existentes de `/inicio/juntas/[id]/page.tsx` no
     están en mi alcance), format, 222 tests del repo. Pendiente smoke
     manual antes de mergeo.
+- **2026-04-27 — Sub-PR 5** (Claude Code, branch
+  `feat/empleado-detail-shared-rh-formal`):
+  - Cambio de alcance autorizado por Beto en sesión: contrato y
+    finiquito aplican para todas las empresas (no solo DILESA), cero
+    fallback hardcoded, datos fiscales obligatorios para alta de
+    empleado.
+  - Creado `lib/rh/datos-fiscales-empresa.ts` con validador
+    centralizado (`camposFaltantes`, `tieneDatosCompletos`,
+    `buildPatronFromDatos`, `useDatosFiscalesEmpresa`).
+  - Eliminado `PATRON_DILESA` de
+    `components/rh/contrato-printable.tsx` y removida importación de
+    `components/rh/finiquito-printable.tsx`. `patron` ahora es prop
+    requerida en ambos printables.
+  - Creado `components/rh/empleado-detail-module.tsx` (~1100 líneas)
+    parametrizado por `empresaSlug` adoptando DILESA como base canónica
+    (todas las features: multi-tel, contacto emergencia, beneficiarios
+    Art. 501, documentos, notas, contrato, finiquito, baja+finiquito).
+  - Creado `components/rh/empleado-contrato-module.tsx` (~210 líneas)
+    y `components/rh/empleado-finiquito-module.tsx` (~330 líneas) con
+    bloqueo duro si datos fiscales incompletos (mensaje + CTA a
+    `/settings/empresas/<slug>`).
+  - Reducido `app/dilesa/rh/personal/[id]/page.tsx` de 1441 → 5 líneas.
+  - Reducido `app/rdb/rh/personal/[id]/page.tsx` de 679 → 5 líneas.
+  - Reducido `app/dilesa/rh/personal/[id]/contrato/page.tsx` de 232 → 5
+    líneas y `/finiquito/page.tsx` de 353 → 5 líneas.
+  - Creadas rutas espejo en RDB:
+    `app/rdb/rh/personal/[id]/contrato/page.tsx` y
+    `/finiquito/page.tsx` (5 líneas cada una).
+  - Modificado `components/rh/personal-module.tsx`: botón "Nuevo
+    empleado" deshabilitado cuando datos fiscales incompletos (single-
+    empresa) o cuando el scope es multi-empresa global.
+  - Actualizado ADR-011 con regla SM6 (cero fallback hardcoded en
+    módulos legales).
+  - DILESA mantiene operación normal porque ya tiene datos fiscales
+    completos. RDB queda en estado "datos fiscales pendientes" hasta
+    que Beto cargue la CSF (anunciado para el día siguiente).
