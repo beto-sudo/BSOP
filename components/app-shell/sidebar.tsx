@@ -20,9 +20,11 @@ import { canAccessEmpresa, canAccessModulo, ROUTE_TO_MODULE } from '@/lib/permis
 import {
   NAV_ITEMS,
   NAV_TO_EMPRESA,
+  type NavChild,
   type NavIconKey,
   type NavItem,
   getActiveSection,
+  hasNavSubItems,
   isItemActive,
   matchesPath,
 } from './nav-config';
@@ -84,6 +86,13 @@ export function Sidebar({
     // Admin sees everything.
     if (permissions.isAdmin) return NAV_ITEMS;
 
+    const filterChild = (child: NavChild) => {
+      const moduloSlug = ROUTE_TO_MODULE[child.href];
+      // If no modulo mapping, show if empresa is accessible.
+      if (!moduloSlug) return true;
+      return canAccessModulo(permissions, moduloSlug);
+    };
+
     return NAV_ITEMS.reduce<NavItem[]>((acc, item) => {
       // Overview is always visible to authenticated users.
       if (!item.href || item.href === '/') {
@@ -102,21 +111,25 @@ export function Sidebar({
       // Check empresa-level access.
       if (!canAccessEmpresa(permissions, empresaSlug)) return acc;
 
-      // Filter children by modulo access.
-      if (item.children?.length) {
-        const visibleChildren = item.children.filter((child) => {
-          const moduloSlug = ROUTE_TO_MODULE[child.href];
-          // If no modulo mapping, show if empresa is accessible.
-          if (!moduloSlug) return true;
-          return canAccessModulo(permissions, moduloSlug);
-        });
-
-        // If all children were filtered out, still show the parent (it has empresa access).
-        acc.push({ ...item, children: visibleChildren });
-      } else {
-        acc.push(item);
+      // Grouped shape: filter children inside each section, then drop empty
+      // sections so the divider doesn't render alone.
+      if (item.sections?.length) {
+        const visibleSections = item.sections
+          .map((section) => ({ ...section, children: section.children.filter(filterChild) }))
+          .filter((section) => section.children.length > 0);
+        acc.push({ ...item, sections: visibleSections });
+        return acc;
       }
 
+      // Flat shape: filter children directly.
+      if (item.children?.length) {
+        const visibleChildren = item.children.filter(filterChild);
+        // If all children were filtered out, still show the parent (it has empresa access).
+        acc.push({ ...item, children: visibleChildren });
+        return acc;
+      }
+
+      acc.push(item);
       return acc;
     }, []);
   }, [permissions]);
@@ -179,7 +192,7 @@ export function Sidebar({
         ) : (
           filteredNavItems.map((item) => {
             const active = isItemActive(pathname, item);
-            const hasChildren = Boolean(item.children?.length);
+            const hasSubItems = hasNavSubItems(item);
             const expanded = !collapsed && expandedSection === item.href;
             const label = t(item.labelKey);
 
@@ -191,7 +204,7 @@ export function Sidebar({
                     active
                       ? 'border border-[var(--accent)]/40 bg-[var(--accent)]/15 dark:text-white text-[var(--text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
                       : 'border border-transparent dark:text-white/68 text-[var(--text)]/68 hover:border-[var(--border)] hover:bg-[var(--card)] dark:hover:text-white hover:text-[var(--text)]',
-                    !collapsed && hasChildren ? 'pr-1' : '',
+                    !collapsed && hasSubItems ? 'pr-1' : '',
                   ].join(' ')}
                 >
                   <Link
@@ -208,7 +221,7 @@ export function Sidebar({
                     <NavIcon icon={item.icon} />
                     {!collapsed ? <span className="min-w-0 flex-1 truncate">{label}</span> : null}
                   </Link>
-                  {!collapsed && hasChildren ? (
+                  {!collapsed && hasSubItems ? (
                     <button
                       type="button"
                       onClick={(e) => {
@@ -228,7 +241,7 @@ export function Sidebar({
                   ) : null}
                 </div>
 
-                {!collapsed && hasChildren ? (
+                {!collapsed && hasSubItems ? (
                   <div
                     className={[
                       'overflow-hidden transition-all duration-200 ease-in-out',
@@ -236,70 +249,18 @@ export function Sidebar({
                     ].join(' ')}
                   >
                     <div className="ml-7 mt-1 space-y-1 border-l border-[var(--border)] pl-4 pb-1">
-                      {item.children?.map((child) => {
-                        if (child.divider) {
-                          return (
-                            <div
-                              key={child.label}
-                              className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] dark:text-white/35 text-[var(--text-subtle)]"
-                            >
-                              {child.label}
-                            </div>
-                          );
-                        }
-                        const childActive = matchesPath(pathname, child.href);
-                        return (
-                          <Link
-                            key={child.href}
-                            href={child.href}
-                            className={[
-                              'block rounded-xl border-l-2 px-3 py-2 text-xs transition',
-                              childActive
-                                ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
-                                : 'border-transparent dark:text-white/48 text-[var(--text-muted)] hover:bg-[var(--card)] dark:hover:text-white/80 hover:text-[var(--text)]',
-                            ].join(' ')}
-                          >
-                            {child.label}
-                          </Link>
-                        );
-                      })}
+                      <NavSubItems item={item} pathname={pathname} variant="expanded" />
                     </div>
                   </div>
                 ) : null}
 
-                {collapsed && hasChildren ? (
+                {collapsed && hasSubItems ? (
                   <div className="pointer-events-none absolute left-full top-0 z-50 ml-2 hidden min-w-48 rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-2 opacity-0 shadow-2xl transition duration-200 group-hover/item:pointer-events-auto group-hover/item:block group-hover/item:opacity-100 md:block">
                     <div className="px-2 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-subtle)]">
                       {label}
                     </div>
                     <div className="space-y-1">
-                      {item.children?.map((child) => {
-                        if (child.divider) {
-                          return (
-                            <div
-                              key={child.label}
-                              className="px-2 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] dark:text-white/35 text-[var(--text-subtle)]"
-                            >
-                              {child.label}
-                            </div>
-                          );
-                        }
-                        const childActive = matchesPath(pathname, child.href);
-                        return (
-                          <Link
-                            key={child.href}
-                            href={child.href}
-                            className={[
-                              'pointer-events-auto block rounded-xl border-l-2 px-3 py-2 text-xs transition',
-                              childActive
-                                ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
-                                : 'border-transparent dark:text-white/60 text-[var(--text)]/60 hover:bg-[var(--card)] dark:hover:text-white hover:text-[var(--text)]',
-                            ].join(' ')}
-                          >
-                            {child.label}
-                          </Link>
-                        );
-                      })}
+                      <NavSubItems item={item} pathname={pathname} variant="floating" />
                     </div>
                   </div>
                 ) : null}
@@ -310,6 +271,76 @@ export function Sidebar({
       </nav>
     </aside>
   );
+}
+
+type NavSubItemsVariant = 'expanded' | 'floating';
+
+/**
+ * Renders the sub-items of a nav entry — either grouped sections (DILESA, RDB)
+ * or a flat children list (SANREN, Settings, Personas Físicas).
+ *
+ * Sections with empty `children` are NOT rendered here — they're already filtered
+ * out upstream by the permission filter. Receiving an empty list is a no-op.
+ */
+function NavSubItems({
+  item,
+  pathname,
+  variant,
+}: {
+  item: NavItem;
+  pathname: string;
+  variant: NavSubItemsVariant;
+}) {
+  const dividerPadding = variant === 'expanded' ? 'px-3' : 'px-2';
+  const linkBase =
+    variant === 'expanded'
+      ? 'block rounded-xl border-l-2 px-3 py-2 text-xs transition'
+      : 'pointer-events-auto block rounded-xl border-l-2 px-3 py-2 text-xs transition';
+  const linkInactive =
+    variant === 'expanded'
+      ? 'border-transparent dark:text-white/48 text-[var(--text-muted)] hover:bg-[var(--card)] dark:hover:text-white/80 hover:text-[var(--text)]'
+      : 'border-transparent dark:text-white/60 text-[var(--text)]/60 hover:bg-[var(--card)] dark:hover:text-white hover:text-[var(--text)]';
+
+  const renderChild = (child: NavChild) => {
+    const childActive = matchesPath(pathname, child.href);
+    return (
+      <Link
+        key={child.href}
+        href={child.href}
+        className={[
+          linkBase,
+          childActive
+            ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
+            : linkInactive,
+        ].join(' ')}
+      >
+        {child.label}
+      </Link>
+    );
+  };
+
+  if (item.sections?.length) {
+    return (
+      <>
+        {item.sections.map((section) => (
+          <div key={section.label}>
+            <div
+              className={`${dividerPadding} pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] dark:text-white/35 text-[var(--text-subtle)]`}
+            >
+              {section.label}
+            </div>
+            {section.children.map(renderChild)}
+          </div>
+        ))}
+      </>
+    );
+  }
+
+  if (item.children?.length) {
+    return <>{item.children.map(renderChild)}</>;
+  }
+
+  return null;
 }
 
 /**

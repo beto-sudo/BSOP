@@ -8,7 +8,11 @@
 export type NavChild = {
   label: string;
   href: string;
-  divider?: boolean;
+};
+
+export type NavSection = {
+  label: string;
+  children: NavChild[];
 };
 
 export type NavIconKey =
@@ -19,12 +23,22 @@ export type NavIconKey =
   | 'rdb-logo'
   | 'sanren-logo';
 
+/**
+ * Top-level nav entry. Has either `children` (flat list, no grouping) or
+ * `sections` (grouped by labeled section). Mutually exclusive.
+ *
+ * - `children`: e.g. SANREN, Settings — small entries without grouping.
+ * - `sections`: e.g. DILESA, RDB — empresas with multiple module groups
+ *   (Administración, RRHH, etc.). Sections with empty `children` after
+ *   permission filtering are hidden by the sidebar render.
+ */
 export type NavItem = {
   href: string;
   labelKey: string;
   icon: NavIconKey;
   matchPaths?: string[];
   children?: NavChild[];
+  sections?: NavSection[];
 };
 
 export const NAV_ITEMS: NavItem[] = [
@@ -33,46 +47,72 @@ export const NAV_ITEMS: NavItem[] = [
     href: '/dilesa',
     labelKey: 'DILESA',
     icon: 'dilesa-logo',
-    children: [
-      { label: 'Administración', href: '#', divider: true },
-      { label: 'Tareas', href: '/dilesa/admin/tasks' },
-      { label: 'Juntas', href: '/dilesa/admin/juntas' },
-      { label: 'Documentos', href: '/dilesa/admin/documentos' },
-      { label: 'Recursos Humanos', href: '#', divider: true },
-      { label: 'Personal', href: '/dilesa/rh/personal' },
-      { label: 'Puestos', href: '/dilesa/rh/puestos' },
-      { label: 'Departamentos', href: '/dilesa/rh/departamentos' },
-      { label: 'Inmobiliario', href: '#', divider: true },
-      { label: 'Terrenos', href: '/dilesa/terrenos' },
-      { label: 'Prototipos', href: '/dilesa/prototipos' },
-      { label: 'Anteproyectos', href: '/dilesa/anteproyectos' },
-      { label: 'Proyectos', href: '/dilesa/proyectos' },
-      { label: 'Operaciones', href: '#', divider: true },
-      { label: 'Proveedores', href: '/dilesa/proveedores' },
+    sections: [
+      {
+        label: 'Administración',
+        children: [
+          { label: 'Tareas', href: '/dilesa/admin/tasks' },
+          { label: 'Juntas', href: '/dilesa/admin/juntas' },
+          { label: 'Documentos', href: '/dilesa/admin/documentos' },
+        ],
+      },
+      {
+        label: 'Recursos Humanos',
+        children: [
+          { label: 'Personal', href: '/dilesa/rh/personal' },
+          { label: 'Puestos', href: '/dilesa/rh/puestos' },
+          { label: 'Departamentos', href: '/dilesa/rh/departamentos' },
+        ],
+      },
+      {
+        label: 'Inmobiliario',
+        children: [
+          { label: 'Terrenos', href: '/dilesa/terrenos' },
+          { label: 'Prototipos', href: '/dilesa/prototipos' },
+          { label: 'Anteproyectos', href: '/dilesa/anteproyectos' },
+          { label: 'Proyectos', href: '/dilesa/proyectos' },
+        ],
+      },
+      {
+        label: 'Operaciones',
+        children: [{ label: 'Proveedores', href: '/dilesa/proveedores' }],
+      },
     ],
   },
   {
     href: '/rdb',
     labelKey: 'Rincón del Bosque',
     icon: 'rdb-logo',
-    children: [
-      { label: 'Administración', href: '#', divider: true },
-      { label: 'Tareas', href: '/rdb/admin/tasks' },
-      { label: 'Juntas', href: '/rdb/admin/juntas' },
-      { label: 'Documentos', href: '/rdb/admin/documentos' },
-      { label: 'Recursos Humanos', href: '#', divider: true },
-      { label: 'Personal', href: '/rdb/rh/personal' },
-      { label: 'Puestos', href: '/rdb/rh/puestos' },
-      { label: 'Departamentos', href: '/rdb/rh/departamentos' },
-      { label: 'Operaciones', href: '#', divider: true },
-      { label: 'Ventas', href: '/rdb/ventas' },
-      { label: 'Cortes', href: '/rdb/cortes' },
-      { label: 'Productos', href: '/rdb/productos' },
-      { label: 'Inventario', href: '/rdb/inventario' },
-      { label: 'Proveedores', href: '/rdb/proveedores' },
-      { label: 'Requisiciones', href: '/rdb/requisiciones' },
-      { label: 'Órdenes de Compra', href: '/rdb/ordenes-compra' },
-      { label: 'Playtomic', href: '/rdb/playtomic' },
+    sections: [
+      {
+        label: 'Administración',
+        children: [
+          { label: 'Tareas', href: '/rdb/admin/tasks' },
+          { label: 'Juntas', href: '/rdb/admin/juntas' },
+          { label: 'Documentos', href: '/rdb/admin/documentos' },
+        ],
+      },
+      {
+        label: 'Recursos Humanos',
+        children: [
+          { label: 'Personal', href: '/rdb/rh/personal' },
+          { label: 'Puestos', href: '/rdb/rh/puestos' },
+          { label: 'Departamentos', href: '/rdb/rh/departamentos' },
+        ],
+      },
+      {
+        label: 'Operaciones',
+        children: [
+          { label: 'Ventas', href: '/rdb/ventas' },
+          { label: 'Cortes', href: '/rdb/cortes' },
+          { label: 'Productos', href: '/rdb/productos' },
+          { label: 'Inventario', href: '/rdb/inventario' },
+          { label: 'Proveedores', href: '/rdb/proveedores' },
+          { label: 'Requisiciones', href: '/rdb/requisiciones' },
+          { label: 'Órdenes de Compra', href: '/rdb/ordenes-compra' },
+          { label: 'Playtomic', href: '/rdb/playtomic' },
+        ],
+      },
     ],
   },
   {
@@ -121,8 +161,28 @@ export function isItemActive(pathname: string, item: NavItem) {
   return paths.some((path) => matchesPath(pathname, path));
 }
 
+/**
+ * Returns true if the nav item has any expandable content (flat children or
+ * grouped sections).
+ */
+export function hasNavSubItems(item: NavItem): boolean {
+  return Boolean(item.children?.length || item.sections?.length);
+}
+
+/**
+ * Flattens an item's children regardless of shape (flat or grouped). Used for
+ * cases where consumers don't care about the section grouping.
+ */
+export function flattenNavChildren(item: NavItem): NavChild[] {
+  if (item.children?.length) return item.children;
+  if (item.sections?.length) return item.sections.flatMap((section) => section.children);
+  return [];
+}
+
 export function getActiveSection(pathname: string) {
-  return NAV_ITEMS.find((item) => item.children && isItemActive(pathname, item))?.href ?? null;
+  return (
+    NAV_ITEMS.find((item) => hasNavSubItems(item) && isItemActive(pathname, item))?.href ?? null
+  );
 }
 
 export function getSectionLabelKey(pathname: string) {
