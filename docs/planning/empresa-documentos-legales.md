@@ -174,4 +174,62 @@ La propuesta de Beto: en lugar de duplicar metadata en `core.empresas`, **ligar 
 
 **Links:**
 
-- PR Sprint 1: TBD (se agregará al merge).
+- PR Sprint 1: [#286](https://github.com/beto-sudo/BSOP/pull/286). Migración aplicada en prod por Beto el mismo día.
+
+### 2026-04-28 — Sprint 2: extracción IA puebla `subtipo_meta`
+
+**Qué se hizo:**
+
+- `lib/documentos/extraction-core.ts`: nuevo `SubtipoMetaEscrituraSchema` con 8 campos (numero_escritura, fecha_escritura, fecha_texto, notario_nombre, notaria_numero, distrito_notarial, tipo_poder, alcance). Es nullable: docs no notariales lo dejan null. Prompt extendido con instrucción explícita: la IA llena el subtipo_meta solo cuando `tipo_operacion ∈ escritura/constitutiva/reforma/poder/...`.
+- `app/api/documentos/[id]/extract/route.ts`: persiste `extraccion.subtipo_meta` a `erp.documentos.subtipo_meta` (jsonb).
+- Tests: 9 nuevos casos cubriendo schema nullable, ambas convenciones de naming, rechazo de tipos no-string.
+
+**Pendiente operativo:** documentos ya extraídos antes de este Sprint NO tienen `subtipo_meta` poblado. Sprint 5 cubre re-extracción de los docs de DILESA (Beto puede correr POST `/api/documentos/[id]/extract` desde la UI sobre cada uno).
+
+**Links:** PR Sprint 2: [#288](https://github.com/beto-sudo/BSOP/pull/288).
+
+### 2026-04-28 — Sprint 3: API endpoints
+
+**Qué se hizo:**
+
+- `GET /api/empresas/[id]/documentos`: lista asignaciones agrupadas por rol con metadata del documento hidratada cross-schema.
+- `POST /api/empresas/[id]/documentos`: asigna doc existente a un rol con validaciones (doc pertenece a la empresa, rol en enum, UUID válido). Si `es_default=true`, baja el flag de los demás del mismo rol antes del INSERT (atomicidad por partial UNIQUE).
+- `PATCH /api/empresas/[id]/documentos/[asignacion_id]`: actualiza `es_default` y/o `notas`.
+- `DELETE`: hard delete del row sin tocar el documento.
+- 30 tests nuevos (16 GET/POST + 14 PATCH/DELETE).
+
+**Decisiones tácticas:**
+
+- **Cross-schema sin JOIN**: Supabase no permite JOIN entre `core.empresa_documentos` y `erp.documentos`. El endpoint hace dos queries (`.eq()` + `.in()`) y hidrata client-side.
+- **`es_default` automático en primera asignación**: la UI manda `es_default=true` cuando el rol está vacío, para reducir el "asignar y luego marcar default" en el caso común de empresa virgen.
+
+**Links:** PR Sprint 3: [#289](https://github.com/beto-sudo/BSOP/pull/289).
+
+### 2026-04-28 — Sprint 4: UI panel en `/settings/empresas/[slug]`
+
+**Qué se hizo:**
+
+- `app/settings/empresas/_components/documentos-legales-panel.tsx` (nuevo): panel client-side que consume los endpoints del Sprint 3 y reemplaza las cards de jsonb manual de PR #280.
+  - Lista por los 7 roles con label legible, descripción, badge `sync RH` en los dos que alimentan el caché jsonb.
+  - Por cada rol con asignaciones: cards con título/número/fecha/notario, badge `default`, badge `falta metadata` si el subtipo_meta no cubre los 5 canónicos.
+  - Botones: ver documento (signed URL), marcar default, desasignar (con confirm).
+  - Dropdown de asignación filtrado por `tipo_operacion ∈ legales` excluyendo los ya asignados al rol.
+  - CTA "súbelo en módulo Documentos" cuando el dropdown está vacío.
+- Editor manual legacy bajo `<details>` "(legacy — preferir panel de arriba)" en modo edit. Se deprecará en Sprint 6 cuando todas las empresas migren.
+
+**Links:** PR Sprint 4: [#290](https://github.com/beto-sudo/BSOP/pull/290).
+
+### 2026-04-28 — Sprint 6: ADR + transición a `in_progress`
+
+**Qué se hizo:**
+
+- `docs/adr/015_empresa_documentos_legales.md`: ADR-015 codifica las 7 reglas del modelo (ED1-ED7): múltiples vigentes con un default, caché jsonb sincronizado por trigger, mapeo defensivo, espejo TS↔PL/pgSQL, ownership empresa-doc, hard delete de asignación, solo admin v1.
+- `docs/strategy/INITIATIVES.md`: transición `planned → in_progress` esperando Sprint 5 operativo.
+
+**Sprint 5 (operativo, lo hace Beto):**
+
+- DILESA: ya tiene sus documentos legales en el módulo. Entrar a `/settings/empresas/dilesa`, asignar la constitutiva al rol `acta_constitutiva` con `es_default=true`; asignar el poder principal a `poder_general_administracion` con `es_default=true`. Verificar que `core.empresas.escritura_constitutiva` y `escritura_poder` se llenan vía trigger.
+- RDB / ANSA / COAGAN: subir las escrituras y poderes vigentes en `/<empresa>/admin/documentos`. La extracción IA poblará el `subtipo_meta` automáticamente. Después asignar en `/settings/empresas/[slug]`.
+- Cierra iniciativa cuando las 4 empresas tengan al menos `acta_constitutiva` y `poder_general_administracion` asignados con `es_default=true`.
+
+**Cleanup pendiente (post-Sprint 5):** deprecar editor manual legacy de jsonb en `empresa-detail.tsx` cuando las 4 empresas estén migradas.
