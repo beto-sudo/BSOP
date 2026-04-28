@@ -3,10 +3,10 @@
 **Slug:** `empleados-multi-puesto`
 **Empresas:** todas
 **Schemas afectados:** `erp` (nueva tabla `empleados_puestos`, refactor de `v_empleados_full`, posible deprecación de `empleados.puesto_id`) + UI (rename módulo "Empleados" → "Personal" en sidebar/URL/detalle/listado)
-**Estado:** in_progress (Sprint 1 cerrado, Sprint 2 siguiente)
+**Estado:** in_progress (Sprint 2 cerrado, Sprint 3 siguiente)
 **Dueño:** Beto
 **Creada:** 2026-04-27
-**Última actualización:** 2026-04-27 (Sprint 1 entregado: tabla `erp.empleados_puestos` + backfill 1:1 (202 empleados) + refactor de `v_empleados_full` con `puestos` jsonb array + ADR-013. Backwards compatible — columnas escalares `puesto_id`/`puesto` preservadas con COALESCE.)
+**Última actualización:** 2026-04-27 (Sprint 2 entregado: trigger `trg_empleados_sync_puesto_principal` mantiene sync automático escalar↔N:M; `puestos-module.tsx` cuenta empleados desde `empleados_puestos` (incluye secundarios). Sprint 1: tabla `erp.empleados_puestos` + backfill 1:1 (202 empleados) + refactor de `v_empleados_full` + ADR-013.)
 
 ## Problema
 
@@ -76,15 +76,25 @@ Además, el listado ya no es solo "empleados operativos": incluye accionistas y 
 
 ## Sprints / hitos
 
-| #   | Scope                                                                                                                                                                                                                          | Estado                                                                           | PR        |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- | --------- |
-| 0   | Cleanup operativo: borrar duplicados extras de Beto/Alejandra/Michelle en RDB                                                                                                                                                  | n/a — ya estaba limpio al verificar (3 filas, una por persona, todas Accionista) | —         |
-| 1   | DB: tabla `erp.empleados_puestos` + backfill + refactor de `v_empleados_full` + ADR-013                                                                                                                                        | done 2026-04-27                                                                  | _este PR_ |
-| 2   | Backend: refactorizar todos los reads directos a `empleados.puesto_id` para que usen la vista o la tabla N:M; actualizar `empleado-alta-wizard.tsx` para escribir a `empleados_puestos`                                        | pending                                                                          | —         |
-| 3   | UI Personal: rename sidebar "Empleados → Personal", URL `/<empresa>/rh/empleados` → `/<empresa>/rh/personal` con redirect 301, listado multi-puesto sin duplicar persona, detalle add/remove puestos, wizard alta multi-select | pending                                                                          | —         |
-| 4   | Cleanup datos final: agregar Comité Ejecutivo + Consejo de Administración como puestos secundarios para Beto/Alejandra/Michelle en RDB y DILESA                                                                                | pending                                                                          | —         |
+| #   | Scope                                                                                                                                                                                                                                           | Estado                                                                           | PR        |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | --------- |
+| 0   | Cleanup operativo: borrar duplicados extras de Beto/Alejandra/Michelle en RDB                                                                                                                                                                   | n/a — ya estaba limpio al verificar (3 filas, una por persona, todas Accionista) | —         |
+| 1   | DB: tabla `erp.empleados_puestos` + backfill + refactor de `v_empleados_full` + ADR-013                                                                                                                                                         | done 2026-04-27                                                                  | #252      |
+| 2   | Backend: trigger DB sincroniza automáticamente `empleados.puesto_id ↔ empleados_puestos.principal` + refactor de `puestos-module.tsx` (conteo desde N:M). Wizard de alta y detail pages no necesitan cambios — el trigger hace todo el trabajo. | done 2026-04-27                                                                  | _este PR_ |
+| 3   | UI Personal: rename sidebar "Empleados → Personal", URL `/<empresa>/rh/empleados` → `/<empresa>/rh/personal` con redirect 301, listado multi-puesto sin duplicar persona, detalle add/remove puestos, wizard alta multi-select                  | pending                                                                          | —         |
+| 4   | Cleanup datos final: agregar Comité Ejecutivo + Consejo de Administración como puestos secundarios para Beto/Alejandra/Michelle en RDB y DILESA                                                                                                 | pending                                                                          | —         |
 
 ## Decisiones registradas
+
+### 2026-04-27 — Decisiones cerradas durante Sprint 2
+
+- **Sprint 2 se reduce a 1 trigger DB + 1 refactor de cliente.** El barrido exhaustivo de queries a `empleados.puesto_id` que estaba en el alcance v1 resulta innecesario: las 5 detail pages leen vía FK relacional `puesto:puesto_id(...)` que sigue funcionando con el COALESCE de la vista; el wizard de alta escribe a `empleados.puesto_id` y el trigger sincroniza automáticamente con `empleados_puestos`. Resultado: cero cambios en UI durante Sprint 2.
+- **Trigger `trg_empleados_sync_puesto_principal` (AFTER INSERT/UPDATE OF puesto_id ON empleados)**:
+  - INSERT con `puesto_id` no NULL → crea fila principal en `empleados_puestos` (idempotente).
+  - UPDATE de `puesto_id` → desmarca principal anterior (queda como secundario, no se borra) y crea/promueve nuevo a principal.
+  - UPDATE a `puesto_id = NULL` → desmarca principal anterior, sin crear nuevo.
+  - **Importante**: el principal anterior queda como **secundario** (no se borra ni se cierra con `fecha_fin`). Esto preserva el histórico multi-puesto cuando alguien cambia de rol — alineado con la semántica del modelo N:M.
+- **`puestos-module.tsx` cuenta desde `empleados_puestos`** con inner join a `empleados` (filtrando `activo = true AND deleted_at IS NULL`). Esto incluye puestos secundarios — un empleado con 3 puestos cuenta para los 3.
 
 ### 2026-04-27 — Decisiones cerradas durante Sprint 1 (ver ADR-013)
 
@@ -101,6 +111,14 @@ Además, el listado ya no es solo "empleados operativos": incluye accionistas y 
 - **Orden vs Roadmap UI**: la iniciativa avanza en paralelo a `shared-modules-refactor`. No compite porque Sprint 1+2 son DB/backend y Sprint 3 es UI específica de RH (no patrón cross-cutting).
 
 ## Bitácora
+
+### 2026-04-27 — Sprint 2 (Backend / Trigger) entregado
+
+- Migración `supabase/migrations/20260427180000_empleados_sync_puesto_principal.sql` aplicada en prod vía Supabase MCP.
+- Smoke test del trigger ejecutado en transacción con ROLLBACK: cambiar `empleados.puesto_id` de Beto en RDB de Accionista → Comité Ejecutivo correctamente desmarca Accionista (queda como secundario) y promueve Comité a principal. Volver atrás (Comité → Accionista) hace lo simétrico. ✅
+- `puestos-module.tsx` refactorizado: query de conteo cambia de `empleados.select('puesto_id')` a `empleados_puestos.select('puesto_id, empleado:empleado_id!inner(activo, deleted_at)')` con filtros sobre el inner join. Resultado: el conteo incluye puestos secundarios automáticamente.
+- `supabase/SCHEMA_REF.md` y `types/supabase.ts` regenerados.
+- 4 CI checks locales en verde (format, lint, typecheck, vitest 222/222).
 
 ### 2026-04-27 — Sprint 1 (DB) entregado
 

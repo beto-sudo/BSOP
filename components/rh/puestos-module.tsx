@@ -217,12 +217,13 @@ export function PuestosModule({
         showEmpleadoCountColumn
           ? supabase
               .schema('erp')
-              .from('empleados')
-              .select('puesto_id')
+              .from('empleados_puestos')
+              .select('puesto_id, empleado:empleado_id!inner(id, activo, deleted_at)')
               .in('empresa_id', ids)
-              .eq('activo', true)
-              .is('deleted_at', null)
-          : Promise.resolve({ data: [] as { puesto_id: string | null }[] }),
+              .is('fecha_fin', null)
+              .eq('empleado.activo', true)
+              .is('empleado.deleted_at', null)
+          : Promise.resolve({ data: [] as { puesto_id: string }[] }),
       ]);
 
       if (pRes.error) {
@@ -238,8 +239,8 @@ export function PuestosModule({
 
       if (showEmpleadoCountColumn) {
         const counts = new Map<string, number>();
-        ((empRes.data ?? []) as { puesto_id: string | null }[]).forEach((e) => {
-          if (e.puesto_id) counts.set(e.puesto_id, (counts.get(e.puesto_id) ?? 0) + 1);
+        ((empRes.data ?? []) as { puesto_id: string }[]).forEach((e) => {
+          counts.set(e.puesto_id, (counts.get(e.puesto_id) ?? 0) + 1);
         });
         setEmpleadoCounts(counts);
       } else {
