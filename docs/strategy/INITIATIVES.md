@@ -1,8 +1,9 @@
 # Iniciativas — BSOP
 
 > Índice activo de iniciativas del repo BSOP. Para detalle de cada una,
-> abre `docs/planning/<slug>.md`. Mantenido por Cowork (cuando se crea o
-> cambia el alcance) y por Claude Code (cuando ejecuta y cierra hitos).
+> abre `docs/planning/<slug>.md`. Mantenido por Claude Code (ver
+> ADR-012 para el contexto histórico de la deprecación del split
+> Cowork/CC).
 >
 > **Última actualización:** 2026-04-27 (Sub-PR 4 de `shared-modules-refactor` entregado: extraído `<AdminJuntasListModule>` cross-empresa (502/687 → 14 líneas cada page) adoptando DILESA como base correcta — RDB hereda auto-title, filtro por mes, content preview, task counts granulares. Auditoría concluyó que `/inicio/juntas` es módulo standalone (no se extrae). Bug `<RequireAccess empresa="rdb">` hardcoded en `/inicio/juntas/{lista,detalle}` arreglado oportunísticamente. Próximo hito: Sub-PR 5 `empleados-detail-audit`. Iniciativa `empleados-multi-puesto` sigue `proposed`.)
 
@@ -99,10 +100,9 @@
 
 ## Cómo se actualiza este archivo
 
-- **Cowork** edita la sección `## Activas` cuando:
-  - Beto promueve una idea nueva a iniciativa → agrega fila con estado `proposed`.
+- **Claude Code** edita la sección `## Activas` cuando:
+  - Beto aprueba promover una idea a iniciativa → agrega fila con estado `proposed`.
   - Beto modifica alcance, dueño o próximo hito → ajusta la fila.
-- **Claude Code** edita cuando:
-  - Ejecuta un hito → actualiza `Estado` y `Próximo hito` y `Última actualización`.
+  - Ejecuta un hito de transición mayor (`proposed → planned → in_progress → done` o `* → blocked`) → actualiza `Estado`, `Próximo hito` y `Última actualización`.
   - Una iniciativa queda completa → la mueve a `## Done` con fecha y outcome.
-- **Beto** aprueba transiciones de estado en cualquier dirección.
+- **Beto** aprueba la promoción a iniciativa y todas las transiciones de estado.
