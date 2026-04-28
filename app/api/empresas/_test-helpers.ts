@@ -193,7 +193,7 @@ export const SAMPLE_EXTRACCION = {
   apellido_paterno: null,
   apellido_materno: null,
   razon_social: 'EJEMPLO SA DE CV',
-  nombre_comercial: null,
+  nombre_comercial: '',
   regimen_fiscal_codigo: '601',
   regimen_fiscal_nombre: 'General de Ley Personas Morales',
   regimenes_adicionales: [
@@ -206,7 +206,7 @@ export const SAMPLE_EXTRACCION = {
   ],
   domicilio_calle: 'Av. Reforma',
   domicilio_num_ext: '100',
-  domicilio_num_int: null,
+  domicilio_num_int: '',
   domicilio_colonia: 'Centro',
   domicilio_cp: '06000',
   domicilio_municipio: 'Cuauhtémoc',

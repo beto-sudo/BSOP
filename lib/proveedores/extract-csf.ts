@@ -16,6 +16,29 @@ import { z } from 'zod';
 
 import { anthropic, MODELO_CLAUDE } from '@/lib/documentos/extraction-core';
 
+// ─── Helper para campos opcionales sin generar union en JSON Schema ─────────
+//
+// La API de Anthropic limita los schemas a 16 propiedades con union types
+// (anyOf, type arrays). `z.string().nullable()` produce `anyOf: [string, null]`
+// que cuenta como union. Para campos donde la semántica "ausente" se puede
+// representar como cadena vacía, este helper:
+//
+//   - JSON Schema enviado a Anthropic: `{ type: 'string', default: '' }` (sin
+//     anyOf, sin null) → no cuenta para el límite de 16.
+//   - Output del parser zod: `string | null` (gracias al transform), así los
+//     consumidores existentes que asumen `string | null` siguen funcionando.
+//   - Acepta `null`/`undefined` como input vía `preprocess` → '': importante
+//     porque el cliente recibe la extracción ya con `null` (post-transform) y
+//     la reenvía como tal a `update-csf`; el server tiene que aceptarla.
+//
+// El modelo recibe la instrucción "devuelve cadena vacía si no aparece" en el
+// prompt; el preprocess normaliza null/undefined → '' antes del schema base; y
+// el transform final colapsa '' → null en el output.
+const optionalNullableString = (description: string) =>
+  z
+    .preprocess((v) => (v == null ? '' : v), z.string().default('').describe(description))
+    .transform((v) => (v === '' ? null : v));
+
 // ─── Schema CSF ──────────────────────────────────────────────────────────────
 
 export const RegimenSchema = z.object({
@@ -118,20 +141,17 @@ export const CsfExtraccionSchema = z.object({
       'Denominación o razón social oficial (solo personas morales). ' +
         'null para personas físicas.'
     ),
-  nombre_comercial: z.string().nullable().describe('Nombre comercial si aparece. null si no.'),
+  nombre_comercial: optionalNullableString(
+    'Nombre comercial si aparece. Cadena vacía si no aparece.'
+  ),
 
   // ─── Régimen fiscal ─────────────────────────────────────────────────────
-  regimen_fiscal_codigo: z
-    .string()
-    .nullable()
-    .describe(
-      'Código del régimen vigente principal (ej. "601" para Ley PM). null si no se ' +
-        'puede determinar el principal.'
-    ),
-  regimen_fiscal_nombre: z
-    .string()
-    .nullable()
-    .describe('Descripción del régimen vigente principal. null si no se puede determinar.'),
+  regimen_fiscal_codigo: optionalNullableString(
+    'Código del régimen vigente principal (ej. "601" para Ley PM). Cadena vacía si no se puede determinar.'
+  ),
+  regimen_fiscal_nombre: optionalNullableString(
+    'Descripción del régimen vigente principal. Cadena vacía si no se puede determinar.'
+  ),
   regimenes_adicionales: z
     .array(RegimenSchema)
     .describe(
@@ -141,16 +161,17 @@ export const CsfExtraccionSchema = z.object({
     ),
 
   // ─── Domicilio fiscal ───────────────────────────────────────────────────
-  domicilio_calle: z.string().nullable(),
-  domicilio_num_ext: z.string().nullable().describe('Número exterior. null si "S/N".'),
-  domicilio_num_int: z.string().nullable(),
-  domicilio_colonia: z.string().nullable(),
-  domicilio_cp: z.string().nullable().describe('Código postal a 5 dígitos.'),
-  domicilio_municipio: z
-    .string()
-    .nullable()
-    .describe('Municipio o alcaldía (CDMX). null si no aparece.'),
-  domicilio_estado: z.string().nullable().describe('Estado (entidad federativa). null si no.'),
+  domicilio_calle: optionalNullableString('Calle del domicilio fiscal. Cadena vacía si no.'),
+  domicilio_num_ext: optionalNullableString('Número exterior. Cadena vacía si "S/N".'),
+  domicilio_num_int: optionalNullableString('Número interior. Cadena vacía si no aplica.'),
+  domicilio_colonia: optionalNullableString('Colonia. Cadena vacía si no aparece.'),
+  domicilio_cp: optionalNullableString('Código postal a 5 dígitos. Cadena vacía si no aparece.'),
+  domicilio_municipio: optionalNullableString(
+    'Municipio o alcaldía (CDMX). Cadena vacía si no aparece.'
+  ),
+  domicilio_estado: optionalNullableString(
+    'Estado (entidad federativa). Cadena vacía si no aparece.'
+  ),
 
   // ─── Obligaciones ───────────────────────────────────────────────────────
   obligaciones: z
@@ -158,14 +179,12 @@ export const CsfExtraccionSchema = z.object({
     .describe('Lista de obligaciones fiscales activas. Vacío si no hay.'),
 
   // ─── Fechas clave ───────────────────────────────────────────────────────
-  fecha_inicio_operaciones: z
-    .string()
-    .nullable()
-    .describe('Fecha de inicio de operaciones, formato YYYY-MM-DD. null si no aparece.'),
-  fecha_emision: z
-    .string()
-    .nullable()
-    .describe('Fecha de emisión / generación de la CSF, formato YYYY-MM-DD. null si no aparece.'),
+  fecha_inicio_operaciones: optionalNullableString(
+    'Fecha de inicio de operaciones, formato YYYY-MM-DD. Cadena vacía si no aparece.'
+  ),
+  fecha_emision: optionalNullableString(
+    'Fecha de emisión / generación de la CSF, formato YYYY-MM-DD. Cadena vacía si no aparece.'
+  ),
 
   // ─── Campos extendidos (consumidos por empresas, opcionales) ────────────
   // Los siguientes campos son opcionales — null por default para no romper
