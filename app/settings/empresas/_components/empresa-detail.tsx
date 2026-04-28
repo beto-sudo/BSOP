@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 
 import type { CsfExtraccion } from '@/lib/proveedores/extract-csf';
+import { DocumentosLegalesPanel } from './documentos-legales-panel';
 import { ImageUploader } from './image-uploader';
 
 export type ActividadEconomica = {
@@ -1054,30 +1055,42 @@ export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved:
         </div>
       </div>
 
-      {/* Documentos legales (alta de empleados) */}
+      {/* Documentos legales — alta de empleados (Sprint 4 empresa-documentos-legales) */}
       <div className="space-y-4">
         <SectionTitle>Documentos legales — alta de empleados</SectionTitle>
-        <p className="text-xs text-[var(--text-muted)] -mt-2">
-          Requeridos por <code>lib/rh/datos-fiscales-empresa.ts</code> para dar de alta empleados,
-          generar contratos LFT y finiquitos. Los datos viven como JSON en{' '}
-          <code>core.empresas.escritura_constitutiva</code> y <code>escritura_poder</code>.
-        </p>
+        <DocumentosLegalesPanel empresaId={empresa.id} empresaSlug={empresa.slug} />
 
-        <EscrituraCard
-          title="Escritura constitutiva"
-          values={editValues.escritura_constitutiva}
-          editing={editing}
-          onChange={(field, v) => setEscrituraField('escritura_constitutiva', field, v)}
-          original={empresa.escritura_constitutiva}
-        />
-
-        <EscrituraCard
-          title="Poder del representante"
-          values={editValues.escritura_poder}
-          editing={editing}
-          onChange={(field, v) => setEscrituraField('escritura_poder', field, v)}
-          original={empresa.escritura_poder}
-        />
+        {/* Editor manual legacy (jsonb) — fallback hasta que todas las empresas
+            estén migradas al panel de arriba. Sprint 6 lo deprecará. */}
+        {editing && (
+          <details className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--panel)]/10 p-3">
+            <summary className="cursor-pointer text-xs text-[var(--text-muted)] select-none">
+              Edición manual de jsonb (legacy — preferir panel de arriba)
+            </summary>
+            <div className="mt-3 space-y-3">
+              <p className="text-xs text-[var(--text-muted)]">
+                Este editor escribe directo a <code>core.empresas.escritura_constitutiva</code> y{' '}
+                <code>escritura_poder</code>. Solo úsalo si no puedes subir el documento al módulo
+                Documentos. Cuando asignes desde el panel de arriba, el caché se sincroniza
+                automáticamente y estos campos quedan obsoletos.
+              </p>
+              <EscrituraCard
+                title="Escritura constitutiva (legacy)"
+                values={editValues.escritura_constitutiva}
+                editing={editing}
+                onChange={(field, v) => setEscrituraField('escritura_constitutiva', field, v)}
+                original={empresa.escritura_constitutiva}
+              />
+              <EscrituraCard
+                title="Poder del representante (legacy)"
+                values={editValues.escritura_poder}
+                editing={editing}
+                onChange={(field, v) => setEscrituraField('escritura_poder', field, v)}
+                original={empresa.escritura_poder}
+              />
+            </div>
+          </details>
+        )}
       </div>
 
       {/* Actividades económicas */}
