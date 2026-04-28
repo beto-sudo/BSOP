@@ -219,7 +219,7 @@ function Inner() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => router.push(`/dilesa/rh/empleados/${id}`)}
+          onClick={() => router.push(`/dilesa/rh/personal/${id}`)}
           className="rounded-xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]"
         >
           <ArrowLeft className="h-4 w-4 mr-1" /> Volver al empleado

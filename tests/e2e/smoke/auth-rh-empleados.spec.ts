@@ -11,7 +11,7 @@ import { skipIfNoAuth } from '../helpers/auth-guard';
 test.describe('RH › Empleados', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     skipIfNoAuth(testInfo);
-    await page.goto('/rh/empleados');
+    await page.goto('/rh/personal');
     await page.waitForTimeout(1500);
     if (page.url().includes('/login')) {
       testInfo.skip(true, 'Session not accepted — auth state may be stale');
@@ -133,10 +133,10 @@ test.describe('RH › Empleados', () => {
     await rows.first().click();
     await page.waitForTimeout(1000);
 
-    // Either URL changed (navigated to /rh/empleados/[id]) or a dialog opened
+    // Either URL changed (navigated to /rh/personal/[id]) or a dialog opened
     const newUrl = page.url();
     const dialog = page.locator('[role="dialog"]');
-    const urlChanged = newUrl !== initialUrl && newUrl.includes('/rh/empleados/');
+    const urlChanged = newUrl !== initialUrl && newUrl.includes('/rh/personal/');
     const dialogOpened = (await dialog.count()) > 0;
 
     expect(urlChanged || dialogOpened).toBeTruthy();

@@ -4,7 +4,7 @@
  * EmpleadosModule — reusable RH › Empleados module.
  *
  * Consolidates the previously duplicated pages under
- * `app/rdb/rh/empleados`, `app/dilesa/rh/empleados` and `app/rh/empleados`
+ * `app/rdb/rh/personal`, `app/dilesa/rh/personal` and `app/rh/personal`
  * into one parametrized component.
  *
  * Usage:
@@ -19,7 +19,7 @@
  *   // Global / admin (fetches all empresas the user belongs to)
  *   <EmpleadosModule
  *     scope="user-empresas"
- *     empresaSlug=""  // routes to /rh/empleados/[id]
+ *     empresaSlug=""  // routes to /rh/personal/[id]
  *     title="Empleados"
  *     createVariant="dialog"
  *   />
@@ -65,6 +65,12 @@ type Empleado = {
   } | null;
   departamento: { nombre: string } | null;
   puesto: { nombre: string } | null;
+  puestos: {
+    puesto_id: string;
+    principal: boolean;
+    fecha_fin: string | null;
+    puesto: { nombre: string } | null;
+  }[];
 };
 
 type Departamento = { id: string; nombre: string };
@@ -87,9 +93,9 @@ export type EmpleadosModuleProps = {
 
   /**
    * URL slug used to build detail page links.
-   *  - 'rdb'    → /rdb/rh/empleados/:id
-   *  - 'dilesa' → /dilesa/rh/empleados/:id
-   *  - ''       → /rh/empleados/:id (global)
+   *  - 'rdb'    → /rdb/rh/personal/:id
+   *  - 'dilesa' → /dilesa/rh/personal/:id
+   *  - ''       → /rh/personal/:id (global)
    */
   empresaSlug: string;
 
@@ -118,6 +124,27 @@ export type EmpleadosModuleProps = {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+function primaryPuestoNombre(emp: Empleado): string {
+  // Toma el primer "principal" vigente; si no hay, cae al primer secundario
+  // vigente; si no hay tampoco, usa el legacy `empleados.puesto_id` por
+  // backwards-compat (el trigger del Sprint 2 mantiene la sincronía).
+  const vigentes = emp.puestos ?? [];
+  const principal = vigentes.find((p) => p.principal);
+  if (principal?.puesto?.nombre) return principal.puesto.nombre;
+  const cualquiera = vigentes.find((p) => p.puesto?.nombre);
+  if (cualquiera?.puesto?.nombre) return cualquiera.puesto.nombre;
+  return emp.puesto?.nombre ?? '—';
+}
+
+function secondaryPuestoCount(emp: Empleado): number {
+  const vigentes = emp.puestos ?? [];
+  const principalIdx = vigentes.findIndex((p) => p.principal);
+  if (principalIdx >= 0) return Math.max(0, vigentes.length - 1);
+  // Sin principal explícito: si hay 2+ vigentes uno cuenta como "principal"
+  // implícito y los otros como secundarios.
+  return Math.max(0, vigentes.length - 1);
+}
+
 function fullName(emp: Empleado) {
   if (!emp.persona) return '—';
   return (
@@ -140,7 +167,7 @@ function formatDate(d: string | null) {
 
 function detailHref(empresaSlug: string, id: string) {
   const prefix = empresaSlug ? `/${empresaSlug}` : '';
-  return `${prefix}/rh/empleados/${id}`;
+  return `${prefix}/rh/personal/${id}`;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -214,7 +241,7 @@ export function EmpleadosModule({
           .schema('erp')
           .from('empleados')
           .select(
-            'id, empresa_id, numero_empleado, fecha_ingreso, fecha_baja, activo, persona:persona_id(nombre, apellido_paterno, apellido_materno, email), departamento:departamento_id(nombre), puesto:puesto_id(nombre)'
+            'id, empresa_id, numero_empleado, fecha_ingreso, fecha_baja, activo, persona:persona_id(nombre, apellido_paterno, apellido_materno, email), departamento:departamento_id(nombre), puesto:puesto_id(nombre), puestos:empleados_puestos!empleado_id(puesto_id, principal, fecha_fin, puesto:puesto_id(nombre))'
           )
           .in('empresa_id', ids)
           .is('deleted_at', null)
@@ -244,6 +271,14 @@ export function EmpleadosModule({
         persona: Array.isArray(e.persona) ? (e.persona[0] ?? null) : e.persona,
         departamento: Array.isArray(e.departamento) ? (e.departamento[0] ?? null) : e.departamento,
         puesto: Array.isArray(e.puesto) ? (e.puesto[0] ?? null) : e.puesto,
+        puestos: ((e.puestos ?? []) as Record<string, unknown>[])
+          .filter((p) => p.fecha_fin == null)
+          .map((p) => ({
+            puesto_id: p.puesto_id as string,
+            principal: Boolean(p.principal),
+            fecha_fin: (p.fecha_fin ?? null) as string | null,
+            puesto: Array.isArray(p.puesto) ? (p.puesto[0] ?? null) : p.puesto,
+          })),
       })) as Empleado[];
       setEmpleados(normalized);
       setDepartamentos((deptRes.data ?? []) as Departamento[]);
@@ -465,10 +500,27 @@ export function EmpleadosModule({
               {
                 key: 'puesto_nombre',
                 label: 'Puesto',
-                width: 'w-36',
+                width: 'w-44',
                 cellClassName: 'text-sm text-[var(--text)]/70',
-                accessor: (emp) => emp.puesto?.nombre ?? '',
-                render: (emp) => emp.puesto?.nombre ?? '—',
+                accessor: (emp) => primaryPuestoNombre(emp),
+                render: (emp) => {
+                  const principal = primaryPuestoNombre(emp);
+                  const extras = secondaryPuestoCount(emp);
+                  if (principal === '—') return '—';
+                  return (
+                    <span className="inline-flex items-center gap-1">
+                      <span>{principal}</span>
+                      {extras > 0 ? (
+                        <span
+                          className="rounded-md border border-[var(--border)] bg-[var(--panel)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-subtle)]"
+                          title={`+${extras} puesto${extras === 1 ? '' : 's'} secundario${extras === 1 ? '' : 's'}`}
+                        >
+                          +{extras}
+                        </span>
+                      ) : null}
+                    </span>
+                  );
+                },
               },
               {
                 key: 'fecha_ingreso',

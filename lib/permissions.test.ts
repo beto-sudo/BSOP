@@ -144,7 +144,7 @@ describe('route maps', () => {
   it('maps DILESA, RDB, and settings pages to module slugs', () => {
     expect(ROUTE_TO_MODULE['/rdb/ventas']).toBe('rdb.ventas');
     expect(ROUTE_TO_MODULE['/rdb/admin/juntas']).toBe('rdb.admin.juntas');
-    expect(ROUTE_TO_MODULE['/dilesa/rh/empleados']).toBe('dilesa.rh.empleados');
+    expect(ROUTE_TO_MODULE['/dilesa/rh/personal']).toBe('dilesa.rh.empleados');
     expect(ROUTE_TO_MODULE['/settings/acceso']).toBe('settings.acceso');
   });
 

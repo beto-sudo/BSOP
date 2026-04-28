@@ -3,10 +3,10 @@
 **Slug:** `empleados-multi-puesto`
 **Empresas:** todas
 **Schemas afectados:** `erp` (nueva tabla `empleados_puestos`, refactor de `v_empleados_full`, posible deprecación de `empleados.puesto_id`) + UI (rename módulo "Empleados" → "Personal" en sidebar/URL/detalle/listado)
-**Estado:** in_progress (Sprint 2 cerrado, Sprint 3 siguiente)
+**Estado:** in_progress (Sprint 3 cerrado, Sprint 4 siguiente)
 **Dueño:** Beto
 **Creada:** 2026-04-27
-**Última actualización:** 2026-04-27 (Sprint 2 entregado: trigger `trg_empleados_sync_puesto_principal` mantiene sync automático escalar↔N:M; `puestos-module.tsx` cuenta empleados desde `empleados_puestos` (incluye secundarios). Sprint 1: tabla `erp.empleados_puestos` + backfill 1:1 (202 empleados) + refactor de `v_empleados_full` + ADR-013.)
+**Última actualización:** 2026-04-27 (Sprint 3 entregado: rename sidebar "Empleados → Personal" + rename URL `/<empresa>/rh/empleados` → `/<empresa>/rh/personal` con redirects 301 + listado multi-puesto con badge "+N". Detalle multi-puesto y wizard alta multi-select quedan como follow-up post-iniciativa.)
 
 ## Problema
 
@@ -76,15 +76,23 @@ Además, el listado ya no es solo "empleados operativos": incluye accionistas y 
 
 ## Sprints / hitos
 
-| #   | Scope                                                                                                                                                                                                                                           | Estado                                                                           | PR        |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | --------- |
-| 0   | Cleanup operativo: borrar duplicados extras de Beto/Alejandra/Michelle en RDB                                                                                                                                                                   | n/a — ya estaba limpio al verificar (3 filas, una por persona, todas Accionista) | —         |
-| 1   | DB: tabla `erp.empleados_puestos` + backfill + refactor de `v_empleados_full` + ADR-013                                                                                                                                                         | done 2026-04-27                                                                  | #252      |
-| 2   | Backend: trigger DB sincroniza automáticamente `empleados.puesto_id ↔ empleados_puestos.principal` + refactor de `puestos-module.tsx` (conteo desde N:M). Wizard de alta y detail pages no necesitan cambios — el trigger hace todo el trabajo. | done 2026-04-27                                                                  | _este PR_ |
-| 3   | UI Personal: rename sidebar "Empleados → Personal", URL `/<empresa>/rh/empleados` → `/<empresa>/rh/personal` con redirect 301, listado multi-puesto sin duplicar persona, detalle add/remove puestos, wizard alta multi-select                  | pending                                                                          | —         |
-| 4   | Cleanup datos final: agregar Comité Ejecutivo + Consejo de Administración como puestos secundarios para Beto/Alejandra/Michelle en RDB y DILESA                                                                                                 | pending                                                                          | —         |
+| #   | Scope                                                                                                                                                                                                                                                                                                            | Estado                                                                           | PR        |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | --------- |
+| 0   | Cleanup operativo: borrar duplicados extras de Beto/Alejandra/Michelle en RDB                                                                                                                                                                                                                                    | n/a — ya estaba limpio al verificar (3 filas, una por persona, todas Accionista) | —         |
+| 1   | DB: tabla `erp.empleados_puestos` + backfill + refactor de `v_empleados_full` + ADR-013                                                                                                                                                                                                                          | done 2026-04-27                                                                  | #252      |
+| 2   | Backend: trigger DB sincroniza automáticamente `empleados.puesto_id ↔ empleados_puestos.principal` + refactor de `puestos-module.tsx` (conteo desde N:M). Wizard de alta y detail pages no necesitan cambios — el trigger hace todo el trabajo.                                                                  | done 2026-04-27                                                                  | #254      |
+| 3   | UI Personal v1: rename sidebar "Empleados → Personal", URL `/<empresa>/rh/empleados` → `/<empresa>/rh/personal` con redirects 301, listado multi-puesto con badge "+N más" cuando hay puestos secundarios. **Detalle multi-puesto add/remove + wizard alta multi-select** quedan como follow-up post-iniciativa. | done 2026-04-27                                                                  | _este PR_ |
+| 4   | Cleanup datos final: agregar Comité Ejecutivo + Consejo de Administración como puestos secundarios para Beto/Alejandra/Michelle en RDB y DILESA                                                                                                                                                                  | pending                                                                          | —         |
 
 ## Decisiones registradas
+
+### 2026-04-27 — Decisiones cerradas durante Sprint 3
+
+- **Rename URL implementado con `next.config.ts:redirects()`** — 3 entradas con `permanent: true` (HTTP 301) para `/dilesa/rh/empleados/:path*`, `/rdb/rh/empleados/:path*` y `/rh/empleados/:path*`. Deep-links viejos siguen funcionando.
+- **Archivo `components/rh/empleados-module.tsx` renombrado a `personal-module.tsx`** alineado con el rename UI. El componente exportado **sigue llamándose `EmpleadosModule`** (no se renombró el símbolo) — costo del rename masivo del símbolo no justifica el beneficio; el nombre del archivo + UI strings ya comunican el rename.
+- **`RequireAccess modulo="rdb.rh.empleados"` se preserva** sin cambios — el módulo de permisos es por nombre interno y cambiarlo requeriría migración en la tabla de permisos (fuera del alcance).
+- **Listado muestra principal + indicador `+N`** cuando hay puestos secundarios. Helpers `primaryPuestoNombre` y `secondaryPuestoCount` calculan desde el array `puestos:empleados_puestos!empleado_id(...)` embedded en la query, con fallback a `empleados.puesto_id` legacy.
+- **Detalle multi-puesto (add/remove) y wizard alta multi-select se posponen** como follow-up post-iniciativa. Razón: para Sprint 4 (cargar puestos secundarios para 3 operadores en RDB+DILESA) la UI nueva no es necesaria — los puestos se cargan via SQL y el listado los muestra como `+N más`. La UI completa de gestión de puestos secundarios se construirá cuando aparezca un caso operativo real más allá de los 3 operadores.
 
 ### 2026-04-27 — Decisiones cerradas durante Sprint 2
 
@@ -111,6 +119,16 @@ Además, el listado ya no es solo "empleados operativos": incluye accionistas y 
 - **Orden vs Roadmap UI**: la iniciativa avanza en paralelo a `shared-modules-refactor`. No compite porque Sprint 1+2 son DB/backend y Sprint 3 es UI específica de RH (no patrón cross-cutting).
 
 ## Bitácora
+
+### 2026-04-27 — Sprint 3 (UI Personal v1) entregado
+
+- **Rename URL**: 3 directorios renombrados con `git mv` preservando historia: `app/{dilesa,rdb,rh}/rh/empleados` → `app/{dilesa,rdb,rh}/rh/personal`. 8 archivos movidos.
+- **Redirects 301** agregados en `next.config.ts` (3 entradas con `:path*` para preservar deep-links).
+- **Sidebar**: 2 entradas en `components/app-shell/nav-config.ts` cambian label "Empleados" → "Personal" (los hrefs ya estaban actualizados al `/personal` por el rename mecánico previo).
+- **Componente listado**: `components/rh/empleados-module.tsx` renombrado a `personal-module.tsx`. Tipo `Empleado` extendido con array `puestos`. Query expandida con embed `puestos:empleados_puestos!empleado_id(puesto_id, principal, fecha_fin, puesto:puesto_id(nombre))`. Render de columna "Puesto" muestra principal con badge `+N` para secundarios.
+- **Pages title**: "Empleados — DILESA/RDB" → "Personal — DILESA/RDB" en las 3 pages.
+- **Replace global** de `/rh/empleados` → `/rh/personal` en código (sed + grep). Cubre `app/{dilesa,rh}/page.tsx`, `tests/e2e/smoke/*` (3), `lib/permissions.{ts,test.ts}`, `nav-config.ts`, `personal-module.tsx`.
+- **CI checks locales**: format ✅, lint ✅ (0 errors), typecheck ✅, vitest ✅ (444/444).
 
 ### 2026-04-27 — Sprint 2 (Backend / Trigger) entregado
 

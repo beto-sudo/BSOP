@@ -29,7 +29,7 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   '/dilesa/admin/tasks': 'dilesa.admin.tasks',
   '/dilesa/admin/juntas': 'dilesa.admin.juntas',
   '/dilesa/admin/documentos': 'dilesa.admin.documentos',
-  '/dilesa/rh/empleados': 'dilesa.rh.empleados',
+  '/dilesa/rh/personal': 'dilesa.rh.empleados',
   '/dilesa/rh/puestos': 'dilesa.rh.puestos',
   '/dilesa/rh/departamentos': 'dilesa.rh.departamentos',
   '/dilesa/proveedores': 'dilesa.proveedores',
@@ -50,7 +50,7 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   '/rdb/admin/tasks': 'rdb.admin.tasks',
   '/rdb/admin/juntas': 'rdb.admin.juntas',
   '/rdb/admin/documentos': 'rdb.admin.documentos',
-  '/rdb/rh/empleados': 'rdb.rh.empleados',
+  '/rdb/rh/personal': 'rdb.rh.empleados',
   '/rdb/rh/puestos': 'rdb.rh.puestos',
   '/rdb/rh/departamentos': 'rdb.rh.departamentos',
 
