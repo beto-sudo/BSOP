@@ -254,7 +254,7 @@ export function CortesView() {
           onOpenChange={abrir.setOpen}
           cajas={abrir.cajas}
           form={abrir.form}
-          onFormChange={abrir.setForm}
+          onCajaChange={abrir.changeCaja}
           onSubmit={() => abrir.submit(() => void fetchCortes())}
           isPending={abrir.isPending}
           error={abrir.error}
