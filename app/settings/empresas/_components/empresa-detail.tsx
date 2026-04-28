@@ -1,11 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
 import { FieldLabel } from '@/components/ui/field-label';
 import { Input } from '@/components/ui/input';
-import { Loader2, CheckCircle, FileText, ExternalLink } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import {
+  AlertTriangle,
+  CheckCircle,
+  ExternalLink,
+  FileText,
+  Loader2,
+  RefreshCw,
+  Save,
+  Sparkles,
+  Upload,
+} from 'lucide-react';
+
+import type { CsfExtraccion } from '@/lib/proveedores/extract-csf';
 import { ImageUploader } from './image-uploader';
 
 export type ActividadEconomica = {
@@ -50,7 +63,200 @@ export type Empresa = {
   obligaciones_fiscales: ObligacionFiscal[] | null;
   csf_fecha_emision: string | null;
   csf_url: string | null;
+  tipo_contribuyente: 'persona_moral' | 'persona_fisica' | null;
+  curp: string | null;
+  registro_patronal_imss: string | null;
 };
+
+// ─── Diff helpers (espejados del patrón de proveedores) ───────────────────
+
+type DiffKey =
+  | 'rfc'
+  | 'curp'
+  | 'razon_social'
+  | 'nombre_comercial'
+  | 'regimen_fiscal'
+  | 'regimen_capital'
+  | 'id_cif'
+  | 'estatus_sat'
+  | 'domicilio_calle'
+  | 'domicilio_numero_ext'
+  | 'domicilio_numero_int'
+  | 'domicilio_colonia'
+  | 'domicilio_cp'
+  | 'domicilio_municipio'
+  | 'domicilio_estado'
+  | 'fecha_inicio_operaciones'
+  | 'csf_fecha_emision'
+  | 'obligaciones_fiscales'
+  | 'actividades_economicas';
+
+const DIFF_FIELDS: ReadonlyArray<DiffKey> = [
+  'rfc',
+  'curp',
+  'razon_social',
+  'nombre_comercial',
+  'regimen_fiscal',
+  'regimen_capital',
+  'id_cif',
+  'estatus_sat',
+  'domicilio_calle',
+  'domicilio_numero_ext',
+  'domicilio_numero_int',
+  'domicilio_colonia',
+  'domicilio_cp',
+  'domicilio_municipio',
+  'domicilio_estado',
+  'fecha_inicio_operaciones',
+  'csf_fecha_emision',
+  'obligaciones_fiscales',
+  'actividades_economicas',
+];
+
+const FIELD_LABELS: Record<DiffKey, string> = {
+  rfc: 'RFC',
+  curp: 'CURP',
+  razon_social: 'Razón social',
+  nombre_comercial: 'Nombre comercial',
+  regimen_fiscal: 'Régimen fiscal',
+  regimen_capital: 'Régimen de capital',
+  id_cif: 'idCIF',
+  estatus_sat: 'Estatus SAT',
+  domicilio_calle: 'Domicilio — calle',
+  domicilio_numero_ext: 'Domicilio — núm. ext.',
+  domicilio_numero_int: 'Domicilio — núm. int.',
+  domicilio_colonia: 'Domicilio — colonia',
+  domicilio_cp: 'Domicilio — CP',
+  domicilio_municipio: 'Domicilio — municipio',
+  domicilio_estado: 'Domicilio — estado',
+  fecha_inicio_operaciones: 'Fecha inicio operaciones',
+  csf_fecha_emision: 'Fecha emisión CSF',
+  obligaciones_fiscales: 'Obligaciones fiscales',
+  actividades_economicas: 'Actividades económicas',
+};
+
+// El backend recibe keys del extractor neutro + extras. Mapeo display→backend.
+const DIFF_KEY_TO_API_KEY: Record<DiffKey, string> = {
+  rfc: 'rfc',
+  curp: 'curp',
+  razon_social: 'razon_social',
+  nombre_comercial: 'nombre_comercial',
+  regimen_fiscal: 'regimen_fiscal_nombre',
+  regimen_capital: 'regimen_capital',
+  id_cif: 'id_cif',
+  estatus_sat: 'estatus_sat',
+  domicilio_calle: 'domicilio_calle',
+  domicilio_numero_ext: 'domicilio_num_ext',
+  domicilio_numero_int: 'domicilio_num_int',
+  domicilio_colonia: 'domicilio_colonia',
+  domicilio_cp: 'domicilio_cp',
+  domicilio_municipio: 'domicilio_municipio',
+  domicilio_estado: 'domicilio_estado',
+  fecha_inicio_operaciones: 'fecha_inicio_operaciones',
+  csf_fecha_emision: 'fecha_emision',
+  obligaciones_fiscales: 'obligaciones',
+  actividades_economicas: 'actividades_economicas',
+};
+
+function valuesEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a == null && b == null) return true;
+  if (a == null || b == null) {
+    if (a === '' && b == null) return true;
+    if (b === '' && a == null) return true;
+    return false;
+  }
+  if (typeof a === 'string' && typeof b === 'string') return a.trim() === b.trim();
+  if (Array.isArray(a) && Array.isArray(b)) return JSON.stringify(a) === JSON.stringify(b);
+  if (typeof a === 'object' && typeof b === 'object')
+    return JSON.stringify(a) === JSON.stringify(b);
+  return false;
+}
+
+function formatDiffValue(v: unknown): string {
+  if (v == null || v === '') return '—';
+  if (Array.isArray(v)) {
+    if (v.length === 0) return '— (vacío)';
+    return v
+      .map((item: unknown) => {
+        if (item && typeof item === 'object') {
+          const obj = item as Record<string, unknown>;
+          if ('actividad' in obj) {
+            const pct = obj.porcentaje ? ` (${obj.porcentaje})` : '';
+            return `${obj.orden ?? '?'}. ${obj.actividad}${pct}`;
+          }
+          if ('descripcion' in obj) return String(obj.descripcion);
+          if ('codigo' in obj && 'nombre' in obj) return `${obj.codigo} · ${obj.nombre}`;
+        }
+        return String(item);
+      })
+      .join('\n');
+  }
+  return String(v);
+}
+
+/**
+ * Para un `DiffKey`, lee el valor "actual" desde la empresa y el valor "nuevo"
+ * desde el extractor. Maneja los renames de columna y la transformación de
+ * arrays con shape distinto.
+ */
+function getActualAndNew(
+  key: DiffKey,
+  empresa: Empresa,
+  extraccion: CsfExtraccion
+): { actual: unknown; nuevo: unknown } {
+  switch (key) {
+    case 'rfc':
+      return { actual: empresa.rfc, nuevo: extraccion.rfc };
+    case 'curp':
+      return { actual: empresa.curp, nuevo: extraccion.curp };
+    case 'razon_social':
+      return { actual: empresa.razon_social, nuevo: extraccion.razon_social };
+    case 'nombre_comercial':
+      return { actual: empresa.nombre_comercial, nuevo: extraccion.nombre_comercial };
+    case 'regimen_fiscal':
+      return { actual: empresa.regimen_fiscal, nuevo: extraccion.regimen_fiscal_nombre };
+    case 'regimen_capital':
+      return { actual: empresa.regimen_capital, nuevo: extraccion.regimen_capital };
+    case 'id_cif':
+      return { actual: empresa.id_cif, nuevo: extraccion.id_cif };
+    case 'estatus_sat':
+      return { actual: empresa.estatus_sat, nuevo: extraccion.estatus_sat };
+    case 'domicilio_calle':
+      return { actual: empresa.domicilio_calle, nuevo: extraccion.domicilio_calle };
+    case 'domicilio_numero_ext':
+      return { actual: empresa.domicilio_numero_ext, nuevo: extraccion.domicilio_num_ext };
+    case 'domicilio_numero_int':
+      return { actual: empresa.domicilio_numero_int, nuevo: extraccion.domicilio_num_int };
+    case 'domicilio_colonia':
+      return { actual: empresa.domicilio_colonia, nuevo: extraccion.domicilio_colonia };
+    case 'domicilio_cp':
+      return { actual: empresa.domicilio_cp, nuevo: extraccion.domicilio_cp };
+    case 'domicilio_municipio':
+      return { actual: empresa.domicilio_municipio, nuevo: extraccion.domicilio_municipio };
+    case 'domicilio_estado':
+      return { actual: empresa.domicilio_estado, nuevo: extraccion.domicilio_estado };
+    case 'fecha_inicio_operaciones':
+      return {
+        actual: empresa.fecha_inicio_operaciones,
+        nuevo: extraccion.fecha_inicio_operaciones,
+      };
+    case 'csf_fecha_emision':
+      return { actual: empresa.csf_fecha_emision, nuevo: extraccion.fecha_emision };
+    case 'obligaciones_fiscales':
+      return {
+        actual: empresa.obligaciones_fiscales ?? [],
+        nuevo: extraccion.obligaciones,
+      };
+    case 'actividades_economicas':
+      return {
+        actual: empresa.actividades_economicas ?? [],
+        nuevo: extraccion.actividades_economicas,
+      };
+  }
+}
+
+// ─── UI helpers ─────────────────────────────────────────────────────────────
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -67,118 +273,160 @@ function formatDate(dateStr: string | null): string {
   return dateStr;
 }
 
-function TextField({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-}) {
+function ReadOnlyField({ label, value }: { label: string; value: string | null }) {
   return (
-    <div>
+    <div className="space-y-1">
       <FieldLabel>{label}</FieldLabel>
-      <Input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-sm text-[var(--text)]"
-      />
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)]/50 px-3 py-2 text-sm text-[var(--text)] min-h-[36px] flex items-center">
+        {value ? <span>{value}</span> : <span className="text-[var(--text)]/30">—</span>}
+      </div>
     </div>
   );
 }
 
+// ─── Componente principal ─────────────────────────────────────────────────
+
 export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved: () => void }) {
   const supabase = createSupabaseBrowserClient();
+
+  // Logos legacy (se mantienen editables — no son CSF).
   const [logoUrl, setLogoUrl] = useState(empresa.logo_url ?? '');
   const [headerUrl, setHeaderUrl] = useState(empresa.header_url ?? '');
-  const [rfc, setRfc] = useState(empresa.rfc ?? '');
-  const [razonSocial, setRazonSocial] = useState(empresa.razon_social ?? '');
-  const [regimenCapital, setRegimenCapital] = useState(empresa.regimen_capital ?? '');
-  const [nombreComercial, setNombreComercial] = useState(empresa.nombre_comercial ?? '');
-  const [fechaInicioOps, setFechaInicioOps] = useState(empresa.fecha_inicio_operaciones ?? '');
-  const [estatusSat, setEstatusSat] = useState(empresa.estatus_sat ?? '');
-  const [idCif, setIdCif] = useState(empresa.id_cif ?? '');
-  const [regimenFiscal, setRegimenFiscal] = useState(empresa.regimen_fiscal ?? '');
-  const [domCp, setDomCp] = useState(empresa.domicilio_cp ?? '');
-  const [domCalle, setDomCalle] = useState(empresa.domicilio_calle ?? '');
-  const [domNumExt, setDomNumExt] = useState(empresa.domicilio_numero_ext ?? '');
-  const [domNumInt, setDomNumInt] = useState(empresa.domicilio_numero_int ?? '');
-  const [domColonia, setDomColonia] = useState(empresa.domicilio_colonia ?? '');
-  const [domLocalidad, setDomLocalidad] = useState(empresa.domicilio_localidad ?? '');
-  const [domMunicipio, setDomMunicipio] = useState(empresa.domicilio_municipio ?? '');
-  const [domEstado, setDomEstado] = useState(empresa.domicilio_estado ?? '');
-  const [csfFechaEmision, setCsfFechaEmision] = useState(empresa.csf_fecha_emision ?? '');
-  const [csfUrl, setCsfUrl] = useState(empresa.csf_url ?? '');
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [savingLegacyLogos, setSavingLegacyLogos] = useState(false);
 
-  const isDirty = () =>
-    logoUrl !== (empresa.logo_url ?? '') ||
-    headerUrl !== (empresa.header_url ?? '') ||
-    rfc !== (empresa.rfc ?? '') ||
-    razonSocial !== (empresa.razon_social ?? '') ||
-    regimenCapital !== (empresa.regimen_capital ?? '') ||
-    nombreComercial !== (empresa.nombre_comercial ?? '') ||
-    fechaInicioOps !== (empresa.fecha_inicio_operaciones ?? '') ||
-    estatusSat !== (empresa.estatus_sat ?? '') ||
-    idCif !== (empresa.id_cif ?? '') ||
-    regimenFiscal !== (empresa.regimen_fiscal ?? '') ||
-    domCp !== (empresa.domicilio_cp ?? '') ||
-    domCalle !== (empresa.domicilio_calle ?? '') ||
-    domNumExt !== (empresa.domicilio_numero_ext ?? '') ||
-    domNumInt !== (empresa.domicilio_numero_int ?? '') ||
-    domColonia !== (empresa.domicilio_colonia ?? '') ||
-    domLocalidad !== (empresa.domicilio_localidad ?? '') ||
-    domMunicipio !== (empresa.domicilio_municipio ?? '') ||
-    domEstado !== (empresa.domicilio_estado ?? '') ||
-    csfFechaEmision !== (empresa.csf_fecha_emision ?? '') ||
-    csfUrl !== (empresa.csf_url ?? '');
+  // Registro patronal IMSS (PATCH).
+  const [rpInput, setRpInput] = useState(empresa.registro_patronal_imss ?? '');
+  const [rpSaving, setRpSaving] = useState(false);
+  const [rpError, setRpError] = useState<string | null>(null);
+  const [rpSaved, setRpSaved] = useState(false);
 
-  const handleSave = async () => {
-    setSaving(true);
-    const { error } = await supabase
-      .schema('core')
+  // Drawer "Actualizar CSF": estados A=drop, B=processing, C=diff, D=applied.
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [csfFile, setCsfFile] = useState<File | null>(null);
+  const [csfProcessing, setCsfProcessing] = useState(false);
+  const [csfError, setCsfError] = useState<string | null>(null);
+  const [csfExtraccion, setCsfExtraccion] = useState<CsfExtraccion | null>(null);
+  const [acceptedFields, setAcceptedFields] = useState<Set<DiffKey>>(new Set());
+  const [applyingDiff, setApplyingDiff] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ─── Derivados ──────────────────────────────────────────────────────────
+  const actividades = empresa.actividades_economicas ?? [];
+  const obligaciones = empresa.obligaciones_fiscales ?? [];
+
+  const changes = useMemo<DiffKey[]>(() => {
+    if (!csfExtraccion) return [];
+    return DIFF_FIELDS.filter((k) => {
+      const { actual, nuevo } = getActualAndNew(k, empresa, csfExtraccion);
+      return !valuesEqual(actual, nuevo);
+    });
+  }, [empresa, csfExtraccion]);
+
+  // ─── Handlers ───────────────────────────────────────────────────────────
+
+  const handleSaveLegacyLogos = async () => {
+    setSavingLegacyLogos(true);
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    const { error } = await (supabase.schema('core') as any)
       .from('empresas')
       .update({
         logo_url: logoUrl.trim() || null,
         header_url: headerUrl.trim() || null,
-        rfc: rfc.trim() || null,
-        razon_social: razonSocial.trim() || null,
-        regimen_capital: regimenCapital.trim() || null,
-        nombre_comercial: nombreComercial.trim() || null,
-        fecha_inicio_operaciones: fechaInicioOps.trim() || null,
-        estatus_sat: estatusSat.trim() || null,
-        id_cif: idCif.trim() || null,
-        regimen_fiscal: regimenFiscal.trim() || null,
-        domicilio_cp: domCp.trim() || null,
-        domicilio_calle: domCalle.trim() || null,
-        domicilio_numero_ext: domNumExt.trim() || null,
-        domicilio_numero_int: domNumInt.trim() || null,
-        domicilio_colonia: domColonia.trim() || null,
-        domicilio_localidad: domLocalidad.trim() || null,
-        domicilio_municipio: domMunicipio.trim() || null,
-        domicilio_estado: domEstado.trim() || null,
-        csf_fecha_emision: csfFechaEmision.trim() || null,
-        csf_url: csfUrl.trim() || null,
       })
       .eq('id', empresa.id);
-
-    setSaving(false);
+    setSavingLegacyLogos(false);
     if (error) {
-      alert(`Error al guardar: ${error.message}`);
+      alert(`Error al guardar logos: ${error.message}`);
       return;
     }
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
     onSaved();
   };
 
-  const actividades = empresa.actividades_economicas ?? [];
-  const obligaciones = empresa.obligaciones_fiscales ?? [];
+  const handleSaveRegistroPatronal = async () => {
+    setRpSaving(true);
+    setRpError(null);
+    try {
+      const res = await fetch(`/api/empresas/${empresa.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ registro_patronal_imss: rpInput.trim() || null }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Error al guardar');
+      setRpSaved(true);
+      setTimeout(() => setRpSaved(false), 3000);
+      onSaved();
+    } catch (err) {
+      setRpError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRpSaving(false);
+    }
+  };
+
+  const resetDrawer = () => {
+    setCsfFile(null);
+    setCsfExtraccion(null);
+    setCsfError(null);
+    setAcceptedFields(new Set());
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleCsfFileChosen = async (file: File | null) => {
+    if (!file) return;
+    setCsfFile(file);
+    setCsfProcessing(true);
+    setCsfError(null);
+    setCsfExtraccion(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/empresas/extract-csf', { method: 'POST', body: fd });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Error al procesar CSF');
+      setCsfExtraccion(json.extraccion as CsfExtraccion);
+    } catch (err) {
+      setCsfError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCsfProcessing(false);
+    }
+  };
+
+  const handleApplyDiff = async () => {
+    if (!csfFile || !csfExtraccion) return;
+    setApplyingDiff(true);
+    try {
+      const apiKeys = Array.from(acceptedFields).map((k) => DIFF_KEY_TO_API_KEY[k]);
+      const fd = new FormData();
+      fd.append('file', csfFile);
+      fd.append(
+        'payload',
+        JSON.stringify({
+          extraccion: csfExtraccion,
+          accepted_fields: apiKeys,
+        })
+      );
+      const res = await fetch(`/api/empresas/${empresa.id}/update-csf`, {
+        method: 'POST',
+        body: fd,
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Error al aplicar cambios');
+      setDrawerOpen(false);
+      resetDrawer();
+      onSaved();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al aplicar cambios');
+    } finally {
+      setApplyingDiff(false);
+    }
+  };
+
+  const isDirtyLegacyLogos = () =>
+    logoUrl !== (empresa.logo_url ?? '') || headerUrl !== (empresa.header_url ?? '');
+
+  const isRpDirty =
+    rpInput.trim() !== (empresa.registro_patronal_imss ?? '') &&
+    /^[A-Z]\d{10}$|^$/.test(rpInput.trim());
 
   return (
     <div className="space-y-6">
@@ -197,61 +445,138 @@ export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved:
         onUploaded={(url) => setHeaderUrl(url)}
       />
 
+      {isDirtyLegacyLogos() && (
+        <div className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3">
+          <span className="flex-1 text-xs text-[var(--text-muted)]">
+            Cambios pendientes en logos legacy.
+          </span>
+          <Button
+            size="sm"
+            onClick={handleSaveLegacyLogos}
+            disabled={savingLegacyLogos}
+            className="gap-1.5 rounded-xl"
+          >
+            {savingLegacyLogos ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            Guardar logos legacy
+          </Button>
+        </div>
+      )}
+
+      {/* Datos fiscales (read-only, vienen del CSF) */}
       <div className="space-y-4">
-        <SectionTitle>Datos Fiscales</SectionTitle>
+        <div className="flex items-center justify-between">
+          <SectionTitle>Datos fiscales (CSF)</SectionTitle>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setDrawerOpen(true)}
+            className="gap-1.5 rounded-xl"
+          >
+            <Sparkles className="h-4 w-4" />
+            Actualizar CSF
+          </Button>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <TextField label="RFC" value={rfc} onChange={setRfc} placeholder="ABC123456XX0" />
-          <TextField label="Razón Social" value={razonSocial} onChange={setRazonSocial} />
-          <TextField
-            label="Régimen Capital"
-            value={regimenCapital}
-            onChange={setRegimenCapital}
-            placeholder="SA de CV"
-          />
-          <TextField
-            label="Nombre Comercial"
-            value={nombreComercial}
-            onChange={setNombreComercial}
-          />
+          <ReadOnlyField label="RFC" value={empresa.rfc} />
+          <ReadOnlyField label="Razón Social" value={empresa.razon_social} />
+          <ReadOnlyField label="Régimen Capital" value={empresa.regimen_capital} />
+          <ReadOnlyField label="Nombre Comercial" value={empresa.nombre_comercial} />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <TextField
+          <ReadOnlyField
             label="Fecha Inicio Operaciones"
-            value={fechaInicioOps}
-            onChange={setFechaInicioOps}
-            placeholder="YYYY-MM-DD"
+            value={formatDate(empresa.fecha_inicio_operaciones)}
           />
-          <TextField
-            label="Estatus SAT"
-            value={estatusSat}
-            onChange={setEstatusSat}
-            placeholder="ACTIVO"
-          />
-          <TextField label="idCIF" value={idCif} onChange={setIdCif} />
-          <TextField label="Régimen Fiscal" value={regimenFiscal} onChange={setRegimenFiscal} />
+          <ReadOnlyField label="Estatus SAT" value={empresa.estatus_sat} />
+          <ReadOnlyField label="idCIF" value={empresa.id_cif} />
+          <ReadOnlyField label="Régimen Fiscal" value={empresa.regimen_fiscal} />
         </div>
+        {empresa.tipo_contribuyente === 'persona_fisica' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <ReadOnlyField label="CURP" value={empresa.curp} />
+          </div>
+        )}
       </div>
 
+      {/* Domicilio (read-only) */}
       <div className="space-y-4">
         <SectionTitle>Domicilio Fiscal</SectionTitle>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="sm:col-span-2">
-            <TextField label="Calle" value={domCalle} onChange={setDomCalle} />
+            <ReadOnlyField label="Calle" value={empresa.domicilio_calle} />
           </div>
-          <TextField label="Número Exterior" value={domNumExt} onChange={setDomNumExt} />
-          <TextField label="Número Interior" value={domNumInt} onChange={setDomNumInt} />
+          <ReadOnlyField label="Número Exterior" value={empresa.domicilio_numero_ext} />
+          <ReadOnlyField label="Número Interior" value={empresa.domicilio_numero_int} />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <TextField label="Colonia" value={domColonia} onChange={setDomColonia} />
-          <TextField label="Localidad" value={domLocalidad} onChange={setDomLocalidad} />
-          <TextField label="Municipio" value={domMunicipio} onChange={setDomMunicipio} />
-          <TextField label="Estado" value={domEstado} onChange={setDomEstado} />
+          <ReadOnlyField label="Colonia" value={empresa.domicilio_colonia} />
+          <ReadOnlyField label="Localidad" value={empresa.domicilio_localidad} />
+          <ReadOnlyField label="Municipio" value={empresa.domicilio_municipio} />
+          <ReadOnlyField label="Estado" value={empresa.domicilio_estado} />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <TextField label="Código Postal" value={domCp} onChange={setDomCp} placeholder="00000" />
+          <ReadOnlyField label="Código Postal" value={empresa.domicilio_cp} />
         </div>
       </div>
 
+      {/* Registro Patronal IMSS (editable) */}
+      <div className="space-y-4">
+        <SectionTitle>Registro Patronal IMSS</SectionTitle>
+        <p className="text-xs text-[var(--text-muted)] -mt-2">
+          Capturado a mano (no viene en el CSF). Formato: 1 letra + 10 dígitos (ej. C8520138108).
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
+            <FieldLabel>Registro patronal</FieldLabel>
+            <Input
+              value={rpInput}
+              onChange={(e) => setRpInput(e.target.value.toUpperCase())}
+              placeholder="A0000000000"
+              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-sm font-mono uppercase"
+              maxLength={11}
+            />
+            {rpInput && !/^[A-Z]\d{10}$/.test(rpInput.trim()) && (
+              <p className="mt-1 text-xs text-red-400">
+                Formato inválido. Esperado: 1 letra + 10 dígitos.
+              </p>
+            )}
+          </div>
+          <div className="flex items-end gap-2">
+            <Button
+              size="sm"
+              onClick={handleSaveRegistroPatronal}
+              disabled={!isRpDirty || rpSaving}
+              className="gap-1.5 rounded-xl"
+            >
+              {rpSaving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              Guardar
+            </Button>
+            {rpSaved && (
+              <span className="flex items-center gap-1 text-sm text-green-400">
+                <CheckCircle className="h-4 w-4" />
+                Guardado
+              </span>
+            )}
+          </div>
+        </div>
+        {rpError && (
+          <div className="flex items-start gap-2 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm text-red-400">
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+            {rpError}
+          </div>
+        )}
+      </div>
+
+      {/* Actividades económicas */}
       {actividades.length > 0 && (
         <div className="space-y-4">
           <SectionTitle>Actividades Económicas</SectionTitle>
@@ -292,6 +617,7 @@ export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved:
         </div>
       )}
 
+      {/* Obligaciones fiscales */}
       {obligaciones.length > 0 && (
         <div className="space-y-4">
           <SectionTitle>Obligaciones Fiscales</SectionTitle>
@@ -326,23 +652,11 @@ export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved:
         </div>
       )}
 
+      {/* CSF actual */}
       <div className="space-y-4">
-        <SectionTitle>Constancia de Situación Fiscal (CSF)</SectionTitle>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <TextField
-            label="Fecha de Emisión"
-            value={csfFechaEmision}
-            onChange={setCsfFechaEmision}
-            placeholder="YYYY-MM-DD"
-          />
-          <div className="sm:col-span-2">
-            <TextField
-              label="Ruta del PDF (storage o URL)"
-              value={csfUrl}
-              onChange={setCsfUrl}
-              placeholder="legal/empresa/csf/archivo.pdf"
-            />
-          </div>
+        <SectionTitle>Constancia de Situación Fiscal vigente</SectionTitle>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+          <ReadOnlyField label="Fecha de Emisión" value={formatDate(empresa.csf_fecha_emision)} />
           {empresa.csf_url && (
             <div className="flex items-end pb-0.5">
               <button
@@ -355,9 +669,15 @@ export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved:
                   }
                   const bucket = url.split('/')[0];
                   const path = url.split('/').slice(1).join('/');
+                  const isAdjuntosPath = !['branding', 'logos'].includes(bucket);
+                  // Convención: paths nuevos viven en bucket `adjuntos` con
+                  // subpath `empresas/{id}/csf-...pdf`. Paths legacy traen el
+                  // bucket como primer segmento.
+                  const targetBucket = isAdjuntosPath ? 'adjuntos' : bucket;
+                  const targetPath = isAdjuntosPath ? url : path;
                   const { data, error } = await supabase.storage
-                    .from(bucket)
-                    .createSignedUrl(path, 3600);
+                    .from(targetBucket)
+                    .createSignedUrl(targetPath, 3600);
                   if (error || !data?.signedUrl) {
                     alert(`Error al generar enlace: ${error?.message ?? 'unknown'}`);
                     return;
@@ -373,29 +693,187 @@ export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved:
             </div>
           )}
         </div>
-        {empresa.csf_fecha_emision && (
-          <p className="text-xs text-[var(--text-subtle)]">
-            Emitida el {formatDate(empresa.csf_fecha_emision)}
-          </p>
-        )}
       </div>
 
-      <div className="flex items-center gap-3 pt-2 border-t border-[var(--border)]">
-        <Button
-          onClick={handleSave}
-          disabled={saving || !isDirty()}
-          className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-50"
-        >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          Guardar cambios
-        </Button>
-        {saved && (
-          <span className="flex items-center gap-1 text-sm text-green-400">
-            <CheckCircle className="h-4 w-4" />
-            Guardado correctamente
-          </span>
-        )}
-      </div>
+      {/* Drawer: Actualizar CSF */}
+      <Sheet
+        open={drawerOpen}
+        onOpenChange={(v) => {
+          if (!v) {
+            setDrawerOpen(false);
+            // Mantenemos extraccion/file por si el usuario quiere re-abrir.
+          }
+        }}
+      >
+        <SheetContent className="sm:max-w-[800px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-emerald-600" />
+              Actualizar CSF — {empresa.nombre}
+            </SheetTitle>
+            <p className="text-xs text-muted-foreground">
+              Sube el PDF de la CSF más reciente. El sistema extrae los campos y te muestra qué
+              cambia. Puedes aplicar todo, parcial, o solo archivar el PDF como histórico.
+            </p>
+          </SheetHeader>
+
+          <div className="mt-6 space-y-4">
+            {/* ── Estado A: drop PDF ──────────────────────────────────────────── */}
+            {!csfFile && !csfProcessing && !csfExtraccion && (
+              <div className="space-y-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] ?? null;
+                    void handleCsfFileChosen(f);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full rounded-xl border-2 border-dashed border-[var(--border)] bg-[var(--panel)]/30 hover:bg-[var(--panel)]/60 px-6 py-12 text-center transition cursor-pointer"
+                >
+                  <Upload className="mx-auto h-10 w-10 text-[var(--text)]/40" />
+                  <p className="mt-3 text-sm font-medium text-[var(--text)]">
+                    Sube el PDF de la CSF
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    Solo archivos .pdf, máximo 50 MB.
+                  </p>
+                </button>
+                {csfError && (
+                  <div className="flex items-start gap-2 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm text-red-400">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                    {csfError}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Estado B: procesando ───────────────────────────────────────── */}
+            {csfProcessing && (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <Loader2 className="h-10 w-10 animate-spin text-emerald-500" />
+                <p className="mt-4 text-sm font-medium text-[var(--text)]">
+                  Procesando con Claude...
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  Tarda 30-90 segundos. No cierres este drawer.
+                </p>
+              </div>
+            )}
+
+            {/* ── Estado C: diff ──────────────────────────────────────────────── */}
+            {csfExtraccion && !csfProcessing && (
+              <>
+                <div className="flex flex-wrap items-center gap-2 border-b pb-3">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setAcceptedFields(new Set(changes))}
+                  >
+                    Seleccionar todos los cambios
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setAcceptedFields(new Set())}>
+                    Limpiar selección
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={resetDrawer}
+                    className="ml-auto text-xs"
+                  >
+                    Cambiar PDF
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    {acceptedFields.size} de {changes.length} cambios
+                  </span>
+                </div>
+
+                {changes.length === 0 ? (
+                  <div className="rounded-md border border-emerald-300/40 bg-emerald-50/40 p-4 text-sm text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-300">
+                    ✓ La CSF nueva no trae cambios respecto a los datos actuales. Si la aplicas (o
+                    la cancelas), el PDF queda archivado igual como histórico.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {changes.map((k) => {
+                      const checked = acceptedFields.has(k);
+                      const { actual, nuevo } = getActualAndNew(k, empresa, csfExtraccion);
+                      return (
+                        <label
+                          key={k}
+                          className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors ${
+                            checked
+                              ? 'border-emerald-400/60 bg-emerald-50/40 dark:bg-emerald-950/20'
+                              : 'border-border'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              const next = new Set(acceptedFields);
+                              if (e.target.checked) next.add(k);
+                              else next.delete(k);
+                              setAcceptedFields(next);
+                            }}
+                            className="mt-0.5 h-4 w-4 shrink-0"
+                          />
+                          <div className="flex-1 space-y-2">
+                            <div className="text-sm font-medium">{FIELD_LABELS[k]}</div>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              <div className="space-y-1">
+                                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                  Actual
+                                </div>
+                                <div className="rounded bg-muted/50 px-2 py-1 text-xs font-mono whitespace-pre-wrap">
+                                  {formatDiffValue(actual)}
+                                </div>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                                  Nuevo
+                                </div>
+                                <div className="rounded bg-emerald-100/50 px-2 py-1 text-xs font-mono whitespace-pre-wrap dark:bg-emerald-950/30">
+                                  {formatDiffValue(nuevo)}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2 border-t pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => setDrawerOpen(false)}
+                    disabled={applyingDiff}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleApplyDiff} disabled={applyingDiff} className="gap-2">
+                    {applyingDiff ? (
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+                    {acceptedFields.size === 0
+                      ? 'Solo archivar PDF'
+                      : `Aplicar ${acceptedFields.size} cambio${acceptedFields.size === 1 ? '' : 's'}`}
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
