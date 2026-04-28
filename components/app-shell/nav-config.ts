@@ -65,17 +65,17 @@ export const NAV_ITEMS: NavItem[] = [
         ],
       },
       {
-        label: 'Inmobiliario',
+        label: 'Compras',
+        children: [{ label: 'Proveedores', href: '/dilesa/proveedores' }],
+      },
+      {
+        label: 'Operaciones',
         children: [
           { label: 'Terrenos', href: '/dilesa/terrenos' },
           { label: 'Prototipos', href: '/dilesa/prototipos' },
           { label: 'Anteproyectos', href: '/dilesa/anteproyectos' },
           { label: 'Proyectos', href: '/dilesa/proyectos' },
         ],
-      },
-      {
-        label: 'Operaciones',
-        children: [{ label: 'Proveedores', href: '/dilesa/proveedores' }],
       },
     ],
   },
@@ -101,15 +101,25 @@ export const NAV_ITEMS: NavItem[] = [
         ],
       },
       {
+        label: 'Compras',
+        children: [
+          { label: 'Proveedores', href: '/rdb/proveedores' },
+          { label: 'Requisiciones', href: '/rdb/requisiciones' },
+          { label: 'Órdenes de Compra', href: '/rdb/ordenes-compra' },
+        ],
+      },
+      {
+        label: 'Inventario',
+        children: [
+          { label: 'Productos', href: '/rdb/productos' },
+          { label: 'Inventario', href: '/rdb/inventario' },
+        ],
+      },
+      {
         label: 'Operaciones',
         children: [
           { label: 'Ventas', href: '/rdb/ventas' },
           { label: 'Cortes', href: '/rdb/cortes' },
-          { label: 'Productos', href: '/rdb/productos' },
-          { label: 'Inventario', href: '/rdb/inventario' },
-          { label: 'Proveedores', href: '/rdb/proveedores' },
-          { label: 'Requisiciones', href: '/rdb/requisiciones' },
-          { label: 'Órdenes de Compra', href: '/rdb/ordenes-compra' },
           { label: 'Playtomic', href: '/rdb/playtomic' },
         ],
       },

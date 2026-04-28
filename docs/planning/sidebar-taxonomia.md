@@ -3,7 +3,7 @@
 **Slug:** `sidebar-taxonomia`
 **Empresas:** RDB, DILESA (alcance v1). ANSA, COAGAN y Nigropetense quedan fuera hasta que tengan más módulos vivos.
 **Schemas afectados:** n/a (UI / shell)
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-04-28
 **Última actualización:** 2026-04-28
@@ -269,5 +269,17 @@ _(append-only, escrita por Claude Code al ejecutar)_
   tests nuevos en `components/app-shell/__tests__/nav-config.test.ts`
   cubriendo helpers, invariantes de taxonomía (sections y children
   mutuamente exclusivos, ninguna sección vacía en definición),
-  `isItemActive` con `matchPaths`. Próximo: Sprint 2 (re-taxonomizar
-  RDB + DILESA con las 5 secciones v1 + ADR-014).
+  `isItemActive` con `matchPaths`. PR #277 mergeado.
+- **2026-04-28 — Sprint 2 completo. Iniciativa CERRADA.**
+  Re-taxonomización aplicada a RDB y DILESA con las 5 secciones v1.
+  RDB: Administración (3) / RRHH (3) / Compras (3: Proveedores,
+  Requisiciones, Órdenes de Compra) / Inventario (2: Productos,
+  Inventario) / Operaciones (3: Ventas, Cortes, Playtomic).
+  DILESA: Administración (3) / RRHH (3) / Compras (1: Proveedores)
+  / Operaciones (4: Terrenos, Prototipos, Anteproyectos, Proyectos)
+  — Inmobiliario plegado en Operaciones, sin sección Inventario
+  (no aplica todavía). Cero cambios en URLs ni en `ROUTE_TO_MODULE`
+  ni en DB. ADR-014 emitido cubriendo shape (ST1), taxonomía v1
+  (ST2), esconder vacías (ST3), permisos a nivel URL (ST4),
+  `flattenNavChildren` para consumers (ST5), playbook empresa nueva
+  (ST6).
