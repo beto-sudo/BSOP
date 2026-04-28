@@ -5,13 +5,19 @@
 /**
  * PATCH /api/empresas/[id]
  *
- * Actualiza campos sueltos de `core.empresas` que NO vienen del CSF y NO son
- * branding. Hoy v1 cubre `registro_patronal_imss` (capturado a mano para
- * contratos LFT) — el endpoint queda extensible para otros campos futuros
- * con el mismo patrón.
+ * Actualiza campos sueltos de `core.empresas`. Cubre dos casos:
  *
- * Para refrescar campos del CSF: usar `[id]/update-csf` con PDF.
+ *   1. **Captura manual**: campos que no vienen del CSF y se editan a mano,
+ *      como `registro_patronal_imss` (formato `A0000000000` para LFT).
+ *   2. **Override manual de campos del CSF**: el operador puede corregir RFC,
+ *      razón social, domicilio, fechas, etc. sin re-subir el PDF — útil para
+ *      typos del SAT o ajustes operativos. El flujo "Actualizar CSF" sigue
+ *      siendo la fuente preferida cuando hay PDF disponible.
+ *
  * Para branding (colores/logos): hay otro flujo en `EmpresaBranding`.
+ * Para `actividades_economicas` / `obligaciones_fiscales` (jsonb), hoy se
+ * sobrescriben sólo vía CSF — la edición manual de esos arrays queda fuera
+ * de este endpoint v1.
  *
  * Solo admin.
  */
@@ -37,9 +43,34 @@ const RegistroPatronalSchema = z
   ])
   .transform((v) => (v === '' ? null : v));
 
+// Campo de texto editable: acepta string, '' o null. Cadena vacía → null.
+const editableText = z
+  .union([z.string(), z.null()])
+  .transform((v) => (v === '' || v == null ? null : v));
+
 const PayloadSchema = z
   .object({
     registro_patronal_imss: RegistroPatronalSchema.optional(),
+    // Identidad fiscal (override manual si el CSF está mal o sin PDF).
+    rfc: editableText.optional(),
+    curp: editableText.optional(),
+    razon_social: editableText.optional(),
+    regimen_capital: editableText.optional(),
+    nombre_comercial: editableText.optional(),
+    fecha_inicio_operaciones: editableText.optional(),
+    estatus_sat: editableText.optional(),
+    id_cif: editableText.optional(),
+    regimen_fiscal: editableText.optional(),
+    csf_fecha_emision: editableText.optional(),
+    // Domicilio fiscal.
+    domicilio_calle: editableText.optional(),
+    domicilio_numero_ext: editableText.optional(),
+    domicilio_numero_int: editableText.optional(),
+    domicilio_colonia: editableText.optional(),
+    domicilio_localidad: editableText.optional(),
+    domicilio_municipio: editableText.optional(),
+    domicilio_estado: editableText.optional(),
+    domicilio_cp: editableText.optional(),
   })
   .strict();
 

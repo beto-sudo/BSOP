@@ -12,10 +12,12 @@ import {
   ExternalLink,
   FileText,
   Loader2,
+  Pencil,
   RefreshCw,
   Save,
   Sparkles,
   Upload,
+  X,
 } from 'lucide-react';
 
 import type { CsfExtraccion } from '@/lib/proveedores/extract-csf';
@@ -284,6 +286,120 @@ function ReadOnlyField({ label, value }: { label: string; value: string | null }
   );
 }
 
+// ─── Campos editables ──────────────────────────────────────────────────────
+
+/**
+ * Subset de columnas de `core.empresas` editables a mano via PATCH /api/empresas/[id].
+ * Excluye `actividades_economicas` y `obligaciones_fiscales` (jsonb arrays —
+ * sólo se sobrescriben vía CSF en v1).
+ */
+const EDITABLE_FIELDS = [
+  'rfc',
+  'curp',
+  'razon_social',
+  'regimen_capital',
+  'nombre_comercial',
+  'fecha_inicio_operaciones',
+  'estatus_sat',
+  'id_cif',
+  'regimen_fiscal',
+  'csf_fecha_emision',
+  'domicilio_calle',
+  'domicilio_numero_ext',
+  'domicilio_numero_int',
+  'domicilio_colonia',
+  'domicilio_localidad',
+  'domicilio_municipio',
+  'domicilio_estado',
+  'domicilio_cp',
+  'registro_patronal_imss',
+] as const;
+
+type EditableField = (typeof EDITABLE_FIELDS)[number];
+
+type EditableValues = Record<EditableField, string>;
+
+function buildInitialEditValues(empresa: Empresa): EditableValues {
+  return {
+    rfc: empresa.rfc ?? '',
+    curp: empresa.curp ?? '',
+    razon_social: empresa.razon_social ?? '',
+    regimen_capital: empresa.regimen_capital ?? '',
+    nombre_comercial: empresa.nombre_comercial ?? '',
+    fecha_inicio_operaciones: empresa.fecha_inicio_operaciones ?? '',
+    estatus_sat: empresa.estatus_sat ?? '',
+    id_cif: empresa.id_cif ?? '',
+    regimen_fiscal: empresa.regimen_fiscal ?? '',
+    csf_fecha_emision: empresa.csf_fecha_emision ?? '',
+    domicilio_calle: empresa.domicilio_calle ?? '',
+    domicilio_numero_ext: empresa.domicilio_numero_ext ?? '',
+    domicilio_numero_int: empresa.domicilio_numero_int ?? '',
+    domicilio_colonia: empresa.domicilio_colonia ?? '',
+    domicilio_localidad: empresa.domicilio_localidad ?? '',
+    domicilio_municipio: empresa.domicilio_municipio ?? '',
+    domicilio_estado: empresa.domicilio_estado ?? '',
+    domicilio_cp: empresa.domicilio_cp ?? '',
+    registro_patronal_imss: empresa.registro_patronal_imss ?? '',
+  };
+}
+
+function EditableTextField({
+  label,
+  value,
+  editing,
+  onChange,
+  placeholder,
+  monospace,
+  type = 'text',
+  uppercase,
+  maxLength,
+  errorMessage,
+}: {
+  label: string;
+  value: string;
+  editing: boolean;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  monospace?: boolean;
+  type?: 'text' | 'date';
+  uppercase?: boolean;
+  maxLength?: number;
+  errorMessage?: string | null;
+}) {
+  if (!editing) {
+    return (
+      <ReadOnlyField
+        label={label}
+        value={
+          type === 'date' && value
+            ? // Read-only date display: dd/mm/yyyy.
+              (() => {
+                const parts = value.split('-');
+                return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : value;
+              })()
+            : value || null
+        }
+      />
+    );
+  }
+  return (
+    <div className="space-y-1">
+      <FieldLabel>{label}</FieldLabel>
+      <Input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(uppercase ? e.target.value.toUpperCase() : e.target.value)}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        className={`rounded-xl border-[var(--border)] bg-[var(--panel)] text-sm ${
+          monospace ? 'font-mono' : ''
+        } ${uppercase ? 'uppercase' : ''}`}
+      />
+      {errorMessage && <p className="text-xs text-red-400">{errorMessage}</p>}
+    </div>
+  );
+}
+
 // ─── Componente principal ─────────────────────────────────────────────────
 
 export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved: () => void }) {
@@ -294,11 +410,15 @@ export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved:
   const [headerUrl, setHeaderUrl] = useState(empresa.header_url ?? '');
   const [savingLegacyLogos, setSavingLegacyLogos] = useState(false);
 
-  // Registro patronal IMSS (PATCH).
-  const [rpInput, setRpInput] = useState(empresa.registro_patronal_imss ?? '');
-  const [rpSaving, setRpSaving] = useState(false);
-  const [rpError, setRpError] = useState<string | null>(null);
-  const [rpSaved, setRpSaved] = useState(false);
+  // Edición manual (PATCH /api/empresas/[id]). Cubre todos los campos de
+  // `EDITABLE_FIELDS` — incluido `registro_patronal_imss`. Save unificado.
+  const [editing, setEditing] = useState(false);
+  const [editValues, setEditValues] = useState<EditableValues>(() =>
+    buildInitialEditValues(empresa)
+  );
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSaved, setEditSaved] = useState(false);
 
   // Drawer "Actualizar CSF": estados A=drop, B=processing, C=diff, D=applied.
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -343,24 +463,65 @@ export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved:
     onSaved();
   };
 
-  const handleSaveRegistroPatronal = async () => {
-    setRpSaving(true);
-    setRpError(null);
+  const setEditField = (key: EditableField, value: string) => {
+    setEditValues((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleStartEdit = () => {
+    setEditValues(buildInitialEditValues(empresa));
+    setEditError(null);
+    setEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setEditing(false);
+    setEditValues(buildInitialEditValues(empresa));
+    setEditError(null);
+  };
+
+  // Diff entre edición y empresa original. Solo manda al server lo que cambió.
+  const editPatch = useMemo<Partial<Record<EditableField, string | null>>>(() => {
+    const patch: Partial<Record<EditableField, string | null>> = {};
+    for (const key of EDITABLE_FIELDS) {
+      const current = (empresa[key as keyof Empresa] ?? '') as string;
+      const next = editValues[key];
+      if ((current ?? '') !== next) {
+        patch[key] = next.trim() === '' ? null : next.trim();
+      }
+    }
+    return patch;
+  }, [editValues, empresa]);
+
+  const editIsDirty = Object.keys(editPatch).length > 0;
+
+  // Validación cliente del registro patronal antes de guardar (regex SAT/IMSS).
+  const rpInputValue = editValues.registro_patronal_imss.trim();
+  const rpInputInvalid = rpInputValue !== '' && !/^[A-Z]\d{10}$/.test(rpInputValue);
+
+  const handleSaveEdit = async () => {
+    if (!editIsDirty) return;
+    if (rpInputInvalid) {
+      setEditError('Registro patronal IMSS inválido. Formato: 1 letra + 10 dígitos.');
+      return;
+    }
+    setSavingEdit(true);
+    setEditError(null);
     try {
       const res = await fetch(`/api/empresas/${empresa.id}`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ registro_patronal_imss: rpInput.trim() || null }),
+        body: JSON.stringify(editPatch),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? 'Error al guardar');
-      setRpSaved(true);
-      setTimeout(() => setRpSaved(false), 3000);
+      setEditing(false);
+      setEditSaved(true);
+      setTimeout(() => setEditSaved(false), 3000);
       onSaved();
     } catch (err) {
-      setRpError(err instanceof Error ? err.message : String(err));
+      setEditError(err instanceof Error ? err.message : String(err));
     } finally {
-      setRpSaving(false);
+      setSavingEdit(false);
     }
   };
 
@@ -466,10 +627,6 @@ export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved:
   const isDirtyLegacyLogos = () =>
     logoUrl !== (empresa.logo_url ?? '') || headerUrl !== (empresa.header_url ?? '');
 
-  const isRpDirty =
-    rpInput.trim() !== (empresa.registro_patronal_imss ?? '') &&
-    /^[A-Z]\d{10}$|^$/.test(rpInput.trim());
-
   return (
     <div className="space-y-6">
       <ImageUploader
@@ -508,114 +665,231 @@ export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved:
         </div>
       )}
 
-      {/* Datos fiscales (read-only, vienen del CSF) */}
+      {/* Datos fiscales — read-only por default, editables vía botón "Editar" */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <SectionTitle>Datos fiscales (CSF)</SectionTitle>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setDrawerOpen(true)}
-            className="gap-1.5 rounded-xl"
-          >
-            <Sparkles className="h-4 w-4" />
-            Actualizar CSF
-          </Button>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <SectionTitle>Datos fiscales</SectionTitle>
+          <div className="flex items-center gap-2">
+            {!editing ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleStartEdit}
+                  className="gap-1.5 rounded-xl"
+                >
+                  <Pencil className="h-4 w-4" />
+                  Editar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setDrawerOpen(true)}
+                  className="gap-1.5 rounded-xl"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Actualizar CSF
+                </Button>
+                {editSaved && (
+                  <span className="flex items-center gap-1 text-sm text-green-400">
+                    <CheckCircle className="h-4 w-4" />
+                    Guardado
+                  </span>
+                )}
+              </>
+            ) : (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleCancelEdit}
+                  disabled={savingEdit}
+                  className="gap-1.5 rounded-xl"
+                >
+                  <X className="h-4 w-4" />
+                  Cancelar
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSaveEdit}
+                  disabled={!editIsDirty || savingEdit || rpInputInvalid}
+                  className="gap-1.5 rounded-xl"
+                >
+                  {savingEdit ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  Guardar cambios
+                </Button>
+              </>
+            )}
+          </div>
         </div>
 
+        {editing && (
+          <p className="text-xs text-[var(--text-muted)] -mt-2">
+            Modo edición manual. Para refrescar campos del CSF desde un PDF nuevo, cancela y usa{' '}
+            <strong>Actualizar CSF</strong>. Solo se guardan los campos que cambien.
+          </p>
+        )}
+
+        {editError && (
+          <div className="flex items-start gap-2 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm text-red-400">
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+            {editError}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <ReadOnlyField label="RFC" value={empresa.rfc} />
-          <ReadOnlyField label="Razón Social" value={empresa.razon_social} />
-          <ReadOnlyField label="Régimen Capital" value={empresa.regimen_capital} />
-          <ReadOnlyField label="Nombre Comercial" value={empresa.nombre_comercial} />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <ReadOnlyField
-            label="Fecha Inicio Operaciones"
-            value={formatDate(empresa.fecha_inicio_operaciones)}
+          <EditableTextField
+            label="RFC"
+            value={editValues.rfc}
+            editing={editing}
+            onChange={(v) => setEditField('rfc', v)}
+            placeholder="ABC123456XX0"
+            monospace
+            uppercase
+            maxLength={13}
           />
-          <ReadOnlyField label="Estatus SAT" value={empresa.estatus_sat} />
-          <ReadOnlyField label="idCIF" value={empresa.id_cif} />
-          <ReadOnlyField label="Régimen Fiscal" value={empresa.regimen_fiscal} />
+          <EditableTextField
+            label="Razón Social"
+            value={editValues.razon_social}
+            editing={editing}
+            onChange={(v) => setEditField('razon_social', v)}
+          />
+          <EditableTextField
+            label="Régimen Capital"
+            value={editValues.regimen_capital}
+            editing={editing}
+            onChange={(v) => setEditField('regimen_capital', v)}
+            placeholder="SA de CV"
+          />
+          <EditableTextField
+            label="Nombre Comercial"
+            value={editValues.nombre_comercial}
+            editing={editing}
+            onChange={(v) => setEditField('nombre_comercial', v)}
+          />
         </div>
-        {empresa.tipo_contribuyente === 'persona_fisica' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <EditableTextField
+            label="Fecha Inicio Operaciones"
+            value={editValues.fecha_inicio_operaciones}
+            editing={editing}
+            onChange={(v) => setEditField('fecha_inicio_operaciones', v)}
+            type="date"
+          />
+          <EditableTextField
+            label="Estatus SAT"
+            value={editValues.estatus_sat}
+            editing={editing}
+            onChange={(v) => setEditField('estatus_sat', v)}
+            placeholder="ACTIVO"
+            uppercase
+          />
+          <EditableTextField
+            label="idCIF"
+            value={editValues.id_cif}
+            editing={editing}
+            onChange={(v) => setEditField('id_cif', v)}
+            monospace
+          />
+          <EditableTextField
+            label="Régimen Fiscal"
+            value={editValues.regimen_fiscal}
+            editing={editing}
+            onChange={(v) => setEditField('regimen_fiscal', v)}
+          />
+        </div>
+        {(editing || empresa.tipo_contribuyente === 'persona_fisica') && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <ReadOnlyField label="CURP" value={empresa.curp} />
+            <EditableTextField
+              label="CURP"
+              value={editValues.curp}
+              editing={editing}
+              onChange={(v) => setEditField('curp', v)}
+              monospace
+              uppercase
+              maxLength={18}
+            />
+            <EditableTextField
+              label="Registro Patronal IMSS"
+              value={editValues.registro_patronal_imss}
+              editing={editing}
+              onChange={(v) => setEditField('registro_patronal_imss', v)}
+              placeholder="A0000000000"
+              monospace
+              uppercase
+              maxLength={11}
+              errorMessage={rpInputInvalid ? 'Formato: 1 letra + 10 dígitos.' : null}
+            />
           </div>
         )}
       </div>
 
-      {/* Domicilio (read-only) */}
+      {/* Domicilio Fiscal */}
       <div className="space-y-4">
         <SectionTitle>Domicilio Fiscal</SectionTitle>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="sm:col-span-2">
-            <ReadOnlyField label="Calle" value={empresa.domicilio_calle} />
-          </div>
-          <ReadOnlyField label="Número Exterior" value={empresa.domicilio_numero_ext} />
-          <ReadOnlyField label="Número Interior" value={empresa.domicilio_numero_int} />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <ReadOnlyField label="Colonia" value={empresa.domicilio_colonia} />
-          <ReadOnlyField label="Localidad" value={empresa.domicilio_localidad} />
-          <ReadOnlyField label="Municipio" value={empresa.domicilio_municipio} />
-          <ReadOnlyField label="Estado" value={empresa.domicilio_estado} />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <ReadOnlyField label="Código Postal" value={empresa.domicilio_cp} />
-        </div>
-      </div>
-
-      {/* Registro Patronal IMSS (editable) */}
-      <div className="space-y-4">
-        <SectionTitle>Registro Patronal IMSS</SectionTitle>
-        <p className="text-xs text-[var(--text-muted)] -mt-2">
-          Capturado a mano (no viene en el CSF). Formato: 1 letra + 10 dígitos (ej. C8520138108).
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
-            <FieldLabel>Registro patronal</FieldLabel>
-            <Input
-              value={rpInput}
-              onChange={(e) => setRpInput(e.target.value.toUpperCase())}
-              placeholder="A0000000000"
-              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-sm font-mono uppercase"
-              maxLength={11}
+            <EditableTextField
+              label="Calle"
+              value={editValues.domicilio_calle}
+              editing={editing}
+              onChange={(v) => setEditField('domicilio_calle', v)}
             />
-            {rpInput && !/^[A-Z]\d{10}$/.test(rpInput.trim()) && (
-              <p className="mt-1 text-xs text-red-400">
-                Formato inválido. Esperado: 1 letra + 10 dígitos.
-              </p>
-            )}
           </div>
-          <div className="flex items-end gap-2">
-            <Button
-              size="sm"
-              onClick={handleSaveRegistroPatronal}
-              disabled={!isRpDirty || rpSaving}
-              className="gap-1.5 rounded-xl"
-            >
-              {rpSaving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-              Guardar
-            </Button>
-            {rpSaved && (
-              <span className="flex items-center gap-1 text-sm text-green-400">
-                <CheckCircle className="h-4 w-4" />
-                Guardado
-              </span>
-            )}
-          </div>
+          <EditableTextField
+            label="Número Exterior"
+            value={editValues.domicilio_numero_ext}
+            editing={editing}
+            onChange={(v) => setEditField('domicilio_numero_ext', v)}
+          />
+          <EditableTextField
+            label="Número Interior"
+            value={editValues.domicilio_numero_int}
+            editing={editing}
+            onChange={(v) => setEditField('domicilio_numero_int', v)}
+          />
         </div>
-        {rpError && (
-          <div className="flex items-start gap-2 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm text-red-400">
-            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-            {rpError}
-          </div>
-        )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <EditableTextField
+            label="Colonia"
+            value={editValues.domicilio_colonia}
+            editing={editing}
+            onChange={(v) => setEditField('domicilio_colonia', v)}
+          />
+          <EditableTextField
+            label="Localidad"
+            value={editValues.domicilio_localidad}
+            editing={editing}
+            onChange={(v) => setEditField('domicilio_localidad', v)}
+          />
+          <EditableTextField
+            label="Municipio"
+            value={editValues.domicilio_municipio}
+            editing={editing}
+            onChange={(v) => setEditField('domicilio_municipio', v)}
+          />
+          <EditableTextField
+            label="Estado"
+            value={editValues.domicilio_estado}
+            editing={editing}
+            onChange={(v) => setEditField('domicilio_estado', v)}
+          />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <EditableTextField
+            label="Código Postal"
+            value={editValues.domicilio_cp}
+            editing={editing}
+            onChange={(v) => setEditField('domicilio_cp', v)}
+            placeholder="00000"
+            monospace
+            maxLength={5}
+          />
+        </div>
       </div>
 
       {/* Actividades económicas */}

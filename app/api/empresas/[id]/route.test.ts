@@ -119,4 +119,35 @@ describe('PATCH /api/empresas/[id]', () => {
     const res = await PATCH(req, ctx);
     expect(res.status).toBe(200);
   });
+
+  it('200 con varios campos editables a la vez (override manual)', async () => {
+    const { req, ctx } = makeReq({
+      razon_social: 'NUEVA RAZÓN SOCIAL',
+      domicilio_calle: 'Av. Reforma',
+      domicilio_numero_ext: '100',
+      regimen_fiscal: 'General de Ley Personas Morales',
+    });
+    const res = await PATCH(req, ctx);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.fields_updated).toContain('razon_social');
+    expect(json.fields_updated).toContain('domicilio_calle');
+    expect(json.fields_updated).toContain('domicilio_numero_ext');
+    expect(json.fields_updated).toContain('regimen_fiscal');
+  });
+
+  it('200 con cadena vacía en cualquier campo editable lo limpia (→ null)', async () => {
+    const { req, ctx } = makeReq({ domicilio_numero_int: '' });
+    const res = await PATCH(req, ctx);
+    expect(res.status).toBe(200);
+  });
+
+  it('400 si llega una llave fuera del set permitido (strict)', async () => {
+    const { req, ctx } = makeReq({
+      razon_social: 'X',
+      campo_inventado: 'Y',
+    });
+    const res = await PATCH(req, ctx);
+    expect(res.status).toBe(400);
+  });
 });
