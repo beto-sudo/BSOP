@@ -6,6 +6,7 @@ import {
   UpdateCsfPayloadSchema,
   RegimenSchema,
   ObligacionSchema,
+  ActividadEconomicaSchema,
 } from './extract-csf';
 
 /**
@@ -282,6 +283,120 @@ describe('CsfExtraccionSchema — rechazos', () => {
       fecha_emision: null,
     };
     expect(() => CsfExtraccionSchema.parse(input)).toThrow();
+  });
+});
+
+describe('CsfExtraccionSchema — campos extendidos (consumidos por empresas)', () => {
+  const baseInput = {
+    tipo_persona: 'moral',
+    rfc: 'ANO8509243H3',
+    curp: null,
+    nombre: null,
+    apellido_paterno: null,
+    apellido_materno: null,
+    razon_social: 'AUTOS DEL NORTE',
+    nombre_comercial: null,
+    regimen_fiscal_codigo: '601',
+    regimen_fiscal_nombre: 'General de Ley Personas Morales',
+    regimenes_adicionales: [
+      {
+        codigo: '601',
+        nombre: 'General de Ley Personas Morales',
+        fecha_inicio: '1958-12-01',
+        fecha_fin: null,
+      },
+    ],
+    domicilio_calle: null,
+    domicilio_num_ext: null,
+    domicilio_num_int: null,
+    domicilio_colonia: null,
+    domicilio_cp: null,
+    domicilio_municipio: null,
+    domicilio_estado: null,
+    obligaciones: [],
+    fecha_inicio_operaciones: '1958-12-01',
+    fecha_emision: '2026-04-01',
+  };
+
+  it('los campos extendidos son opcionales y default a null/[]', () => {
+    const parsed = CsfExtraccionSchema.parse(baseInput);
+    expect(parsed.id_cif).toBeNull();
+    expect(parsed.estatus_sat).toBeNull();
+    expect(parsed.regimen_capital).toBeNull();
+    expect(parsed.actividades_economicas).toEqual([]);
+  });
+
+  it('parsea CSF de empresa moral con id_cif, estatus_sat, regimen_capital y actividades', () => {
+    const input = {
+      ...baseInput,
+      id_cif: '14110980997',
+      estatus_sat: 'ACTIVO',
+      regimen_capital: 'SOCIEDAD ANONIMA DE CAPITAL VARIABLE',
+      actividades_economicas: [
+        {
+          orden: 1,
+          actividad: 'Comercio al por menor de automóviles y camionetas nuevos',
+          porcentaje: '90%',
+          fecha_inicio: '1999-04-09',
+          fecha_fin: null,
+        },
+        {
+          orden: 2,
+          actividad: 'Reparación mecánica en general de automóviles y camiones',
+          porcentaje: '2%',
+          fecha_inicio: '2023-05-24',
+          fecha_fin: null,
+        },
+      ],
+    };
+    const parsed = CsfExtraccionSchema.parse(input);
+    expect(parsed.id_cif).toBe('14110980997');
+    expect(parsed.estatus_sat).toBe('ACTIVO');
+    expect(parsed.regimen_capital).toBe('SOCIEDAD ANONIMA DE CAPITAL VARIABLE');
+    expect(parsed.actividades_economicas).toHaveLength(2);
+    expect(parsed.actividades_economicas[0]?.orden).toBe(1);
+    expect(parsed.actividades_economicas[0]?.porcentaje).toBe('90%');
+  });
+
+  it('rechaza una actividad económica sin "orden" (campo obligatorio)', () => {
+    const input = {
+      ...baseInput,
+      actividades_economicas: [
+        {
+          actividad: 'Sin orden',
+          porcentaje: '100%',
+          fecha_inicio: null,
+          fecha_fin: null,
+        },
+      ],
+    };
+    expect(() => CsfExtraccionSchema.parse(input)).toThrow();
+  });
+});
+
+describe('ActividadEconomicaSchema standalone', () => {
+  it('parsea actividad con todos los campos', () => {
+    expect(
+      ActividadEconomicaSchema.parse({
+        orden: 1,
+        actividad: 'Comercio al por menor',
+        porcentaje: '90%',
+        fecha_inicio: '2020-01-01',
+        fecha_fin: null,
+      })
+    ).toMatchObject({ orden: 1, porcentaje: '90%' });
+  });
+
+  it('acepta porcentaje null cuando la CSF no lo muestra', () => {
+    expect(
+      ActividadEconomicaSchema.parse({
+        orden: 1,
+        actividad: 'X',
+        porcentaje: null,
+        fecha_inicio: null,
+        fecha_fin: null,
+      })
+    ).toMatchObject({ porcentaje: null });
   });
 });
 
