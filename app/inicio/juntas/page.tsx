@@ -6,7 +6,6 @@
  * out of scope for bulk lint cleanup.
  */
 
-import { RequireAccess } from '@/components/require-access';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
@@ -495,10 +494,10 @@ function JuntasInner() {
   );
 }
 
+// Sin RequireAccess de empresa: el dashboard personal es para todo usuario
+// logueado; el proxy ya valida la sesión. Mismo patrón que `/inicio/tasks`.
+// (Antes había `<RequireAccess empresa="rdb">` hardcoded — bloqueaba acceso
+// a usuarios DILESA. Bug arreglado en Sub-PR 4 de `shared-modules-refactor`.)
 export default function Page() {
-  return (
-    <RequireAccess empresa="rdb">
-      <JuntasInner />
-    </RequireAccess>
-  );
+  return <JuntasInner />;
 }
