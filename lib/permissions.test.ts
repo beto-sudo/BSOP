@@ -156,6 +156,78 @@ describe('route maps', () => {
   });
 });
 
+/**
+ * Sync entre ROUTE_TO_MODULE (código) y core.modulos (DB).
+ *
+ * Lista canónica de slugs que deben existir como rows en `core.modulos`
+ * (post-migración 20260428230000_modulos_dilesa_inmobiliario.sql).
+ *
+ * Cuando se libera un módulo nuevo: (1) agregar URL al sidebar,
+ * (2) agregar entry a `ROUTE_TO_MODULE`, (3) agregar slug aquí,
+ * (4) crear migración SQL con INSERT en `core.modulos` + backfill de
+ * permisos. El test falla si tocas (2) sin tocar (3) — recordatorio
+ * de que falta migración. Ver `BSOP/CLAUDE.md` sección "Reglas DB".
+ *
+ * NO incluye slugs que existen solo en DB sin URL en sidebar
+ * (ej. `settings.empresas` vive en `core.modulos` pero no se mapea
+ * desde una URL — Settings → Empresas no tiene gating fino por módulo).
+ */
+const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
+  // DILESA
+  'dilesa.admin.tasks',
+  'dilesa.admin.juntas',
+  'dilesa.admin.documentos',
+  'dilesa.rh.empleados',
+  'dilesa.rh.puestos',
+  'dilesa.rh.departamentos',
+  'dilesa.proveedores',
+  // DILESA Inmobiliario (Sprint 2 de modulos-catalog)
+  'dilesa.terrenos',
+  'dilesa.prototipos',
+  'dilesa.anteproyectos',
+  'dilesa.proyectos',
+
+  // RDB
+  'rdb.home',
+  'rdb.tasks',
+  'rdb.ventas',
+  'rdb.cortes',
+  'rdb.productos',
+  'rdb.inventario',
+  'rdb.proveedores',
+  'rdb.requisiciones',
+  'rdb.playtomic',
+  'rdb.ordenes_compra',
+  'rdb.admin.tasks',
+  'rdb.admin.juntas',
+  'rdb.admin.documentos',
+  'rdb.rh.empleados',
+  'rdb.rh.puestos',
+  'rdb.rh.departamentos',
+
+  // Settings
+  'settings.acceso',
+]);
+
+describe('ROUTE_TO_MODULE ↔ core.modulos sync', () => {
+  it('every slug in ROUTE_TO_MODULE has an expected DB row', () => {
+    const missing = Object.values(ROUTE_TO_MODULE).filter(
+      (slug) => !EXPECTED_DB_MODULE_SLUGS.has(slug)
+    );
+    expect(missing).toEqual([]);
+    // Si este test falla: agregaste un slug a ROUTE_TO_MODULE pero falta
+    // (a) agregarlo a EXPECTED_DB_MODULE_SLUGS arriba y (b) crear una
+    // migración SQL con INSERT en `core.modulos` + backfill de permisos.
+    // Ver BSOP/CLAUDE.md → "Reglas DB" → "Liberación de módulo nuevo".
+  });
+
+  it('there are no duplicate slugs in ROUTE_TO_MODULE', () => {
+    const values = Object.values(ROUTE_TO_MODULE);
+    const unique = new Set(values);
+    expect(values.length).toBe(unique.size);
+  });
+});
+
 // ── Supabase-coupled fetchers ─────────────────────────────────────────────
 
 /**

@@ -3,7 +3,7 @@
 **Slug:** `modulos-catalog`
 **Empresas:** todas (catálogo es cross-empresa por construcción)
 **Schemas afectados:** core (`core.modulos`)
-**Estado:** planned
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-28
 **Última actualización:** 2026-04-28
@@ -206,4 +206,24 @@ _(append-only, escrita por Claude Code al ejecutar)_
 
 - **2026-04-28** — Iniciativa promovida directo a `planned` con
   alcance v1 cerrado en conversación con Beto tras cierre de
-  `sidebar-taxonomia`. Doc creado + fila en `INITIATIVES.md`.
+  `sidebar-taxonomia`. Doc creado + fila en `INITIATIVES.md`. PR
+  #281 mergeado.
+- **2026-04-28 — Sprint 1 completo.** Migración
+  `20260428220000_modulos_add_seccion.sql` aplicada en producción
+  (22 rows backfilled — todos cayeron en una de las 6 secciones
+  canónicas). Columna `core.modulos.seccion text NOT NULL` con CHECK
+  constraint. Type `Modulo` extendido con `ModuloSeccion`. UI de
+  Settings → Roles agrupada por secciones (mismo orden + labels que
+  sidebar). PR #282 mergeado, SCHEMA_REF regenerado.
+- **2026-04-28 — Sprint 2 PR abierto.** Migración
+  `20260428230000_modulos_dilesa_inmobiliario.sql` con INSERT de
+  los 4 módulos faltantes (`dilesa.terrenos`, `dilesa.prototipos`,
+  `dilesa.anteproyectos`, `dilesa.proyectos`) en sección
+  `operaciones` + backfill defensivo de `core.permisos_rol` con
+  read+write para cada rol existente en DILESA. `ROUTE_TO_MODULE`
+  actualizado con los 4 slugs. Test `ROUTE_TO_MODULE ↔ core.modulos
+sync` agregado en `lib/permissions.test.ts` con
+  `EXPECTED_DB_MODULE_SLUGS` como lista canónica. Regla "Liberación
+  de módulo nuevo (RBAC sync)" documentada en `BSOP/CLAUDE.md`
+  sección "Reglas DB" listando los 4 lugares a tocar y la plantilla
+  de la migración.

@@ -33,6 +33,12 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   '/dilesa/rh/puestos': 'dilesa.rh.puestos',
   '/dilesa/rh/departamentos': 'dilesa.rh.departamentos',
   '/dilesa/proveedores': 'dilesa.proveedores',
+  // DILESA Inmobiliario (módulos agregados en Sprint 2 de `modulos-catalog`,
+  // migración 20260428230000_modulos_dilesa_inmobiliario.sql)
+  '/dilesa/terrenos': 'dilesa.terrenos',
+  '/dilesa/prototipos': 'dilesa.prototipos',
+  '/dilesa/anteproyectos': 'dilesa.anteproyectos',
+  '/dilesa/proyectos': 'dilesa.proyectos',
 
   // RDB — home + operaciones
   '/rdb': 'rdb.home',
