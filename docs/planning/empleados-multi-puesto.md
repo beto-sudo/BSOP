@@ -3,10 +3,10 @@
 **Slug:** `empleados-multi-puesto`
 **Empresas:** todas
 **Schemas afectados:** `erp` (nueva tabla `empleados_puestos`, refactor de `v_empleados_full`, posible deprecación de `empleados.puesto_id`) + UI (rename módulo "Empleados" → "Personal" en sidebar/URL/detalle/listado)
-**Estado:** proposed
+**Estado:** in_progress (Sprint 1 cerrado, Sprint 2 siguiente)
 **Dueño:** Beto
 **Creada:** 2026-04-27
-**Última actualización:** 2026-04-27
+**Última actualización:** 2026-04-27 (Sprint 1 entregado: tabla `erp.empleados_puestos` + backfill 1:1 (202 empleados) + refactor de `v_empleados_full` con `puestos` jsonb array + ADR-013. Backwards compatible — columnas escalares `puesto_id`/`puesto` preservadas con COALESCE.)
 
 ## Problema
 
@@ -76,12 +76,37 @@ Además, el listado ya no es solo "empleados operativos": incluye accionistas y 
 
 ## Sprints / hitos
 
-_(se llena cuando arranque ejecución, vía Claude Code)_
+| #   | Scope                                                                                                                                                                                                                          | Estado                                                                           | PR        |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- | --------- |
+| 0   | Cleanup operativo: borrar duplicados extras de Beto/Alejandra/Michelle en RDB                                                                                                                                                  | n/a — ya estaba limpio al verificar (3 filas, una por persona, todas Accionista) | —         |
+| 1   | DB: tabla `erp.empleados_puestos` + backfill + refactor de `v_empleados_full` + ADR-013                                                                                                                                        | done 2026-04-27                                                                  | _este PR_ |
+| 2   | Backend: refactorizar todos los reads directos a `empleados.puesto_id` para que usen la vista o la tabla N:M; actualizar `empleado-alta-wizard.tsx` para escribir a `empleados_puestos`                                        | pending                                                                          | —         |
+| 3   | UI Personal: rename sidebar "Empleados → Personal", URL `/<empresa>/rh/empleados` → `/<empresa>/rh/personal` con redirect 301, listado multi-puesto sin duplicar persona, detalle add/remove puestos, wizard alta multi-select | pending                                                                          | —         |
+| 4   | Cleanup datos final: agregar Comité Ejecutivo + Consejo de Administración como puestos secundarios para Beto/Alejandra/Michelle en RDB y DILESA                                                                                | pending                                                                          | —         |
 
 ## Decisiones registradas
 
-_(append-only, fechadas — escrito por Claude Code)_
+### 2026-04-27 — Decisiones cerradas durante Sprint 1 (ver ADR-013)
+
+- **`empresa_id` denormalizado en `empleados_puestos`** para alinear con el patrón RLS existente (`core.fn_has_empresa(empresa_id)`). Coherencia validada por trigger BEFORE INSERT/UPDATE.
+- **`empleados.puesto_id` no se deprecia en Sprint 1** — queda como columna escalar nullable. La vista hace `COALESCE(pu_principal, pu_legacy)` para no romper consumidores. Sprint 2 migra los reads y se considera drop como follow-up post-iniciativa.
+- **`puestos` como `jsonb` array** en `v_empleados_full`, ordenado con principal primero. Cada elemento `{puesto_id, nombre, principal, fecha_inicio, fecha_fin}`.
+- **`fecha_fin IS NULL` = vigente.** No se fuerza append-only; se permite UPDATE/DELETE directo. La columna existe para soportar histórico futuro sin migración.
+- **Validación cross-empresa por trigger**, no por CHECK constraint (Postgres no permite leer otras tablas en CHECK). Patrón consistente con el resto del repo.
+
+### 2026-04-27 — Decisiones tomadas por Beto al arrancar la iniciativa
+
+- **Sprint 0 no se ejecuta** — el cleanup operativo ya estaba hecho (los 3 operadores aparecen una sola vez en RDB con puesto Accionista).
+- **Rename de URL confirmado**: `/<empresa>/rh/empleados` pasa a `/<empresa>/rh/personal` con redirect 301 desde la ruta vieja (Sprint 3).
+- **Orden vs Roadmap UI**: la iniciativa avanza en paralelo a `shared-modules-refactor`. No compite porque Sprint 1+2 son DB/backend y Sprint 3 es UI específica de RH (no patrón cross-cutting).
 
 ## Bitácora
 
-_(append-only, escrita por Claude Code al ejecutar)_
+### 2026-04-27 — Sprint 1 (DB) entregado
+
+- Migración `supabase/migrations/20260427150000_empleados_multi_puesto_modelo.sql` aplicada en prod vía Supabase MCP.
+- Backfill verificado: **202 empleados con `puesto_id` → 202 filas en `empleados_puestos`** (todas `principal = true`). Match 1:1.
+- Vista `v_empleados_full` recreada con columna nueva `puestos` (jsonb array). Backwards compatible — `puesto_id`/`puesto` escalares siguen llenos.
+- Verificación funcional: query a la vista para Beto/Alejandra/Michelle en RDB devuelve `puesto = "Accionista"` y `puestos = [{nombre: "Accionista", principal: true, ...}]`. ✅
+- `supabase/SCHEMA_REF.md` y `types/supabase.ts` regenerados.
+- ADR-013 documenta D1-D7 (denormalización, partial unique, fecha_fin semántica, no-deprecación de `puesto_id`, jsonb format, trigger validación, backfill idempotente).
