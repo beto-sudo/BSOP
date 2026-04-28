@@ -1,7 +1,7 @@
 'use client';
 
 import { RequireAccess } from '@/components/require-access';
-import { EmpleadosModule } from '@/components/rh/empleados-module';
+import { EmpleadosModule } from '@/components/rh/personal-module';
 
 export default function Page() {
   return (
@@ -9,7 +9,7 @@ export default function Page() {
       <EmpleadosModule
         scope="user-empresas"
         empresaSlug=""
-        title="Empleados"
+        title="Personal"
         createVariant="dialog"
       />
     </RequireAccess>

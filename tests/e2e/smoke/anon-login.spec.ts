@@ -46,7 +46,7 @@ test.describe('Unauthenticated access to protected routes', () => {
   const PROTECTED_ROUTES = [
     '/rdb/ventas',
     '/rdb/cortes',
-    '/rh/empleados',
+    '/rh/personal',
     '/settings/acceso',
     '/inicio/tasks',
   ];

@@ -359,7 +359,7 @@ function EmpleadoDetailInner() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => router.push(`/${EMPRESA_SLUG}/rh/empleados`)}
+            onClick={() => router.push(`/${EMPRESA_SLUG}/rh/personal`)}
             className="rounded-xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]"
           >
             <ArrowLeft className="h-4 w-4" />

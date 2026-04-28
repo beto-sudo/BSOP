@@ -45,15 +45,15 @@ const ROUTES: RhRoute[] = [
   // BSOP default
   { empresa: 'BSOP', recurso: 'departamentos', path: '/rh/departamentos' },
   { empresa: 'BSOP', recurso: 'puestos', path: '/rh/puestos' },
-  { empresa: 'BSOP', recurso: 'empleados', path: '/rh/empleados' },
+  { empresa: 'BSOP', recurso: 'empleados', path: '/rh/personal' },
   // RDB
   { empresa: 'RDB', recurso: 'departamentos', path: '/rdb/rh/departamentos' },
   { empresa: 'RDB', recurso: 'puestos', path: '/rdb/rh/puestos' },
-  { empresa: 'RDB', recurso: 'empleados', path: '/rdb/rh/empleados' },
+  { empresa: 'RDB', recurso: 'empleados', path: '/rdb/rh/personal' },
   // DILESA
   { empresa: 'DILESA', recurso: 'departamentos', path: '/dilesa/rh/departamentos' },
   { empresa: 'DILESA', recurso: 'puestos', path: '/dilesa/rh/puestos' },
-  { empresa: 'DILESA', recurso: 'empleados', path: '/dilesa/rh/empleados' },
+  { empresa: 'DILESA', recurso: 'empleados', path: '/dilesa/rh/personal' },
 ];
 
 // ── Helpers ─────────────────────────────────────────────────────────────────

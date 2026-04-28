@@ -679,7 +679,7 @@ function EmpleadoDetailInner() {
     }
     setShowBajaDialog(false);
     if (generarFiniquito) {
-      router.push(`/${EMPRESA_SLUG}/rh/empleados/${empleado.id}/finiquito`);
+      router.push(`/${EMPRESA_SLUG}/rh/personal/${empleado.id}/finiquito`);
       return;
     }
     await fetchAll();
@@ -719,7 +719,7 @@ function EmpleadoDetailInner() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => router.push(`/${EMPRESA_SLUG}/rh/empleados`)}
+            onClick={() => router.push(`/${EMPRESA_SLUG}/rh/personal`)}
             className="rounded-xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -767,7 +767,7 @@ function EmpleadoDetailInner() {
           <div className="flex items-center gap-2 shrink-0">
             <Button
               variant="outline"
-              onClick={() => router.push(`/${EMPRESA_SLUG}/rh/empleados/${empleado.id}/contrato`)}
+              onClick={() => router.push(`/${EMPRESA_SLUG}/rh/personal/${empleado.id}/contrato`)}
               className="gap-1.5 rounded-xl border-[var(--border)] text-[var(--text)]"
               title="Generar contrato individual de trabajo"
             >
@@ -776,9 +776,7 @@ function EmpleadoDetailInner() {
             {isBaja && (
               <Button
                 variant="outline"
-                onClick={() =>
-                  router.push(`/${EMPRESA_SLUG}/rh/empleados/${empleado.id}/finiquito`)
-                }
+                onClick={() => router.push(`/${EMPRESA_SLUG}/rh/personal/${empleado.id}/finiquito`)}
                 className="gap-1.5 rounded-xl border-[var(--border)] text-[var(--text)]"
                 title="Generar convenio de terminación y finiquito"
               >

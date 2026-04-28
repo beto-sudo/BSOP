@@ -78,6 +78,28 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async redirects() {
+    // Sprint 3 de empleados-multi-puesto: el módulo "Empleados" se renombra a
+    // "Personal" en sidebar/URL. Redirects 301 permanentes para no romper
+    // deep-links viejos (bookmarks, links pegados en docs/Slack, etc.).
+    return [
+      {
+        source: '/dilesa/rh/empleados/:path*',
+        destination: '/dilesa/rh/personal/:path*',
+        permanent: true,
+      },
+      {
+        source: '/rdb/rh/empleados/:path*',
+        destination: '/rdb/rh/personal/:path*',
+        permanent: true,
+      },
+      {
+        source: '/rh/empleados/:path*',
+        destination: '/rh/personal/:path*',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
