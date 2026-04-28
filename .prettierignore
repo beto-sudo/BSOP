@@ -21,6 +21,7 @@ test-results/
 
 # Supabase generated files
 supabase/functions/_shared/
+supabase/SCHEMA_REF.md
 types/supabase.ts
 
 # Lock files
