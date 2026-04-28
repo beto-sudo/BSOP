@@ -3,7 +3,7 @@
 **Slug:** `sidebar-taxonomia`
 **Empresas:** RDB, DILESA (alcance v1). ANSA, COAGAN y Nigropetense quedan fuera hasta que tengan más módulos vivos.
 **Schemas afectados:** n/a (UI / shell)
-**Estado:** planned
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-28
 **Última actualización:** 2026-04-28
@@ -254,4 +254,20 @@ _(append-only, escrita por Claude Code al ejecutar)_
 
 - **2026-04-28** — Iniciativa promovida a `planned` con alcance v1
   cerrado entre Beto y CC en conversación. Doc creado + fila en
-  `INITIATIVES.md`.
+  `INITIATIVES.md`. PR #273 mergeado.
+- **2026-04-28 — Sprint 1 completo.** Refactor estructural del shape
+  de `NAV_ITEMS` (flat con `divider: true` → grupos `{ label, children[] }`
+  agrupados en `sections`). Helpers nuevos `hasNavSubItems` y
+  `flattenNavChildren`; `getActiveSection` adaptado. Render del
+  sidebar: extraído componente local `<NavSubItems>` con variant
+  `expanded` / `floating` que renderiza tanto items con `sections`
+  (DILESA, RDB) como con `children` flat (SANREN, Settings,
+  Personas Físicas). Filtrado por permisos preservado y reforzado:
+  ahora también colapsa secciones cuyos `children` quedan en cero
+  post-filtro de `canAccessModulo`. Taxonomía visible NO cambia en
+  este sprint — mismas 4 secciones DILESA + 3 RDB que antes. 18
+  tests nuevos en `components/app-shell/__tests__/nav-config.test.ts`
+  cubriendo helpers, invariantes de taxonomía (sections y children
+  mutuamente exclusivos, ninguna sección vacía en definición),
+  `isItemActive` con `matchPaths`. Próximo: Sprint 2 (re-taxonomizar
+  RDB + DILESA con las 5 secciones v1 + ADR-014).
