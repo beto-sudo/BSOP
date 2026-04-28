@@ -34,6 +34,7 @@ import {
   ensurePdfFitsForClaude,
   embedContent,
   extractWithClaude,
+  extraccionToDocumentoUpdates,
   MODELO_CLAUDE,
 } from '@/lib/documentos/extraction-core';
 import {
@@ -186,25 +187,16 @@ export async function POST(_req: NextRequest, { params }: Params) {
       numero: extraccion.numero_documento,
     });
 
+    // `extraccionToDocumentoUpdates` aplana `predio.*` a columnas top-level
+    // y normaliza "" → null y 0 → null para `superficie_m2`. El sync_trigger
+    // de core.empresa_documentos depende de `null = ausente` en
+    // `subtipo_meta`. Centralizado en lib/documentos/extraction-core.ts para
+    // que API route y script batch no diverjan.
+    const documentoUpdates = extraccionToDocumentoUpdates(extraccion);
+
     const updates: Record<string, unknown> = {
-      descripcion: extraccion.descripcion,
-      contenido_texto: extraccion.contenido_texto,
+      ...documentoUpdates,
       contenido_embedding: embedding,
-      tipo_operacion: extraccion.tipo_operacion,
-      monto: extraccion.monto,
-      moneda: extraccion.moneda,
-      superficie_m2: extraccion.superficie_m2,
-      ubicacion_predio: extraccion.ubicacion_predio,
-      municipio: extraccion.municipio,
-      estado: extraccion.estado,
-      folio_real: extraccion.folio_real,
-      libro_tomo: extraccion.libro_tomo,
-      partes: extraccion.partes,
-      // subtipo_meta: solo se llena si el doc es escritura/poder/acta. Para
-      // otros tipos (factura, contrato laboral, comprobante) la IA pone null.
-      // Consumido por el sync_trigger de core.empresa_documentos para llenar
-      // el caché jsonb en core.empresas.escritura_*.
-      subtipo_meta: extraccion.subtipo_meta,
       extraccion_status: 'completado',
       extraccion_fecha: new Date().toISOString(),
       extraccion_modelo: MODELO_CLAUDE,
@@ -212,8 +204,10 @@ export async function POST(_req: NextRequest, { params }: Params) {
       updated_at: new Date().toISOString(),
     };
 
-    if (extraccion.fecha_emision) updates.fecha_emision = extraccion.fecha_emision;
-    if (extraccion.numero_documento) updates.numero_documento = extraccion.numero_documento;
+    // `fecha_emision` y `numero_documento` solo se sobrescriben si la IA los
+    // determinó (no null) — preservamos el valor humano si existía.
+    if (!documentoUpdates.fecha_emision) delete updates.fecha_emision;
+    if (!documentoUpdates.numero_documento) delete updates.numero_documento;
     // Solo sobrescribimos el título si podemos generar uno estándar nuevo y
     // el actual no está ya en formato estándar (respetamos ediciones humanas).
     const titleIsStandard = isStandardTitulo(docRow.titulo);
