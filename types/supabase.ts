@@ -272,6 +272,7 @@ export type Database = {
           empresa_id: string
           id: string
           nombre: string
+          seccion: string
           slug: string
         }
         Insert: {
@@ -279,6 +280,7 @@ export type Database = {
           empresa_id: string
           id?: string
           nombre: string
+          seccion: string
           slug: string
         }
         Update: {
@@ -286,6 +288,7 @@ export type Database = {
           empresa_id?: string
           id?: string
           nombre?: string
+          seccion?: string
           slug?: string
         }
         Relationships: [

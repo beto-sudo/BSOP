@@ -84,7 +84,11 @@ export default async function AccesoPage() {
     { data: excepciones },
   ] = await Promise.all([
     admin.schema('core').from('empresas').select('id, nombre, slug').order('nombre'),
-    admin.schema('core').from('modulos').select('id, slug, nombre, empresa_id').order('nombre'),
+    admin
+      .schema('core')
+      .from('modulos')
+      .select('id, slug, nombre, empresa_id, seccion')
+      .order('nombre'),
     admin.schema('core').from('roles').select('id, nombre, empresa_id').order('nombre'),
     admin
       .schema('core')

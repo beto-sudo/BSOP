@@ -16,7 +16,7 @@
  * a permanent exception.
  */
 
-import { type ReactNode, useState, useTransition } from 'react';
+import { Fragment, type ReactNode, useState, useTransition } from 'react';
 import { usePermissions } from '@/components/providers';
 import {
   Building2,
@@ -61,6 +61,7 @@ import type {
   Empresa,
   ExcepcionUsuario,
   Modulo,
+  ModuloSeccion,
   PermisoRol,
   RolRecord,
   UsuarioCore,
@@ -121,6 +122,43 @@ function slugify(str: string): string {
 
 function modulosParaEmpresa(modulos: Modulo[], empresaId: string): Modulo[] {
   return modulos.filter((m) => m.empresa_id === empresaId);
+}
+
+/**
+ * Orden y labels de las secciones — espejo del sidebar (ADR-014).
+ * `sistema` va al final como catch-all para módulos transversales.
+ */
+const SECCION_ORDER: readonly ModuloSeccion[] = [
+  'administracion',
+  'rh',
+  'compras',
+  'inventario',
+  'operaciones',
+  'sistema',
+] as const;
+
+const SECCION_LABELS: Record<ModuloSeccion, string> = {
+  administracion: 'Administración',
+  rh: 'Recursos Humanos',
+  compras: 'Compras',
+  inventario: 'Inventario',
+  operaciones: 'Operaciones',
+  sistema: 'Sistema',
+};
+
+/**
+ * Agrupa módulos por sección en el orden canónico, devolviendo solo
+ * grupos no vacíos. Dentro de cada grupo, los módulos preservan el
+ * orden de entrada (que viene alfabético desde el query del page).
+ */
+function groupModulosBySeccion(
+  modulos: Modulo[]
+): Array<{ seccion: ModuloSeccion; label: string; modulos: Modulo[] }> {
+  return SECCION_ORDER.map((seccion) => ({
+    seccion,
+    label: SECCION_LABELS[seccion],
+    modulos: modulos.filter((m) => m.seccion === seccion),
+  })).filter((g) => g.modulos.length > 0);
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -487,55 +525,67 @@ export function AccesoClient({
                           </TableCell>
                         </TableRow>
                       ) : (
-                        modulosDelRol.map((mod) => {
-                          const perm = getPermisoRol(selectedRol.id, mod.id);
-                          return (
-                            <TableRow
-                              key={mod.id}
-                              className="border-[var(--border)] dark:hover:bg-white/3 hover:bg-black/2"
-                            >
-                              <TableCell className="text-sm dark:text-white/80 text-[var(--text)]/80">
-                                {mod.nombre}
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <input
-                                  type="checkbox"
-                                  disabled={isPending}
-                                  checked={perm?.acceso_lectura ?? false}
-                                  onChange={(e) => {
-                                    run(() =>
-                                      upsertPermisoRol(
-                                        selectedRol.id,
-                                        mod.id,
-                                        e.target.checked,
-                                        perm?.acceso_escritura ?? false
-                                      )
-                                    );
-                                  }}
-                                  className="h-4 w-4 cursor-pointer rounded accent-[var(--accent)]"
-                                />
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <input
-                                  type="checkbox"
-                                  disabled={isPending}
-                                  checked={perm?.acceso_escritura ?? false}
-                                  onChange={(e) => {
-                                    run(() =>
-                                      upsertPermisoRol(
-                                        selectedRol.id,
-                                        mod.id,
-                                        perm?.acceso_lectura ?? false,
-                                        e.target.checked
-                                      )
-                                    );
-                                  }}
-                                  className="h-4 w-4 cursor-pointer rounded accent-[var(--accent)]"
-                                />
+                        groupModulosBySeccion(modulosDelRol).map((grupo) => (
+                          <Fragment key={grupo.seccion}>
+                            <TableRow className="border-[var(--border)] dark:hover:bg-transparent hover:bg-transparent">
+                              <TableCell
+                                colSpan={3}
+                                className="px-4 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] dark:text-white/35 text-[var(--text-subtle)]"
+                              >
+                                {grupo.label}
                               </TableCell>
                             </TableRow>
-                          );
-                        })
+                            {grupo.modulos.map((mod) => {
+                              const perm = getPermisoRol(selectedRol.id, mod.id);
+                              return (
+                                <TableRow
+                                  key={mod.id}
+                                  className="border-[var(--border)] dark:hover:bg-white/3 hover:bg-black/2"
+                                >
+                                  <TableCell className="text-sm dark:text-white/80 text-[var(--text)]/80">
+                                    {mod.nombre}
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <input
+                                      type="checkbox"
+                                      disabled={isPending}
+                                      checked={perm?.acceso_lectura ?? false}
+                                      onChange={(e) => {
+                                        run(() =>
+                                          upsertPermisoRol(
+                                            selectedRol.id,
+                                            mod.id,
+                                            e.target.checked,
+                                            perm?.acceso_escritura ?? false
+                                          )
+                                        );
+                                      }}
+                                      className="h-4 w-4 cursor-pointer rounded accent-[var(--accent)]"
+                                    />
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <input
+                                      type="checkbox"
+                                      disabled={isPending}
+                                      checked={perm?.acceso_escritura ?? false}
+                                      onChange={(e) => {
+                                        run(() =>
+                                          upsertPermisoRol(
+                                            selectedRol.id,
+                                            mod.id,
+                                            perm?.acceso_lectura ?? false,
+                                            e.target.checked
+                                          )
+                                        );
+                                      }}
+                                      className="h-4 w-4 cursor-pointer rounded accent-[var(--accent)]"
+                                    />
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </Fragment>
+                        ))
                       )}
                     </TableBody>
                   </Table>
