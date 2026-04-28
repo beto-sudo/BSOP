@@ -32,7 +32,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Combobox } from '@/components/ui/combobox';
-import { AlertTriangle, CalendarDays, RefreshCw, Search, Send, Truck } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
+import { useActionFeedback } from '@/hooks/use-action-feedback';
+import { AlertTriangle, CalendarDays, Lock, RefreshCw, Search, Send, Truck, X } from 'lucide-react';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -51,8 +54,11 @@ type OrdenCompraItem = {
   descripcion: string | null;
   cantidad: number | null;
   cantidad_recibida: number | null;
+  cantidad_cancelada: number | null;
   precio_unitario: number | null;
+  precio_real: number | null;
   subtotal: number | null;
+  motivo_cancelacion: string | null;
 };
 
 type OrdenCompra = {
@@ -63,6 +69,8 @@ type OrdenCompra = {
   estatus: string | null;
   total_estimado: number | null;
   total_real: number | null;
+  total_a_pagar: number | null;
+  cerrada_at: string | null;
   fecha_emision: string | null;
   notas: string | null;
   proveedor?: Proveedor | Proveedor[] | null;
@@ -187,11 +195,14 @@ function getRequisicionFolio(req: OrdenCompra['requisicion']) {
 
 function getEstatusLabel(estatus: string | null, proveedorId: string | null) {
   const s = (estatus ?? '').toLowerCase();
-  if (s === 'abierta') return proveedorId ? 'Lista' : 'Sin proveedor';
+  if (s === 'borrador') return proveedorId ? 'Lista' : 'Sin proveedor';
   if (s === 'enviada') return 'Enviada';
   if (s === 'parcial') return 'Recepción parcial';
-  if (s === 'recibida') return 'Recibida';
+  if (s === 'cerrada') return 'Cerrada';
   if (s === 'cancelada') return 'Cancelada';
+  // Legacy values (pre-Sprint-1 backfill): tratar como borrador
+  if (s === 'abierta') return proveedorId ? 'Lista' : 'Sin proveedor';
+  if (s === 'recibida') return 'Cerrada';
   return estatus ?? 'Sin estatus';
 }
 
@@ -200,23 +211,36 @@ function getBadgeVariant(
   proveedorId: string | null
 ): 'default' | 'secondary' | 'destructive' | 'outline' {
   const s = (estatus ?? '').toLowerCase();
-  if (s === 'recibida') return 'default';
-  if (s === 'enviada') return 'secondary';
+  if (s === 'cerrada' || s === 'recibida') return 'default';
+  if (s === 'enviada' || s === 'parcial') return 'secondary';
   if (s === 'cancelada') return 'destructive';
-  if (s === 'abierta') return proveedorId ? 'secondary' : 'outline';
+  if (s === 'borrador' || s === 'abierta') return proveedorId ? 'secondary' : 'outline';
   return 'outline';
+}
+
+function isOcTerminal(estatus: string | null) {
+  const s = (estatus ?? '').toLowerCase();
+  return s === 'cerrada' || s === 'cancelada' || s === 'recibida';
+}
+
+function isOcEditable(estatus: string | null) {
+  const s = (estatus ?? '').toLowerCase();
+  return s === 'borrador' || s === 'abierta';
+}
+
+function isOcReceiving(estatus: string | null) {
+  const s = (estatus ?? '').toLowerCase();
+  return s === 'enviada' || s === 'parcial';
 }
 
 // ── Summary Bar ───────────────────────────────────────────────────────────────
 
 function SummaryBar({ ordenes }: { ordenes: OrdenCompra[] }) {
-  const sinProveedor = ordenes.filter(
-    (o) => (o.estatus ?? '').toLowerCase() === 'abierta' && !o.proveedor_id
-  ).length;
+  const sinProveedor = ordenes.filter((o) => isOcEditable(o.estatus) && !o.proveedor_id).length;
 
   const activas = ordenes.filter((o) => {
     const s = (o.estatus ?? '').toLowerCase();
-    return ['enviada', 'parcial', 'abierta'].includes(s);
+    return ['enviada', 'parcial', 'borrador', 'abierta'].includes(s);
   }).length;
 
   const total = ordenes.reduce((acc, o) => acc + (o.total_real ?? o.total_estimado ?? 0), 0);
@@ -274,6 +298,8 @@ function OrdenDetail({
   onReceiveAll,
   onAsignarProveedor,
   onMarcarEnviada,
+  onCancelarLinea,
+  onCerrarOrden,
 }: {
   orden: OrdenCompra | null;
   proveedores: Proveedor[];
@@ -288,26 +314,38 @@ function OrdenDetail({
   onReceiveAll: () => Promise<void>;
   onAsignarProveedor: (proveedorId: string) => Promise<void>;
   onMarcarEnviada: () => Promise<void>;
+  onCancelarLinea: (itemId: string, motivo: string) => Promise<void>;
+  onCerrarOrden: (motivo: string) => Promise<void>;
 }) {
   const [selectedProveedorId, setSelectedProveedorId] = useState<string>('');
+  const [cancelLineState, setCancelLineState] = useState<{
+    itemId: string;
+    motivo: string;
+  } | null>(null);
+  const [cerrarState, setCerrarState] = useState<{ motivo: string } | null>(null);
 
   useEffect(() => {
     setSelectedProveedorId(orden?.proveedor_id ?? '');
   }, [orden?.id, orden?.proveedor_id]);
 
   const items = orden?.items ?? [];
-  const isAbierta = (orden?.estatus ?? '').toLowerCase() === 'abierta';
-  const isRecibida = (orden?.estatus ?? '').toLowerCase() === 'recibida';
-  const isCancelada = (orden?.estatus ?? '').toLowerCase() === 'cancelada';
-  const canReceive = !isAbierta && !isRecibida && !isCancelada;
+  const editable = isOcEditable(orden?.estatus ?? null);
+  const terminal = isOcTerminal(orden?.estatus ?? null);
+  const receiving = isOcReceiving(orden?.estatus ?? null);
 
   const proveedorObj = getProveedorObj(orden?.proveedor ?? null);
   const reqFolio = getRequisicionFolio(orden?.requisicion ?? null);
 
-  const hasPendingItems = items.some((item) => {
+  const linesPending = items.filter((item) => {
     const pedida = item.cantidad ?? 0;
-    const recibida = Number(editedReceipts[item.id] ?? item.cantidad_recibida ?? 0);
-    return recibida < pedida;
+    const cancelada = item.cantidad_cancelada ?? 0;
+    const recibidaEdit = Number(editedReceipts[item.id] ?? item.cantidad_recibida ?? 0);
+    return recibidaEdit + cancelada < pedida;
+  });
+  const hasUnsavedReceipts = items.some((item) => {
+    const stored = item.cantidad_recibida ?? 0;
+    const edit = Number(editedReceipts[item.id] ?? stored);
+    return edit !== stored;
   });
 
   const printTotal = items.reduce((acc, item) => {
@@ -411,8 +449,8 @@ function OrdenDetail({
               </div>
             </div>
 
-            {/* ── Provider assignment (abierta only) ── */}
-            {isAbierta && (
+            {/* ── Provider assignment (editable only) ── */}
+            {editable && (
               <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/40 p-4 print:hidden">
                 <div className="flex items-center gap-2 text-sm font-semibold">
                   <Truck className="h-4 w-4 text-amber-600" />
@@ -443,6 +481,23 @@ function OrdenDetail({
               </div>
             )}
 
+            {terminal && (
+              <div className="flex items-start gap-2 rounded-xl border bg-muted/30 p-4 text-sm print:hidden">
+                <Lock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <div>
+                  <div className="font-medium">
+                    OC {orden?.estatus === 'cancelada' ? 'cancelada' : 'cerrada'}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    No se pueden registrar más recepciones ni cancelaciones. Total a pagar:{' '}
+                    <span className="font-medium text-foreground">
+                      {formatCurrency(orden?.total_a_pagar ?? 0)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <Separator className="print:hidden" />
 
             {/* ═══ Items (both screen and print) ═══ */}
@@ -466,9 +521,9 @@ function OrdenDetail({
                       <TableRow className="print:bg-gray-100">
                         <TableHead className="print:font-bold print:text-black">Artículo</TableHead>
                         <TableHead className="text-right print:font-bold print:text-black">
-                          Cant.
+                          Pedida
                         </TableHead>
-                        {isAbierta ? (
+                        {editable ? (
                           <TableHead className="text-right print:font-bold print:text-black">
                             P. Unitario
                           </TableHead>
@@ -476,6 +531,9 @@ function OrdenDetail({
                           <>
                             <TableHead className="text-right print:font-bold print:text-black">
                               Recibida
+                            </TableHead>
+                            <TableHead className="text-right print:font-bold print:text-black print:hidden">
+                              Pendiente
                             </TableHead>
                             <TableHead className="text-right print:font-bold print:text-black">
                               P. Unitario
@@ -490,26 +548,35 @@ function OrdenDetail({
                     <TableBody>
                       {items.map((item) => {
                         const max = item.cantidad ?? 0;
-                        const recValue =
-                          editedReceipts[item.id] ?? String(item.cantidad_recibida ?? 0);
+                        const cancelada = item.cantidad_cancelada ?? 0;
+                        const recibidaStored = item.cantidad_recibida ?? 0;
+                        const recValue = editedReceipts[item.id] ?? String(recibidaStored);
+                        const recibidaNum = Number(recValue) || 0;
+                        const pendiente = Math.max(max - recibidaNum - cancelada, 0);
                         const priceValue =
                           editedPrices[item.id] ?? String(item.precio_unitario ?? '');
                         const priceNum = parseFloat(priceValue) || 0;
-                        const displaySubtotal = isAbierta ? max * priceNum : (item.subtotal ?? 0);
+                        const displaySubtotal = editable ? max * priceNum : (item.subtotal ?? 0);
+                        const recvMax = max - cancelada;
                         return (
                           <TableRow key={item.id} className="print:border-b-gray-300">
                             <TableCell className="print:py-1">
                               <div className="font-medium print:text-black">
                                 {item.descripcion ?? 'Sin descripción'}
                               </div>
+                              {cancelada > 0 && (
+                                <div className="mt-0.5 text-xs text-destructive print:hidden">
+                                  {cancelada} cancelada
+                                  {item.motivo_cancelacion ? ` · ${item.motivo_cancelacion}` : ''}
+                                </div>
+                              )}
                             </TableCell>
                             <TableCell className="text-right tabular-nums print:py-1 print:text-black">
                               {max}
                             </TableCell>
 
-                            {isAbierta ? (
+                            {editable ? (
                               <TableCell className="text-right print:py-1">
-                                {/* Screen: editable price input */}
                                 <div className="flex justify-end print:hidden">
                                   <Input
                                     type="number"
@@ -521,7 +588,6 @@ function OrdenDetail({
                                     placeholder="0.00"
                                   />
                                 </div>
-                                {/* Print: price */}
                                 <span className="hidden print:inline print:text-black">
                                   {priceNum > 0 ? formatCurrency(priceNum) : '—'}
                                 </span>
@@ -529,26 +595,48 @@ function OrdenDetail({
                             ) : (
                               <>
                                 <TableCell className="text-right print:py-1">
-                                  <div className="flex justify-end print:hidden">
+                                  <div className="flex items-center justify-end gap-1 print:hidden">
                                     <Input
                                       type="number"
                                       min="0"
-                                      max={String(max)}
+                                      max={String(recvMax)}
                                       step="1"
                                       value={recValue}
-                                      disabled={isRecibida}
+                                      disabled={terminal}
                                       onChange={(e) =>
-                                        onReceiveChange(item.id, e.target.value, max)
+                                        onReceiveChange(item.id, e.target.value, recvMax)
                                       }
-                                      className="w-24 text-right tabular-nums"
+                                      className="w-20 text-right tabular-nums"
                                     />
+                                    {!terminal && pendiente > 0 && (
+                                      <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                        onClick={() =>
+                                          setCancelLineState({ itemId: item.id, motivo: '' })
+                                        }
+                                        aria-label="Cancelar pendiente de esta línea"
+                                        title="Cancelar pendiente"
+                                      >
+                                        <X className="h-3.5 w-3.5" />
+                                      </Button>
+                                    )}
                                   </div>
                                   <span className="hidden print:inline print:text-black">
                                     {recValue}
                                   </span>
                                 </TableCell>
+                                <TableCell className="text-right tabular-nums print:py-1 print:hidden">
+                                  {pendiente > 0 ? (
+                                    <span className="text-amber-600">{pendiente}</span>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground/50">—</span>
+                                  )}
+                                </TableCell>
                                 <TableCell className="text-right tabular-nums text-muted-foreground print:py-1 print:text-black">
-                                  {formatCurrency(item.precio_unitario)}
+                                  {formatCurrency(item.precio_real ?? item.precio_unitario)}
                                 </TableCell>
                               </>
                             )}
@@ -604,7 +692,7 @@ function OrdenDetail({
 
         {/* ── Footer actions (screen only) ── */}
         <div className="space-y-3 border-t pt-4 print:hidden">
-          {isAbierta && orden?.proveedor_id && items.length > 0 && (
+          {editable && orden?.proveedor_id && items.length > 0 && (
             <div className="flex justify-end">
               <Button variant="outline" onClick={() => void onMarcarEnviada()} className="gap-2">
                 <Send className="h-4 w-4" />
@@ -612,17 +700,91 @@ function OrdenDetail({
               </Button>
             </div>
           )}
-          {canReceive && items.length > 0 && (
+          {receiving && items.length > 0 && (
             <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-              {hasPendingItems && (
-                <Button variant="outline" onClick={() => void onReceivePartial()}>
-                  Recibir Parcialmente
+              {linesPending.length > 0 && (
+                <Button
+                  variant="outline"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => setCerrarState({ motivo: '' })}
+                >
+                  Cerrar OC
                 </Button>
               )}
-              <Button onClick={() => void onReceiveAll()}>Recibir Todo</Button>
+              {hasUnsavedReceipts && (
+                <Button variant="outline" onClick={() => void onReceivePartial()}>
+                  Guardar recepciones
+                </Button>
+              )}
+              {linesPending.length > 0 && (
+                <Button onClick={() => void onReceiveAll()}>Recibir Todo</Button>
+              )}
             </div>
           )}
         </div>
+
+        {/* ── ConfirmDialog: Cancelar pendiente de línea ── */}
+        <ConfirmDialog
+          open={cancelLineState !== null}
+          onOpenChange={(o) => !o && setCancelLineState(null)}
+          onConfirm={async () => {
+            if (!cancelLineState) return;
+            await onCancelarLinea(cancelLineState.itemId, cancelLineState.motivo);
+            setCancelLineState(null);
+          }}
+          title="¿Cancelar pendiente de esta línea?"
+          description={
+            <div className="space-y-2">
+              <p>
+                El pendiente de esta partida se marcará como cancelado. La cantidad ya recibida no
+                se toca; solo el faltante deja de esperarse.
+              </p>
+              <Textarea
+                placeholder="Motivo (opcional)"
+                value={cancelLineState?.motivo ?? ''}
+                onChange={(e) =>
+                  setCancelLineState((prev) => (prev ? { ...prev, motivo: e.target.value } : prev))
+                }
+                rows={2}
+              />
+            </div>
+          }
+          confirmLabel="Cancelar pendiente"
+          confirmVariant="destructive"
+        />
+
+        {/* ── ConfirmDialog: Cerrar OC ── */}
+        <ConfirmDialog
+          open={cerrarState !== null}
+          onOpenChange={(o) => !o && setCerrarState(null)}
+          onConfirm={async () => {
+            if (!cerrarState) return;
+            await onCerrarOrden(cerrarState.motivo);
+            setCerrarState(null);
+          }}
+          title="¿Cerrar orden de compra?"
+          description={
+            <div className="space-y-2">
+              <p>
+                Se cancelará el pendiente de{' '}
+                <span className="font-medium">{linesPending.length}</span>{' '}
+                {linesPending.length === 1 ? 'partida' : 'partidas'} y la OC pasará a estado{' '}
+                <span className="font-medium">cerrada</span>. No se podrán registrar más
+                recepciones.
+              </p>
+              <Textarea
+                placeholder="Motivo del cierre (opcional)"
+                value={cerrarState?.motivo ?? ''}
+                onChange={(e) =>
+                  setCerrarState((prev) => (prev ? { ...prev, motivo: e.target.value } : prev))
+                }
+                rows={2}
+              />
+            </div>
+          }
+          confirmLabel="Cerrar OC"
+          confirmVariant="destructive"
+        />
       </SheetContent>
     </Sheet>
   );
@@ -631,6 +793,7 @@ function OrdenDetail({
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function OrdenesCompraPage() {
+  const feedback = useActionFeedback();
   const [ordenes, setOrdenes] = useState<OrdenCompra[]>([]);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -709,7 +872,7 @@ export default function OrdenesCompraPage() {
         .schema('erp')
         .from('ordenes_compra')
         .select(
-          'id, codigo, requisicion_id, proveedor_id, total, autorizada_at, created_at, proveedor:proveedores!proveedor_id(id, persona:personas!persona_id(nombre, apellido_paterno, apellido_materno, email, telefono, rfc)), requisicion:requisiciones!requisicion_id(codigo)'
+          'id, codigo, requisicion_id, proveedor_id, total, total_a_pagar, estado, autorizada_at, cerrada_at, created_at, proveedor:proveedores!proveedor_id(id, persona:personas!persona_id(nombre, apellido_paterno, apellido_materno, email, telefono, rfc)), requisicion:requisiciones!requisicion_id(codigo)'
         )
         .eq('empresa_id', RDB_EMPRESA_ID)
         .order('created_at', { ascending: false });
@@ -726,7 +889,10 @@ export default function OrdenesCompraPage() {
         requisicion_id: string | null;
         proveedor_id: string | null;
         total: number | null;
+        total_a_pagar: number | null;
+        estado: string | null;
         autorizada_at: string | null;
+        cerrada_at: string | null;
         created_at: string | null;
         proveedor: unknown;
         requisicion: unknown;
@@ -773,9 +939,11 @@ export default function OrdenesCompraPage() {
           folio: o.codigo ?? null,
           requisicion_id: o.requisicion_id ?? null,
           proveedor_id: o.proveedor_id ?? null,
-          estatus: o.autorizada_at ? 'enviada' : 'abierta',
+          estatus: o.estado ?? (o.autorizada_at ? 'enviada' : 'borrador'),
           total_estimado: o.total ?? null,
           total_real: o.total ?? null,
+          total_a_pagar: o.total_a_pagar ?? null,
+          cerrada_at: o.cerrada_at ?? null,
           fecha_emision: o.created_at ?? null,
           notas: null,
           proveedor,
@@ -838,17 +1006,16 @@ export default function OrdenesCompraPage() {
       const { data, error: itemsError } = await supabase
         .schema('erp')
         .from('ordenes_compra_detalle')
-        .select('id, descripcion, cantidad, precio_unitario, subtotal')
+        .select(
+          'id, descripcion, cantidad, cantidad_recibida, cantidad_cancelada, precio_unitario, precio_real, subtotal, motivo_cancelacion'
+        )
         .eq('empresa_id', RDB_EMPRESA_ID)
         .eq('orden_compra_id', orden.id)
         .order('descripcion');
 
       if (itemsError) throw itemsError;
 
-      const items = (data ?? []).map((item) => ({
-        ...item,
-        cantidad_recibida: null,
-      })) as OrdenCompraItem[];
+      const items = (data ?? []) as OrdenCompraItem[];
       const initialReceipts = items.reduce<Record<string, string>>((acc, item) => {
         acc[item.id] = String(item.cantidad_recibida ?? 0);
         return acc;
@@ -880,63 +1047,145 @@ export default function OrdenesCompraPage() {
     setEditedPrices((prev) => ({ ...prev, [itemId]: value }));
   }, []);
 
+  const refreshOrdenAfterMutation = useCallback(async (ordenId: string) => {
+    const supabase = createSupabaseBrowserClient();
+    const { data: oRaw } = await supabase
+      .schema('erp')
+      .from('ordenes_compra')
+      .select('estado, total_a_pagar, cerrada_at')
+      .eq('empresa_id', RDB_EMPRESA_ID)
+      .eq('id', ordenId)
+      .single();
+    const { data: itemsRaw } = await supabase
+      .schema('erp')
+      .from('ordenes_compra_detalle')
+      .select(
+        'id, descripcion, cantidad, cantidad_recibida, cantidad_cancelada, precio_unitario, precio_real, subtotal, motivo_cancelacion'
+      )
+      .eq('empresa_id', RDB_EMPRESA_ID)
+      .eq('orden_compra_id', ordenId)
+      .order('descripcion');
+
+    const items = (itemsRaw ?? []) as OrdenCompraItem[];
+    const nextEstado = oRaw?.estado ?? null;
+    const nextTotalAPagar = oRaw?.total_a_pagar ?? null;
+    const nextCerradaAt = oRaw?.cerrada_at ?? null;
+
+    setSelected((prev) =>
+      prev?.id === ordenId
+        ? {
+            ...prev,
+            estatus: nextEstado ?? prev.estatus,
+            total_a_pagar: nextTotalAPagar,
+            cerrada_at: nextCerradaAt,
+            items,
+          }
+        : prev
+    );
+    setOrdenes((prev) =>
+      prev.map((o) =>
+        o.id === ordenId
+          ? {
+              ...o,
+              estatus: nextEstado ?? o.estatus,
+              total_a_pagar: nextTotalAPagar,
+              cerrada_at: nextCerradaAt,
+            }
+          : o
+      )
+    );
+    setEditedReceipts(
+      items.reduce<Record<string, string>>((acc, item) => {
+        acc[item.id] = String(item.cantidad_recibida ?? 0);
+        return acc;
+      }, {})
+    );
+  }, []);
+
   const persistReception = useCallback(
     async (markAll: boolean) => {
-      if (!selected?.items?.length) return;
+      if (!selected?.items?.length || !selected.id) return;
       setSaving(true);
       setError(null);
       try {
         const supabase = createSupabaseBrowserClient();
-        const nextItems = selected.items.map((item) => {
-          const cantidadPedida = item.cantidad ?? 0;
-          const cantidadRecibida = markAll
-            ? cantidadPedida
-            : Math.min(
-                Math.max(Number(editedReceipts[item.id] ?? item.cantidad_recibida ?? 0), 0),
-                cantidadPedida
-              );
-          return { ...item, cantidad_recibida: cantidadRecibida };
-        });
-
-        const totalReal = nextItems.reduce(
-          (acc, item) => acc + (item.cantidad ?? 0) * (item.precio_unitario ?? 0),
-          0
-        );
-        const nextStatus = 'Recibida';
-
-        const { error: e2 } = await supabase
-          .schema('erp')
-          .from('ordenes_compra')
-          .update({ total: totalReal })
-          .eq('empresa_id', RDB_EMPRESA_ID)
-          .eq('id', selected.id);
-        if (e2) throw e2;
-
-        const updatedOrden: OrdenCompra = {
-          ...selected,
-          estatus: nextStatus,
-          total_real: totalReal,
-          items: nextItems,
-        };
-        setSelected(updatedOrden);
-        setOrdenes((prev) =>
-          prev.map((o) =>
-            o.id === updatedOrden.id ? { ...o, estatus: nextStatus, total_real: totalReal } : o
-          )
-        );
-        setEditedReceipts(
-          nextItems.reduce<Record<string, string>>((acc, item) => {
-            acc[item.id] = String(item.cantidad_recibida ?? 0);
-            return acc;
-          }, {})
-        );
+        for (const item of selected.items) {
+          const max = item.cantidad ?? 0;
+          const cancelada = item.cantidad_cancelada ?? 0;
+          const stored = item.cantidad_recibida ?? 0;
+          const target = markAll
+            ? max - cancelada
+            : Math.min(Math.max(Number(editedReceipts[item.id] ?? stored), 0), max - cancelada);
+          if (target === stored) continue;
+          const { error: rpcError } = await supabase.schema('erp').rpc('oc_recibir_linea', {
+            p_detalle_id: item.id,
+            p_cantidad_recibida_total: target,
+          });
+          if (rpcError) throw rpcError;
+        }
+        await refreshOrdenAfterMutation(selected.id);
+        feedback.success(markAll ? 'Recepción completa registrada' : 'Recepciones guardadas');
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'No pude guardar la recepción.');
+        const msg = err instanceof Error ? err.message : 'No pude guardar la recepción.';
+        setError(msg);
+        feedback.error(err instanceof Error ? err : new Error(msg));
       } finally {
         setSaving(false);
       }
     },
-    [editedReceipts, selected]
+    [editedReceipts, selected, refreshOrdenAfterMutation, feedback]
+  );
+
+  const handleCancelarLinea = useCallback(
+    async (itemId: string, motivo: string) => {
+      if (!selected?.id) return;
+      setSaving(true);
+      setError(null);
+      try {
+        const supabase = createSupabaseBrowserClient();
+        const { error: rpcError } = await supabase
+          .schema('erp')
+          .rpc('oc_cancelar_pendiente_linea', {
+            p_detalle_id: itemId,
+            p_motivo: motivo || undefined,
+          });
+        if (rpcError) throw rpcError;
+        await refreshOrdenAfterMutation(selected.id);
+        feedback.success('Pendiente cancelado');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'No pude cancelar el pendiente.';
+        setError(msg);
+        feedback.error(err instanceof Error ? err : new Error(msg));
+      } finally {
+        setSaving(false);
+      }
+    },
+    [selected, refreshOrdenAfterMutation, feedback]
+  );
+
+  const handleCerrarOrden = useCallback(
+    async (motivo: string) => {
+      if (!selected?.id) return;
+      setSaving(true);
+      setError(null);
+      try {
+        const supabase = createSupabaseBrowserClient();
+        const { error: rpcError } = await supabase.schema('erp').rpc('oc_cerrar_orden', {
+          p_orden_id: selected.id,
+          p_motivo: motivo || undefined,
+        });
+        if (rpcError) throw rpcError;
+        await refreshOrdenAfterMutation(selected.id);
+        feedback.success('Orden de compra cerrada');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'No pude cerrar la OC.';
+        setError(msg);
+        feedback.error(err instanceof Error ? err : new Error(msg));
+      } finally {
+        setSaving(false);
+      }
+    },
+    [selected, refreshOrdenAfterMutation, feedback]
   );
 
   const handleAsignarProveedor = useCallback(
@@ -989,10 +1238,11 @@ export default function OrdenesCompraPage() {
         if (e) throw e;
       }
 
+      const nowIso = new Date().toISOString();
       const { error: e2 } = await supabase
         .schema('erp')
         .from('ordenes_compra')
-        .update({ total: totalEstimado })
+        .update({ total: totalEstimado, estado: 'enviada', autorizada_at: nowIso })
         .eq('empresa_id', RDB_EMPRESA_ID)
         .eq('id', selected.id);
       if (e2) throw e2;
@@ -1002,24 +1252,27 @@ export default function OrdenesCompraPage() {
         precio_unitario: parseFloat(editedPrices[item.id] ?? '') || item.precio_unitario,
         subtotal: (item.cantidad ?? 0) * (parseFloat(editedPrices[item.id] ?? '') || 0),
       }));
-      const updatedOrden = {
+      const updatedOrden: OrdenCompra = {
         ...selected,
-        estatus: 'Enviada',
+        estatus: 'enviada',
         total_estimado: totalEstimado,
         items: updatedItems,
       };
       setSelected(updatedOrden);
       setOrdenes((prev) =>
         prev.map((o) =>
-          o.id === selected.id ? { ...o, estatus: 'Enviada', total_estimado: totalEstimado } : o
+          o.id === selected.id ? { ...o, estatus: 'enviada', total_estimado: totalEstimado } : o
         )
       );
+      feedback.success('OC marcada como Enviada');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No pude guardar los precios.');
+      const msg = err instanceof Error ? err.message : 'No pude guardar los precios.';
+      setError(msg);
+      feedback.error(err instanceof Error ? err : new Error(msg));
     } finally {
       setSaving(false);
     }
-  }, [selected, editedPrices]);
+  }, [selected, editedPrices, feedback]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -1149,6 +1402,8 @@ export default function OrdenesCompraPage() {
           }}
           onAsignarProveedor={handleAsignarProveedor}
           onMarcarEnviada={handleSavePricesAndMarkEnviada}
+          onCancelarLinea={handleCancelarLinea}
+          onCerrarOrden={handleCerrarOrden}
         />
       </div>
     </RequireAccess>
