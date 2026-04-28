@@ -1,14 +1,3 @@
-// ==============================================================================
-// Auto-generated Supabase database types.
-// Last regenerated: 2026-04-27T17:21:12Z
-// Project ref: ybklderteyhuugzfmxbi
-// Schemas: public, core, erp, rdb, health, playtomic, dilesa, maquinaria
-//
-// DO NOT EDIT BY HAND. Regenerate via:
-//   - GitHub Actions: trigger 'DB Types' workflow manually
-//   - Local: npm run db:types (requiere supabase CLI + SUPABASE_ACCESS_TOKEN)
-// ==============================================================================
-
 export type Json =
   | string
   | number
@@ -4522,13 +4511,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "empleados_puesto_id_fkey"
-            columns: ["puesto_id"]
-            isOneToOne: false
-            referencedRelation: "v_empleados_full"
-            referencedColumns: ["puesto_id"]
-          },
-          {
             foreignKeyName: "empleados_reemplaza_a_fkey"
             columns: ["reemplaza_a"]
             isOneToOne: false
@@ -4613,6 +4595,64 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_empleados_full"
             referencedColumns: ["empleado_id"]
+          },
+        ]
+      }
+      empleados_puestos: {
+        Row: {
+          created_at: string
+          empleado_id: string
+          empresa_id: string
+          fecha_fin: string | null
+          fecha_inicio: string | null
+          id: string
+          principal: boolean
+          puesto_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          empleado_id: string
+          empresa_id: string
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          id?: string
+          principal?: boolean
+          puesto_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          empleado_id?: string
+          empresa_id?: string
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          id?: string
+          principal?: boolean
+          puesto_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "empleados_puestos_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "empleados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "empleados_puestos_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "v_empleados_full"
+            referencedColumns: ["empleado_id"]
+          },
+          {
+            foreignKeyName: "empleados_puestos_puesto_id_fkey"
+            columns: ["puesto_id"]
+            isOneToOne: false
+            referencedRelation: "puestos"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -6155,13 +6195,6 @@ export type Database = {
             referencedRelation: "puestos"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "puestos_reporta_a_fkey"
-            columns: ["reporta_a"]
-            isOneToOne: false
-            referencedRelation: "v_empleados_full"
-            referencedColumns: ["puesto_id"]
-          },
         ]
       }
       recepciones: {
@@ -7096,6 +7129,7 @@ export type Database = {
           persona_id: string | null
           puesto: string | null
           puesto_id: string | null
+          puestos: Json | null
           rfc: string | null
           sdi: number | null
           sueldo_diario: number | null
