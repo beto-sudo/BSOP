@@ -283,7 +283,7 @@ function ReporteInner() {
         {/* Membrete */}
         <div className="mb-1">
           <Image
-            src="/membrete-rdb.jpg"
+            src="/brand/rdb/header-email.png"
             alt="Rincón del Bosque"
             width={1240}
             height={300}

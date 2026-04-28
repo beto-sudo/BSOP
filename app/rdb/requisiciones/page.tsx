@@ -356,7 +356,7 @@ function ExistingRequestSheet({
         {/* Membrete y encabezado solo para impresión */}
         <div className="hidden print:block mb-8">
           <img
-            src="/membrete-rdb.jpg"
+            src="/brand/rdb/header-email.png"
             alt="Membrete Rincón del Bosque"
             className="w-full object-contain mb-6 max-h-32"
           />
@@ -601,7 +601,7 @@ function NewRequestSheet({
       <SheetContent className="sm:max-w-[700px] flex min-h-0 flex-col overflow-hidden p-6 print:p-0">
         <div className="hidden print:block mb-8">
           <img
-            src="/membrete-rdb.jpg"
+            src="/brand/rdb/header-email.png"
             alt="Membrete Rincón del Bosque"
             className="w-full object-contain mb-6 max-h-32"
           />

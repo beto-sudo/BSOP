@@ -10,7 +10,7 @@ export default function Page() {
       <ProveedoresModule
         empresaId={DILESA_EMPRESA_ID}
         empresaSlug="dilesa"
-        logoPath="/logos/dilesa-header.jpg"
+        logoPath="/brand/dilesa/header-email.png"
         membreteAlt="Membrete DILESA"
       />
     </RequireAccess>

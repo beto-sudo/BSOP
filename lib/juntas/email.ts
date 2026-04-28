@@ -15,9 +15,10 @@ export const EMAIL_IMAGE_TTL_SECONDS = 365 * 24 * 60 * 60;
 const ASSET_BASE_URL = 'https://bsop.io';
 
 // Header de fallback cuando la empresa no tiene `header_url` configurado en
-// `core.empresas`. Mantener apuntando a DILESA hasta que cada empresa cargue
-// su propio asset.
-const FALLBACK_HEADER_URL = `${ASSET_BASE_URL}/logos/dilesa-header.jpg`;
+// `core.empresas`. RDB y DILESA ya tienen su `header_url` apuntando a
+// `/brand/<empresa>/header-email.png`; este fallback solo se usa si una
+// empresa nueva entra al repo sin configurar branding todavía.
+const FALLBACK_HEADER_URL = `${ASSET_BASE_URL}/brand/dilesa/header-email.png`;
 
 // Mientras cada empresa configura su propio buzón de consejo, todas usan el de
 // DILESA. Agregar entradas aquí cuando una empresa estrene el suyo.

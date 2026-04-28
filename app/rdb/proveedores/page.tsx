@@ -10,7 +10,7 @@ export default function Page() {
       <ProveedoresModule
         empresaId={RDB_EMPRESA_ID}
         empresaSlug="rdb"
-        logoPath="/membrete-rdb.jpg"
+        logoPath="/brand/rdb/header-email.png"
         membreteAlt="Membrete Rincón del Bosque"
       />
     </RequireAccess>

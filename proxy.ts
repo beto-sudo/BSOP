@@ -16,7 +16,7 @@ function isPublicPath(pathname: string) {
     pathname === '/logo-bs.png' ||
     pathname === '/logo-bs.jpg' ||
     pathname === '/logo-bsop.jpg' ||
-    pathname === '/membrete-rdb.jpg'
+    pathname.startsWith('/brand/')
   );
 }
 
