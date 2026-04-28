@@ -38,6 +38,19 @@ export type ObligacionFiscal = {
   fecha_fin: string | null;
 };
 
+/**
+ * Forma de `core.empresas.escritura_constitutiva` y `escritura_poder` (jsonb).
+ * Validado por `lib/rh/datos-fiscales-empresa.ts` para alta de empleados.
+ */
+export type EscrituraJsonb = {
+  numero?: string | null;
+  fecha?: string | null;
+  fecha_texto?: string | null;
+  notario?: string | null;
+  notaria_numero?: string | null;
+  distrito?: string | null;
+};
+
 export type Empresa = {
   id: string;
   nombre: string;
@@ -68,6 +81,34 @@ export type Empresa = {
   tipo_contribuyente: 'persona_moral' | 'persona_fisica' | null;
   curp: string | null;
   registro_patronal_imss: string | null;
+  representante_legal: string | null;
+  escritura_constitutiva: EscrituraJsonb | null;
+  escritura_poder: EscrituraJsonb | null;
+};
+
+const ESCRITURA_FIELD_KEYS = [
+  'numero',
+  'fecha_texto',
+  'notario',
+  'notaria_numero',
+  'distrito',
+] as const;
+type EscrituraFieldKey = (typeof ESCRITURA_FIELD_KEYS)[number];
+
+const ESCRITURA_LABELS: Record<EscrituraFieldKey, string> = {
+  numero: 'Número de escritura',
+  fecha_texto: 'Fecha (texto legible)',
+  notario: 'Notario',
+  notaria_numero: 'Número de notaría',
+  distrito: 'Distrito notarial',
+};
+
+const ESCRITURA_PLACEHOLDERS: Record<EscrituraFieldKey, string> = {
+  numero: '12345',
+  fecha_texto: 'quince de mayo del dos mil diez',
+  notario: 'JUAN PÉREZ',
+  notaria_numero: '5',
+  distrito: 'PIEDRAS NEGRAS',
 };
 
 // ─── Diff helpers (espejados del patrón de proveedores) ───────────────────
@@ -313,11 +354,25 @@ const EDITABLE_FIELDS = [
   'domicilio_estado',
   'domicilio_cp',
   'registro_patronal_imss',
+  'representante_legal',
 ] as const;
 
 type EditableField = (typeof EDITABLE_FIELDS)[number];
 
-type EditableValues = Record<EditableField, string>;
+type EditableValues = Record<EditableField, string> & {
+  escritura_constitutiva: Record<EscrituraFieldKey, string>;
+  escritura_poder: Record<EscrituraFieldKey, string>;
+};
+
+function buildEscrituraEditValues(src: EscrituraJsonb | null): Record<EscrituraFieldKey, string> {
+  return {
+    numero: src?.numero ?? '',
+    fecha_texto: src?.fecha_texto ?? src?.fecha ?? '',
+    notario: src?.notario ?? '',
+    notaria_numero: src?.notaria_numero ?? '',
+    distrito: src?.distrito ?? '',
+  };
+}
 
 function buildInitialEditValues(empresa: Empresa): EditableValues {
   return {
@@ -340,7 +395,52 @@ function buildInitialEditValues(empresa: Empresa): EditableValues {
     domicilio_estado: empresa.domicilio_estado ?? '',
     domicilio_cp: empresa.domicilio_cp ?? '',
     registro_patronal_imss: empresa.registro_patronal_imss ?? '',
+    representante_legal: empresa.representante_legal ?? '',
+    escritura_constitutiva: buildEscrituraEditValues(empresa.escritura_constitutiva),
+    escritura_poder: buildEscrituraEditValues(empresa.escritura_poder),
   };
+}
+
+function EscrituraCard({
+  title,
+  values,
+  editing,
+  onChange,
+  original,
+}: {
+  title: string;
+  values: Record<EscrituraFieldKey, string>;
+  editing: boolean;
+  onChange: (field: EscrituraFieldKey, value: string) => void;
+  original: EscrituraJsonb | null;
+}) {
+  const isEmpty = !original || Object.values(original).every((v) => v == null || v === '');
+  return (
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)]/30 p-4 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <h5 className="text-sm font-semibold text-[var(--text)]">{title}</h5>
+        {!editing && isEmpty && (
+          <span className="text-[10px] uppercase tracking-wider text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded px-2 py-0.5">
+            Sin capturar
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {ESCRITURA_FIELD_KEYS.map((field) => (
+          <div key={field} className={field === 'fecha_texto' ? 'sm:col-span-2' : ''}>
+            <EditableTextField
+              label={ESCRITURA_LABELS[field]}
+              value={values[field]}
+              editing={editing}
+              onChange={(v) => onChange(field, v)}
+              placeholder={ESCRITURA_PLACEHOLDERS[field]}
+              monospace={field === 'numero' || field === 'notaria_numero'}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function EditableTextField({
@@ -467,6 +567,17 @@ export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved:
     setEditValues((prev) => ({ ...prev, [key]: value }));
   };
 
+  const setEscrituraField = (
+    which: 'escritura_constitutiva' | 'escritura_poder',
+    field: EscrituraFieldKey,
+    value: string
+  ) => {
+    setEditValues((prev) => ({
+      ...prev,
+      [which]: { ...prev[which], [field]: value },
+    }));
+  };
+
   const handleStartEdit = () => {
     setEditValues(buildInitialEditValues(empresa));
     setEditError(null);
@@ -480,8 +591,11 @@ export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved:
   };
 
   // Diff entre edición y empresa original. Solo manda al server lo que cambió.
-  const editPatch = useMemo<Partial<Record<EditableField, string | null>>>(() => {
-    const patch: Partial<Record<EditableField, string | null>> = {};
+  // Para los jsonb de escrituras, comparamos los 5 campos contra el original
+  // y mandamos el objeto entero si algo cambió (más simple y suficiente para
+  // este uso — son metadatos pequeños).
+  const editPatch = useMemo<Record<string, string | null | Record<string, string | null>>>(() => {
+    const patch: Record<string, string | null | Record<string, string | null>> = {};
     for (const key of EDITABLE_FIELDS) {
       const current = (empresa[key as keyof Empresa] ?? '') as string;
       const next = editValues[key];
@@ -489,6 +603,25 @@ export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved:
         patch[key] = next.trim() === '' ? null : next.trim();
       }
     }
+
+    const escriturasFromEmpresa = {
+      escritura_constitutiva: buildEscrituraEditValues(empresa.escritura_constitutiva),
+      escritura_poder: buildEscrituraEditValues(empresa.escritura_poder),
+    } as const;
+
+    for (const which of ['escritura_constitutiva', 'escritura_poder'] as const) {
+      const original = escriturasFromEmpresa[which];
+      const edited = editValues[which];
+      const changed = ESCRITURA_FIELD_KEYS.some((f) => (original[f] ?? '') !== (edited[f] ?? ''));
+      if (changed) {
+        const obj: Record<string, string | null> = {};
+        for (const f of ESCRITURA_FIELD_KEYS) {
+          obj[f] = edited[f].trim() === '' ? null : edited[f].trim();
+        }
+        patch[which] = obj;
+      }
+    }
+
     return patch;
   }, [editValues, empresa]);
 
@@ -824,6 +957,35 @@ export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved:
               maxLength={11}
               errorMessage={rpInputInvalid ? 'Formato: 1 letra + 10 dígitos.' : null}
             />
+            <div className="sm:col-span-2">
+              <EditableTextField
+                label="Representante Legal"
+                value={editValues.representante_legal}
+                editing={editing}
+                onChange={(v) => setEditField('representante_legal', v)}
+                placeholder="Nombre completo del representante legal"
+              />
+            </div>
+          </div>
+        )}
+        {/* Si solo hay registro_patronal o representante_legal en read-only sin
+            CURP (caso típico para personas morales del grupo), mostrarlos. */}
+        {!editing && empresa.tipo_contribuyente !== 'persona_fisica' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <EditableTextField
+              label="Registro Patronal IMSS"
+              value={editValues.registro_patronal_imss}
+              editing={false}
+              onChange={() => undefined}
+            />
+            <div className="sm:col-span-2">
+              <EditableTextField
+                label="Representante Legal"
+                value={editValues.representante_legal}
+                editing={false}
+                onChange={() => undefined}
+              />
+            </div>
           </div>
         )}
       </div>
@@ -890,6 +1052,32 @@ export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved:
             maxLength={5}
           />
         </div>
+      </div>
+
+      {/* Documentos legales (alta de empleados) */}
+      <div className="space-y-4">
+        <SectionTitle>Documentos legales — alta de empleados</SectionTitle>
+        <p className="text-xs text-[var(--text-muted)] -mt-2">
+          Requeridos por <code>lib/rh/datos-fiscales-empresa.ts</code> para dar de alta empleados,
+          generar contratos LFT y finiquitos. Los datos viven como JSON en{' '}
+          <code>core.empresas.escritura_constitutiva</code> y <code>escritura_poder</code>.
+        </p>
+
+        <EscrituraCard
+          title="Escritura constitutiva"
+          values={editValues.escritura_constitutiva}
+          editing={editing}
+          onChange={(field, v) => setEscrituraField('escritura_constitutiva', field, v)}
+          original={empresa.escritura_constitutiva}
+        />
+
+        <EscrituraCard
+          title="Poder del representante"
+          values={editValues.escritura_poder}
+          editing={editing}
+          onChange={(field, v) => setEscrituraField('escritura_poder', field, v)}
+          original={empresa.escritura_poder}
+        />
       </div>
 
       {/* Actividades económicas */}

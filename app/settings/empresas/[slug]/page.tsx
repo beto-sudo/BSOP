@@ -37,6 +37,7 @@ const SELECT_COLS = [
   'domicilio_localidad, domicilio_municipio, domicilio_estado, actividades_economicas,',
   'obligaciones_fiscales, csf_fecha_emision, csf_url,',
   'tipo_contribuyente, curp, registro_patronal_imss,',
+  'representante_legal, escritura_constitutiva, escritura_poder,',
   'color_primario, color_primario_dark, color_secundario, color_texto_titulo,',
   'color_fondo_brand, color_inverso, logo_master_url, logo_horizontal_light_url,',
   'logo_horizontal_dark_url, logo_vertical_url, isotipo_url, favicon_url,',

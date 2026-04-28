@@ -150,4 +150,62 @@ describe('PATCH /api/empresas/[id]', () => {
     const res = await PATCH(req, ctx);
     expect(res.status).toBe(400);
   });
+
+  it('200 con representante_legal capturado a mano', async () => {
+    const { req, ctx } = makeReq({
+      representante_legal: 'BETO SANTOS',
+    });
+    const res = await PATCH(req, ctx);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.fields_updated).toContain('representante_legal');
+  });
+
+  it('200 con escritura_constitutiva como jsonb completo', async () => {
+    const { req, ctx } = makeReq({
+      escritura_constitutiva: {
+        numero: '12345',
+        fecha: '2010-05-15',
+        fecha_texto: 'quince de mayo del dos mil diez',
+        notario: 'JUAN PÉREZ',
+        notaria_numero: '5',
+        distrito: 'PIEDRAS NEGRAS',
+      },
+    });
+    const res = await PATCH(req, ctx);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.fields_updated).toContain('escritura_constitutiva');
+  });
+
+  it('200 con escritura_poder parcial (campos opcionales)', async () => {
+    const { req, ctx } = makeReq({
+      escritura_poder: {
+        numero: '6789',
+        notario: 'MARÍA LÓPEZ',
+        notaria_numero: '12',
+        distrito: 'COAHUILA',
+        fecha_texto: 'tres de marzo del dos mil veintiuno',
+      },
+    });
+    const res = await PATCH(req, ctx);
+    expect(res.status).toBe(200);
+  });
+
+  it('200 con escritura como null limpia el jsonb completo', async () => {
+    const { req, ctx } = makeReq({ escritura_constitutiva: null });
+    const res = await PATCH(req, ctx);
+    expect(res.status).toBe(200);
+  });
+
+  it('400 si la escritura trae llaves desconocidas (strict)', async () => {
+    const { req, ctx } = makeReq({
+      escritura_constitutiva: {
+        numero: '1',
+        campo_random: 'x',
+      },
+    });
+    const res = await PATCH(req, ctx);
+    expect(res.status).toBe(400);
+  });
 });
