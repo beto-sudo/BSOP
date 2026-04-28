@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-28
-**Última actualización:** 2026-04-28 (Sprint 1 mergeado: extractor CSF extendido con `id_cif`/`estatus_sat`/`regimen_capital`/`actividades_economicas` opcionales, `lib/empresas/csf-mapping.ts` + 4 endpoints `/api/empresas` admin-only + tests; CI verde)
+**Última actualización:** 2026-04-28 (Sprint 2 mergeado: `EmpresaDetail` reescrito con CSF read-only + drawer "Actualizar CSF" inline (estados A→B→C→D + diff selectivo) + campo `registro_patronal_imss` editable con regex; SELECT del page extiende `tipo_contribuyente`, `curp`, `registro_patronal_imss`)
 
 ## Problema
 
@@ -101,8 +101,8 @@ Empresa es estructuralmente igual al proveedor moral: mismo PDF de SAT, mismos c
 | #   | Scope                                                                                                                                  | Estado  | PR   |
 | --- | -------------------------------------------------------------------------------------------------------------------------------------- | ------- | ---- |
 | 0   | Promoción: este doc + fila en INITIATIVES.md                                                                                           | done    | #267 |
-| 1   | Endpoints `/api/empresas/extract-csf`, `create-with-csf`, `[id]/update-csf`, `PATCH [id]` (registro patronal) + tests con fixtures CSF | done    | TBD  |
-| 2   | UI drawer "Actualizar CSF" en `/settings/empresas/[slug]` + campo `registro_patronal_imss` editable + reuso `<CsfDiffModal>`           | pending | —    |
+| 1   | Endpoints `/api/empresas/extract-csf`, `create-with-csf`, `[id]/update-csf`, `PATCH [id]` (registro patronal) + tests con fixtures CSF | done    | #269 |
+| 2   | UI drawer "Actualizar CSF" en `/settings/empresas/[slug]` + campo `registro_patronal_imss` editable + reuso `<CsfDiffModal>`           | done    | TBD  |
 | 3   | Botón "Nueva empresa" + drawer `create-with-csf` en lista `/settings/empresas`                                                         | pending | —    |
 | 4   | Refresh operativo: subir CSF al día de RDB/DILESA/COAGAN/ANSA + capturar `registro_patronal_imss` faltantes                            | pending | —    |
 
@@ -140,4 +140,32 @@ Empresa es estructuralmente igual al proveedor moral: mismo PDF de SAT, mismos c
 
 **Links:**
 
-- PR Sprint 1: TBD (se agregará al merge).
+- PR Sprint 1: [#269](https://github.com/beto-sudo/BSOP/pull/269).
+
+### 2026-04-28 — Sprint 2: UI drawer "Actualizar CSF" + registro patronal
+
+**Qué se hizo en esta sesión:**
+
+- `app/settings/empresas/_components/empresa-detail.tsx` reescrito:
+  - Datos fiscales (RFC, razón social, régimen, régimen capital, idCIF, estatus SAT, domicilio, fechas) ahora **read-only** — la fuente de verdad es la CSF cargada vía drawer.
+  - Botón header "Actualizar CSF" abre drawer con 4 estados:
+    - **A — drop:** zona de upload con dashed border (acepta solo PDF, máx. 50 MB).
+    - **B — processing:** loader con texto "Procesando con Claude... 30-90 segundos".
+    - **C — diff:** lista de campos cambiados con checkbox por campo, valor actual vs nuevo side-by-side, toolbar "Seleccionar todos / Limpiar / Cambiar PDF".
+    - **D — applied:** drawer cierra y refresca página.
+  - Campo **`registro_patronal_imss`** editable inline con regex `/^[A-Z]\d{10}$/`, mensaje de validación en vivo, PATCH a `/api/empresas/[id]` con feedback (✓ Guardado).
+  - Helper `getActualAndNew(key, empresa, extraccion)` mapea cada `DiffKey` a su valor en `core.empresas` (con renames `num_ext`→`numero_ext`) y a su valor en el extractor (con renames `regimen_fiscal_nombre`→`regimen_fiscal`, `obligaciones`→`obligaciones_fiscales`, `fecha_emision`→`csf_fecha_emision`).
+  - Logos legacy (`logo_url`, `header_url`) siguen editables — se guardan con un solo botón "Guardar logos legacy" cuando hay dirty.
+- `app/settings/empresas/[slug]/page.tsx`: SELECT extendido con `tipo_contribuyente`, `curp`, `registro_patronal_imss`.
+- Apertura del CSF vía Storage funciona para paths nuevos (`empresas/{id}/csf-...pdf` en bucket `adjuntos`) y legacy (path con bucket como primer segmento).
+- Tipo `Empresa` extendido con `tipo_contribuyente`, `curp`, `registro_patronal_imss`.
+
+**Decisiones tácticas registradas durante implementación:**
+
+- **No promovido `<CsfDiffModal>` a componente compartido**: el diff vive inline en empresa-detail (igual que en proveedores-module). Ambos consumidores tienen ahora la misma forma; cuando se promueva a `components/csf/<CsfDiffModal>` se pueden refactorizar los dos en un solo PR.
+- **Mapeo display↔backend explícito** vía `DIFF_KEY_TO_API_KEY`: el cliente usa `DiffKey` (alineado con columnas de `core.empresas`) para renderizar diff y send-on-apply convierte a la key del extractor neutro (`regimen_fiscal_nombre`, `domicilio_num_ext`, etc.). Aísla al cliente del shape del extractor — si éste cambia, sólo se actualiza la tabla de mapeo.
+- **Save de `registro_patronal_imss` independiente** del flujo CSF (su propio botón Save), porque el campo no viene del CSF y no debe forzar al usuario a re-subir el PDF para capturar este dato.
+
+**Links:**
+
+- PR Sprint 2: TBD (se agregará al merge).
