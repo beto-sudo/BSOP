@@ -308,6 +308,7 @@ export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved:
   const [csfExtraccion, setCsfExtraccion] = useState<CsfExtraccion | null>(null);
   const [acceptedFields, setAcceptedFields] = useState<Set<DiffKey>>(new Set());
   const [applyingDiff, setApplyingDiff] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ─── Derivados ──────────────────────────────────────────────────────────
@@ -368,11 +369,16 @@ export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved:
     setCsfExtraccion(null);
     setCsfError(null);
     setAcceptedFields(new Set());
+    setDragActive(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleCsfFileChosen = async (file: File | null) => {
     if (!file) return;
+    if (file.type && file.type !== 'application/pdf') {
+      setCsfError(`Tipo de archivo no soportado: ${file.type}. Solo .pdf.`);
+      return;
+    }
     setCsfFile(file);
     setCsfProcessing(true);
     setCsfError(null);
@@ -381,14 +387,50 @@ export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved:
       const fd = new FormData();
       fd.append('file', file);
       const res = await fetch('/api/empresas/extract-csf', { method: 'POST', body: fd });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? 'Error al procesar CSF');
-      setCsfExtraccion(json.extraccion as CsfExtraccion);
+      const text = await res.text();
+      let json: { ok?: boolean; extraccion?: CsfExtraccion; error?: string } | null = null;
+      try {
+        json = text ? JSON.parse(text) : null;
+      } catch {
+        // Server devolvió HTML/texto plano (típico de timeout, 502, login redirect).
+        const preview = text.slice(0, 160);
+        throw new Error(
+          `Respuesta no-JSON del servidor (${res.status}): ${preview || 'cuerpo vacío'}`
+        );
+      }
+      if (!res.ok) {
+        throw new Error(json?.error ?? `Error ${res.status} al procesar CSF`);
+      }
+      if (!json?.extraccion) {
+        throw new Error('Respuesta del servidor sin campo "extraccion".');
+      }
+      setCsfExtraccion(json.extraccion);
     } catch (err) {
       setCsfError(err instanceof Error ? err.message : String(err));
+      // Si la extracción falla, soltamos el file para que el botón vuelva a la
+      // zona de drop (estado A) y el usuario pueda reintentar sin re-abrir.
+      setCsfFile(null);
     } finally {
       setCsfProcessing(false);
     }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!dragActive) setDragActive(true);
+  };
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+  };
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    const file = e.dataTransfer.files?.[0] ?? null;
+    void handleCsfFileChosen(file);
   };
 
   const handleApplyDiff = async () => {
@@ -700,8 +742,12 @@ export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved:
         open={drawerOpen}
         onOpenChange={(v) => {
           if (!v) {
+            // Reset completo al cerrar para que la próxima apertura siempre
+            // arranque limpia en el estado A (drop). Si el usuario está a
+            // medio aplicar (applyingDiff), no cerramos.
+            if (applyingDiff) return;
             setDrawerOpen(false);
-            // Mantenemos extraccion/file por si el usuario quiere re-abrir.
+            resetDrawer();
           }
         }}
       >
@@ -731,19 +777,34 @@ export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved:
                     void handleCsfFileChosen(f);
                   }}
                 />
-                <button
-                  type="button"
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full rounded-xl border-2 border-dashed border-[var(--border)] bg-[var(--panel)]/30 hover:bg-[var(--panel)]/60 px-6 py-12 text-center transition cursor-pointer"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      fileInputRef.current?.click();
+                    }
+                  }}
+                  onDragOver={handleDragOver}
+                  onDragEnter={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={`w-full rounded-xl border-2 border-dashed px-6 py-12 text-center transition cursor-pointer ${
+                    dragActive
+                      ? 'border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/20'
+                      : 'border-[var(--border)] bg-[var(--panel)]/30 hover:bg-[var(--panel)]/60'
+                  }`}
                 >
-                  <Upload className="mx-auto h-10 w-10 text-[var(--text)]/40" />
-                  <p className="mt-3 text-sm font-medium text-[var(--text)]">
-                    Sube el PDF de la CSF
+                  <Upload className="mx-auto h-10 w-10 text-[var(--text)]/40 pointer-events-none" />
+                  <p className="mt-3 text-sm font-medium text-[var(--text)] pointer-events-none">
+                    {dragActive ? 'Suelta el PDF aquí' : 'Arrastra el PDF o haz click para subirlo'}
                   </p>
-                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  <p className="mt-1 text-xs text-[var(--text-muted)] pointer-events-none">
                     Solo archivos .pdf, máximo 50 MB.
                   </p>
-                </button>
+                </div>
                 {csfError && (
                   <div className="flex items-start gap-2 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm text-red-400">
                     <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />

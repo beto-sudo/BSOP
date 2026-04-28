@@ -53,6 +53,7 @@ export function NuevaEmpresaDrawer({
   const [csfProcessing, setCsfProcessing] = useState(false);
   const [csfError, setCsfError] = useState<string | null>(null);
   const [extraccion, setExtraccion] = useState<CsfExtraccion | null>(null);
+  const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [nombre, setNombre] = useState('');
@@ -79,11 +80,14 @@ export function NuevaEmpresaDrawer({
     setTipoContribuyente('persona_moral');
     setCreating(false);
     setCreateError(null);
+    setDragActive(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleClose = (v: boolean) => {
     if (!v) {
+      // Si está creando, no cerramos a media operación.
+      if (creating) return;
       reset();
       onOpenChange(false);
     }
@@ -91,6 +95,10 @@ export function NuevaEmpresaDrawer({
 
   const handleFileChosen = async (file: File | null) => {
     if (!file) return;
+    if (file.type && file.type !== 'application/pdf') {
+      setCsfError(`Tipo de archivo no soportado: ${file.type}. Solo .pdf.`);
+      return;
+    }
     setCsfFile(file);
     setCsfProcessing(true);
     setCsfError(null);
@@ -99,9 +107,23 @@ export function NuevaEmpresaDrawer({
       const fd = new FormData();
       fd.append('file', file);
       const res = await fetch('/api/empresas/extract-csf', { method: 'POST', body: fd });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? 'Error al procesar CSF');
-      const ex = json.extraccion as CsfExtraccion;
+      const text = await res.text();
+      let json: { ok?: boolean; extraccion?: CsfExtraccion; error?: string } | null = null;
+      try {
+        json = text ? JSON.parse(text) : null;
+      } catch {
+        const preview = text.slice(0, 160);
+        throw new Error(
+          `Respuesta no-JSON del servidor (${res.status}): ${preview || 'cuerpo vacío'}`
+        );
+      }
+      if (!res.ok) {
+        throw new Error(json?.error ?? `Error ${res.status} al procesar CSF`);
+      }
+      if (!json?.extraccion) {
+        throw new Error('Respuesta del servidor sin campo "extraccion".');
+      }
+      const ex = json.extraccion;
       setExtraccion(ex);
       const isMoral = ex.tipo_persona === 'moral';
       setTipoContribuyente(isMoral ? 'persona_moral' : 'persona_fisica');
@@ -113,9 +135,30 @@ export function NuevaEmpresaDrawer({
       if (!slugTouched) setSlug(slugify(defaultNombre));
     } catch (err) {
       setCsfError(err instanceof Error ? err.message : String(err));
+      // Si la extracción falla, soltamos el file para que el usuario reintente
+      // sin re-abrir el drawer.
+      setCsfFile(null);
     } finally {
       setCsfProcessing(false);
     }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!dragActive) setDragActive(true);
+  };
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+  };
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    const file = e.dataTransfer.files?.[0] ?? null;
+    void handleFileChosen(file);
   };
 
   const handleNombreChange = (v: string) => {
@@ -200,17 +243,34 @@ export function NuevaEmpresaDrawer({
                   void handleFileChosen(f);
                 }}
               />
-              <button
-                type="button"
+              <div
+                role="button"
+                tabIndex={0}
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full rounded-xl border-2 border-dashed border-[var(--border)] bg-[var(--panel)]/30 hover:bg-[var(--panel)]/60 px-6 py-12 text-center transition cursor-pointer"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    fileInputRef.current?.click();
+                  }
+                }}
+                onDragOver={handleDragOver}
+                onDragEnter={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`w-full rounded-xl border-2 border-dashed px-6 py-12 text-center transition cursor-pointer ${
+                  dragActive
+                    ? 'border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/20'
+                    : 'border-[var(--border)] bg-[var(--panel)]/30 hover:bg-[var(--panel)]/60'
+                }`}
               >
-                <Upload className="mx-auto h-10 w-10 text-[var(--text)]/40" />
-                <p className="mt-3 text-sm font-medium text-[var(--text)]">Sube el PDF de la CSF</p>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                <Upload className="mx-auto h-10 w-10 text-[var(--text)]/40 pointer-events-none" />
+                <p className="mt-3 text-sm font-medium text-[var(--text)] pointer-events-none">
+                  {dragActive ? 'Suelta el PDF aquí' : 'Arrastra el PDF o haz click para subirlo'}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)] pointer-events-none">
                   Solo .pdf, máximo 50 MB. La extracción tarda 30-90 segundos.
                 </p>
-              </button>
+              </div>
               {csfError && (
                 <div className="flex items-start gap-2 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm text-red-400">
                   <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
