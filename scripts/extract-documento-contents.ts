@@ -56,6 +56,7 @@ import {
   ensurePdfFitsForClaude,
   embedContent,
   extractWithClaude,
+  extraccionToDocumentoUpdates,
   formatMB,
   MODELO_CLAUDE,
   MODELO_EMBEDDING,
@@ -224,19 +225,8 @@ async function writeResult(id: string, extraccion: Extraccion, embedding: number
   const { error } = await (supabase.schema('erp') as any)
     .from('documentos')
     .update({
-      descripcion: extraccion.descripcion,
-      contenido_texto: extraccion.contenido_texto,
+      ...extraccionToDocumentoUpdates(extraccion),
       contenido_embedding: embedding as any,
-      tipo_operacion: extraccion.tipo_operacion,
-      monto: extraccion.monto,
-      moneda: extraccion.moneda,
-      superficie_m2: extraccion.superficie_m2,
-      ubicacion_predio: extraccion.ubicacion_predio,
-      municipio: extraccion.municipio,
-      estado: extraccion.estado,
-      folio_real: extraccion.folio_real,
-      libro_tomo: extraccion.libro_tomo,
-      partes: extraccion.partes,
       extraccion_status: 'completado',
       extraccion_fecha: new Date().toISOString(),
       extraccion_modelo: MODELO_CLAUDE,
