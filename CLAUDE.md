@@ -11,8 +11,12 @@
    `docs/planning/<slug>.md` antes de empezar a actuar — ahí vive el
    contexto, alcance, decisiones y bitácora.
 3. Si lo que el usuario pide no encaja con ninguna iniciativa existente,
-   pregúntale si es una iniciativa nueva (entonces se crea un doc de
-   planning vía Cowork) o un task suelto (no requiere doc nuevo).
+   estresá la idea con preguntas (¿qué problema resuelve?, ¿qué
+   pantallas/schemas toca?, ¿métrica de éxito?, ¿riesgos?, ¿hay ADR
+   pendiente?) y proponé promoverla a iniciativa. Solo creá el doc de
+   planning + la fila en `INITIATIVES.md` cuando Beto diga
+   explícitamente _"sí, promovela"_. Si es un task suelto, no requiere
+   doc nuevo.
 
 ### Al cerrar trabajo en una iniciativa
 
@@ -30,20 +34,22 @@ Reflejá el cambio de estado en `docs/strategy/INITIATIVES.md` también
 iniciativa quedó completa, movela a la sección `## Done` con fecha de
 cierre y outcome — no borres su doc de planning, queda como referencia.
 
-### División de roles (Cowork vs Claude Code)
+### Roles
 
-- **Cowork escribe el QUÉ y el POR QUÉ**: Problema, Outcome esperado,
-  Alcance v1, Fuera de alcance, Métricas de éxito, Riesgos. Edita header
-  y secciones de planning.
-- **Claude Code (yo) escribe el CÓMO y el CUÁNDO**: Bitácora, Decisiones
-  registradas, Sprints/hitos al ejecutar, ADRs durante ejecución, código.
-- **Beto decide y mergea**: aprueba transiciones de estado (proposed →
-  planned → in_progress → done), mergea PRs.
+- **Claude Code (yo)** soy dueño de planeación + ejecución end-to-end:
+  Problema, Outcome, Alcance, Riesgos, Métricas, Bitácora, Decisiones
+  registradas, Sprints/hitos, ADRs, código, PRs.
+- **Beto decide y mergea**: aprueba promoción de ideas a iniciativas,
+  transiciones de estado (`proposed → planned → in_progress → done`),
+  mergea PRs.
 
-Si en una sesión el usuario me pide redefinir alcance o crear una
-iniciativa nueva, propóngale que lo haga vía Cowork para mantener la
-división. Excepción: si Cowork no está disponible y el cambio es chico,
-puedo hacerlo yo y dejar registro claro en la bitácora.
+Cuando Beto suelta una idea cruda, mi trabajo es estresarla con
+preguntas (¿qué problema resuelve?, ¿qué pantallas/schemas toca?,
+¿métrica de éxito?, ¿riesgos?, ¿hay ADR pendiente?) antes de
+proponerle promoverla a iniciativa. Solo creo el doc de planning +
+agrego la fila a `INITIATIVES.md` cuando Beto diga explícitamente
+_"sí, promovela"_. Ver ADR-012 para el contexto histórico de esta
+decisión (deprecación del split Cowork/CC).
 
 ### Cuándo crear un ADR
 
@@ -95,10 +101,11 @@ Si `format:check` reporta archivos que no toqué, igual los formateo en
 este PR — su mal estado bloquea CI tanto si lo causé yo como si lo
 heredé. Mejor un commit chico de "chore(format)" que un CI rojo.
 
-Mecanismo común de drift: alguien (Cowork u otro agente) crea un
-archivo formateado correctamente en su sub-set, su PR pasa porque no
-corrió `prettier --check .` global, y el archivo se mergea malformatado.
-La regla de "todo el repo, no solo lo tocado" detecta eso.
+Mecanismo común de drift: una herramienta externa (formateador de IDE,
+otro agente, generador de código) escribe un archivo formateado
+correctamente en su sub-set, el PR pasa porque no corrió
+`prettier --check .` global, y el archivo se mergea malformatado. La
+regla de "todo el repo, no solo lo tocado" detecta eso.
 
 ### Después de `git push` (vigilancia obligatoria)
 
@@ -169,10 +176,10 @@ solo actualizo `docs/planning/<slug>.md` (que casi nunca conflicta —
 un archivo por iniciativa). El próximo hito y la última actividad se
 infieren del header del planning doc.
 
-Resultado: ~70% menos ediciones al archivo hotspot. Cowork edita
-`INITIATIVES.md` cuando crea iniciativas y cuando ajusta alcance; yo
-edito solo en transiciones mayores. Los dos roles raramente coinciden
-en el mismo PR.
+Resultado: ~70% menos ediciones al archivo hotspot. Toco
+`INITIATIVES.md` solo cuando promuevo una iniciativa nueva o cuando
+cruza una transición mayor de estado. Los hitos intermedios viven solo
+en el planning doc.
 
 #### Regla 2: rebase preventivo sobre `origin/main`
 
