@@ -1,4 +1,4 @@
-import { Loader2, PlusCircle } from 'lucide-react';
+import { AlertTriangle, Loader2, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -8,16 +8,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Combobox } from '@/components/ui/combobox';
+import { formatCurrency, formatDateTime } from './helpers';
 import type { Caja } from './types';
 
 export type AbrirForm = {
   caja_id: string;
   responsable_apertura: string;
-  efectivo_inicial: string;
   fecha_operativa: string;
   auto_matched: boolean;
+  // Efectivo inicial heredado del cierre del corte anterior. Es display-only:
+  // el server action `abrirCaja` recalcula al abrir y usa su propio valor.
+  efectivo_heredado_monto: number;
+  efectivo_heredado_es_heredado: boolean;
+  efectivo_heredado_previo_sin_contar: boolean;
+  efectivo_heredado_cerrado_at: string | null;
+  efectivo_heredado_cargando: boolean;
 };
 
 export function AbrirCajaDialog({
@@ -25,7 +31,7 @@ export function AbrirCajaDialog({
   onOpenChange,
   cajas,
   form,
-  onFormChange,
+  onCajaChange,
   onSubmit,
   isPending,
   error,
@@ -34,7 +40,7 @@ export function AbrirCajaDialog({
   onOpenChange: (v: boolean) => void;
   cajas: Caja[];
   form: AbrirForm;
-  onFormChange: (updater: (f: AbrirForm) => AbrirForm) => void;
+  onCajaChange: (cajaId: string) => void;
   onSubmit: () => void;
   isPending: boolean;
   error: string | null;
@@ -80,7 +86,7 @@ export function AbrirCajaDialog({
               ) : (
                 <Combobox
                   value={form.caja_id}
-                  onChange={(v) => onFormChange((f) => ({ ...f, caja_id: v }))}
+                  onChange={(v) => onCajaChange(v)}
                   options={cajas.map((caja) => ({ value: caja.id, label: caja.nombre }))}
                   placeholder="Selecciona tu caja…"
                   allowClear
@@ -94,21 +100,37 @@ export function AbrirCajaDialog({
             <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Efectivo inicial
             </label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                $
-              </span>
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.efectivo_inicial}
-                onChange={(e) => onFormChange((f) => ({ ...f, efectivo_inicial: e.target.value }))}
-                placeholder="0.00"
-                className="pl-7 text-lg font-medium"
-                autoFocus
-              />
+            <div className="rounded-md border bg-muted/40 px-3 py-2.5">
+              {form.efectivo_heredado_cargando ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Calculando…
+                </div>
+              ) : (
+                <div className="text-lg font-semibold tabular-nums text-foreground">
+                  {formatCurrency(form.efectivo_heredado_monto)}
+                </div>
+              )}
             </div>
+            {!form.efectivo_heredado_cargando &&
+              (form.efectivo_heredado_previo_sin_contar ? (
+                <p className="flex items-start gap-1.5 text-[11px] text-yellow-700 dark:text-yellow-400">
+                  <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                  El turno anterior cerró sin contar efectivo. Inicia en $0.00 — confírmalo con el
+                  responsable.
+                </p>
+              ) : form.efectivo_heredado_es_heredado ? (
+                <p className="text-[11px] text-muted-foreground">
+                  Heredado del cierre del turno anterior
+                  {form.efectivo_heredado_cerrado_at
+                    ? ` · ${formatDateTime(form.efectivo_heredado_cerrado_at)}`
+                    : ''}
+                </p>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">
+                  Primer turno registrado para esta caja — inicia en $0.00.
+                </p>
+              ))}
           </div>
 
           {error && (

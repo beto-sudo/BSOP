@@ -19,11 +19,22 @@ export type AbrirCajaInput = {
   caja_id: string;
   caja_nombre: string;
   responsable_apertura: string;
-  efectivo_inicial: number;
   fecha_operativa: string; // YYYY-MM-DD
 };
 
-export type AbrirCajaResult = { ok: true; id: string } | { ok: false; error: string };
+export type AbrirCajaResult =
+  | {
+      ok: true;
+      id: string;
+      efectivo_inicial: number;
+      // true si se heredó del corte cerrado anterior; false si es primer turno o el
+      // anterior no tenía conteo (en cuyo caso `efectivo_inicial` es 0).
+      heredado: boolean;
+      // true si hubo corte previo cerrado pero sin efectivo_contado capturado —
+      // el cliente debe avisar al operador que está abriendo en $0 por falta de conteo.
+      previo_sin_contar: boolean;
+    }
+  | { ok: false; error: string };
 
 export async function abrirCaja(input: AbrirCajaInput): Promise<AbrirCajaResult> {
   const supabase = await createSupabaseServerClient();
@@ -56,6 +67,27 @@ export async function abrirCaja(input: AbrirCajaInput): Promise<AbrirCajaResult>
     };
   }
 
+  // Heredar efectivo_inicial del último corte cerrado de la misma caja. Server-side
+  // es la fuente de verdad — el cliente solo lo previsualiza.
+  const { data: ultimoCorte, error: ultimoErr } = await supabase
+    .schema('erp')
+    .from('cortes_caja')
+    .select('id, efectivo_contado, cerrado_at')
+    .eq('empresa_id', RDB_EMPRESA_ID)
+    .eq('caja_nombre', input.caja_nombre)
+    .eq('estado', 'cerrado')
+    .order('cerrado_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (ultimoErr) {
+    return { ok: false, error: `Error al consultar último corte: ${ultimoErr.message}` };
+  }
+
+  const heredado = !!ultimoCorte;
+  const previo_sin_contar = heredado && ultimoCorte.efectivo_contado == null;
+  const efectivoInicial = ultimoCorte?.efectivo_contado ?? 0;
+
   const now = new Date().toISOString();
 
   const { data: corte, error: insertErr } = await supabase
@@ -65,7 +97,7 @@ export async function abrirCaja(input: AbrirCajaInput): Promise<AbrirCajaResult>
       empresa_id: RDB_EMPRESA_ID,
       caja_nombre: input.caja_nombre,
       estado: 'abierto',
-      efectivo_inicial: input.efectivo_inicial,
+      efectivo_inicial: efectivoInicial,
       fecha_operativa: input.fecha_operativa,
       abierto_at: now,
       observaciones: input.responsable_apertura,
@@ -81,7 +113,51 @@ export async function abrirCaja(input: AbrirCajaInput): Promise<AbrirCajaResult>
   }
 
   revalidatePath('/rdb/cortes');
-  return { ok: true, id: corte.id };
+  return {
+    ok: true,
+    id: corte.id,
+    efectivo_inicial: efectivoInicial,
+    heredado,
+    previo_sin_contar,
+  };
+}
+
+export type EfectivoInicialPreview = {
+  monto: number;
+  heredado: boolean;
+  previo_sin_contar: boolean;
+  cerrado_at: string | null;
+};
+
+/**
+ * Preview del efectivo inicial que heredaría una nueva apertura para la caja
+ * dada. El server action `abrirCaja` recalcula igual al abrir — esto es solo
+ * para mostrar al operador antes de confirmar.
+ */
+export async function previewEfectivoInicial(caja_nombre: string): Promise<EfectivoInicialPreview> {
+  const supabase = await createSupabaseServerClient();
+
+  const { data, error } = await supabase
+    .schema('erp')
+    .from('cortes_caja')
+    .select('efectivo_contado, cerrado_at')
+    .eq('empresa_id', RDB_EMPRESA_ID)
+    .eq('caja_nombre', caja_nombre)
+    .eq('estado', 'cerrado')
+    .order('cerrado_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+
+  const heredado = !!data;
+  const previo_sin_contar = heredado && data.efectivo_contado == null;
+  return {
+    monto: data?.efectivo_contado ?? 0,
+    heredado,
+    previo_sin_contar,
+    cerrado_at: data?.cerrado_at ?? null,
+  };
 }
 
 export type Denominacion = {
