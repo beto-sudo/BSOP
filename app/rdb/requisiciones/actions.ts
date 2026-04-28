@@ -276,3 +276,59 @@ export async function generarOrdenCompra(
 
   return { id: oc.id, folio: oc.codigo } as { id: string; folio: string };
 }
+
+// ── Borrar (soft delete, admin-only) ──────────────────────────────────────────
+
+async function requireAdmin() {
+  const { supabase, user } = await requireAuth();
+  const { data: profile, error: profileError } = await supabase
+    .schema('core')
+    .from('usuarios')
+    .select('rol')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (profileError) throw new Error(profileError.message);
+  if (profile?.rol !== 'admin') {
+    throw new Error('Solo un administrador puede borrar requisiciones');
+  }
+
+  return { supabase, user };
+}
+
+export async function borrarRequisicion(id: string): Promise<void> {
+  const { supabase } = await requireAdmin();
+
+  const { data: existing, error: existingError } = await supabase
+    .schema('erp')
+    .from('requisiciones')
+    .select('id, deleted_at')
+    .eq('id', id)
+    .eq('empresa_id', RDB_EMPRESA_ID)
+    .maybeSingle();
+
+  if (existingError) throw new Error(existingError.message);
+  if (!existing) throw new Error('Requisición no encontrada');
+  if (existing.deleted_at) throw new Error('La requisición ya fue borrada');
+
+  const { count: ocCount, error: ocError } = await supabase
+    .schema('erp')
+    .from('ordenes_compra')
+    .select('id', { count: 'exact', head: true })
+    .eq('requisicion_id', id)
+    .eq('empresa_id', RDB_EMPRESA_ID);
+
+  if (ocError) throw new Error(ocError.message);
+  if ((ocCount ?? 0) > 0) {
+    throw new Error('No se puede borrar: la requisición tiene órdenes de compra derivadas');
+  }
+
+  const { error: deleteError } = await supabase
+    .schema('erp')
+    .from('requisiciones')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('empresa_id', RDB_EMPRESA_ID);
+
+  if (deleteError) throw new Error(deleteError.message);
+}

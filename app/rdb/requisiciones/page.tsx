@@ -8,9 +8,11 @@ import {
   guardarRequisicion,
   actualizarRequisicion,
   aprobarRequisicion,
+  borrarRequisicion,
   generarOrdenCompra,
   type DraftItemInput,
 } from './actions';
+import { usePermissions } from '@/components/providers';
 import {
   Table,
   TableBody,
@@ -52,6 +54,7 @@ import {
   RefreshCw,
   Search,
   ShoppingBasket,
+  Trash2,
   User2,
   XCircle,
   ChevronsUpDown,
@@ -319,11 +322,14 @@ function ExistingRequestSheet({
 }) {
   const [isPending, startTransition] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
+  const { permissions } = usePermissions();
+  const isAdmin = permissions.isAdmin;
 
   if (!requisicion) return null;
 
   const status = normalizeStatus(requisicion.estatus);
   const items = requisicion.items ?? [];
+  const canDelete = isAdmin && status === 'pendiente';
 
   function handleAprobar() {
     setActionError(null);
@@ -347,6 +353,24 @@ function ExistingRequestSheet({
         onClose();
       } catch (err) {
         setActionError(err instanceof Error ? err.message : 'Error al generar OC');
+      }
+    });
+  }
+
+  function handleBorrar() {
+    if (!requisicion) return;
+    const confirmed = window.confirm(
+      `¿Borrar la requisición ${requisicion.folio || 'sin folio'}? Esta acción es solo para administradores.`
+    );
+    if (!confirmed) return;
+    setActionError(null);
+    startTransition(async () => {
+      try {
+        await borrarRequisicion(requisicion!.id);
+        onAction();
+        onClose();
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : 'Error al borrar');
       }
     });
   }
@@ -498,6 +522,17 @@ function ExistingRequestSheet({
 
             {(status === 'pendiente' || status === 'autorizada') && (
               <div className="flex flex-wrap justify-end gap-3">
+                {canDelete && (
+                  <Button
+                    variant="outline"
+                    onClick={handleBorrar}
+                    disabled={isPending}
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    {isPending ? 'Borrando…' : 'Borrar'}
+                  </Button>
+                )}
                 {status === 'pendiente' && (
                   <>
                     <Button
@@ -984,6 +1019,7 @@ export default function RequisicionesPage() {
         .from('requisiciones')
         .select('id, codigo, justificacion, autorizada_at, solicitante_id, created_at')
         .eq('empresa_id', RDB_EMPRESA_ID)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false })
         .limit(200);
 
