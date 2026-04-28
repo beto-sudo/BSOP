@@ -3,10 +3,11 @@
 **Slug:** `empleados-multi-puesto`
 **Empresas:** todas
 **Schemas afectados:** `erp` (nueva tabla `empleados_puestos`, refactor de `v_empleados_full`, posible deprecación de `empleados.puesto_id`) + UI (rename módulo "Empleados" → "Personal" en sidebar/URL/detalle/listado)
-**Estado:** in_progress (Sprint 3 cerrado, Sprint 4 siguiente)
+**Estado:** done (cerrada 2026-04-27)
 **Dueño:** Beto
 **Creada:** 2026-04-27
-**Última actualización:** 2026-04-27 (Sprint 3 entregado: rename sidebar "Empleados → Personal" + rename URL `/<empresa>/rh/empleados` → `/<empresa>/rh/personal` con redirects 301 + listado multi-puesto con badge "+N". Detalle multi-puesto y wizard alta multi-select quedan como follow-up post-iniciativa.)
+**Cerrada:** 2026-04-27
+**Última actualización:** 2026-04-27 (Sprint 4 entregado: cargados los puestos secundarios — Comité Ejecutivo + Consejo de Administración — para Beto/Alejandra/Michelle en RDB y DILESA. 18 relaciones empleado-puesto vigentes, 6 principales + 12 secundarios. Iniciativa **completa**.)
 
 ## Problema
 
@@ -81,10 +82,15 @@ Además, el listado ya no es solo "empleados operativos": incluye accionistas y 
 | 0   | Cleanup operativo: borrar duplicados extras de Beto/Alejandra/Michelle en RDB                                                                                                                                                                                                                                    | n/a — ya estaba limpio al verificar (3 filas, una por persona, todas Accionista) | —         |
 | 1   | DB: tabla `erp.empleados_puestos` + backfill + refactor de `v_empleados_full` + ADR-013                                                                                                                                                                                                                          | done 2026-04-27                                                                  | #252      |
 | 2   | Backend: trigger DB sincroniza automáticamente `empleados.puesto_id ↔ empleados_puestos.principal` + refactor de `puestos-module.tsx` (conteo desde N:M). Wizard de alta y detail pages no necesitan cambios — el trigger hace todo el trabajo.                                                                  | done 2026-04-27                                                                  | #254      |
-| 3   | UI Personal v1: rename sidebar "Empleados → Personal", URL `/<empresa>/rh/empleados` → `/<empresa>/rh/personal` con redirects 301, listado multi-puesto con badge "+N más" cuando hay puestos secundarios. **Detalle multi-puesto add/remove + wizard alta multi-select** quedan como follow-up post-iniciativa. | done 2026-04-27                                                                  | _este PR_ |
-| 4   | Cleanup datos final: agregar Comité Ejecutivo + Consejo de Administración como puestos secundarios para Beto/Alejandra/Michelle en RDB y DILESA                                                                                                                                                                  | pending                                                                          | —         |
+| 3   | UI Personal v1: rename sidebar "Empleados → Personal", URL `/<empresa>/rh/empleados` → `/<empresa>/rh/personal` con redirects 301, listado multi-puesto con badge "+N más" cuando hay puestos secundarios. **Detalle multi-puesto add/remove + wizard alta multi-select** quedan como follow-up post-iniciativa. | done 2026-04-27                                                                  | #255      |
+| 4   | Cleanup datos final: agregar Comité Ejecutivo + Consejo de Administración como puestos secundarios para Beto/Alejandra/Michelle en RDB y DILESA                                                                                                                                                                  | done 2026-04-27                                                                  | _este PR_ |
 
 ## Decisiones registradas
+
+### 2026-04-27 — Decisiones cerradas durante Sprint 4 (cierre de la iniciativa)
+
+- **Para DILESA, primer UPDATE de `empleados.puesto_id = Accionista`** dispara el trigger del Sprint 2 que crea la fila principal en `empleados_puestos` automáticamente. Después se insertan los 2 secundarios. Este enfoque aprovecha el trigger en lugar de hacer 3 INSERTs directos por persona. Idempotente: el filtro `puesto_id IS NULL` evita re-aplicar.
+- **Producto cartesiano vía CTE** para los secundarios: `empleados_target` × `puestos_secundarios` (joineados por empresa_id) generó las 12 filas (3 personas × 2 empresas × 2 puestos secundarios) en un solo INSERT `ON CONFLICT DO NOTHING`. Idempotente vs ejecución manual previa.
 
 ### 2026-04-27 — Decisiones cerradas durante Sprint 3
 
@@ -119,6 +125,20 @@ Además, el listado ya no es solo "empleados operativos": incluye accionistas y 
 - **Orden vs Roadmap UI**: la iniciativa avanza en paralelo a `shared-modules-refactor`. No compite porque Sprint 1+2 son DB/backend y Sprint 3 es UI específica de RH (no patrón cross-cutting).
 
 ## Bitácora
+
+### 2026-04-27 — Sprint 4 (Cleanup datos final) entregado — iniciativa cerrada
+
+- Migración `supabase/migrations/20260427210000_empleados_secundarios_operadores.sql` aplicada en prod vía Supabase MCP.
+- **DILESA**: UPDATE de `empleados.puesto_id = Accionista` para Beto/Alejandra/Michelle disparó el trigger del Sprint 2 → 3 filas principales en `empleados_puestos` creadas automáticamente.
+- **RDB y DILESA**: INSERT de 12 filas secundarias (Comité + Consejo × 3 personas × 2 empresas) vía CTE con producto cartesiano + `ON CONFLICT DO NOTHING`.
+- **Verificación final**: query a `v_empleados_full` para los 6 empleados (3 personas × 2 empresas) devuelve `num_puestos_vigentes = 3` para cada uno, con Accionista marcado como `principal: true`. ✅
+- **Total relaciones empleado-puesto** post-Sprint-4: 6 principales (Accionista en RDB+DILESA × 3 personas) + 12 secundarios (Comité+Consejo en RDB+DILESA × 3 personas) = 18 vigentes para los operadores. Más las 202 del backfill original = 220 totales.
+- **Métricas de éxito de la iniciativa cumplidas**:
+  - 1 fila por persona+empresa en `erp.empleados`: ✅
+  - Listado de Personal muestra múltiples puestos sin duplicar persona: ✅ (vía badge `+N`)
+  - Sidebar dice "Personal" en RDB y DILESA: ✅ (DILESA + RDB en `nav-config.ts`)
+  - Cero queries directas a `empleados.puesto_id` rompiendo: ✅ (todas pasan por la vista o el trigger sincroniza)
+  - Deep-links viejos funcionando: ✅ (redirects 301 en `next.config.ts`)
 
 ### 2026-04-27 — Sprint 3 (UI Personal v1) entregado
 
