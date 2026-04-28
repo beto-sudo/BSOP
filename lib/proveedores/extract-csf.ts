@@ -56,7 +56,12 @@ export const ObligacionSchema = z.object({
 });
 
 export const ActividadEconomicaSchema = z.object({
-  orden: z.number().int().describe('Número de orden tal como aparece en la CSF (1, 2, 3...).'),
+  // NOTA: usamos `z.number()` sin `.int()` porque la API de Anthropic rechaza
+  // schemas `integer` con `minimum`/`maximum` que zod inyecta automáticamente
+  // (error: "output_config.format.schema: For 'integer' type, properties
+  // maximum, minimum are not supported"). El prompt instruye al modelo a
+  // devolver enteros 1, 2, 3...; en la práctica nunca llegan decimales.
+  orden: z.number().describe('Número de orden tal como aparece en la CSF (1, 2, 3...). Entero.'),
   actividad: z
     .string()
     .describe('Texto literal de la actividad económica tal como aparece en la CSF.'),
