@@ -286,10 +286,17 @@ extracción.
   3 categorías (cosmético / lógica divergente legítima / drift
   accidental) — ver §Decisiones registradas para cómo se resolvió cada
   una.
-- **Sub-PR 4 — `juntas-list-shared`** (Tier B, pendiente): próximo hito.
-  Triángulo `inicio/juntas` ↔ `rdb/admin/juntas` ↔ `dilesa/admin/juntas`,
-  auditoría primero.
-- **Sub-PR 5 — `empleados-detail-audit`** (Tier C, pendiente).
+- **Sub-PR 4 — `juntas-list-shared`** (2026-04-27): mergeado en PR
+  pendiente. Auditoría previa concluyó que `inicio/juntas` es módulo
+  distinto (vista personal multi-empresa) — no extraer. RDB+DILESA
+  admin sí se extrajeron a `<AdminJuntasListModule>` adoptando la
+  versión DILESA como fuente correcta (RDB hereda auto-title, filtro
+  por mes, content preview, task counts granulares avanzadas/terminadas).
+  Pages reducidos a ~14 líneas. Bug de `<RequireAccess empresa="rdb">`
+  hardcoded en ambos pages de `/inicio/juntas` (lista + detalle)
+  arreglado oportunísticamente.
+- **Sub-PR 5 — `empleados-detail-audit`** (Tier C, pendiente): próximo
+  hito.
 
 ## Decisiones registradas
 
@@ -376,6 +383,42 @@ extracción.
   prop alcanza para construir la URL de retorno (`/${empresaSlug}/admin/juntas`).
   Cumple SM3 con la API mínima posible.
 
+### Sub-PR 4 — juntas-list-shared (2026-04-27)
+
+- **Sub-PR 4 — Auditoría previa concluyó: 2 módulos distintos, no 3.**
+  Los 3 archivos (`inicio/juntas`, `rdb/admin/juntas`, `dilesa/admin/juntas`)
+  parecían un triángulo cross-empresa pero no lo son: `inicio/juntas` es
+  vista personal multi-empresa (filtra por empresas del usuario actual,
+  query distinta, navegación distinta). RDB+DILESA admin sí son el mismo
+  módulo. El Sub-PR extrajo solo el admin, no Inicio. Inicio queda como
+  módulo standalone — alineado con el patrón de `/inicio/tasks` que está
+  documentado como "sin RequireAccess porque el dashboard personal es
+  para todo usuario logueado".
+- **Sub-PR 4 — DILESA es la versión correcta; RDB se iguala.** Beto
+  decidió adoptar todas las features de DILESA para ambas empresas en
+  vez de feature-flags opcionales. RDB hereda: auto-title generation
+  (`generateTitulo()` con formato ISO + "9:05 AM - Tipo"), filtro por
+  mes, columna `JuntaContentPreview` con conteo de imágenes y excerpt
+  plain-text de descripción, columnas Avanzadas/Terminadas para task
+  counts granulares, búsqueda en descripción además del título, UX de
+  Sheet con flujo "Iniciar Junta" en lugar de Dialog modal. La
+  alternativa (feature flags por empresa) hubiera sido sobre-ingeniería
+  para una deuda que se resuelve más limpio igualando comportamiento.
+- **Sub-PR 4 — `JuntaContentPreview` se mantiene como columna TEMP
+  documentada.** Es deuda de la migración Coda en curso (~2-4 semanas
+  restantes). El componente y la columna llevan JSDoc explícito de
+  remoción cuando termine el backfill. Cuando esto pase, hay que
+  remover una sola sección del componente shared — no N pages.
+- **Sub-PR 4 — `<AdminJuntasListModule>` API**: `empresaId`, `empresaSlug`,
+  `title`, `subtitle?` (default "Agenda y minutas de juntas"). Sigue el
+  mismo patrón mínimo que `<DepartamentosModule>` (RH).
+- **Sub-PR 4 — Bug `<RequireAccess empresa="rdb">` hardcoded en
+  `/inicio/juntas/page.tsx` y `/inicio/juntas/[id]/page.tsx`.**
+  Bloqueaba acceso a usuarios DILESA (sólo RDB podía abrir su dashboard
+  personal de juntas). Resuelto quitando el wrap `<RequireAccess>`
+  completo, igualando el patrón de `/inicio/tasks` (proxy ya valida
+  sesión). Comentario JSDoc explica por qué no hay RequireAccess.
+
 ## Bitácora
 
 - **2026-04-27 — Sub-PR 1 + ADR-011** (Claude Code, branch
@@ -405,6 +448,23 @@ extracción.
   - Bugs heredados de RDB arreglados al unificar (auto-save sin
     normalizar, race condition del editor, state innecesario, title
     hardcoded con email de DILESA).
-  - 4 checks de CI verde local (typecheck, lint sin warnings nuevos,
-    format, 222 tests del repo + 222 tests de worktrees paralelos).
-    Pendiente smoke manual en RDB y DILESA antes de mergeo.
+  - PR #248 mergeado.
+- **2026-04-27 — Sub-PR 4** (Claude Code, branch
+  `feat/juntas-list-shared`):
+  - Auditoría previa concluyó: `inicio/juntas` es módulo standalone
+    (vista personal multi-empresa) — no extraer. RDB+DILESA admin sí.
+  - Creado `components/juntas/admin-juntas-list-module.tsx` (~520 líneas)
+    adoptando DILESA como base correcta. RDB hereda: auto-title
+    generation, filtro por mes, content preview con conteo de imágenes,
+    task counts granulares (avanzadas/terminadas), búsqueda en
+    descripción, UX de Sheet con "Iniciar Junta".
+  - Reducido `app/rdb/admin/juntas/page.tsx` de 502 → 14 líneas.
+  - Reducido `app/dilesa/admin/juntas/page.tsx` de 687 → 14 líneas.
+  - Bug `<RequireAccess empresa="rdb">` hardcoded en
+    `/inicio/juntas/page.tsx` y `/inicio/juntas/[id]/page.tsx`
+    arreglado quitando el wrap (patrón canónico de
+    `/inicio/`: sin RequireAccess porque el proxy valida sesión).
+  - 4 checks de CI verde local (typecheck, lint sin warnings nuevos —
+    los 4 warnings pre-existentes de `/inicio/juntas/[id]/page.tsx` no
+    están en mi alcance), format, 222 tests del repo. Pendiente smoke
+    manual antes de mergeo.
