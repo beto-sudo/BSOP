@@ -35,7 +35,18 @@ import { Combobox } from '@/components/ui/combobox';
 import { Textarea } from '@/components/ui/textarea';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
-import { AlertTriangle, CalendarDays, Lock, RefreshCw, Search, Send, Truck, X } from 'lucide-react';
+import { usePermissions } from '@/components/providers';
+import {
+  AlertTriangle,
+  CalendarDays,
+  Lock,
+  Pencil,
+  RefreshCw,
+  Search,
+  Send,
+  Truck,
+  X,
+} from 'lucide-react';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -291,6 +302,7 @@ function OrdenDetail({
   open,
   editedReceipts,
   editedPrices,
+  isAdmin,
   onClose,
   onReceiveChange,
   onPriceChange,
@@ -300,6 +312,7 @@ function OrdenDetail({
   onMarcarEnviada,
   onCancelarLinea,
   onCerrarOrden,
+  onPriceOverride,
 }: {
   orden: OrdenCompra | null;
   proveedores: Proveedor[];
@@ -307,6 +320,7 @@ function OrdenDetail({
   open: boolean;
   editedReceipts: Record<string, string>;
   editedPrices: Record<string, string>;
+  isAdmin: boolean;
   onClose: () => void;
   onReceiveChange: (itemId: string, value: string, max: number) => void;
   onPriceChange: (itemId: string, value: string) => void;
@@ -316,6 +330,7 @@ function OrdenDetail({
   onMarcarEnviada: () => Promise<void>;
   onCancelarLinea: (itemId: string, motivo: string) => Promise<void>;
   onCerrarOrden: (motivo: string) => Promise<void>;
+  onPriceOverride: (itemId: string, precio: number) => Promise<void>;
 }) {
   const [selectedProveedorId, setSelectedProveedorId] = useState<string>('');
   const [cancelLineState, setCancelLineState] = useState<{
@@ -323,6 +338,9 @@ function OrdenDetail({
     motivo: string;
   } | null>(null);
   const [cerrarState, setCerrarState] = useState<{ motivo: string } | null>(null);
+  const [overrideState, setOverrideState] = useState<{ itemId: string; value: string } | null>(
+    null
+  );
 
   useEffect(() => {
     setSelectedProveedorId(orden?.proveedor_id ?? '');
@@ -636,7 +654,44 @@ function OrdenDetail({
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right tabular-nums text-muted-foreground print:py-1 print:text-black">
-                                  {formatCurrency(item.precio_real ?? item.precio_unitario)}
+                                  <div className="flex items-center justify-end gap-1">
+                                    <span
+                                      className={
+                                        item.precio_real != null &&
+                                        item.precio_real !== item.precio_unitario
+                                          ? 'font-medium text-foreground'
+                                          : ''
+                                      }
+                                      title={
+                                        item.precio_real != null &&
+                                        item.precio_real !== item.precio_unitario
+                                          ? `Override del precio original ${formatCurrency(item.precio_unitario)}`
+                                          : undefined
+                                      }
+                                    >
+                                      {formatCurrency(item.precio_real ?? item.precio_unitario)}
+                                    </span>
+                                    {isAdmin && !terminal && (
+                                      <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-6 w-6 text-muted-foreground hover:text-foreground print:hidden"
+                                        onClick={() =>
+                                          setOverrideState({
+                                            itemId: item.id,
+                                            value: String(
+                                              item.precio_real ?? item.precio_unitario ?? ''
+                                            ),
+                                          })
+                                        }
+                                        aria-label="Modificar precio (admin)"
+                                        title="Modificar precio (admin)"
+                                      >
+                                        <Pencil className="h-3 w-3" />
+                                      </Button>
+                                    )}
+                                  </div>
                                 </TableCell>
                               </>
                             )}
@@ -785,6 +840,43 @@ function OrdenDetail({
           confirmLabel="Cerrar OC"
           confirmVariant="destructive"
         />
+
+        {/* ── ConfirmDialog: Override de precio (admin) ── */}
+        <ConfirmDialog
+          open={overrideState !== null}
+          onOpenChange={(o) => !o && setOverrideState(null)}
+          onConfirm={async () => {
+            if (!overrideState) return;
+            const num = parseFloat(overrideState.value);
+            if (!isFinite(num) || num < 0) {
+              throw new Error('Precio inválido');
+            }
+            await onPriceOverride(overrideState.itemId, num);
+            setOverrideState(null);
+          }}
+          title="Modificar precio de la línea"
+          description={
+            <div className="space-y-2">
+              <p>
+                Override del precio. Este cambio queda registrado en audit log con tu usuario y la
+                hora.
+              </p>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={overrideState?.value ?? ''}
+                onChange={(e) =>
+                  setOverrideState((prev) => (prev ? { ...prev, value: e.target.value } : prev))
+                }
+                placeholder="0.00"
+                className="text-right tabular-nums"
+              />
+            </div>
+          }
+          confirmLabel="Aplicar override"
+          confirmVariant="default"
+        />
       </SheetContent>
     </Sheet>
   );
@@ -794,6 +886,8 @@ function OrdenDetail({
 
 export default function OrdenesCompraPage() {
   const feedback = useActionFeedback();
+  const { permissions } = usePermissions();
+  const isAdmin = permissions.isAdmin;
   const [ordenes, setOrdenes] = useState<OrdenCompra[]>([]);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1163,6 +1257,32 @@ export default function OrdenesCompraPage() {
     [selected, refreshOrdenAfterMutation, feedback]
   );
 
+  const handlePriceOverride = useCallback(
+    async (itemId: string, precio: number) => {
+      if (!selected?.id) return;
+      setSaving(true);
+      setError(null);
+      try {
+        const supabase = createSupabaseBrowserClient();
+        const { error: updError } = await supabase
+          .schema('erp')
+          .from('ordenes_compra_detalle')
+          .update({ precio_real: precio })
+          .eq('id', itemId);
+        if (updError) throw updError;
+        await refreshOrdenAfterMutation(selected.id);
+        feedback.success('Precio actualizado');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'No pude actualizar el precio.';
+        setError(msg);
+        feedback.error(err instanceof Error ? err : new Error(msg));
+      } finally {
+        setSaving(false);
+      }
+    },
+    [selected, refreshOrdenAfterMutation, feedback]
+  );
+
   const handleCerrarOrden = useCallback(
     async (motivo: string) => {
       if (!selected?.id) return;
@@ -1391,6 +1511,7 @@ export default function OrdenesCompraPage() {
           open={drawerOpen}
           editedReceipts={editedReceipts}
           editedPrices={editedPrices}
+          isAdmin={isAdmin}
           onClose={() => setDrawerOpen(false)}
           onReceiveChange={handleReceiveChange}
           onPriceChange={handlePriceChange}
@@ -1404,6 +1525,7 @@ export default function OrdenesCompraPage() {
           onMarcarEnviada={handleSavePricesAndMarkEnviada}
           onCancelarLinea={handleCancelarLinea}
           onCerrarOrden={handleCerrarOrden}
+          onPriceOverride={handlePriceOverride}
         />
       </div>
     </RequireAccess>
