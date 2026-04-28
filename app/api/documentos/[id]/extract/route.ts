@@ -200,6 +200,11 @@ export async function POST(_req: NextRequest, { params }: Params) {
       folio_real: extraccion.folio_real,
       libro_tomo: extraccion.libro_tomo,
       partes: extraccion.partes,
+      // subtipo_meta: solo se llena si el doc es escritura/poder/acta. Para
+      // otros tipos (factura, contrato laboral, comprobante) la IA pone null.
+      // Consumido por el sync_trigger de core.empresa_documentos para llenar
+      // el caché jsonb en core.empresas.escritura_*.
+      subtipo_meta: extraccion.subtipo_meta,
       extraccion_status: 'completado',
       extraccion_fecha: new Date().toISOString(),
       extraccion_modelo: MODELO_CLAUDE,
