@@ -28,6 +28,7 @@ import { ArrowLeft, Printer } from 'lucide-react';
 import Image from 'next/image';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { useTriggerPrint } from '@/components/print';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LevantamientoStatusBadge } from '@/components/inventario/levantamiento-status-badge';
@@ -110,6 +111,7 @@ function ReporteInner() {
   const [firmas, setFirmas] = useState<FirmaRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const triggerPrint = useTriggerPrint();
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -202,9 +204,9 @@ function ReporteInner() {
   // Auto-print 400ms después de cargar (replica el patrón de handlePrintLista).
   useEffect(() => {
     if (loading || error || !lev) return;
-    const t = window.setTimeout(() => window.print(), 400);
+    const t = window.setTimeout(triggerPrint, 400);
     return () => window.clearTimeout(t);
-  }, [loading, error, lev]);
+  }, [loading, error, lev, triggerPrint]);
 
   const kpis = useMemo(() => {
     const conDiff = lineas.filter((l) => (l.diferencia ?? 0) !== 0);
@@ -270,7 +272,7 @@ function ReporteInner() {
           </Link>
           <div className="flex items-center gap-2">
             <LevantamientoStatusBadge estado={lev.estado} />
-            <Button size="sm" onClick={() => window.print()}>
+            <Button size="sm" onClick={triggerPrint}>
               <Printer className="size-4" />
               Imprimir
             </Button>

@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
+import { useTriggerPrint } from '@/components/print';
 import {
   Table,
   TableBody,
@@ -32,6 +33,7 @@ export interface StockDetailDrawerProps {
 export function StockDetailDrawer({ item, open, onClose }: StockDetailDrawerProps) {
   const [kardex, setKardex] = useState<MovimientoRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const triggerPrint = useTriggerPrint();
 
   useEffect(() => {
     if (open && item) {
@@ -69,7 +71,7 @@ export function StockDetailDrawer({ item, open, onClose }: StockDetailDrawerProp
       title={item.nombre}
       description={`${item.categoria ?? 'Sin categoría'} · ${item.unidad ?? 'pieza'}`}
       actions={
-        <Button variant="outline" size="sm" onClick={() => window.print()}>
+        <Button variant="outline" size="sm" onClick={triggerPrint}>
           Imprimir
         </Button>
       }

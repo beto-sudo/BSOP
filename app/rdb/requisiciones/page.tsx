@@ -29,6 +29,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { useTriggerPrint } from '@/components/print';
 import { Combobox } from '@/components/ui/combobox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
@@ -324,6 +325,7 @@ function ExistingRequestSheet({
   const [actionError, setActionError] = useState<string | null>(null);
   const { permissions } = usePermissions();
   const isAdmin = permissions.isAdmin;
+  const triggerPrint = useTriggerPrint();
 
   if (!requisicion) return null;
 
@@ -398,7 +400,7 @@ function ExistingRequestSheet({
           <SheetTitle>{requisicion.folio || 'Sin folio'}</SheetTitle>
           <SheetDescription>{formatDate(requisicion.fecha_solicitud)}</SheetDescription>
           <div className="absolute right-12 top-4 hidden sm:flex print:hidden">
-            <Button variant="outline" size="sm" onClick={() => window.print()}>
+            <Button variant="outline" size="sm" onClick={triggerPrint}>
               Imprimir
             </Button>
           </div>
@@ -593,6 +595,7 @@ function NewRequestSheet({
 }) {
   const [isPending, startTransition] = useTransition();
   const [saveError, setSaveError] = useState<string | null>(null);
+  const triggerPrint = useTriggerPrint();
   const isEditing = Boolean(editingRequisicion?.id);
   const printableItems = draftItems.filter((item) =>
     [item.producto, item.descripcion, item.cantidad, item.unidad].some((value) =>
@@ -661,7 +664,7 @@ function NewRequestSheet({
               : 'Captura los artículos que necesitas y envía la requisición a autorización.'}
           </SheetDescription>
           <div className="absolute right-12 top-4 hidden sm:flex print:hidden">
-            <Button variant="outline" size="sm" onClick={() => window.print()}>
+            <Button variant="outline" size="sm" onClick={triggerPrint}>
               Imprimir
             </Button>
           </div>

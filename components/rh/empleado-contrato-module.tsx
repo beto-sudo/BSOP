@@ -25,6 +25,7 @@ import Link from 'next/link';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useTriggerPrint } from '@/components/print';
 import { ArrowLeft, Printer, AlertCircle, Settings } from 'lucide-react';
 import {
   ContratoPrintable,
@@ -47,6 +48,7 @@ function Inner({ empresaSlug }: EmpleadoContratoModuleProps) {
   const [empresaId, setEmpresaId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const triggerPrint = useTriggerPrint();
 
   const datosFiscales = useDatosFiscalesEmpresa(empresaId);
 
@@ -225,7 +227,7 @@ function Inner({ empresaSlug }: EmpleadoContratoModuleProps) {
           <ArrowLeft className="h-4 w-4 mr-1" /> Volver al empleado
         </Button>
         <Button
-          onClick={() => window.print()}
+          onClick={triggerPrint}
           className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90"
         >
           <Printer className="h-4 w-4" /> Imprimir contrato

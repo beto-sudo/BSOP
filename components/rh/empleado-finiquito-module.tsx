@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input';
 import { FieldLabel } from '@/components/ui/field-label';
 import { Combobox } from '@/components/ui/combobox';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useTriggerPrint } from '@/components/print';
 import { ArrowLeft, Printer, AlertCircle, Settings } from 'lucide-react';
 import {
   FiniquitoPrintable,
@@ -56,6 +57,7 @@ function Inner({ empresaSlug }: EmpleadoFiniquitoModuleProps) {
   const id = params.id as string;
   const supabase = createSupabaseERPClient();
 
+  const triggerPrint = useTriggerPrint();
   const [empleado, setEmpleado] = useState<FiniquitoEmpleadoData | null>(null);
   const [empresaId, setEmpresaId] = useState<string | null>(null);
   const [fechaIngreso, setFechaIngreso] = useState<string>('');
@@ -250,7 +252,7 @@ function Inner({ empresaSlug }: EmpleadoFiniquitoModuleProps) {
         </Button>
         {calculo && (
           <Button
-            onClick={() => window.print()}
+            onClick={triggerPrint}
             className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90"
           >
             <Printer className="h-4 w-4" /> Imprimir finiquito
