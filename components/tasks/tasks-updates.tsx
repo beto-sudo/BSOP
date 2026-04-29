@@ -2,23 +2,80 @@
 
 /**
  * Presentational pieces for the `erp.task_updates` feature.
- * Used by the DILESA edit/create flow (both standalone sheet and embedded panel).
+ *
+ * `<UpdatesList>` is now a thin wrapper over `<ActivityLog>` (ADR-023);
+ * it adapts `TaskUpdateRow[]` → `ActivityEvent[]` and forwards a tones
+ * map derived from `UPDATE_TIPO_CONFIG`. The tasks-specific UI hangs
+ * here so the rest of the repo can adopt `<ActivityLog>` directly.
  */
 
-import { Loader2, Clock, MessageSquarePlus } from 'lucide-react';
+import { Loader2, MessageSquarePlus } from 'lucide-react';
 import {
   ESTADO_CONFIG,
   UPDATE_TIPO_CONFIG,
   type TaskEstado,
   type TaskUpdateRow,
-  formatDate,
-  formatDateTime,
 } from './tasks-shared';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { ActivityLog, type ActivityEvent, type ActivityEventType } from '@/components/activity-log';
 
 type Variant = 'sheet' | 'embedded';
+
+/**
+ * Adapter `task_updates` → `ActivityEvent[]` (ADR-023 AL1).
+ *
+ * Mapping:
+ * - `tipo` raw → `type` literal abierto (e.g. `'cambio_estado'`).
+ * - `usuario.nombre` → `actor.nombre`; null cuando no hay usuario (Sistema).
+ * - `contenido` (texto libre del usuario) → `detail`.
+ * - `valor_anterior` + `valor_nuevo` → `changes[0]` con field = tipo.
+ */
+export function taskUpdatesToEvents(updates: TaskUpdateRow[]): ActivityEvent[] {
+  return updates.map((u) => ({
+    id: u.id,
+    at: u.created_at,
+    type: u.tipo as ActivityEventType,
+    actor: u.usuario ? { id: u.creado_por ?? null, nombre: u.usuario.nombre } : null,
+    detail: u.contenido ?? null,
+    changes:
+      u.valor_anterior != null && u.valor_nuevo != null
+        ? [
+            {
+              field: u.tipo,
+              before: u.valor_anterior,
+              after: u.valor_nuevo,
+            },
+          ]
+        : undefined,
+  }));
+}
+
+/**
+ * Tones map derived from `UPDATE_TIPO_CONFIG` (badge-system tones).
+ * Passed to `<ActivityLog tones>` — sus keys ganan sobre los defaults
+ * para los 5 tipos del dominio tasks.
+ */
+const TASK_UPDATE_TONES = Object.fromEntries(
+  Object.entries(UPDATE_TIPO_CONFIG).map(([k, v]) => [k, { label: v.label, tone: v.tone }])
+);
+
+/**
+ * `formatChange` para tasks — traduce los valores raw de `cambio_estado`
+ * (e.g. `'pendiente'` → `'Pendiente'`) usando `ESTADO_CONFIG`. Para otros
+ * tipos pasa el value tal cual.
+ */
+function formatChange(
+  value: string | number,
+  ctx: { field: string; kind: 'value' | 'field' }
+): string {
+  if (ctx.kind !== 'value') return String(value);
+  if (ctx.field === 'cambio_estado') {
+    const estado = String(value) as TaskEstado;
+    return ESTADO_CONFIG[estado]?.label ?? String(value);
+  }
+  return String(value);
+}
 
 export function UpdatesList({
   updates,
@@ -29,71 +86,17 @@ export function UpdatesList({
   loading: boolean;
   variant?: Variant;
 }) {
-  if (loading) {
-    return (
-      <div
-        className={
-          variant === 'sheet'
-            ? 'flex items-center justify-center py-6'
-            : 'flex items-center justify-center py-4'
-        }
-      >
-        <Loader2
-          className={`${variant === 'sheet' ? 'h-5 w-5' : 'h-4 w-4'} animate-spin text-[var(--text)]/30`}
-        />
-      </div>
-    );
-  }
-
-  if (updates.length === 0) {
-    if (variant === 'embedded') {
-      return (
-        <p className="text-xs text-[var(--text-subtle)] text-center py-3">Sin actualizaciones</p>
-      );
-    }
-    return (
-      <div className="flex flex-col items-center justify-center py-6 text-center">
-        <Clock className="mb-2 h-8 w-8 text-[var(--text)]/20" />
-        <p className="text-sm text-[var(--text)]/50">No hay actualizaciones registradas</p>
-      </div>
-    );
-  }
-
   return (
-    <div className={variant === 'embedded' ? 'space-y-2' : 'space-y-2'}>
-      {updates.map((u) => {
-        const tc = UPDATE_TIPO_CONFIG[u.tipo] ?? { label: u.tipo, tone: 'neutral' as const };
-        const isEmbedded = variant === 'embedded';
-        return (
-          <div
-            key={u.id}
-            className={`rounded-xl border border-[var(--border)] bg-[var(--panel)] ${isEmbedded ? 'px-3 py-2' : 'px-3 py-2.5'}`}
-          >
-            <div className={`flex items-center gap-2 ${isEmbedded ? 'mb-0.5' : 'mb-1'}`}>
-              <Badge tone={tc.tone}>{tc.label}</Badge>
-              <span className="text-[10px] text-[var(--text-subtle)]">
-                {u.usuario?.nombre ?? 'Sistema'}
-              </span>
-              <span className="text-[10px] text-[var(--text)]/30 ml-auto">
-                {isEmbedded ? formatDateTime(u.created_at) : formatDate(u.created_at)}
-              </span>
-            </div>
-            {u.contenido && (
-              <p className={`${isEmbedded ? 'text-xs' : 'text-sm'} text-[var(--text)]/80`}>
-                {u.contenido}
-              </p>
-            )}
-            {u.valor_anterior != null && u.valor_nuevo != null && (
-              <p className={`${isEmbedded ? 'text-[10px]' : 'text-xs'} text-[var(--text)]/50`}>
-                {u.tipo === 'cambio_estado'
-                  ? `${ESTADO_CONFIG[u.valor_anterior as TaskEstado]?.label ?? u.valor_anterior} → ${ESTADO_CONFIG[u.valor_nuevo as TaskEstado]?.label ?? u.valor_nuevo}`
-                  : `${u.valor_anterior || '—'} → ${u.valor_nuevo || '—'}`}
-              </p>
-            )}
-          </div>
-        );
-      })}
-    </div>
+    <ActivityLog
+      events={taskUpdatesToEvents(updates)}
+      loading={loading}
+      size={variant === 'embedded' ? 'compact' : 'default'}
+      tones={TASK_UPDATE_TONES}
+      formatChange={formatChange}
+      emptyLabel={
+        variant === 'embedded' ? 'Sin actualizaciones' : 'No hay actualizaciones registradas'
+      }
+    />
   );
 }
 
