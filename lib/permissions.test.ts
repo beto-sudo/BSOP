@@ -220,11 +220,12 @@ describe('ROUTE_TO_MODULE ↔ core.modulos sync', () => {
     // Ver BSOP/CLAUDE.md → "Reglas DB" → "Liberación de módulo nuevo".
   });
 
-  it('there are no duplicate slugs in ROUTE_TO_MODULE', () => {
-    const values = Object.values(ROUTE_TO_MODULE);
-    const unique = new Set(values);
-    expect(values.length).toBe(unique.size);
-  });
+  // Nota: no validamos uniqueness de slugs en `ROUTE_TO_MODULE`.
+  // Sub-pages que comparten un módulo de permisos (ej. `/rdb/productos`
+  // y `/rdb/productos/grupos` → ambas mapean a `rdb.productos`) son un
+  // caso legítimo y esperado: un módulo de DB puede tener varias rutas
+  // visibles en sidebar. Lo que importa es que cada URL apunte a un
+  // slug que existe en DB (cubierto por el test de arriba).
 });
 
 // ── Supabase-coupled fetchers ─────────────────────────────────────────────

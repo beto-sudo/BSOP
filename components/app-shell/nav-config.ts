@@ -112,6 +112,7 @@ export const NAV_ITEMS: NavItem[] = [
         label: 'Inventario',
         children: [
           { label: 'Productos', href: '/rdb/productos' },
+          { label: 'Grupos · Padres-Hijos', href: '/rdb/productos/grupos' },
           { label: 'Inventario', href: '/rdb/inventario' },
         ],
       },

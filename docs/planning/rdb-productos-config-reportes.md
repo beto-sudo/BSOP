@@ -3,7 +3,7 @@
 **Slug:** `rdb-productos-config-reportes`
 **Empresas:** RDB (v1); diseñada para enchufar otras cuando aplique
 **Schemas afectados:** `erp` (productos, producto_receta), `rdb` (v_productos_grupo)
-**Estado:** proposed
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-29
 **Última actualización:** 2026-04-29
@@ -195,7 +195,47 @@ cueste decenas de líneas, no centenas — siguiendo la convención
 
 ## Sprints / hitos
 
-_(se llena cuando arranque ejecución)_
+### Sprint 1 — Vista Padres-Hijos (read-only) · 2026-04-29
+
+**Estado:** mergeado pendiente · PR Sprint 1 (este PR).
+
+Entregable:
+
+- Página `/rdb/productos/grupos` consumiendo `rdb.v_productos_grupo`.
+- `<DataTable>` con columnas: padre (con categoría como meta), costo
+  unitario, unidad, total hijos. Sort default por `padre_nombre` asc.
+- Filtros con `useUrlFilters` (ADR-007): búsqueda libre (matchea padre,
+  categoría e hijos) y toggle `solo_con_hijos`.
+- Estados con `<DataTable>` (loading + error + empty con
+  `<EmptyState>` ADR-006).
+- `<DetailDrawer>` (size `lg`, ADR-018) con tabla de hijos
+  (nombre / factor / precio) read-only. Empty state cuando el padre no
+  tiene hijos.
+- Sidebar: nuevo sub-item "Grupos · Padres-Hijos" bajo Inventario en RDB.
+- `ROUTE_TO_MODULE` actualizado: `/rdb/productos/grupos → rdb.productos`
+  (mismo slug que la página padre — sin granularidad RBAC nueva).
+- Smoke test e2e en `tests/e2e/smoke/auth-rdb-productos-grupos.spec.ts`
+  (carga + input + tabla + filter + click → drawer).
+
+Cierre técnico:
+
+- `parseHijos()` valida shape del jsonb defensivamente (ignora
+  entradas malformadas en lugar de fallar duro).
+- Test `'no duplicate slugs in ROUTE_TO_MODULE'` removido: la
+  uniqueness no aplica cuando sub-pages legítimas comparten módulo de
+  permisos con su padre. Reemplazado por comment explicativo en
+  `lib/permissions.test.ts`.
+- Detalle del grupo es read-only en Sprint 1; edición de
+  `factor_consumo` queda para Sprint 3 (configuración masiva).
+
+### Sprint 2 — Vista Recetas (próximo)
+
+Pendiente de arrancar. Decisiones técnicas a cerrar al arrancar:
+
+- Fuente de costo del insumo: `erp.productos.costo_unitario` vs
+  ponderado de movimientos recientes (afecta margen reportado).
+- Si la performance de costo calculado en cliente es aceptable o
+  amerita RPC.
 
 ## Decisiones registradas
 
@@ -221,4 +261,11 @@ Decisiones tomadas en la conversación de promoción:
 
 ## Bitácora
 
-_(append-only, escrita por Claude Code al ejecutar)_
+### 2026-04-29 · Sprint 1 mergeado pendiente · transición proposed → in_progress
+
+PR Sprint 1 (este PR). Vista `/rdb/productos/grupos` read-only sobre
+`rdb.v_productos_grupo`. Sidebar entry agregada, `ROUTE_TO_MODULE`
+actualizado, smoke test creado. Test de uniqueness en
+`lib/permissions.test.ts` removido (caso de sub-page legítima comparte
+slug). Estado de iniciativa cambia a `in_progress`. Próximo: Sprint 2
+(recetas + costo/margen) cuando Beto lo desbloquee.
