@@ -89,8 +89,8 @@ Síntomas visibles:
 | --- | -------------------------------------------- | ------- | ---- |
 | 1   | Foundation + ADR-016 + golden path tasks     | done    | #300 |
 | 2   | tasks (rich create + edit) + juntas adopters | done    | TBD  |
-| 3   | documentos (form-fields + create-sheet)      | next    | —    |
-| 4   | DILESA `[id]` inline forms                   | pending | —    |
+| 3   | documentos (form-fields + create + detail)   | done    | TBD  |
+| 4   | DILESA `[id]` inline forms                   | next    | —    |
 | 5   | Cortes (abrir/cerrar caja)                   | pending | —    |
 | 6   | empleado-alta-wizard (eval + migrate o spin) | pending | —    |
 | 7   | Cierre + INITIATIVES move to Done            | pending | —    |
@@ -123,6 +123,29 @@ en el pattern; si requiere API materialmente distinta, sale como
 `wizard-pattern` aparte para no contaminar la API simple del v1.
 
 ## Bitácora
+
+### 2026-04-29 — Sprint 3 mergeado
+
+`components/documentos/`:
+
+- `documento-form-fields.tsx`: refactor para leer/escribir desde
+  `useFormContext<DocForm>()`. Drop de `form`/`setForm` props. Cada
+  field usa `<FormField>` con render-prop. Lógica de cascadas
+  (auto-título de Escritura cuando cambia tipo/notaría/subtipo_meta)
+  conservada via `setValue` + `getValues`.
+- `documento-create-sheet.tsx`: migrado a `<Form>` + `useZodForm` +
+  `<FormActions>`. Schema `DocCreateSchema` (zod) con `tipo` required;
+  los demás campos son opcionales en create por el flujo IA.
+- `documento-detail-sheet.tsx`: extraído `DocEditSection` sub-componente
+  que usa `<Form>` + `useZodForm` para el modo edit. Padre maneja
+  `editing` boolean y delete state como antes; `editForm`/`setEditForm`
+  /`saving` eliminados.
+
+`emptyForm()` queda en `helpers.ts` porque se usa como `defaultValues`
+inicial de los `useZodForm`. `docToForm()` también queda — es el mapper
+documento → form values al entrar a edit.
+
+PR: pendiente.
 
 ### 2026-04-29 — Sprint 2 mergeado
 
