@@ -3,13 +3,10 @@
 **Slug:** `badge-system`
 **Empresas:** todas
 **Schemas afectados:** n/a (UI)
-**Estado:** proposed
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-27
-**Última actualización:** 2026-04-27
-
-> **Bloqueada hasta cierre de `forms-pattern`.** Alcance v1 detallado se
-> cierra cuando arranque su turno.
+**Última actualización:** 2026-04-29
 
 ## Problema
 
@@ -53,21 +50,36 @@ pending | active`. Cada uno con color de fondo, texto y borde
   se preserva.
 - ADR documentando los tonos y cuándo usar cada uno.
 
-## Alcance v1 (tentativo — refinar al arrancar)
+## Alcance v1 (cerrado 2026-04-29 — ver ADR-017)
 
-- [ ] Definir los 7 tonos canónicos + paleta (alineada con tokens
-      `--color-*` existentes en el sistema).
-- [ ] `<Badge>` actualizado con prop `tone` (preservar `variant` de
-      shadcn para compat, deprecar a futuro).
-- [ ] `<BadgeIcon>` opcional (algunos badges llevan ícono — visible
-      en `EstadoBadge` y `EtapaBadgeLarge`).
-- [ ] Helpers de mapping en `lib/badges/` o equivalente:
-      `taskEstadoTone`, `tareaPrioridadTone`, `corteEstadoTone`,
-      `etapaTerrenoTone`, `documentoTipoTone`.
-- [ ] Migrar wrappers existentes a usar `<Badge tone>` internamente.
-- [ ] Auditar usos directos de `<Badge variant="...">` en módulos
-      y migrar a `tone` semántico.
-- [ ] ADR (probable ADR-012).
+- [x] Definir 6 tonos canónicos: `neutral`, `info`, `success`, `warning`, `danger`, `accent`.
+- [x] `<Badge>` extendido con prop `tone` + export `BadgeTone` type.
+      Variants legacy (`default`, `secondary`, etc.) preservadas para usos
+      no-semánticos (counts, links). `tone` gana cuando se pasan ambos.
+- [x] `lib/status-tokens.ts` refactor: cada config expone `tone: BadgeTone`
+      al lado del legacy `cls`. 6 configs migrados (junta, prioridad
+      DILESA, anteproyecto, terreno etapa, prototipo etapa, proyecto fase).
+- [x] `components/tasks/tasks-shared.tsx`: `ESTADO_CONFIG`,
+      `PRIORIDAD_CONFIG`, `UPDATE_TIPO_CONFIG` con `tone` agregado.
+      `EstadoBadge` y `PrioridadBadge` migrados a `<Badge tone>`.
+- [x] ADR-017 con 6 reglas (B1-B6).
+- [ ] Migración del resto de callsites — Sprints 2+ (≈11 archivos).
+- [ ] Eliminar `cls` de los configs cuando todos los callsites migren.
+
+## Decisiones tomadas al cerrar alcance
+
+- **6 tones (no 7)**: agrupar `pending`+`active` bajo `info` y `success`
+  según contexto. Sin granularity loss porque el `label` siempre se
+  muestra. 7+ invita a debate "¿uso `pending` o `info`?".
+- **Sin `<BadgeIcon>` en v1**: los íconos custom en badges son raros
+  (1 caso real: `PrioridadTextBadge` con dot). No vale agregar API; si
+  surge, se itera.
+- **Sin helpers `mapEstadoToTone(estado)`**: el config ya provee
+  `cfg.tone`. Helper sería redundante.
+- **`tone` como naming** (vs `intent`/`kind`/`status`): consistente con
+  shadcn/Radix/MUI design system convention.
+- **Sin `size` prop**: el `<Badge>` actual tiene un solo size; si surge
+  necesidad de "hero badges" (ej. `EtapaBadgeLarge`), se evalúa aparte.
 
 ## Fuera de alcance
 
@@ -85,27 +97,38 @@ pending | active`. Cada uno con color de fondo, texto y borde
 - Visual audit: pasar por las 25 tablas migradas y confirmar que los
   badges del mismo tono se ven idénticos en todas.
 
-## Riesgos / preguntas abiertas
-
-- [ ] **¿Cuántos tonos son suficientes?** Más tonos = más decisiones
-      del caller. Menos tonos = menos expresividad. Mi voto previo:
-      7 (success, warning, error, info, neutral, pending, active).
-      Cerrar al arrancar.
-- [ ] **Coexistencia con `<Badge variant>` shadcn** — deprecar como
-      en `useSortableTable` (mantener exportado, marcar `@deprecated`).
-- [ ] **Naming**: `tone` vs `intent` vs `kind` vs `status`. `tone` es
-      común en design systems modernos.
-- [ ] **Tamaños**: `sm | md | lg` o solo uno. v1 probable 2 tamaños
-      (`md` default, `lg` para badges hero como `EtapaBadgeLarge`).
-
 ## Sprints / hitos
 
-_(se llena cuando arranque ejecución, vía Claude Code)_
+| #   | Sprint                                     | Estado  | PR  |
+| --- | ------------------------------------------ | ------- | --- |
+| 1   | Foundation + ADR-017 + golden tasks        | done    | TBD |
+| 2   | Migrar callsites de `cls` a `<Badge tone>` | pending | —   |
+| 3   | Eliminar `cls` de configs + cierre         | pending | —   |
 
 ## Decisiones registradas
 
-_(append-only, fechadas — escrito por Claude Code)_
+### 2026-04-29 · ADR-017 — Badge tones (Sprint 1)
+
+Codificado en [ADR-017](../adr/017_badge_system.md). Las 6 reglas:
+
+- **B1** — 6 tones canónicos: `neutral`/`info`/`success`/`warning`/`danger`/`accent`.
+- **B2** — Cada slug del repo mapea a un tone exactamente (en `status-tokens.ts`).
+- **B3** — `<Badge tone>` reemplaza `<span className="bg-X/15 text-X border-X/20">` en TODO el repo.
+- **B4** — `cls` legacy queda como derivado, no canónico (deprecación incremental tipo ADR-010 DT8).
+- **B5** — Variants legacy (`default`, `secondary`, etc.) coexisten con `tone`; `tone` gana cuando se pasan ambos.
+- **B6** — `<Badge tone="neutral">` para fallback de slugs desconocidos (defensivo contra drift DB↔UI).
 
 ## Bitácora
 
-_(append-only, escrita por Claude Code al ejecutar)_
+### 2026-04-29 — Sprint 1 mergeado
+
+Foundation:
+
+- `components/ui/badge.tsx` extendido con 6 tones (`neutral`/`info`/`success`/`warning`/`danger`/`accent`) + export `BadgeTone`.
+- `lib/status-tokens.ts` refactor — cada config (junta, prioridad DILESA, anteproyecto, terreno etapa, prototipo etapa, proyecto fase) expone `tone: BadgeTone` al lado del legacy `cls`.
+- `components/tasks/tasks-shared.tsx` — `ESTADO_CONFIG`, `PRIORIDAD_CONFIG`, `UPDATE_TIPO_CONFIG` con `tone`. `EstadoBadge` + `PrioridadBadge` golden migration a `<Badge tone>`.
+- ADR-017 con 6 reglas (B1-B6).
+
+Sprint 2 migrará los ≈11 callsites que aún rendean `<span className={cfg.cls}>`. Sprint 3 elimina `cls` cuando todos migren.
+
+PR: pendiente.
