@@ -18,15 +18,19 @@ export type Usuario = {
 
 // ── RBAC schema types (core.*) ─────────────────────────────────────────────
 export type Empresa = { id: string; nombre: string; slug: string };
-export const MODULO_SECCIONES = [
-  'administracion',
-  'rh',
-  'compras',
-  'inventario',
-  'operaciones',
-  'sistema',
-] as const;
-export type ModuloSeccion = (typeof MODULO_SECCIONES)[number];
+// NOTE: this file is a `'use server'` module — Next.js 16 only allows async
+// function exports from it. Anything else (e.g. `export const ...`) makes
+// EVERY action in the file fail at runtime with:
+//   `Error: A "use server" file can only export async functions`
+// Keep this as a pure type alias. If you need a runtime list of secciones,
+// put it in a sibling non-server file and import from there.
+export type ModuloSeccion =
+  | 'administracion'
+  | 'rh'
+  | 'compras'
+  | 'inventario'
+  | 'operaciones'
+  | 'sistema';
 
 export type Modulo = {
   id: string;
