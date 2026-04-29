@@ -40,10 +40,11 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { FieldLabel } from '@/components/ui/field-label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
-import { Plus, Search, RefreshCw, Loader2, Link2 } from 'lucide-react';
+import { Plus, Search, RefreshCw, Link2 } from 'lucide-react';
+import { z } from 'zod';
+import { Form, FormActions, FormField, useZodForm } from '@/components/forms';
 import {
   PROYECTO_FASE_CONFIG,
   PROYECTO_FASE_OPTIONS,
@@ -59,6 +60,26 @@ import {
 } from '@/lib/dilesa-constants';
 import { ModuleTabs, TabPanel, useActiveTab } from '@/components/shared/module-tabs';
 import { EmptyStateImported } from '@/components/shared/empty-state-imported';
+
+const ProyectoCreateSchema = z.object({
+  nombre: z.string().trim().min(1, 'El nombre es obligatorio'),
+  codigo: z.string().default(''),
+  terreno_id: z.string().min(1, 'El terreno es obligatorio'),
+  tipo_proyecto_id: z.string().default(''),
+  fecha_inicio: z.string().default(''),
+  notas: z.string().default(''),
+});
+
+type ProyectoCreateValues = z.infer<typeof ProyectoCreateSchema>;
+
+const proyectoCreateDefaults: ProyectoCreateValues = {
+  nombre: '',
+  codigo: '',
+  terreno_id: '',
+  tipo_proyecto_id: '',
+  fecha_inicio: '',
+  notas: '',
+};
 
 type Proyecto = {
   id: string;
@@ -142,13 +163,10 @@ function ProyectosInner() {
   const [filterFase, setFilterFase] = useState<string>('all');
 
   const [showCreate, setShowCreate] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [createNombre, setCreateNombre] = useState('');
-  const [createCodigo, setCreateCodigo] = useState('');
-  const [createTerrenoId, setCreateTerrenoId] = useState<string | null>(null);
-  const [createTipoProyectoId, setCreateTipoProyectoId] = useState<string | null>(null);
-  const [createFechaInicio, setCreateFechaInicio] = useState('');
-  const [createNotas, setCreateNotas] = useState('');
+  const createForm = useZodForm({
+    schema: ProyectoCreateSchema,
+    defaultValues: proyectoCreateDefaults,
+  });
 
   const fetchProyectos = useCallback(async () => {
     // Embed ambiguo cuando hay más de una FK entre tablas: especificamos nombre
@@ -240,36 +258,28 @@ function ProyectosInner() {
   }, [fetchProyectos, fetchValorComercial, fetchLookups]);
 
   const openCreate = () => {
-    setCreateNombre('');
-    setCreateCodigo('');
-    setCreateTerrenoId(null);
-    setCreateTipoProyectoId(null);
-    setCreateFechaInicio('');
-    setCreateNotas('');
+    createForm.reset(proyectoCreateDefaults);
     setShowCreate(true);
   };
 
-  const handleCreate = async () => {
-    if (!createNombre.trim() || !createTerrenoId) return;
-    setCreating(true);
+  const handleCreate = async (values: ProyectoCreateValues) => {
     const { data: newRow, error: err } = await supabase
       .schema('dilesa')
       .from('proyectos')
       .insert({
         empresa_id: DILESA_EMPRESA_ID,
-        nombre: createNombre.trim(),
-        codigo: createCodigo.trim() || null,
-        terreno_id: createTerrenoId,
-        tipo_proyecto_id: createTipoProyectoId,
-        fecha_inicio: createFechaInicio || null,
+        nombre: values.nombre.trim(),
+        codigo: values.codigo.trim() || null,
+        terreno_id: values.terreno_id,
+        tipo_proyecto_id: values.tipo_proyecto_id || null,
+        fecha_inicio: values.fecha_inicio || null,
         fase: 'planeacion',
         etapa: 'planeacion',
         decision_actual: 'desarrollar',
-        notas: createNotas.trim() || null,
+        notas: values.notas.trim() || null,
       })
       .select('id')
       .single();
-    setCreating(false);
     if (err) {
       alert(`Error al crear proyecto: ${err.message}`);
       return;
@@ -392,99 +402,93 @@ function ProyectosInner() {
               Anteproyectos.
             </SheetDescription>
           </SheetHeader>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void handleCreate();
-            }}
-            className="mt-6 space-y-5"
-          >
-            <div>
-              <FieldLabel htmlFor="p-nombre" required>
-                Nombre
-              </FieldLabel>
-              <Input
-                id="p-nombre"
-                value={createNombre}
-                onChange={(e) => setCreateNombre(e.target.value)}
-                placeholder="Ej. Fracc. Los Nogales Etapa I"
-                required
-              />
-            </div>
-            <div>
-              <FieldLabel htmlFor="p-codigo">Código</FieldLabel>
-              <Input
-                id="p-codigo"
-                value={createCodigo}
-                onChange={(e) => setCreateCodigo(e.target.value)}
-                placeholder="Ej. LNE1"
-              />
-            </div>
-            <div>
-              <FieldLabel htmlFor="p-terreno" required>
-                Terreno
-              </FieldLabel>
-              <Combobox
-                id="p-terreno"
-                value={createTerrenoId}
-                onChange={setCreateTerrenoId}
-                options={terrenoOptions}
-                placeholder={
-                  terrenoOptions.length === 0 ? 'No hay terrenos activos' : 'Selecciona terreno…'
-                }
-                searchPlaceholder="Buscar por nombre o clave…"
-                disabled={terrenoOptions.length === 0}
-              />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <FieldLabel htmlFor="p-tipo">Tipo de proyecto</FieldLabel>
-                <Combobox
-                  id="p-tipo"
-                  value={createTipoProyectoId}
-                  onChange={setCreateTipoProyectoId}
-                  options={tipoOptions}
-                  placeholder="(opcional)"
-                  allowClear
-                />
-              </div>
-              <div>
-                <FieldLabel htmlFor="p-fi">Fecha de inicio</FieldLabel>
+          <Form form={createForm} onSubmit={handleCreate} className="mt-6 space-y-5">
+            <FormField name="nombre" label="Nombre" required>
+              {(field) => (
                 <Input
-                  id="p-fi"
-                  type="date"
-                  value={createFechaInicio}
-                  onChange={(e) => setCreateFechaInicio(e.target.value)}
+                  {...field}
+                  id={field.id}
+                  aria-invalid={field.invalid || undefined}
+                  aria-describedby={field.describedBy}
+                  placeholder="Ej. Fracc. Los Nogales Etapa I"
                 />
-              </div>
+              )}
+            </FormField>
+            <FormField name="codigo" label="Código">
+              {(field) => (
+                <Input
+                  {...field}
+                  id={field.id}
+                  aria-invalid={field.invalid || undefined}
+                  aria-describedby={field.describedBy}
+                  placeholder="Ej. LNE1"
+                />
+              )}
+            </FormField>
+            <FormField name="terreno_id" label="Terreno" required>
+              {(field) => (
+                <Combobox
+                  id={field.id}
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={terrenoOptions}
+                  placeholder={
+                    terrenoOptions.length === 0 ? 'No hay terrenos activos' : 'Selecciona terreno…'
+                  }
+                  searchPlaceholder="Buscar por nombre o clave…"
+                  disabled={terrenoOptions.length === 0}
+                />
+              )}
+            </FormField>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField name="tipo_proyecto_id" label="Tipo de proyecto">
+                {(field) => (
+                  <Combobox
+                    id={field.id}
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={tipoOptions}
+                    placeholder="(opcional)"
+                    allowClear
+                  />
+                )}
+              </FormField>
+              <FormField name="fecha_inicio" label="Fecha de inicio">
+                {(field) => (
+                  <Input
+                    {...field}
+                    id={field.id}
+                    aria-invalid={field.invalid || undefined}
+                    aria-describedby={field.describedBy}
+                    type="date"
+                  />
+                )}
+              </FormField>
             </div>
-            <div>
-              <FieldLabel htmlFor="p-notas">Notas</FieldLabel>
-              <Input
-                id="p-notas"
-                value={createNotas}
-                onChange={(e) => setCreateNotas(e.target.value)}
-                placeholder="Contexto del proyecto"
-              />
-            </div>
+            <FormField name="notas" label="Notas">
+              {(field) => (
+                <Input
+                  {...field}
+                  id={field.id}
+                  aria-invalid={field.invalid || undefined}
+                  aria-describedby={field.describedBy}
+                  placeholder="Contexto del proyecto"
+                />
+              )}
+            </FormField>
             <p className="text-xs text-[var(--text)]/50">
               El proyecto se crea en fase <strong>planeación</strong>. El resto del expediente
               (presupuesto, área vendible, fraccionamiento de prototipos) se captura en el detalle.
             </p>
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={creating || !createNombre.trim() || !createTerrenoId}>
-                {creating ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Plus className="size-4" />
-                )}
-                Crear proyecto
-              </Button>
-            </div>
-          </form>
+            <FormActions
+              cancelLabel="Cancelar"
+              submitLabel="Crear proyecto"
+              submittingLabel="Creando..."
+              submitIcon={<Plus className="size-4" />}
+              onCancel={() => setShowCreate(false)}
+              className="border-t-0 pt-2"
+            />
+          </Form>
         </SheetContent>
       </Sheet>
     </div>

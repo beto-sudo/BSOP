@@ -39,9 +39,10 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { FieldLabel } from '@/components/ui/field-label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, RefreshCw, Loader2, ImageOff, FileWarning } from 'lucide-react';
+import { Plus, Search, RefreshCw, ImageOff, FileWarning } from 'lucide-react';
+import { z } from 'zod';
+import { Form, FormActions, FormField, useZodForm } from '@/components/forms';
 import {
   PROTOTIPO_ETAPA_CONFIG,
   PROTOTIPO_ETAPA_OPTIONS,
@@ -58,6 +59,40 @@ import {
 } from '@/lib/dilesa-constants';
 import { ModuleTabs, TabPanel, useActiveTab } from '@/components/shared/module-tabs';
 import { EmptyStateImported } from '@/components/shared/empty-state-imported';
+
+const PrototipoCreateSchema = z.object({
+  nombre: z.string().trim().min(1, 'El nombre es obligatorio'),
+  codigo: z.string().default(''),
+  superficie_construida_m2: z.string().default(''),
+  superficie_lote_min_m2: z.string().default(''),
+  recamaras: z.string().default(''),
+  banos: z.string().default(''),
+  valor_comercial: z.string().default(''),
+  costo_urbanizacion: z.string().default(''),
+  costo_materiales: z.string().default(''),
+  costo_mano_obra: z.string().default(''),
+  costo_registro_ruv: z.string().default(''),
+  seguro_calidad: z.string().default(''),
+  costo_comercializacion: z.string().default(''),
+});
+
+type PrototipoCreateValues = z.infer<typeof PrototipoCreateSchema>;
+
+const prototipoCreateDefaults: PrototipoCreateValues = {
+  nombre: '',
+  codigo: '',
+  superficie_construida_m2: '',
+  superficie_lote_min_m2: '',
+  recamaras: '',
+  banos: '',
+  valor_comercial: '',
+  costo_urbanizacion: '',
+  costo_materiales: '',
+  costo_mano_obra: '',
+  costo_registro_ruv: '',
+  seguro_calidad: '',
+  costo_comercializacion: '',
+};
 
 type Prototipo = {
   id: string;
@@ -135,20 +170,10 @@ function PrototiposInner() {
   const [filterEtapa, setFilterEtapa] = useState<string>('all');
 
   const [showCreate, setShowCreate] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [createNombre, setCreateNombre] = useState('');
-  const [createCodigo, setCreateCodigo] = useState('');
-  const [createSupConstruida, setCreateSupConstruida] = useState('');
-  const [createSupLoteMin, setCreateSupLoteMin] = useState('');
-  const [createRecamaras, setCreateRecamaras] = useState('');
-  const [createBanos, setCreateBanos] = useState('');
-  const [createValorComercial, setCreateValorComercial] = useState('');
-  const [createCostoUrban, setCreateCostoUrban] = useState('');
-  const [createCostoMateriales, setCreateCostoMateriales] = useState('');
-  const [createCostoManoObra, setCreateCostoManoObra] = useState('');
-  const [createCostoRuv, setCreateCostoRuv] = useState('');
-  const [createSeguroCalidad, setCreateSeguroCalidad] = useState('');
-  const [createCostoComer, setCreateCostoComer] = useState('');
+  const createForm = useZodForm({
+    schema: PrototipoCreateSchema,
+    defaultValues: prototipoCreateDefaults,
+  });
 
   const fetchPrototipos = useCallback(async () => {
     // Embed clasificacion_inmobiliaria vía FK — PostgREST resuelve la relación
@@ -183,50 +208,35 @@ function PrototiposInner() {
   }, [fetchPrototipos]);
 
   const openCreate = () => {
-    setCreateNombre('');
-    setCreateCodigo('');
-    setCreateSupConstruida('');
-    setCreateSupLoteMin('');
-    setCreateRecamaras('');
-    setCreateBanos('');
-    setCreateValorComercial('');
-    setCreateCostoUrban('');
-    setCreateCostoMateriales('');
-    setCreateCostoManoObra('');
-    setCreateCostoRuv('');
-    setCreateSeguroCalidad('');
-    setCreateCostoComer('');
+    createForm.reset(prototipoCreateDefaults);
     setShowCreate(true);
   };
 
   const parseNum = (v: string) => (v.trim() ? Number(v) : null);
 
-  const handleCreate = async () => {
-    if (!createNombre.trim()) return;
-    setCreating(true);
+  const handleCreate = async (values: PrototipoCreateValues) => {
     // costo_total_unitario NO se envía en Insert — es GENERATED en DB.
     const { data: newRow, error: err } = await supabase
       .schema('dilesa')
       .from('prototipos')
       .insert({
         empresa_id: DILESA_EMPRESA_ID,
-        nombre: createNombre.trim(),
-        codigo: createCodigo.trim() || null,
-        superficie_construida_m2: parseNum(createSupConstruida),
-        superficie_lote_min_m2: parseNum(createSupLoteMin),
-        recamaras: createRecamaras.trim() ? Number.parseInt(createRecamaras, 10) : null,
-        banos: parseNum(createBanos),
-        valor_comercial: parseNum(createValorComercial),
-        costo_urbanizacion: parseNum(createCostoUrban),
-        costo_materiales: parseNum(createCostoMateriales),
-        costo_mano_obra: parseNum(createCostoManoObra),
-        costo_registro_ruv: parseNum(createCostoRuv),
-        seguro_calidad: parseNum(createSeguroCalidad),
-        costo_comercializacion: parseNum(createCostoComer),
+        nombre: values.nombre.trim(),
+        codigo: values.codigo.trim() || null,
+        superficie_construida_m2: parseNum(values.superficie_construida_m2),
+        superficie_lote_min_m2: parseNum(values.superficie_lote_min_m2),
+        recamaras: values.recamaras.trim() ? Number.parseInt(values.recamaras, 10) : null,
+        banos: parseNum(values.banos),
+        valor_comercial: parseNum(values.valor_comercial),
+        costo_urbanizacion: parseNum(values.costo_urbanizacion),
+        costo_materiales: parseNum(values.costo_materiales),
+        costo_mano_obra: parseNum(values.costo_mano_obra),
+        costo_registro_ruv: parseNum(values.costo_registro_ruv),
+        seguro_calidad: parseNum(values.seguro_calidad),
+        costo_comercializacion: parseNum(values.costo_comercializacion),
       })
       .select('id')
       .single();
-    setCreating(false);
     if (err) {
       alert(`Error al crear prototipo: ${err.message}`);
       return;
@@ -329,38 +339,33 @@ function PrototiposInner() {
               total se calcula solo (GENERATED).
             </SheetDescription>
           </SheetHeader>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void handleCreate();
-            }}
-            className="mt-6 space-y-5"
-          >
+          <Form form={createForm} onSubmit={handleCreate} className="mt-6 space-y-5">
             <section className="space-y-3">
               <h3 className="text-xs font-semibold uppercase tracking-widest text-[var(--text)]/50">
                 Identidad
               </h3>
-              <div>
-                <FieldLabel htmlFor="p-nombre" required>
-                  Nombre
-                </FieldLabel>
-                <Input
-                  id="p-nombre"
-                  value={createNombre}
-                  onChange={(e) => setCreateNombre(e.target.value)}
-                  placeholder="Ej. Modelo Nogal 72"
-                  required
-                />
-              </div>
-              <div>
-                <FieldLabel htmlFor="p-codigo">Código</FieldLabel>
-                <Input
-                  id="p-codigo"
-                  value={createCodigo}
-                  onChange={(e) => setCreateCodigo(e.target.value)}
-                  placeholder="Ej. NGL-72"
-                />
-              </div>
+              <FormField name="nombre" label="Nombre" required>
+                {(field) => (
+                  <Input
+                    {...field}
+                    id={field.id}
+                    aria-invalid={field.invalid || undefined}
+                    aria-describedby={field.describedBy}
+                    placeholder="Ej. Modelo Nogal 72"
+                  />
+                )}
+              </FormField>
+              <FormField name="codigo" label="Código">
+                {(field) => (
+                  <Input
+                    {...field}
+                    id={field.id}
+                    aria-invalid={field.invalid || undefined}
+                    aria-describedby={field.describedBy}
+                    placeholder="Ej. NGL-72"
+                  />
+                )}
+              </FormField>
             </section>
 
             <section className="space-y-3">
@@ -368,56 +373,64 @@ function PrototiposInner() {
                 Dimensiones
               </h3>
               <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <FieldLabel htmlFor="p-sup-const">Superficie construida (m²)</FieldLabel>
-                  <Input
-                    id="p-sup-const"
-                    type="number"
-                    step="0.01"
-                    inputMode="decimal"
-                    value={createSupConstruida}
-                    onChange={(e) => setCreateSupConstruida(e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-                <div>
-                  <FieldLabel htmlFor="p-sup-lote">Lote mínimo (m²)</FieldLabel>
-                  <Input
-                    id="p-sup-lote"
-                    type="number"
-                    step="0.01"
-                    inputMode="decimal"
-                    value={createSupLoteMin}
-                    onChange={(e) => setCreateSupLoteMin(e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
+                <FormField name="superficie_construida_m2" label="Superficie construida (m²)">
+                  {(field) => (
+                    <Input
+                      {...field}
+                      id={field.id}
+                      aria-invalid={field.invalid || undefined}
+                      aria-describedby={field.describedBy}
+                      type="number"
+                      step="0.01"
+                      inputMode="decimal"
+                      placeholder="0"
+                    />
+                  )}
+                </FormField>
+                <FormField name="superficie_lote_min_m2" label="Lote mínimo (m²)">
+                  {(field) => (
+                    <Input
+                      {...field}
+                      id={field.id}
+                      aria-invalid={field.invalid || undefined}
+                      aria-describedby={field.describedBy}
+                      type="number"
+                      step="0.01"
+                      inputMode="decimal"
+                      placeholder="0"
+                    />
+                  )}
+                </FormField>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <FieldLabel htmlFor="p-rec">Recámaras</FieldLabel>
-                  <Input
-                    id="p-rec"
-                    type="number"
-                    step="1"
-                    inputMode="numeric"
-                    value={createRecamaras}
-                    onChange={(e) => setCreateRecamaras(e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-                <div>
-                  <FieldLabel htmlFor="p-ban">Baños</FieldLabel>
-                  <Input
-                    id="p-ban"
-                    type="number"
-                    step="0.5"
-                    inputMode="decimal"
-                    value={createBanos}
-                    onChange={(e) => setCreateBanos(e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
+                <FormField name="recamaras" label="Recámaras">
+                  {(field) => (
+                    <Input
+                      {...field}
+                      id={field.id}
+                      aria-invalid={field.invalid || undefined}
+                      aria-describedby={field.describedBy}
+                      type="number"
+                      step="1"
+                      inputMode="numeric"
+                      placeholder="0"
+                    />
+                  )}
+                </FormField>
+                <FormField name="banos" label="Baños">
+                  {(field) => (
+                    <Input
+                      {...field}
+                      id={field.id}
+                      aria-invalid={field.invalid || undefined}
+                      aria-describedby={field.describedBy}
+                      type="number"
+                      step="0.5"
+                      inputMode="decimal"
+                      placeholder="0"
+                    />
+                  )}
+                </FormField>
               </div>
             </section>
 
@@ -425,108 +438,117 @@ function PrototiposInner() {
               <h3 className="text-xs font-semibold uppercase tracking-widest text-[var(--text)]/50">
                 Económica
               </h3>
-              <div>
-                <FieldLabel htmlFor="p-valor">Valor comercial</FieldLabel>
-                <Input
-                  id="p-valor"
-                  type="number"
-                  step="0.01"
-                  inputMode="decimal"
-                  value={createValorComercial}
-                  onChange={(e) => setCreateValorComercial(e.target.value)}
-                  placeholder="0"
-                />
-              </div>
+              <FormField name="valor_comercial" label="Valor comercial">
+                {(field) => (
+                  <Input
+                    {...field}
+                    id={field.id}
+                    aria-invalid={field.invalid || undefined}
+                    aria-describedby={field.describedBy}
+                    type="number"
+                    step="0.01"
+                    inputMode="decimal"
+                    placeholder="0"
+                  />
+                )}
+              </FormField>
               <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <FieldLabel htmlFor="p-urban">Costo urbanización</FieldLabel>
-                  <Input
-                    id="p-urban"
-                    type="number"
-                    step="0.01"
-                    inputMode="decimal"
-                    value={createCostoUrban}
-                    onChange={(e) => setCreateCostoUrban(e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-                <div>
-                  <FieldLabel htmlFor="p-mat">Costo materiales</FieldLabel>
-                  <Input
-                    id="p-mat"
-                    type="number"
-                    step="0.01"
-                    inputMode="decimal"
-                    value={createCostoMateriales}
-                    onChange={(e) => setCreateCostoMateriales(e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-                <div>
-                  <FieldLabel htmlFor="p-mo">Costo mano de obra</FieldLabel>
-                  <Input
-                    id="p-mo"
-                    type="number"
-                    step="0.01"
-                    inputMode="decimal"
-                    value={createCostoManoObra}
-                    onChange={(e) => setCreateCostoManoObra(e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-                <div>
-                  <FieldLabel htmlFor="p-ruv">Registro RUV</FieldLabel>
-                  <Input
-                    id="p-ruv"
-                    type="number"
-                    step="0.01"
-                    inputMode="decimal"
-                    value={createCostoRuv}
-                    onChange={(e) => setCreateCostoRuv(e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-                <div>
-                  <FieldLabel htmlFor="p-seg">Seguro de calidad</FieldLabel>
-                  <Input
-                    id="p-seg"
-                    type="number"
-                    step="0.01"
-                    inputMode="decimal"
-                    value={createSeguroCalidad}
-                    onChange={(e) => setCreateSeguroCalidad(e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-                <div>
-                  <FieldLabel htmlFor="p-com">Comercialización</FieldLabel>
-                  <Input
-                    id="p-com"
-                    type="number"
-                    step="0.01"
-                    inputMode="decimal"
-                    value={createCostoComer}
-                    onChange={(e) => setCreateCostoComer(e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
+                <FormField name="costo_urbanizacion" label="Costo urbanización">
+                  {(field) => (
+                    <Input
+                      {...field}
+                      id={field.id}
+                      aria-invalid={field.invalid || undefined}
+                      aria-describedby={field.describedBy}
+                      type="number"
+                      step="0.01"
+                      inputMode="decimal"
+                      placeholder="0"
+                    />
+                  )}
+                </FormField>
+                <FormField name="costo_materiales" label="Costo materiales">
+                  {(field) => (
+                    <Input
+                      {...field}
+                      id={field.id}
+                      aria-invalid={field.invalid || undefined}
+                      aria-describedby={field.describedBy}
+                      type="number"
+                      step="0.01"
+                      inputMode="decimal"
+                      placeholder="0"
+                    />
+                  )}
+                </FormField>
+                <FormField name="costo_mano_obra" label="Costo mano de obra">
+                  {(field) => (
+                    <Input
+                      {...field}
+                      id={field.id}
+                      aria-invalid={field.invalid || undefined}
+                      aria-describedby={field.describedBy}
+                      type="number"
+                      step="0.01"
+                      inputMode="decimal"
+                      placeholder="0"
+                    />
+                  )}
+                </FormField>
+                <FormField name="costo_registro_ruv" label="Registro RUV">
+                  {(field) => (
+                    <Input
+                      {...field}
+                      id={field.id}
+                      aria-invalid={field.invalid || undefined}
+                      aria-describedby={field.describedBy}
+                      type="number"
+                      step="0.01"
+                      inputMode="decimal"
+                      placeholder="0"
+                    />
+                  )}
+                </FormField>
+                <FormField name="seguro_calidad" label="Seguro de calidad">
+                  {(field) => (
+                    <Input
+                      {...field}
+                      id={field.id}
+                      aria-invalid={field.invalid || undefined}
+                      aria-describedby={field.describedBy}
+                      type="number"
+                      step="0.01"
+                      inputMode="decimal"
+                      placeholder="0"
+                    />
+                  )}
+                </FormField>
+                <FormField name="costo_comercializacion" label="Comercialización">
+                  {(field) => (
+                    <Input
+                      {...field}
+                      id={field.id}
+                      aria-invalid={field.invalid || undefined}
+                      aria-describedby={field.describedBy}
+                      type="number"
+                      step="0.01"
+                      inputMode="decimal"
+                      placeholder="0"
+                    />
+                  )}
+                </FormField>
               </div>
             </section>
 
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={creating || !createNombre.trim()}>
-                {creating ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Plus className="size-4" />
-                )}
-                Crear prototipo
-              </Button>
-            </div>
-          </form>
+            <FormActions
+              cancelLabel="Cancelar"
+              submitLabel="Crear prototipo"
+              submittingLabel="Creando..."
+              submitIcon={<Plus className="size-4" />}
+              onCancel={() => setShowCreate(false)}
+              className="border-t-0 pt-2"
+            />
+          </Form>
         </SheetContent>
       </Sheet>
     </div>

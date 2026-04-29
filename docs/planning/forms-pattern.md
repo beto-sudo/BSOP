@@ -90,8 +90,8 @@ Síntomas visibles:
 | 1   | Foundation + ADR-016 + golden path tasks     | done    | #300 |
 | 2   | tasks (rich create + edit) + juntas adopters | done    | TBD  |
 | 3   | documentos (form-fields + create + detail)   | done    | TBD  |
-| 4   | DILESA `[id]` inline forms                   | next    | —    |
-| 5   | Cortes (abrir/cerrar caja)                   | pending | —    |
+| 4   | DILESA list pages (terrenos/proyectos/etc.)  | done    | TBD  |
+| 5   | Cortes (abrir/cerrar caja)                   | next    | —    |
 | 6   | empleado-alta-wizard (eval + migrate o spin) | pending | —    |
 | 7   | Cierre + INITIATIVES move to Done            | pending | —    |
 
@@ -123,6 +123,33 @@ en el pattern; si requiere API materialmente distinta, sale como
 `wizard-pattern` aparte para no contaminar la API simple del v1.
 
 ## Bitácora
+
+### 2026-04-29 — Sprint 4 mergeado
+
+`app/dilesa/{terrenos,proyectos,anteproyectos,prototipos}/page.tsx`: las
+4 list pages tienen un Sheet "Nuevo X" con form de creación. Migrados
+todos a `<Form>` + `useZodForm` + `<FormField>` + `<FormActions>`.
+
+Boilerplate eliminado: 27 `useState` per-field reemplazados por 4
+`useZodForm` (uno por list page). Validación inline `if (!nombre.trim())
+return` removida — vive en zod schema. Required fields:
+
+- `terrenos`: `nombre`.
+- `proyectos`: `nombre` + `terreno_id` + `tipo_proyecto_id`.
+- `anteproyectos`: `nombre` + `terreno_id`.
+- `prototipos`: `nombre` + `terreno_id` + `tipo_prototipo_id`.
+
+`<select>` HTML nativos preservados (no se migró a `<Combobox>` —
+fuera de alcance). `<Combobox>` ya usados se mantienen, ahora dentro de
+`<FormField>` render-prop con `value={field.value}` / `onChange={field.onChange}`.
+
+Aclaración del scope del sprint: el planning original decía "DILESA
+`[id]` inline forms"; la realidad es que los `[id]` pages usan
+EditableField/inline-edit (no forms), mientras que los **list** pages
+son los que tienen los Sheets con forms. Se actualizó el alcance del
+sprint para reflejarlo.
+
+PR: pendiente.
 
 ### 2026-04-29 — Sprint 3 mergeado
 

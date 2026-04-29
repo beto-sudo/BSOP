@@ -38,10 +38,11 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { FieldLabel } from '@/components/ui/field-label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
-import { Plus, Search, RefreshCw, Loader2, AlertTriangle } from 'lucide-react';
+import { Plus, Search, RefreshCw, AlertTriangle } from 'lucide-react';
+import { z } from 'zod';
+import { Form, FormActions, FormField, useZodForm } from '@/components/forms';
 import {
   ANTEPROYECTO_ESTADO_CONFIG,
   PRIORIDAD_CONFIG,
@@ -57,6 +58,30 @@ import {
 } from '@/lib/dilesa-constants';
 import { ModuleTabs, TabPanel, useActiveTab } from '@/components/shared/module-tabs';
 import { EmptyStateImported } from '@/components/shared/empty-state-imported';
+
+const AnteproyectoCreateSchema = z.object({
+  nombre: z.string().trim().min(1, 'El nombre es obligatorio'),
+  terreno_id: z.string().min(1, 'El terreno es obligatorio'),
+  tipo_proyecto_id: z.string().default(''),
+  fecha_inicio: z.string().default(''),
+  area_vendible_m2: z.string().default(''),
+  areas_verdes_m2: z.string().default(''),
+  cantidad_lotes: z.string().default(''),
+  infraestructura_cabecera_inversion: z.string().default(''),
+});
+
+type AnteproyectoCreateValues = z.infer<typeof AnteproyectoCreateSchema>;
+
+const anteproyectoCreateDefaults: AnteproyectoCreateValues = {
+  nombre: '',
+  terreno_id: '',
+  tipo_proyecto_id: '',
+  fecha_inicio: '',
+  area_vendible_m2: '',
+  areas_verdes_m2: '',
+  cantidad_lotes: '',
+  infraestructura_cabecera_inversion: '',
+};
 
 type TerrenoOption = {
   id: string;
@@ -162,15 +187,10 @@ function AnteproyectosInner() {
   const [filterEstado, setFilterEstado] = useState<string>('all');
 
   const [showCreate, setShowCreate] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [createNombre, setCreateNombre] = useState('');
-  const [createTerrenoId, setCreateTerrenoId] = useState('');
-  const [createTipoProyectoId, setCreateTipoProyectoId] = useState('');
-  const [createFechaInicio, setCreateFechaInicio] = useState('');
-  const [createAreaVendible, setCreateAreaVendible] = useState('');
-  const [createAreasVerdes, setCreateAreasVerdes] = useState('');
-  const [createCantidadLotes, setCreateCantidadLotes] = useState('');
-  const [createInfraestructura, setCreateInfraestructura] = useState('');
+  const createForm = useZodForm({
+    schema: AnteproyectoCreateSchema,
+    defaultValues: anteproyectoCreateDefaults,
+  });
 
   const fetchAll = useCallback(async () => {
     const [apRes, vRes, tRes, tpRes] = await Promise.all([
@@ -247,40 +267,30 @@ function AnteproyectosInner() {
   }, [fetchAll]);
 
   const openCreate = () => {
-    setCreateNombre('');
-    setCreateTerrenoId('');
-    setCreateTipoProyectoId('');
-    setCreateFechaInicio('');
-    setCreateAreaVendible('');
-    setCreateAreasVerdes('');
-    setCreateCantidadLotes('');
-    setCreateInfraestructura('');
+    createForm.reset(anteproyectoCreateDefaults);
     setShowCreate(true);
   };
 
-  const handleCreate = async () => {
-    if (!createNombre.trim() || !createTerrenoId) return;
-    setCreating(true);
+  const handleCreate = async (values: AnteproyectoCreateValues) => {
     const { data: newRow, error: err } = await supabase
       .schema('dilesa')
       .from('anteproyectos')
       .insert({
         empresa_id: DILESA_EMPRESA_ID,
-        nombre: createNombre.trim(),
-        terreno_id: createTerrenoId,
-        tipo_proyecto_id: createTipoProyectoId || null,
-        fecha_inicio: createFechaInicio || null,
-        area_vendible_m2: createAreaVendible ? Number(createAreaVendible) : null,
-        areas_verdes_m2: createAreasVerdes ? Number(createAreasVerdes) : null,
-        cantidad_lotes: createCantidadLotes ? Number(createCantidadLotes) : null,
-        infraestructura_cabecera_inversion: createInfraestructura
-          ? Number(createInfraestructura)
+        nombre: values.nombre.trim(),
+        terreno_id: values.terreno_id,
+        tipo_proyecto_id: values.tipo_proyecto_id || null,
+        fecha_inicio: values.fecha_inicio || null,
+        area_vendible_m2: values.area_vendible_m2 ? Number(values.area_vendible_m2) : null,
+        areas_verdes_m2: values.areas_verdes_m2 ? Number(values.areas_verdes_m2) : null,
+        cantidad_lotes: values.cantidad_lotes ? Number(values.cantidad_lotes) : null,
+        infraestructura_cabecera_inversion: values.infraestructura_cabecera_inversion
+          ? Number(values.infraestructura_cabecera_inversion)
           : null,
         estado: 'en_analisis',
       })
       .select('id')
       .single();
-    setCreating(false);
     if (err) {
       alert(`Error al crear anteproyecto: ${err.message}`);
       return;
@@ -400,142 +410,147 @@ function AnteproyectosInner() {
               desde el detalle.
             </SheetDescription>
           </SheetHeader>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void handleCreate();
-            }}
-            className="mt-6 space-y-5"
-          >
-            <div>
-              <FieldLabel htmlFor="ap-nombre" required>
-                Nombre del anteproyecto
-              </FieldLabel>
-              <Input
-                id="ap-nombre"
-                value={createNombre}
-                onChange={(e) => setCreateNombre(e.target.value)}
-                placeholder="Ej. Los Nogales Etapa 1"
-                required
-              />
-            </div>
+          <Form form={createForm} onSubmit={handleCreate} className="mt-6 space-y-5">
+            <FormField name="nombre" label="Nombre del anteproyecto" required>
+              {(field) => (
+                <Input
+                  {...field}
+                  id={field.id}
+                  aria-invalid={field.invalid || undefined}
+                  aria-describedby={field.describedBy}
+                  placeholder="Ej. Los Nogales Etapa 1"
+                />
+              )}
+            </FormField>
 
-            <div>
-              <FieldLabel htmlFor="ap-terreno" required>
-                Terreno
-              </FieldLabel>
-              <Combobox
-                id="ap-terreno"
-                value={createTerrenoId}
-                onChange={setCreateTerrenoId}
-                options={terrenoOptions}
-                placeholder="Seleccionar terreno…"
-                searchPlaceholder="Buscar por nombre o municipio…"
-                emptyText="Sin terrenos disponibles"
-                allowClear
-              />
-              {terrenoOptions.length === 0 ? (
-                <p className="mt-1 text-xs text-[var(--text)]/55">
-                  Aún no hay terrenos capturados. Crea uno en{' '}
-                  <Link href="/dilesa/terrenos" className="text-[var(--accent)] hover:underline">
-                    Terrenos
-                  </Link>
-                  .
-                </p>
-              ) : null}
-            </div>
+            <FormField name="terreno_id" label="Terreno" required>
+              {(field) => (
+                <>
+                  <Combobox
+                    id={field.id}
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={terrenoOptions}
+                    placeholder="Seleccionar terreno…"
+                    searchPlaceholder="Buscar por nombre o municipio…"
+                    emptyText="Sin terrenos disponibles"
+                    allowClear
+                  />
+                  {terrenoOptions.length === 0 ? (
+                    <p className="mt-1 text-xs text-[var(--text)]/55">
+                      Aún no hay terrenos capturados. Crea uno en{' '}
+                      <Link
+                        href="/dilesa/terrenos"
+                        className="text-[var(--accent)] hover:underline"
+                      >
+                        Terrenos
+                      </Link>
+                      .
+                    </p>
+                  ) : null}
+                </>
+              )}
+            </FormField>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <FieldLabel htmlFor="ap-tipo">Tipo de proyecto</FieldLabel>
-                <Combobox
-                  id="ap-tipo"
-                  value={createTipoProyectoId}
-                  onChange={setCreateTipoProyectoId}
-                  options={tipoProyectoOptions}
-                  placeholder={tipoProyectoOptions.length === 0 ? '(sin definir)' : 'Seleccionar…'}
-                  emptyText="Catálogo vacío"
-                  allowClear
-                />
-              </div>
-              <div>
-                <FieldLabel htmlFor="ap-fecha">Fecha inicio</FieldLabel>
-                <Input
-                  id="ap-fecha"
-                  type="date"
-                  value={createFechaInicio}
-                  onChange={(e) => setCreateFechaInicio(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <FieldLabel htmlFor="ap-area-v">Área vendible (m²)</FieldLabel>
-                <Input
-                  id="ap-area-v"
-                  type="number"
-                  step="0.01"
-                  inputMode="decimal"
-                  value={createAreaVendible}
-                  onChange={(e) => setCreateAreaVendible(e.target.value)}
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <FieldLabel htmlFor="ap-area-verdes">Áreas verdes (m²)</FieldLabel>
-                <Input
-                  id="ap-area-verdes"
-                  type="number"
-                  step="0.01"
-                  inputMode="decimal"
-                  value={createAreasVerdes}
-                  onChange={(e) => setCreateAreasVerdes(e.target.value)}
-                  placeholder="0"
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <FieldLabel htmlFor="ap-lotes">Cantidad de lotes</FieldLabel>
-                <Input
-                  id="ap-lotes"
-                  type="number"
-                  inputMode="numeric"
-                  value={createCantidadLotes}
-                  onChange={(e) => setCreateCantidadLotes(e.target.value)}
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <FieldLabel htmlFor="ap-infra">Inversión cabecera</FieldLabel>
-                <Input
-                  id="ap-infra"
-                  type="number"
-                  step="0.01"
-                  inputMode="decimal"
-                  value={createInfraestructura}
-                  onChange={(e) => setCreateInfraestructura(e.target.value)}
-                  placeholder="0"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={creating || !createNombre.trim() || !createTerrenoId}>
-                {creating ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Plus className="size-4" />
+              <FormField name="tipo_proyecto_id" label="Tipo de proyecto">
+                {(field) => (
+                  <Combobox
+                    id={field.id}
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={tipoProyectoOptions}
+                    placeholder={
+                      tipoProyectoOptions.length === 0 ? '(sin definir)' : 'Seleccionar…'
+                    }
+                    emptyText="Catálogo vacío"
+                    allowClear
+                  />
                 )}
-                Crear anteproyecto
-              </Button>
+              </FormField>
+              <FormField name="fecha_inicio" label="Fecha inicio">
+                {(field) => (
+                  <Input
+                    {...field}
+                    id={field.id}
+                    aria-invalid={field.invalid || undefined}
+                    aria-describedby={field.describedBy}
+                    type="date"
+                  />
+                )}
+              </FormField>
             </div>
-          </form>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField name="area_vendible_m2" label="Área vendible (m²)">
+                {(field) => (
+                  <Input
+                    {...field}
+                    id={field.id}
+                    aria-invalid={field.invalid || undefined}
+                    aria-describedby={field.describedBy}
+                    type="number"
+                    step="0.01"
+                    inputMode="decimal"
+                    placeholder="0"
+                  />
+                )}
+              </FormField>
+              <FormField name="areas_verdes_m2" label="Áreas verdes (m²)">
+                {(field) => (
+                  <Input
+                    {...field}
+                    id={field.id}
+                    aria-invalid={field.invalid || undefined}
+                    aria-describedby={field.describedBy}
+                    type="number"
+                    step="0.01"
+                    inputMode="decimal"
+                    placeholder="0"
+                  />
+                )}
+              </FormField>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField name="cantidad_lotes" label="Cantidad de lotes">
+                {(field) => (
+                  <Input
+                    {...field}
+                    id={field.id}
+                    aria-invalid={field.invalid || undefined}
+                    aria-describedby={field.describedBy}
+                    type="number"
+                    inputMode="numeric"
+                    placeholder="0"
+                  />
+                )}
+              </FormField>
+              <FormField name="infraestructura_cabecera_inversion" label="Inversión cabecera">
+                {(field) => (
+                  <Input
+                    {...field}
+                    id={field.id}
+                    aria-invalid={field.invalid || undefined}
+                    aria-describedby={field.describedBy}
+                    type="number"
+                    step="0.01"
+                    inputMode="decimal"
+                    placeholder="0"
+                  />
+                )}
+              </FormField>
+            </div>
+
+            <FormActions
+              cancelLabel="Cancelar"
+              submitLabel="Crear anteproyecto"
+              submittingLabel="Creando..."
+              submitIcon={<Plus className="size-4" />}
+              onCancel={() => setShowCreate(false)}
+              className="border-t-0 pt-2"
+            />
+          </Form>
         </SheetContent>
       </Sheet>
     </div>
