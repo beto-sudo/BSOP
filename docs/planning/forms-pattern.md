@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-27
-**Última actualización:** 2026-04-28
+**Última actualización:** 2026-04-29
 
 ## Problema
 
@@ -85,15 +85,15 @@ Síntomas visibles:
 
 ## Sprints / hitos
 
-| #   | Sprint                                       | Estado  | PR  |
-| --- | -------------------------------------------- | ------- | --- |
-| 1   | Foundation + ADR-016 + golden path tasks     | done    | TBD |
-| 2   | tasks (rich create + edit + updates)         | next    | —   |
-| 3   | documentos (form-fields + create-sheet)      | pending | —   |
-| 4   | DILESA `[id]` inline forms                   | pending | —   |
-| 5   | Cortes (abrir/cerrar caja)                   | pending | —   |
-| 6   | empleado-alta-wizard (eval + migrate o spin) | pending | —   |
-| 7   | Cierre + INITIATIVES move to Done            | pending | —   |
+| #   | Sprint                                       | Estado  | PR   |
+| --- | -------------------------------------------- | ------- | ---- |
+| 1   | Foundation + ADR-016 + golden path tasks     | done    | #300 |
+| 2   | tasks (rich create + edit) + juntas adopters | done    | TBD  |
+| 3   | documentos (form-fields + create-sheet)      | next    | —    |
+| 4   | DILESA `[id]` inline forms                   | pending | —    |
+| 5   | Cortes (abrir/cerrar caja)                   | pending | —    |
+| 6   | empleado-alta-wizard (eval + migrate o spin) | pending | —    |
+| 7   | Cierre + INITIATIVES move to Done            | pending | —    |
 
 ## Decisiones registradas
 
@@ -123,6 +123,38 @@ en el pattern; si requiere API materialmente distinta, sale como
 `wizard-pattern` aparte para no contaminar la API simple del v1.
 
 ## Bitácora
+
+### 2026-04-29 — Sprint 2 mergeado
+
+`tasks-create-form.tsx` rich variant migrado a `<Form>` + zod
+(`RichCreateSchema` con required `prioridad`/`asignado_a`/`fecha_compromiso`
+
+- `superRefine` para `motivo_bloqueo` cuando estado='bloqueado').
+  `tasks-edit-form.tsx` simple + rich variants migrados (schema con
+  `porcentaje_avance` + `motivo_bloqueo` condicional + reset on
+  `selectedTask` change). API del dispatcher unificada — ambos componentes
+  ahora reciben `onCreate(values)` / `onSave(values)` y manejan su propio
+  state internamente.
+
+`components/tasks/tasks-module.tsx` simplificado: `createForm`,
+`editForm`, `creating`, `saving`, `emptyTaskForm()` eliminados — el form
+maneja todo. `handleCreate`/`handleUpdate` ahora reciben `formValues` y
+hacen el insert/update directo.
+
+Adopters de juntas refactorizados:
+
+- `components/juntas/junta-detail-module.tsx`: `handleAddTask` ahora
+  recibe `formValues`. `taskForm`/`addingTask` state eliminados.
+  Validación inline removida (vive en zod).
+- `app/inicio/juntas/[id]/page.tsx`: idem. Bug colateral fixed:
+  validación previa pedía `fecha_vence` que el rich form nunca llenaba
+  (el rich captura `fecha_compromiso`); ahora el insert escribe ambos en
+  sync con `fechaPrincipal`.
+
+`emptyTaskForm()` removido de `tasks-shared.tsx` — ningún caller lo
+necesita ya. Cada form pone sus defaults locales por construcción.
+
+PR: pendiente.
 
 ### 2026-04-28 — Sprint 1 mergeado
 

@@ -24,7 +24,7 @@ import { rewriteHtmlImagesToSigned, normalizeHtmlImagesToPaths } from '@/lib/adj
 import { htmlHasCodaImages, importCodaImagesInHtml } from '@/lib/coda-paste-import';
 import { fetchJuntaUpdates } from '@/lib/juntas/fetch-updates';
 import { TasksCreateForm } from '@/components/tasks/tasks-create-form';
-import { emptyTaskForm, type TaskFormValues } from '@/components/tasks/tasks-shared';
+import { type TaskFormValues } from '@/components/tasks/tasks-shared';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -305,8 +305,7 @@ export function JuntaDetailModule({ empresaSlug }: JuntaDetailModuleProps) {
   const [addingPersona, setAddingPersona] = useState(false);
 
   const [showAddTask, setShowAddTask] = useState(false);
-  const [taskForm, setTaskForm] = useState<TaskFormValues>(emptyTaskForm());
-  const [addingTask, setAddingTask] = useState(false);
+  // Task form state lives inside `<TasksCreateForm>` (forms-pattern).
   const [completingTask, setCompletingTask] = useState<string | null>(null);
 
   const [taskUpdates, setTaskUpdates] = useState<TaskUpdate[]>([]);
@@ -823,19 +822,10 @@ export function JuntaDetailModule({ empresaSlug }: JuntaDetailModuleProps) {
     setShowAddPersona(false);
   };
 
-  const handleAddTask = async () => {
-    // Validación estricta (Sub-PR 3, opción A): exige título + prioridad +
-    // asignado + fecha. RDB antes solo exigía título — adoptamos DILESA por
-    // disciplina de datos.
-    if (
-      !taskForm.titulo.trim() ||
-      !taskForm.prioridad ||
-      !taskForm.asignado_a ||
-      !taskForm.fecha_vence ||
-      !junta
-    )
-      return;
-    setAddingTask(true);
+  const handleAddTask = async (taskForm: TaskFormValues) => {
+    if (!junta) return;
+    // Validación de campos requeridos vive en zod (RichCreateSchema en
+    // tasks-create-form.tsx). Si llegamos aquí, los valores son válidos.
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -846,12 +836,9 @@ export function JuntaDetailModule({ empresaSlug }: JuntaDetailModuleProps) {
       .eq('email', (user?.email ?? '').toLowerCase())
       .maybeSingle();
     // El schema de `erp.tasks` tiene ambas columnas `fecha_vence` y
-    // `fecha_compromiso`; el handler de update de DILESA ya escribe ambas
-    // (líneas 911-913). Aquí en el insert escribimos las dos por la misma
-    // razón: mantenerlas en sync evita drift entre vistas que leen una u
-    // otra. Antes RDB escribía solo `fecha_vence` y DILESA solo
-    // `fecha_compromiso` — drift que esta unificación elimina.
-    const fechaPrincipal = taskForm.fecha_vence || taskForm.fecha_compromiso || null;
+    // `fecha_compromiso`; las escribimos en sync para evitar drift entre
+    // vistas que leen una u otra. El form rich captura `fecha_compromiso`.
+    const fechaPrincipal = taskForm.fecha_compromiso || taskForm.fecha_vence || null;
     const { data: newTask, error: err } = await supabase
       .schema('erp')
       .from('tasks')
@@ -870,13 +857,11 @@ export function JuntaDetailModule({ empresaSlug }: JuntaDetailModuleProps) {
       })
       .select('id, titulo, estado, asignado_a, fecha_vence')
       .single();
-    setAddingTask(false);
     if (err) {
       alert(`Error al crear tarea: ${err.message}`);
       return;
     }
     setTasks((prev) => [...prev, newTask as JuntaTask]);
-    setTaskForm(emptyTaskForm());
     setShowAddTask(false);
   };
 
@@ -1717,16 +1702,8 @@ export function JuntaDetailModule({ empresaSlug }: JuntaDetailModuleProps) {
       <TasksCreateForm
         variant="rich"
         open={showAddTask}
-        onOpenChange={(open) => {
-          if (!open) {
-            setShowAddTask(false);
-            setTaskForm(emptyTaskForm());
-          }
-        }}
-        value={taskForm}
-        onChange={setTaskForm}
+        onOpenChange={setShowAddTask}
         onCreate={handleAddTask}
-        creating={addingTask}
         empleados={empleados}
         empleadoOptions={empleadoOptions as any}
       />

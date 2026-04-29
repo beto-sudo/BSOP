@@ -36,7 +36,6 @@ import type { TablesInsert, TablesUpdate } from '@/types/supabase';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 
-import { emptyTaskForm } from './tasks-shared';
 import type { Empleado, ErpTask, TaskEstado, TaskFormValues, TaskUpdateRow } from './tasks-shared';
 import { TasksTable } from './tasks-table';
 import { TasksCreateForm } from './tasks-create-form';
@@ -139,14 +138,11 @@ export function TasksModule({
   const [hideCompleted, setHideCompleted] = useState(true);
 
   // ── Create / edit state ────────────────────────────────────────────────────
+  // Form values now live inside `<TasksCreateForm>` / `<TasksEditForm>`
+  // (forms-pattern via `<Form>` + RHF); the module only tracks open + selection.
   const [showCreate, setShowCreate] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [createForm, setCreateForm] = useState<TaskFormValues>(emptyTaskForm());
-
   const [showEdit, setShowEdit] = useState(false);
   const [selectedTask, setSelectedTask] = useState<ErpTask | null>(null);
-  const [editForm, setEditForm] = useState<TaskFormValues>(emptyTaskForm());
-  const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   // ── Rich-only: inline editing + updates ───────────────────────────────────
@@ -376,27 +372,9 @@ export function TasksModule({
 
   const resolveInsertEmpresaId = () => empresaId ?? empresaIds[0] ?? null;
 
-  const handleCreate = async (values?: TaskFormValues) => {
+  const handleCreate = async (formValues: TaskFormValues) => {
     const insertEmpresaId = resolveInsertEmpresaId();
     if (!insertEmpresaId) return;
-
-    // Simple variant submits typed values from RHF; rich still uses the
-    // local `createForm` state until Sprint 2 migrates it.
-    const formValues = values ?? createForm;
-
-    if (isRich) {
-      if (
-        !formValues.titulo.trim() ||
-        !formValues.prioridad ||
-        !formValues.asignado_a ||
-        !formValues.fecha_compromiso
-      ) {
-        return;
-      }
-    } else {
-      if (!formValues.titulo.trim()) return;
-    }
-    setCreating(true);
 
     const {
       data: { user },
@@ -452,67 +430,49 @@ export function TasksModule({
     }
 
     const { error: err } = await supabase.schema('erp').from('tasks').insert(payload);
-    setCreating(false);
     if (err) {
       alert(`Error al crear tarea: ${err.message}`);
       return;
     }
     setShowCreate(false);
-    setCreateForm(emptyTaskForm());
     await fetchTasks(empresaIds);
   };
 
   const openEdit = (task: ErpTask) => {
     setSelectedTask(task);
-    setEditForm({
-      titulo: task.titulo,
-      descripcion: task.descripcion ?? '',
-      prioridad: task.prioridad ?? '',
-      asignado_a: task.asignado_a ?? '',
-      estado: task.estado,
-      fecha_vence: task.fecha_vence ? task.fecha_vence.split('T')[0] : '',
-      fecha_compromiso: task.fecha_compromiso
-        ? task.fecha_compromiso.split('T')[0]
-        : task.fecha_vence
-          ? task.fecha_vence.split('T')[0]
-          : '',
-      porcentaje_avance: task.porcentaje_avance ?? 0,
-      motivo_bloqueo: task.motivo_bloqueo ?? '',
-    });
     setUpdateContent('');
     setShowEdit(true);
     if (isRich) void fetchUpdatesForTask(task.id);
   };
 
-  const handleUpdate = async () => {
-    if (!selectedTask || !editForm.titulo.trim()) return;
-    setSaving(true);
+  const handleUpdate = async (formValues: TaskFormValues) => {
+    if (!selectedTask) return;
     let payload: TasksUpdatePayload;
     if (isRich) {
       payload = {
-        titulo: editForm.titulo.trim(),
-        descripcion: editForm.descripcion.trim() || null,
-        prioridad: editForm.prioridad || null,
-        asignado_a: editForm.asignado_a || null,
-        fecha_compromiso: editForm.fecha_compromiso || null,
-        porcentaje_avance: editForm.porcentaje_avance,
+        titulo: formValues.titulo.trim(),
+        descripcion: formValues.descripcion.trim() || null,
+        prioridad: formValues.prioridad || null,
+        asignado_a: formValues.asignado_a || null,
+        fecha_compromiso: formValues.fecha_compromiso || null,
+        porcentaje_avance: formValues.porcentaje_avance,
       };
       if (canCompleteTask(selectedTask)) {
-        payload.estado = editForm.estado;
-        if (editForm.estado === 'completado' && selectedTask.estado !== 'completado') {
+        payload.estado = formValues.estado;
+        if (formValues.estado === 'completado' && selectedTask.estado !== 'completado') {
           payload.completado_por = currentEmpleadoId;
         }
         payload.motivo_bloqueo =
-          editForm.estado === 'bloqueado' ? editForm.motivo_bloqueo.trim() || null : null;
+          formValues.estado === 'bloqueado' ? formValues.motivo_bloqueo.trim() || null : null;
       }
     } else {
       payload = {
-        titulo: editForm.titulo.trim(),
-        descripcion: editForm.descripcion.trim() || null,
-        prioridad: editForm.prioridad || null,
-        asignado_a: editForm.asignado_a || null,
-        estado: editForm.estado,
-        fecha_vence: editForm.fecha_vence || null,
+        titulo: formValues.titulo.trim(),
+        descripcion: formValues.descripcion.trim() || null,
+        prioridad: formValues.prioridad || null,
+        asignado_a: formValues.asignado_a || null,
+        estado: formValues.estado,
+        fecha_vence: formValues.fecha_vence || null,
       };
     }
     const { error: err } = await supabase
@@ -520,7 +480,6 @@ export function TasksModule({
       .from('tasks')
       .update(payload)
       .eq('id', selectedTask.id);
-    setSaving(false);
     if (err) {
       alert(`Error al guardar tarea: ${err.message}`);
       return;
@@ -800,10 +759,7 @@ export function TasksModule({
           </Button>
           <Button
             size="sm"
-            onClick={() => {
-              setCreateForm(emptyTaskForm());
-              setShowCreate(true);
-            }}
+            onClick={() => setShowCreate(true)}
             className="rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 gap-1.5"
           >
             <Plus className="h-4 w-4" />
@@ -885,14 +841,8 @@ export function TasksModule({
       <TasksCreateForm
         variant={isRich ? 'rich' : 'simple'}
         open={showCreate}
-        onOpenChange={(open) => {
-          setShowCreate(open);
-          if (!open) setCreateForm(emptyTaskForm());
-        }}
-        value={createForm}
-        onChange={setCreateForm}
+        onOpenChange={setShowCreate}
         onCreate={handleCreate}
-        creating={creating}
         empleados={empleados}
         empleadoOptions={empleadoOptions}
       />
@@ -906,10 +856,7 @@ export function TasksModule({
           if (!open) setSelectedTask(null);
         }}
         selectedTask={selectedTask}
-        value={editForm}
-        onChange={setEditForm}
         onSave={handleUpdate}
-        saving={saving}
         empleados={empleados}
         empleadoOptions={empleadoOptions}
         empleadoMap={empleadoMap}
