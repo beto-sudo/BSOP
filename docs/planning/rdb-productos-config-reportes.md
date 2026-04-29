@@ -211,9 +211,11 @@ Entregable:
 - `<DetailDrawer>` (size `lg`, ADR-018) con tabla de hijos
   (nombre / factor / precio) read-only. Empty state cuando el padre no
   tiene hijos.
-- Sidebar: nuevo sub-item "Grupos · Padres-Hijos" bajo Inventario en RDB.
-- `ROUTE_TO_MODULE` actualizado: `/rdb/productos/grupos → rdb.productos`
-  (mismo slug que la página padre — sin granularidad RBAC nueva).
+- Layout `app/rdb/productos/layout.tsx` con `<RoutedModuleTabs>`
+  (ADR-005): tabs **Catálogo / Grupos · Padres-Hijos / Análisis**.
+  Productos pasa de 1 page a un módulo con sub-tabs sin sumar entradas
+  al sidebar. La sidebar entry "Productos" del módulo Inventario sigue
+  apuntando al `/rdb/productos` default.
 - Smoke test e2e en `tests/e2e/smoke/auth-rdb-productos-grupos.spec.ts`
   (carga + input + tabla + filter + click → drawer).
 
@@ -221,10 +223,11 @@ Cierre técnico:
 
 - `parseHijos()` valida shape del jsonb defensivamente (ignora
   entradas malformadas en lugar de fallar duro).
-- Test `'no duplicate slugs in ROUTE_TO_MODULE'` removido: la
-  uniqueness no aplica cuando sub-pages legítimas comparten módulo de
-  permisos con su padre. Reemplazado por comment explicativo en
-  `lib/permissions.test.ts`.
+- Test `'no duplicate slugs in ROUTE_TO_MODULE'` removido en el commit
+  inicial (ahora obsoleto): el approach final con `<RoutedModuleTabs>`
+  no agrega rutas a `ROUTE_TO_MODULE` — las sub-tabs heredan el guard
+  del page padre vía `<RequireAccess>` propio. Comment explicativo en
+  `lib/permissions.test.ts` queda como nota para futuras sub-pages.
 - Detalle del grupo es read-only en Sprint 1; edición de
   `factor_consumo` queda para Sprint 3 (configuración masiva).
 
@@ -264,8 +267,24 @@ Decisiones tomadas en la conversación de promoción:
 ### 2026-04-29 · Sprint 1 mergeado pendiente · transición proposed → in_progress
 
 PR Sprint 1 (este PR). Vista `/rdb/productos/grupos` read-only sobre
-`rdb.v_productos_grupo`. Sidebar entry agregada, `ROUTE_TO_MODULE`
-actualizado, smoke test creado. Test de uniqueness en
-`lib/permissions.test.ts` removido (caso de sub-page legítima comparte
-slug). Estado de iniciativa cambia a `in_progress`. Próximo: Sprint 2
-(recetas + costo/margen) cuando Beto lo desbloquee.
+`rdb.v_productos_grupo`. Smoke test creado. Estado de iniciativa
+cambia a `in_progress`. Próximo: Sprint 2 (recetas + costo/margen)
+cuando Beto lo desbloquee.
+
+### 2026-04-29 · Sprint 1 corrección post-review · sub-tabs en vez de sidebar entry
+
+Beto revisó el preview y apuntó que Grupos no debe ser entrada
+separada en sidebar — debe vivir como sub-tab del módulo Productos
+siguiendo ADR-005 (`module-page-submodules`). Corrección aplicada en
+el mismo PR:
+
+- Nuevo `app/rdb/productos/layout.tsx` con `<RoutedModuleTabs>` y 3
+  tabs: **Catálogo** (`/rdb/productos`) · **Grupos · Padres-Hijos**
+  (`/rdb/productos/grupos`) · **Análisis** (`/rdb/productos/analisis`).
+- Sidebar entry "Grupos · Padres-Hijos" removida; "Productos" sigue
+  siendo el único item.
+- `/rdb/productos/grupos` removido de `ROUTE_TO_MODULE` (las sub-tabs
+  heredan el guard del page padre vía su propio `<RequireAccess>`).
+- `h1` redundante "Productos · Grupos" removido del page (la tab
+  activa ya etiqueta el sub-modulo); descripción y botón Refrescar
+  preservados.

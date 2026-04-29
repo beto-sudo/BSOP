@@ -170,14 +170,11 @@ function ProductosGruposBody() {
 
   return (
     <div className="space-y-4 p-4 sm:p-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Productos · Grupos</h1>
-          <p className="text-sm text-[var(--text)]/60">
-            Productos padres con sus hijos y factor de consumo. Solo lectura — la edición masiva del
-            factor llega en Sprint 3.
-          </p>
-        </div>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-[var(--text)]/60">
+          Productos padres con sus hijos y factor de consumo. Solo lectura — la edición masiva del
+          factor llega en Sprint 3.
+        </p>
         <Button variant="outline" size="sm" onClick={() => void fetchGrupos()}>
           <RefreshCw className="mr-1 h-3.5 w-3.5" /> Refrescar
         </Button>

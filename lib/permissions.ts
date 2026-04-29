@@ -45,7 +45,6 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   '/rdb/ventas': 'rdb.ventas',
   '/rdb/cortes': 'rdb.cortes',
   '/rdb/productos': 'rdb.productos',
-  '/rdb/productos/grupos': 'rdb.productos',
   '/rdb/inventario': 'rdb.inventario',
   '/rdb/proveedores': 'rdb.proveedores',
   '/rdb/requisiciones': 'rdb.requisiciones',
