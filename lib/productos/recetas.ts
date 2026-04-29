@@ -142,6 +142,39 @@ export async function fetchRecetas(
   return out;
 }
 
+// ── Insumos disponibles (para editor) ────────────────────────────────────────
+
+export type InsumoDisponible = {
+  id: string;
+  nombre: string;
+  unidad: string | null;
+};
+
+/**
+ * Lista de productos inventariables activos de la empresa, candidatos a ser
+ * insumos en una receta. Consumido por el editor de receta para poblar el
+ * combobox "Agregar insumo".
+ */
+export async function fetchInsumosDisponibles(
+  supabase: SupabaseClient<Database>,
+  empresaId: string
+): Promise<InsumoDisponible[]> {
+  const { data, error } = await supabase
+    .schema('erp')
+    .from('productos')
+    .select('id, nombre, unidad')
+    .eq('empresa_id', empresaId)
+    .eq('activo', true)
+    .eq('inventariable', true)
+    .order('nombre');
+  if (error) throw error;
+  return (data ?? []).map((p) => ({
+    id: p.id,
+    nombre: p.nombre ?? 'Sin nombre',
+    unidad: p.unidad ?? null,
+  }));
+}
+
 // ── Auditoría ────────────────────────────────────────────────────────────────
 
 export type AlertSeverity = 'critical' | 'warning';

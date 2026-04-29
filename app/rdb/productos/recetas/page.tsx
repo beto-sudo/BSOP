@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ChefHat, RefreshCw, Search } from 'lucide-react';
+import { ChefHat, Pencil, RefreshCw, Search } from 'lucide-react';
 
 import { RequireAccess } from '@/components/require-access';
 import { ActiveFiltersChip, DataTable, type Column } from '@/components/module-page';
@@ -12,7 +12,13 @@ import { Input } from '@/components/ui/input';
 import { useUrlFilters } from '@/hooks/use-url-filters';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { formatCurrency, formatNumber } from '@/lib/format';
-import { fetchRecetas, type Receta } from '@/lib/productos/recetas';
+import {
+  fetchInsumosDisponibles,
+  fetchRecetas,
+  type InsumoDisponible,
+  type Receta,
+} from '@/lib/productos/recetas';
+import { RecetasEditor } from '@/components/productos/recetas-editor';
 
 const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
 
@@ -31,6 +37,7 @@ export default function ProductosRecetasPage() {
 
 function ProductosRecetasBody() {
   const [recetas, setRecetas] = useState<Receta[]>([]);
+  const [insumosDisponibles, setInsumosDisponibles] = useState<InsumoDisponible[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,16 +48,21 @@ function ProductosRecetasBody() {
   const searchParams = useSearchParams();
   const focusId = searchParams.get('focus');
 
-  const [selected, setSelected] = useState<Receta | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const supabase = createSupabaseBrowserClient();
-      const data = await fetchRecetas(supabase, RDB_EMPRESA_ID);
-      setRecetas(data);
+      const [recetasData, insumosData] = await Promise.all([
+        fetchRecetas(supabase, RDB_EMPRESA_ID),
+        fetchInsumosDisponibles(supabase, RDB_EMPRESA_ID),
+      ]);
+      setRecetas(recetasData);
+      setInsumosDisponibles(insumosData);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error al cargar recetas');
     } finally {
@@ -65,12 +77,23 @@ function ProductosRecetasBody() {
   // Auto-abrir drawer cuando llega un ?focus=<id> (deep-link desde Auditoría).
   useEffect(() => {
     if (!focusId || recetas.length === 0) return;
-    const match = recetas.find((r) => r.producto_venta_id === focusId);
-    if (match) {
-      setSelected(match);
+    if (recetas.some((r) => r.producto_venta_id === focusId)) {
+      setSelectedId(focusId);
       setDrawerOpen(true);
     }
   }, [focusId, recetas]);
+
+  // Reset edit mode cuando cierra el drawer o cambia la receta seleccionada.
+  useEffect(() => {
+    if (!drawerOpen) setEditing(false);
+  }, [drawerOpen]);
+
+  // `selected` es derivado para que tras un save (que muta `recetas`) se
+  // refleje en el drawer sin reabrirlo.
+  const selected = useMemo<Receta | null>(
+    () => (selectedId ? (recetas.find((r) => r.producto_venta_id === selectedId) ?? null) : null),
+    [selectedId, recetas]
+  );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -156,9 +179,15 @@ function ProductosRecetasBody() {
   );
 
   const openDrawer = useCallback((row: Receta) => {
-    setSelected(row);
+    setSelectedId(row.producto_venta_id);
+    setEditing(false);
     setDrawerOpen(true);
   }, []);
+
+  const handleSaved = useCallback(async () => {
+    await fetchData();
+    setEditing(false);
+  }, [fetchData]);
 
   return (
     <div className="space-y-4 p-4 sm:p-6">
@@ -234,21 +263,53 @@ function ProductosRecetasBody() {
             </span>
           ) : null
         }
+        actions={
+          selected && !editing ? (
+            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+              <Pencil className="mr-1 h-3.5 w-3.5" /> Editar receta
+            </Button>
+          ) : null
+        }
         size="lg"
       >
         <DetailDrawerContent>
-          {selected ? <InsumosSection receta={selected} /> : null}
+          {selected ? (
+            editing ? (
+              <RecetasEditor
+                productoVentaId={selected.producto_venta_id}
+                productoVentaNombre={selected.producto_venta_nombre}
+                insumosDisponibles={insumosDisponibles}
+                initialRows={selected.insumos.map((i) => ({
+                  insumo_id: i.insumo_id,
+                  insumo_nombre: i.insumo_nombre,
+                  cantidad: i.cantidad,
+                  unidad: i.unidad,
+                }))}
+                onSaved={() => void handleSaved()}
+                onCancel={() => setEditing(false)}
+              />
+            ) : (
+              <InsumosSection receta={selected} onEdit={() => setEditing(true)} />
+            )
+          ) : null}
         </DetailDrawerContent>
       </DetailDrawer>
     </div>
   );
 }
 
-function InsumosSection({ receta }: { receta: Receta }) {
+function InsumosSection({ receta, onEdit }: { receta: Receta; onEdit: () => void }) {
   if (receta.insumos.length === 0) {
     return (
-      <div className="text-muted-foreground rounded-md border border-dashed border-[var(--border)] p-6 text-center text-sm">
-        Esta receta no tiene insumos configurados.
+      <div className="space-y-3">
+        <div className="text-muted-foreground rounded-md border border-dashed border-[var(--border)] p-6 text-center text-sm">
+          Esta receta no tiene insumos configurados.
+        </div>
+        <div className="flex justify-end">
+          <Button variant="outline" size="sm" onClick={onEdit}>
+            <Pencil className="mr-1 h-3.5 w-3.5" /> Agregar insumos
+          </Button>
+        </div>
       </div>
     );
   }
@@ -304,10 +365,6 @@ function InsumosSection({ receta }: { receta: Receta }) {
           </tfoot>
         </table>
       </div>
-      <p className="text-muted-foreground text-xs">
-        Edición de receta vive en la pestaña Catálogo, en el drawer del producto. La edición masiva
-        consolidada llega en sprint posterior.
-      </p>
     </div>
   );
 }

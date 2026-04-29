@@ -121,26 +121,66 @@ cueste decenas de líneas, no centenas — siguiendo la convención
   datos operativos para calibrar. Sprint posterior cuando emerja
   necesidad.
 
-### Sprint 3 — Edición masiva de recetas
+### Sprint 3 — Edición de recetas en su drawer ✅ entregable en este PR
 
-- [ ] Vista de edición sobre la misma página de Recetas (toggle "modo
-      edición" o sub-tab) o página dedicada `/rdb/productos/recetas/edicion`.
-- [ ] Editar cantidades, unidades, agregar/quitar insumos sin tener
-      que abrir un producto a la vez.
-- [ ] Validación zod (ADR-016) por fila — cantidad > 0, insumo
-      pertenece a RDB, no es self-reference.
-- [ ] Audit trail: cambios quedan registrados (verificar si
-      `producto_receta` ya tiene trigger de auditoría; si no, agregar
-      uno o usar el patrón estándar del repo).
+- [x] `<RecetasEditor>` shared en `components/productos/` — editor
+      inline reutilizable. Controla rows (insumos), cantidades, unidad,
+      add/remove. Persiste vía `upsertReceta` (server action existente
+      del Catálogo, reusada).
+- [x] Drawer del Recetas page con 2 modos: lectura (default) y
+      edición. Botón "Editar receta" en header del drawer cambia a
+      modo edición; el editor exibe Cancelar / Guardar receta.
+- [x] Validación cliente: cantidad > 0 + no self-reference + no
+      duplicados. Validación servidor existe en `upsertReceta` (cubre
+      RDB-only + cantidad > 0 + insumo inventariable).
+- [x] `useDirtyConfirm` interno en el editor: `Cancelar` con cambios
+      dispara confirm nativo. Guardar exitoso refresca recetas + sale
+      de modo edición + drawer queda abierto con datos actualizados.
+- [x] `fetchInsumosDisponibles()` agregado al lib para poblar el
+      combobox de insumos disponibles (productos inventariables
+      activos de RDB).
+- [x] Smoke test e2e
+      `tests/e2e/smoke/auth-rdb-productos-recetas-edit.spec.ts`.
 
-### Sprint 4 — Sidebar + permisos + cierre
+Decisiones técnicas tomadas:
 
-- [ ] Verificar tabs definitivas del módulo Productos (Catálogo /
-      Recetas / Análisis / Auditoría) y orden.
+- **Editor custom (no `<Form>` v1)**: el editor tiene N filas
+  dinámicas de insumos. RHF + `useFieldArray` no fue expuesto en
+  `<Form>` v1 (ver iniciativa `wizard-pattern` separada). Editor
+  custom es más liviano y no contamina la API de `<Form>`. Si emerja
+  necesidad de reuso en otros casos similares, se evalúa migrar
+  cuando wizard-pattern arranque.
+- **Audit trail diferido**: `producto_receta` no tiene trigger de
+  auditoría hoy. Sin trigger en este PR (cambios DB los aplica Beto
+  manualmente; un trigger de auditoría es scope propio que merece
+  decisión sobre granularidad y formato del log). El server action
+  `upsertReceta` queda como punto único de mutación, lo que hace que
+  agregar audit trail después sea un solo cambio.
+- **Editor reusable** en `components/productos/` (shared) para que
+  cuando otra empresa entre al módulo, el editor cueste poco
+  reutilizar (siguiendo convención `shared-modules-refactor`,
+  ADR-011).
+
+### Sprint 4 — Cierre
+
+- [ ] Verificar visualmente las 4 tabs del módulo Productos (Catálogo
+      / Recetas / Auditoría / Análisis) en preview con datos reales.
 - [ ] Confirmar que `rdb.productos` cubra todas las rutas en
       `ROUTE_TO_MODULE` ([lib/permissions.ts](../../lib/permissions.ts)).
-- [ ] Closeout: bitácora, ADR si aplica, sweep de Reminders, mover
-      iniciativa a `## Done` en `INITIATIVES.md`.
+- [ ] Closeout: bitácora, sweep de Reminders, mover iniciativa a
+      `## Done` en `INITIATIVES.md` con outcome resumido.
+
+### Follow-ups (sub-iniciativas pendientes, no v1)
+
+- **Audit trail de `producto_receta`**: agregar trigger SQL para
+  registrar cambios al editar receta. Decidir formato del log
+  (tabla audit canónica del repo, granularidad, retención).
+- **Deprecación `parent_id` + `factor_consumo`** de `erp.productos`:
+  auditar consumidores (`v_productos_grupo`, otras queries),
+  migrar datos vivos a `erp.producto_receta`, DROP columnas + view.
+- **Heurística "producto sin receta esperada"** para Auditoría:
+  decidir señal (categoría, flag, regla derivada) cuando haya
+  datos operativos para calibrar.
 
 ## Fuera de alcance v1
 
@@ -343,6 +383,18 @@ Beto revisó el preview y apuntó que Grupos no debe ser entrada
 separada en sidebar — debe vivir como sub-tab del módulo Productos
 (ADR-005). Sidebar entry removida; `/rdb/productos/grupos` removido
 de `ROUTE_TO_MODULE`; `h1` redundante removido del page.
+
+### 2026-04-29 · Sprint 3 mergeado pendiente · Edición de recetas
+
+PR Sprint 3 (este PR). `<RecetasEditor>` shared en
+`components/productos/` con add/remove/edit de insumos + Save/Cancel +
+dirty confirm. Drawer del Recetas page con modo lectura ↔ edición vía
+botón "Editar receta". `fetchInsumosDisponibles()` agregado al lib
+para poblar combobox. Validación cliente (cantidad > 0, no
+duplicados, no self-reference) + servidor (`upsertReceta` existente).
+Editor custom (no RHF) porque `<Form>` v1 no expone `useFieldArray`
+— eso queda para iniciativa `wizard-pattern`. Audit trail diferido
+como follow-up. Próximo: Sprint 4 (cierre) cuando Beto lo desbloquee.
 
 ### 2026-04-29 · Sprint 2 mergeado pendiente · Auditoría
 
