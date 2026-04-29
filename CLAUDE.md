@@ -34,6 +34,16 @@ Reflejá el cambio de estado en `docs/strategy/INITIATIVES.md` también
 iniciativa quedó completa, movela a la sección `## Done` con fecha de
 cierre y outcome — no borres su doc de planning, queda como referencia.
 
+**Barrido de Reminders al cerrar (`* → done`):** antes de cerrar la
+iniciativa, listá los pendientes vivos en la lista `Claude: BSOP` con
+`remindctl list "Claude: BSOP" --json` y completá los que sean
+sub-tareas de la iniciativa que cierra (referencias a sus PRs, su
+slug, sub-PRs, sprints, smoke tests, closeouts). Las sub-tareas
+históricas mueren con la iniciativa — no quedan vivas para confundir
+sesiones futuras. Ver regla global "Pendientes y calendario" en
+`~/.claude/CLAUDE.md` para el filtro de qué SÍ va a Reminders desde el
+inicio.
+
 ### Roles
 
 - **Claude Code (yo)** soy dueño de planeación + ejecución end-to-end:
