@@ -185,11 +185,12 @@ export function DocumentoDetailSheet({
   if (!doc) return null;
 
   const metaEntries = Object.entries(doc.subtipo_meta ?? {}).filter(([, v]) => v);
-  const canExtract =
-    !!doc.id &&
-    (doc.extraccion_status === 'pendiente' ||
-      doc.extraccion_status === 'error' ||
-      !doc.extraccion_status);
+  // Permitimos re-extraer también docs ya 'completado' — útil cuando el schema
+  // del extractor cambia (ej. Sprint 2 de empresa-documentos-legales agregó
+  // `subtipo_meta` para escrituras y los docs viejos no lo tienen poblado).
+  // El único estado que bloquea es 'procesando' (otro request lo tiene).
+  const canExtract = !!doc.id && doc.extraccion_status !== 'procesando';
+  const isReExtract = doc.extraccion_status === 'completado';
 
   const hasPrincipalPdf = adjuntos.some((a) => a.rol === 'documento_principal');
   const needsPdf = doc.tipo && doc.tipo !== 'Otro';
@@ -212,14 +213,22 @@ export function DocumentoDetailSheet({
                 onClick={handleExtract}
                 disabled={extracting}
                 className="border-[var(--accent)]/30 bg-[var(--accent)]/5 text-[var(--accent)] hover:bg-[var(--accent)]/10"
-                title="Extraer datos del PDF con IA (60-120s)"
+                title={
+                  isReExtract
+                    ? 'Volver a extraer datos del PDF con IA (60-120s) — sobrescribe la extracción actual.'
+                    : 'Extraer datos del PDF con IA (60-120s)'
+                }
               >
                 {extracting ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <Wand2 className="mr-2 h-4 w-4" />
                 )}
-                {extracting ? 'Procesando...' : 'Procesar con IA'}
+                {extracting
+                  ? 'Procesando...'
+                  : isReExtract
+                    ? 'Re-extraer con IA'
+                    : 'Procesar con IA'}
               </Button>
             )}
             {!editing && (
