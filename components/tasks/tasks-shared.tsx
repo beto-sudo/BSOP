@@ -10,6 +10,8 @@
 // (Combobox local eliminado — usar @/components/ui/combobox para form fields y
 // @/components/ui/filter-combobox para filtros de tabla).
 
+import { Badge, type BadgeTone } from '@/components/ui/badge';
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type TaskEstado = 'pendiente' | 'en_progreso' | 'bloqueado' | 'completado' | 'cancelado';
@@ -80,13 +82,30 @@ export type TaskFormValues = {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-export const ESTADO_CONFIG: Record<TaskEstado, { label: string; cls: string }> = {
-  pendiente: { label: 'Pendiente', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
-  en_progreso: { label: 'En progreso', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
-  bloqueado: { label: 'Bloqueado', cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
-  completado: { label: 'Completado', cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
+export const ESTADO_CONFIG: Record<TaskEstado, { label: string; tone: BadgeTone; cls: string }> = {
+  pendiente: {
+    label: 'Pendiente',
+    tone: 'warning',
+    cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
+  },
+  en_progreso: {
+    label: 'En progreso',
+    tone: 'info',
+    cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
+  },
+  bloqueado: {
+    label: 'Bloqueado',
+    tone: 'danger',
+    cls: 'bg-red-500/15 text-red-400 border-red-500/20',
+  },
+  completado: {
+    label: 'Completado',
+    tone: 'success',
+    cls: 'bg-green-500/15 text-green-400 border-green-500/20',
+  },
   cancelado: {
     label: 'Cancelado',
+    tone: 'neutral',
     cls: 'bg-[var(--border)]/60 text-[var(--text-subtle)] border-[var(--border)]',
   },
 };
@@ -99,25 +118,55 @@ export const ESTADO_ORDER: TaskEstado[] = [
   'cancelado',
 ];
 
-export const PRIORIDAD_CONFIG: Record<string, { label: string; cls: string }> = {
-  Urgente: { label: 'Urgente', cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
-  Alta: { label: 'Alta', cls: 'bg-orange-500/15 text-orange-400 border-orange-500/20' },
-  Media: { label: 'Media', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
-  Baja: { label: 'Baja', cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
+export const PRIORIDAD_CONFIG: Record<string, { label: string; tone: BadgeTone; cls: string }> = {
+  Urgente: {
+    label: 'Urgente',
+    tone: 'danger',
+    cls: 'bg-red-500/15 text-red-400 border-red-500/20',
+  },
+  Alta: {
+    label: 'Alta',
+    tone: 'warning',
+    cls: 'bg-orange-500/15 text-orange-400 border-orange-500/20',
+  },
+  Media: {
+    label: 'Media',
+    tone: 'warning',
+    cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
+  },
+  Baja: {
+    label: 'Baja',
+    tone: 'success',
+    cls: 'bg-green-500/15 text-green-400 border-green-500/20',
+  },
 };
 
 export const PRIORIDAD_OPTIONS = ['Urgente', 'Alta', 'Media', 'Baja'] as const;
 
-export const UPDATE_TIPO_CONFIG: Record<string, { label: string; cls: string }> = {
-  avance: { label: 'Avance', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
-  cambio_estado: { label: 'Estado', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
-  cambio_fecha: { label: 'Fecha', cls: 'bg-purple-500/15 text-purple-400 border-purple-500/20' },
+export const UPDATE_TIPO_CONFIG: Record<string, { label: string; tone: BadgeTone; cls: string }> = {
+  avance: {
+    label: 'Avance',
+    tone: 'info',
+    cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
+  },
+  cambio_estado: {
+    label: 'Estado',
+    tone: 'warning',
+    cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
+  },
+  cambio_fecha: {
+    label: 'Fecha',
+    tone: 'accent',
+    cls: 'bg-purple-500/15 text-purple-400 border-purple-500/20',
+  },
   nota: {
     label: 'Nota',
+    tone: 'neutral',
     cls: 'bg-[var(--border)]/60 text-[var(--text)]/60 border-[var(--border)]',
   },
   cambio_responsable: {
     label: 'Responsable',
+    tone: 'success',
     cls: 'bg-teal-500/15 text-teal-400 border-teal-500/20',
   },
 };
@@ -143,30 +192,20 @@ export function formatDateTime(dateStr: string | null | undefined) {
 // ─── Small presentational pieces ─────────────────────────────────────────────
 
 export function EstadoBadge({ estado }: { estado: TaskEstado }) {
-  const cfg = ESTADO_CONFIG[estado] ?? { label: estado, cls: '' };
-  return (
-    <span
-      className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}
-    >
-      {cfg.label}
-    </span>
-  );
+  const cfg = ESTADO_CONFIG[estado];
+  if (!cfg) return <Badge tone="neutral">{estado}</Badge>;
+  return <Badge tone={cfg.tone}>{cfg.label}</Badge>;
 }
 
 /**
- * Classic prioridad badge (used by simpler variants). Looks up a class by
+ * Classic prioridad badge (used by simpler variants). Looks up a tone by
  * exact prioridad value (e.g. "Urgente", "Alta").
  */
 export function PrioridadBadge({ prioridad }: { prioridad: string | null }) {
   if (!prioridad) return <span className="text-[var(--text-subtle)]">—</span>;
-  const cfg = PRIORIDAD_CONFIG[prioridad] ?? { label: prioridad, cls: '' };
-  return (
-    <span
-      className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}
-    >
-      {cfg.label}
-    </span>
-  );
+  const cfg = PRIORIDAD_CONFIG[prioridad];
+  if (!cfg) return <Badge tone="neutral">{prioridad}</Badge>;
+  return <Badge tone={cfg.tone}>{cfg.label}</Badge>;
 }
 
 /**

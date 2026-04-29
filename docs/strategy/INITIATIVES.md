@@ -30,7 +30,7 @@
 | Access Denied UX (UI)       | `access-denied-ux`           | todas    | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (cola UI — orden en §Roadmap UI)                                                                                                                                                                 | 2026-04-27           |
 | Activity Log pattern (UI)   | `activity-log-pattern`       | todas    | n/a (UI; consume audit_log) | proposed    | Cerrar alcance v1 al arrancar (cola UI — orden en §Roadmap UI)                                                                                                                                                                 | 2026-04-27           |
 | Analytics (BI externo)      | `analytics`                  | todas    | analytics, erp, dilesa, rdb | blocked     | Sprint 0 — desbloquear export del bootstrap (Metabase + Caddy + Postgres) desde Cowork al repo Analytics                                                                                                                       | 2026-04-25           |
-| Badge system (UI)           | `badge-system`               | todas    | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (cola UI — orden en §Roadmap UI)                                                                                                                                                                 | 2026-04-27           |
+| Badge system (UI)           | `badge-system`               | todas    | n/a (UI)                    | in_progress | Sprint 2 — migrar ≈11 callsites de `<span className={cfg.cls}>` a `<Badge tone={cfg.tone}>`                                                                                                                                    | 2026-04-29           |
 | Cuentas por Pagar           | `cxp`                        | todas    | erp                         | planned     | Sprint 1 — schema (extender `erp.facturas` + crear `cxp_pagos` + `cxp_pago_aplicaciones`) + RPCs (alta/alta_xml/cancelar/programar/aprobar/marcar_pagado) + helper `es_comite_ejecutivo` + backfill + regenerar SCHEMA_REF     | 2026-04-28           |
 | Drawer anatomy (UI)         | `drawer-anatomy`             | todas    | n/a (UI)                    | proposed    | Cerrar alcance v1 al arrancar (cola UI — orden en §Roadmap UI)                                                                                                                                                                 | 2026-04-27           |
 | Empresa Docs Legales        | `empresa-documentos-legales` | todas    | core, erp                   | in_progress | Sprint 5 (operativo, **lo hace Beto**) — DILESA asigna sus docs ya cargados en `/settings/empresas/dilesa`; RDB/ANSA/COAGAN suben sus PDFs en `/<empresa>/admin/documentos` y luego los asignan; cierra iniciativa al terminar | 2026-04-28           |
@@ -74,7 +74,7 @@
 > vez de N veces.
 
 6. ~~`forms-pattern`~~ — **DONE** (6 PRs, `<Form>` + zod + RHF; `wizard-pattern` spinned out).
-7. `badge-system` — tokens semánticos para badges; deuda dispersa. **Próximo en cola UI.**
+7. ~~`badge-system`~~ — **`in_progress`** (Sprint 1 foundation listo + ADR-017, Sprint 2+ migración).
 8. `drawer-anatomy` — `<DetailDrawer>` paralelo a `<DetailPage>` (ADR-009).
 9. `responsive-policy` — mobile-first vs desktop-only por módulo.
 10. `a11y-baseline` — WCAG 2.1 AA mínimo. Después de forms + badges para que el audit cubra los componentes ya estandarizados.
