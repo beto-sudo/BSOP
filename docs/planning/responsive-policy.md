@@ -3,13 +3,10 @@
 **Slug:** `responsive-policy`
 **Empresas:** todas
 **Schemas afectados:** n/a (UI)
-**Estado:** proposed
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-26
-**Última actualización:** 2026-04-26
-
-> **Bloqueada hasta cierre de `data-table`.** Alcance v1 detallado se
-> cierra cuando arranque su turno.
+**Última actualización:** 2026-04-29
 
 ## Problema
 
@@ -24,48 +21,82 @@ en su teléfono, la experiencia varía entre "funciona", "funciona feo" y
 
 - Cada módulo declara su perfil responsive: `mobile-first`,
   `desktop-only`, o `responsive` (degrada gracefully).
-- Convención clara de breakpoints (Tailwind defaults o custom).
-- Componentes compartidos saben cómo degradan: `<DataTable>` →
-  cards en mobile, drawers full-screen en mobile, etc.
-- Para módulos `desktop-only`, copy explícito en mobile: "Este módulo
-  está optimizado para desktop. Abrilo en una pantalla más grande."
+- Convención clara de breakpoints (Tailwind defaults).
+- Componente `<DesktopOnlyNotice>` para módulos desktop-only.
+- Detección por viewport (CSS), no user-agent.
+- Componentes compartidos agnósticos al perfil.
 
-## Alcance v1 (tentativo — refinar al arrancar)
+## Alcance v1 (cerrado 2026-04-29 — ver ADR-019)
 
-- [ ] Auditoría: catalogar perfil responsive actual de cada módulo.
-- [ ] ADR fijando los 3 perfiles + breakpoints canónicos.
-- [ ] Componente `<DesktopOnlyNotice>` para módulos no-mobile.
-- [ ] Reglas de degradación de `<DataTable>`, `<ModuleKpiStrip>`,
-      `<ModuleFilters>` en mobile.
-- [ ] Touch target mínimo (44x44 en mobile).
+- [x] 3 perfiles canónicos: `mobile-first` / `desktop-only` / `responsive`.
+- [x] Tailwind defaults como breakpoints (sin custom).
+- [x] `<DesktopOnlyNotice>` en `components/responsive/`.
+- [x] Detección por viewport (CSS-driven, no UA-sniffing).
+- [x] Componentes compartidos agnósticos al perfil — el page decide.
+- [x] ADR-019 con 5 reglas (R1-R5).
+- [ ] Adopción incremental: PRs nuevos declaran perfil cuando tocan un page.
 
-## Fuera de alcance
+## Decisiones tomadas al cerrar alcance
 
-- Apps nativas (RN, Capacitor). Solo web.
-- PWA installability — feature aparte.
+- **3 perfiles (no más, no menos)**: cubre el repo con matiz suficiente sin
+  invocar perfiles ad-hoc.
+- **Tailwind defaults** en lugar de breakpoints custom: cero refactor masivo.
+- **Comentario JSDoc `@responsive`** en lugar de file convention o folder
+  layout: cero churn estructural; declarar es 1 línea.
+- **CSS-driven detection** en lugar de UA-sniffing: estable bajo SSR, rotación
+  de tablet, navegadores in-app.
+- **Sin migración inmediata** — adopción incremental tipo ADR-010 DT8. PRs
+  nuevos respetan; pages viejos se actualizan al tocarlos.
+- **Sin `<MobileFirstNotice>` o `<ResponsiveNotice>`**: solo desktop-only
+  necesita el opt-out visual; los otros 2 perfiles son default por
+  construcción.
+
+## Fuera de alcance v1
+
+- **Bottom sheet en mobile** (drawer side-bottom).
+- **Touch target audit masivo**.
+- **PWA installability**.
+- **Native apps** (RN, Capacitor).
+- **eslint-rule custom** que enforce el JSDoc `@responsive` — si se vuelve
+  necesario, se agrega.
 
 ## Métricas de éxito
 
-- Cada módulo tiene perfil declarado en su page o layout.
-- Mobile audit (Chrome DevTools) sin overlap ni overflow horizontal
-  en ninguno de los módulos `mobile-first` o `responsive`.
-
-## Riesgos / preguntas abiertas
-
-- [ ] ¿Detectar mobile por viewport o user-agent? Viewport es estándar
-      pero pierde casos edge (tablet en portrait).
-- [ ] Sidebar en mobile — ¿drawer hamburger o tab bar inferior?
-- [ ] Coordinar con `module-states` (skeletons en mobile son distintos
-      al desktop) y `data-table` (degradación a cards).
+- Cada PR nuevo que toca un page declara su `@responsive` perfil.
+- Mobile audit (Chrome DevTools `< sm`) en módulos `mobile-first`/`responsive`:
+  cero overflow horizontal, cero overlap.
+- `<DesktopOnlyNotice>` visible en módulos desktop-only abiertos en mobile.
 
 ## Sprints / hitos
 
-_(se llena cuando arranque ejecución, vía Claude Code)_
+| #   | Sprint                                   | Estado | PR  |
+| --- | ---------------------------------------- | ------ | --- |
+| 1   | Foundation + ADR-019 + DesktopOnlyNotice | done   | TBD |
 
 ## Decisiones registradas
 
-_(append-only, fechadas — escrito por Claude Code)_
+### 2026-04-29 · ADR-019 — Responsive policy (Sprint 1)
+
+Codificado en [ADR-019](../adr/019_responsive_policy.md). Las 5 reglas:
+
+- **R1** — 3 perfiles canónicos: `mobile-first` / `desktop-only` / `responsive`.
+- **R2** — Breakpoints canónicos: Tailwind defaults (sm/md/lg/xl/2xl).
+- **R3** — `<DesktopOnlyNotice>` para módulos `desktop-only`; visible solo en `< sm`.
+- **R4** — Detección por viewport (CSS-driven), no user-agent.
+- **R5** — Componentes compartidos heredan el perfil del page padre, no se autodetectan.
 
 ## Bitácora
 
-_(append-only, escrita por Claude Code al ejecutar)_
+### 2026-04-29 — Sprint 1 mergeado
+
+Foundation:
+
+- `components/responsive/desktop-only-notice.tsx` — `<DesktopOnlyNotice>` con copy estándar + `role="alert"` + Monitor icon de lucide.
+- `components/responsive/index.ts` — barrel export.
+- ADR-019 con 5 reglas (R1-R5).
+
+Sin migración masiva: la adopción del comentario JSDoc `@responsive` y de
+`<DesktopOnlyNotice>` es incremental — PRs nuevos respetan, pages viejos
+se actualizan cuando se tocan por feature work.
+
+PR: pendiente.
