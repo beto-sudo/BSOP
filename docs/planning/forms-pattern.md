@@ -3,7 +3,7 @@
 **Slug:** `forms-pattern`
 **Empresas:** todas
 **Schemas afectados:** n/a (UI)
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-04-27
 **Última actualización:** 2026-04-29
@@ -85,15 +85,15 @@ Síntomas visibles:
 
 ## Sprints / hitos
 
-| #   | Sprint                                       | Estado  | PR   |
-| --- | -------------------------------------------- | ------- | ---- |
-| 1   | Foundation + ADR-016 + golden path tasks     | done    | #300 |
-| 2   | tasks (rich create + edit) + juntas adopters | done    | TBD  |
-| 3   | documentos (form-fields + create + detail)   | done    | TBD  |
-| 4   | DILESA list pages (terrenos/proyectos/etc.)  | done    | TBD  |
-| 5   | Cortes (registrar-mov + voucher-capture)     | done    | TBD  |
-| 6   | empleado-alta-wizard (eval + migrate o spin) | next    | —    |
-| 7   | Cierre + INITIATIVES move to Done            | pending | —    |
+| #   | Sprint                                                | Estado | PR   |
+| --- | ----------------------------------------------------- | ------ | ---- |
+| 1   | Foundation + ADR-016 + golden path tasks              | done   | #300 |
+| 2   | tasks (rich create + edit) + juntas adopters          | done   | TBD  |
+| 3   | documentos (form-fields + create + detail)            | done   | TBD  |
+| 4   | DILESA list pages (terrenos/proyectos/etc.)           | done   | TBD  |
+| 5   | Cortes (registrar-mov + voucher-capture)              | done   | #304 |
+| 6   | empleado-alta-wizard (eval + spin a `wizard-pattern`) | done   | TBD  |
+| 7   | Cierre + INITIATIVES move to Done                     | done   | TBD  |
 
 ## Decisiones registradas
 
@@ -123,6 +123,52 @@ en el pattern; si requiere API materialmente distinta, sale como
 `wizard-pattern` aparte para no contaminar la API simple del v1.
 
 ## Bitácora
+
+### 2026-04-29 — Sprint 6 + 7 mergeados (cierre)
+
+**Sprint 6 — `empleado-alta-wizard` evaluation**: 1329 líneas, 3 pasos
+navegables, ~30 useState, file uploads con storage Supabase, inserción
+multi-tabla con rollback best-effort, beneficiarios dinámicos (1..N).
+Forzarlo al `<Form>` de v1 contamina la API porque:
+
+- Submit no es único — secuencial multi-tabla con rollback.
+- Cada paso valida antes de avanzar, no solo al final.
+- Dirty confirm tiene que considerar progreso parcial.
+- Beneficiarios dinámicos requieren `useFieldArray` (no expuesto en v1).
+- File uploads arrastran `file-attachments` (iniciativa hermana pending).
+
+**Decisión**: spin-out a `wizard-pattern` (ver `docs/planning/wizard-pattern.md`).
+`empleado-alta-wizard` queda con su patrón actual hasta que
+`wizard-pattern` v1 esté listo. Cuando esa iniciativa arranque, migra
+este wizard como golden path.
+
+**Sprint 7 — cierre**: iniciativa `forms-pattern` movida a `done` en
+INITIATIVES.md. Outcome:
+
+- Foundation completa en `components/forms/` (Form + FormField +
+  FormSection + FormRow + FormActions + useDirtyConfirm + useZodForm).
+- ADR-016 con 7 reglas (F1-F7).
+- 7 forms migrados a `<Form>` + zod en 5 sprints (PRs #300, #301, #302,
+  #303, #304, _este PR_):
+  - tasks-create-form (simple + rich) + tasks-edit-form (simple + rich)
+  - juntas adopters (junta-detail-module + app/inicio/juntas/[id])
+  - documento-form-fields + documento-create-sheet + documento-detail-sheet (edit mode)
+  - 4 DILESA list pages (terrenos + proyectos + anteproyectos + prototipos)
+  - cortes registrar-movimiento-dialog + voucher-capture-form
+
+Boilerplate eliminado total (estimación): ~50 `useState` per-field +
+~12 `setSaving` / `setCreating` ad-hoc + 1 `emptyTaskForm()` helper +
+~10 validaciones inline `if (!field) return`.
+
+Holdouts documentados como excepciones permanentes:
+
+- `cortes/abrir-caja-dialog.tsx`: display, no form real.
+- `cortes/cerrar-corte-dialog.tsx`: state derivado complejo (breakdown
+  efectivo + diferencias + conciliación visual). Migrarlo requiere
+  reescritura. Follow-up cuando se toque por feature work.
+- `rh/empleado-alta-wizard.tsx`: spin a `wizard-pattern`.
+
+PR: pendiente.
 
 ### 2026-04-29 — Sprint 5 mergeado
 
