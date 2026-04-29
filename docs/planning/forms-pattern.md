@@ -3,13 +3,10 @@
 **Slug:** `forms-pattern`
 **Empresas:** todas
 **Schemas afectados:** n/a (UI)
-**Estado:** proposed
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-27
-**Última actualización:** 2026-04-27
-
-> **Bloqueada hasta cierre de `data-table` (ya done).** Alcance v1
-> detallado se cierra cuando arranque su turno.
+**Última actualización:** 2026-04-28
 
 ## Problema
 
@@ -37,11 +34,6 @@ Síntomas visibles:
 - Dirty tracking: si el usuario cierra el sheet/dialog con cambios
   sin guardar, algunos preguntan, otros se cierran y pierden datos.
 
-Adicional: `proveedores-csf-ai` está `planned` (Sprint 1) y va a
-traer formulario nuevo de captura de proveedores con OCR de CSF. Si
-sale antes que `forms-pattern`, va a inventar otro form ad-hoc que
-después haya que migrar. Si sale después, nace con el pattern correcto.
-
 ## Outcome esperado
 
 - Componente `<Form>` con react-hook-form + zod como base.
@@ -55,30 +47,33 @@ después haya que migrar. Si sale después, nace con el pattern correcto.
   "Cancelar". Disabled visible (opacity + cursor-not-allowed) sin
   ambigüedad.
 
-## Alcance v1 (tentativo — refinar al arrancar)
+## Alcance v1 (cerrado 2026-04-28 — ver ADR-016)
 
-- [ ] Decidir librería: react-hook-form (estándar) vs Conform vs
-      formik. RHF probablemente, ya familiar.
-- [ ] Schema layer: zod (estándar para tipado + runtime validation).
-- [ ] Componentes: `<Form>`, `<FormField>`, `<FormSection>`,
-      `<FormRow>`, `<FormActions>`.
-- [ ] Hook `useDirtyConfirm()` integrado con `<ConfirmDialog>` para
-      confirmación de descartar cambios.
-- [ ] Migrar 2-3 forms existentes como golden path: - probable: `tasks-create-form` (form simple) - probable: `empleado-alta-wizard` (multi-step → ver si v1 lo
-      cubre o queda fuera) - probable: form de captura de proveedor de
-      `proveedores-csf-ai` cuando llegue
-- [ ] ADR documentando la decisión (probable ADR-011).
+- [x] Decidir librería: **react-hook-form** (estándar industria, integra
+      con shadcn/base-ui inputs vía `Controller`, ~12kb gzipped).
+- [x] Schema layer: **zod** (ya en deps `^4.3.6`).
+- [x] Componentes: `<Form>`, `<FormField>`, `<FormSection>`,
+      `<FormRow>`, `<FormActions>` en `components/forms/`.
+- [x] `useZodForm` helper que encapsula `useForm + zodResolver` con
+      typing limpio.
+- [x] `useDirtyConfirm` integrado con `<ConfirmDialog>` (ADR-008).
+- [x] ADR-016 codificando las 7 reglas (F1-F7).
+- [x] Golden path: `tasks-create-form` simple variant migrado en Sprint 1.
+- [ ] Migración del resto de forms — Sprints 2-6.
 
-## Fuera de alcance
+## Fuera de alcance v1
 
-- Wizards / multi-step forms si demuestran requerir API distinta.
-  Decidir al arrancar — si `empleado-alta-wizard` encaja sin churn,
-  va; si no, sale aparte como `wizard-pattern`.
-- Form builders dinámicos (campos definidos en runtime). No hay caso
-  hoy.
-- Auto-save / draft persistence. Postergable.
-- File inputs como parte del form schema — eso vive en
+- **Multi-step wizards**. `empleado-alta-wizard` evaluado en Sprint 6;
+  si encaja sin churn entra, si no sale como `wizard-pattern`.
+- **Form builders dinámicos**. No hay caso real hoy.
+- **Auto-save / draft persistence**. Postergable.
+- **File inputs como parte del form schema** — vive en
   `file-attachments` (iniciativa hermana).
+- **Tests unitarios del wrapper** — repo no tiene testing-library;
+  e2e + uso del componente cubren el comportamiento.
+- **Server actions como convención forzada** — `<Form>` soporta server
+  actions, pero el repo es 95% client-side fetch hoy y no se migra como
+  parte de esta iniciativa.
 
 ## Métricas de éxito
 
@@ -88,32 +83,67 @@ después haya que migrar. Si sale después, nace con el pattern correcto.
 - Cerrar drawer/sheet con cambios sin guardar pregunta antes (en
   forms migrados).
 
-## Riesgos / preguntas abiertas
-
-- [ ] **Coordinación con `proveedores-csf-ai`.** Idealmente
-      `forms-pattern` arranca antes para que el form de proveedores
-      nazca con el pattern. Si `proveedores-csf-ai` arranca primero,
-      retro-migrar ese form en el PR de adopción de `forms-pattern`.
-- [ ] **Multi-step (wizard)** — incluir o no en v1. Si se incluye,
-      la API se complica. Decisión al arrancar.
-- [ ] **Server actions vs client mutations** — Next.js App Router.
-      Definir si el `<Form>` soporta ambos modos o si se queda con
-      client-side fetch (consistente con el resto del repo hoy).
-- [ ] **Coexistencia con shadcn `<Form>`** — shadcn ya provee un
-      `<Form>` minimal. ¿Wrappear o reemplazar? Probable wrappear
-      para no perder los primitives existentes.
-- [ ] **A11y de errores de validación** — `aria-invalid`,
-      `aria-describedby` en cada FormField. Integrar con
-      `a11y-baseline` cuando arranque.
-
 ## Sprints / hitos
 
-_(se llena cuando arranque ejecución, vía Claude Code)_
+| #   | Sprint                                       | Estado  | PR  |
+| --- | -------------------------------------------- | ------- | --- |
+| 1   | Foundation + ADR-016 + golden path tasks     | done    | TBD |
+| 2   | tasks (rich create + edit + updates)         | next    | —   |
+| 3   | documentos (form-fields + create-sheet)      | pending | —   |
+| 4   | DILESA `[id]` inline forms                   | pending | —   |
+| 5   | Cortes (abrir/cerrar caja)                   | pending | —   |
+| 6   | empleado-alta-wizard (eval + migrate o spin) | pending | —   |
+| 7   | Cierre + INITIATIVES move to Done            | pending | —   |
 
 ## Decisiones registradas
 
-_(append-only, fechadas — escrito por Claude Code)_
+### 2026-04-28 · ADR-016 — `<Form>` + RHF + zod (Sprint 1)
+
+Codificado en [ADR-016](../adr/016_forms_pattern.md). Las 7 reglas:
+
+- **F1** — `react-hook-form` + `zod` como base, `useZodForm` como entry point.
+- **F2** — Errores **debajo del input**, nunca toast/alert/banner (refuerza ADR-008 T2).
+- **F3** — `<FormField>` cablea label + control + error + a11y por construcción (render-prop pattern).
+- **F4** — Layout via `<FormSection>` + `<FormRow>` (mobile-first, 1 col mobile / N cols `sm:`+).
+- **F5** — `<FormActions>` estandariza copy (`Cancelar`/`Guardar`/`Guardando...`) + auto-detect `isSubmitting`.
+- **F6** — `useDirtyConfirm` integrado con `<ConfirmDialog>` para gate de drawer/sheet close cuando dirty.
+- **F7** — `<Form>` agnostic a server actions vs client mutations; el callback `onSubmit` decide.
+
+### 2026-04-28 · Tests unitarios pospuestos
+
+Repo no tiene `@testing-library/react` ni `jsdom`. Los tests existentes son
+node-only (lógica pura). Sprint 1 entrega sin tests de componente; los e2e
+de Playwright + el uso real cubren el comportamiento. Si surge regresión,
+se evalúa instalar testing-library en una iniciativa aparte.
+
+### 2026-04-28 · Multi-step wizards fuera de v1
+
+`empleado-alta-wizard` es el único caso real hoy. Sprint 6 evalúa si encaja
+en el pattern; si requiere API materialmente distinta, sale como
+`wizard-pattern` aparte para no contaminar la API simple del v1.
 
 ## Bitácora
 
-_(append-only, escrita por Claude Code al ejecutar)_
+### 2026-04-28 — Sprint 1 mergeado
+
+Foundation completo en `components/forms/`:
+
+- `form.tsx` — `<Form>` + `useZodForm` helper.
+- `form-field.tsx` — render-prop con a11y por construcción.
+- `form-section.tsx` — heading + body con divider opcional.
+- `form-row.tsx` — grid responsive mobile-first.
+- `form-actions.tsx` — submit/cancel con auto-detect de submitting.
+- `use-dirty-confirm.tsx` — hook + `<ConfirmDialog>` para gate de close.
+- `index.ts` — barrel export.
+
+Deps agregadas: `react-hook-form` ^7.74.0, `@hookform/resolvers` ^5.2.2.
+
+ADR-016 publicado con las 7 reglas (F1-F7).
+
+Golden path: `components/tasks/tasks-create-form.tsx` simple variant
+migrado a `<Form>` + `useZodForm` + `<FormField>`. Rich variant queda
+intacta para Sprint 2 (dispatcher acepta `onCreate(values?)` para
+mantener ambos paths funcionando). Module padre simplificado: validación
+deja de vivir inline en `handleCreate`.
+
+PR: pendiente (creado tras update de INITIATIVES.md).
