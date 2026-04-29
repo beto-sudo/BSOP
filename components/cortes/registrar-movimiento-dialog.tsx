@@ -1,9 +1,10 @@
 'use client';
 
-import { Loader2, Plus } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import * as React from 'react';
+import { Plus } from 'lucide-react';
+import { z } from 'zod';
+
 import { registrarMovimiento } from '@/app/rdb/cortes/actions';
-import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -22,6 +23,8 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
+import { Form, FormActions, FormField, useFormContext, useZodForm } from '@/components/forms';
+
 import { TIPO_MOVIMIENTO_OPTIONS } from './types';
 
 type Props = {
@@ -31,59 +34,45 @@ type Props = {
   onSuccess: () => void;
 };
 
+const RegistrarSchema = z.object({
+  tipo_detalle: z.string().min(1, 'Selecciona un tipo de movimiento'),
+  monto: z
+    .string()
+    .min(1, 'Captura el monto')
+    .refine((v) => Number.isFinite(Number(v)) && Number(v) > 0, 'Monto debe ser mayor a 0'),
+  concepto: z.string().trim().min(1, 'Captura el concepto'),
+});
+
+type RegistrarValues = z.infer<typeof RegistrarSchema>;
+
+const registrarDefaults: RegistrarValues = {
+  tipo_detalle: '',
+  monto: '',
+  concepto: '',
+};
+
 export function RegistrarMovimientoDialog({ corteId, open, onOpenChange, onSuccess }: Props) {
   const toast = useToast();
-  const [tipoDetalle, setTipoDetalle] = useState<string>('');
-  const [monto, setMonto] = useState<string>('');
-  const [concepto, setConcepto] = useState<string>('');
-  const [submitting, setSubmitting] = useState(false);
-  const prevConceptoDefaultRef = useRef<string | undefined>(undefined);
-  const tipoInputRef = useRef<HTMLButtonElement | null>(null);
 
-  useEffect(() => {
-    if (open) {
-      setTipoDetalle('');
-      setMonto('');
-      setConcepto('');
-      prevConceptoDefaultRef.current = undefined;
-      queueMicrotask(() => tipoInputRef.current?.focus());
-    }
-  }, [open]);
+  const form = useZodForm({
+    schema: RegistrarSchema,
+    defaultValues: registrarDefaults,
+  });
 
-  const selected = TIPO_MOVIMIENTO_OPTIONS.find((o) => o.tipo_detalle === tipoDetalle);
-  const direccion = selected?.tipo;
+  React.useEffect(() => {
+    if (open) form.reset(registrarDefaults);
+  }, [open, form]);
 
-  function handleTipoChange(next: string | null) {
-    const value = next ?? '';
-    setTipoDetalle(value);
-    const nextOpt = TIPO_MOVIMIENTO_OPTIONS.find((o) => o.tipo_detalle === value);
-    const prevDefault = prevConceptoDefaultRef.current;
-    const conceptoIsEmpty = !concepto.trim();
-    const conceptoMatchesPrevDefault = prevDefault ? concepto === prevDefault : false;
-    if (nextOpt?.conceptoDefault && (conceptoIsEmpty || conceptoMatchesPrevDefault)) {
-      setConcepto(nextOpt.conceptoDefault);
-    }
-    prevConceptoDefaultRef.current = nextOpt?.conceptoDefault;
-  }
-
-  const montoNum = Number(monto);
-  const canSubmit =
-    !!selected &&
-    Number.isFinite(montoNum) &&
-    montoNum > 0 &&
-    concepto.trim().length > 0 &&
-    !submitting;
-
-  async function handleSubmit() {
-    if (!selected || !canSubmit) return;
-    setSubmitting(true);
+  const handleSubmit = async (values: RegistrarValues) => {
+    const selected = TIPO_MOVIMIENTO_OPTIONS.find((o) => o.tipo_detalle === values.tipo_detalle);
+    if (!selected) return;
     try {
       await registrarMovimiento({
         corte_id: corteId,
         tipo: selected.tipo,
         tipo_detalle: selected.tipo_detalle,
-        monto: montoNum,
-        concepto: concepto.trim(),
+        monto: Number(values.monto),
+        concepto: values.concepto.trim(),
       });
       toast.add({ title: 'Movimiento registrado', type: 'success' });
       onSuccess();
@@ -91,20 +80,14 @@ export function RegistrarMovimientoDialog({ corteId, open, onOpenChange, onSucce
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Error al registrar';
       toast.add({ title: 'Error al registrar movimiento', description: msg, type: 'error' });
-    } finally {
-      setSubmitting(false);
     }
-  }
-
-  const conceptoPlaceholder = selected
-    ? (selected.conceptoDefault ?? `Detalle del ${selected.label.toLowerCase()}`)
-    : 'Describe el movimiento…';
+  };
 
   return (
     <Dialog
       open={open}
       onOpenChange={(v) => {
-        if (!v && !submitting) onOpenChange(false);
+        if (!v && !form.formState.isSubmitting) onOpenChange(false);
       }}
     >
       <DialogContent className="sm:max-w-md">
@@ -115,27 +98,70 @@ export function RegistrarMovimientoDialog({ corteId, open, onOpenChange, onSucce
           </DialogDescription>
         </DialogHeader>
 
-        <form
-          className="space-y-4 py-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void handleSubmit();
-          }}
-        >
-          <div className="space-y-1.5">
-            <label
-              htmlFor="mov-tipo"
-              className="text-xs font-medium uppercase tracking-wider text-muted-foreground"
-            >
-              Tipo de movimiento
-            </label>
-            <Select value={tipoDetalle} onValueChange={handleTipoChange}>
-              <SelectTrigger
-                id="mov-tipo"
-                ref={tipoInputRef}
-                aria-describedby="mov-tipo-help"
-                className="w-full"
-              >
+        <Form form={form} onSubmit={handleSubmit} className="space-y-4 py-2">
+          <TipoMovimientoField />
+          <MontoConDireccionField />
+
+          <FormField name="concepto" label="Concepto">
+            {(field) => (
+              <Textarea
+                {...field}
+                id={field.id}
+                aria-invalid={field.invalid || undefined}
+                aria-describedby={field.describedBy}
+                rows={2}
+                placeholder="Describe el movimiento…"
+              />
+            )}
+          </FormField>
+
+          <DialogFooter>
+            <FormActions
+              cancelLabel="Cancelar"
+              submitLabel="Registrar"
+              submittingLabel="Registrando..."
+              submitIcon={<Plus className="h-4 w-4" />}
+              onCancel={() => onOpenChange(false)}
+              className="border-t-0 pt-0"
+            />
+          </DialogFooter>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * Tipo selector with conceptoDefault cascade: when the user picks a tipo
+ * whose option has a `conceptoDefault`, prefill `concepto` if the field is
+ * empty or still showing the previous default. Mirrors the original
+ * useRef-based behaviour with RHF's `setValue` / `watch`.
+ */
+function TipoMovimientoField() {
+  const { setValue, getValues } = useFormContext<RegistrarValues>();
+  const prevConceptoDefaultRef = React.useRef<string | undefined>(undefined);
+
+  const handleChange = (next: string) => {
+    setValue('tipo_detalle', next, { shouldDirty: true, shouldValidate: true });
+    const nextOpt = TIPO_MOVIMIENTO_OPTIONS.find((o) => o.tipo_detalle === next);
+    const concepto = getValues('concepto');
+    const prevDefault = prevConceptoDefaultRef.current;
+    const conceptoIsEmpty = !concepto.trim();
+    const conceptoMatchesPrevDefault = prevDefault ? concepto === prevDefault : false;
+    if (nextOpt?.conceptoDefault && (conceptoIsEmpty || conceptoMatchesPrevDefault)) {
+      setValue('concepto', nextOpt.conceptoDefault, { shouldDirty: true });
+    }
+    prevConceptoDefaultRef.current = nextOpt?.conceptoDefault;
+  };
+
+  return (
+    <FormField name="tipo_detalle" label="Tipo de movimiento" required>
+      {(field) => {
+        const selected = TIPO_MOVIMIENTO_OPTIONS.find((o) => o.tipo_detalle === field.value);
+        return (
+          <>
+            <Select value={field.value} onValueChange={handleChange}>
+              <SelectTrigger id={field.id} aria-describedby={field.describedBy} className="w-full">
                 <SelectValue placeholder="Seleccionar tipo…" />
               </SelectTrigger>
               <SelectContent>
@@ -146,89 +172,63 @@ export function RegistrarMovimientoDialog({ corteId, open, onOpenChange, onSucce
                 ))}
               </SelectContent>
             </Select>
-            <p id="mov-tipo-help" className="min-h-4 text-xs text-muted-foreground">
-              {selected?.descripcion ?? ' '}
-            </p>
-          </div>
+            <p className="min-h-4 text-xs text-muted-foreground">{selected?.descripcion ?? ' '}</p>
+          </>
+        );
+      }}
+    </FormField>
+  );
+}
 
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label
-                htmlFor="mov-monto"
-                className="text-xs font-medium uppercase tracking-wider text-muted-foreground"
-              >
-                Monto
-              </label>
-              {direccion && (
-                <span
-                  className={
-                    'text-xs font-medium tabular-nums ' +
-                    (direccion === 'salida' ? 'text-destructive' : 'text-emerald-500')
-                  }
-                >
-                  {direccion === 'salida' ? '– salida' : '+ entrada'}
-                </span>
-              )}
-            </div>
-            <div className="relative">
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                $
-              </span>
-              <Input
-                id="mov-monto"
-                type="number"
-                inputMode="decimal"
-                min="0.01"
-                step="0.01"
-                value={monto}
-                onChange={(e) => setMonto(e.target.value)}
-                placeholder="0.00"
-                className="pl-7 text-lg font-medium"
-              />
-            </div>
-          </div>
+/**
+ * Monto field with a "+ entrada" / "– salida" badge derived from the tipo
+ * that's currently selected. Reads `tipo_detalle` from form context.
+ */
+function MontoConDireccionField() {
+  const { watch } = useFormContext<RegistrarValues>();
+  const tipoDetalle = watch('tipo_detalle');
+  const selected = TIPO_MOVIMIENTO_OPTIONS.find((o) => o.tipo_detalle === tipoDetalle);
+  const direccion = selected?.tipo;
 
-          <div className="space-y-1.5">
-            <label
-              htmlFor="mov-concepto"
-              className="text-xs font-medium uppercase tracking-wider text-muted-foreground"
-            >
-              Concepto
-            </label>
-            <Textarea
-              id="mov-concepto"
-              rows={2}
-              value={concepto}
-              onChange={(e) => setConcepto(e.target.value)}
-              placeholder={conceptoPlaceholder}
-            />
-          </div>
+  return (
+    <FormField name="monto" label={<MontoLabel direccion={direccion} />} required>
+      {(field) => (
+        <div className="relative">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+            $
+          </span>
+          <Input
+            {...field}
+            id={field.id}
+            aria-invalid={field.invalid || undefined}
+            aria-describedby={field.describedBy}
+            type="number"
+            inputMode="decimal"
+            min="0.01"
+            step="0.01"
+            placeholder="0.00"
+            className="pl-7 text-lg font-medium"
+          />
+        </div>
+      )}
+    </FormField>
+  );
+}
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={submitting}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={!canSubmit}>
-              {submitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Registrando…
-                </>
-              ) : (
-                <>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Registrar
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+function MontoLabel({ direccion }: { direccion: 'entrada' | 'salida' | undefined }) {
+  return (
+    <span className="flex items-center justify-between gap-2">
+      <span>Monto</span>
+      {direccion && (
+        <span
+          className={
+            'text-xs font-medium tabular-nums ' +
+            (direccion === 'salida' ? 'text-destructive' : 'text-emerald-500')
+          }
+        >
+          {direccion === 'salida' ? '– salida' : '+ entrada'}
+        </span>
+      )}
+    </span>
   );
 }

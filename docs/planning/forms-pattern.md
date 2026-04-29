@@ -91,8 +91,8 @@ Síntomas visibles:
 | 2   | tasks (rich create + edit) + juntas adopters | done    | TBD  |
 | 3   | documentos (form-fields + create + detail)   | done    | TBD  |
 | 4   | DILESA list pages (terrenos/proyectos/etc.)  | done    | TBD  |
-| 5   | Cortes (abrir/cerrar caja)                   | next    | —    |
-| 6   | empleado-alta-wizard (eval + migrate o spin) | pending | —    |
+| 5   | Cortes (registrar-mov + voucher-capture)     | done    | TBD  |
+| 6   | empleado-alta-wizard (eval + migrate o spin) | next    | —    |
 | 7   | Cierre + INITIATIVES move to Done            | pending | —    |
 
 ## Decisiones registradas
@@ -123,6 +123,39 @@ en el pattern; si requiere API materialmente distinta, sale como
 `wizard-pattern` aparte para no contaminar la API simple del v1.
 
 ## Bitácora
+
+### 2026-04-29 — Sprint 5 mergeado
+
+`components/cortes/`: 2 forms migrados a `<Form>` + zod.
+
+- `registrar-movimiento-dialog.tsx`: schema con `tipo_detalle` requerido +
+  `monto` validado (`Number > 0` via `.refine`) + `concepto` requerido.
+  La cascada original (cuando cambias `tipo_detalle` se autofila
+  `concepto` con el `conceptoDefault` de la opción si está vacío o
+  matchea el default previo) preservada via `useRef` + `setValue`/`getValues`
+  encapsulado en sub-componente `<TipoMovimientoField>`. Badge dinámico
+  "+ entrada"/"– salida" derivado del watch en `<MontoConDireccionField>`.
+- `voucher-capture-form.tsx`: schema con `superRefine` para validación
+  condicional por `categoria`:
+  - `voucher_tarjeta`: requires monto > 0.
+  - `comprobante_movimiento`: requires `movimiento_id`.
+  - `otro`: nada.
+    Sub-componente `<CategoriaSegmentedControl>` para el toggle visual,
+    reads/writes via context.
+
+**Skip explícito**:
+
+- `abrir-caja-dialog.tsx`: no es realmente un form — es display de info
+  heredada (efectivo inicial calculado externamente, responsable y fecha
+  prefilled, único campo editable es Combobox de caja controlado
+  externamente). Migrarlo agregaría boilerplate sin valor.
+- `cerrar-corte-dialog.tsx`: form de cierre con state derivado complejo
+  (breakdown de efectivo por denominación, diferencias, conciliación
+  visual). Migrarlo requiere casi reescribirlo. Postergado fuera de v1
+  de `forms-pattern`; queda como follow-up cuando se toque el módulo
+  por feature work real.
+
+PR: pendiente.
 
 ### 2026-04-29 — Sprint 4 mergeado
 
