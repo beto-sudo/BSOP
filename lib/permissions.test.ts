@@ -189,7 +189,6 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
 
   // RDB
   'rdb.home',
-  'rdb.tasks',
   'rdb.ventas',
   'rdb.cortes',
   'rdb.productos',
