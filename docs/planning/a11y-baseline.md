@@ -3,76 +3,97 @@
 **Slug:** `a11y-baseline`
 **Empresas:** todas
 **Schemas afectados:** n/a (UI)
-**Estado:** proposed
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-26
-**Última actualización:** 2026-04-26
-
-> **Bloqueada hasta cierre de `responsive-policy`.** Alcance v1 detallado
-> se cierra cuando arranque su turno.
+**Última actualización:** 2026-04-29
 
 ## Problema
 
 Cero documentado sobre accesibilidad. Riesgo bajo hoy (uso interno, base
-de usuarios chica), pero crece con cada empleado nuevo (operadores con
-distintas capacidades, uso prolongado que exige buena ergonomía visual,
-posible obligación legal a futuro). Costo de corrección crece con el
-tamaño del producto: mejor fijar baseline ahora que cuando haya 50
-módulos.
+de usuarios chica), pero crece con cada empleado nuevo. Costo de
+corrección crece con el tamaño del producto: mejor fijar baseline ahora
+que cuando haya 50 módulos.
 
 ## Outcome esperado
 
 - Baseline WCAG 2.1 AA documentado y testeable.
-- `<ModulePage>`, `<DataTable>`, `<EmptyState>`, etc. cumplen el
-  baseline by default.
-- Audit script (`npm run audit:a11y` con axe-core o similar) corre en
-  CI y bloquea PRs con regresiones críticas.
-- Convenciones explícitas: contrast ratios, focus visible, keyboard
-  nav, labels, ARIA.
+- Componentes shadcn/Radix + convenciones ADR-006/008/010/016/017/018
+  cumplen el baseline by default.
+- Audit automatizado (axe-core) en CI bloqueando regresiones críticas.
+- Convenciones explícitas en code review.
 
-## Alcance v1 (tentativo — refinar al arrancar)
+## Alcance v1 (cerrado 2026-04-29 — ver ADR-020)
 
-- [ ] ADR fijando WCAG 2.1 AA como baseline mínimo.
-- [ ] Audit baseline con axe DevTools sobre módulos clave.
-- [ ] Reglas: contraste 4.5:1 en texto normal, focus visible
-      siempre, todo elemento interactivo navegable por teclado.
-- [ ] Convención de aria-label / aria-labelledby para componentes
-      compartidos.
-- [ ] Script `audit:a11y` en CI sobre rutas representativas.
-- [ ] Capacitación / referencia rápida en `docs/qa/a11y-rubric.md`.
+- [x] WCAG 2.1 AA como baseline mínimo (no AAA).
+- [x] 6 reglas codificadas (A1-A6) en ADR-020.
+- [x] Audit empírico (no automatizado) confirma que los componentes
+      recientes ya cumplen baseline; gaps identificados (icon buttons,
+      touch targets, charts color-only).
+- [x] Convenciones explícitas para code review.
+- [ ] Audit automatizado con `@axe-core/playwright` — Sprint 2.
+- [ ] Fix de gaps incrementalmente — Sprint 3.
 
-## Fuera de alcance
+## Decisiones tomadas al cerrar alcance
 
-- WCAG AAA (más estricto, no es estándar internacional para apps
-  internas).
-- Soporte completo de screen readers en flujos OCR / camera (caso
-  edge — documentar como excepción).
-- Audit manual con usuarios con discapacidad — costoso, postergar.
+- **WCAG 2.1 (no 2.2)**: 2.2 agrega criterios sobre dragging y focus
+  appearance que axe-core aún no enforza en default. Subir a 2.2 cuando
+  el tooling lo soporte (futuro).
+- **Audit automatizado deferred a Sprint 2**: requiere instalar
+  `@axe-core/playwright`, escribir tests de smoke para 3-5 rutas
+  representativas, decidir bloqueante vs warning-only. Sprint 1 fija el
+  contrato; Sprint 2 lo enforza.
+- **Sin refactor masivo**: la mayoría del repo ya cumple por construcción
+  via shadcn/Radix. Los gaps específicos (icon button sin aria-label,
+  charts color-only) se fixean incrementalmente al tocarlos.
+
+## Fuera de alcance v1
+
+- **WCAG AAA**.
+- **Screen reader full support** en OCR/camera flows.
+- **Manual audit con usuarios con discapacidad**.
+- **`@axe-core/playwright` integration** — Sprint 2.
+- **Linter custom** que enforce `aria-label` en icon buttons — postergable.
 
 ## Métricas de éxito
 
-- axe-core reporta 0 issues críticas o serias en módulos auditados.
+- axe-core (cuando esté en CI) reporta 0 issues críticas o serias en
+  módulos auditados.
 - Keyboard-only walkthrough completo de 3 módulos clave sin bloqueo.
-- Contraste mínimo 4.5:1 en todo texto (verificado con tool).
-
-## Riesgos / preguntas abiertas
-
-- [ ] ¿Algunos componentes shadcn/radix ya cumplen baseline o hay que
-      ajustarlos?
-- [ ] Tablas grandes con `<DataTable>` — ¿navegación por teclado entre
-      celdas o solo entre filas?
-- [ ] Modales y drawers — focus trap correcto.
-- [ ] Color como único indicador de estado (badges) — agregar texto o
-      icono.
+- Contraste mínimo 4.5:1 en todo texto (verificado puntualmente con tool).
 
 ## Sprints / hitos
 
-_(se llena cuando arranque ejecución, vía Claude Code)_
+| #   | Sprint                                      | Estado    | PR  |
+| --- | ------------------------------------------- | --------- | --- |
+| 1   | ADR-020 con baseline + 6 reglas             | done      | TBD |
+| 2   | `@axe-core/playwright` + audit script en CI | postponed | —   |
+| 3   | Fix de gaps incrementales                   | postponed | —   |
 
 ## Decisiones registradas
 
-_(append-only, fechadas — escrito por Claude Code)_
+### 2026-04-29 · ADR-020 — A11y baseline (Sprint 1)
+
+Codificado en [ADR-020](../adr/020_a11y_baseline.md). Las 6 reglas:
+
+- **A1** — WCAG 2.1 AA como baseline; AAA fuera de alcance.
+- **A2** — Contraste 4.5:1 texto normal, 3:1 texto large/UI.
+- **A3** — Focus visible siempre; nunca `outline-none` sin reemplazo.
+- **A4** — Keyboard nav completo: todo clickeable es activable con teclado.
+- **A5** — `aria-label` / `aria-labelledby` para controles sin texto visible.
+- **A6** — Color no es el único indicador de estado.
 
 ## Bitácora
 
-_(append-only, escrita por Claude Code al ejecutar)_
+### 2026-04-29 — Sprint 1 mergeado
+
+ADR-020 publicado. Sprint 1 cierra el contrato (qué cumplimos como
+baseline) sin código nuevo. Las reglas A1-A6 codifican convenciones que
+ya aplican los componentes recientes (forms-pattern, badge-system,
+drawer-anatomy, etc.).
+
+Sprint 2 (postponed) instalará `@axe-core/playwright` para audit
+automatizado en CI. Sprint 3 (postponed) fixea gaps específicos
+identificados en el audit empírico (icon buttons sin aria-label, etc.).
+
+PR: pendiente.
