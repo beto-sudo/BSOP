@@ -1031,7 +1031,7 @@ export function JuntaDetailModule({ empresaSlug }: JuntaDetailModuleProps) {
 
   const empleadoMap = new Map(empleados.map((e) => [e.id, e]));
   const empleadoOptions = useMemo(
-    () => empleados.map((e) => ({ value: e.id, label: e.nombre })),
+    () => empleados.map((e) => ({ id: e.id, label: e.nombre })),
     [empleados]
   );
 
@@ -1663,7 +1663,7 @@ export function JuntaDetailModule({ empresaSlug }: JuntaDetailModuleProps) {
         onOpenChange={setShowAddTask}
         onCreate={handleAddTask}
         empleados={empleados}
-        empleadoOptions={empleadoOptions as any}
+        empleadoOptions={empleadoOptions}
       />
 
       <Dialog open={showReenviarDialog} onOpenChange={setShowReenviarDialog}>
