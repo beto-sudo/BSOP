@@ -1,81 +1,104 @@
-# Iniciativa — Access Denied UX (`<RequireAccess>`)
+# Iniciativa — Access Denied UX (`<AccessDenied>`)
 
 **Slug:** `access-denied-ux`
 **Empresas:** todas
 **Schemas afectados:** n/a (UI)
-**Estado:** proposed
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-26
-**Última actualización:** 2026-04-26
-
-> **Bloqueada hasta cierre de `a11y-baseline`.** Alcance v1 detallado se
-> cierra cuando arranque su turno.
+**Última actualización:** 2026-04-29
 
 ## Problema
 
-El componente `<RequireAccess>` decide qué se renderiza cuando un usuario
-no tiene permiso, pero el "qué" varía por módulo. La rúbrica
-(`docs/qa/ui-rubric.md` Section 1) menciona "Acceso restringido" pero no
-fija copy ni diseño. Probablemente hay deriva: pantalla en blanco,
-mensaje genérico, redirección silenciosa a `/`, o `<RequireAccess>` no
-aplicado consistentemente.
-
-Síntomas anticipables:
-
-- "Acceso restringido" sin acción — el usuario no sabe a quién pedirle
-  el permiso.
-- Algunos módulos redirigen, otros muestran mensaje, otros no protegen
-  nada (ouch).
+`<RequireAccess>` (en `components/require-access.tsx`) decide qué se
+renderiza cuando un usuario no tiene permiso, pero el `AccessDenied`
+interno era hardcoded y limitado: copy genérico sin info del permiso
+faltante, sin CTA ("pedir acceso a quién?"), no reutilizable en
+sub-secciones.
 
 ## Outcome esperado
 
 - Componente compartido `<AccessDenied>` con copy estándar, indicación
-  del permiso requerido, y CTA "Pedir acceso a [admin]" o link a
-  página de soporte.
+  del permiso requerido, y CTA opcional.
 - `<RequireAccess>` aplicado consistentemente en todas las rutas
-  protegidas.
-- Lint rule o test que detecte páginas sin protección de acceso.
+  protegidas (Sprint 2 audit).
+- Variant `inline` para sub-secciones dentro de pages permitidos.
+- A11y por construcción.
 
-## Alcance v1 (tentativo — refinar al arrancar)
+## Alcance v1 (cerrado 2026-04-29 — ver ADR-024)
 
-- [ ] Auditoría: catalogar uso de `<RequireAccess>` en `app/**`.
-- [ ] Componente `<AccessDenied permissionRequired>` con copy
-      estándar y acción.
-- [ ] Decisión: ¿mostrar la página con `<AccessDenied>` o redirigir
-      a `/`? (Recomendación previa: mostrar — el usuario sabe que el
-      módulo existe pero no tiene acceso.)
-- [ ] CTA "Pedir acceso" — definir qué hace (mailto, slack, ticket).
-- [ ] Documentar en ADR.
+- [x] `<AccessDenied>` público en `components/access-denied/` con
+      variants `page`/`inline`.
+- [x] `<RequestAccessButton>` helper para CTA mailto.
+- [x] `<RequireAccess>` actualizado para pasar `required` line con el
+      permiso faltante (formato `<empresa> · <modulo> · <escritura/lectura>`).
+- [x] A11y: `role="alert"` + `aria-live="polite"` + heading semántico.
+- [x] ADR-024 con 5 reglas (AD1-AD5).
+- [ ] Audit completo de pages + aplicar `<RequireAccess>` donde falte —
+      Sprint 2 (postponed).
 
-## Fuera de alcance
+## Decisiones tomadas al cerrar alcance
 
-- Sistema de solicitud de acceso self-service con aprobación. Eso es
-  feature de producto.
-- RLS / permisos a nivel DB — eso es DB, no UI.
+- **No redirect silencioso** (AD1): mostrar `<AccessDenied>` con copy
+  explícito previene confusión ("¿el módulo existe?") y respeta el deep-
+  link del usuario.
+- **`required` line obligatoria** (AD3): elimina ambigüedad sobre qué
+  permiso pedir. El admin recibe un ticket entendible.
+- **Variant `page` + `inline`**: cubre tanto el guard de page completo
+  como sub-features. Cambiar visual se hace en un lugar.
+- **CTA mailto** como helper minimalista: cuando haya tickets/Slack/Linear,
+  se reemplaza el helper sin tocar callsites.
+- **`role="alert"` + `aria-live="polite"`**: anuncia al screen reader sin
+  robar focus.
+
+## Fuera de alcance v1
+
+- **Sistema self-service de solicitud de acceso**.
+- **RLS / permisos DB**.
+- **Audit automatizado** (lint custom).
+- **`<RequireAccess>` con redirect opcional**.
 
 ## Métricas de éxito
 
-- 100% de rutas en `app/<empresa>/**` protegidas con `<RequireAccess>`.
-- `<AccessDenied>` reusa componente compartido (cero copy ad-hoc).
-- Usuarios reportan menos confusión cuando no tienen acceso.
-
-## Riesgos / preguntas abiertas
-
-- [ ] ¿Detectar permiso requerido por convención de path o explícito
-      por prop?
-- [ ] ¿Mostrar "no tienes acceso" para módulos completos que el rol
-      del usuario no incluye en sidebar (consistencia con la nav)?
-- [ ] Coordinar con `a11y-baseline` (focus en mensaje al cargar,
-      role="alert").
+- 100% de rutas en `app/<empresa>/**` y `app/settings/**` protegidas con `<RequireAccess>` (Sprint 2 audit).
+- `<AccessDenied>` reusa el componente compartido (cero copy ad-hoc en
+  módulos nuevos).
 
 ## Sprints / hitos
 
-_(se llena cuando arranque ejecución, vía Claude Code)_
+| #   | Sprint                                               | Estado    | PR  |
+| --- | ---------------------------------------------------- | --------- | --- |
+| 1   | `<AccessDenied>` + `<RequestAccessButton>` + ADR-024 | done      | TBD |
+| 2   | Audit + aplicar `<RequireAccess>` donde falte        | postponed | —   |
+| 3   | Integrar CTA con sistema de tickets futuro           | postponed | —   |
 
 ## Decisiones registradas
 
-_(append-only, fechadas — escrito por Claude Code)_
+### 2026-04-29 · ADR-024 — Access denied UX (Sprint 1)
+
+Codificado en [ADR-024](../adr/024_access_denied_ux.md). Las 5 reglas:
+
+- **AD1** — `<RequireAccess>` para checks; nunca redirect silencioso.
+- **AD2** — `<AccessDenied>` es el componente canónico; sin copy ad-hoc.
+- **AD3** — `required` line muestra qué permiso falta (`<empresa> · <modulo> · <escritura/lectura>`).
+- **AD4** — CTA opcional via `action` prop; `<RequestAccessButton>` para mailto.
+- **AD5** — A11y: `role="alert"` + `aria-live="polite"` + heading semántico.
 
 ## Bitácora
 
-_(append-only, escrita por Claude Code al ejecutar)_
+### 2026-04-29 — Sprint 1 mergeado
+
+Foundation:
+
+- `components/access-denied/access-denied.tsx` — `<AccessDenied>` con
+  variants `page`/`inline` + `<RequestAccessButton>` helper.
+- `components/access-denied/index.ts` — barrel export.
+- `components/require-access.tsx` — refactor: importa `<AccessDenied>` del
+  componente público, agrega helper `describeRequired()` que arma la
+  línea de permiso faltante a partir de las props (empresa/modulo/write/
+  adminOnly).
+- ADR-024 con 5 reglas (AD1-AD5).
+
+API exterior de `<RequireAccess>` sin cambios — backwards compatible.
+
+PR: pendiente.
