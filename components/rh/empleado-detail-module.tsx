@@ -1145,6 +1145,7 @@ function EmpleadoDetailInner({ empresaSlug }: EmpleadoDetailModuleProps) {
         <EmpleadoAdjuntos
           empleadoId={empleado.id}
           empresaId={empleado.empresa_id}
+          empresaSlug={empresaSlug}
           readOnly={!isAdmin}
         />
       </div>

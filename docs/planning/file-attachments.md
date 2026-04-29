@@ -3,10 +3,10 @@
 **Slug:** `file-attachments`
 **Empresas:** todas
 **Schemas afectados:** n/a (UI; consume `erp.adjuntos`)
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-04-27
-**Última actualización:** 2026-04-30
+**Última actualización:** 2026-04-30 (cierre)
 
 ## Problema
 
@@ -63,11 +63,11 @@ algunos, etc.
 
 ## Sprints / hitos
 
-| #   | Sprint                                            | Estado  | PR   |
-| --- | ------------------------------------------------- | ------- | ---- |
-| 1   | Foundation policy + ADR-022 + path helper         | done    | #312 |
-| 2   | Componente `<FileAttachments>` + golden documento | done    | TBD  |
-| 3   | Migrar `<EmpleadoAdjuntos>` + voucher uploader    | pending | —    |
+| #   | Sprint                                                           | Estado | PR   |
+| --- | ---------------------------------------------------------------- | ------ | ---- |
+| 1   | Foundation policy + ADR-022 + path helper                        | done   | #312 |
+| 2   | Componente `<FileAttachments>` + golden documento                | done   | #315 |
+| 3   | Migrar `<EmpleadoAdjuntos>` (RH) al `<FileAttachments>` + cierre | done   | TBD  |
 
 ## Decisiones registradas
 
@@ -83,6 +83,38 @@ Codificado en [ADR-022](../adr/022_file_attachments.md). Las 6 reglas:
 - **FA6** — Read flows usan `lib/adjuntos.ts`; nunca construir URLs ad-hoc.
 
 ## Bitácora
+
+### 2026-04-30 — Sprint 3 mergeado (cierre)
+
+`<EmpleadoAdjuntos>` (RH) reescrito como wrapper thin sobre
+`<FileAttachments>`:
+
+- `EMPLEADO_ROLES` (13 roles canónicos: foto/ine/curp/acta_nacimiento/
+  comprobante_domicilio/csf/imss/cv/solicitud/constancia_estudios/
+  licencia_conducir/finiquito/otro) preservado como export para callers
+  externos.
+- Componente reducido de ~340 líneas a ~50 líneas. Toda la lógica de
+  upload + preview + delete + path construction + sluggify ahora vive
+  en el componente compartido.
+- Callsite (`empleado-detail-module.tsx`) actualizado para pasar
+  `empresaSlug` (ya recibido por el module padre).
+
+**Excepción documentada — voucher-uploader (cortes)**: el flujo es
+fundamentalmente distinto (single-file con OCR client-side via
+Tesseract.js, no multi-rol). Migrarlo requeriría una refactor del
+wrapper para soportar pre-procesamiento OCR — fuera de alcance v1.
+Postergable hasta que cortes-conciliacion necesite features compartidas
+(e.g. drag-drop estandarizado).
+
+**Outcome final**:
+
+- ADR-022 con 6 reglas (FA1-FA6).
+- `lib/storage/path.ts` con `buildAdjuntoPath()` + `slugifyFilename()` + 11 unit tests.
+- `<FileAttachments>` componente compartido con drag-drop + preview multi-tipo
+  (PDF/IMG/otros) + delete via `<ConfirmDialog>` (FA5) + variants
+  `grouped`/`flat` + upload con progress + resumable lazy-import (>5MB).
+- 2 callers migrados: `<AdjuntosSection>` (documentos) y `<EmpleadoAdjuntos>` (RH).
+- Voucher-uploader (cortes) excepción documentada.
 
 ### 2026-04-30 — Sprint 2 mergeado
 
