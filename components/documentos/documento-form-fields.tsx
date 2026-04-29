@@ -8,6 +8,11 @@
 /**
  * DocFormFields — common field set shared by both create and edit flows.
  *
+ * Reads/writes from a surrounding `<Form>` (forms-pattern) via
+ * `useFormContext<DocForm>`. Both `documento-create-sheet.tsx` and the edit
+ * mode of `documento-detail-sheet.tsx` mount this component inside their
+ * `<Form>` providers.
+ *
  * Flujo simplificado (2026-04): con el pipeline de extracción IA, la mayoría
  * de los metadatos (número, fecha, partes, monto, ubicación, etc.) se
  * rellenan automáticamente cuando el usuario dispara "Procesar con IA" sobre
@@ -23,27 +28,21 @@
  * pueda ajustar si la extracción IA se equivocó o para capturar manualmente.
  */
 
-import type React from 'react';
-
 import { Input } from '@/components/ui/input';
 import { Combobox } from '@/components/ui/combobox';
 import { Textarea } from '@/components/ui/textarea';
+import { FormField, useFormContext } from '@/components/forms';
 
 import type { DocForm, NotariaOption } from './types';
 import { TIPOS_DOCUMENTO } from './types';
 import { autoTituloEscritura } from './helpers';
-import { FLabel } from './ui';
 import { SubtipoFields } from './documento-subtipo-fields';
 
 export function DocFormFields({
-  form,
-  setForm,
   notarias,
   onOpenCreateNotaria,
   mode = 'edit',
 }: {
-  form: DocForm;
-  setForm: React.Dispatch<React.SetStateAction<DocForm>>;
   notarias: NotariaOption[];
   onOpenCreateNotaria: () => void;
   /**
@@ -53,187 +52,217 @@ export function DocFormFields({
    */
   mode?: 'create' | 'edit';
 }) {
+  const { watch, setValue, getValues } = useFormContext<DocForm>();
   const isCreate = mode === 'create';
+  const tipo = watch('tipo');
+  const subtipoMeta = watch('subtipo_meta');
+  const notarioProveedorId = watch('notario_proveedor_id');
+
   // Campos subtipo-específicos solo tienen sentido mostrarlos en create si
   // la IA NO los extrae (Seguro). Para escritura/acta/poder/contrato los
   // ocultamos porque son redundantes con lo que la extracción va a poblar.
-  const showSubtipoFieldsInCreate = form.tipo === 'Seguro';
+  const showSubtipoFieldsInCreate = tipo === 'Seguro';
+  const showNotaria = ['Escritura', 'Acta Constitutiva', 'Poder'].includes(tipo);
+
+  const recomputeTituloIfEscritura = () => {
+    const next = getValues();
+    if (next.tipo === 'Escritura') {
+      setValue('titulo', autoTituloEscritura(next), { shouldDirty: true });
+    }
+  };
+
   const handleNotariaChange = (value: string | null) => {
     if (!value) {
-      setForm((f) => ({ ...f, notario_proveedor_id: '', notaria: '' }));
+      setValue('notario_proveedor_id', '', { shouldDirty: true });
+      setValue('notaria', '', { shouldDirty: true });
+      recomputeTituloIfEscritura();
       return;
     }
     const sel = notarias.find((n) => n.id === value);
-    setForm((f) => {
-      const nf = { ...f, notario_proveedor_id: value, notaria: sel?.nombre ?? '' };
-      if (f.tipo === 'Escritura') nf.titulo = autoTituloEscritura(nf);
-      return nf;
-    });
+    setValue('notario_proveedor_id', value, { shouldDirty: true });
+    setValue('notaria', sel?.nombre ?? '', { shouldDirty: true });
+    recomputeTituloIfEscritura();
   };
 
-  const handleTipoChange = (tipo: string | null) => {
-    if (!tipo) return;
-    setForm((f) => {
-      const nf = { ...f, tipo };
-      if (tipo === 'Escritura') nf.titulo = autoTituloEscritura(nf);
-      return nf;
-    });
+  const handleTipoChange = (next: string | null) => {
+    if (!next) return;
+    setValue('tipo', next, { shouldDirty: true });
+    if (next === 'Escritura') {
+      const values = getValues();
+      setValue('titulo', autoTituloEscritura({ ...values, tipo: next }), {
+        shouldDirty: true,
+      });
+    }
   };
 
   const handleMetaChange = (meta: Record<string, any>) => {
-    setForm((f) => {
-      const nf = { ...f, subtipo_meta: meta };
-      if (f.tipo === 'Escritura') nf.titulo = autoTituloEscritura(nf);
-      return nf;
-    });
+    setValue('subtipo_meta', meta, { shouldDirty: true });
+    recomputeTituloIfEscritura();
   };
-
-  const showNotaria = ['Escritura', 'Acta Constitutiva', 'Poder'].includes(form.tipo);
 
   return (
     <div className="space-y-4">
       {/* Tipo selector — first, drives everything */}
-      <div>
-        <FLabel req>Tipo de documento</FLabel>
-        <Combobox
-          value={form.tipo}
-          onChange={handleTipoChange}
-          options={TIPOS_DOCUMENTO.map((t) => ({
-            value: t.value,
-            label: `${t.icon} ${t.label}`,
-          }))}
-          placeholder="Seleccionar tipo..."
-          className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-        />
-      </div>
-
-      {/* Type-specific fields — en create, solo Seguro (la IA no extrae sus
-          campos específicos). En edit, siempre. */}
-      {form.tipo && (!isCreate || showSubtipoFieldsInCreate) && (
-        <SubtipoFields tipo={form.tipo} meta={form.subtipo_meta} onChange={handleMetaChange} />
-      )}
-
-      {/* Título — en create se omite (se genera placeholder automático y la IA
-          lo actualiza al procesar). En edit es editable manualmente. */}
-      {!isCreate && (
-        <div>
-          <FLabel req>Título</FLabel>
-          <Input
-            placeholder={
-              form.tipo === 'Escritura'
-                ? 'Se genera automáticamente'
-                : 'Ej: Contrato de arrendamiento oficina'
-            }
-            value={form.titulo}
-            onChange={(e) => setForm((f) => ({ ...f, titulo: e.target.value }))}
+      <FormField name="tipo" label="Tipo de documento" required>
+        {(field) => (
+          <Combobox
+            id={field.id}
+            value={field.value}
+            onChange={handleTipoChange}
+            options={TIPOS_DOCUMENTO.map((t) => ({
+              value: t.value,
+              label: `${t.icon} ${t.label}`,
+            }))}
+            placeholder="Seleccionar tipo..."
             className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-            readOnly={form.tipo === 'Escritura'}
           />
-          {form.tipo === 'Escritura' && (
-            <p className="mt-1 text-[10px] text-[var(--text-subtle)]">
-              Se genera a partir de los datos de la escritura.
-            </p>
-          )}
-        </div>
+        )}
+      </FormField>
+
+      {/* Type-specific fields */}
+      {tipo && (!isCreate || showSubtipoFieldsInCreate) && (
+        <SubtipoFields tipo={tipo} meta={subtipoMeta} onChange={handleMetaChange} />
       )}
 
-      {/* Número y fecha de emisión — en create solo para Seguro (para el resto
-          la IA los extrae del PDF). En edit, siempre. */}
+      {/* Título — en create se omite (placeholder automático + IA). */}
+      {!isCreate && (
+        <FormField name="titulo" label="Título" required>
+          {(field) => (
+            <>
+              <Input
+                {...field}
+                id={field.id}
+                aria-invalid={field.invalid || undefined}
+                aria-describedby={field.describedBy}
+                placeholder={
+                  tipo === 'Escritura'
+                    ? 'Se genera automáticamente'
+                    : 'Ej: Contrato de arrendamiento oficina'
+                }
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+                readOnly={tipo === 'Escritura'}
+              />
+              {tipo === 'Escritura' && (
+                <p className="mt-1 text-[10px] text-[var(--text-subtle)]">
+                  Se genera a partir de los datos de la escritura.
+                </p>
+              )}
+            </>
+          )}
+        </FormField>
+      )}
+
+      {/* Número y fecha — en create solo para Seguro. */}
       {(!isCreate || showSubtipoFieldsInCreate) && (
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <FLabel>No. de documento</FLabel>
-            <Input
-              placeholder="Ej: 4521"
-              value={form.numero_documento}
-              onChange={(e) => setForm((f) => ({ ...f, numero_documento: e.target.value }))}
-              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-            />
-          </div>
-          <div>
-            <FLabel>Fecha de emisión</FLabel>
-            <Input
-              type="date"
-              value={form.fecha_emision}
-              onChange={(e) => setForm((f) => ({ ...f, fecha_emision: e.target.value }))}
-              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-            />
-          </div>
+          <FormField name="numero_documento" label="No. de documento">
+            {(field) => (
+              <Input
+                {...field}
+                id={field.id}
+                aria-invalid={field.invalid || undefined}
+                aria-describedby={field.describedBy}
+                placeholder="Ej: 4521"
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
+            )}
+          </FormField>
+          <FormField name="fecha_emision" label="Fecha de emisión">
+            {(field) => (
+              <Input
+                {...field}
+                id={field.id}
+                type="date"
+                aria-invalid={field.invalid || undefined}
+                aria-describedby={field.describedBy}
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
+            )}
+          </FormField>
         </div>
       )}
 
-      {/* Fecha de vencimiento: solo tiene sentido capturar al crear para
-          Contrato / Seguro (alertas de caducidad). Para Escritura/Acta/Poder
-          no aplica y la ocultamos en create — si hace falta, se edita. */}
-      {(!isCreate ||
-        form.tipo === 'Contrato' ||
-        form.tipo === 'Seguro' ||
-        form.tipo === 'Otro') && (
-        <div>
-          <FLabel>Fecha de vencimiento</FLabel>
-          <Input
-            type="date"
-            value={form.fecha_vencimiento}
-            onChange={(e) => setForm((f) => ({ ...f, fecha_vencimiento: e.target.value }))}
-            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-          />
-        </div>
+      {/* Fecha de vencimiento: solo en create para Contrato/Seguro/Otro. */}
+      {(!isCreate || tipo === 'Contrato' || tipo === 'Seguro' || tipo === 'Otro') && (
+        <FormField name="fecha_vencimiento" label="Fecha de vencimiento">
+          {(field) => (
+            <Input
+              {...field}
+              id={field.id}
+              type="date"
+              aria-invalid={field.invalid || undefined}
+              aria-describedby={field.describedBy}
+              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+            />
+          )}
+        </FormField>
       )}
 
       {/* Notaría — only for relevant types */}
       {showNotaria && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between gap-3">
-            <FLabel>Notaría</FLabel>
-            <button
-              type="button"
-              onClick={onOpenCreateNotaria}
-              className="text-xs text-[var(--accent)] hover:text-[var(--accent)]/80"
-            >
-              + Nueva notaría
-            </button>
-          </div>
-          <Combobox
-            value={form.notario_proveedor_id}
-            onChange={(v) => handleNotariaChange(v || null)}
-            options={notarias.map((n) => ({ value: n.id, label: n.nombre }))}
-            placeholder="Seleccionar notaría"
-            allowClear
-            className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-          />
-        </div>
+        <FormField name="notario_proveedor_id" label="Notaría">
+          {(field) => (
+            <div className="space-y-2">
+              <div className="flex items-center justify-end -mt-7">
+                <button
+                  type="button"
+                  onClick={onOpenCreateNotaria}
+                  className="text-xs text-[var(--accent)] hover:text-[var(--accent)]/80"
+                >
+                  + Nueva notaría
+                </button>
+              </div>
+              <Combobox
+                id={field.id}
+                value={notarioProveedorId}
+                onChange={(v) => handleNotariaChange(v || null)}
+                options={notarias.map((n) => ({ value: n.id, label: n.nombre }))}
+                placeholder="Seleccionar notaría"
+                allowClear
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
+            </div>
+          )}
+        </FormField>
       )}
 
-      {/* Descripción — en create se oculta (la IA la genera al procesar
-          el PDF). En edit se muestra por si el usuario quiere ajustarla. */}
+      {/* Descripción — en create se oculta (la IA la genera). */}
       {!isCreate && (
-        <div>
-          <FLabel>Descripción</FLabel>
+        <FormField name="descripcion" label="Descripción">
+          {(field) => (
+            <>
+              <Textarea
+                {...field}
+                id={field.id}
+                aria-invalid={field.invalid || undefined}
+                aria-describedby={field.describedBy}
+                placeholder="Resumen breve de lo que contiene el documento..."
+                rows={4}
+                maxLength={1500}
+                className="resize-none rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
+              <p className="mt-1 text-[10px] text-[var(--text-subtle)]">
+                Se muestra como vista previa en la tabla. Hasta 1500 caracteres para escrituras
+                complejas que contienen varios actos jurídicos.
+              </p>
+            </>
+          )}
+        </FormField>
+      )}
+
+      <FormField name="notas" label="Notas">
+        {(field) => (
           <Textarea
-            placeholder="Resumen breve de lo que contiene el documento..."
-            value={form.descripcion}
-            onChange={(e) => setForm((f) => ({ ...f, descripcion: e.target.value }))}
-            rows={4}
-            maxLength={1500}
+            {...field}
+            id={field.id}
+            aria-invalid={field.invalid || undefined}
+            aria-describedby={field.describedBy}
+            placeholder="Observaciones adicionales..."
+            rows={3}
             className="resize-none rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
           />
-          <p className="mt-1 text-[10px] text-[var(--text-subtle)]">
-            Se muestra como vista previa en la tabla. Hasta 1500 caracteres para escrituras
-            complejas que contienen varios actos jurídicos.
-          </p>
-        </div>
-      )}
-
-      <div>
-        <FLabel>Notas</FLabel>
-        <Textarea
-          placeholder="Observaciones adicionales..."
-          value={form.notas}
-          onChange={(e) => setForm((f) => ({ ...f, notas: e.target.value }))}
-          rows={3}
-          className="resize-none rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-        />
-      </div>
+        )}
+      </FormField>
     </div>
   );
 }

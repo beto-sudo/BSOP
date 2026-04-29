@@ -1,24 +1,38 @@
 'use client';
 
-/* eslint-disable react-hooks/set-state-in-effect --
- * Carried from the original pages. Resetting the form on open is a
- * data-sync pattern flagged by the new hook rules; behavior-preserving
- * rewrite is out of scope for this PR.
- */
-
-import { useEffect, useState } from 'react';
-import { Loader2, Plus, Sparkles } from 'lucide-react';
+import * as React from 'react';
+import { Plus, Sparkles } from 'lucide-react';
+import { z } from 'zod';
 
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
-import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Form, FormActions, useZodForm } from '@/components/forms';
 
 import { placeholderTitulo } from '@/lib/documentos/naming';
 
 import type { DocForm, Documento, NotariaOption } from './types';
 import { emptyForm } from './helpers';
 import { DocFormFields } from './documento-form-fields';
+
+// ─── Schema ──────────────────────────────────────────────────────────────────
+
+const DocCreateSchema = z.object({
+  titulo: z.string().default(''),
+  numero_documento: z.string().default(''),
+  tipo: z.string().min(1, 'Selecciona un tipo de documento'),
+  fecha_emision: z.string().default(''),
+  fecha_vencimiento: z.string().default(''),
+  notario_proveedor_id: z.string().default(''),
+  notaria: z.string().default(''),
+  descripcion: z.string().default(''),
+  notas: z.string().default(''),
+  subtipo_meta: z.record(z.string(), z.any()).default({}),
+}) satisfies z.ZodType<DocForm>;
+
+type DocCreateValues = z.infer<typeof DocCreateSchema>;
+
+// ─── Component ───────────────────────────────────────────────────────────────
 
 export function DocumentoCreateSheet({
   open,
@@ -43,16 +57,20 @@ export function DocumentoCreateSheet({
   onCreated: (doc: Documento) => void;
 }) {
   const supabase = createSupabaseERPClient();
-  const [form, setForm] = useState<DocForm>(emptyForm());
-  const [creating, setCreating] = useState(false);
 
-  useEffect(() => {
-    if (open) setForm(emptyForm());
-  }, [open]);
+  const form = useZodForm({
+    schema: DocCreateSchema,
+    defaultValues: emptyForm() as DocCreateValues,
+  });
 
-  const handleCreate = async () => {
-    if (!form.tipo || !primaryEmpresaId) return;
-    setCreating(true);
+  // Reset whenever the sheet opens (carry-over from the original behaviour:
+  // each open is a fresh capture).
+  React.useEffect(() => {
+    if (open) form.reset(emptyForm() as DocCreateValues);
+  }, [open, form]);
+
+  const handleSubmit = async (values: DocCreateValues) => {
+    if (!primaryEmpresaId) return;
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -67,7 +85,7 @@ export function DocumentoCreateSheet({
     // explícitamente), usamos un placeholder temporal. El título final lo
     // genera la IA al "Procesar con IA" y lo actualiza en `titulo` con el
     // formato estándar DILESA-YYYY-M-Tipo_Numero.
-    const titulo = form.titulo.trim() || placeholderTitulo(empresaSlugForTitulo);
+    const titulo = values.titulo.trim() || placeholderTitulo(empresaSlugForTitulo);
 
     const { data: newDoc, error: err } = await supabase
       .schema('erp')
@@ -75,20 +93,19 @@ export function DocumentoCreateSheet({
       .insert({
         empresa_id: primaryEmpresaId,
         titulo,
-        numero_documento: form.numero_documento.trim() || null,
-        tipo: form.tipo || null,
-        fecha_emision: form.fecha_emision || null,
-        fecha_vencimiento: form.fecha_vencimiento || null,
-        notario_proveedor_id: form.notario_proveedor_id || null,
-        notaria: form.notaria.trim() || null,
-        descripcion: form.descripcion.trim() || null,
-        notas: form.notas.trim() || null,
-        subtipo_meta: Object.keys(form.subtipo_meta).length > 0 ? form.subtipo_meta : null,
+        numero_documento: values.numero_documento.trim() || null,
+        tipo: values.tipo || null,
+        fecha_emision: values.fecha_emision || null,
+        fecha_vencimiento: values.fecha_vencimiento || null,
+        notario_proveedor_id: values.notario_proveedor_id || null,
+        notaria: values.notaria.trim() || null,
+        descripcion: values.descripcion.trim() || null,
+        notas: values.notas.trim() || null,
+        subtipo_meta: Object.keys(values.subtipo_meta).length > 0 ? values.subtipo_meta : null,
         creado_por: cu?.id ?? null,
       })
       .select('*')
       .single();
-    setCreating(false);
     if (err || !newDoc) {
       alert(`Error: ${err?.message ?? 'No se pudo crear'}`);
       return;
@@ -109,7 +126,7 @@ export function DocumentoCreateSheet({
           <SheetTitle>Nuevo Documento</SheetTitle>
         </SheetHeader>
         <ScrollArea className="flex-1 min-h-0 pr-1">
-          <div className="mt-4 pb-6 space-y-4">
+          <Form form={form} onSubmit={handleSubmit} className="mt-4 pb-6 space-y-4">
             <div className="flex items-start gap-2 rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/5 px-3 py-2.5 text-xs text-[var(--text)]/70">
               <Sparkles className="h-4 w-4 shrink-0 mt-0.5 text-[var(--accent)]" />
               <div>
@@ -125,34 +142,20 @@ export function DocumentoCreateSheet({
             </div>
 
             <DocFormFields
-              form={form}
-              setForm={setForm}
               notarias={notarias}
               onOpenCreateNotaria={onOpenCreateNotaria}
               mode="create"
             />
-            <div className="flex gap-2 pt-4">
-              <Button
-                variant="outline"
-                onClick={onClose}
-                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleCreate}
-                disabled={creating || !form.tipo}
-                className="rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 gap-1.5"
-              >
-                {creating ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Plus className="h-4 w-4" />
-                )}
-                Guardar y adjuntar archivos
-              </Button>
-            </div>
-          </div>
+
+            <FormActions
+              cancelLabel="Cancelar"
+              submitLabel="Guardar y adjuntar archivos"
+              submittingLabel="Guardando..."
+              submitIcon={<Plus className="h-4 w-4" />}
+              onCancel={onClose}
+              className="border-t-0 pt-2"
+            />
+          </Form>
         </ScrollArea>
       </SheetContent>
     </Sheet>

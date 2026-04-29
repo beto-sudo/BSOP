@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import { useEffect, useState } from 'react';
 import {
   AlertTriangle,
@@ -12,6 +13,7 @@ import {
   Trash2,
   Wand2,
 } from 'lucide-react';
+import { z } from 'zod';
 
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import { usePermissions } from '@/components/providers';
@@ -27,20 +29,31 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Form, FormActions, useZodForm } from '@/components/forms';
 
 import type { Adjunto, DocForm, Documento, NotariaOption } from './types';
 import { META_LABELS } from './types';
-import {
-  docToForm,
-  emptyForm,
-  formatDate,
-  formatMonto,
-  formatPrecioM2,
-  formatSuperficie,
-} from './helpers';
+import { docToForm, formatDate, formatMonto, formatPrecioM2, formatSuperficie } from './helpers';
 import { FLabel, TipoBadge, TipoOperacionBadge, VencBadge } from './ui';
 import { DocFormFields } from './documento-form-fields';
 import { AdjuntosSection } from './documento-adjuntos';
+
+// ─── Edit-mode schema ────────────────────────────────────────────────────────
+
+const DocEditSchema = z.object({
+  titulo: z.string().trim().min(1, 'El título es obligatorio'),
+  numero_documento: z.string().default(''),
+  tipo: z.string().default(''),
+  fecha_emision: z.string().default(''),
+  fecha_vencimiento: z.string().default(''),
+  notario_proveedor_id: z.string().default(''),
+  notaria: z.string().default(''),
+  descripcion: z.string().default(''),
+  notas: z.string().default(''),
+  subtipo_meta: z.record(z.string(), z.any()).default({}),
+}) satisfies z.ZodType<DocForm>;
+
+type DocEditValues = z.infer<typeof DocEditSchema>;
 
 export function DocumentoDetailSheet({
   doc,
@@ -78,8 +91,6 @@ export function DocumentoDetailSheet({
   const supabase = createSupabaseERPClient();
   const { permissions } = usePermissions();
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState<DocForm>(emptyForm());
-  const [saving, setSaving] = useState(false);
   const [showContenido, setShowContenido] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -88,50 +99,47 @@ export function DocumentoDetailSheet({
 
   useEffect(() => {
     if (doc) {
-      setEditForm(docToForm(doc));
       setEditing(false);
     }
   }, [doc]);
 
-  const handleSave = async () => {
-    if (!doc || !editForm.titulo.trim()) return;
-    setSaving(true);
+  const handleSaveEdit = async (values: DocEditValues) => {
+    if (!doc) return;
     let query = supabase
       .schema('erp')
       .from('documentos')
       .update({
-        titulo: editForm.titulo.trim(),
-        numero_documento: editForm.numero_documento.trim() || null,
-        tipo: editForm.tipo || null,
-        fecha_emision: editForm.fecha_emision || null,
-        fecha_vencimiento: editForm.fecha_vencimiento || null,
-        notario_proveedor_id: editForm.notario_proveedor_id || null,
-        notaria: editForm.notaria.trim() || null,
-        descripcion: editForm.descripcion.trim() || null,
-        notas: editForm.notas.trim() || null,
-        subtipo_meta: Object.keys(editForm.subtipo_meta).length > 0 ? editForm.subtipo_meta : null,
+        titulo: values.titulo.trim(),
+        numero_documento: values.numero_documento.trim() || null,
+        tipo: values.tipo || null,
+        fecha_emision: values.fecha_emision || null,
+        fecha_vencimiento: values.fecha_vencimiento || null,
+        notario_proveedor_id: values.notario_proveedor_id || null,
+        notaria: values.notaria.trim() || null,
+        descripcion: values.descripcion.trim() || null,
+        notas: values.notas.trim() || null,
+        subtipo_meta: Object.keys(values.subtipo_meta).length > 0 ? values.subtipo_meta : null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', doc.id);
     if (scopedEmpresaId) query = query.eq('empresa_id', scopedEmpresaId);
     const { error: err } = await query;
-    setSaving(false);
     if (err) {
       alert(`Error: ${err.message}`);
       return;
     }
     const updated: Documento = {
       ...doc,
-      titulo: editForm.titulo.trim(),
-      numero_documento: editForm.numero_documento.trim() || null,
-      tipo: editForm.tipo || null,
-      fecha_emision: editForm.fecha_emision || null,
-      fecha_vencimiento: editForm.fecha_vencimiento || null,
-      notario_proveedor_id: editForm.notario_proveedor_id || null,
-      notaria: editForm.notaria.trim() || null,
-      descripcion: editForm.descripcion.trim() || null,
-      notas: editForm.notas.trim() || null,
-      subtipo_meta: Object.keys(editForm.subtipo_meta).length > 0 ? editForm.subtipo_meta : null,
+      titulo: values.titulo.trim(),
+      numero_documento: values.numero_documento.trim() || null,
+      tipo: values.tipo || null,
+      fecha_emision: values.fecha_emision || null,
+      fecha_vencimiento: values.fecha_vencimiento || null,
+      notario_proveedor_id: values.notario_proveedor_id || null,
+      notaria: values.notaria.trim() || null,
+      descripcion: values.descripcion.trim() || null,
+      notas: values.notas.trim() || null,
+      subtipo_meta: Object.keys(values.subtipo_meta).length > 0 ? values.subtipo_meta : null,
     };
     onDocUpdated(updated);
     setEditing(false);
@@ -272,38 +280,13 @@ export function DocumentoDetailSheet({
 
             {/* ── Info / Edit section ── */}
             {editing ? (
-              <>
-                <DocFormFields
-                  form={editForm}
-                  setForm={setEditForm}
-                  notarias={notarias}
-                  onOpenCreateNotaria={onOpenCreateNotaria}
-                />
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setEditForm(docToForm(doc));
-                      setEditing(false);
-                    }}
-                    className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    onClick={handleSave}
-                    disabled={saving || !editForm.titulo.trim()}
-                    className="rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90"
-                  >
-                    {saving ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Save className="mr-2 h-4 w-4" />
-                    )}
-                    Guardar
-                  </Button>
-                </div>
-              </>
+              <DocEditSection
+                doc={doc}
+                notarias={notarias}
+                onOpenCreateNotaria={onOpenCreateNotaria}
+                onSave={handleSaveEdit}
+                onCancel={() => setEditing(false)}
+              />
             ) : (
               <>
                 <div className="flex items-center gap-2">
@@ -587,5 +570,45 @@ export function DocumentoDetailSheet({
         </DialogContent>
       </Dialog>
     </Sheet>
+  );
+}
+
+// ─── Edit-section sub-component ──────────────────────────────────────────────
+
+function DocEditSection({
+  doc,
+  notarias,
+  onOpenCreateNotaria,
+  onSave,
+  onCancel,
+}: {
+  doc: Documento;
+  notarias: NotariaOption[];
+  onOpenCreateNotaria: () => void;
+  onSave: (values: DocEditValues) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const form = useZodForm({
+    schema: DocEditSchema,
+    defaultValues: docToForm(doc) as DocEditValues,
+  });
+
+  // Reset when the underlying doc changes (e.g. after a successful extract).
+  React.useEffect(() => {
+    form.reset(docToForm(doc) as DocEditValues);
+  }, [doc, form]);
+
+  return (
+    <Form form={form} onSubmit={onSave}>
+      <DocFormFields notarias={notarias} onOpenCreateNotaria={onOpenCreateNotaria} />
+      <FormActions
+        cancelLabel="Cancelar"
+        submitLabel="Guardar"
+        submittingLabel="Guardando..."
+        submitIcon={<Save className="h-4 w-4" />}
+        onCancel={onCancel}
+        className="border-t-0 pt-2"
+      />
+    </Form>
   );
 }
