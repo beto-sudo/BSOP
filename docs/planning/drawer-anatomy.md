@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-27
-**Última actualización:** 2026-04-29
+**Última actualización:** 2026-04-30
 
 ## Problema
 
@@ -75,12 +75,12 @@ actions)`, `content (scrollable)`, `footer (sticky opcional)`.
 
 ## Sprints / hitos
 
-| #   | Sprint                                     | Estado  | PR  |
-| --- | ------------------------------------------ | ------- | --- |
-| 1   | Foundation + ADR-018 + golden Stock drawer | done    | TBD |
-| 2   | Migrar drawers de detalle                  | pending | —   |
-| 3   | Migrar drawers de creación/edición         | pending | —   |
-| 4   | Cierre + INITIATIVES move to Done          | pending | —   |
+| #   | Sprint                                                      | Estado  | PR   |
+| --- | ----------------------------------------------------------- | ------- | ---- |
+| 1   | Foundation + ADR-018 + golden Stock drawer                  | done    | #308 |
+| 2   | Migrar drawers de detalle (Order, Corte, Documento, OC)     | done    | TBD  |
+| 3   | Migrar drawers restantes (TasksUpdates, NuevaEmpresa, etc.) | pending | —    |
+| 4   | Cierre + INITIATIVES move to Done                           | pending | —    |
 
 ## Decisiones registradas
 
@@ -96,6 +96,40 @@ Codificado en [ADR-018](../adr/018_drawer_anatomy.md). Las 6 reglas:
 - **DD6** — Dirty confirm via `useDirtyConfirm` (ADR-016 F6) cuando el drawer tiene un form.
 
 ## Bitácora
+
+### 2026-04-30 — Sprint 2 mergeado
+
+4 drawers de detalle migrados a `<DetailDrawer>`:
+
+- `<OrderDetail>` (Ventas) — header con folio + fecha + acción "Imprimir"
+  via `useTriggerPrint()`. Bug colateral fixed: el botón Imprimir
+  estaba duplicado en el header artesanal (líneas 64-73 idénticas).
+- `<CorteDetail>` (Cortes) — header con corte_nombre + caja + horario,
+  acciones "Cerrar Corte" (state-machine: solo si `estaAbierto`) +
+  "Marbete" (print). Print-only logo strip preservado como hijo del
+  drawer (antes del content). Modales internos (`RegistrarMovimientoDialog`,
+  `VoucherLightbox`) ahora son hijos del `<DetailDrawer>` directamente,
+  no del `<SheetContent>`.
+- `<DocumentoDetailSheet>` (Documentos) — header dinámico (cambia
+  título cuando `editing=true`), acciones condicionales (Procesar IA +
+  Editar + Eliminar admin-only) que se ocultan en modo edit. Dialog de
+  delete confirm queda como sibling del `<DetailDrawer>` (antes era hijo
+  del `<SheetContent>`).
+- OC drawer en `app/rdb/ordenes-compra/page.tsx` — header con folio +
+  proveedor + fecha + req, acción "Imprimir OC" con guard de proveedor
+  asignado. Footer con acciones operativas (Asignar proveedor, Marcar
+  Enviada, Recibir, Cerrar) queda inline como antes — no usa `footer`
+  prop porque depende del state-machine y necesita scroll junto con el
+  content.
+
+Convenciones aplicadas: `useTriggerPrint()` reemplaza `window.print()`
+inline (P5 de ADR-021). `<ScrollArea>` artesanal eliminado en cada
+caller. Print stylesheets de los drawers heredan DD5 por default.
+
+Sprint 3 cubrirá los drawers restantes (`<TasksUpdatesSheet>`,
+`<NuevaEmpresaDrawer>`, `<DocumentoCreateSheet>`).
+
+PR: pendiente.
 
 ### 2026-04-29 — Sprint 1 mergeado
 

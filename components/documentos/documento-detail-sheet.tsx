@@ -26,9 +26,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import { Form, FormActions, useZodForm } from '@/components/forms';
 
 import type { Adjunto, DocForm, Documento, NotariaOption } from './types';
@@ -204,17 +203,17 @@ export function DocumentoDetailSheet({
   const needsPdf = doc.tipo && doc.tipo !== 'Otro';
 
   return (
-    <Sheet
+    <DetailDrawer
       open={open}
       onOpenChange={(v) => {
         if (!v) onClose();
       }}
-    >
-      <SheetContent className="sm:max-w-[640px]">
-        <SheetHeader>
-          <SheetTitle>{editing ? 'Editar Documento' : doc.titulo}</SheetTitle>
-          <div className="absolute right-12 top-4 hidden sm:flex gap-2 print:hidden">
-            {!editing && canExtract && (
+      size="md"
+      title={editing ? 'Editar Documento' : doc.titulo}
+      actions={
+        !editing ? (
+          <>
+            {canExtract && (
               <Button
                 variant="outline"
                 size="sm"
@@ -239,286 +238,271 @@ export function DocumentoDetailSheet({
                     : 'Procesar con IA'}
               </Button>
             )}
-            {!editing && (
-              <>
-                <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Editar
-                </Button>
-                {permissions.isAdmin && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setConfirmingDelete(true)}
-                    className="border-red-500/30 bg-red-500/5 text-red-400 hover:bg-red-500/10"
-                    title="Eliminar documento (solo admin)"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Eliminar
-                  </Button>
-                )}
-              </>
+            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Editar
+            </Button>
+            {permissions.isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setConfirmingDelete(true)}
+                className="border-red-500/30 bg-red-500/5 text-red-400 hover:bg-red-500/10"
+                title="Eliminar documento (solo admin)"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Eliminar
+              </Button>
             )}
-          </div>
-        </SheetHeader>
+          </>
+        ) : null
+      }
+    >
+      <DetailDrawerContent>
+        <div className="space-y-5">
+          {extractError && (
+            <div className="flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-xs text-red-400">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium mb-0.5">Procesar con IA falló</p>
+                <p className="text-red-400/80">{extractError}</p>
+              </div>
+            </div>
+          )}
 
-        {/* `min-h-0` permite que este flex item shrinke debajo de la altura
-            natural de su contenido — sin esto, los flex items tienen
-            `min-height: auto` y el ScrollArea nunca llega a overflow, así
-            que el contenido se sale del viewport y no scrollea. */}
-        <ScrollArea className="flex-1 min-h-0 pr-1 print:h-auto">
-          <div className="mt-4 space-y-5 pb-6">
-            {extractError && (
-              <div className="flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-xs text-red-400">
-                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          {/* ── Info / Edit section ── */}
+          {editing ? (
+            <DocEditSection
+              doc={doc}
+              notarias={notarias}
+              onOpenCreateNotaria={onOpenCreateNotaria}
+              onSave={handleSaveEdit}
+              onCancel={() => setEditing(false)}
+            />
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <TipoBadge tipo={doc.tipo} />
+                <VencBadge d={doc.fecha_vencimiento} />
+              </div>
+              <Separator />
+              <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="font-medium mb-0.5">Procesar con IA falló</p>
-                  <p className="text-red-400/80">{extractError}</p>
+                  <FLabel>Número</FLabel>
+                  <p className="text-[var(--text)]/80">{doc.numero_documento ?? '—'}</p>
+                </div>
+                <div>
+                  <FLabel>Emisión</FLabel>
+                  <p className="text-[var(--text)]/80">{formatDate(doc.fecha_emision)}</p>
                 </div>
               </div>
-            )}
-
-            {/* ── Info / Edit section ── */}
-            {editing ? (
-              <DocEditSection
-                doc={doc}
-                notarias={notarias}
-                onOpenCreateNotaria={onOpenCreateNotaria}
-                onSave={handleSaveEdit}
-                onCancel={() => setEditing(false)}
-              />
-            ) : (
-              <>
-                <div className="flex items-center gap-2">
-                  <TipoBadge tipo={doc.tipo} />
-                  <VencBadge d={doc.fecha_vencimiento} />
+              {doc.notaria && (
+                <div>
+                  <FLabel>Notaría</FLabel>
+                  <p className="text-sm text-[var(--text)]/80">{doc.notaria}</p>
                 </div>
-                <Separator />
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <FLabel>Número</FLabel>
-                    <p className="text-[var(--text)]/80">{doc.numero_documento ?? '—'}</p>
-                  </div>
-                  <div>
-                    <FLabel>Emisión</FLabel>
-                    <p className="text-[var(--text)]/80">{formatDate(doc.fecha_emision)}</p>
-                  </div>
-                </div>
-                {doc.notaria && (
-                  <div>
-                    <FLabel>Notaría</FLabel>
-                    <p className="text-sm text-[var(--text)]/80">{doc.notaria}</p>
-                  </div>
-                )}
+              )}
 
-                {metaEntries.length > 0 && (
-                  <>
-                    <Separator />
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      {metaEntries.map(([k, v]) => (
-                        <div key={k}>
-                          <FLabel>{META_LABELS[k] ?? k}</FLabel>
-                          <p className="text-[var(--text)]/80">{String(v)}</p>
-                        </div>
-                      ))}
+              {metaEntries.length > 0 && (
+                <>
+                  <Separator />
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    {metaEntries.map(([k, v]) => (
+                      <div key={k}>
+                        <FLabel>{META_LABELS[k] ?? k}</FLabel>
+                        <p className="text-[var(--text)]/80">{String(v)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* ── Datos extraídos por IA ── */}
+              {doc.extraccion_status === 'completado' && (
+                <>
+                  <Separator />
+                  <div>
+                    <div className="mb-3 flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-[var(--accent)]" />
+                      <h3 className="text-sm font-semibold text-[var(--text)]">Datos extraídos</h3>
+                      {doc.extraccion_fecha && (
+                        <span className="ml-auto text-[10px] text-[var(--text-subtle)]">
+                          {formatDate(doc.extraccion_fecha.slice(0, 10))}
+                        </span>
+                      )}
                     </div>
-                  </>
-                )}
 
-                {/* ── Datos extraídos por IA ── */}
-                {doc.extraccion_status === 'completado' && (
-                  <>
-                    <Separator />
-                    <div>
-                      <div className="mb-3 flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 text-[var(--accent)]" />
-                        <h3 className="text-sm font-semibold text-[var(--text)]">
-                          Datos extraídos
-                        </h3>
-                        {doc.extraccion_fecha && (
-                          <span className="ml-auto text-[10px] text-[var(--text-subtle)]">
-                            {formatDate(doc.extraccion_fecha.slice(0, 10))}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3 text-sm">
-                        {doc.tipo_operacion && (
-                          <div>
-                            <FLabel>Operación</FLabel>
-                            <TipoOperacionBadge tipo={doc.tipo_operacion} />
-                          </div>
-                        )}
-                        {doc.monto != null && (
-                          <div>
-                            <FLabel>Monto</FLabel>
-                            <p className="font-mono text-[var(--text)]/80">
-                              {formatMonto(doc.monto, doc.moneda)}
-                            </p>
-                          </div>
-                        )}
-                        {doc.superficie_m2 != null && (
-                          <div>
-                            <FLabel>Superficie</FLabel>
-                            <p className="text-[var(--text)]/80">
-                              {formatSuperficie(doc.superficie_m2)}
-                            </p>
-                          </div>
-                        )}
-                        {doc.precio_m2 != null && (
-                          <div>
-                            <FLabel>Precio / m²</FLabel>
-                            <p className="font-mono text-[var(--text)]/80">
-                              {formatPrecioM2(doc.precio_m2, doc.moneda)}
-                            </p>
-                          </div>
-                        )}
-                        {(doc.municipio || doc.estado) && (
-                          <div>
-                            <FLabel>Ubicación</FLabel>
-                            <p className="text-[var(--text)]/80">
-                              {[doc.municipio, doc.estado].filter(Boolean).join(', ')}
-                            </p>
-                          </div>
-                        )}
-                        {doc.folio_real && (
-                          <div>
-                            <FLabel>Folio real</FLabel>
-                            <p className="text-[var(--text)]/80">{doc.folio_real}</p>
-                          </div>
-                        )}
-                        {doc.libro_tomo && (
-                          <div>
-                            <FLabel>Libro / Tomo</FLabel>
-                            <p className="text-[var(--text)]/80">{doc.libro_tomo}</p>
-                          </div>
-                        )}
-                      </div>
-
-                      {doc.ubicacion_predio && (
-                        <div className="mt-3">
-                          <FLabel>Ubicación del predio</FLabel>
-                          <p className="text-sm text-[var(--text)]/70 whitespace-pre-wrap">
-                            {doc.ubicacion_predio}
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      {doc.tipo_operacion && (
+                        <div>
+                          <FLabel>Operación</FLabel>
+                          <TipoOperacionBadge tipo={doc.tipo_operacion} />
+                        </div>
+                      )}
+                      {doc.monto != null && (
+                        <div>
+                          <FLabel>Monto</FLabel>
+                          <p className="font-mono text-[var(--text)]/80">
+                            {formatMonto(doc.monto, doc.moneda)}
                           </p>
                         </div>
                       )}
-
-                      {doc.partes && doc.partes.length > 0 && (
-                        <div className="mt-4">
-                          <FLabel>Partes involucradas</FLabel>
-                          <ul className="space-y-2">
-                            {doc.partes.map((p, i) => (
-                              <li
-                                key={i}
-                                className="rounded-xl border border-[var(--border)] bg-[var(--panel)]/40 p-2.5"
-                              >
-                                <div className="flex items-baseline justify-between gap-2">
-                                  <span className="text-sm font-medium text-[var(--text)]">
-                                    {p.nombre}
-                                  </span>
-                                  <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">
-                                    {p.rol}
-                                  </span>
-                                </div>
-                                <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-[var(--text-muted)]">
-                                  {p.rfc && <span>RFC: {p.rfc}</span>}
-                                  {p.representante && <span>Rep: {p.representante}</span>}
-                                </div>
-                              </li>
-                            ))}
-                          </ul>
+                      {doc.superficie_m2 != null && (
+                        <div>
+                          <FLabel>Superficie</FLabel>
+                          <p className="text-[var(--text)]/80">
+                            {formatSuperficie(doc.superficie_m2)}
+                          </p>
                         </div>
                       )}
+                      {doc.precio_m2 != null && (
+                        <div>
+                          <FLabel>Precio / m²</FLabel>
+                          <p className="font-mono text-[var(--text)]/80">
+                            {formatPrecioM2(doc.precio_m2, doc.moneda)}
+                          </p>
+                        </div>
+                      )}
+                      {(doc.municipio || doc.estado) && (
+                        <div>
+                          <FLabel>Ubicación</FLabel>
+                          <p className="text-[var(--text)]/80">
+                            {[doc.municipio, doc.estado].filter(Boolean).join(', ')}
+                          </p>
+                        </div>
+                      )}
+                      {doc.folio_real && (
+                        <div>
+                          <FLabel>Folio real</FLabel>
+                          <p className="text-[var(--text)]/80">{doc.folio_real}</p>
+                        </div>
+                      )}
+                      {doc.libro_tomo && (
+                        <div>
+                          <FLabel>Libro / Tomo</FLabel>
+                          <p className="text-[var(--text)]/80">{doc.libro_tomo}</p>
+                        </div>
+                      )}
+                    </div>
 
-                      {doc.contenido_texto && (
-                        <div className="mt-4">
-                          <button
-                            type="button"
-                            onClick={() => setShowContenido((v) => !v)}
-                            className="flex w-full items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--panel)]/40 px-3 py-2 text-xs font-medium text-[var(--text)]/70 hover:bg-[var(--panel)]"
-                          >
-                            <span>
-                              Contenido completo ·{' '}
-                              {doc.contenido_texto.length.toLocaleString('es-MX')} chars
-                            </span>
-                            {showContenido ? (
-                              <ChevronUp className="h-4 w-4" />
-                            ) : (
-                              <ChevronDown className="h-4 w-4" />
-                            )}
-                          </button>
-                          {showContenido && (
-                            <div className="mt-2 max-h-96 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--panel)]/30 p-3">
-                              <p className="whitespace-pre-wrap font-mono text-xs text-[var(--text)]/75 leading-relaxed">
-                                {doc.contenido_texto}
-                              </p>
-                            </div>
+                    {doc.ubicacion_predio && (
+                      <div className="mt-3">
+                        <FLabel>Ubicación del predio</FLabel>
+                        <p className="text-sm text-[var(--text)]/70 whitespace-pre-wrap">
+                          {doc.ubicacion_predio}
+                        </p>
+                      </div>
+                    )}
+
+                    {doc.partes && doc.partes.length > 0 && (
+                      <div className="mt-4">
+                        <FLabel>Partes involucradas</FLabel>
+                        <ul className="space-y-2">
+                          {doc.partes.map((p, i) => (
+                            <li
+                              key={i}
+                              className="rounded-xl border border-[var(--border)] bg-[var(--panel)]/40 p-2.5"
+                            >
+                              <div className="flex items-baseline justify-between gap-2">
+                                <span className="text-sm font-medium text-[var(--text)]">
+                                  {p.nombre}
+                                </span>
+                                <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">
+                                  {p.rol}
+                                </span>
+                              </div>
+                              <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-[var(--text-muted)]">
+                                {p.rfc && <span>RFC: {p.rfc}</span>}
+                                {p.representante && <span>Rep: {p.representante}</span>}
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {doc.contenido_texto && (
+                      <div className="mt-4">
+                        <button
+                          type="button"
+                          onClick={() => setShowContenido((v) => !v)}
+                          className="flex w-full items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--panel)]/40 px-3 py-2 text-xs font-medium text-[var(--text)]/70 hover:bg-[var(--panel)]"
+                        >
+                          <span>
+                            Contenido completo ·{' '}
+                            {doc.contenido_texto.length.toLocaleString('es-MX')} chars
+                          </span>
+                          {showContenido ? (
+                            <ChevronUp className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
                           )}
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-
-                {doc.extraccion_status === 'error' && (
-                  <div className="flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-xs text-red-400">
-                    <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-medium mb-0.5">Extracción IA falló</p>
-                      <p className="text-red-400/80">
-                        {doc.extraccion_error ?? 'Error desconocido'}
-                      </p>
-                    </div>
+                        </button>
+                        {showContenido && (
+                          <div className="mt-2 max-h-96 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--panel)]/30 p-3">
+                            <p className="whitespace-pre-wrap font-mono text-xs text-[var(--text)]/75 leading-relaxed">
+                              {doc.contenido_texto}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                )}
+                </>
+              )}
 
-                {doc.descripcion && (
-                  <>
-                    <Separator />
-                    <div>
-                      <FLabel>Descripción</FLabel>
-                      <p className="text-sm text-[var(--text)]/70 whitespace-pre-wrap">
-                        {doc.descripcion}
-                      </p>
-                    </div>
-                  </>
-                )}
+              {doc.extraccion_status === 'error' && (
+                <div className="flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-xs text-red-400">
+                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium mb-0.5">Extracción IA falló</p>
+                    <p className="text-red-400/80">{doc.extraccion_error ?? 'Error desconocido'}</p>
+                  </div>
+                </div>
+              )}
 
-                {doc.notas && (
-                  <>
-                    <Separator />
-                    <div>
-                      <FLabel>Notas</FLabel>
-                      <p className="text-sm text-[var(--text)]/70 whitespace-pre-wrap">
-                        {doc.notas}
-                      </p>
-                    </div>
-                  </>
-                )}
-              </>
-            )}
+              {doc.descripcion && (
+                <>
+                  <Separator />
+                  <div>
+                    <FLabel>Descripción</FLabel>
+                    <p className="text-sm text-[var(--text)]/70 whitespace-pre-wrap">
+                      {doc.descripcion}
+                    </p>
+                  </div>
+                </>
+              )}
 
-            {/* ── Archivos section (always visible) ── */}
-            <Separator />
+              {doc.notas && (
+                <>
+                  <Separator />
+                  <div>
+                    <FLabel>Notas</FLabel>
+                    <p className="text-sm text-[var(--text)]/70 whitespace-pre-wrap">{doc.notas}</p>
+                  </div>
+                </>
+              )}
+            </>
+          )}
 
-            {needsPdf && !hasPrincipalPdf && (
-              <div className="flex items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-400">
-                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                Este documento requiere un PDF escaneado como documento principal.
-              </div>
-            )}
+          {/* ── Archivos section (always visible) ── */}
+          <Separator />
 
-            <AdjuntosSection
-              documentoId={doc.id}
-              empresaId={doc.empresa_id}
-              adjuntos={adjuntos}
-              onRefresh={onRefreshAdjuntos}
-            />
-          </div>
-        </ScrollArea>
-      </SheetContent>
+          {needsPdf && !hasPrincipalPdf && (
+            <div className="flex items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-400">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              Este documento requiere un PDF escaneado como documento principal.
+            </div>
+          )}
 
+          <AdjuntosSection
+            documentoId={doc.id}
+            empresaId={doc.empresa_id}
+            adjuntos={adjuntos}
+            onRefresh={onRefreshAdjuntos}
+          />
+        </div>
+      </DetailDrawerContent>
       {/* Confirmación de borrado — solo alcanza aquí si el usuario es admin. */}
       <Dialog
         open={confirmingDelete}
@@ -569,7 +553,7 @@ export function DocumentoDetailSheet({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Sheet>
+    </DetailDrawer>
   );
 }
 
