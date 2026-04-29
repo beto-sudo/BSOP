@@ -254,7 +254,11 @@ export function DocumentoDetailSheet({
           </div>
         </SheetHeader>
 
-        <ScrollArea className="flex-1 pr-1 print:h-auto">
+        {/* `min-h-0` permite que este flex item shrinke debajo de la altura
+            natural de su contenido — sin esto, los flex items tienen
+            `min-height: auto` y el ScrollArea nunca llega a overflow, así
+            que el contenido se sale del viewport y no scrollea. */}
+        <ScrollArea className="flex-1 min-h-0 pr-1 print:h-auto">
           <div className="mt-4 space-y-5 pb-6">
             {extractError && (
               <div className="flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-xs text-red-400">

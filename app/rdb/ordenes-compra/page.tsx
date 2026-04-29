@@ -432,7 +432,7 @@ function OrdenDetail({
           </div>
         </SheetHeader>
 
-        <ScrollArea className="flex-1 pr-1 print:h-auto print:overflow-visible">
+        <ScrollArea className="flex-1 min-h-0 pr-1 print:h-auto print:overflow-visible">
           <div className="space-y-6 pb-6 pt-6 print:space-y-4 print:pt-0">
             {/* ── Screen: Status + meta ── */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between print:hidden">

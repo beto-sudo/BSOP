@@ -108,7 +108,7 @@ export function DocumentoCreateSheet({
         <SheetHeader>
           <SheetTitle>Nuevo Documento</SheetTitle>
         </SheetHeader>
-        <ScrollArea className="flex-1 pr-1">
+        <ScrollArea className="flex-1 min-h-0 pr-1">
           <div className="mt-4 pb-6 space-y-4">
             <div className="flex items-start gap-2 rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/5 px-3 py-2.5 text-xs text-[var(--text)]/70">
               <Sparkles className="h-4 w-4 shrink-0 mt-0.5 text-[var(--accent)]" />
