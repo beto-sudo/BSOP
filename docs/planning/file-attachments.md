@@ -2,110 +2,100 @@
 
 **Slug:** `file-attachments`
 **Empresas:** todas
-**Schemas afectados:** n/a (UI)
-**Estado:** proposed
+**Schemas afectados:** n/a (UI; consume `erp.adjuntos`)
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-27
-**Última actualización:** 2026-04-27
-
-> **Bloqueada hasta cierre de `print-pattern`.** Alcance v1 detallado
-> se cierra cuando arranque su turno.
+**Última actualización:** 2026-04-29
 
 ## Problema
 
-Multiple módulos manejan adjuntos de archivos pero cada uno reinventó
-upload + preview + delete + signed URLs:
-
-- `components/documentos/documento-adjuntos.tsx` — adjuntos PDF/IMG.
-- `components/rh/empleado-adjuntos.tsx` — INE, CURP, RFC, etc.
-- OCR vouchers en cortes (Tesseract.js client-side, sube image y
-  procesa).
-- Marbete subido en levantamientos.
-- Adjuntos en movimientos de inventario (chip 📎 entregado en
-  `cortes-conciliacion`).
-- Futuro: adjuntos en proyectos DILESA, en proveedores
-  (`proveedores-csf-ai` probablemente sube CSF), en órdenes de
-  compra.
-
-Síntomas:
-
-- Cada módulo implementa su propio flujo de upload (drag-drop o
-  click-to-select), generación de signed URLs, preview, delete.
-- Validación de tipo / tamaño dispersa.
-- Manejo de progreso (% upload) implementado en algunos, ausente en
-  otros.
-- Multi-archivo vs single-archivo: APIs distintas.
-- Storage en Supabase storage — buckets y paths convencionales pero
-  cada caller construye los paths a mano.
+Múltiples módulos manejan adjuntos pero cada uno reinventó upload +
+preview + delete + signed URLs. Path construction inconsistente
+(timestamp prefix opcional, filenames no sluggificados), UI dispar
+(drag-drop vs click-only), delete con `window.confirm()` legacy en
+algunos, etc.
 
 ## Outcome esperado
 
-- Componente `<FileAttachments>` con upload (drag-drop + click),
-  preview multi-tipo (PDF, IMG, otros), delete con confirm.
-- Hook `useSignedUrls` para resolver URLs firmadas (con cache + TTL
-  awareness).
-- Helper `lib/storage/` con convención de paths
-  (`<bucket>/<empresa>/<entidad>/<id>/<filename>`).
-- Validación tipada: `accept` (mime types), `maxSize`, `maxCount`.
-- Progress visible en uploads largos (videos, PDFs grandes).
-- Integración con `forms-pattern` (file inputs como parte del schema
-  de form).
-- ADR documentando convenciones de paths, tipos permitidos, tamaños
-  máximos por contexto.
+- Convenciones documentadas: bucket, paths, tabla, roles, helpers de read.
+- Helper `buildAdjuntoPath()` para path canónico.
+- Componente `<FileAttachments>` (Sprint 2) con drag-drop + preview + delete.
+- Adopción incremental.
 
-## Alcance v1 (tentativo — refinar al arrancar)
+## Alcance v1 (cerrado 2026-04-29 — ver ADR-022)
 
-- [ ] Auditar implementaciones actuales — qué buckets, qué paths,
-      qué APIs de upload (signed URL upload vs server-side).
-- [ ] Componente `<FileAttachments entity entityId accept maxSize maxCount>` con drag-drop + preview + delete.
-- [ ] Hook `useSignedUrls(adjuntos)` que cachea + revalida.
-- [ ] Helper `lib/storage/path.ts` con builders tipados.
-- [ ] Migrar 2-3 callers como golden path: - probable: `documento-adjuntos` (multi-archivo). - probable: `empleado-adjuntos` (single-archivo por tipo).
-- [ ] ADR documentando.
+- [x] ADR-022 codifica las 6 convenciones (FA1-FA6).
+- [x] `lib/storage/path.ts` con `buildAdjuntoPath()` + `slugifyFilename()` + tests.
+- [x] `lib/adjuntos.ts` (read helpers) confirmado como single point para reads.
+- [ ] `<FileAttachments>` componente — Sprint 2 (postponed).
+- [ ] Migrar uploaders existentes a `buildAdjuntoPath()` — Sprint 2+.
 
-## Fuera de alcance
+## Decisiones tomadas al cerrar alcance
 
-- OCR / extracción de contenido (cortes vouchers, proveedores CSF).
-  Eso queda en cada caller — el componente solo maneja upload.
-- Versioning de archivos (subir nueva versión y mantener histórico).
-  Postergable.
-- Generación de thumbnails server-side. v1 client-side `<img>` o
-  `<embed>` para PDF.
+- **Foundation policy primero, componente después**: el path/bucket/tabla
+  ya está consolidado en el repo (cada uploader lo respeta); el churn
+  está en la UI de upload + path construction. ADR codifica lo primero;
+  componente Sprint 2 cubre lo segundo.
+- **Bucket único `adjuntos`**: no fragmentar por entidad. Todas las
+  entidades comparten el mismo bucket privado con paths jerárquicos.
+- **Path con timestamp prefix** previene colisiones por filenames idénticos
+  subidos al mismo `entidadId` (e.g. "ine.jpg" subido dos veces al mismo
+  empleado).
+- **Sin componente en v1**: extraer `<FileAttachments>` requiere consolidar
+  3 patrones de UI distintos (documentos, empleado-adjuntos,
+  voucher-uploader) — alcance grande, postergable sin bloquear otras
+  iniciativas.
+
+## Fuera de alcance v1
+
+- **Componente `<FileAttachments>` con UI consolidada** — Sprint 2.
+- **Versioning de archivos**.
+- **OCR / extracción** — vive en cada caller.
+- **Mobile camera capture** estandarizado.
+- **Server actions para signed URL**.
 
 ## Métricas de éxito
 
-- Cero implementaciones nuevas de upload + signed URL en módulos
-  posteriores.
-- Tiempo de agregar adjuntos a un módulo nuevo baja a ~10 líneas
-  de JSX.
-- Audit visual: drag-drop, preview y delete se ven idénticos en
-  todos los módulos migrados.
-
-## Riesgos / preguntas abiertas
-
-- [ ] **Buckets existentes y políticas de Storage** — auditar antes
-      de generalizar. Cada bucket tiene RLS distinto (algunos
-      público, otros privado por empresa). El componente debe ser
-      agnóstico al bucket pero respetar las políticas.
-- [ ] **Server actions para signed URL** — Next.js App Router
-      permite server actions; ¿el componente las usa o el caller
-      pasa el endpoint?
-- [ ] **Coordinación con `proveedores-csf-ai`** — ese va a subir
-      CSF + extraer con AI. Ideal: este componente sale primero y
-      el extract-csf endpoint usa el path estándar. Si CC arranca
-      proveedores antes, retro-migrar el upload en el PR de adopción.
-- [ ] **Mobile camera capture** — levantamientos físicos ya tiene
-      patrón de captura mobile. Reutilizar o coordinar con
-      `responsive-policy`.
+- `buildAdjuntoPath()` usado en uploaders nuevos (post Sprint 2 migration).
+- Cero `window.confirm()` para delete de adjuntos.
+- Path construction consistente en todo el repo.
 
 ## Sprints / hitos
 
-_(se llena cuando arranque ejecución, vía Claude Code)_
+| #   | Sprint                                    | Estado    | PR  |
+| --- | ----------------------------------------- | --------- | --- |
+| 1   | Foundation policy + ADR-022 + path helper | done      | TBD |
+| 2   | Componente `<FileAttachments>` + golden   | postponed | —   |
+| 3   | Migrar uploaders existentes               | postponed | —   |
 
 ## Decisiones registradas
 
-_(append-only, fechadas — escrito por Claude Code)_
+### 2026-04-29 · ADR-022 — File attachments policy (Sprint 1)
+
+Codificado en [ADR-022](../adr/022_file_attachments.md). Las 6 reglas:
+
+- **FA1** — Bucket único `adjuntos` privado; reads via proxy `/api/adjuntos/<path>`.
+- **FA2** — Path canónico `<empresa>/<entidad>/<entidadId>/<timestamp>-<slug>.<ext>`.
+- **FA3** — Tabla `erp.adjuntos` como single source of truth de metadata; persistir solo el path.
+- **FA4** — Roles canónicos por entidad (documentos: principal/imagen/anexo; empleados: ine/curp/etc.).
+- **FA5** — Delete via `<ConfirmDialog>` (ADR-008); soft/hard según entidad.
+- **FA6** — Read flows usan `lib/adjuntos.ts`; nunca construir URLs ad-hoc.
 
 ## Bitácora
 
-_(append-only, escrita por Claude Code al ejecutar)_
+### 2026-04-29 — Sprint 1 mergeado
+
+Foundation:
+
+- `lib/storage/path.ts` — `buildAdjuntoPath()` con timestamp prefix +
+  `slugifyFilename()` con normalización ASCII + diacritics strip.
+- `lib/storage/path.test.ts` — 11 tests cubren slugify edge cases +
+  build path con/sin timestamp.
+- `lib/storage/index.ts` — barrel export.
+- ADR-022 con 6 reglas (FA1-FA6).
+
+Sin migración masiva: los uploaders existentes siguen como están. La
+adopción del helper + del componente `<FileAttachments>` es Sprint 2+.
+
+PR: pendiente.
