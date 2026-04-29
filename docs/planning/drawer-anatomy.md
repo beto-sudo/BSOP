@@ -3,10 +3,10 @@
 **Slug:** `drawer-anatomy`
 **Empresas:** todas
 **Schemas afectados:** n/a (UI)
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-04-27
-**Última actualización:** 2026-04-30
+**Última actualización:** 2026-04-30 (cierre)
 
 ## Problema
 
@@ -75,12 +75,11 @@ actions)`, `content (scrollable)`, `footer (sticky opcional)`.
 
 ## Sprints / hitos
 
-| #   | Sprint                                                      | Estado  | PR   |
-| --- | ----------------------------------------------------------- | ------- | ---- |
-| 1   | Foundation + ADR-018 + golden Stock drawer                  | done    | #308 |
-| 2   | Migrar drawers de detalle (Order, Corte, Documento, OC)     | done    | TBD  |
-| 3   | Migrar drawers restantes (TasksUpdates, NuevaEmpresa, etc.) | pending | —    |
-| 4   | Cierre + INITIATIVES move to Done                           | pending | —    |
+| #   | Sprint                                                                                    | Estado | PR   |
+| --- | ----------------------------------------------------------------------------------------- | ------ | ---- |
+| 1   | Foundation + ADR-018 + golden Stock drawer                                                | done   | #308 |
+| 2   | Migrar drawers de detalle (Order, Corte, Documento, OC)                                   | done   | #316 |
+| 3   | Migrar drawers de creación/edición (TasksUpdates, NuevaEmpresa, DocumentoCreate) + cierre | done   | TBD  |
 
 ## Decisiones registradas
 
@@ -96,6 +95,36 @@ Codificado en [ADR-018](../adr/018_drawer_anatomy.md). Las 6 reglas:
 - **DD6** — Dirty confirm via `useDirtyConfirm` (ADR-016 F6) cuando el drawer tiene un form.
 
 ## Bitácora
+
+### 2026-04-30 — Sprint 3 mergeado (cierre)
+
+3 drawers de creación/edición migrados:
+
+- `<TasksUpdatesSheet>` — sheet "Avances de tarea" con composer + history
+  list. `<Sheet>` artesanal → `<DetailDrawer size="sm">` con `title` +
+  `description` (titulo de la tarea).
+- `<NuevaEmpresaDrawer>` (settings) — drawer multi-state (drop → processing
+  → preview+form) para alta de empresa con CSF. Header con icon Sparkles
+  - copy descriptivo en `description`. State machine interno preservado.
+- `<DocumentoCreateSheet>` — drawer "Nuevo Documento" con `<Form>`+zod.
+  Eliminado `<ScrollArea>` artesanal (heredado de DD3).
+
+**Excepciones documentadas (fuera de v1)**:
+
+- `<EmpleadoAltaWizard>` — multi-step con state machine compleja, vive
+  en la iniciativa `wizard-pattern` (spin-out de forms-pattern Sprint 6).
+- DILESA list pages (`terrenos`, `prototipos`, `proyectos`, `anteproyectos`)
+  — sus sheets "Nuevo X" ya migraron a `<Form>` en forms-pattern Sprint 4.
+  Cambiar el shell a `<DetailDrawer>` ahora sería doble churn sin valor;
+  se actualizan cuando se toquen por feature work.
+- `<Settings/Acceso>` y otros sheets state-machine (Productos, Requisiciones,
+  Proveedores list, RH dept/puestos) — postergables al patrón
+  "drawer + sub-tabs" que sale como ADR aparte si emerge necesidad.
+
+**Outcome final**: 7 drawers core migrados (Stock + Order + Corte +
+Documento detail + OC + TasksUpdates + NuevaEmpresa + DocumentoCreate).
+Patrón establecido y documentado en ADR-018. PRs nuevos no se aprueban
+con `<Sheet>` directo + header artesanal.
 
 ### 2026-04-30 — Sprint 2 mergeado
 
