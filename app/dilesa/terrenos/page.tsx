@@ -48,9 +48,10 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { FieldLabel } from '@/components/ui/field-label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, RefreshCw, Loader2, MapPin } from 'lucide-react';
+import { Plus, Search, RefreshCw, MapPin } from 'lucide-react';
+import { z } from 'zod';
+import { Form, FormActions, FormField, useZodForm } from '@/components/forms';
 import {
   TERRENO_ETAPA_CONFIG,
   TERRENO_ETAPA_OPTIONS,
@@ -104,6 +105,32 @@ type Terreno = {
   fecha_captura: string;
   created_at: string;
   updated_at: string;
+};
+
+const TerrenoCreateSchema = z.object({
+  nombre: z.string().trim().min(1, 'El nombre es obligatorio'),
+  municipio: z.string().default(''),
+  tipo: z.string().default(''),
+  objetivo: z.string().default(''),
+  origen: z.string().default(''),
+  area_m2: z.string().default(''),
+  precio_solicitado: z.string().default(''),
+  nombre_propietario: z.string().default(''),
+  telefono_propietario: z.string().default(''),
+});
+
+type TerrenoCreateValues = z.infer<typeof TerrenoCreateSchema>;
+
+const terrenoCreateDefaults: TerrenoCreateValues = {
+  nombre: '',
+  municipio: '',
+  tipo: '',
+  objetivo: '',
+  origen: '',
+  area_m2: '',
+  precio_solicitado: '',
+  nombre_propietario: '',
+  telefono_propietario: '',
 };
 
 const TIPO_OPTIONS = ['Rústico', 'Urbano', 'Comercial', 'Industrial', 'Mixto', 'Otro'];
@@ -268,16 +295,10 @@ function TerrenosInner() {
   const [filterEstatus, setFilterEstatus] = useState<string>('all');
 
   const [showCreate, setShowCreate] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [createNombre, setCreateNombre] = useState('');
-  const [createMunicipio, setCreateMunicipio] = useState('');
-  const [createTipo, setCreateTipo] = useState('');
-  const [createObjetivo, setCreateObjetivo] = useState('');
-  const [createOrigen, setCreateOrigen] = useState('');
-  const [createAreaM2, setCreateAreaM2] = useState('');
-  const [createPrecioSolicitado, setCreatePrecioSolicitado] = useState('');
-  const [createNombrePropietario, setCreateNombrePropietario] = useState('');
-  const [createTelefonoPropietario, setCreateTelefonoPropietario] = useState('');
+  const createForm = useZodForm({
+    schema: TerrenoCreateSchema,
+    defaultValues: terrenoCreateDefaults,
+  });
 
   const fetchTerrenos = useCallback(async () => {
     const { data, error: err } = await supabase
@@ -309,39 +330,28 @@ function TerrenosInner() {
   }, [fetchTerrenos]);
 
   const openCreate = () => {
-    setCreateNombre('');
-    setCreateMunicipio('');
-    setCreateTipo('');
-    setCreateObjetivo('');
-    setCreateOrigen('');
-    setCreateAreaM2('');
-    setCreatePrecioSolicitado('');
-    setCreateNombrePropietario('');
-    setCreateTelefonoPropietario('');
+    createForm.reset(terrenoCreateDefaults);
     setShowCreate(true);
   };
 
-  const handleCreate = async () => {
-    if (!createNombre.trim()) return;
-    setCreating(true);
+  const handleCreate = async (values: TerrenoCreateValues) => {
     const { data: newRow, error: err } = await supabase
       .schema('dilesa')
       .from('terrenos')
       .insert({
         empresa_id: DILESA_EMPRESA_ID,
-        nombre: createNombre.trim(),
-        municipio: createMunicipio.trim() || null,
-        tipo: createTipo || null,
-        objetivo: createObjetivo || null,
-        origen: createOrigen || null,
-        area_terreno_m2: createAreaM2 ? Number(createAreaM2) : null,
-        precio_solicitado_m2: createPrecioSolicitado ? Number(createPrecioSolicitado) : null,
-        nombre_propietario: createNombrePropietario.trim() || null,
-        telefono_propietario: createTelefonoPropietario.trim() || null,
+        nombre: values.nombre.trim(),
+        municipio: values.municipio.trim() || null,
+        tipo: values.tipo || null,
+        objetivo: values.objetivo || null,
+        origen: values.origen || null,
+        area_terreno_m2: values.area_m2 ? Number(values.area_m2) : null,
+        precio_solicitado_m2: values.precio_solicitado ? Number(values.precio_solicitado) : null,
+        nombre_propietario: values.nombre_propietario.trim() || null,
+        telefono_propietario: values.telefono_propietario.trim() || null,
       })
       .select('id')
       .single();
-    setCreating(false);
     if (err) {
       alert(`Error al crear terreno: ${err.message}`);
       return;
@@ -450,151 +460,155 @@ function TerrenosInner() {
               Solo campos esenciales — el resto del expediente se captura después desde el detalle.
             </SheetDescription>
           </SheetHeader>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void handleCreate();
-            }}
-            className="mt-6 space-y-5"
-          >
-            <div>
-              <FieldLabel htmlFor="t-nombre" required>
-                Nombre del terreno
-              </FieldLabel>
-              <Input
-                id="t-nombre"
-                value={createNombre}
-                onChange={(e) => setCreateNombre(e.target.value)}
-                placeholder="Ej. Rancho Los Nogales"
-                required
-              />
-            </div>
+          <Form form={createForm} onSubmit={handleCreate} className="mt-6 space-y-5">
+            <FormField name="nombre" label="Nombre del terreno" required>
+              {(field) => (
+                <Input
+                  {...field}
+                  id={field.id}
+                  aria-invalid={field.invalid || undefined}
+                  aria-describedby={field.describedBy}
+                  placeholder="Ej. Rancho Los Nogales"
+                />
+              )}
+            </FormField>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <FieldLabel htmlFor="t-municipio">Municipio</FieldLabel>
-                <Input
-                  id="t-municipio"
-                  value={createMunicipio}
-                  onChange={(e) => setCreateMunicipio(e.target.value)}
-                  placeholder="Piedras Negras, Nava, Acuña…"
-                />
-              </div>
-              <div>
-                <FieldLabel htmlFor="t-tipo">Tipo</FieldLabel>
-                <select
-                  id="t-tipo"
-                  value={createTipo}
-                  onChange={(e) => setCreateTipo(e.target.value)}
-                  className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 text-sm"
-                >
-                  <option value="">(sin definir)</option>
-                  {TIPO_OPTIONS.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <FieldLabel htmlFor="t-objetivo">Objetivo</FieldLabel>
-                <select
-                  id="t-objetivo"
-                  value={createObjetivo}
-                  onChange={(e) => setCreateObjetivo(e.target.value)}
-                  className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 text-sm"
-                >
-                  <option value="">(sin definir)</option>
-                  {OBJETIVO_OPTIONS.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <FieldLabel htmlFor="t-origen">Origen</FieldLabel>
-                <select
-                  id="t-origen"
-                  value={createOrigen}
-                  onChange={(e) => setCreateOrigen(e.target.value)}
-                  className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 text-sm"
-                >
-                  <option value="">(sin definir)</option>
-                  {ORIGEN_OPTIONS.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <FieldLabel htmlFor="t-area">Área total (m²)</FieldLabel>
-                <Input
-                  id="t-area"
-                  type="number"
-                  step="0.01"
-                  inputMode="decimal"
-                  value={createAreaM2}
-                  onChange={(e) => setCreateAreaM2(e.target.value)}
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <FieldLabel htmlFor="t-precio">Precio solicitado / m²</FieldLabel>
-                <Input
-                  id="t-precio"
-                  type="number"
-                  step="0.01"
-                  inputMode="decimal"
-                  value={createPrecioSolicitado}
-                  onChange={(e) => setCreatePrecioSolicitado(e.target.value)}
-                  placeholder="0"
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <FieldLabel htmlFor="t-prop">Propietario</FieldLabel>
-                <Input
-                  id="t-prop"
-                  value={createNombrePropietario}
-                  onChange={(e) => setCreateNombrePropietario(e.target.value)}
-                  placeholder="Nombre"
-                />
-              </div>
-              <div>
-                <FieldLabel htmlFor="t-proptel">Teléfono propietario</FieldLabel>
-                <Input
-                  id="t-proptel"
-                  value={createTelefonoPropietario}
-                  onChange={(e) => setCreateTelefonoPropietario(e.target.value)}
-                  placeholder="10 dígitos"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={creating || !createNombre.trim()}>
-                {creating ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Plus className="size-4" />
+              <FormField name="municipio" label="Municipio">
+                {(field) => (
+                  <Input
+                    {...field}
+                    id={field.id}
+                    aria-invalid={field.invalid || undefined}
+                    aria-describedby={field.describedBy}
+                    placeholder="Piedras Negras, Nava, Acuña…"
+                  />
                 )}
-                Crear terreno
-              </Button>
+              </FormField>
+              <FormField name="tipo" label="Tipo">
+                {(field) => (
+                  <select
+                    {...field}
+                    id={field.id}
+                    aria-invalid={field.invalid || undefined}
+                    aria-describedby={field.describedBy}
+                    className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 text-sm"
+                  >
+                    <option value="">(sin definir)</option>
+                    {TIPO_OPTIONS.map((o) => (
+                      <option key={o} value={o}>
+                        {o}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
             </div>
-          </form>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField name="objetivo" label="Objetivo">
+                {(field) => (
+                  <select
+                    {...field}
+                    id={field.id}
+                    aria-invalid={field.invalid || undefined}
+                    aria-describedby={field.describedBy}
+                    className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 text-sm"
+                  >
+                    <option value="">(sin definir)</option>
+                    {OBJETIVO_OPTIONS.map((o) => (
+                      <option key={o} value={o}>
+                        {o}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+              <FormField name="origen" label="Origen">
+                {(field) => (
+                  <select
+                    {...field}
+                    id={field.id}
+                    aria-invalid={field.invalid || undefined}
+                    aria-describedby={field.describedBy}
+                    className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 text-sm"
+                  >
+                    <option value="">(sin definir)</option>
+                    {ORIGEN_OPTIONS.map((o) => (
+                      <option key={o} value={o}>
+                        {o}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField name="area_m2" label="Área total (m²)">
+                {(field) => (
+                  <Input
+                    {...field}
+                    id={field.id}
+                    aria-invalid={field.invalid || undefined}
+                    aria-describedby={field.describedBy}
+                    type="number"
+                    step="0.01"
+                    inputMode="decimal"
+                    placeholder="0"
+                  />
+                )}
+              </FormField>
+              <FormField name="precio_solicitado" label="Precio solicitado / m²">
+                {(field) => (
+                  <Input
+                    {...field}
+                    id={field.id}
+                    aria-invalid={field.invalid || undefined}
+                    aria-describedby={field.describedBy}
+                    type="number"
+                    step="0.01"
+                    inputMode="decimal"
+                    placeholder="0"
+                  />
+                )}
+              </FormField>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField name="nombre_propietario" label="Propietario">
+                {(field) => (
+                  <Input
+                    {...field}
+                    id={field.id}
+                    aria-invalid={field.invalid || undefined}
+                    aria-describedby={field.describedBy}
+                    placeholder="Nombre"
+                  />
+                )}
+              </FormField>
+              <FormField name="telefono_propietario" label="Teléfono propietario">
+                {(field) => (
+                  <Input
+                    {...field}
+                    id={field.id}
+                    aria-invalid={field.invalid || undefined}
+                    aria-describedby={field.describedBy}
+                    placeholder="10 dígitos"
+                  />
+                )}
+              </FormField>
+            </div>
+
+            <FormActions
+              cancelLabel="Cancelar"
+              submitLabel="Crear terreno"
+              submittingLabel="Creando..."
+              submitIcon={<Plus className="size-4" />}
+              onCancel={() => setShowCreate(false)}
+              className="border-t-0 pt-2"
+            />
+          </Form>
         </SheetContent>
       </Sheet>
     </div>
