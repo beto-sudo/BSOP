@@ -3,10 +3,10 @@
 **Slug:** `print-pattern`
 **Empresas:** todas
 **Schemas afectados:** n/a (UI)
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-04-27
-**Última actualización:** 2026-04-29
+**Última actualización:** 2026-04-30 (cierre)
 
 ## Problema
 
@@ -58,10 +58,10 @@ controlados, headers/footers inconsistentes.
 
 ## Sprints / hitos
 
-| #   | Sprint                                     | Estado    | PR  |
-| --- | ------------------------------------------ | --------- | --- |
-| 1   | Foundation + ADR-021 + helpers             | done      | TBD |
-| 2   | Migrar printables existentes (incremental) | postponed | —   |
+| #   | Sprint                                                           | Estado | PR   |
+| --- | ---------------------------------------------------------------- | ------ | ---- |
+| 1   | Foundation + ADR-021 + helpers                                   | done   | #311 |
+| 2   | Migrar `window.print()` callsites a `useTriggerPrint()` + cierre | done   | TBD  |
 
 ## Decisiones registradas
 
@@ -76,6 +76,43 @@ Codificado en [ADR-021](../adr/021_print_pattern.md). Las 5 reglas:
 - **P5** — Trigger via `useTriggerPrint()`; nunca `window.print()` directo en JSX.
 
 ## Bitácora
+
+### 2026-04-30 — Sprint 2 mergeado (cierre)
+
+Migración de **7 callsites** de `window.print()` directo a
+`useTriggerPrint()` (P5 ADR-021):
+
+- `app/rdb/requisiciones/page.tsx` — 2 botones Imprimir (existing + new
+  request sheets).
+- `app/rdb/inventario/levantamientos/[id]/reporte/page.tsx` — auto-print
+  setTimeout 400ms + botón manual.
+- `components/rh/empleado-contrato-module.tsx` — botón "Imprimir contrato".
+- `components/rh/empleado-finiquito-module.tsx` — botón "Imprimir finiquito".
+- `components/proveedores/proveedores-module.tsx` — botón Imprimir en
+  detail sheet.
+- `components/inventario/stock-detail-drawer.tsx` — botón Imprimir
+  (legacy del Sprint 1 de drawer-anatomy, ahora consistente).
+
+Cero callsites con `window.print()` directo en el repo (excepto
+JSDoc/comments). El hook `useTriggerPrint()` queda como punto único de
+extensión (futuro: callbacks `onBefore`/`onAfter`, fallback en browsers
+sin print, telemetry).
+
+**Printables existentes (`<ContratoPrintable>`, `<FiniquitoPrintable>`,
+`marbete-conciliacion`)** NO se wrappearon en `<PrintLayout>`: ya cumplen
+P1 (Tailwind `print:` utilities) + P3 (print-only via `hidden print:block`)
+
+- P4 (page breaks donde aplica). Wrap a `<PrintLayout>` queda como
+  follow-up cuando se necesite header/footer estándar repetido por página
+  o cambio de `size` semántico — ningún caso real hoy.
+
+**Outcome final**:
+
+- ADR-021 con 5 reglas (P1-P5).
+- `<PrintLayout>` + `<PrintLayoutHeader>` + `<PrintLayoutFooter>` + 4 sizes canónicos.
+- `useTriggerPrint()` hook SSR-safe.
+- 7 callsites migrados a `useTriggerPrint()` + cero `window.print()` directo.
+- 213 usos de `print:` Tailwind preservados (cumplen P1 implícito).
 
 ### 2026-04-29 — Sprint 1 mergeado
 

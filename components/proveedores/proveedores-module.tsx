@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { useTriggerPrint } from '@/components/print';
 import {
   Truck,
   RefreshCw,
@@ -210,6 +211,7 @@ function ProveedorDetail({
   logoPath: string;
   membreteAlt: string;
 }) {
+  const triggerPrint = useTriggerPrint();
   if (!proveedor) return null;
 
   const rows = [
@@ -258,7 +260,7 @@ function ProveedorDetail({
               )}
               {proveedor.activo ? 'Inactivar' : 'Reactivar'}
             </Button>
-            <Button variant="outline" size="sm" onClick={() => window.print()}>
+            <Button variant="outline" size="sm" onClick={triggerPrint}>
               Imprimir
             </Button>
           </div>
