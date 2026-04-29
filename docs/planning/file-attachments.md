@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-27
-**Última actualización:** 2026-04-29
+**Última actualización:** 2026-04-30
 
 ## Problema
 
@@ -63,11 +63,11 @@ algunos, etc.
 
 ## Sprints / hitos
 
-| #   | Sprint                                    | Estado    | PR  |
-| --- | ----------------------------------------- | --------- | --- |
-| 1   | Foundation policy + ADR-022 + path helper | done      | TBD |
-| 2   | Componente `<FileAttachments>` + golden   | postponed | —   |
-| 3   | Migrar uploaders existentes               | postponed | —   |
+| #   | Sprint                                            | Estado  | PR   |
+| --- | ------------------------------------------------- | ------- | ---- |
+| 1   | Foundation policy + ADR-022 + path helper         | done    | #312 |
+| 2   | Componente `<FileAttachments>` + golden documento | done    | TBD  |
+| 3   | Migrar `<EmpleadoAdjuntos>` + voucher uploader    | pending | —    |
 
 ## Decisiones registradas
 
@@ -83,6 +83,34 @@ Codificado en [ADR-022](../adr/022_file_attachments.md). Las 6 reglas:
 - **FA6** — Read flows usan `lib/adjuntos.ts`; nunca construir URLs ad-hoc.
 
 ## Bitácora
+
+### 2026-04-30 — Sprint 2 mergeado
+
+Componente compartido `<FileAttachments>` extraído consolidando los
+patrones de `<AdjuntosSection>` (documento) y `<EmpleadoAdjuntos>`:
+
+- `components/file-attachments/file-attachments.tsx` — `<FileAttachments>`
+  con drag-drop, preview multi-tipo (PDF/IMG/otros), delete via
+  `<ConfirmDialog>` (FA5), variants `grouped`/`flat`, upload con progress
+  - resumable lazy-import (`>5MB` usa tus-js-client).
+- `components/file-attachments/use-adjuntos.ts` — hook fetch interno
+  via `erp.adjuntos` + refresh callback.
+- `components/file-attachments/types.ts` — `FileRole`, `AdjuntoRow`,
+  `FileAttachmentsProps`.
+- API: caller pasa `empresaId` + `empresaSlug` + `entidad` (plural) +
+  `entidadId` + `roles[]`. El componente deriva `entidad_tipo` (singular
+  para DB) stripping `'s'` final.
+- Reads via `getAdjuntoProxyUrl()` (FA1, FA6). Paths via
+  `buildAdjuntoPath()` (FA2). Hard delete DB + storage (FA5).
+
+Golden migration: `<AdjuntosSection>` (documento-adjuntos) reescrito
+como wrapper thin sobre `<FileAttachments>`. API exterior preservada
+(`adjuntos` queda como `@deprecated` por compat; `onRefresh` pasa al
+`onChange` del nuevo componente para que el bulk fetch del parent siga
+sincronizándose). Sprint 3 migrará `<EmpleadoAdjuntos>` + voucher
+uploader y consolidará el bulk fetch en `documentos-module.tsx`.
+
+PR: pendiente.
 
 ### 2026-04-29 — Sprint 1 mergeado
 
