@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { ChefHat, RefreshCw, Search } from 'lucide-react';
 
 import { RequireAccess } from '@/components/require-access';
@@ -11,90 +12,14 @@ import { Input } from '@/components/ui/input';
 import { useUrlFilters } from '@/hooks/use-url-filters';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { formatCurrency, formatNumber } from '@/lib/format';
+import { fetchRecetas, type Receta } from '@/lib/productos/recetas';
 
 const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
-
-type ProductoInfo = {
-  id: string;
-  nombre: string;
-  unidad: string | null;
-  categoria_nombre: string | null;
-  ultimo_costo: number | null;
-  ultimo_precio_venta: number | null;
-};
-
-type InsumoReceta = {
-  insumo_id: string;
-  insumo_nombre: string;
-  insumo_unidad: string | null;
-  cantidad: number;
-  unidad: string;
-  costo_insumo: number | null;
-  costo_subtotal: number | null;
-};
-
-type Receta = {
-  producto_venta_id: string;
-  producto_venta_nombre: string;
-  categoria_nombre: string | null;
-  precio_venta: number | null;
-  insumos: InsumoReceta[];
-  insumos_count: number;
-  costo_total: number | null;
-  margen_pct: number | null;
-};
 
 const FILTER_DEFAULTS = {
   search: '',
   soloMargenNegativo: false,
 };
-
-function computeReceta(
-  producto: ProductoInfo,
-  rawInsumos: Array<{ insumo_id: string; cantidad: number; unidad: string }>,
-  productoLookup: Map<string, ProductoInfo>
-): Receta {
-  let costoTotal: number | null = 0;
-  let allCostsKnown = rawInsumos.length > 0;
-
-  const insumos: InsumoReceta[] = rawInsumos.map((row) => {
-    const insumo = productoLookup.get(row.insumo_id);
-    const costoUnit = insumo?.ultimo_costo ?? null;
-    const subtotal = costoUnit == null ? null : costoUnit * row.cantidad;
-    if (subtotal == null) {
-      allCostsKnown = false;
-    } else if (costoTotal != null) {
-      costoTotal += subtotal;
-    }
-    return {
-      insumo_id: row.insumo_id,
-      insumo_nombre: insumo?.nombre ?? 'Insumo eliminado',
-      insumo_unidad: insumo?.unidad ?? null,
-      cantidad: row.cantidad,
-      unidad: row.unidad,
-      costo_insumo: costoUnit,
-      costo_subtotal: subtotal,
-    };
-  });
-
-  const finalCosto = allCostsKnown ? costoTotal : null;
-  const precio = producto.ultimo_precio_venta;
-  const margen =
-    finalCosto != null && precio != null && precio > 0
-      ? ((precio - finalCosto) / precio) * 100
-      : null;
-
-  return {
-    producto_venta_id: producto.id,
-    producto_venta_nombre: producto.nombre,
-    categoria_nombre: producto.categoria_nombre,
-    precio_venta: precio,
-    insumos,
-    insumos_count: insumos.length,
-    costo_total: finalCosto,
-    margen_pct: margen,
-  };
-}
 
 export default function ProductosRecetasPage() {
   return (
@@ -113,61 +38,19 @@ function ProductosRecetasBody() {
   const search = filters.search;
   const soloMargenNegativo = filters.soloMargenNegativo;
 
+  const searchParams = useSearchParams();
+  const focusId = searchParams.get('focus');
+
   const [selected, setSelected] = useState<Receta | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const fetchRecetas = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const supabase = createSupabaseBrowserClient();
-      const [recetaRes, productoRes] = await Promise.all([
-        supabase
-          .schema('erp')
-          .from('producto_receta')
-          .select('producto_venta_id, insumo_id, cantidad, unidad')
-          .eq('empresa_id', RDB_EMPRESA_ID),
-        supabase.schema('rdb').from('v_productos_tabla').select('*'),
-      ]);
-      if (recetaRes.error) throw recetaRes.error;
-      if (productoRes.error) throw productoRes.error;
-
-      const productoLookup = new Map<string, ProductoInfo>();
-      for (const p of productoRes.data ?? []) {
-        if (!p.id) continue;
-        productoLookup.set(p.id, {
-          id: p.id,
-          nombre: p.nombre ?? 'Sin nombre',
-          unidad: p.unidad ?? null,
-          categoria_nombre: p.categoria_nombre ?? null,
-          ultimo_costo: p.ultimo_costo == null ? null : Number(p.ultimo_costo),
-          ultimo_precio_venta: p.ultimo_precio_venta == null ? null : Number(p.ultimo_precio_venta),
-        });
-      }
-
-      const grouped = new Map<
-        string,
-        Array<{ insumo_id: string; cantidad: number; unidad: string }>
-      >();
-      for (const row of recetaRes.data ?? []) {
-        if (!row.producto_venta_id) continue;
-        const list = grouped.get(row.producto_venta_id) ?? [];
-        list.push({
-          insumo_id: row.insumo_id ?? '',
-          cantidad: Number(row.cantidad ?? 0),
-          unidad: row.unidad ?? '',
-        });
-        grouped.set(row.producto_venta_id, list);
-      }
-
-      const out: Receta[] = [];
-      for (const [productoVentaId, rows] of grouped) {
-        const producto = productoLookup.get(productoVentaId);
-        if (!producto) continue; // receta huérfana — producto venta eliminado
-        out.push(computeReceta(producto, rows, productoLookup));
-      }
-      out.sort((a, b) => a.producto_venta_nombre.localeCompare(b.producto_venta_nombre));
-      setRecetas(out);
+      const data = await fetchRecetas(supabase, RDB_EMPRESA_ID);
+      setRecetas(data);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error al cargar recetas');
     } finally {
@@ -176,8 +59,18 @@ function ProductosRecetasBody() {
   }, []);
 
   useEffect(() => {
-    void fetchRecetas();
-  }, [fetchRecetas]);
+    void fetchData();
+  }, [fetchData]);
+
+  // Auto-abrir drawer cuando llega un ?focus=<id> (deep-link desde Auditoría).
+  useEffect(() => {
+    if (!focusId || recetas.length === 0) return;
+    const match = recetas.find((r) => r.producto_venta_id === focusId);
+    if (match) {
+      setSelected(match);
+      setDrawerOpen(true);
+    }
+  }, [focusId, recetas]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -275,7 +168,7 @@ function ProductosRecetasBody() {
           de venta. El costo del insumo viene del último costo registrado; insumos sin costo
           conocido dejan la receta sin costo total.
         </p>
-        <Button variant="outline" size="sm" onClick={() => void fetchRecetas()}>
+        <Button variant="outline" size="sm" onClick={() => void fetchData()}>
           <RefreshCw className="mr-1 h-3.5 w-3.5" /> Refrescar
         </Button>
       </div>
@@ -309,7 +202,7 @@ function ProductosRecetasBody() {
         onRowClick={openDrawer}
         loading={loading}
         error={error}
-        onRetry={() => void fetchRecetas()}
+        onRetry={() => void fetchData()}
         initialSort={{ key: 'producto_venta_nombre', dir: 'asc' }}
         emptyTitle="No hay recetas configuradas"
         emptyDescription="Cuando un producto vendible tenga insumos en erp.producto_receta, aparecerá aquí."
@@ -380,7 +273,7 @@ function InsumosSection({ receta }: { receta: Receta }) {
               <tr key={i.insumo_id} className="border-t border-[var(--border)]">
                 <td className="px-3 py-2">
                   <div className="flex flex-col">
-                    <span>{i.insumo_nombre}</span>
+                    <span className={i.insumo_orfano ? 'text-red-600' : ''}>{i.insumo_nombre}</span>
                     {i.insumo_unidad && i.insumo_unidad !== i.unidad ? (
                       <span className="text-muted-foreground text-xs">
                         unidad base: {i.insumo_unidad}
