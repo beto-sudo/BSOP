@@ -227,3 +227,21 @@ sync` agregado en `lib/permissions.test.ts` con
   `BSOP/CLAUDE.md` sección "Reglas DB" listando los 4 lugares a
   tocar (NAV_ITEMS, ROUTE_TO_MODULE, EXPECTED_DB_MODULE_SLUGS,
   migración SQL) + plantilla de la migración. PR #284 mergeado.
+- **2026-04-29 — Hot-fix post-cierre (PR #326).** Regresión
+  detectada por Beto en `/settings/acceso`: "Crear rol" y toggle de
+  permisos fallaban con `An error occurred in the Server Components
+render`. Causa: el Sprint 1 (PR #282) había agregado
+  `export const MODULO_SECCIONES = [...] as const` a
+  `app/settings/acceso/actions.ts`, que es un archivo `'use server'`.
+  Next.js 16 solo permite exports de funciones async en archivos
+  `'use server'` — cualquier otro export hace fallar **todas** las
+  Server Actions del archivo al primer invoke con
+  `Error: A "use server" file can only export async functions`.
+  Confirmado en runtime logs de prod (deployment
+  `dpl_E8pVPCHTAuiLPJX7AGQrLqYmMMEP`, 20+ POSTs 500 desde 19:49 CST).
+  Fix: el const solo se usaba para derivar el type vía
+  `(typeof MODULO_SECCIONES)[number]`; reemplazado por type union
+  literal directo + comentario explicando la regla. Lección para
+  futuras sesiones: **nunca poner `export const`/`export class` en
+  archivos con `'use server'` — solo `export async function` y
+  `export type`** (los types se borran en compile, son safe).
