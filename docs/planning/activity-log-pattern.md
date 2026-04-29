@@ -3,10 +3,10 @@
 **Slug:** `activity-log-pattern`
 **Empresas:** todas
 **Schemas afectados:** n/a (UI; consume backends existentes)
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-04-27
-**Última actualización:** 2026-04-29
+**Última actualización:** 2026-04-30 (cierre)
 
 ## Problema
 
@@ -64,11 +64,11 @@ tenga que construirse desde cero.
 
 ## Sprints / hitos
 
-| #   | Sprint                                             | Estado    | PR  |
-| --- | -------------------------------------------------- | --------- | --- |
-| 1   | Contrato `ActivityEvent` + tones + ADR-023         | done      | TBD |
-| 2   | Componente `<ActivityLog>` + golden tasks          | postponed | —   |
-| 3   | Adopters: cortes, terrenos DILESA o levantamientos | postponed | —   |
+| #   | Sprint                                                             | Estado  | PR   |
+| --- | ------------------------------------------------------------------ | ------- | ---- |
+| 1   | Contrato `ActivityEvent` + tones + ADR-023                         | done    | #313 |
+| 2   | Componente `<ActivityLog>` + golden tasks `<UpdatesList>` + cierre | done    | TBD  |
+| 3   | Adopters opt-in (cortes detail timeline, terrenos DILESA, etc.)    | pending | —    |
 
 ## Decisiones registradas
 
@@ -83,6 +83,39 @@ Codificado en [ADR-023](../adr/023_activity_log_pattern.md). Las 5 reglas:
 - **AL5** — Componente Sprint 2 debe soportar `<DetailPage>` y `<DetailDrawer>` como section.
 
 ## Bitácora
+
+### 2026-04-30 — Sprint 2 mergeado (cierre)
+
+Componente `<ActivityLog>` extraído consumiendo `ActivityEvent[]` (AL1):
+
+- `components/activity-log/activity-log.tsx` — section component con
+  loading/empty states, variants `default`/`compact` (drawer-friendly),
+  tones override merged sobre `DEFAULT_ACTIVITY_TONES`, `formatChange`
+  callback para resolver labels custom de los `field` de `changes`.
+- A11y: `<time dateTime>` con title hover, `aria-label="Actividad"` en la
+  lista, `aria-hidden` en iconos decorativos, `<ul>/<li>` semánticos.
+- Renderea cada evento con: badge tone + actor name + relative timestamp
+  - summary/detail + changes inline (`field: before → after`).
+
+Golden migration: `<UpdatesList>` (tasks) reescrito como wrapper thin
+sobre `<ActivityLog>` (~70 líneas → ~25 líneas):
+
+- Adapter `taskUpdatesToEvents` exportado para uso en tests/otros callers.
+- `TASK_UPDATE_TONES` derivado de `UPDATE_TIPO_CONFIG` (badge-system tones).
+- `formatChange` callback traduce valores raw de `cambio_estado`
+  (e.g. `pendiente` → `Pendiente`) usando `ESTADO_CONFIG`.
+- API exterior preservada (`updates`/`loading`/`variant` props).
+
+**Outcome final**:
+
+- ADR-023 con 5 reglas (AL1-AL5).
+- Contrato `ActivityEvent` + `DEFAULT_ACTIVITY_TONES`.
+- Componente `<ActivityLog>` agnóstico al backend.
+- 1 caller migrado (tasks `<UpdatesList>` reusa internamente).
+
+Sprint 3 (cortes detail timeline, terrenos DILESA, levantamientos) queda
+como adopción opt-in cuando esos módulos quieran timeline visible —
+escribir el adapter `xToEvents` por dominio y montar `<ActivityLog>`.
 
 ### 2026-04-29 — Sprint 1 mergeado
 
