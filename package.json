@@ -19,6 +19,7 @@
     "test:e2e:anon": "playwright test --project=anon",
     "test:e2e:auth": "playwright test --project=auth",
     "test:report": "playwright show-report",
+    "audit:a11y": "playwright test tests/e2e/a11y",
     "audit:ui": "npx tsx scripts/audit-ui.ts",
     "audit:ui:json": "npx tsx scripts/audit-ui.ts --json",
     "db:types": "supabase gen types typescript --project-id ybklderteyhuugzfmxbi --schema public --schema core --schema erp --schema rdb --schema health --schema playtomic --schema dilesa --schema maquinaria > types/supabase.ts",
@@ -67,6 +68,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.2",
     "@eslint/eslintrc": "^3.3.5",
     "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "latest",
