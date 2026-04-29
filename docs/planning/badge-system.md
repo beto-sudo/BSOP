@@ -3,7 +3,7 @@
 **Slug:** `badge-system`
 **Empresas:** todas
 **Schemas afectados:** n/a (UI)
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-04-27
 **Última actualización:** 2026-04-29
@@ -63,8 +63,8 @@ pending | active`. Cada uno con color de fondo, texto y borde
       `PRIORIDAD_CONFIG`, `UPDATE_TIPO_CONFIG` con `tone` agregado.
       `EstadoBadge` y `PrioridadBadge` migrados a `<Badge tone>`.
 - [x] ADR-017 con 6 reglas (B1-B6).
-- [ ] Migración del resto de callsites — Sprints 2+ (≈11 archivos).
-- [ ] Eliminar `cls` de los configs cuando todos los callsites migren.
+- [x] Migración del resto de callsites (Sprint 2 — 11 archivos, 17 callsites).
+- [x] Eliminar `cls` de TODOS los configs (Sprint 3) — `lib/status-tokens.ts` y `components/tasks/tasks-shared.tsx` solo `{label, tone}`.
 
 ## Decisiones tomadas al cerrar alcance
 
@@ -99,11 +99,11 @@ pending | active`. Cada uno con color de fondo, texto y borde
 
 ## Sprints / hitos
 
-| #   | Sprint                                     | Estado  | PR  |
-| --- | ------------------------------------------ | ------- | --- |
-| 1   | Foundation + ADR-017 + golden tasks        | done    | TBD |
-| 2   | Migrar callsites de `cls` a `<Badge tone>` | pending | —   |
-| 3   | Eliminar `cls` de configs + cierre         | pending | —   |
+| #   | Sprint                                     | Estado | PR   |
+| --- | ------------------------------------------ | ------ | ---- |
+| 1   | Foundation + ADR-017 + golden tasks        | done   | #305 |
+| 2   | Migrar callsites de `cls` a `<Badge tone>` | done   | TBD  |
+| 3   | Eliminar `cls` de configs + cierre         | done   | TBD  |
 
 ## Decisiones registradas
 
@@ -131,4 +131,32 @@ Foundation:
 
 Sprint 2 migrará los ≈11 callsites que aún rendean `<span className={cfg.cls}>`. Sprint 3 elimina `cls` cuando todos migren.
 
-PR: pendiente.
+PR: #305.
+
+### 2026-04-29 — Sprint 2 + 3 mergeados (cierre de iniciativa)
+
+Sprint 2 (migración de callsites — 11 archivos, 17 callsites):
+
+- `app/dilesa/prototipos/page.tsx` — `EtapaBadge`.
+- `app/dilesa/prototipos/[id]/page.tsx` — `EtapaBadgeLarge`.
+- `app/dilesa/proyectos/page.tsx` — `FaseBadge`.
+- `app/dilesa/proyectos/[id]/page.tsx` — `FaseBadgeLarge`.
+- `app/dilesa/terrenos/page.tsx` — `EtapaBadge`.
+- `app/dilesa/terrenos/[id]/page.tsx` — `EtapaBadgeLarge`.
+- `app/dilesa/anteproyectos/page.tsx` — `EstadoBadge`.
+- `app/dilesa/anteproyectos/[id]/page.tsx` — `EstadoBadgeLarge`.
+- `app/inicio/juntas/page.tsx` — `EstadoBadge`.
+- `app/inicio/juntas/[id]/page.tsx` — 3 callsites (estado de tarea en updates timeline + chip de tipo de update + estado en `renderTask`). Eliminados `ESTADO_JUNTA` + `ESTADO_TASK` + `tipoCfg` locales (ahora usa `JUNTA_ESTADO_CONFIG`/`ESTADO_CONFIG`/`UPDATE_TIPO_CONFIG` canónicos via import alias).
+- `components/juntas/junta-detail-module.tsx` — mismos 3 callsites + mismas eliminaciones de configs locales (espejo del page de inicio).
+- `components/juntas/admin-juntas-list-module.tsx` — `EstadoBadge`.
+- `components/tasks/tasks-updates.tsx` — chip de tipo de update en `UpdatesList`.
+- `components/tasks/tasks-shared.tsx` — `PrioridadTextBadge` migrado a `<Badge tone>` envolviendo el dot custom (caso especial preserved).
+
+Sprint 3 (cleanup configs):
+
+- `lib/status-tokens.ts` — `cls: string` eliminado de los 6 configs (`JUNTA_ESTADO_CONFIG`, `PRIORIDAD_CONFIG`, `ANTEPROYECTO_ESTADO_CONFIG`, `TERRENO_ETAPA_CONFIG`, `PROTOTIPO_ETAPA_CONFIG`, `PROYECTO_FASE_CONFIG`). Solo queda `{label, tone}` (+ `dot` en `PRIORIDAD_CONFIG` para `PrioridadDot` text-only).
+- `components/tasks/tasks-shared.tsx` — `cls` eliminado de `ESTADO_CONFIG`, `PRIORIDAD_CONFIG`, `UPDATE_TIPO_CONFIG`.
+
+Beneficio colateral: 3 configs duplicados (`ESTADO_JUNTA`/`ESTADO_TASK`/`tipoCfg` locales en juntas detail) consolidados a los canónicos. Cero callsites refieren `cfg.cls` o `\.cls` post-migración. CI local verde (typecheck + format:check + lint 0 errors + 364 tests pass).
+
+PR: TBD.

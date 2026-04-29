@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { Plus, Search, RefreshCw, AlertTriangle } from 'lucide-react';
@@ -143,20 +144,8 @@ const ESTADO_KEYS = Object.keys(ANTEPROYECTO_ESTADO_CONFIG) as AnteproyectoEstad
 function EstadoBadge({ estado }: { estado: string | null }) {
   if (!estado) return <span className="text-[var(--text)]/35">—</span>;
   const cfg = ANTEPROYECTO_ESTADO_CONFIG[estado as AnteproyectoEstado];
-  if (!cfg) {
-    return (
-      <span className="inline-flex items-center rounded-lg border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text)]/55">
-        {estado}
-      </span>
-    );
-  }
-  return (
-    <span
-      className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}
-    >
-      {cfg.label}
-    </span>
-  );
+  if (!cfg) return <Badge tone="neutral">{estado}</Badge>;
+  return <Badge tone={cfg.tone}>{cfg.label}</Badge>;
 }
 
 function PrioridadDot({ prioridad }: { prioridad: string | null }) {

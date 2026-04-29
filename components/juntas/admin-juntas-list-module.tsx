@@ -42,6 +42,7 @@ import { FilterCombobox, type FilterComboboxOption } from '@/components/ui/filte
 import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { FieldLabel } from '@/components/ui/field-label';
 import { Plus, Search, RefreshCw, Loader2, CalendarDays, Play } from 'lucide-react';
 import { JUNTA_ESTADO_CONFIG as ESTADO_CONFIG, type JuntaEstado } from '@/lib/status-tokens';
@@ -104,13 +105,7 @@ function formatDateTime(dt: string) {
 
 function EstadoBadge({ estado }: { estado: Junta['estado'] }) {
   const cfg = ESTADO_CONFIG[estado];
-  return (
-    <span
-      className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}
-    >
-      {cfg.label}
-    </span>
-  );
+  return <Badge tone={cfg.tone}>{cfg.label}</Badge>;
 }
 
 function nowDatetimeLocal() {

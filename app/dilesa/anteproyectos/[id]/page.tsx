@@ -30,6 +30,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import {
@@ -392,20 +393,8 @@ function Field({
 function EstadoBadgeLarge({ estado }: { estado: string | null }) {
   if (!estado) return null;
   const cfg = ANTEPROYECTO_ESTADO_CONFIG[estado as AnteproyectoEstado];
-  if (!cfg) {
-    return (
-      <span className="inline-flex items-center rounded-lg border border-[var(--border)] px-3 py-1 text-xs text-[var(--text)]/65">
-        {estado}
-      </span>
-    );
-  }
-  return (
-    <span
-      className={`inline-flex items-center rounded-lg border px-3 py-1 text-xs font-medium ${cfg.cls}`}
-    >
-      {cfg.label}
-    </span>
-  );
+  if (!cfg) return <Badge tone="neutral">{estado}</Badge>;
+  return <Badge tone={cfg.tone}>{cfg.label}</Badge>;
 }
 
 export default function AnteproyectoDetailPage() {
