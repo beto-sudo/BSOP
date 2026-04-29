@@ -19,17 +19,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { DataTable, type Column } from '@/components/module-page';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
+import { useTriggerPrint } from '@/components/print';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Combobox } from '@/components/ui/combobox';
@@ -342,6 +336,7 @@ function OrdenDetail({
   const [overrideState, setOverrideState] = useState<{ itemId: string; value: string } | null>(
     null
   );
+  const triggerPrint = useTriggerPrint();
 
   useEffect(() => {
     setSelectedProveedorId(orden?.proveedor_id ?? '');
@@ -376,8 +371,28 @@ function OrdenDetail({
   const canPrint = Boolean(orden?.proveedor_id);
 
   return (
-    <Sheet open={open} onOpenChange={(value) => !value && onClose()}>
-      <SheetContent className="flex min-h-0 flex-col overflow-hidden p-6 print:p-0 sm:max-w-[700px]">
+    <DetailDrawer
+      open={open}
+      onOpenChange={(value) => !value && onClose()}
+      size="md"
+      className="sm:max-w-[700px]"
+      title={orden?.folio ?? 'Orden de compra'}
+      description={`${proveedorObj?.nombre ?? 'Sin proveedor'} · ${formatDate(orden?.fecha_emision)}${reqFolio ? ` · Req: ${reqFolio}` : ''}`}
+      actions={
+        <>
+          {!canPrint && (
+            <span className="flex items-center gap-1 text-xs text-amber-600">
+              <AlertTriangle className="h-3 w-3" />
+              Asigna proveedor primero
+            </span>
+          )}
+          <Button variant="outline" size="sm" onClick={triggerPrint} disabled={!canPrint}>
+            Imprimir OC
+          </Button>
+        </>
+      }
+    >
+      <DetailDrawerContent>
         {/* ═══ PRINT: Header block ═══ */}
         <div className="hidden print:block">
           <img
@@ -412,339 +427,315 @@ function OrdenDetail({
           <hr className="mb-4 border-black" />
         </div>
 
-        {/* ═══ SCREEN: Header ═══ */}
-        <SheetHeader className="print:hidden">
-          <SheetTitle>{orden?.folio ?? 'Orden de compra'}</SheetTitle>
-          <SheetDescription>
-            {proveedorObj?.nombre ?? 'Sin proveedor'} · {formatDate(orden?.fecha_emision)}
-            {reqFolio && ` · Req: ${reqFolio}`}
-          </SheetDescription>
-          <div className="absolute right-12 top-4 hidden items-center gap-2 sm:flex print:hidden">
-            {!canPrint && (
-              <span className="flex items-center gap-1 text-xs text-amber-600">
-                <AlertTriangle className="h-3 w-3" />
-                Asigna proveedor primero
-              </span>
-            )}
-            <Button variant="outline" size="sm" onClick={() => window.print()} disabled={!canPrint}>
-              Imprimir OC
-            </Button>
-          </div>
-        </SheetHeader>
-
-        <ScrollArea className="flex-1 min-h-0 pr-1 print:h-auto print:overflow-visible">
-          <div className="space-y-6 pb-6 pt-6 print:space-y-4 print:pt-0">
-            {/* ── Screen: Status + meta ── */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between print:hidden">
-              <div className="space-y-1 text-sm">
-                {reqFolio && (
-                  <div>
-                    <span className="text-muted-foreground">Requisición: </span>
-                    <span className="font-mono font-medium">{reqFolio}</span>
-                  </div>
-                )}
+        <div className="space-y-6 print:space-y-4">
+          {/* ── Screen: Status + meta ── */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between print:hidden">
+            <div className="space-y-1 text-sm">
+              {reqFolio && (
                 <div>
-                  <span className="text-muted-foreground">Fecha emisión: </span>
-                  <span className="font-medium">{formatDate(orden?.fecha_emision)}</span>
+                  <span className="text-muted-foreground">Requisición: </span>
+                  <span className="font-mono font-medium">{reqFolio}</span>
                 </div>
+              )}
+              <div>
+                <span className="text-muted-foreground">Fecha emisión: </span>
+                <span className="font-medium">{formatDate(orden?.fecha_emision)}</span>
               </div>
-              <div className="flex items-center gap-3">
-                <Badge
-                  variant={getBadgeVariant(orden?.estatus ?? null, orden?.proveedor_id ?? null)}
-                >
-                  {getEstatusLabel(orden?.estatus ?? null, orden?.proveedor_id ?? null)}
-                </Badge>
-                <div className="text-right text-sm">
-                  <div className="text-muted-foreground">
-                    Total:{' '}
-                    <span className="font-medium text-foreground">
-                      {(() => {
-                        const t = orden?.total_real ?? orden?.total_estimado;
-                        return t != null && t > 0 ? formatCurrency(t) : '—';
-                      })()}
-                    </span>
-                  </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Badge variant={getBadgeVariant(orden?.estatus ?? null, orden?.proveedor_id ?? null)}>
+                {getEstatusLabel(orden?.estatus ?? null, orden?.proveedor_id ?? null)}
+              </Badge>
+              <div className="text-right text-sm">
+                <div className="text-muted-foreground">
+                  Total:{' '}
+                  <span className="font-medium text-foreground">
+                    {(() => {
+                      const t = orden?.total_real ?? orden?.total_estimado;
+                      return t != null && t > 0 ? formatCurrency(t) : '—';
+                    })()}
+                  </span>
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* ── Provider assignment (editable only) ── */}
-            {editable && (
-              <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/40 p-4 print:hidden">
-                <div className="flex items-center gap-2 text-sm font-semibold">
-                  <Truck className="h-4 w-4 text-amber-600" />
-                  Asignación de proveedor
-                </div>
-                <div className="flex gap-2">
-                  <Combobox
-                    value={selectedProveedorId}
-                    onChange={setSelectedProveedorId}
-                    options={proveedores.map((p) => ({ value: p.id, label: p.nombre }))}
-                    placeholder="Seleccionar proveedor…"
-                    allowClear
-                    className="flex-1"
-                  />
-                  <Button
-                    size="sm"
-                    disabled={!selectedProveedorId || selectedProveedorId === orden?.proveedor_id}
-                    onClick={() => void onAsignarProveedor(selectedProveedorId)}
-                  >
-                    Asignar
-                  </Button>
-                </div>
-                {!orden?.proveedor_id && (
-                  <p className="text-xs text-amber-700">
-                    Asigna un proveedor para poder imprimir o marcar esta OC como enviada.
-                  </p>
-                )}
+          {/* ── Provider assignment (editable only) ── */}
+          {editable && (
+            <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/40 p-4 print:hidden">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Truck className="h-4 w-4 text-amber-600" />
+                Asignación de proveedor
               </div>
-            )}
+              <div className="flex gap-2">
+                <Combobox
+                  value={selectedProveedorId}
+                  onChange={setSelectedProveedorId}
+                  options={proveedores.map((p) => ({ value: p.id, label: p.nombre }))}
+                  placeholder="Seleccionar proveedor…"
+                  allowClear
+                  className="flex-1"
+                />
+                <Button
+                  size="sm"
+                  disabled={!selectedProveedorId || selectedProveedorId === orden?.proveedor_id}
+                  onClick={() => void onAsignarProveedor(selectedProveedorId)}
+                >
+                  Asignar
+                </Button>
+              </div>
+              {!orden?.proveedor_id && (
+                <p className="text-xs text-amber-700">
+                  Asigna un proveedor para poder imprimir o marcar esta OC como enviada.
+                </p>
+              )}
+            </div>
+          )}
 
-            {terminal && (
-              <div className="flex items-start gap-2 rounded-xl border bg-muted/30 p-4 text-sm print:hidden">
-                <Lock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                <div>
-                  <div className="font-medium">
-                    OC {orden?.estatus === 'cancelada' ? 'cancelada' : 'cerrada'}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    No se pueden registrar más recepciones ni cancelaciones. Total a pagar:{' '}
-                    <span className="font-medium text-foreground">
-                      {formatCurrency(orden?.total_a_pagar ?? 0)}
-                    </span>
-                  </div>
+          {terminal && (
+            <div className="flex items-start gap-2 rounded-xl border bg-muted/30 p-4 text-sm print:hidden">
+              <Lock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <div>
+                <div className="font-medium">
+                  OC {orden?.estatus === 'cancelada' ? 'cancelada' : 'cerrada'}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  No se pueden registrar más recepciones ni cancelaciones. Total a pagar:{' '}
+                  <span className="font-medium text-foreground">
+                    {formatCurrency(orden?.total_a_pagar ?? 0)}
+                  </span>
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            <Separator className="print:hidden" />
+          <Separator className="print:hidden" />
 
-            {/* ═══ Items (both screen and print) ═══ */}
-            <div className="space-y-3">
-              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground print:hidden">
-                Partidas
+          {/* ═══ Items (both screen and print) ═══ */}
+          <div className="space-y-3">
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground print:hidden">
+              Partidas
+            </div>
+
+            {loadingItems ? (
+              <div className="space-y-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
               </div>
-
-              {loadingItems ? (
-                <div className="space-y-3">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <Skeleton key={i} className="h-12 w-full" />
-                  ))}
-                </div>
-              ) : items.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Sin artículos registrados.</p>
-              ) : (
-                <div className="overflow-hidden rounded-xl border print:rounded-none print:border-black">
-                  <Table className="print:text-xs">
-                    <TableHeader>
-                      <TableRow className="print:bg-gray-100">
-                        <TableHead className="print:font-bold print:text-black">Artículo</TableHead>
+            ) : items.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Sin artículos registrados.</p>
+            ) : (
+              <div className="overflow-hidden rounded-xl border print:rounded-none print:border-black">
+                <Table className="print:text-xs">
+                  <TableHeader>
+                    <TableRow className="print:bg-gray-100">
+                      <TableHead className="print:font-bold print:text-black">Artículo</TableHead>
+                      <TableHead className="text-right print:font-bold print:text-black">
+                        Pedida
+                      </TableHead>
+                      {editable ? (
                         <TableHead className="text-right print:font-bold print:text-black">
-                          Pedida
+                          P. Unitario
                         </TableHead>
-                        {editable ? (
+                      ) : (
+                        <>
+                          <TableHead className="text-right print:font-bold print:text-black">
+                            Recibida
+                          </TableHead>
+                          <TableHead className="text-right print:font-bold print:text-black print:hidden">
+                            Pendiente
+                          </TableHead>
                           <TableHead className="text-right print:font-bold print:text-black">
                             P. Unitario
                           </TableHead>
-                        ) : (
-                          <>
-                            <TableHead className="text-right print:font-bold print:text-black">
-                              Recibida
-                            </TableHead>
-                            <TableHead className="text-right print:font-bold print:text-black print:hidden">
-                              Pendiente
-                            </TableHead>
-                            <TableHead className="text-right print:font-bold print:text-black">
-                              P. Unitario
-                            </TableHead>
-                          </>
-                        )}
-                        <TableHead className="text-right print:font-bold print:text-black">
-                          Subtotal
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {items.map((item) => {
-                        const max = item.cantidad ?? 0;
-                        const cancelada = item.cantidad_cancelada ?? 0;
-                        const recibidaStored = item.cantidad_recibida ?? 0;
-                        const recValue = editedReceipts[item.id] ?? String(recibidaStored);
-                        const recibidaNum = Number(recValue) || 0;
-                        const pendiente = Math.max(max - recibidaNum - cancelada, 0);
-                        const priceValue =
-                          editedPrices[item.id] ?? String(item.precio_unitario ?? '');
-                        const priceNum = parseFloat(priceValue) || 0;
-                        const displaySubtotal = editable ? max * priceNum : (item.subtotal ?? 0);
-                        const recvMax = max - cancelada;
-                        return (
-                          <TableRow key={item.id} className="print:border-b-gray-300">
-                            <TableCell className="print:py-1">
-                              <div className="font-medium print:text-black">
-                                {item.descripcion ?? 'Sin descripción'}
+                        </>
+                      )}
+                      <TableHead className="text-right print:font-bold print:text-black">
+                        Subtotal
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.map((item) => {
+                      const max = item.cantidad ?? 0;
+                      const cancelada = item.cantidad_cancelada ?? 0;
+                      const recibidaStored = item.cantidad_recibida ?? 0;
+                      const recValue = editedReceipts[item.id] ?? String(recibidaStored);
+                      const recibidaNum = Number(recValue) || 0;
+                      const pendiente = Math.max(max - recibidaNum - cancelada, 0);
+                      const priceValue =
+                        editedPrices[item.id] ?? String(item.precio_unitario ?? '');
+                      const priceNum = parseFloat(priceValue) || 0;
+                      const displaySubtotal = editable ? max * priceNum : (item.subtotal ?? 0);
+                      const recvMax = max - cancelada;
+                      return (
+                        <TableRow key={item.id} className="print:border-b-gray-300">
+                          <TableCell className="print:py-1">
+                            <div className="font-medium print:text-black">
+                              {item.descripcion ?? 'Sin descripción'}
+                            </div>
+                            {cancelada > 0 && (
+                              <div className="mt-0.5 text-xs text-destructive print:hidden">
+                                {cancelada} cancelada
+                                {item.motivo_cancelacion ? ` · ${item.motivo_cancelacion}` : ''}
                               </div>
-                              {cancelada > 0 && (
-                                <div className="mt-0.5 text-xs text-destructive print:hidden">
-                                  {cancelada} cancelada
-                                  {item.motivo_cancelacion ? ` · ${item.motivo_cancelacion}` : ''}
-                                </div>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right tabular-nums print:py-1 print:text-black">
-                              {max}
-                            </TableCell>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums print:py-1 print:text-black">
+                            {max}
+                          </TableCell>
 
-                            {editable ? (
+                          {editable ? (
+                            <TableCell className="text-right print:py-1">
+                              <div className="flex justify-end print:hidden">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={priceValue}
+                                  onChange={(e) => onPriceChange(item.id, e.target.value)}
+                                  className="w-28 text-right tabular-nums"
+                                  placeholder="0.00"
+                                />
+                              </div>
+                              <span className="hidden print:inline print:text-black">
+                                {priceNum > 0 ? formatCurrency(priceNum) : '—'}
+                              </span>
+                            </TableCell>
+                          ) : (
+                            <>
                               <TableCell className="text-right print:py-1">
-                                <div className="flex justify-end print:hidden">
+                                <div className="flex items-center justify-end gap-1 print:hidden">
                                   <Input
                                     type="number"
                                     min="0"
-                                    step="0.01"
-                                    value={priceValue}
-                                    onChange={(e) => onPriceChange(item.id, e.target.value)}
-                                    className="w-28 text-right tabular-nums"
-                                    placeholder="0.00"
+                                    max={String(recvMax)}
+                                    step="1"
+                                    value={recValue}
+                                    disabled={terminal}
+                                    onChange={(e) =>
+                                      onReceiveChange(item.id, e.target.value, recvMax)
+                                    }
+                                    className="w-20 text-right tabular-nums"
                                   />
+                                  {!terminal && pendiente > 0 && (
+                                    <Button
+                                      type="button"
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                      onClick={() =>
+                                        setCancelLineState({ itemId: item.id, motivo: '' })
+                                      }
+                                      aria-label="Cancelar pendiente de esta línea"
+                                      title="Cancelar pendiente"
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
                                 </div>
                                 <span className="hidden print:inline print:text-black">
-                                  {priceNum > 0 ? formatCurrency(priceNum) : '—'}
+                                  {recValue}
                                 </span>
                               </TableCell>
-                            ) : (
-                              <>
-                                <TableCell className="text-right print:py-1">
-                                  <div className="flex items-center justify-end gap-1 print:hidden">
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      max={String(recvMax)}
-                                      step="1"
-                                      value={recValue}
-                                      disabled={terminal}
-                                      onChange={(e) =>
-                                        onReceiveChange(item.id, e.target.value, recvMax)
-                                      }
-                                      className="w-20 text-right tabular-nums"
-                                    />
-                                    {!terminal && pendiente > 0 && (
-                                      <Button
-                                        type="button"
-                                        size="icon"
-                                        variant="ghost"
-                                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                                        onClick={() =>
-                                          setCancelLineState({ itemId: item.id, motivo: '' })
-                                        }
-                                        aria-label="Cancelar pendiente de esta línea"
-                                        title="Cancelar pendiente"
-                                      >
-                                        <X className="h-3.5 w-3.5" />
-                                      </Button>
-                                    )}
-                                  </div>
-                                  <span className="hidden print:inline print:text-black">
-                                    {recValue}
+                              <TableCell className="text-right tabular-nums print:py-1 print:hidden">
+                                {pendiente > 0 ? (
+                                  <span className="text-amber-600">{pendiente}</span>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground/50">—</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums text-muted-foreground print:py-1 print:text-black">
+                                <div className="flex items-center justify-end gap-1">
+                                  <span
+                                    className={
+                                      item.precio_real != null &&
+                                      item.precio_real !== item.precio_unitario
+                                        ? 'font-medium text-foreground'
+                                        : ''
+                                    }
+                                    title={
+                                      item.precio_real != null &&
+                                      item.precio_real !== item.precio_unitario
+                                        ? `Override del precio original ${formatCurrency(item.precio_unitario)}`
+                                        : undefined
+                                    }
+                                  >
+                                    {formatCurrency(item.precio_real ?? item.precio_unitario)}
                                   </span>
-                                </TableCell>
-                                <TableCell className="text-right tabular-nums print:py-1 print:hidden">
-                                  {pendiente > 0 ? (
-                                    <span className="text-amber-600">{pendiente}</span>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground/50">—</span>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-right tabular-nums text-muted-foreground print:py-1 print:text-black">
-                                  <div className="flex items-center justify-end gap-1">
-                                    <span
-                                      className={
-                                        item.precio_real != null &&
-                                        item.precio_real !== item.precio_unitario
-                                          ? 'font-medium text-foreground'
-                                          : ''
+                                  {isAdmin && !terminal && (
+                                    <Button
+                                      type="button"
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-6 w-6 text-muted-foreground hover:text-foreground print:hidden"
+                                      onClick={() =>
+                                        setOverrideState({
+                                          itemId: item.id,
+                                          value: String(
+                                            item.precio_real ?? item.precio_unitario ?? ''
+                                          ),
+                                        })
                                       }
-                                      title={
-                                        item.precio_real != null &&
-                                        item.precio_real !== item.precio_unitario
-                                          ? `Override del precio original ${formatCurrency(item.precio_unitario)}`
-                                          : undefined
-                                      }
+                                      aria-label="Modificar precio (admin)"
+                                      title="Modificar precio (admin)"
                                     >
-                                      {formatCurrency(item.precio_real ?? item.precio_unitario)}
-                                    </span>
-                                    {isAdmin && !terminal && (
-                                      <Button
-                                        type="button"
-                                        size="icon"
-                                        variant="ghost"
-                                        className="h-6 w-6 text-muted-foreground hover:text-foreground print:hidden"
-                                        onClick={() =>
-                                          setOverrideState({
-                                            itemId: item.id,
-                                            value: String(
-                                              item.precio_real ?? item.precio_unitario ?? ''
-                                            ),
-                                          })
-                                        }
-                                        aria-label="Modificar precio (admin)"
-                                        title="Modificar precio (admin)"
-                                      >
-                                        <Pencil className="h-3 w-3" />
-                                      </Button>
-                                    )}
-                                  </div>
-                                </TableCell>
-                              </>
-                            )}
+                                      <Pencil className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </>
+                          )}
 
-                            <TableCell className="text-right tabular-nums font-medium print:py-1 print:text-black">
-                              {displaySubtotal > 0 ? formatCurrency(displaySubtotal) : '—'}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
+                          <TableCell className="text-right tabular-nums font-medium print:py-1 print:text-black">
+                            {displaySubtotal > 0 ? formatCurrency(displaySubtotal) : '—'}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
 
-              {/* Print: total row */}
-              {items.length > 0 && (
-                <div className="hidden justify-end pt-1 print:flex">
-                  <div className="text-sm">
-                    <span className="font-bold">Total estimado: </span>
-                    <span className="tabular-nums">
-                      {formatCurrency(printTotal > 0 ? printTotal : (orden?.total_estimado ?? 0))}
-                    </span>
-                  </div>
+            {/* Print: total row */}
+            {items.length > 0 && (
+              <div className="hidden justify-end pt-1 print:flex">
+                <div className="text-sm">
+                  <span className="font-bold">Total estimado: </span>
+                  <span className="tabular-nums">
+                    {formatCurrency(printTotal > 0 ? printTotal : (orden?.total_estimado ?? 0))}
+                  </span>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+          </div>
 
-            {/* ═══ PRINT: Control / Authorization block ═══ */}
-            <div className="hidden print:block">
-              {orden?.notas && (
-                <div className="mb-6 text-sm">
-                  <div className="mb-1 font-bold">Notas:</div>
-                  <div>{orden.notas}</div>
-                </div>
-              )}
-              <div className="mt-12 grid grid-cols-3 gap-8 text-center text-xs">
-                <div>
-                  <div className="w-full border-t border-black pt-2 font-medium">Elaboró</div>
-                </div>
-                <div>
-                  <div className="w-full border-t border-black pt-2 font-medium">Autorizó</div>
-                </div>
-                <div>
-                  <div className="w-full border-t border-black pt-2 font-medium">
-                    Proveedor / Recibido por
-                  </div>
+          {/* ═══ PRINT: Control / Authorization block ═══ */}
+          <div className="hidden print:block">
+            {orden?.notas && (
+              <div className="mb-6 text-sm">
+                <div className="mb-1 font-bold">Notas:</div>
+                <div>{orden.notas}</div>
+              </div>
+            )}
+            <div className="mt-12 grid grid-cols-3 gap-8 text-center text-xs">
+              <div>
+                <div className="w-full border-t border-black pt-2 font-medium">Elaboró</div>
+              </div>
+              <div>
+                <div className="w-full border-t border-black pt-2 font-medium">Autorizó</div>
+              </div>
+              <div>
+                <div className="w-full border-t border-black pt-2 font-medium">
+                  Proveedor / Recibido por
                 </div>
               </div>
             </div>
           </div>
-        </ScrollArea>
+        </div>
 
         {/* ── Footer actions (screen only) ── */}
         <div className="space-y-3 border-t pt-4 print:hidden">
@@ -878,8 +869,8 @@ function OrdenDetail({
           confirmLabel="Aplicar override"
           confirmVariant="default"
         />
-      </SheetContent>
-    </Sheet>
+      </DetailDrawerContent>
+    </DetailDrawer>
   );
 }
 
