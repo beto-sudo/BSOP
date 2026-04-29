@@ -10,6 +10,8 @@ import { usePermissions } from '@/components/providers';
 import { canAccessEmpresa, canAccessModulo } from '@/lib/permissions';
 import { useRef, type ReactNode } from 'react';
 
+import { AccessDenied } from '@/components/access-denied';
+
 interface RequireAccessProps {
   children: ReactNode;
   /** Empresa slug to check (e.g. 'rdb', 'dilesa', 'familia') */
@@ -22,19 +24,26 @@ interface RequireAccessProps {
   adminOnly?: boolean;
 }
 
-function AccessDenied() {
-  return (
-    <div className="flex flex-col items-center justify-center py-24 text-center">
-      <div className="text-4xl">🔒</div>
-      <h2 className="mt-4 text-xl font-semibold dark:text-white text-[var(--text)]">
-        Acceso restringido
-      </h2>
-      <p className="mt-2 text-sm dark:text-white/55 text-[var(--text-muted)]">
-        No tienes permisos para acceder a esta sección. Contacta al administrador si necesitas
-        acceso.
-      </p>
-    </div>
-  );
+/**
+ * Builds the `required` context line for the canonical `<AccessDenied>` surface.
+ * Renders nothing when no specific permission was requested (admin-only with no
+ * empresa/modulo).
+ */
+function describeRequired({
+  empresa,
+  modulo,
+  write,
+  adminOnly,
+}: Pick<RequireAccessProps, 'empresa' | 'modulo' | 'write' | 'adminOnly'>): ReactNode {
+  if (adminOnly && !empresa && !modulo) {
+    return <span>admin</span>;
+  }
+  const parts: string[] = [];
+  if (empresa) parts.push(empresa);
+  if (modulo) parts.push(modulo);
+  parts.push(write ? 'escritura' : 'lectura');
+  if (parts.length === 1) return null;
+  return <span>{parts.join(' · ')}</span>;
 }
 
 function AccessLoading() {
@@ -89,20 +98,22 @@ export function RequireAccess({
     return <>{children}</>;
   }
 
+  const required = describeRequired({ empresa, modulo, write, adminOnly });
+
   // Admin-only check
-  if (adminOnly) return <AccessDenied />;
+  if (adminOnly) return <AccessDenied required={required} />;
 
   // Empresa-level check
   if (empresa && !canAccessEmpresa(permissions, empresa)) {
     // If user previously had access, give a grace period (transient auth refresh)
     if (hadAccessRef.current) return <>{children}</>;
-    return <AccessDenied />;
+    return <AccessDenied required={required} />;
   }
 
   // Module-level check
   if (modulo && !canAccessModulo(permissions, modulo, write ? 'write' : 'read')) {
     if (hadAccessRef.current) return <>{children}</>;
-    return <AccessDenied />;
+    return <AccessDenied required={required} />;
   }
 
   hadAccessRef.current = true;
