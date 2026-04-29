@@ -27,6 +27,7 @@ import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigat
 import Link from 'next/link';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   DropdownMenu,
@@ -526,20 +527,8 @@ function Field({
 function FaseBadgeLarge({ fase }: { fase: string | null }) {
   if (!fase) return null;
   const cfg = PROYECTO_FASE_CONFIG[fase as ProyectoFase];
-  if (!cfg) {
-    return (
-      <span className="inline-flex items-center rounded-lg border border-[var(--border)] px-3 py-1 text-xs text-[var(--text)]/65">
-        {fase}
-      </span>
-    );
-  }
-  return (
-    <span
-      className={`inline-flex items-center rounded-lg border px-3 py-1 text-xs font-medium ${cfg.cls}`}
-    >
-      {cfg.label}
-    </span>
-  );
+  if (!cfg) return <Badge tone="neutral">{fase}</Badge>;
+  return <Badge tone={cfg.tone}>{cfg.label}</Badge>;
 }
 
 function PlaceholderPanel({ title, description }: { title: string; description: string }) {

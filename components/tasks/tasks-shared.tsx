@@ -82,32 +82,12 @@ export type TaskFormValues = {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-export const ESTADO_CONFIG: Record<TaskEstado, { label: string; tone: BadgeTone; cls: string }> = {
-  pendiente: {
-    label: 'Pendiente',
-    tone: 'warning',
-    cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
-  },
-  en_progreso: {
-    label: 'En progreso',
-    tone: 'info',
-    cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
-  },
-  bloqueado: {
-    label: 'Bloqueado',
-    tone: 'danger',
-    cls: 'bg-red-500/15 text-red-400 border-red-500/20',
-  },
-  completado: {
-    label: 'Completado',
-    tone: 'success',
-    cls: 'bg-green-500/15 text-green-400 border-green-500/20',
-  },
-  cancelado: {
-    label: 'Cancelado',
-    tone: 'neutral',
-    cls: 'bg-[var(--border)]/60 text-[var(--text-subtle)] border-[var(--border)]',
-  },
+export const ESTADO_CONFIG: Record<TaskEstado, { label: string; tone: BadgeTone }> = {
+  pendiente: { label: 'Pendiente', tone: 'warning' },
+  en_progreso: { label: 'En progreso', tone: 'info' },
+  bloqueado: { label: 'Bloqueado', tone: 'danger' },
+  completado: { label: 'Completado', tone: 'success' },
+  cancelado: { label: 'Cancelado', tone: 'neutral' },
 };
 
 export const ESTADO_ORDER: TaskEstado[] = [
@@ -118,57 +98,21 @@ export const ESTADO_ORDER: TaskEstado[] = [
   'cancelado',
 ];
 
-export const PRIORIDAD_CONFIG: Record<string, { label: string; tone: BadgeTone; cls: string }> = {
-  Urgente: {
-    label: 'Urgente',
-    tone: 'danger',
-    cls: 'bg-red-500/15 text-red-400 border-red-500/20',
-  },
-  Alta: {
-    label: 'Alta',
-    tone: 'warning',
-    cls: 'bg-orange-500/15 text-orange-400 border-orange-500/20',
-  },
-  Media: {
-    label: 'Media',
-    tone: 'warning',
-    cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
-  },
-  Baja: {
-    label: 'Baja',
-    tone: 'success',
-    cls: 'bg-green-500/15 text-green-400 border-green-500/20',
-  },
+export const PRIORIDAD_CONFIG: Record<string, { label: string; tone: BadgeTone }> = {
+  Urgente: { label: 'Urgente', tone: 'danger' },
+  Alta: { label: 'Alta', tone: 'warning' },
+  Media: { label: 'Media', tone: 'warning' },
+  Baja: { label: 'Baja', tone: 'success' },
 };
 
 export const PRIORIDAD_OPTIONS = ['Urgente', 'Alta', 'Media', 'Baja'] as const;
 
-export const UPDATE_TIPO_CONFIG: Record<string, { label: string; tone: BadgeTone; cls: string }> = {
-  avance: {
-    label: 'Avance',
-    tone: 'info',
-    cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
-  },
-  cambio_estado: {
-    label: 'Estado',
-    tone: 'warning',
-    cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
-  },
-  cambio_fecha: {
-    label: 'Fecha',
-    tone: 'accent',
-    cls: 'bg-purple-500/15 text-purple-400 border-purple-500/20',
-  },
-  nota: {
-    label: 'Nota',
-    tone: 'neutral',
-    cls: 'bg-[var(--border)]/60 text-[var(--text)]/60 border-[var(--border)]',
-  },
-  cambio_responsable: {
-    label: 'Responsable',
-    tone: 'success',
-    cls: 'bg-teal-500/15 text-teal-400 border-teal-500/20',
-  },
+export const UPDATE_TIPO_CONFIG: Record<string, { label: string; tone: BadgeTone }> = {
+  avance: { label: 'Avance', tone: 'info' },
+  cambio_estado: { label: 'Estado', tone: 'warning' },
+  cambio_fecha: { label: 'Fecha', tone: 'accent' },
+  nota: { label: 'Nota', tone: 'neutral' },
+  cambio_responsable: { label: 'Responsable', tone: 'success' },
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -211,10 +155,21 @@ export function PrioridadBadge({ prioridad }: { prioridad: string | null }) {
 /**
  * DILESA-style prioridad badge — includes a colored dot and accepts free-form
  * text (case-insensitive matching for "alta"/"urgente"/"media"/"baja").
+ *
+ * Usa `<Badge tone>` para la paleta canónica y agrega un dot custom
+ * via children (caso especial que justifica un wrapper sobre `<Badge>`).
  */
 export function PrioridadTextBadge({ text }: { text: string | null }) {
   if (!text) return <span className="text-[var(--text-subtle)]">—</span>;
   const lower = text.toLowerCase();
+  const tone: BadgeTone =
+    lower === 'alta' || lower === 'urgente'
+      ? 'danger'
+      : lower === 'media'
+        ? 'warning'
+        : lower === 'baja'
+          ? 'success'
+          : 'neutral';
   const dotColor =
     lower === 'alta' || lower === 'urgente'
       ? 'bg-red-500'
@@ -223,21 +178,11 @@ export function PrioridadTextBadge({ text }: { text: string | null }) {
         : lower === 'baja'
           ? 'bg-green-500'
           : 'bg-gray-400';
-  const cls =
-    lower === 'alta' || lower === 'urgente'
-      ? 'bg-red-500/15 text-red-400 border-red-500/20'
-      : lower === 'media'
-        ? 'bg-amber-500/15 text-amber-400 border-amber-500/20'
-        : lower === 'baja'
-          ? 'bg-green-500/15 text-green-400 border-green-500/20'
-          : 'bg-[var(--border)]/40 text-[var(--text)]/60 border-[var(--border)]';
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-0.5 text-xs font-medium ${cls}`}
-    >
+    <Badge tone={tone}>
       <span className={`h-2 w-2 rounded-full ${dotColor}`} />
       {text}
-    </span>
+    </Badge>
   );
 }
 

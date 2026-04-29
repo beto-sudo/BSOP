@@ -12,7 +12,14 @@ import { normalizeHtmlImagesToPaths, rewriteHtmlImagesToSigned } from '@/lib/adj
 import { htmlHasCodaImages, importCodaImagesInHtml } from '@/lib/coda-paste-import';
 import { fetchJuntaUpdates } from '@/lib/juntas/fetch-updates';
 import { TasksCreateForm } from '@/components/tasks/tasks-create-form';
-import { type TaskFormValues } from '@/components/tasks/tasks-shared';
+import {
+  type TaskFormValues,
+  type TaskEstado,
+  ESTADO_CONFIG as ESTADO_TASK,
+  UPDATE_TIPO_CONFIG,
+} from '@/components/tasks/tasks-shared';
+import { JUNTA_ESTADO_CONFIG as ESTADO_JUNTA } from '@/lib/status-tokens';
+import { Badge } from '@/components/ui/badge';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -114,27 +121,6 @@ type TaskUpdate = {
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const ESTADO_JUNTA: Record<Junta['estado'], { label: string; cls: string }> = {
-  programada: { label: 'Programada', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
-  en_curso: { label: 'En curso', cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
-  completada: {
-    label: 'Completada',
-    cls: 'bg-[var(--border)]/60 text-[var(--text)]/50 border-[var(--border)]',
-  },
-  cancelada: { label: 'Cancelada', cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
-};
-
-const ESTADO_TASK: Record<string, { label: string; cls: string }> = {
-  pendiente: { label: 'Pendiente', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
-  en_progreso: { label: 'En progreso', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
-  bloqueado: { label: 'Bloqueado', cls: 'bg-red-500/15 text-red-400 border-red-500/20' },
-  completado: { label: 'Completado', cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
-  cancelado: {
-    label: 'Cancelado',
-    cls: 'bg-[var(--border)]/60 text-[var(--text-subtle)] border-[var(--border)]',
-  },
-};
 
 const PRIORIDAD_OPTIONS = ['Urgente', 'Alta', 'Media', 'Baja'] as const;
 
@@ -1407,36 +1393,14 @@ function JuntaDetailInner() {
                   (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
                 );
               }
-              const tipoCfg: Record<string, { label: string; cls: string }> = {
-                avance: {
-                  label: 'Avance',
-                  cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
-                },
-                cambio_estado: {
-                  label: 'Estado',
-                  cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
-                },
-                cambio_fecha: {
-                  label: 'Fecha',
-                  cls: 'bg-purple-500/15 text-purple-400 border-purple-500/20',
-                },
-                nota: {
-                  label: 'Nota',
-                  cls: 'bg-[var(--border)]/60 text-[var(--text)]/60 border-[var(--border)]',
-                },
-                cambio_responsable: {
-                  label: 'Responsable',
-                  cls: 'bg-teal-500/15 text-teal-400 border-teal-500/20',
-                },
-              };
               return (
                 <div className="divide-y divide-[var(--border)]">
                   {Array.from(grouped.entries()).map(([taskId, updates]) => {
                     const task = updates[0]?.task ?? tasks.find((t) => t.id === taskId);
                     if (!task) return null;
-                    const estadoCfg = ESTADO_TASK[task.estado] ?? {
+                    const estadoCfg = ESTADO_TASK[task.estado as TaskEstado] ?? {
                       label: task.estado,
-                      cls: '',
+                      tone: 'neutral' as const,
                     };
                     const asignado = empleadoMap.get(task.asignado_a ?? '');
                     return (
@@ -1445,11 +1409,7 @@ function JuntaDetailInner() {
                           <span className="text-sm font-medium text-[var(--text)]">
                             {task.titulo}
                           </span>
-                          <span
-                            className={`inline-flex items-center rounded-md border px-1.5 py-px text-[10px] font-medium ${estadoCfg.cls}`}
-                          >
-                            {estadoCfg.label}
-                          </span>
+                          <Badge tone={estadoCfg.tone}>{estadoCfg.label}</Badge>
                           <span className="text-[10px] text-[var(--text)]/45">
                             {asignado?.nombre ?? '—'}
                             {task.fecha_vence && ` · vence ${formatDate(task.fecha_vence)}`}
@@ -1458,16 +1418,15 @@ function JuntaDetailInner() {
                         </div>
                         <ul className="space-y-1 pl-2 border-l-2 border-[var(--border)]">
                           {updates.map((u) => {
-                            const tc = tipoCfg[u.tipo] ?? { label: u.tipo, cls: '' };
+                            const tc = UPDATE_TIPO_CONFIG[u.tipo] ?? {
+                              label: u.tipo,
+                              tone: 'neutral' as const,
+                            };
                             const hasDelta = u.valor_anterior != null && u.valor_nuevo != null;
                             return (
                               <li key={u.id} className="text-xs leading-snug text-[var(--text)]/80">
                                 <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-[var(--text)]/45">
-                                  <span
-                                    className={`inline-flex items-center rounded border px-1.5 py-px font-medium ${tc.cls}`}
-                                  >
-                                    {tc.label}
-                                  </span>
+                                  <Badge tone={tc.tone}>{tc.label}</Badge>
                                   <span className="text-[var(--text)]/65">
                                     {u.usuario?.nombre ?? 'Sistema'}
                                   </span>
@@ -1482,7 +1441,7 @@ function JuntaDetailInner() {
                                 {hasDelta && (
                                   <p className="text-[11px] text-[var(--text)]/50">
                                     {u.tipo === 'cambio_estado'
-                                      ? `${ESTADO_TASK[u.valor_anterior!]?.label ?? u.valor_anterior} → ${ESTADO_TASK[u.valor_nuevo!]?.label ?? u.valor_nuevo}`
+                                      ? `${ESTADO_TASK[u.valor_anterior as TaskEstado]?.label ?? u.valor_anterior} → ${ESTADO_TASK[u.valor_nuevo as TaskEstado]?.label ?? u.valor_nuevo}`
                                       : `${u.valor_anterior || '—'} → ${u.valor_nuevo || '—'}`}
                                   </p>
                                 )}
@@ -1534,7 +1493,10 @@ function JuntaDetailInner() {
               (t) => t.estado === 'completado' || t.estado === 'cancelado'
             );
             const renderTask = (task: JuntaTask) => {
-              const cfg = ESTADO_TASK[task.estado] ?? { label: task.estado, cls: '' };
+              const cfg = ESTADO_TASK[task.estado] ?? {
+                label: task.estado,
+                tone: 'neutral' as const,
+              };
               const asignado = empleadoMap.get(task.asignado_a ?? '');
               return (
                 <div
@@ -1583,11 +1545,7 @@ function JuntaDetailInner() {
                       <span className="block text-xs text-[var(--text)]/50">{asignado.nombre}</span>
                     )}
                   </div>
-                  <span
-                    className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}
-                  >
-                    {cfg.label}
-                  </span>
+                  <Badge tone={cfg.tone}>{cfg.label}</Badge>
                   {task.fecha_vence && (
                     <span className="text-xs text-[var(--text-subtle)] shrink-0">
                       {formatDate(task.fecha_vence)}

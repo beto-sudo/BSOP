@@ -21,6 +21,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Archive, Loader2, MapPin, ExternalLink } from 'lucide-react';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
@@ -426,20 +427,8 @@ function DocLink({ label, url }: { label: string; url: string | null }) {
 function EtapaBadgeLarge({ etapa }: { etapa: string | null }) {
   if (!etapa) return null;
   const cfg = TERRENO_ETAPA_CONFIG[etapa as TerrenoEtapa];
-  if (!cfg) {
-    return (
-      <span className="inline-flex items-center rounded-lg border border-[var(--border)] px-3 py-1 text-xs text-[var(--text)]/65">
-        {etapa}
-      </span>
-    );
-  }
-  return (
-    <span
-      className={`inline-flex items-center rounded-lg border px-3 py-1 text-xs font-medium ${cfg.cls}`}
-    >
-      {cfg.label}
-    </span>
-  );
+  if (!cfg) return <Badge tone="neutral">{etapa}</Badge>;
+  return <Badge tone={cfg.tone}>{cfg.label}</Badge>;
 }
 
 export default function TerrenoDetailPage() {

@@ -24,6 +24,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Archive, Loader2, ExternalLink, ImageOff } from 'lucide-react';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
@@ -425,20 +426,8 @@ function CostRow({ label, value }: { label: string; value: number | null }) {
 function EtapaBadgeLarge({ etapa }: { etapa: string | null }) {
   if (!etapa) return null;
   const cfg = PROTOTIPO_ETAPA_CONFIG[etapa as PrototipoEtapa];
-  if (!cfg) {
-    return (
-      <span className="inline-flex items-center rounded-lg border border-[var(--border)] px-3 py-1 text-xs text-[var(--text)]/65">
-        {etapa}
-      </span>
-    );
-  }
-  return (
-    <span
-      className={`inline-flex items-center rounded-lg border px-3 py-1 text-xs font-medium ${cfg.cls}`}
-    >
-      {cfg.label}
-    </span>
-  );
+  if (!cfg) return <Badge tone="neutral">{etapa}</Badge>;
+  return <Badge tone={cfg.tone}>{cfg.label}</Badge>;
 }
 
 export default function PrototipoDetailPage() {

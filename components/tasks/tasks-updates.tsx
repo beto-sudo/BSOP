@@ -16,6 +16,7 @@ import {
 } from './tasks-shared';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 type Variant = 'sheet' | 'embedded';
 
@@ -61,7 +62,7 @@ export function UpdatesList({
   return (
     <div className={variant === 'embedded' ? 'space-y-2' : 'space-y-2'}>
       {updates.map((u) => {
-        const tc = UPDATE_TIPO_CONFIG[u.tipo] ?? { label: u.tipo, cls: '' };
+        const tc = UPDATE_TIPO_CONFIG[u.tipo] ?? { label: u.tipo, tone: 'neutral' as const };
         const isEmbedded = variant === 'embedded';
         return (
           <div
@@ -69,13 +70,7 @@ export function UpdatesList({
             className={`rounded-xl border border-[var(--border)] bg-[var(--panel)] ${isEmbedded ? 'px-3 py-2' : 'px-3 py-2.5'}`}
           >
             <div className={`flex items-center gap-2 ${isEmbedded ? 'mb-0.5' : 'mb-1'}`}>
-              <span
-                className={`inline-flex items-center rounded-lg border ${
-                  isEmbedded ? 'px-1.5 py-0.5 text-[9px]' : 'px-2 py-0.5 text-[10px]'
-                } font-medium ${tc.cls}`}
-              >
-                {tc.label}
-              </span>
+              <Badge tone={tc.tone}>{tc.label}</Badge>
               <span className="text-[10px] text-[var(--text-subtle)]">
                 {u.usuario?.nombre ?? 'Sistema'}
               </span>

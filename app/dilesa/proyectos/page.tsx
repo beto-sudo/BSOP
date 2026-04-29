@@ -40,6 +40,7 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { Plus, Search, RefreshCw, Link2 } from 'lucide-react';
@@ -116,20 +117,8 @@ function FaseBadge({ fase }: { fase: string | null }) {
   if (!fase) return <span className="text-[var(--text)]/35">—</span>;
   const key = fase as ProyectoFase;
   const cfg = PROYECTO_FASE_CONFIG[key];
-  if (!cfg) {
-    return (
-      <span className="inline-flex items-center rounded-lg border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text)]/55">
-        {fase}
-      </span>
-    );
-  }
-  return (
-    <span
-      className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}
-    >
-      {cfg.label}
-    </span>
-  );
+  if (!cfg) return <Badge tone="neutral">{fase}</Badge>;
+  return <Badge tone={cfg.tone}>{cfg.label}</Badge>;
 }
 
 function PrioridadDot({ prioridad }: { prioridad: string | null }) {

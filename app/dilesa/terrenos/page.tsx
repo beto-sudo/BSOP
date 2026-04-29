@@ -48,6 +48,7 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, Search, RefreshCw, MapPin } from 'lucide-react';
 import { z } from 'zod';
@@ -245,20 +246,8 @@ function EtapaBadge({ etapa }: { etapa: string | null }) {
   if (!etapa) return <span className="text-[var(--text)]/35">—</span>;
   const key = etapa as TerrenoEtapa;
   const cfg = TERRENO_ETAPA_CONFIG[key];
-  if (!cfg) {
-    return (
-      <span className="inline-flex items-center rounded-lg border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text)]/55">
-        {etapa}
-      </span>
-    );
-  }
-  return (
-    <span
-      className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}
-    >
-      {cfg.label}
-    </span>
-  );
+  if (!cfg) return <Badge tone="neutral">{etapa}</Badge>;
+  return <Badge tone={cfg.tone}>{cfg.label}</Badge>;
 }
 
 function PrioridadDot({ prioridad }: { prioridad: string | null }) {
