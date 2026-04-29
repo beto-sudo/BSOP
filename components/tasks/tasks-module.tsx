@@ -376,21 +376,25 @@ export function TasksModule({
 
   const resolveInsertEmpresaId = () => empresaId ?? empresaIds[0] ?? null;
 
-  const handleCreate = async () => {
+  const handleCreate = async (values?: TaskFormValues) => {
     const insertEmpresaId = resolveInsertEmpresaId();
     if (!insertEmpresaId) return;
 
+    // Simple variant submits typed values from RHF; rich still uses the
+    // local `createForm` state until Sprint 2 migrates it.
+    const formValues = values ?? createForm;
+
     if (isRich) {
       if (
-        !createForm.titulo.trim() ||
-        !createForm.prioridad ||
-        !createForm.asignado_a ||
-        !createForm.fecha_compromiso
+        !formValues.titulo.trim() ||
+        !formValues.prioridad ||
+        !formValues.asignado_a ||
+        !formValues.fecha_compromiso
       ) {
         return;
       }
     } else {
-      if (!createForm.titulo.trim()) return;
+      if (!formValues.titulo.trim()) return;
     }
     setCreating(true);
 
@@ -422,27 +426,27 @@ export function TasksModule({
       }
       payload = {
         empresa_id: insertEmpresaId,
-        titulo: createForm.titulo.trim(),
-        descripcion: createForm.descripcion.trim() || null,
-        prioridad: createForm.prioridad,
-        asignado_a: createForm.asignado_a || null,
+        titulo: formValues.titulo.trim(),
+        descripcion: formValues.descripcion.trim() || null,
+        prioridad: formValues.prioridad,
+        asignado_a: formValues.asignado_a || null,
         asignado_por: currentEmpleadoId,
-        estado: createForm.estado,
-        fecha_compromiso: createForm.fecha_compromiso || null,
-        porcentaje_avance: createForm.porcentaje_avance,
+        estado: formValues.estado,
+        fecha_compromiso: formValues.fecha_compromiso || null,
+        porcentaje_avance: formValues.porcentaje_avance,
         motivo_bloqueo:
-          createForm.estado === 'bloqueado' ? createForm.motivo_bloqueo.trim() || null : null,
+          formValues.estado === 'bloqueado' ? formValues.motivo_bloqueo.trim() || null : null,
         ...entidad,
       } as TasksInsert;
     } else {
       payload = {
         empresa_id: insertEmpresaId,
-        titulo: createForm.titulo.trim(),
-        descripcion: createForm.descripcion.trim() || null,
-        prioridad: createForm.prioridad || null,
-        asignado_a: createForm.asignado_a || null,
-        estado: createForm.estado,
-        fecha_vence: createForm.fecha_vence || null,
+        titulo: formValues.titulo.trim(),
+        descripcion: formValues.descripcion.trim() || null,
+        prioridad: formValues.prioridad || null,
+        asignado_a: formValues.asignado_a || null,
+        estado: formValues.estado,
+        fecha_vence: formValues.fecha_vence || null,
         creado_por: coreUser?.id ?? null,
       } as TasksInsert;
     }
