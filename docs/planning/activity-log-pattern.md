@@ -2,93 +2,99 @@
 
 **Slug:** `activity-log-pattern`
 **Empresas:** todas
-**Schemas afectados:** n/a (UI; consume `audit_log` u equivalente backend)
-**Estado:** proposed
+**Schemas afectados:** n/a (UI; consume backends existentes)
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-27
-**Última actualización:** 2026-04-27
-
-> **Bloqueada hasta cierre de `file-attachments`.** Alcance v1 detallado
-> se cierra cuando arranque su turno.
+**Última actualización:** 2026-04-29
 
 ## Problema
 
-Cortes ya implementa "quién cambió qué cuándo" en su detail page. El
-backend tiene `audit_log` como pattern. A medida que más módulos
-necesitan trazabilidad (terrenos DILESA con cambio de etapa,
-proveedores con actualización de datos fiscales, levantamientos con
-auto-aplicación, etc.), el patrón se va a multiplicar.
-
-Si esperamos a la 3a implementación, ya hay deriva. Mejor abstraer
-ahora que solo hay 1 implementación de referencia.
+Trazabilidad empieza a aparecer en múltiples lugares (cortes, tasks,
+OC, inventario, futuro: terrenos, proveedores, levantamientos). Cada
+backend tiene shape distinto y cada UI lo renderiza a su manera. Si
+esperamos al 3er o 4to módulo, el drift hace que cada timeline UI
+tenga que construirse desde cero.
 
 ## Outcome esperado
 
-- Componente `<ActivityLog entity entityId>` que carga eventos de
-  audit y los renderiza con timeline visual.
-- Convención de tipos de evento: `created`, `updated`,
-  `status_changed`, `archived`, `restored`, `deleted`, plus eventos
-  específicos por dominio.
-- Render por tipo de evento: copy parametrizado, ícono semántico,
-  timestamp relativo (`formatRelativeDays` ya existe en `lib/format/`).
-- Integración con `<DetailPage>` y `<DetailDrawer>` como sección
-  estándar.
-- ADR documentando contrato con backend (qué columnas espera de
-  `audit_log`, cómo se serializa el `meta` de cada evento).
+- Contrato `ActivityEvent` como shape canónica.
+- Adapters por backend que mapean a `ActivityEvent[]`.
+- Componente `<ActivityLog>` (Sprint 2) que consume `ActivityEvent[]` agnóstico al backend.
+- Convención de tipos de evento + tokens de tone.
+- ADR documentando el contrato.
 
-## Alcance v1 (tentativo — refinar al arrancar)
+## Alcance v1 (cerrado 2026-04-29 — ver ADR-023)
 
-- [ ] Auditar la implementación actual de cortes.
-- [ ] Definir contrato de evento (event_type, actor, timestamp,
-      meta).
-- [ ] Componente `<ActivityLog>` con timeline visual.
-- [ ] Helper `useActivityLog(entity, entityId)` que fetcha + cachea.
-- [ ] Renderizadores por tipo de evento (`renderEvent(event) => ReactNode`).
-- [ ] Migrar Cortes al componente compartido.
-- [ ] Adoptar en 1 módulo nuevo (probable terrenos DILESA o
-      levantamientos).
-- [ ] ADR.
+- [x] Contrato `ActivityEvent` en `components/activity-log/types.ts`.
+- [x] 7 tipos canónicos (`created` / `updated` / `status_changed` / `archived` / `restored` / `deleted` / `comment`) + extensión libre para domain-specific.
+- [x] `DEFAULT_ACTIVITY_TONES` reusa `BadgeTone` (ADR-017).
+- [x] ADR-023 con 5 reglas (AL1-AL5).
+- [ ] Componente `<ActivityLog>` — Sprint 2.
+- [ ] Adapters por backend + golden migration — Sprint 3.
 
-## Fuera de alcance
+## Decisiones tomadas al cerrar alcance
 
-- Filtros del activity log (por usuario, por tipo, por rango de
-  fecha). Postergable.
-- Comments / threading sobre eventos. Eso es feature distinta
-  (similar a `tasks-updates-sheet.tsx` actual).
-- Diff visual de campos cambiados (before/after side by side).
-  Útil pero no v1.
-- Real-time updates (websocket / polling). Postergable.
+- **Adapter pattern en TypeScript**, no migrations DB: backends ya difieren;
+  forzar uniformidad cruza iniciativas. Cada caller escribe `xToEvents(rows)`.
+- **`type` canónico abierto** (string & {}): 7 tipos cubren el 80%; el resto se pasa
+  como string literal sin castear. Defensivo contra drift.
+- **`actor` nullable** con fallback "Sistema": eventos automáticos (triggers,
+  cron) no requieren usuario sintético en DB.
+- **`changes` (estructurado) vs `detail` (texto libre)** son campos separados:
+  permite render diferente (diff vs body).
+- **Sin componente en v1**: el contrato es la pieza estable; el componente
+  puede iterarse. Sprint 2 lo entrega.
+
+## Fuera de alcance v1
+
+- **Componente `<ActivityLog>`** — Sprint 2.
+- **Filtros** por usuario/tipo/fecha.
+- **Comments / threading**.
+- **Diff visual side-by-side**.
+- **Real-time updates**.
+- **Composer de eventos**.
+- **Permisos por evento**.
 
 ## Métricas de éxito
 
-- 100% de detail pages que muestran activity usan `<ActivityLog>`.
-- Cero implementaciones nuevas de timeline de eventos.
-- Backend `audit_log` consumido vía contrato tipado, no SQL ad-hoc.
-
-## Riesgos / preguntas abiertas
-
-- [ ] **Contrato con backend** — el `audit_log` actual probablemente
-      no tiene shape uniforme entre módulos (cortes lo armó a
-      medida). Definir si el componente UI dicta el shape o si se
-      adapta a lo que viene.
-- [ ] **Volumen de eventos** — entidades con muchos eventos pueden
-      saturar. Paginación / scroll infinito en v1 sí.
-- [ ] **Permisos** — algunos eventos son sensibles (cambios de monto,
-      decisiones de aprobación). El componente debe respetar
-      `<RequireAccess>` opcional por evento.
-- [ ] **Coordinación con `<DataTable>`** — ¿es activity-log una vista
-      de tabla degenerada? Probable que NO — el shape (timeline,
-      agrupado por día/hora, mixed event types) no encaja con
-      `<DataTable>`.
+- Cualquier nuevo módulo con timeline usa `ActivityEvent` adapter, no
+  HTML directo del backend.
+- Sprint 2: `<ActivityLog>` reutilizado por tasks, cortes, y 1+ módulo nuevo.
 
 ## Sprints / hitos
 
-_(se llena cuando arranque ejecución, vía Claude Code)_
+| #   | Sprint                                             | Estado    | PR  |
+| --- | -------------------------------------------------- | --------- | --- |
+| 1   | Contrato `ActivityEvent` + tones + ADR-023         | done      | TBD |
+| 2   | Componente `<ActivityLog>` + golden tasks          | postponed | —   |
+| 3   | Adopters: cortes, terrenos DILESA o levantamientos | postponed | —   |
 
 ## Decisiones registradas
 
-_(append-only, fechadas — escrito por Claude Code)_
+### 2026-04-29 · ADR-023 — Activity log contract (Sprint 1)
+
+Codificado en [ADR-023](../adr/023_activity_log_pattern.md). Las 5 reglas:
+
+- **AL1** — `ActivityEvent` es la shape canónica; adapters por backend.
+- **AL2** — `type` canónico (7 tipos) + extensiones libres por dominio.
+- **AL3** — `actor` es nullable; `'Sistema'` como fallback.
+- **AL4** — `changes` para diffs estructurados; `detail` para texto libre.
+- **AL5** — Componente Sprint 2 debe soportar `<DetailPage>` y `<DetailDrawer>` como section.
 
 ## Bitácora
 
-_(append-only, escrita por Claude Code al ejecutar)_
+### 2026-04-29 — Sprint 1 mergeado
+
+Foundation:
+
+- `components/activity-log/types.ts` — `ActivityEvent`, `ActivityActor`,
+  `ActivityFieldChange`, `ActivityEventType`, `DEFAULT_ACTIVITY_TONES`.
+- `components/activity-log/index.ts` — barrel export.
+- ADR-023 con 5 reglas (AL1-AL5).
+
+Sin componente UI en v1 — el contrato es la pieza estable, el componente
+puede iterarse en Sprint 2 sin breaking changes para callers que ya
+construyan adapters siguiendo el contrato.
+
+PR: pendiente.
