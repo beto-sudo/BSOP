@@ -73,7 +73,7 @@ export function OrderDetail({
           </div>
         </SheetHeader>
 
-        <ScrollArea className="flex-1 pr-1 print:h-auto">
+        <ScrollArea className="flex-1 min-h-0 pr-1 print:h-auto">
           <div className="mt-6 space-y-6 pb-6">
             {/* Status + total */}
             <div className="flex items-center justify-between">
