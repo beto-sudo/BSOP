@@ -5,8 +5,7 @@ import { Plus, Sparkles } from 'lucide-react';
 import { z } from 'zod';
 
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import { Form, FormActions, useZodForm } from '@/components/forms';
 
 import { placeholderTitulo } from '@/lib/documentos/naming';
@@ -115,49 +114,45 @@ export function DocumentoCreateSheet({
   };
 
   return (
-    <Sheet
+    <DetailDrawer
       open={open}
       onOpenChange={(v) => {
         if (!v) onClose();
       }}
+      size="md"
+      className="sm:max-w-[640px]"
+      title="Nuevo Documento"
     >
-      <SheetContent className="sm:max-w-[640px]">
-        <SheetHeader>
-          <SheetTitle>Nuevo Documento</SheetTitle>
-        </SheetHeader>
-        <ScrollArea className="flex-1 min-h-0 pr-1">
-          <Form form={form} onSubmit={handleSubmit} className="mt-4 pb-6 space-y-4">
-            <div className="flex items-start gap-2 rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/5 px-3 py-2.5 text-xs text-[var(--text)]/70">
-              <Sparkles className="h-4 w-4 shrink-0 mt-0.5 text-[var(--accent)]" />
-              <div>
-                <p className="mb-0.5 font-medium text-[var(--text)]">
-                  Flujo con IA — captura mínima
-                </p>
-                <p>
-                  Solo pedimos lo esencial. Después de guardar, sube el PDF y haz click en{' '}
-                  <strong>Procesar con IA</strong>: el número, fecha, partes, monto, ubicación,
-                  descripción y título final se rellenan automáticamente del contenido del PDF.
-                </p>
-              </div>
+      <DetailDrawerContent>
+        <Form form={form} onSubmit={handleSubmit} className="space-y-4">
+          <div className="flex items-start gap-2 rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/5 px-3 py-2.5 text-xs text-[var(--text)]/70">
+            <Sparkles className="h-4 w-4 shrink-0 mt-0.5 text-[var(--accent)]" />
+            <div>
+              <p className="mb-0.5 font-medium text-[var(--text)]">Flujo con IA — captura mínima</p>
+              <p>
+                Solo pedimos lo esencial. Después de guardar, sube el PDF y haz click en{' '}
+                <strong>Procesar con IA</strong>: el número, fecha, partes, monto, ubicación,
+                descripción y título final se rellenan automáticamente del contenido del PDF.
+              </p>
             </div>
+          </div>
 
-            <DocFormFields
-              notarias={notarias}
-              onOpenCreateNotaria={onOpenCreateNotaria}
-              mode="create"
-            />
+          <DocFormFields
+            notarias={notarias}
+            onOpenCreateNotaria={onOpenCreateNotaria}
+            mode="create"
+          />
 
-            <FormActions
-              cancelLabel="Cancelar"
-              submitLabel="Guardar y adjuntar archivos"
-              submittingLabel="Guardando..."
-              submitIcon={<Plus className="h-4 w-4" />}
-              onCancel={onClose}
-              className="border-t-0 pt-2"
-            />
-          </Form>
-        </ScrollArea>
-      </SheetContent>
-    </Sheet>
+          <FormActions
+            cancelLabel="Cancelar"
+            submitLabel="Guardar y adjuntar archivos"
+            submittingLabel="Guardando..."
+            submitIcon={<Plus className="h-4 w-4" />}
+            onCancel={onClose}
+            className="border-t-0 pt-2"
+          />
+        </Form>
+      </DetailDrawerContent>
+    </DetailDrawer>
   );
 }

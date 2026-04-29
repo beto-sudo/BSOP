@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { FieldLabel } from '@/components/ui/field-label';
 import { Input } from '@/components/ui/input';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import { AlertTriangle, Loader2, RefreshCw, Save, Sparkles, Upload } from 'lucide-react';
 
 import type { CsfExtraccion } from '@/lib/proveedores/extract-csf';
@@ -216,20 +216,21 @@ export function NuevaEmpresaDrawer({
     !!csfFile && !!extraccion && nombre.trim().length > 0 && slug.trim().length > 0 && slugValid;
 
   return (
-    <Sheet open={open} onOpenChange={handleClose}>
-      <SheetContent className="sm:max-w-[700px] overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-emerald-600" />
-            Nueva empresa con CSF
-          </SheetTitle>
-          <p className="text-xs text-muted-foreground">
-            Sube el PDF de la CSF y el sistema extrae los datos fiscales. Solo necesitas confirmar
-            slug y nombre.
-          </p>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-4">
+    <DetailDrawer
+      open={open}
+      onOpenChange={handleClose}
+      size="md"
+      className="sm:max-w-[700px]"
+      title={
+        <span className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-emerald-600" />
+          Nueva empresa con CSF
+        </span>
+      }
+      description="Sube el PDF de la CSF y el sistema extrae los datos fiscales. Solo necesitas confirmar slug y nombre."
+    >
+      <DetailDrawerContent>
+        <div className="space-y-4">
           {/* Estado A: drop */}
           {!csfFile && !csfProcessing && (
             <div className="space-y-3">
@@ -443,7 +444,7 @@ export function NuevaEmpresaDrawer({
             </>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </DetailDrawerContent>
+    </DetailDrawer>
   );
 }
