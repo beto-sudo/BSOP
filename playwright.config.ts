@@ -33,13 +33,13 @@ export default defineConfig({
     // ── Anon: tests that do NOT need authentication
     {
       name: 'anon',
-      testMatch: /smoke\/anon-.*\.spec\.ts/,
+      testMatch: /(smoke|a11y)\/anon-.*\.spec\.ts/,
       use: { ...devices['Desktop Chrome'] },
     },
     // ── Auth: tests that need a logged-in user (depends on setup)
     {
       name: 'auth',
-      testMatch: /smoke\/auth-.*\.spec\.ts/,
+      testMatch: /(smoke|a11y)\/auth-.*\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         storageState: 'playwright/.auth/user.json',
