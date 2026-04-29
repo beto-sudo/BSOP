@@ -97,20 +97,29 @@ cueste decenas de líneas, no centenas — siguiendo la convención
 - [x] Smoke test e2e en
       `tests/e2e/smoke/auth-rdb-productos-recetas.spec.ts`.
 
-### Sprint 2 — Reporte de auditoría / validación
+### Sprint 2 — Reporte de auditoría / validación ✅ entregable en este PR
 
-- [ ] Página `/rdb/productos/auditoria` (o sección dentro de
-      `/rdb/productos/analisis`).
-- [ ] Lista alerts agrupadas por severidad:
+- [x] Página `/rdb/productos/auditoria` como sub-tab del módulo
+      Productos (4ta tab — Catálogo / Recetas / Auditoría / Análisis).
+- [x] Refactor: `lib/productos/recetas.ts` extrae types + helpers
+      `fetchRecetas()` + `auditarRecetas()` para que Recetas y
+      Auditoría compartan lógica.
+- [x] 4 alerts en v1 (todas derivables 100% de los datos):
   - **Crítico**: receta con margen negativo (costo > precio_venta).
-  - **Crítico**: producto vendible sin receta donde se esperaría tener
-    una (heurística por categoría o flag manual a definir al arrancar).
-  - **Warning**: receta con algún insumo sin `ultimo_costo` registrado.
-  - **Warning**: receta con insumo eliminado / huérfano.
-  - **Warning**: receta con insumo no inventariable (datos legacy).
-- [ ] Cada alert linkea al detalle de la receta vía drawer ya
-      construido.
-- [ ] Dashboard summary cards arriba: # alerts críticas, # warnings.
+  - **Warning**: receta con insumo huérfano (eliminado del catálogo).
+  - **Warning**: receta con algún insumo sin `ultimo_costo`.
+  - **Warning**: receta con insumo no inventariable.
+- [x] Click en alert → `/rdb/productos/recetas?focus=<id>` abre el
+      drawer canónico de la receta. Recetas page detecta `?focus` y
+      auto-abre el drawer al cargar.
+- [x] Summary cards arriba: # críticas · # warnings · # recetas
+      auditadas.
+- [x] Filtros: search libre + select severidad + select tipo de
+      alerta (con `useUrlFilters`).
+- **Heurística "producto sin receta esperada" deferida**: requiere
+  decisión sobre qué señal usar (categoría, flag, regla derivada) y
+  datos operativos para calibrar. Sprint posterior cuando emerja
+  necesidad.
 
 ### Sprint 3 — Edición masiva de recetas
 
@@ -231,14 +240,52 @@ Cierre técnico:
 - Edición de receta sigue viviendo en la pestaña Catálogo, en el
   drawer del producto. Edición masiva consolidada llega en Sprint 3.
 
-### Sprint 2 — Reporte de auditoría (próximo)
+### Sprint 2 — Reporte de auditoría · 2026-04-29
+
+**Estado:** mergeado pendiente · PR Sprint 2 (este PR).
+
+Entregable:
+
+- Refactor `lib/productos/recetas.ts`: types `ProductoInfo`,
+  `InsumoReceta`, `Receta`, `RecetaAlert` + helpers `fetchRecetas()`,
+  `auditarReceta()`, `auditarRecetas()`, `alertLabel()`. Recetas y
+  Auditoría comparten lógica sin duplicar.
+- Nueva sub-tab "Auditoría" en el layout (4 tabs: Catálogo / Recetas
+  / Auditoría / Análisis).
+- Página `/rdb/productos/auditoria` con summary cards (críticas /
+  warnings / recetas auditadas), DataTable de alerts, filtros con
+  `useUrlFilters` (search + severidad + tipo).
+- 4 tipos de alerta: margen negativo (crítico), insumo huérfano,
+  insumo sin costo, insumo no inventariable (warnings).
+- Click en alert → `/rdb/productos/recetas?focus=<id>` abre drawer
+  canónico de la receta.
+- Recetas page actualizado: detecta `?focus=<id>` y auto-abre el
+  drawer al cargar (deep-link compartible).
+- Smoke test e2e en
+  `tests/e2e/smoke/auth-rdb-productos-auditoria.spec.ts`.
+
+Decisiones técnicas tomadas:
+
+- **Sub-tab "Auditoría"** (no dentro de Análisis que ya tiene ~800
+  líneas).
+- **4 alerts en v1** todas 100% derivables de los datos. Heurística
+  "producto sin receta esperada" deferida porque requiere calibración
+  con datos operativos.
+- **Deep-link via URL** (`?focus=<id>`) en lugar de duplicar el
+  drawer en Auditoría: una sola fuente de verdad para el detalle de
+  receta, URL compartible.
+- **Insumos huérfanos visibles en Recetas** (en rojo dentro del
+  drawer) para que el operador los identifique sin ir solo a
+  Auditoría.
+
+### Sprint 3 — Edición masiva de recetas (próximo)
 
 Pendiente de arrancar. Decisiones técnicas a cerrar al arrancar:
 
-- Heurística para "producto vendible sin receta esperada": ¿flag
-  manual en `productos`, categoría, o regla derivada?
-- ¿Reporte como nueva sub-tab "Auditoría" o sección dentro de
-  "Análisis"?
+- ¿Vista de edición sobre la misma página de Recetas (toggle "modo
+  edición") o sub-tab dedicada?
+- Audit trail: verificar si `producto_receta` ya tiene trigger de
+  auditoría o si lo agregamos.
 
 ## Decisiones registradas
 
@@ -296,6 +343,18 @@ Beto revisó el preview y apuntó que Grupos no debe ser entrada
 separada en sidebar — debe vivir como sub-tab del módulo Productos
 (ADR-005). Sidebar entry removida; `/rdb/productos/grupos` removido
 de `ROUTE_TO_MODULE`; `h1` redundante removido del page.
+
+### 2026-04-29 · Sprint 2 mergeado pendiente · Auditoría
+
+PR Sprint 2 (este PR). Sub-tab "Auditoría" en módulo Productos con
+reporte de huecos sobre recetas. Refactor: `lib/productos/recetas.ts`
+extrae types + helpers para que Recetas y Auditoría compartan lógica
+(antes el `computeReceta` y los types vivían inline en
+`recetas/page.tsx`). 4 alerts implementadas; heurística "producto sin
+receta esperada" deferida por requerir calibración con datos
+operativos. Click en alert → `/rdb/productos/recetas?focus=<id>` abre
+drawer canónico (deep-link compartible). Próximo: Sprint 3 (edición
+masiva de recetas) cuando Beto lo desbloquee.
 
 ### 2026-04-29 · Sprint 1 redirección · Recetas reemplaza Padres-Hijos
 

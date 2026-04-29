@@ -9,9 +9,10 @@ import { RoutedModuleTabs } from '@/components/module-page';
  *
  * - `/rdb/productos`           → tab "Catálogo" (default landing).
  * - `/rdb/productos/recetas`   → tab "Recetas".
+ * - `/rdb/productos/auditoria` → tab "Auditoría".
  * - `/rdb/productos/analisis`  → tab "Análisis".
  *
- * El strip de tabs vive aquí para que las 3 rutas hermanas mantengan la
+ * El strip de tabs vive aquí para que las 4 rutas hermanas mantengan la
  * navegación consistente sin sumar entradas separadas al sidebar.
  *
  * `<RequireAccess>` se mantiene en cada page individual (defense in
@@ -21,6 +22,7 @@ import { RoutedModuleTabs } from '@/components/module-page';
 const TABS = [
   { label: 'Catálogo', href: '/rdb/productos', exact: true },
   { label: 'Recetas', href: '/rdb/productos/recetas' },
+  { label: 'Auditoría', href: '/rdb/productos/auditoria' },
   { label: 'Análisis', href: '/rdb/productos/analisis' },
 ] as const;
 
