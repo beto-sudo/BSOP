@@ -3,14 +3,14 @@
 /**
  * TasksCreateForm — "Nueva tarea" dialog/sheet body.
  *
- * `simple` variant (rdb/inicio): 2-col grid with Estado + Prioridad + Asignado + Fecha.
- *                                Migrated to `<Form>` + zod (forms-pattern Sprint 1).
- * `rich` variant (DILESA):       required Prioridad/Responsable/Fecha compromiso,
- *                                Combobox responsable, motivo bloqueo when needed.
- *                                Pending Sprint 2 migration.
+ * `simple` variant (rdb/inicio): Dialog with Estado + Prioridad + Asignado + Fecha.
+ * `rich` variant (DILESA):       Sheet with required Prioridad/Responsable/Fecha
+ *                                compromiso + motivo_bloqueo when estado='bloqueado'.
+ *
+ * Both variants own their state via `<Form>` + zod (forms-pattern).
  */
 
-import { Loader2, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { z } from 'zod';
 
 import {
@@ -29,7 +29,6 @@ import {
 } from '@/components/ui/sheet';
 import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormActions, FormField, FormRow, useZodForm } from '@/components/forms';
 
@@ -37,15 +36,16 @@ import {
   type ComboboxOption,
   type Empleado,
   ESTADO_CONFIG,
-  FieldLabel,
   PRIORIDAD_OPTIONS,
   type TaskFormValues,
   type TaskEstado,
 } from './tasks-shared';
 
-// ─── Simple variant schema ────────────────────────────────────────────────────
+// ─── Shared zod pieces ────────────────────────────────────────────────────────
 
 const TaskEstadoEnum = z.enum(['pendiente', 'en_progreso', 'bloqueado', 'completado', 'cancelado']);
+
+// ─── Simple variant schema ────────────────────────────────────────────────────
 
 const SimpleCreateSchema = z.object({
   titulo: z.string().trim().min(1, 'El título es obligatorio').max(255, 'Máximo 255 caracteres'),
@@ -67,26 +67,48 @@ const simpleDefaults: SimpleCreateValues = {
   fecha_vence: '',
 };
 
+// ─── Rich variant schema ──────────────────────────────────────────────────────
+
+const RichCreateSchema = z
+  .object({
+    titulo: z.string().trim().min(1, 'El título es obligatorio').max(255, 'Máximo 255 caracteres'),
+    descripcion: z.string().max(2000).default(''),
+    estado: TaskEstadoEnum,
+    prioridad: z.string().min(1, 'Selecciona una prioridad'),
+    asignado_a: z.string().min(1, 'Selecciona un responsable'),
+    fecha_compromiso: z.string().min(1, 'Selecciona la fecha de compromiso'),
+    motivo_bloqueo: z.string().default(''),
+  })
+  .superRefine((data, ctx) => {
+    if (data.estado === 'bloqueado' && !data.motivo_bloqueo.trim()) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Indica el motivo del bloqueo',
+        path: ['motivo_bloqueo'],
+      });
+    }
+  });
+
+type RichCreateValues = z.infer<typeof RichCreateSchema>;
+
+const richDefaults: RichCreateValues = {
+  titulo: '',
+  descripcion: '',
+  estado: 'pendiente',
+  prioridad: '',
+  asignado_a: '',
+  fecha_compromiso: '',
+  motivo_bloqueo: '',
+};
+
 // ─── Dispatcher API ──────────────────────────────────────────────────────────
 
 export type TasksCreateFormProps = {
   variant: 'simple' | 'rich';
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /**
-   * Called on submit.
-   *  - simple: receives the typed RHF values (the form owns its state).
-   *  - rich:   called with no args; the parent reads its `value` state.
-   *
-   * The rich path still uses the legacy `value`/`onChange`/`creating` props
-   * until Sprint 2 migrates it.
-   */
-  onCreate: (values?: TaskFormValues) => void | Promise<void>;
-
-  // Rich-variant legacy props (ignored by simple).
-  value?: TaskFormValues;
-  onChange?: (v: TaskFormValues) => void;
-  creating?: boolean;
+  /** Called with the typed form values; the form owns its state. */
+  onCreate: (values: TaskFormValues) => Promise<void>;
 
   empleados: Empleado[];
   empleadoOptions: ComboboxOption[];
@@ -99,7 +121,7 @@ export function TasksCreateForm(props: TasksCreateFormProps) {
   return <SimpleCreateDialog {...props} />;
 }
 
-// ─── Simple variant — `<Form>` + zod + RHF ───────────────────────────────────
+// ─── Simple variant — Dialog ─────────────────────────────────────────────────
 
 function SimpleCreateDialog({ open, onOpenChange, onCreate, empleados }: TasksCreateFormProps) {
   const form = useZodForm({
@@ -108,12 +130,9 @@ function SimpleCreateDialog({ open, onOpenChange, onCreate, empleados }: TasksCr
   });
 
   const handleSubmit = async (values: SimpleCreateValues) => {
-    // Map back to the wider `TaskFormValues` shape the parent module expects.
-    // Simple variant doesn't use the rich-only fields (`fecha_compromiso`,
-    // `porcentaje_avance`, `motivo_bloqueo`), but they need defaults so the
-    // type is satisfied.
     await onCreate({
       ...values,
+      // Rich-only fields default empty for simple variant.
       fecha_compromiso: '',
       porcentaje_avance: 0,
       motivo_bloqueo: '',
@@ -122,7 +141,6 @@ function SimpleCreateDialog({ open, onOpenChange, onCreate, empleados }: TasksCr
     onOpenChange(false);
   };
 
-  // Reset when dialog closes (in case the user cancelled).
   const handleOpenChange = (next: boolean) => {
     if (!next) form.reset(simpleDefaults);
     onOpenChange(next);
@@ -239,24 +257,41 @@ function SimpleCreateDialog({ open, onOpenChange, onCreate, empleados }: TasksCr
   );
 }
 
-// ─── Rich variant — legacy (Sprint 2 will migrate) ───────────────────────────
+// ─── Rich variant — Sheet ────────────────────────────────────────────────────
 
-function RichCreateSheet({
-  open,
-  onOpenChange,
-  value,
-  onChange,
-  onCreate,
-  creating,
-  empleadoOptions,
-}: TasksCreateFormProps) {
-  if (!value || !onChange) return null;
-  const set = (patch: Partial<TaskFormValues>) => onChange({ ...value, ...patch });
-  const canCreate =
-    !!value.titulo.trim() && !!value.prioridad && !!value.asignado_a && !!value.fecha_compromiso;
+function RichCreateSheet({ open, onOpenChange, onCreate, empleadoOptions }: TasksCreateFormProps) {
+  const form = useZodForm({
+    schema: RichCreateSchema,
+    defaultValues: richDefaults,
+  });
+
+  // Watch estado to conditionally show motivo_bloqueo.
+  const estado = form.watch('estado');
+
+  const handleSubmit = async (values: RichCreateValues) => {
+    await onCreate({
+      titulo: values.titulo,
+      descripcion: values.descripcion,
+      estado: values.estado,
+      prioridad: values.prioridad,
+      asignado_a: values.asignado_a,
+      fecha_compromiso: values.fecha_compromiso,
+      motivo_bloqueo: values.motivo_bloqueo,
+      // Simple-only field unused by rich.
+      fecha_vence: '',
+      porcentaje_avance: 0,
+    });
+    form.reset(richDefaults);
+    onOpenChange(false);
+  };
+
+  const handleOpenChange = (next: boolean) => {
+    if (!next) form.reset(richDefaults);
+    onOpenChange(next);
+  };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent
         side="right"
         className="w-full sm:max-w-lg border-[var(--border)] bg-[var(--card)] text-[var(--text)] overflow-y-auto"
@@ -268,95 +303,102 @@ function RichCreateSheet({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="space-y-5 py-4">
-          <div>
-            <FieldLabel required>Título</FieldLabel>
-            <Input
-              placeholder="Descripción breve de la tarea..."
-              value={value.titulo}
-              onChange={(e) => set({ titulo: e.target.value })}
-              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-            />
-          </div>
-
-          <div>
-            <FieldLabel>Descripción</FieldLabel>
-            <Textarea
-              placeholder="Detalla la tarea..."
-              value={value.descripcion}
-              onChange={(e) => set({ descripcion: e.target.value })}
-              rows={3}
-              className="resize-none rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <FieldLabel required>Prioridad</FieldLabel>
-              <Combobox
-                value={value.prioridad}
-                onChange={(v) => set({ prioridad: v })}
-                options={PRIORIDAD_OPTIONS.map((p) => ({ value: p, label: p }))}
-                placeholder="Seleccionar"
+        <Form form={form} onSubmit={handleSubmit} className="space-y-5 py-4">
+          <FormField name="titulo" label="Título" required>
+            {(field) => (
+              <Input
+                {...field}
+                id={field.id}
+                aria-invalid={field.invalid || undefined}
+                aria-describedby={field.describedBy}
+                placeholder="Descripción breve de la tarea..."
                 className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
               />
-            </div>
-            {/* Estado se asigna automáticamente como 'pendiente' */}
-          </div>
+            )}
+          </FormField>
 
-          {value.estado === 'bloqueado' && (
-            <div>
-              <FieldLabel required>Motivo del Bloqueo</FieldLabel>
+          <FormField name="descripcion" label="Descripción">
+            {(field) => (
               <Textarea
-                placeholder="Describe por qué está bloqueada..."
-                value={value.motivo_bloqueo}
-                onChange={(e) => set({ motivo_bloqueo: e.target.value })}
-                rows={2}
+                {...field}
+                id={field.id}
+                aria-invalid={field.invalid || undefined}
+                aria-describedby={field.describedBy}
+                placeholder="Detalla la tarea..."
+                rows={3}
                 className="resize-none rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
               />
-            </div>
+            )}
+          </FormField>
+
+          <FormRow cols={2}>
+            <FormField name="prioridad" label="Prioridad" required>
+              {(field) => (
+                <Combobox
+                  id={field.id}
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={PRIORIDAD_OPTIONS.map((p) => ({ value: p, label: p }))}
+                  placeholder="Seleccionar"
+                  className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+                />
+              )}
+            </FormField>
+            {/* Estado se asigna automáticamente como 'pendiente' */}
+          </FormRow>
+
+          {estado === 'bloqueado' && (
+            <FormField name="motivo_bloqueo" label="Motivo del Bloqueo" required>
+              {(field) => (
+                <Textarea
+                  {...field}
+                  id={field.id}
+                  aria-invalid={field.invalid || undefined}
+                  aria-describedby={field.describedBy}
+                  placeholder="Describe por qué está bloqueada..."
+                  rows={2}
+                  className="resize-none rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+                />
+              )}
+            </FormField>
           )}
 
-          <div>
-            <FieldLabel required>Responsable</FieldLabel>
-            <Combobox
-              value={value.asignado_a}
-              onChange={(v) => set({ asignado_a: v })}
-              options={empleadoOptions.map((o) => ({ value: o.id, label: o.label }))}
-              placeholder="Buscar responsable..."
-              searchPlaceholder="Escriba un nombre..."
-              allowClear
-            />
-          </div>
+          <FormField name="asignado_a" label="Responsable" required>
+            {(field) => (
+              <Combobox
+                id={field.id}
+                value={field.value}
+                onChange={field.onChange}
+                options={empleadoOptions.map((o) => ({ value: o.id, label: o.label }))}
+                placeholder="Buscar responsable..."
+                searchPlaceholder="Escriba un nombre..."
+                allowClear
+              />
+            )}
+          </FormField>
 
-          <div>
-            <FieldLabel required>Fecha Compromiso</FieldLabel>
-            <Input
-              type="date"
-              value={value.fecha_compromiso}
-              onChange={(e) => set({ fecha_compromiso: e.target.value })}
-              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-            />
-          </div>
-        </div>
+          <FormField name="fecha_compromiso" label="Fecha Compromiso" required>
+            {(field) => (
+              <Input
+                {...field}
+                id={field.id}
+                type="date"
+                aria-invalid={field.invalid || undefined}
+                aria-describedby={field.describedBy}
+                className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
+            )}
+          </FormField>
 
-        <div className="flex items-center gap-2 pt-4 border-t border-[var(--border)]">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            className="flex-1 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-          >
-            Cancelar
-          </Button>
-          <Button
-            onClick={() => void onCreate()}
-            disabled={creating || !canCreate}
-            className="flex-1 gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60"
-          >
-            {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            Crear tarea
-          </Button>
-        </div>
+          <FormActions
+            cancelLabel="Cancelar"
+            submitLabel="Crear tarea"
+            submittingLabel="Creando..."
+            submitIcon={<Plus className="h-4 w-4" />}
+            onCancel={() => handleOpenChange(false)}
+            stretch
+          />
+        </Form>
       </SheetContent>
     </Sheet>
   );

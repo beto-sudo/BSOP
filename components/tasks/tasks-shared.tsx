@@ -75,17 +75,8 @@ export type TaskFormValues = {
   motivo_bloqueo: string;
 };
 
-export const emptyTaskForm = (): TaskFormValues => ({
-  titulo: '',
-  descripcion: '',
-  prioridad: '',
-  asignado_a: '',
-  estado: 'pendiente',
-  fecha_vence: '',
-  fecha_compromiso: '',
-  porcentaje_avance: 0,
-  motivo_bloqueo: '',
-});
+// `emptyTaskForm` removed (forms-pattern Sprint 2): each form owns its
+// defaults locally via the `<Form>` + zod pattern.
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

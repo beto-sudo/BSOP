@@ -12,7 +12,7 @@ import { normalizeHtmlImagesToPaths, rewriteHtmlImagesToSigned } from '@/lib/adj
 import { htmlHasCodaImages, importCodaImagesInHtml } from '@/lib/coda-paste-import';
 import { fetchJuntaUpdates } from '@/lib/juntas/fetch-updates';
 import { TasksCreateForm } from '@/components/tasks/tasks-create-form';
-import { emptyTaskForm, type TaskFormValues } from '@/components/tasks/tasks-shared';
+import { type TaskFormValues } from '@/components/tasks/tasks-shared';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -294,10 +294,8 @@ function JuntaDetailInner() {
   const [selectedPersonaId, setSelectedPersonaId] = useState('');
   const [addingPersona, setAddingPersona] = useState(false);
 
-  // Add task dialog
+  // Add task dialog (form state lives inside `<TasksCreateForm>` — forms-pattern)
   const [showAddTask, setShowAddTask] = useState(false);
-  const [taskForm, setTaskForm] = useState<TaskFormValues>(emptyTaskForm());
-  const [addingTask, setAddingTask] = useState(false);
   const [completingTask, setCompletingTask] = useState<string | null>(null);
 
   const [taskUpdates, setTaskUpdates] = useState<TaskUpdate[]>([]);
@@ -835,9 +833,10 @@ function JuntaDetailInner() {
     setShowAddPersona(false);
   };
 
-  const handleAddTask = async () => {
-    if (!taskForm.titulo.trim() || !junta) return;
-    setAddingTask(true);
+  const handleAddTask = async (taskForm: TaskFormValues) => {
+    if (!junta) return;
+    // Validación de campos requeridos vive en zod (RichCreateSchema en
+    // tasks-create-form.tsx). Si llegamos aquí, los valores son válidos.
 
     const {
       data: { user },
@@ -849,6 +848,10 @@ function JuntaDetailInner() {
       .eq('email', (user?.email ?? '').toLowerCase())
       .maybeSingle();
 
+    // Rich form captura `fecha_compromiso`; sync a `fecha_vence` para evitar
+    // drift entre vistas que leen una u otra.
+    const fechaPrincipal = taskForm.fecha_compromiso || taskForm.fecha_vence || null;
+
     const { data: newTask, error: err } = await supabase
       .schema('erp')
       .from('tasks')
@@ -859,7 +862,8 @@ function JuntaDetailInner() {
         asignado_a: taskForm.asignado_a || null,
         prioridad: taskForm.prioridad || null,
         estado: taskForm.estado,
-        fecha_vence: taskForm.fecha_vence || null,
+        fecha_vence: fechaPrincipal,
+        fecha_compromiso: fechaPrincipal,
         creado_por: coreUser?.id ?? null,
         entidad_tipo: 'junta',
         entidad_id: junta.id,
@@ -867,15 +871,12 @@ function JuntaDetailInner() {
       .select('id, titulo, estado, asignado_a, fecha_vence')
       .single();
 
-    setAddingTask(false);
-
     if (err) {
       alert(`Error al crear tarea: ${err.message}`);
       return;
     }
 
     setTasks((prev) => [...prev, newTask as JuntaTask]);
-    setTaskForm(emptyTaskForm());
     setShowAddTask(false);
   };
 
@@ -1720,10 +1721,7 @@ function JuntaDetailInner() {
         variant="rich"
         open={showAddTask}
         onOpenChange={setShowAddTask}
-        value={taskForm}
-        onChange={setTaskForm}
         onCreate={handleAddTask}
-        creating={addingTask}
         empleados={empleados}
         empleadoOptions={empleados.map((e) => ({ id: e.id, label: e.nombre }))}
       />
