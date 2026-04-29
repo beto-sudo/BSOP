@@ -8,7 +8,7 @@ import { RoutedModuleTabs } from '@/components/module-page';
  * ADR-005 (`docs/adr/005_module_with_submodules_routed_tabs.md`):
  *
  * - `/rdb/productos`           → tab "Catálogo" (default landing).
- * - `/rdb/productos/grupos`    → tab "Grupos · Padres-Hijos".
+ * - `/rdb/productos/recetas`   → tab "Recetas".
  * - `/rdb/productos/analisis`  → tab "Análisis".
  *
  * El strip de tabs vive aquí para que las 3 rutas hermanas mantengan la
@@ -20,7 +20,7 @@ import { RoutedModuleTabs } from '@/components/module-page';
  */
 const TABS = [
   { label: 'Catálogo', href: '/rdb/productos', exact: true },
-  { label: 'Grupos · Padres-Hijos', href: '/rdb/productos/grupos' },
+  { label: 'Recetas', href: '/rdb/productos/recetas' },
   { label: 'Análisis', href: '/rdb/productos/analisis' },
 ] as const;
 

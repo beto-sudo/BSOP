@@ -1,20 +1,21 @@
 /**
- * Smoke tests — RDB › Productos · Grupos (authenticated)
+ * Smoke tests — RDB › Productos · Recetas (authenticated)
  *
  * Sprint 1 de iniciativa `rdb-productos-config-reportes`. Vista read-only
- * de padres con sus hijos consumiendo `rdb.v_productos_grupo`.
+ * de productos vendibles con su receta (insumos + costo + margen) sobre
+ * `erp.producto_receta` joined con `rdb.v_productos_tabla`.
  *
  * Requires auth state. Will self-skip if no credentials were configured.
- * Run with: npm run test:e2e:auth -- --grep "RDB.*Grupos"
+ * Run with: npm run test:e2e:auth -- --grep "RDB.*Recetas"
  */
 
 import { test, expect } from '@playwright/test';
 import { skipIfNoAuth } from '../helpers/auth-guard';
 
-test.describe('RDB › Productos · Grupos', () => {
+test.describe('RDB › Productos · Recetas', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     skipIfNoAuth(testInfo);
-    await page.goto('/rdb/productos/grupos');
+    await page.goto('/rdb/productos/recetas');
     await page.waitForTimeout(1500);
     if (page.url().includes('/login')) {
       testInfo.skip(true, 'Session not accepted — auth state may be stale');
@@ -49,9 +50,9 @@ test.describe('RDB › Productos · Grupos', () => {
 
   test('search input filters rows', async ({ page }) => {
     await page.waitForTimeout(2500);
-    const input = page.locator('input[aria-label="Buscar padre, categoría o hijo"]').first();
+    const input = page.locator('input[aria-label="Buscar producto, categoría o insumo"]').first();
     const isVisible = await input.isVisible().catch(() => false);
-    if (!isVisible) return; // access denied — skip interaction
+    if (!isVisible) return;
 
     const before = await page.locator('table tbody tr').count();
     await input.fill('xxxxxxxxxnothing');
@@ -64,7 +65,7 @@ test.describe('RDB › Productos · Grupos', () => {
     await page.waitForTimeout(2500);
     const rows = page.locator('table tbody tr');
     const count = await rows.count();
-    if (count === 0) return; // no data or access denied
+    if (count === 0) return;
 
     await rows.first().click();
     await page.waitForTimeout(800);

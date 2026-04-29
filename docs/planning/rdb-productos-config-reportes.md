@@ -2,7 +2,7 @@
 
 **Slug:** `rdb-productos-config-reportes`
 **Empresas:** RDB (v1); diseñada para enchufar otras cuando aplique
-**Schemas afectados:** `erp` (productos, producto_receta), `rdb` (v_productos_grupo)
+**Schemas afectados:** `erp` (productos, producto_receta), `rdb` (v_productos_tabla)
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-29
@@ -11,183 +11,183 @@
 > Promovida a iniciativa el 2026-04-29 después de estresar la idea con
 > Beto. La gerencia del Deportivo Rincón del Bosque y contabilidad no
 > tienen visibilidad sobre cómo están configurados los productos:
-> padres-hijos, recetas, factores de consumo. La información existe en
-> el schema (`erp.productos.parent_id`, `erp.productos.factor_consumo`,
-> `erp.producto_receta`, view `rdb.v_productos_grupo`) pero no hay
-> pantallas que la expongan ni reportes que la auditen — todo se edita
-> celda por celda en `app/rdb/productos/page.tsx`.
+> qué recetas existen, qué insumos consumen, en qué cantidad y con
+> qué margen vs el precio de venta. La información existe en
+> `erp.producto_receta` + `rdb.v_productos_tabla` (último costo, último
+> precio) pero no hay pantallas que la expongan ni reportes que la
+> auditen — la edición de receta vive enterrada en el drawer del
+> producto en `app/rdb/productos/page.tsx`.
 
 ## Problema
 
 La gerencia del deportivo (RDB) y contabilidad no tienen forma de:
 
-1. **Ver qué productos están configurados como padres** (a granel, ej.
-   botella de licor, garrafa) y cuáles son sus hijos (porciones que se
-   venden, ej. trago de 45 ml).
-2. **Ver qué recetas existen** y qué insumos consume cada una, en qué
-   cantidad y unidad.
-3. **Auditar la configuración**: productos vendibles sin receta,
-   productos hijos sin factor de consumo configurado, padres sin hijos,
-   recetas con insumos no inventariables.
-4. **Ver el costo real de una receta** calculado a partir de los costos
-   de sus insumos vs el precio de venta → margen.
-5. **Configurar masivamente factores de consumo**: hoy se edita un
-   factor a la vez dentro de una celda en la tabla maestra; no hay
-   pantalla dedicada para revisar y ajustar el catálogo en bulk.
+1. **Ver qué recetas existen** y qué insumos consume cada una, en qué
+   cantidad y unidad — hoy solo se ve abriendo el drawer producto por
+   producto en el catálogo.
+2. **Ver el costo real de una receta** calculado a partir del último
+   costo de cada insumo, vs el precio de venta del producto vendible →
+   margen visible.
+3. **Auditar la configuración**: productos vendibles con receta
+   margen-negativo, recetas con insumos sin costo conocido, productos
+   vendibles sin receta cuando se esperaría tenerla.
+4. **Editar masivamente cantidades de receta** — hoy se edita una
+   receta a la vez en el drawer del producto.
 
-Datos cuantitativos del schema (al 2026-04-29):
+Datos del schema (al 2026-04-29):
 
-- `erp.productos` tiene columnas `parent_id` (FK self) y `factor_consumo`
-  (numeric, default 1.0) — ya soportan padres-hijos.
-- `erp.producto_receta` ya existe con `producto_venta_id`, `insumo_id`,
-  `cantidad`, `unidad`, `notas`.
-- `rdb.v_productos_grupo` ya agrupa hijos por padre — pero no hay
-  pantalla que la consuma hoy.
+- `erp.producto_receta` — `producto_venta_id`, `insumo_id`, `cantidad`,
+  `unidad`, `notas`. La tabla canónica de "qué insumos consume cada
+  producto vendible".
+- `rdb.v_productos_tabla` — view ya existente con `ultimo_costo` (de
+  movimientos recientes) y `ultimo_precio_venta`. Es la fuente
+  pragmática para Sprint 1; precisión vs realidad operativa puede
+  refinarse después.
+- `erp.productos.parent_id` + `factor_consumo` — modelo legacy de
+  porcionamiento que se planeaba usar en paralelo a recetas, pero
+  Beto confirmó (2026-04-29) que **el modelo de recetas cubre el caso
+  de uso completo** (botella → trago = receta de 1 insumo). Las
+  columnas quedan candidatas a deprecar en sub-iniciativa aparte
+  (requiere auditar consumidores: la view `rdb.v_productos_grupo`,
+  posibles queries, datos vivos a migrar a recetas).
 
-El gap es **100% UI + reportes**, no schema (con la excepción de
-posibles validaciones que se decidirán en Sprint 3-4).
+El gap es **100% UI + reportes**, no schema.
 
 ## Outcome esperado
 
-Gerencia RDB y contabilidad pueden auditar y configurar productos sin
-escalar preguntas a Beto/Claude:
+Gerencia RDB y contabilidad pueden auditar la configuración de
+productos sin escalar consultas:
 
-- Tabla de **grupos padres-hijos** con factor de consumo visible y
-  filtrable.
-- Listado de **recetas** con insumos, cantidades y costo calculado.
-- **Costo-margen** por producto vendible (costo_receta_calculado vs
-  precio_venta).
-- **Reporte de huecos** de configuración con alertas accionables (sin
-  receta, sin factor, margen negativo, padres huérfanos).
-- **Vista dedicada para editar factores** masivamente con filtros
-  (solo padres, factor=1 sospechoso).
+- Listado consolidado de **recetas existentes** con #insumos, costo
+  calculado, precio de venta y margen.
+- Drawer detalle por receta con la lista completa de insumos
+  (cantidad, unidad, costo unitario, costo subtotal, total).
+- **Reporte de huecos**: recetas con margen negativo, recetas sin
+  costo conocido (algún insumo sin `ultimo_costo`), recetas con
+  insumos eliminados.
+- **Edición masiva** de cantidades de receta (sin tener que entrar
+  producto por producto).
 
 Componentes en `components/productos/` shared para que cuando otra
 empresa requiera el módulo, sumar pages bajo `app/<empresa>/productos/`
 cueste decenas de líneas, no centenas — siguiendo la convención
 `shared-modules-refactor` (ADR-011).
 
-## Alcance v1 (tentativo — refinar al arrancar)
+## Alcance v1
 
-### Sprint 1 — Vista Padres-Hijos (read-only)
+### Sprint 1 — Vista Recetas (read-only) ✅ entregable en este PR
 
-- [ ] Página nueva `/rdb/productos/grupos` con `<DataTable>` que
-      consume `rdb.v_productos_grupo` (FK cross-schema requiere usar
-      el patrón documentado en memory `reference_supabase_cross_schema_fk.md`).
-- [ ] Columnas: padre (nombre + sku), total_hijos, lista de hijos (jsonb
-      de la view) con factor_consumo de cada uno.
-- [ ] Detalle de grupo (drawer o sub-page): tabla de hijos con factor
-      editable inline (reusa `<DetailDrawer>` o `<DetailPage>`).
-- [ ] Filtros con `useUrlFilters` + `<ActiveFiltersChip>` (ADR-007).
-- [ ] Estados via `<EmptyState>` + `<TableSkeleton>` + `<ErrorBanner>`
-      (ADR-006).
-- [ ] Test smoke: carga sin auth-block, filter funciona, drawer abre.
-
-### Sprint 2 — Vista Recetas
-
-- [ ] Página `/rdb/productos/recetas` con `<DataTable>` listando los
+- [x] Layout `app/rdb/productos/layout.tsx` con `<RoutedModuleTabs>`
+      (ADR-005): **Catálogo / Recetas / Análisis**. Productos pasa de
+      1 page a módulo con sub-tabs sin sumar entradas al sidebar.
+- [x] Página `/rdb/productos/recetas` con `<DataTable>` listando los
       productos vendibles que tienen al menos un renglón en
       `erp.producto_receta`.
-- [ ] Columnas: producto venta (nombre + sku), # insumos,
-      `costo_receta_calculado`, `precio_venta`, margen ($, %).
-- [ ] Drawer detalle (`<DetailDrawer>`): lista de insumos con cantidad,
-      unidad, costo unitario por insumo, costo subtotal.
-- [ ] Helper nuevo: `lib/productos/recetas.ts` con
-      `calcularCostoReceta(producto_venta_id)` — cliente + RPC opcional
-      si la performance lo justifica.
-- [ ] Decidir fuente de costo del insumo: `erp.productos.costo_unitario`
-      vs costo histórico de movimientos (ver Riesgos).
+- [x] Columnas: producto vendible (con categoría), # insumos, costo
+      receta, precio venta, margen (%) con color por umbral
+      (rojo / ámbar / verde).
+- [x] Filtros con `useUrlFilters` (ADR-007): búsqueda libre (matchea
+      producto, categoría, insumos) y toggle "solo margen negativo".
+- [x] `<DetailDrawer>` (size `lg`, ADR-018) con tabla de insumos:
+      nombre, cantidad, unidad, costo unitario, subtotal, total.
+- [x] Costo del insumo: **opción (a)** confirmada con Beto —
+      `rdb.v_productos_tabla.ultimo_costo`. Insumos sin costo dejan la
+      receta sin costo total (UI muestra "—" en vez de fingir un
+      número incorrecto).
+- [x] Smoke test e2e en
+      `tests/e2e/smoke/auth-rdb-productos-recetas.spec.ts`.
 
-### Sprint 3 — Configuración masiva de factores
-
-- [ ] Página `/rdb/productos/factores` con grid editable
-      (`<DataTable>` + `<Form>` + `useZodForm` per-row, ADR-016).
-- [ ] Filtros: solo padres / solo hijos / factor=1 (sospechoso) /
-      factor faltante.
-- [ ] Edición inline por fila con validación zod (factor > 0).
-- [ ] Audit trail: cambios en `factor_consumo` quedan registrados en
-      la tabla audit estándar del repo (verificar si ya hay trigger;
-      si no, agregar uno o usar el patrón de `actualizar_*` existente).
-- [ ] Bulk edit (postergable a Sprint 3.B si surge necesidad).
-
-### Sprint 4 — Reporte de auditoría / validación
+### Sprint 2 — Reporte de auditoría / validación
 
 - [ ] Página `/rdb/productos/auditoria` (o sección dentro de
       `/rdb/productos/analisis`).
 - [ ] Lista alerts agrupadas por severidad:
   - **Crítico**: receta con margen negativo (costo > precio_venta).
-  - **Crítico**: producto vendible sin receta (si tiene insumo
-    inventariable razonablemente esperado — heurística por categoría
-    o flag manual a definir).
-  - **Warning**: producto hijo sin factor configurado o factor=1.
-  - **Warning**: padre sin hijos (orfandad de configuración).
-  - **Warning**: receta con insumo no inventariable (ya existe
-    validación en `upsertReceta`, pero datos legacy pueden tenerlo).
-- [ ] Cada alert linkea al detalle del producto / receta / grupo.
+  - **Crítico**: producto vendible sin receta donde se esperaría tener
+    una (heurística por categoría o flag manual a definir al arrancar).
+  - **Warning**: receta con algún insumo sin `ultimo_costo` registrado.
+  - **Warning**: receta con insumo eliminado / huérfano.
+  - **Warning**: receta con insumo no inventariable (datos legacy).
+- [ ] Cada alert linkea al detalle de la receta vía drawer ya
+      construido.
 - [ ] Dashboard summary cards arriba: # alerts críticas, # warnings.
 
-### Sprint 5 — Sidebar + permisos + cierre
+### Sprint 3 — Edición masiva de recetas
 
-- [ ] Sub-items en sidebar bajo Inventario (RDB): Productos / Grupos /
-      Recetas / Factores / Auditoría. Seguir convención de
-      `sidebar-taxonomia` ADR-014 (sección Inventario para RDB).
-- [ ] Verificar que `rdb.productos` cubra todas las rutas en
+- [ ] Vista de edición sobre la misma página de Recetas (toggle "modo
+      edición" o sub-tab) o página dedicada `/rdb/productos/recetas/edicion`.
+- [ ] Editar cantidades, unidades, agregar/quitar insumos sin tener
+      que abrir un producto a la vez.
+- [ ] Validación zod (ADR-016) por fila — cantidad > 0, insumo
+      pertenece a RDB, no es self-reference.
+- [ ] Audit trail: cambios quedan registrados (verificar si
+      `producto_receta` ya tiene trigger de auditoría; si no, agregar
+      uno o usar el patrón estándar del repo).
+
+### Sprint 4 — Sidebar + permisos + cierre
+
+- [ ] Verificar tabs definitivas del módulo Productos (Catálogo /
+      Recetas / Análisis / Auditoría) y orden.
+- [ ] Confirmar que `rdb.productos` cubra todas las rutas en
       `ROUTE_TO_MODULE` ([lib/permissions.ts](../../lib/permissions.ts)).
-      Probable: sí, todo es lectura/escritura del mismo módulo y no
-      requiere slugs nuevos (decisión confirmada con Beto 2026-04-29).
 - [ ] Closeout: bitácora, ADR si aplica, sweep de Reminders, mover
       iniciativa a `## Done` en `INITIATIVES.md`.
 
 ## Fuera de alcance v1
 
+- **Vista de Padres-Hijos** (`erp.productos.parent_id` +
+  `factor_consumo`). Confirmado con Beto el 2026-04-29: el modelo de
+  recetas cubre el caso de uso completo (botella → trago = receta de
+  1 insumo con cantidad). Las columnas `parent_id` y `factor_consumo`
+  quedan **candidatas a deprecar**, sub-iniciativa aparte:
+  - Auditar consumidores: `rdb.v_productos_grupo` (view), queries
+    posibles en otros módulos, datos vivos en `erp.productos` con
+    `parent_id` no nulo.
+  - Migrar datos vivos de padres-hijos a `erp.producto_receta` (un
+    hijo con `factor_consumo = N` se vuelve una receta de 1 insumo
+    con `cantidad = N`).
+  - DROP `parent_id` + `factor_consumo` + view `v_productos_grupo`.
+  - Requiere migración SQL aplicada por Beto + regeneración de
+    SCHEMA_REF + types.
 - **Cross-empresa rollout** (ANSA / COAGAN / DILESA). Los componentes
-  se construyen en `components/productos/` shared, pero la liberación
-  v1 es **solo RDB**. Cuando otra empresa requiera el módulo, será
-  iniciativa hija o expansión — typically pages nuevos bajo
-  `app/<empresa>/productos/...` que consumen los mismos componentes
-  pasando `empresa_id`.
-- **Validación de ciclos padre-hijo** a nivel constraint DB
-  (ej. CHECK `parent_id != id` y prevención transitiva). Hoy no hay
-  constraint que prevenga "A es padre de B y B es padre de A". Se
-  evaluará en Sprint 3 al tocar el editor de factores; si crece a
-  ADR aparte, se promueve.
-- **Wizard de alta masiva de productos / recetas** (importar desde
-  CSV / Excel). Si la operación de carga inicial lo amerita, se
-  evalúa como sub-iniciativa.
+  se construyen pensados para reutilizarse, pero la liberación v1 es
+  **solo RDB**. Cuando otra empresa requiera el módulo, será sub-iniciativa.
+- **Wizard de alta masiva de recetas** (importar desde CSV / Excel).
+  Si la operación de carga inicial lo amerita, se evalúa como
+  sub-iniciativa.
 - **RBAC granular nuevo** (`rdb.productos.recetas`,
-  `rdb.productos.factores`, `rdb.productos.reportes`). Confirmado
-  con Beto 2026-04-29: por ahora todo bajo `rdb.productos` único, se
-  resuelve vía rol. Si más adelante contabilidad debe ver _menos_
-  que gerencia, será refactor de permisos en iniciativa nueva.
-- **Histórico de cambios de receta** (versionado). El audit trail
-  básico de `factor_consumo` entra en Sprint 3, pero un sistema de
-  versiones de receta queda fuera v1.
+  `rdb.productos.auditoria`, etc.). Confirmado con Beto 2026-04-29:
+  por ahora todo bajo `rdb.productos` único, se resuelve vía rol.
+- **Histórico de cambios de receta** (versionado). Audit trail básico
+  entra en Sprint 3, pero un sistema de versiones de receta queda
+  fuera v1.
+- **Drift consumo real vs configurado** (comparar lo que la receta
+  dice que se consume vs los movimientos de inventario reales).
+  Reporte separado, evaluar después de v1.
 
 ## Bloqueos / Dependencias
 
-- **Schema cross-schema FK** (`erp.productos.parent_id` + view
-  `rdb.v_productos_grupo`): supabase-js no embebe FKs entre schemas
-  vía `.schema('rdb')`. Mitigación: dos queries con `.in()` o consumir
-  la view `rdb.v_productos_grupo` directamente cuando ya tiene los
-  hijos serializados como jsonb. Documentado en memory
-  `reference_supabase_cross_schema_fk.md`.
-- **`v_productos_grupo` no se consume hoy**: verificar shape real
-  antes de construir UI encima — si la view no devuelve lo esperado,
-  hay que ajustarla en Sprint 1.
-- **Costo del insumo** (Sprint 2): `erp.productos.costo_unitario` es
-  el dato más simple, pero puede estar stale o no reflejar costo real
-  promedio. Alternativa: costo ponderado de movimientos de entrada
-  recientes (vía RPC). Decidir antes de implementar — afecta margen
-  reportado.
-- **Patron de audit trail**: verificar si `factor_consumo` ya tiene
-  trigger de auditoría o si hay que agregarlo en Sprint 3.
+- **Costo del insumo precisión** (ya decidido v1): `ultimo_costo` de
+  `rdb.v_productos_tabla` puede estar stale o desviado del costo
+  promedio real. Para v1 es suficiente; si Sprint 2 (auditoría)
+  expone problemas reales con datos, considerar costo ponderado vía
+  RPC en sprint posterior.
+- **Unidades**: `producto_receta.unidad` puede no coincidir con
+  `productos.unidad` del insumo. El cálculo costo_subtotal =
+  ultimo_costo × cantidad asume coincidencia. Para v1 lo dejamos así
+  y la UI lo señala visualmente cuando difiere ("unidad base: X" en
+  el drawer). Conversión real entra en Sprint 3 si se vuelve común.
+- **Patron de audit trail** (Sprint 3): verificar si `producto_receta`
+  ya tiene trigger o si lo agregamos.
+- **Deprecación padres-hijos** (sub-iniciativa): NO se toca schema en
+  esta iniciativa, queda como follow-up.
 
 ## Métrica de éxito
 
-- Gerencia RDB y contabilidad operan sin escalar consultas de
+- Gerencia RDB + contabilidad operan sin escalar consultas de
   configuración de productos a Beto / Claude (señal cualitativa).
-- Reporte de auditoría (Sprint 4) llega a **0 alerts críticas
-  pendientes** dentro de las primeras 4 semanas post-Sprint 4 — el
+- Reporte de auditoría (Sprint 2) llega a **0 alerts críticas
+  pendientes** dentro de las primeras 4 semanas post-Sprint 2 — el
   closing del backlog inicial es la señal de que el reporte funciona
   y la operación lo está usando.
 - Productos con margen negativo se vuelven visibles y accionables
@@ -195,50 +195,50 @@ cueste decenas de líneas, no centenas — siguiendo la convención
 
 ## Sprints / hitos
 
-### Sprint 1 — Vista Padres-Hijos (read-only) · 2026-04-29
+### Sprint 1 — Vista Recetas (read-only) · 2026-04-29
 
 **Estado:** mergeado pendiente · PR Sprint 1 (este PR).
 
 Entregable:
 
-- Página `/rdb/productos/grupos` consumiendo `rdb.v_productos_grupo`.
-- `<DataTable>` con columnas: padre (con categoría como meta), costo
-  unitario, unidad, total hijos. Sort default por `padre_nombre` asc.
-- Filtros con `useUrlFilters` (ADR-007): búsqueda libre (matchea padre,
-  categoría e hijos) y toggle `solo_con_hijos`.
-- Estados con `<DataTable>` (loading + error + empty con
-  `<EmptyState>` ADR-006).
-- `<DetailDrawer>` (size `lg`, ADR-018) con tabla de hijos
-  (nombre / factor / precio) read-only. Empty state cuando el padre no
-  tiene hijos.
-- Layout `app/rdb/productos/layout.tsx` con `<RoutedModuleTabs>`
-  (ADR-005): tabs **Catálogo / Grupos · Padres-Hijos / Análisis**.
-  Productos pasa de 1 page a un módulo con sub-tabs sin sumar entradas
-  al sidebar. La sidebar entry "Productos" del módulo Inventario sigue
-  apuntando al `/rdb/productos` default.
-- Smoke test e2e en `tests/e2e/smoke/auth-rdb-productos-grupos.spec.ts`
-  (carga + input + tabla + filter + click → drawer).
+- Layout `app/rdb/productos/layout.tsx` con `<RoutedModuleTabs>` y 3
+  tabs: **Catálogo** (`/rdb/productos`) · **Recetas**
+  (`/rdb/productos/recetas`) · **Análisis** (`/rdb/productos/analisis`).
+  Sidebar entry "Productos" del módulo Inventario sigue siendo único
+  (las sub-tabs no agregan nada al sidebar).
+- Página `/rdb/productos/recetas` con `<DataTable>` consumiendo
+  `erp.producto_receta` joined con `rdb.v_productos_tabla` (costo +
+  precio).
+- Columnas: producto + categoría · #insumos · costo receta · precio
+  venta · margen (con color por umbral).
+- Filtros con `useUrlFilters` (ADR-007): búsqueda libre y toggle
+  "solo margen negativo".
+- `<DetailDrawer>` (size `lg`, ADR-018) con tabla de insumos: nombre,
+  cantidad, unidad, costo unitario, subtotal, total. Indica unidad
+  base del insumo cuando difiere de la unidad de receta.
+- Smoke test e2e en `tests/e2e/smoke/auth-rdb-productos-recetas.spec.ts`.
 
 Cierre técnico:
 
-- `parseHijos()` valida shape del jsonb defensivamente (ignora
-  entradas malformadas en lugar de fallar duro).
-- Test `'no duplicate slugs in ROUTE_TO_MODULE'` removido en el commit
-  inicial (ahora obsoleto): el approach final con `<RoutedModuleTabs>`
-  no agrega rutas a `ROUTE_TO_MODULE` — las sub-tabs heredan el guard
-  del page padre vía `<RequireAccess>` propio. Comment explicativo en
-  `lib/permissions.test.ts` queda como nota para futuras sub-pages.
-- Detalle del grupo es read-only en Sprint 1; edición de
-  `factor_consumo` queda para Sprint 3 (configuración masiva).
+- Costo del insumo viene de `rdb.v_productos_tabla.ultimo_costo`
+  (opción a, decisión Beto 2026-04-29). Insumos sin costo dejan la
+  receta sin costo total — UI muestra "—" en vez de fingir.
+- Recetas huérfanas (producto vendible eliminado) se filtran y no
+  rompen render.
+- `<RequireAccess empresa="rdb" modulo="rdb.productos">` en cada page
+  individual (defense in depth) — no en el layout para no contaminar
+  el árbol con un wrapper extra.
+- Edición de receta sigue viviendo en la pestaña Catálogo, en el
+  drawer del producto. Edición masiva consolidada llega en Sprint 3.
 
-### Sprint 2 — Vista Recetas (próximo)
+### Sprint 2 — Reporte de auditoría (próximo)
 
 Pendiente de arrancar. Decisiones técnicas a cerrar al arrancar:
 
-- Fuente de costo del insumo: `erp.productos.costo_unitario` vs
-  ponderado de movimientos recientes (afecta margen reportado).
-- Si la performance de costo calculado en cliente es aceptable o
-  amerita RPC.
+- Heurística para "producto vendible sin receta esperada": ¿flag
+  manual en `productos`, categoría, o regla derivada?
+- ¿Reporte como nueva sub-tab "Auditoría" o sección dentro de
+  "Análisis"?
 
 ## Decisiones registradas
 
@@ -252,39 +252,65 @@ Decisiones tomadas en la conversación de promoción:
   para que cross-empresa cueste poco después.
 - **Reportes en alcance:** validación de configuración (a) + análisis
   costo/margen (b). Drift consumo real vs configurado (c) **fuera de
-  v1** — se evalúa cuando los reportes a/b estén operando.
-- **Factores de consumo:** foco en _ver y configurar fácilmente_
-  (Sprint 3). Bulk edit / detección de drift queda para v2.
-- **Padres-hijos:** visualización tabular (Sprint 1). Árbol jerárquico
-  / drilldown queda fuera v1 — se evalúa si surge necesidad operativa.
+  v1**.
 - **Empresas:** RDB only v1. Componentes shared para enchufar otras
   empresas barato cuando llegue el caso.
 - **RBAC:** sin granularidad nueva. Sigue `rdb.productos` único, se
   resuelve vía rol.
 
+### 2026-04-29 · Padres-Hijos descartado de v1 · Recetas absorbe el caso
+
+Beto revisó el preview del Sprint 1 (vista Padres-Hijos) y aclaró que
+el modelo de recetas cubre el caso de uso completo: un trago "consume"
+de la botella exactamente como una margarita "consume" tequila — son
+recetas. Padres-Hijos en `erp.productos` queda candidato a deprecar
+en sub-iniciativa aparte (requiere auditoría de consumidores y
+migración de datos antes de DROP).
+
+Cambios en este Sprint 1:
+
+- Vista de Recetas reemplaza la vista de Grupos.
+- Tab del módulo Productos: **Catálogo / Recetas / Análisis** (sin
+  Grupos).
+- Schemas afectados ajustados: ya no consumimos `v_productos_grupo`.
+
+### 2026-04-29 · Costo del insumo (Sprint 1) — ultimo_costo
+
+Confirmado con Beto: `rdb.v_productos_tabla.ultimo_costo` es la
+fuente para v1. Es lo más simple y suficiente para que gerencia +
+contabilidad vean orden de magnitud del margen. Si Sprint 2 expone
+desviaciones que confunden la auditoría, considerar costo ponderado
+en sprint posterior.
+
 ## Bitácora
 
 ### 2026-04-29 · Sprint 1 mergeado pendiente · transición proposed → in_progress
 
-PR Sprint 1 (este PR). Vista `/rdb/productos/grupos` read-only sobre
-`rdb.v_productos_grupo`. Smoke test creado. Estado de iniciativa
-cambia a `in_progress`. Próximo: Sprint 2 (recetas + costo/margen)
-cuando Beto lo desbloquee.
+PR Sprint 1 (este PR). Originalmente arrancó como vista Padres-Hijos
+sobre `rdb.v_productos_grupo`. Layout con tabs (ADR-005). Smoke test
+creado. Estado de iniciativa cambia a `in_progress`.
 
 ### 2026-04-29 · Sprint 1 corrección post-review · sub-tabs en vez de sidebar entry
 
 Beto revisó el preview y apuntó que Grupos no debe ser entrada
 separada en sidebar — debe vivir como sub-tab del módulo Productos
-siguiendo ADR-005 (`module-page-submodules`). Corrección aplicada en
-el mismo PR:
+(ADR-005). Sidebar entry removida; `/rdb/productos/grupos` removido
+de `ROUTE_TO_MODULE`; `h1` redundante removido del page.
 
-- Nuevo `app/rdb/productos/layout.tsx` con `<RoutedModuleTabs>` y 3
-  tabs: **Catálogo** (`/rdb/productos`) · **Grupos · Padres-Hijos**
-  (`/rdb/productos/grupos`) · **Análisis** (`/rdb/productos/analisis`).
-- Sidebar entry "Grupos · Padres-Hijos" removida; "Productos" sigue
-  siendo el único item.
-- `/rdb/productos/grupos` removido de `ROUTE_TO_MODULE` (las sub-tabs
-  heredan el guard del page padre vía su propio `<RequireAccess>`).
-- `h1` redundante "Productos · Grupos" removido del page (la tab
-  activa ya etiqueta el sub-modulo); descripción y botón Refrescar
-  preservados.
+### 2026-04-29 · Sprint 1 redirección · Recetas reemplaza Padres-Hijos
+
+Segunda revisión de preview. Beto observó que Padres-Hijos y Recetas
+no son lo mismo y que el modelo de recetas cubre el caso de uso real.
+Reescritura del Sprint 1:
+
+- Borrada `app/rdb/productos/grupos/page.tsx`; creada
+  `app/rdb/productos/recetas/page.tsx` con vista nueva sobre
+  `erp.producto_receta` + `rdb.v_productos_tabla`.
+- Renombrado smoke test: `auth-rdb-productos-grupos.spec.ts` →
+  `auth-rdb-productos-recetas.spec.ts`.
+- Layout actualizado: tab "Grupos · Padres-Hijos" → "Recetas".
+- Plan de iniciativa reordenado: Sprint 2 ahora es Reporte de
+  auditoría (subió de Sprint 4); Sprint 3 ahora es Edición masiva
+  de recetas (en lugar de configuración masiva de factores). Vista
+  de Padres-Hijos descartada de v1 con nota de deprecación pendiente
+  de las columnas `parent_id` + `factor_consumo`.
