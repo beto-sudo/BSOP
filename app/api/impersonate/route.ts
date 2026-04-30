@@ -21,6 +21,11 @@ const ImpersonateQuerySchema = z.object({
  * call `assertNotInPreview()`).
  *
  * The cookie is cleared by `POST /api/impersonate/stop`.
+ *
+ * Accepts both GET and POST for backwards compatibility: clients running
+ * an older bundle from before Sprint 1 still call this with GET. The
+ * behavior is identical — same admin auth, same cookie set. Safe because
+ * cookie setting only happens after the admin check passes.
  */
 export async function POST(req: NextRequest) {
   const rate = await impersonateRateLimiter.check(extractIdentifier(req));
@@ -178,3 +183,9 @@ export async function POST(req: NextRequest) {
     modulos,
   });
 }
+
+// Backwards compatibility: clients on the pre-Sprint-1 bundle still call
+// this endpoint with GET. Aliasing GET to the same handler keeps them
+// working while their browsers warm up to the new bundle. Behavior is
+// identical — admin auth + same cookie set + same payload.
+export const GET = POST;
