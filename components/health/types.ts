@@ -16,6 +16,10 @@ export type HeroCard = {
   icon: typeof HeartPulse;
   stale?: boolean;
   staleLabel?: string;
+  // Recovery warning surfaced next to the label when the vital has shifted
+  // unfavorably vs its 7-day baseline (e.g. HRV drop > 10%, RHR rise > 5
+  // bpm). Set by getRecoveryFlag in helpers.
+  flag?: { tone: 'warning'; label: string };
 };
 
 export type ChartConfig = {

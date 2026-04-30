@@ -27,6 +27,14 @@ export function HeroVitals({ heroCards }: { heroCards: HeroCard[] }) {
                     <Icon className="h-5 w-5" />
                   </div>
                   <div className="flex items-center gap-2">
+                    {card.flag ? (
+                      <span
+                        className="rounded-full border border-amber-400/50 bg-amber-200/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-800 dark:border-amber-300/30 dark:bg-amber-300/15 dark:text-amber-100"
+                        title={`${card.label} se movió contra ti vs la base 7d previa.`}
+                      >
+                        {card.flag.label}
+                      </span>
+                    ) : null}
                     {card.stale ? (
                       <span className="rounded-full border border-amber-300/40 bg-amber-100/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700 dark:border-amber-300/25 dark:bg-amber-300/10 dark:text-amber-200">
                         {card.staleLabel ?? 'Sin datos'}

@@ -182,6 +182,90 @@ export function isStaleSince(latestIso: string | null | undefined, maxDaysStale:
 }
 
 /**
+ * Daily sleep efficiency = (Core + Deep + REM) / In Bed × 100. Clinical
+ * benchmark: > 85% is considered restorative; sub-80% suggests fragmented
+ * sleep. Sleep In Bed is taken from the larger of the two devices that
+ * report it (Sleeptracker® primary; Apple Watch sometimes reports 0 → it's
+ * skipped at the normalizer level so won't override the bed value here).
+ *
+ * Returns one Point per day where both inBed > 0 and asleep > 0 — days
+ * with only one component (e.g. nap recorded on Apple Watch without an
+ * In Bed sample) are skipped to avoid 0% / >100% noise.
+ */
+export function groupDailySleepEfficiency(rows: HealthMetricRow[]): Point[] {
+  type Bucket = {
+    asleepSt: number;
+    asleepOther: number;
+    inBedSt: number;
+    inBedOther: number;
+  };
+  const buckets = new Map<string, Bucket>();
+  rows.forEach((row) => {
+    const key = row.date.slice(0, 10);
+    const existing = buckets.get(key) ?? { asleepSt: 0, asleepOther: 0, inBedSt: 0, inBedOther: 0 };
+    const isSleeptracker = (row.source ?? '').toLowerCase().includes('sleeptracker');
+    if (row.metric_name === 'Sleep In Bed') {
+      if (isSleeptracker) existing.inBedSt += row.value;
+      else existing.inBedOther += row.value;
+    } else if (
+      row.metric_name === 'Sleep Core' ||
+      row.metric_name === 'Sleep Deep' ||
+      row.metric_name === 'Sleep REM'
+    ) {
+      if (isSleeptracker) existing.asleepSt += row.value;
+      else existing.asleepOther += row.value;
+    }
+    buckets.set(key, existing);
+  });
+  const points: Point[] = [];
+  for (const [date, b] of buckets.entries()) {
+    const asleep = Math.max(b.asleepSt, b.asleepOther);
+    const inBed = Math.max(b.inBedSt, b.inBedOther);
+    if (asleep <= 0 || inBed <= 0) continue;
+    points.push({ date, value: Math.min(100, (asleep / inBed) * 100) });
+  }
+  return points.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * Compute a recovery flag for a vital that has shifted unfavorably vs the
+ * previous 7-day baseline. For HRV (where lower = worse) pass type='drop'
+ * and a relative threshold (0.10 = 10% drop). For resting HR (where higher
+ * = worse) pass type='rise' and an absolute threshold (e.g. 5 bpm). Uses
+ * the existing computeSymmetricDelta helper so it requires at least 14
+ * days of data — returns null otherwise.
+ *
+ * Clinical context: post-bypass cardiac rehab. A sustained HRV drop or RHR
+ * rise without a workout / illness explanation is a warning sign worth
+ * surfacing on the hero card so it doesn't get lost in the trend chart.
+ */
+export function getRecoveryFlag(
+  points: Point[],
+  options: { type: 'drop'; threshold: number } | { type: 'rise'; thresholdAbs: number }
+): { tone: 'warning'; label: string } | null {
+  const delta = computeSymmetricDelta(points, 7);
+  if (!delta || delta.previous <= 0) return null;
+
+  if (options.type === 'drop') {
+    const ratio = delta.delta / delta.previous;
+    if (ratio <= -options.threshold) {
+      return {
+        tone: 'warning',
+        label: `↓ ${Math.round(Math.abs(ratio) * 100)}%`,
+      };
+    }
+  } else {
+    if (delta.delta >= options.thresholdAbs) {
+      return {
+        tone: 'warning',
+        label: `↑ ${Math.round(delta.delta)} bpm`,
+      };
+    }
+  }
+  return null;
+}
+
+/**
  * Group sleep-stage rows into per-stage daily totals, de-duplicated across
  * Sleeptracker®/Apple Watch by taking the larger value per stage per day.
  * Returns averages keyed by stage name for breakdown charts.
