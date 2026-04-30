@@ -653,6 +653,14 @@ export function EmpleadosModule({
           open={showCreate}
           onOpenChange={setShowCreate}
           empresaId={insertEmpresaId}
+          empresaSlug={
+            empresaSlug === 'rdb' ||
+            empresaSlug === 'dilesa' ||
+            empresaSlug === 'ansa' ||
+            empresaSlug === 'coagan'
+              ? empresaSlug
+              : undefined
+          }
           departamentos={departamentos}
           puestos={puestos}
           onCreated={handleEmpleadoCreated}
