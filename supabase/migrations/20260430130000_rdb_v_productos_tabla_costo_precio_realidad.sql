@@ -35,9 +35,13 @@ AS
 WITH ultimo_costo_oc AS (
   -- Una fila por producto: el costo de la línea más reciente cuya OC
   -- esté en estado terminal post-recepción.
+  -- Cast explícito a numeric(14,2): la versión anterior de la vista
+  -- exponía ultimo_costo desde productos_precios.costo numeric(14,2),
+  -- y CREATE OR REPLACE VIEW no permite cambiar el tipo de columnas
+  -- existentes (SQLSTATE 42P16). Mantenemos la firma exacta.
   SELECT DISTINCT ON (ocd.producto_id)
     ocd.producto_id,
-    COALESCE(ocd.precio_real, ocd.precio_unitario) AS costo
+    COALESCE(ocd.precio_real, ocd.precio_unitario)::numeric(14, 2) AS costo
   FROM erp.ordenes_compra_detalle ocd
   JOIN erp.ordenes_compra oc ON oc.id = ocd.orden_compra_id
   WHERE ocd.empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
@@ -52,9 +56,10 @@ ultimo_precio_waitry AS (
   -- Una fila por product_id Waitry (= productos.codigo): el unit_price
   -- de la venta más reciente. Filtra unit_price > 0 para excluir
   -- cortesías/ajustes que no representan precio real cobrado.
+  -- Cast a numeric(14,2) por el mismo motivo que ultimo_costo arriba.
   SELECT DISTINCT ON (wp.product_id)
     wp.product_id,
-    wp.unit_price AS precio
+    wp.unit_price::numeric(14, 2) AS precio
   FROM rdb.waitry_productos wp
   WHERE wp.product_id IS NOT NULL
     AND wp.unit_price IS NOT NULL
