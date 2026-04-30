@@ -3,7 +3,7 @@
 **Slug:** `wizard-pattern`
 **Empresas:** todas
 **Schemas afectados:** n/a (UI)
-**Estado:** proposed
+**Estado:** planned
 **Dueño:** Beto
 **Creada:** 2026-04-29
 **Última actualización:** 2026-04-29
@@ -11,8 +11,8 @@
 > Spin-out de `forms-pattern` Sprint 6. La evaluación de
 > `empleado-alta-wizard.tsx` (1329 líneas) confirmó que un wizard de N
 > pasos requiere API materialmente distinta del `<Form>` de v1, y
-> arrastra `file-attachments` (iniciativa hermana). Se separa para no
-> contaminar el API simple de `forms-pattern`.
+> arrastra `file-attachments` (iniciativa hermana — ya cerrada). Se
+> separa para no contaminar el API simple de `forms-pattern`.
 
 ## Problema
 
@@ -40,32 +40,52 @@ wizard al `<Form>` de v1 contamina la API porque:
 - Beneficiarios dinámicos (1..N) usan `useFieldArray` — feature de RHF
   que `<Form>` v1 no expuso explícitamente.
 
+`<FileAttachments>` (ADR-022) tampoco calza directo dentro del wizard:
+requiere `entidadId` ya existente porque hace upload+insert inmediato.
+En el wizard el `empleadoId` no existe hasta el submit final, así que
+los archivos viven en buffer in-memory hasta entonces.
+
 ## Outcome esperado
 
 - Componente `<Wizard>` con N pasos navegables (back/next), cada paso
-  con su propio schema zod local.
-- Submit final atómico-ish (pre-validación de los N pasos antes de
-  hacer cualquier mutation).
-- Soporte para `useFieldArray` (beneficiarios, contactos, etc.).
-- File uploads dentro del flow, integrados con `file-attachments` pattern
-  (cuando esa iniciativa cierre).
+  con su propia lista de `fields` a validar antes de avanzar.
+- Submit final atómico-ish: pre-validación de los N pasos antes de
+  invocar `onSubmit`; al primer paso con error, navegar y mostrar
+  errors inline.
+- Soporte para `useFieldArray` nativo de RHF (beneficiarios, contactos
+  múltiples, etc.) — sin wrapper custom.
+- File uploads diferidos: slot que recolecta `File` por rol en memoria,
+  el caller hace upload+insert en su submit pipeline reusando
+  `buildAdjuntoPath()` (FA2 ADR-022).
 - Migración del único caso real (`empleado-alta-wizard`) como golden.
 
-## Alcance v1 (tentativo — refinar al arrancar)
+## Alcance v1 (cerrado 2026-04-29)
 
-- [ ] Decidir API: ¿`<Wizard steps={[...]} />` con array de schemas y
-      renderers? ¿`<WizardStep>` declarativo en children? ¿Hook
-      `useWizard()` que devuelve helpers + el componente lo arma?
-- [ ] Decidir storage del state inter-pasos: ¿un solo `useForm` global
-      con schema unificado y validación parcial por paso? ¿N `useForm`
-      independientes con sync manual? Probable: 1 form global, validación
-      parcial via `trigger()` por paso.
-- [ ] `useFieldArray` integration para beneficiarios.
-- [ ] Submit pipeline: pre-validar todos los pasos, ejecutar mutations
-      secuenciales, manejar rollback best-effort. Probable: callback
-      `onSubmit(values)` que el caller implementa con su propia secuencia
-      transaccional.
-- [ ] Migrar `empleado-alta-wizard` como golden path.
+- [x] Decidir API: **`<Wizard form={form}>` con `<WizardStep>` declarativo
+      en children + hook `useWizard()` interno**. El caller pinta cada
+      paso; el wizard solo es state machine + gate de validación.
+- [x] Decidir storage del state inter-pasos: **1 `useForm` global con
+      schema unificado**, validación parcial via `form.trigger(stepFields)`
+      antes de avanzar. `formState.isDirty` global → `useDirtyConfirm`
+      out-of-the-box (W6 ↔ ADR-016 F6).
+- [x] `useFieldArray` integration: **sin wrapper custom**, RHF nativo.
+      Beneficiarios = ejemplo canónico documentado en ADR.
+- [x] Submit pipeline: **`onSubmit(values)` callback en el caller**, igual
+      que `<Form>` v1. El wizard pre-valida los N pasos via
+      `form.trigger()` global; al primer paso con error, navega y
+      `setShowErrors(true)`. **El caller dueño de mutations + rollback.**
+- [x] File uploads: **`<WizardFileSlot>` standalone** que recolecta
+      `File` por rol en memoria. UI alineada visualmente a
+      `<FileAttachments>` (ícono + label + size + remove). El caller hace
+      upload+insert en el submit pipeline usando `buildAdjuntoPath()`.
+- [x] Stepper UI: `<WizardStepper>` con number + label + estado
+      (active/complete/incomplete + count de errores por paso).
+- [x] Footer: `<WizardActions>` Atrás/Siguiente/Submit. Auto-detect del
+      último paso → submit, step 1 → Atrás disabled, submitting → todos
+      disabled + spinner.
+- [x] Container: `<DetailDrawer size="xl">` (ADR-018) — el wizard se
+      renderea inside.
+- [x] Migrar `empleado-alta-wizard` como golden path.
 
 ## Fuera de alcance v1
 
@@ -75,18 +95,45 @@ wizard al `<Form>` de v1 contamina la API porque:
 - **Persistencia de progreso** (draft entre sesiones). Postergable.
 - **Validación cruzada inter-paso** beyond zod refines locales. Si surge
   necesidad, schema unificado al final.
+- **Modo "deferred" en `<FileAttachments>`**. Si surge un segundo wizard
+  con uploads, evaluamos si extraer un modo `<FileAttachments mode="deferred">`
+  o mantener `<WizardFileSlot>` standalone.
+- **Tests unitarios del wrapper** (mismo razonamiento que `forms-pattern`:
+  e2e cubre el comportamiento end-to-end; jsdom no instalado).
 
 ## Bloqueos
 
-- Depende parcialmente de **`file-attachments`**: si el wizard incluye
-  uploads, idealmente esa iniciativa cierra primero para no inventar
-  otra API de file inputs aquí. Alternativamente, `wizard-pattern` v1
-  acepta file inputs como callback opaco y `file-attachments` los
-  estandariza después.
+Ninguno. `file-attachments` cerrada (2026-04-30) — `<WizardFileSlot>`
+reusa `buildAdjuntoPath()` y los roles canónicos. `forms-pattern`
+cerrada (2026-04-29) — `<Wizard>` envuelve `useZodForm` + `<Form>`
+internamente. `drawer-anatomy` cerrada (2026-04-30) — container es
+`<DetailDrawer size="xl">`.
 
 ## Sprints / hitos
 
-_(se llena cuando arranque ejecución)_
+### Sprint 1 — Foundation + ADR-025 + golden migration `empleado-alta-wizard`
+
+Single PR contundente:
+
+1. `components/wizard/`:
+   - `wizard.tsx` — orquestador `<Wizard>` + hook `useWizard()` (context).
+   - `wizard-step.tsx` — `<WizardStep id fields>` declarativo.
+   - `wizard-stepper.tsx` — UI de pasos con estado.
+   - `wizard-actions.tsx` — footer Atrás/Siguiente/Submit.
+   - `wizard-file-slot.tsx` — slot para `File` deferred uploads.
+   - `index.ts`.
+2. `docs/adr/025_wizard_pattern.md` con reglas W1-W7.
+3. Migración golden: `components/rh/empleado-alta-wizard.tsx` reescrito
+   sobre la nueva foundation. Reduce ~1329 → ~700 líneas estimadas
+   (zero `useState` per-field; `<WizardStep>` por paso).
+
+### Sprint 2 — Closeout
+
+PR pequeño de cierre:
+
+- Mover `wizard-pattern` a `## Done` en `INITIATIVES.md`.
+- Bitácora final + outcome en este planning doc.
+- Barrido de Reminders en lista `Claude: BSOP` si quedan sub-tareas.
 
 ## Decisiones registradas
 
@@ -96,6 +143,61 @@ _(se llena cuando arranque ejecución)_
 real) requiere API materialmente distinta y arrastra `file-attachments`.
 Se separa para no contaminar el API simple de v1.
 
+### 2026-04-29 · API declarativa con `<WizardStep>` en children + 1 form global
+
+Tres alternativas evaluadas:
+
+1. `<Wizard steps={[{id, fields, render}, ...]} />` con array de configs.
+2. `<WizardStep id fields>...</WizardStep>` declarativo en children + hook.
+3. Hook `useWizard()` con render manual de pasos.
+
+Elegida #2 porque:
+
+- Paralelo a `<FormSection>` v1 (ADR-016 F4) — el caller pinta cada paso
+  inline, sin re-armar render functions.
+- El context interno centraliza state machine; el caller solo declara
+  estructura.
+- Pasar context (e.g. `persona.primer_empleo` afecta qué archivos son
+  obligatorios en step 3) es trivial — el caller tiene closure sobre
+  todo el state del form.
+
+State storage: **1 `useForm` global**. Razón: SDI auto-calc cruza pasos
+(compensación afecta cálculos derivados); `formState.isDirty` global =
+`useDirtyConfirm` cero-config; `form.trigger(fieldNames)` valida parcial
+sin sync manual entre N forms.
+
+### 2026-04-29 · Submit pipeline en el caller, no en el wizard
+
+`<Wizard>` no orquesta mutations. El callback `onSubmit(values)` recibe
+los values typed después de validar los N pasos. El caller implementa
+la secuencia de inserts + storage + rollback (igual que hoy).
+
+Razón: rollback es altamente domain-specific. Inventar API genérica
+de "transactional submit" es accidental complexity y arrastra el
+wrapper a conocer cosas que no debe (Supabase, schemas, storage).
+
+### 2026-04-29 · `<WizardFileSlot>` standalone vs refactor `<FileAttachments>`
+
+`<FileAttachments>` requiere `entidadId` pre-existente (upload+insert
+inmediato). En un wizard, ese id no existe hasta el submit final.
+
+Dos alternativas:
+
+A. Slot standalone `<WizardFileSlot>` que recolecta `File` por rol en
+memoria; el caller hace upload+insert en submit pipeline.
+B. Extender `<FileAttachments>` con `mode="deferred"` que devuelve
+`File[]` por rol al caller en lugar de uploadear inmediato.
+
+Elegida A en v1: extracción mínima, no toca `<FileAttachments>`. Si
+surge un segundo wizard con uploads, evaluamos B (refactor con
+beneficio cross-iniciativa).
+
 ## Bitácora
 
 _(append-only, escrita por Claude Code al ejecutar)_
+
+### 2026-04-29 · Promoción a `planned` y arranque de Sprint 1
+
+Beto autorizó el alcance v1 cerrado arriba y los 2 sprints. Arranca
+Sprint 1 con foundation `components/wizard/` + ADR-025 + golden
+migration `empleado-alta-wizard` en un solo PR.
