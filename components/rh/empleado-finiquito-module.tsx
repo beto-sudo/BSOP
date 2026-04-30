@@ -38,13 +38,11 @@ import {
   CAUSA_LABELS,
   type CausaTerminacion,
 } from '@/lib/hr/calcular-finiquito';
-
-// Salario mínimo diario 2026 (zona libre de frontera norte — Piedras Negras).
-// ⚠️ Ajustar anualmente o extraer a una tabla en DB si es necesario.
-// Fuente: CONASAMI. Al 2026 el SMG general es $248.93/día, zona frontera
-// $374.89/día. Las empresas que operan en otras zonas pueden ajustar el
-// valor en el panel de cálculo (campo "Salario mínimo diario").
-const SALARIO_MINIMO_DIARIO_ZLFN_2026 = 374.89;
+import {
+  getSalarioMinimoZona,
+  labelZona,
+  type ZonaSalarioMinimo,
+} from '@/lib/hr/salario-minimo-zona';
 
 export type EmpleadoFiniquitoModuleProps = {
   empresaSlug: 'rdb' | 'dilesa';
@@ -74,9 +72,29 @@ function Inner({ empresaSlug }: EmpleadoFiniquitoModuleProps) {
   const [diasPend, setDiasPend] = useState<string>('0');
   const [vacsTomadas, setVacsTomadas] = useState<string>('0');
   const [motivoDetalle, setMotivoDetalle] = useState<string>('');
-  const [salarioMinimo, setSalarioMinimo] = useState<number>(SALARIO_MINIMO_DIARIO_ZLFN_2026);
+  const [salarioMinimo, setSalarioMinimo] = useState<number>(0);
+  const [salarioMinimoZona, setSalarioMinimoZona] = useState<ZonaSalarioMinimo>('general');
+  // Marca si el usuario ya editó el SM manualmente — evita que el effect
+  // de auto-set por zona pise un valor ajustado a propósito.
+  const [smTouched, setSmTouched] = useState(false);
 
   const datosFiscales = useDatosFiscalesEmpresa(empresaId);
+
+  // Auto-setear SM según municipio fiscal de la empresa, una sola vez
+  // cuando los datos fiscales y la fecha de baja están disponibles.
+  useEffect(() => {
+    if (smTouched) return;
+    if (!datosFiscales.datos) return;
+    if (!fechaBaja) return;
+    const anio = Number(fechaBaja.slice(0, 4)) || new Date().getFullYear();
+    const sm = getSalarioMinimoZona({
+      municipio: datosFiscales.datos.domicilio_municipio,
+      estado: datosFiscales.datos.domicilio_estado,
+      anio,
+    });
+    setSalarioMinimo(sm.valor);
+    setSalarioMinimoZona(sm.zona);
+  }, [datosFiscales.datos, fechaBaja, smTouched]);
 
   const fetchAll = useCallback(async () => {
     const { data: emp, error: eErr } = await supabase
@@ -299,11 +317,17 @@ function Inner({ empresaSlug }: EmpleadoFiniquitoModuleProps) {
               type="number"
               step="0.01"
               value={salarioMinimo}
-              onChange={(e) => setSalarioMinimo(Number(e.target.value) || 0)}
+              onChange={(e) => {
+                setSalarioMinimo(Number(e.target.value) || 0);
+                setSmTouched(true);
+              }}
               className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
             />
             <p className="mt-1 text-[10px] text-[var(--text-subtle)]">
-              Zona libre frontera norte 2026: $374.89. Ajustar si cambia vigencia.
+              Detectado: {labelZona(salarioMinimoZona)} (
+              {datosFiscales.datos?.domicilio_municipio ?? '—'},{' '}
+              {datosFiscales.datos?.domicilio_estado ?? '—'}). Editable si la empresa opera en una
+              zona distinta.
             </p>
           </div>
           <div>

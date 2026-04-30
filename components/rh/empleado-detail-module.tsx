@@ -1441,19 +1441,29 @@ function EmpleadoDetailInner({ empresaSlug }: EmpleadoDetailModuleProps) {
               />
             </div>
           </div>
-          <DialogFooter className="gap-2">
+          {/* Stack vertical en todos los breakpoints: el textos en español
+              ("Solo dar de baja", "Baja + generar finiquito") no caben en
+              `max-w-sm` cuando el footer es flex-row. CTA destructivo al
+              tope, Cancelar al final. */}
+          <DialogFooter className="flex flex-col gap-2 sm:flex-col sm:space-x-0">
             <Button
-              variant="outline"
-              onClick={() => setShowBajaDialog(false)}
-              className="rounded-xl border-[var(--border)] text-[var(--text)]"
+              onClick={() => handleBaja(true)}
+              disabled={givingBaja || !datosOk}
+              title={datosOk ? 'Crea baja y abre el finiquito' : tooltipDatosFaltantes}
+              className="w-full justify-center gap-1.5 rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
             >
-              Cancelar
+              {givingBaja ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileSignature className="h-4 w-4" />
+              )}{' '}
+              Baja + generar finiquito
             </Button>
             <Button
               onClick={() => handleBaja(false)}
               disabled={givingBaja}
               variant="outline"
-              className="gap-1.5 rounded-xl border-red-500/40 text-red-500 hover:bg-red-500/10 disabled:opacity-60"
+              className="w-full justify-center gap-1.5 rounded-xl border-red-500/40 text-red-500 hover:bg-red-500/10 disabled:opacity-60"
             >
               {givingBaja ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -1463,17 +1473,11 @@ function EmpleadoDetailInner({ empresaSlug }: EmpleadoDetailModuleProps) {
               Solo dar de baja
             </Button>
             <Button
-              onClick={() => handleBaja(true)}
-              disabled={givingBaja || !datosOk}
-              title={datosOk ? 'Crea baja y abre el finiquito' : tooltipDatosFaltantes}
-              className="gap-1.5 rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+              variant="outline"
+              onClick={() => setShowBajaDialog(false)}
+              className="w-full justify-center rounded-xl border-[var(--border)] text-[var(--text)]"
             >
-              {givingBaja ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <FileSignature className="h-4 w-4" />
-              )}{' '}
-              Baja + generar finiquito
+              Cancelar
             </Button>
           </DialogFooter>
         </DialogContent>

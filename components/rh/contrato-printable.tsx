@@ -70,7 +70,12 @@ export interface ContratoEmpleado {
 export interface ContratoPatron {
   razonSocial: string;
   rfc: string;
+  /** Domicilio fiscal completo, ya formateado para impresión. */
   domicilio: string;
+  /** Municipio fiscal (`core.empresas.domicilio_municipio`). Se usa para el header del finiquito y para resolver SM por zona. */
+  municipio: string;
+  /** Estado fiscal (`core.empresas.domicilio_estado`). */
+  estado: string;
   registroPatronalImss: string;
   representanteLegal: string;
   escrituraConstitutiva: {

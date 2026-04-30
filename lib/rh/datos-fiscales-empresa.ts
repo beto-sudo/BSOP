@@ -134,6 +134,8 @@ export function buildPatronFromDatos(d: DatosFiscalesEmpresaRow): ContratoPatron
     razonSocial: /S\.A\.|SA DE CV/i.test(razon) ? razon : `${razon}, S.A. DE C.V.`,
     rfc: d.rfc as string,
     domicilio: domParts.join(', '),
+    municipio: d.domicilio_municipio as string,
+    estado: d.domicilio_estado as string,
     registroPatronalImss: d.registro_patronal_imss as string,
     representanteLegal: d.representante_legal as string,
     escrituraConstitutiva: {
