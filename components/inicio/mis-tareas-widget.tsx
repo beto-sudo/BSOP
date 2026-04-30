@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
+import { useEffectiveUser } from '@/components/providers';
 import { Surface } from '@/components/ui/surface';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -96,43 +97,28 @@ function formatRelative(iso: string | null, todayIso: string): string {
 
 export function MisTareasWidget() {
   const supabase = useMemo(() => createSupabaseERPClient(), []);
+  const { data: effective, loading: effectiveLoading } = useEffectiveUser();
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const loadTasks = useCallback(async () => {
+    if (effectiveLoading) return;
     setLoading(true);
     setError(null);
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user?.email) {
+      if (!effective?.email) {
         setTasks([]);
         setLoading(false);
         return;
       }
 
-      // core.usuarios por email
-      const { data: coreUser } = await supabase
-        .schema('core')
-        .from('usuarios')
-        .select('id')
-        .eq('email', user.email.toLowerCase())
-        .maybeSingle();
-
-      if (!coreUser) {
-        setTasks([]);
-        setLoading(false);
-        return;
-      }
-
-      // empresas del usuario
+      // empresas del usuario efectivo
       const { data: ue } = await supabase
         .schema('core')
         .from('usuarios_empresas')
         .select('empresa_id')
-        .eq('usuario_id', coreUser.id)
+        .eq('usuario_id', effective.id)
         .eq('activo', true);
 
       const empresaIds = (ue ?? []).map((r: { empresa_id: string }) => r.empresa_id);
@@ -142,8 +128,8 @@ export function MisTareasWidget() {
         return;
       }
 
-      // empleados del usuario en esas empresas (match por email empresa o personal)
-      const emailLower = user.email.toLowerCase();
+      // empleados del usuario efectivo en esas empresas (match por email empresa o personal)
+      const emailLower = effective.email.toLowerCase();
       const { data: empleados } = await supabase
         .schema('erp')
         .from('v_empleados_full')
@@ -185,7 +171,7 @@ export function MisTareasWidget() {
       setError('No pudimos cargar tus tareas. Intenta recargar la página.');
       setLoading(false);
     }
-  }, [supabase]);
+  }, [supabase, effective, effectiveLoading]);
 
   useEffect(() => {
     void loadTasks();

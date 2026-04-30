@@ -64,6 +64,58 @@ export function useReadOnlyMode(): boolean {
   return impersonating !== null;
 }
 
+export type EffectiveUserData = {
+  id: string;
+  email: string;
+  isAdmin: boolean;
+  isPreviewing: boolean;
+};
+
+/**
+ * Returns the effective user for personal-data widgets (`/inicio` greeting,
+ * "mis tareas", "mis juntas", etc).
+ *
+ * When an admin is previewing another user, returns the impersonated user.
+ * Otherwise returns the real caller.
+ *
+ * Refetches whenever the impersonate state changes so widgets re-render with
+ * the right identity.
+ */
+export function useEffectiveUser(): { data: EffectiveUserData | null; loading: boolean } {
+  const { impersonating } = usePermissions();
+  const [data, setData] = useState<EffectiveUserData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    // setLoading(true) is intentional here — we want to flip to loading
+    // whenever `impersonating` changes so widgets can show a skeleton until
+    // /api/me returns. eslint-disable for the initial flip; subsequent
+    // setStates live in async callbacks (already lint-clean).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
+    fetch('/api/me')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (!cancelled) {
+          setData(json);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setData(null);
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [impersonating]);
+
+  return { data, loading };
+}
+
 function PermissionsProvider({ children }: { children: ReactNode }) {
   const [permissions, setPermissions] = useState<UserPermissions>(DEFAULT_PERMISSIONS);
   const [realPermissions, setRealPermissions] = useState<UserPermissions>(DEFAULT_PERMISSIONS);

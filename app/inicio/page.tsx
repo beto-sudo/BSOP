@@ -16,6 +16,7 @@ import { ContentShell } from '@/components/ui/content-shell';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { MisTareasWidget } from '@/components/inicio/mis-tareas-widget';
 import { FechasImportantesWidget } from '@/components/inicio/fechas-importantes-widget';
+import { useEffectiveUser } from '@/components/providers';
 import { useLocale } from '@/lib/i18n';
 import { getGreeting, formatLongDate } from '@/lib/datetime/greeting';
 
@@ -25,23 +26,28 @@ import { getGreeting, formatLongDate } from '@/lib/datetime/greeting';
  */
 export default function InicioPage() {
   const { t, locale } = useLocale();
-  const [userName, setUserName] = useState<string>('');
+  const { data: effective } = useEffectiveUser();
+  const [callerName, setCallerName] = useState<string>('');
 
   useEffect(() => {
+    // Fallback to auth metadata only when there's no effective user yet
+    // (e.g. /api/me hasn't returned). Once effective is available, that wins.
     const supabase = createSupabaseBrowserClient();
     supabase.auth.getUser().then(({ data }) => {
       const meta = data?.user?.user_metadata as
         | { first_name?: string; full_name?: string }
         | undefined;
       if (meta?.first_name) {
-        setUserName(meta.first_name);
+        setCallerName(meta.first_name);
       } else if (meta?.full_name) {
-        setUserName(meta.full_name.split(' ')[0]);
+        setCallerName(meta.full_name.split(' ')[0]);
       } else if (data?.user?.email) {
-        setUserName(data.user.email.split('@')[0]);
+        setCallerName(data.user.email.split('@')[0]);
       }
     });
   }, []);
+
+  const userName = effective?.email ? effective.email.split('@')[0] : callerName;
 
   return (
     <ContentShell>

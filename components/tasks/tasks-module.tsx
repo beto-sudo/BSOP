@@ -32,6 +32,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, RefreshCw, Eye, EyeOff } from 'lucide-react';
 
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
+import { useEffectiveUser } from '@/components/providers';
 import type { TablesInsert, TablesUpdate } from '@/types/supabase';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
@@ -108,6 +109,11 @@ export function TasksModule({
   const supabase = createSupabaseERPClient();
   const isRich = variant === 'rich';
 
+  // Effective user override: when an admin previews another user, "mis tareas"
+  // (onlyMine) should show the impersonated user's tasks. For empresa-level
+  // queries we still use the real caller. See viendo-como-readonly Sprint 2.
+  const { data: effective } = useEffectiveUser();
+
   // ── Empresa scope ──────────────────────────────────────────────────────────
   const [empresaIds, setEmpresaIds] = useState<string[]>(
     scope === 'empresa' && empresaId ? [empresaId] : []
@@ -160,27 +166,39 @@ export function TasksModule({
 
   const fetchEmpresaIds = useCallback(async (): Promise<string[]> => {
     if (scope === 'empresa') return empresaId ? [empresaId] : [];
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return [];
-    const { data: coreUser } = await supabase
-      .schema('core')
-      .from('usuarios')
-      .select('id')
-      .eq('email', (user.email ?? '').toLowerCase())
-      .maybeSingle();
-    if (!coreUser) return [];
+
+    // For onlyMine, resolve via the effective user (respects "Viendo como").
+    // For other user-empresas scopes (e.g. cross-empresa overview) use the
+    // real caller — those views are admin-side.
+    let userId: string | null = null;
+    if (onlyMine && effective?.id) {
+      userId = effective.id;
+    } else {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return [];
+      const { data: coreUser } = await supabase
+        .schema('core')
+        .from('usuarios')
+        .select('id')
+        .eq('email', (user.email ?? '').toLowerCase())
+        .maybeSingle();
+      if (!coreUser) return [];
+      userId = coreUser.id;
+    }
+    if (!userId) return [];
+
     const { data: ueData } = await supabase
       .schema('core')
       .from('usuarios_empresas')
       .select('empresa_id')
-      .eq('usuario_id', coreUser.id)
+      .eq('usuario_id', userId)
       .eq('activo', true);
     const ids = (ueData ?? []).map((r: { empresa_id: string }) => r.empresa_id);
     setEmpresaIds(ids);
     return ids;
-  }, [scope, empresaId, supabase]);
+  }, [scope, empresaId, supabase, onlyMine, effective]);
 
   const fetchRefData = useCallback(
     async (ids: string[]) => {
@@ -213,8 +231,10 @@ export function TasksModule({
       setEmpleados(mapped);
 
       // Personal view: resolve my empleado_ids across all empresas in scope.
+      // When previewing another user, the effective email is theirs.
       if (onlyMine) {
-        if (!email) {
+        const personalEmail = (effective?.email ?? email).toLowerCase();
+        if (!personalEmail) {
           setMyEmpleadoIds([]);
         } else {
           const { data: mineRows } = await supabase
@@ -222,7 +242,7 @@ export function TasksModule({
             .from('v_empleados_full')
             .select('empleado_id, empresa_id, email_empresa, email_personal')
             .in('empresa_id', ids)
-            .or(`email_empresa.eq.${email},email_personal.eq.${email}`);
+            .or(`email_empresa.eq.${personalEmail},email_personal.eq.${personalEmail}`);
           const mineIds = (mineRows ?? [])
             .map((r: { empleado_id: string | null }) => r.empleado_id)
             .filter((x: string | null): x is string => Boolean(x));
@@ -290,7 +310,7 @@ export function TasksModule({
         }
       }
     },
-    [supabase, isRich, onlyMine]
+    [supabase, isRich, onlyMine, effective]
   );
 
   const fetchTasks = useCallback(
