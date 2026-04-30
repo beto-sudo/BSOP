@@ -17,7 +17,6 @@ import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { DataTable, type Column } from '@/components/module-page';
 import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
