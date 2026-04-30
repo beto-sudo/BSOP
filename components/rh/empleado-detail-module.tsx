@@ -104,6 +104,41 @@ type Beneficiario = {
   orden: number;
 };
 
+type FiniquitoListItem = {
+  id: string;
+  fecha_baja: string;
+  fecha_convenio: string;
+  causa: string;
+  total_general: number;
+  forma_pago: string;
+  referencia_pago: string | null;
+  creado_en: string;
+};
+
+const CAUSA_LABELS_SHORT: Record<string, string> = {
+  renuncia: 'Renuncia voluntaria',
+  mutuo_consentimiento: 'Mutuo consentimiento',
+  termino_contrato: 'Término de contrato',
+  despido_justificado: 'Despido justificado',
+  despido_injustificado: 'Despido injustificado',
+  muerte: 'Muerte del trabajador',
+  incapacidad: 'Incapacidad permanente',
+};
+
+const FORMA_PAGO_LABELS_SHORT: Record<string, string> = {
+  efectivo: 'Efectivo',
+  cheque: 'Cheque',
+  transferencia: 'Transferencia',
+};
+
+function formatMoneda(n: number): string {
+  return new Intl.NumberFormat('es-MX', {
+    style: 'currency',
+    currency: 'MXN',
+    minimumFractionDigits: 2,
+  }).format(n);
+}
+
 const TIPO_CONTRATO_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'prueba', label: 'Periodo de prueba (Art. 39-A)' },
   { value: 'indefinido', label: 'Tiempo indefinido / Planta' },
@@ -460,6 +495,10 @@ function EmpleadoDetailInner({ empresaSlug }: EmpleadoDetailModuleProps) {
   // Beneficiarios (Art. 501 LFT)
   const [beneficiarios, setBeneficiarios] = useState<Beneficiario[]>([]);
 
+  // Finiquitos generados (Sprint 2 de finiquito-mejoras): historial
+  // read-only de los convenios persistidos en `erp.finiquitos`.
+  const [finiquitos, setFiniquitos] = useState<FiniquitoListItem[]>([]);
+
   // Datos fiscales de la empresa (para habilitar contrato/finiquito)
   const datosFiscales = useDatosFiscalesEmpresa(empleado?.empresa_id ?? null);
 
@@ -610,6 +649,34 @@ function EmpleadoDetailInner({ empresaSlug }: EmpleadoDetailModuleProps) {
   useEffect(() => {
     void fetchAll();
   }, [fetchAll]);
+
+  // Carga el historial de finiquitos generados para este empleado.
+  // La tabla `erp.finiquitos` se agrega en migración
+  // 20260430160000_erp_finiquitos.sql; hasta que se aplique con psql y
+  // se regeneren types/supabase.ts, no aparece en los tipos generados —
+  // de ahí el cast.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const { data, error: fErr } = await (supabase.schema('erp') as any)
+        .from('finiquitos')
+        .select(
+          'id, fecha_baja, fecha_convenio, causa, total_general, forma_pago, referencia_pago, creado_en'
+        )
+        .eq('empleado_id', id)
+        .order('creado_en', { ascending: false });
+      if (cancelled) return;
+      if (fErr) {
+        // Tabla aún no aplicada o sin permisos — no es un error de UI.
+        setFiniquitos([]);
+        return;
+      }
+      setFiniquitos((data ?? []) as FiniquitoListItem[]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id, supabase]);
 
   const handleSave = async () => {
     if (!empleado) return;
@@ -1412,6 +1479,40 @@ function EmpleadoDetailInner({ empresaSlug }: EmpleadoDetailModuleProps) {
           />
         ) : (
           <p className="text-xs text-[var(--text-subtle)]">Sin notas registradas.</p>
+        )}
+      </div>
+
+      {/* Finiquitos generados (audit trail) */}
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
+        <SectionTitle>Finiquitos generados</SectionTitle>
+        {finiquitos.length === 0 ? (
+          <p className="text-xs text-[var(--text-subtle)]">
+            Sin finiquitos guardados. Al usar &ldquo;Guardar y descargar&rdquo; desde la pantalla de
+            finiquito, cada convenio queda registrado aquí.
+          </p>
+        ) : (
+          <ul className="space-y-2 text-sm">
+            {finiquitos.map((f) => (
+              <li
+                key={f.id}
+                className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3"
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <div className="font-medium text-[var(--text)]">
+                    {formatDate(f.fecha_convenio)} — {formatMoneda(Number(f.total_general))}
+                  </div>
+                  <div className="text-[10px] uppercase tracking-wide text-[var(--text-subtle)]">
+                    Baja {formatDate(f.fecha_baja)}
+                  </div>
+                </div>
+                <div className="mt-1 text-xs text-[var(--text-muted)]">
+                  {CAUSA_LABELS_SHORT[f.causa] ?? f.causa} ·{' '}
+                  {FORMA_PAGO_LABELS_SHORT[f.forma_pago] ?? f.forma_pago}
+                  {f.referencia_pago ? ` (ref. ${f.referencia_pago})` : ''}
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 

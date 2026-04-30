@@ -1,6 +1,6 @@
 'use client';
 
-/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect --
+/* eslint-disable @typescript-eslint/no-explicit-any --
  * Supabase row mapping is dynamic; data-sync en useEffect es el patrón
  * estándar de la app.
  */
@@ -25,11 +25,13 @@ import { Input } from '@/components/ui/input';
 import { FieldLabel } from '@/components/ui/field-label';
 import { Combobox } from '@/components/ui/combobox';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/components/ui/toast';
 import { useTriggerPrint } from '@/components/print';
-import { ArrowLeft, Printer, AlertCircle, Settings } from 'lucide-react';
+import { ArrowLeft, Printer, AlertCircle, Settings, Save, Loader2 } from 'lucide-react';
 import {
   FiniquitoPrintable,
   type FiniquitoEmpleadoData,
+  type FormaPagoFiniquito,
 } from '@/components/rh/finiquito-printable';
 import type { ContratoPatron } from '@/components/rh/contrato-printable';
 import { useDatosFiscalesEmpresa, buildPatronFromDatos } from '@/lib/rh/datos-fiscales-empresa';
@@ -43,6 +45,19 @@ import {
   labelZona,
   type ZonaSalarioMinimo,
 } from '@/lib/hr/salario-minimo-zona';
+import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+
+const FORMA_PAGO_LABELS: Record<FormaPagoFiniquito, string> = {
+  efectivo: 'Efectivo',
+  cheque: 'Cheque',
+  transferencia: 'Transferencia bancaria',
+};
+
+function placeholderReferencia(forma: FormaPagoFiniquito): string {
+  if (forma === 'cheque') return 'Nº de cheque (ej. 0001234)';
+  if (forma === 'transferencia') return 'Referencia / SPEI';
+  return 'No aplica para efectivo';
+}
 
 export type EmpleadoFiniquitoModuleProps = {
   empresaSlug: 'rdb' | 'dilesa';
@@ -78,7 +93,14 @@ function Inner({ empresaSlug }: EmpleadoFiniquitoModuleProps) {
   // de auto-set por zona pise un valor ajustado a propósito.
   const [smTouched, setSmTouched] = useState(false);
 
+  // Forma de pago + referencia (Sprint 2): se capturan en el panel y
+  // entran al convenio impreso + al snapshot persistido.
+  const [formaPago, setFormaPago] = useState<FormaPagoFiniquito>('transferencia');
+  const [referenciaPago, setReferenciaPago] = useState<string>('');
+  const [saving, setSaving] = useState(false);
+
   const datosFiscales = useDatosFiscalesEmpresa(empresaId);
+  const toast = useToast();
 
   // Auto-setear SM según municipio fiscal de la empresa, una sola vez
   // cuando los datos fiscales y la fecha de baja están disponibles.
@@ -180,6 +202,92 @@ function Inner({ empresaSlug }: EmpleadoFiniquitoModuleProps) {
     });
   }, [fechaIngreso, fechaBaja, sueldoDiario, sdi, salarioMinimo, causa, diasPend, vacsTomadas]);
 
+  // Construir patron solo cuando datos fiscales completos. Memoizado para
+  // que `handleGuardarYDescargar` pueda referenciarlo en sus deps sin
+  // re-construir en cada render.
+  const patron = useMemo<ContratoPatron | null>(() => {
+    if (!datosFiscales.completo || !datosFiscales.datos) return null;
+    try {
+      return buildPatronFromDatos(datosFiscales.datos);
+    } catch {
+      return null;
+    }
+  }, [datosFiscales.completo, datosFiscales.datos]);
+
+  // Guarda un snapshot inmutable del finiquito en `erp.finiquitos` y
+  // dispara el print dialog. Si el usuario cancela el print, el registro
+  // ya quedó persistido — eso es intencional: el motivo de persistir es
+  // tener audit trail del que se enseñó al trabajador.
+  const handleGuardarYDescargar = useCallback(async () => {
+    if (!calculo || !empleado || !empresaId || !patron) return;
+    setSaving(true);
+    try {
+      const row = {
+        empleado_id: id,
+        empresa_id: empresaId,
+        fecha_baja: calculo.fechaBaja,
+        fecha_convenio: new Date().toISOString().split('T')[0],
+        causa: calculo.causa,
+        motivo_detalle: motivoDetalle || motivoBajaGuardado || null,
+        fecha_ingreso: calculo.fechaIngreso,
+        antiguedad_anios: calculo.antiguedad.anios,
+        antiguedad_meses: calculo.antiguedad.meses,
+        antiguedad_dias: calculo.antiguedad.dias,
+        sueldo_diario: calculo.sueldoDiario,
+        sdi: calculo.sdi !== calculo.sueldoDiario ? calculo.sdi : null,
+        salario_minimo_diario: salarioMinimo,
+        zona_salario_minimo: salarioMinimoZona,
+        total_finiquito: calculo.totalFiniquito,
+        total_indemnizacion: calculo.totalIndemnizacion,
+        total_general: calculo.totalGeneral,
+        conceptos: calculo.conceptos,
+        notas_calculo: calculo.notas,
+        empleado_snapshot: empleado,
+        patron_snapshot: patron,
+        forma_pago: formaPago,
+        referencia_pago: formaPago === 'efectivo' ? null : referenciaPago.trim() || null,
+      };
+      // `erp.finiquitos` se agrega en migración 20260430160000_erp_finiquitos.sql.
+      // Hasta que se aplique con psql + se regeneren types/supabase.ts, la
+      // tabla no aparece en los tipos generados — por eso el cast.
+      const { error: insertErr } = await (supabase.schema('erp') as any)
+        .from('finiquitos')
+        .insert(row);
+      if (insertErr) {
+        toast.add({
+          title: 'No se pudo guardar el finiquito',
+          description: getSupabaseErrorMessage(insertErr, 'Error desconocido al insertar.'),
+          type: 'error',
+        });
+        return;
+      }
+      toast.add({
+        title: 'Finiquito guardado',
+        description: 'El registro queda en histórico del empleado.',
+        type: 'success',
+      });
+      // Pequeña espera para que el toast sea visible antes del print dialog.
+      setTimeout(() => triggerPrint(), 300);
+    } finally {
+      setSaving(false);
+    }
+  }, [
+    calculo,
+    empleado,
+    empresaId,
+    id,
+    patron,
+    motivoDetalle,
+    motivoBajaGuardado,
+    salarioMinimo,
+    salarioMinimoZona,
+    formaPago,
+    referenciaPago,
+    supabase,
+    toast,
+    triggerPrint,
+  ]);
+
   if (loading || datosFiscales.loading) {
     return (
       <div className="space-y-4">
@@ -244,37 +352,53 @@ function Inner({ empresaSlug }: EmpleadoFiniquitoModuleProps) {
     );
   }
 
-  let patron: ContratoPatron;
-  try {
-    patron = buildPatronFromDatos(datosFiscales.datos!);
-  } catch (err) {
+  if (!patron) {
     return (
       <div className="rounded-2xl border border-red-500/30 bg-red-500/5 p-5 text-sm text-red-400">
-        Error construyendo datos del patrón: {err instanceof Error ? err.message : 'desconocido'}
+        Error construyendo datos del patrón. Revisa los datos fiscales en Settings → Empresas.
       </div>
     );
   }
 
   const hayDatosFaltantes = sueldoDiario <= 0 || !fechaIngreso;
+  const referenciaRequerida = formaPago !== 'efectivo' && referenciaPago.trim() === '';
+  const puedeGuardar = !!calculo && !hayDatosFaltantes && !referenciaRequerida && !saving;
 
   return (
     <div className="space-y-4">
-      <div className="no-print flex items-center justify-between">
+      <div className="no-print flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <Button
           variant="outline"
           size="sm"
           onClick={() => router.push(`/${empresaSlug}/rh/personal/${id}`)}
-          className="rounded-xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]"
+          className="rounded-xl border-[var(--border)] bg-[var(--card)] text-[var(--text)] sm:w-auto"
         >
           <ArrowLeft className="h-4 w-4 mr-1" /> Volver al empleado
         </Button>
         {calculo && (
-          <Button
-            onClick={triggerPrint}
-            className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90"
-          >
-            <Printer className="h-4 w-4" /> Imprimir finiquito
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              variant="outline"
+              onClick={triggerPrint}
+              className="gap-1.5 rounded-xl border-[var(--border)] text-[var(--text)]"
+              title="Vista previa sin guardar el registro"
+            >
+              <Printer className="h-4 w-4" /> Vista previa
+            </Button>
+            <Button
+              onClick={handleGuardarYDescargar}
+              disabled={!puedeGuardar}
+              title={
+                referenciaRequerida
+                  ? `Captura la referencia para forma de pago "${FORMA_PAGO_LABELS[formaPago]}"`
+                  : 'Guarda el snapshot en histórico y abre el print dialog'
+              }
+              className="gap-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 disabled:opacity-60"
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{' '}
+              Guardar y descargar
+            </Button>
+          </div>
         )}
       </div>
 
@@ -371,6 +495,38 @@ function Inner({ empresaSlug }: EmpleadoFiniquitoModuleProps) {
             />
           </div>
         </div>
+
+        {/* Forma de pago — entra a la cláusula PRIMERA del convenio. */}
+        <div className="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-2">
+          <div>
+            <FieldLabel>Forma de pago</FieldLabel>
+            <Combobox
+              value={formaPago}
+              onChange={(v) => {
+                setFormaPago(v as FormaPagoFiniquito);
+                if (v === 'efectivo') setReferenciaPago('');
+              }}
+              options={(Object.keys(FORMA_PAGO_LABELS) as FormaPagoFiniquito[]).map((k) => ({
+                value: k,
+                label: FORMA_PAGO_LABELS[k],
+              }))}
+              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+            />
+          </div>
+          <div>
+            <FieldLabel>
+              Referencia / nº de cheque {formaPago === 'efectivo' ? '(opcional)' : '(requerida)'}
+            </FieldLabel>
+            <Input
+              value={referenciaPago}
+              onChange={(e) => setReferenciaPago(e.target.value)}
+              disabled={formaPago === 'efectivo'}
+              placeholder={placeholderReferencia(formaPago)}
+              className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)] disabled:opacity-60"
+            />
+          </div>
+        </div>
+
         {fechaBajaGuardada && fechaBaja !== fechaBajaGuardada && (
           <p className="text-[10px] text-amber-400">
             La fecha de baja guardada en BSOP es {fechaBajaGuardada}; estás calculando con{' '}
@@ -387,6 +543,8 @@ function Inner({ empresaSlug }: EmpleadoFiniquitoModuleProps) {
             calculo={calculo}
             motivoDetalle={motivoDetalle || motivoBajaGuardado || undefined}
             patron={patron}
+            formaPago={formaPago}
+            referenciaPago={referenciaPago.trim() || null}
           />
         </div>
       )}

@@ -32,9 +32,21 @@ export interface FiniquitoEmpleadoData {
   numero_empleado: string | null;
 }
 
+export type FormaPagoFiniquito = 'efectivo' | 'cheque' | 'transferencia';
+
 function formatDateLarga(iso: string): string {
   const d = new Date(iso.includes('T') ? iso : `${iso}T00:00:00`);
   return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function describeFormaPago(forma: FormaPagoFiniquito, referencia: string | null): string {
+  if (forma === 'efectivo') return 'efectivo';
+  if (forma === 'cheque') {
+    return referencia ? `cheque número ${referencia}` : 'cheque';
+  }
+  return referencia
+    ? `transferencia bancaria con referencia ${referencia}`
+    : 'transferencia bancaria';
 }
 
 export function FiniquitoPrintable({
@@ -43,12 +55,18 @@ export function FiniquitoPrintable({
   motivoDetalle,
   patron,
   fechaConvenio,
+  formaPago,
+  referenciaPago,
 }: {
   empleado: FiniquitoEmpleadoData;
   calculo: FiniquitoCalculado;
   motivoDetalle?: string;
   patron: ContratoPatron;
   fechaConvenio?: string;
+  /** Forma de pago capturada en el panel. Default 'transferencia' para mantener back-compat con renderizados sin captura. */
+  formaPago?: FormaPagoFiniquito;
+  /** Nº de cheque o referencia de transferencia. NULL si forma=efectivo o no se capturó. */
+  referenciaPago?: string | null;
 }) {
   const fechaHoy = fechaConvenio ?? new Date().toISOString().split('T')[0];
   const nombreCompleto = composeFullName(
@@ -248,7 +266,7 @@ export function FiniquitoPrintable({
         <strong>PRIMERA.</strong> EL PATRÓN entrega en este acto a EL TRABAJADOR la cantidad de{' '}
         <strong>{formatMoneda(totalGeneral)}</strong> ({formatMoneda(totalGeneral).replace('$', '')}{' '}
         pesos M.N.), correspondiente al desglose descrito, mediante{' '}
-        <em>[efectivo / cheque / transferencia bancaria nº ________________]</em>.
+        <strong>{describeFormaPago(formaPago ?? 'transferencia', referenciaPago ?? null)}</strong>.
       </p>
 
       <p>

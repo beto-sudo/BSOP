@@ -157,3 +157,13 @@ en `core.empresas`:
   del proceso completo de finiquitos. Tras el explainer, autoriza los
   5 puntos como iniciativa formal. Promovida a `in_progress` en este
   mismo PR (Sprint 1 arranca de inmediato).
+- **2026-04-30**: Sprint 1 mergeado en PR #371 — modal fix + ciudad
+  dinámica + SM por zona. CI verde, 14 tests nuevos.
+- **2026-04-30**: Sprint 2 abierto — migración `erp.finiquitos` con
+  RLS por empresa + `core.fn_has_empresa` + UPDATE/DELETE solo admin
+  (audit trail estricto), captura de forma de pago + referencia,
+  botón "Guardar y descargar" que persiste snapshot inmutable
+  (incluye `empleado_snapshot` y `patron_snapshot` jsonb), sección
+  "Finiquitos generados" en detalle del empleado. La migración la
+  aplica Beto con `psql` post-merge + regenera `SCHEMA_REF.md` y
+  `types/supabase.ts`.
