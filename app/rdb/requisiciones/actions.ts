@@ -1,6 +1,7 @@
 'use server';
 
 import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { assertNotInPreview } from '@/lib/auth/preview-guard';
 
 const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
 
@@ -66,6 +67,7 @@ export async function guardarRequisicion(
   items: DraftItemInput[],
   notas?: string | null
 ): Promise<{ id: string; folio: string }> {
+  await assertNotInPreview();
   try {
     const { supabase, user } = await requireAuth();
 
@@ -131,6 +133,7 @@ export async function actualizarRequisicion(
   items: DraftItemInput[],
   notas?: string | null
 ): Promise<void> {
+  await assertNotInPreview();
   const { supabase } = await requireAuth();
 
   const sanitizedItems = items
@@ -198,6 +201,7 @@ export async function actualizarRequisicion(
 }
 
 export async function aprobarRequisicion(id: string): Promise<void> {
+  await assertNotInPreview();
   const { supabase, user } = await requireAuth();
 
   const { error } = await supabase
@@ -215,6 +219,7 @@ export async function aprobarRequisicion(id: string): Promise<void> {
 export async function generarOrdenCompra(
   requisicionId: string
 ): Promise<{ id: string; folio: string }> {
+  await assertNotInPreview();
   const { supabase } = await requireAuth();
 
   // Load requisicion items
@@ -297,6 +302,7 @@ async function requireAdmin() {
 }
 
 export async function borrarRequisicion(id: string): Promise<void> {
+  await assertNotInPreview();
   const { supabase } = await requireAdmin();
 
   const { data: existing, error: existingError } = await supabase

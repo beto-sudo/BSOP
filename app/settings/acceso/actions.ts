@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
+import { assertNotInPreview } from '@/lib/auth/preview-guard';
 import { generateWelcomeHtml, type WelcomeEmpresa } from '@/lib/welcome-email';
 
 // ── Legacy flat-role types (pre-RBAC) ──────────────────────────────────────
@@ -63,6 +64,7 @@ export type ExcepcionUsuario = {
 };
 
 async function requireAdmin(): Promise<void> {
+  await assertNotInPreview();
   const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

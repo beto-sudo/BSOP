@@ -51,6 +51,19 @@ export function usePermissions() {
   return useContext(PermissionsContext);
 }
 
+/**
+ * Returns `true` while an admin is in a "Viendo como" preview session.
+ *
+ * Components rendering forms, edit buttons, or other write CTAs should
+ * disable themselves when this is `true` — the server will reject the
+ * underlying mutation anyway (see proxy.ts and `assertNotInPreview()`),
+ * but a disabled button avoids confusing 403 toasts mid-flow.
+ */
+export function useReadOnlyMode(): boolean {
+  const { impersonating } = usePermissions();
+  return impersonating !== null;
+}
+
 function PermissionsProvider({ children }: { children: ReactNode }) {
   const [permissions, setPermissions] = useState<UserPermissions>(DEFAULT_PERMISSIONS);
   const [realPermissions, setRealPermissions] = useState<UserPermissions>(DEFAULT_PERMISSIONS);
@@ -76,6 +89,15 @@ function PermissionsProvider({ children }: { children: ReactNode }) {
       return realPermissionsRef.current;
     }
   }, [supabase]);
+
+  const clearImpersonateCookie = useCallback(async () => {
+    try {
+      await fetch('/api/impersonate/stop', { method: 'POST' });
+    } catch {
+      // Silently ignore — the cookie is httpOnly so we can't fall back to JS.
+      // Proxy still respects whatever the server sees; user can refresh.
+    }
+  }, []);
 
   // Load initial permissions
   useEffect(() => {
@@ -106,14 +128,17 @@ function PermissionsProvider({ children }: { children: ReactNode }) {
         setRealPermissions(fallback);
         setPermissions(fallback);
         setImpersonating(null);
+        void clearImpersonateCookie();
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [supabase, loadReal, impersonating]);
+  }, [supabase, loadReal, impersonating, clearImpersonateCookie]);
 
   const fetchImpersonatePerms = useCallback(async (userId: string): Promise<UserPermissions> => {
-    const res = await fetch(`/api/impersonate?userId=${encodeURIComponent(userId)}`);
+    const res = await fetch(`/api/impersonate?userId=${encodeURIComponent(userId)}`, {
+      method: 'POST',
+    });
     if (!res.ok) return { ...DEFAULT_PERMISSIONS, loading: false };
     const data = await res.json();
     return {
@@ -166,7 +191,8 @@ function PermissionsProvider({ children }: { children: ReactNode }) {
   const stopImpersonate = useCallback(() => {
     setImpersonating(null);
     setPermissions(realPermissions);
-  }, [realPermissions]);
+    void clearImpersonateCookie();
+  }, [realPermissions, clearImpersonateCookie]);
 
   const value = useMemo(
     () => ({ permissions, refreshPermissions, impersonating, startImpersonate, stopImpersonate }),
