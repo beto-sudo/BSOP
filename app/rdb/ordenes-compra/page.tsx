@@ -76,6 +76,7 @@ type OrdenCompra = {
   total_estimado: number | null;
   total_real: number | null;
   total_a_pagar: number | null;
+  autorizada_at: string | null;
   cerrada_at: string | null;
   fecha_emision: string | null;
   notas: string | null;
@@ -239,6 +240,15 @@ function isOcReceiving(estatus: string | null) {
   return s === 'enviada' || s === 'parcial';
 }
 
+function getEstadoSeal(estatus: string | null): string | null {
+  const s = (estatus ?? '').toLowerCase();
+  if (s === 'enviada') return 'ENVIADA';
+  if (s === 'parcial') return 'RECEPCIÓN PARCIAL';
+  if (s === 'cerrada' || s === 'recibida') return 'RECIBIDA';
+  if (s === 'cancelada') return 'CANCELADA';
+  return null;
+}
+
 // ── Summary Bar ───────────────────────────────────────────────────────────────
 
 function SummaryBar({ ordenes }: { ordenes: OrdenCompra[] }) {
@@ -368,7 +378,14 @@ function OrdenDetail({
     return acc + qty * (isNaN(price) ? 0 : price);
   }, 0);
 
-  const canPrint = Boolean(orden?.proveedor_id);
+  const hasProveedor = Boolean(orden?.proveedor_id);
+  const canPrint = hasProveedor && !editable;
+  const printBlockedReason = !hasProveedor
+    ? 'Asigna proveedor primero'
+    : editable
+      ? 'Marca Enviada para imprimir'
+      : null;
+  const estadoSeal = getEstadoSeal(orden?.estatus ?? null);
 
   return (
     <DetailDrawer
@@ -380,13 +397,19 @@ function OrdenDetail({
       description={`${proveedorObj?.nombre ?? 'Sin proveedor'} · ${formatDate(orden?.fecha_emision)}${reqFolio ? ` · Req: ${reqFolio}` : ''}`}
       actions={
         <>
-          {!canPrint && (
+          {printBlockedReason && (
             <span className="flex items-center gap-1 text-xs text-amber-600">
               <AlertTriangle className="h-3 w-3" />
-              Asigna proveedor primero
+              {printBlockedReason}
             </span>
           )}
-          <Button variant="outline" size="sm" onClick={triggerPrint} disabled={!canPrint}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={triggerPrint}
+            disabled={!canPrint}
+            title={printBlockedReason ?? undefined}
+          >
             Imprimir OC
           </Button>
         </>
@@ -404,7 +427,25 @@ function OrdenDetail({
             <div>
               <h2 className="text-2xl font-bold uppercase tracking-widest">Orden de Compra</h2>
               <p className="mt-1 text-base font-semibold">{orden?.folio ?? 'OC-BORRADOR'}</p>
-              <p className="mt-0.5 text-sm text-gray-600">
+              {estadoSeal && (
+                <p
+                  className={`mt-2 inline-block rounded-md border-2 px-3 py-1 text-xs font-bold uppercase tracking-widest ${
+                    orden?.estatus === 'cancelada'
+                      ? 'border-red-600 text-red-600'
+                      : orden?.estatus === 'cerrada'
+                        ? 'border-emerald-700 text-emerald-700'
+                        : 'border-black text-black'
+                  }`}
+                >
+                  {estadoSeal}
+                  {orden?.autorizada_at && orden?.estatus !== 'cancelada' && (
+                    <span className="ml-2 font-normal">
+                      · {formatDateLong(orden.autorizada_at)}
+                    </span>
+                  )}
+                </p>
+              )}
+              <p className="mt-2 text-sm text-gray-600">
                 Fecha: {formatDateLong(orden?.fecha_emision)}
               </p>
               {reqFolio && (
@@ -492,18 +533,67 @@ function OrdenDetail({
             </div>
           )}
 
-          {terminal && (
-            <div className="flex items-start gap-2 rounded-xl border bg-muted/30 p-4 text-sm print:hidden">
-              <Lock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+          {receiving && (
+            <div className="flex items-start gap-2 rounded-xl border-2 border-emerald-200 bg-emerald-50/60 p-4 text-sm print:hidden">
+              <Send className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
               <div>
-                <div className="font-medium">
-                  OC {orden?.estatus === 'cancelada' ? 'cancelada' : 'cerrada'}
+                <div className="font-semibold text-emerald-900">
+                  {orden?.estatus === 'parcial'
+                    ? 'OC con recepción parcial'
+                    : 'OC enviada al proveedor'}
+                  {orden?.autorizada_at && (
+                    <span className="ml-2 font-normal text-emerald-800">
+                      · {formatDateLong(orden.autorizada_at)}
+                    </span>
+                  )}
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  No se pueden registrar más recepciones ni cancelaciones. Total a pagar:{' '}
-                  <span className="font-medium text-foreground">
-                    {formatCurrency(orden?.total_a_pagar ?? 0)}
-                  </span>
+                <div className="mt-0.5 text-xs text-emerald-800/80">
+                  {orden?.estatus === 'parcial'
+                    ? 'Captura las recepciones conforme lleguen. Cuando completes o ya no esperes el pendiente, cierra la OC.'
+                    : 'Precios bloqueados. Captura recepciones cuando llegue la mercancía.'}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {terminal && (
+            <div
+              className={`flex items-start gap-2 rounded-xl border-2 p-4 text-sm print:hidden ${
+                orden?.estatus === 'cancelada'
+                  ? 'border-red-200 bg-red-50/60'
+                  : 'border-muted bg-muted/40'
+              }`}
+            >
+              <Lock
+                className={`mt-0.5 h-4 w-4 shrink-0 ${
+                  orden?.estatus === 'cancelada' ? 'text-red-700' : 'text-muted-foreground'
+                }`}
+              />
+              <div>
+                <div
+                  className={`font-semibold ${
+                    orden?.estatus === 'cancelada' ? 'text-red-900' : 'text-foreground'
+                  }`}
+                >
+                  OC {orden?.estatus === 'cancelada' ? 'cancelada' : 'cerrada'}
+                  {orden?.cerrada_at && (
+                    <span className="ml-2 font-normal text-muted-foreground">
+                      · {formatDateLong(orden.cerrada_at)}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-0.5 text-xs text-muted-foreground">
+                  No se pueden registrar más recepciones ni cancelaciones.
+                  {orden?.estatus !== 'cancelada' && (
+                    <>
+                      {' '}
+                      Total a pagar:{' '}
+                      <span className="font-medium text-foreground">
+                        {formatCurrency(orden?.total_a_pagar ?? 0)}
+                      </span>
+                      .
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -1041,6 +1131,7 @@ function OrdenesCompraContent() {
           total_estimado: o.total ?? null,
           total_real: o.total ?? null,
           total_a_pagar: o.total_a_pagar ?? null,
+          autorizada_at: o.autorizada_at ?? null,
           cerrada_at: o.cerrada_at ?? null,
           fecha_emision: o.created_at ?? null,
           notas: null,
@@ -1164,7 +1255,7 @@ function OrdenesCompraContent() {
     const { data: oRaw } = await supabase
       .schema('erp')
       .from('ordenes_compra')
-      .select('estado, total_a_pagar, cerrada_at')
+      .select('estado, total, total_a_pagar, autorizada_at, cerrada_at')
       .eq('empresa_id', RDB_EMPRESA_ID)
       .eq('id', ordenId)
       .single();
@@ -1180,7 +1271,9 @@ function OrdenesCompraContent() {
 
     const items = (itemsRaw ?? []) as OrdenCompraItem[];
     const nextEstado = oRaw?.estado ?? null;
+    const nextTotalEstimado = oRaw?.total ?? null;
     const nextTotalAPagar = oRaw?.total_a_pagar ?? null;
+    const nextAutorizadaAt = oRaw?.autorizada_at ?? null;
     const nextCerradaAt = oRaw?.cerrada_at ?? null;
 
     setSelected((prev) =>
@@ -1188,7 +1281,9 @@ function OrdenesCompraContent() {
         ? {
             ...prev,
             estatus: nextEstado ?? prev.estatus,
+            total_estimado: nextTotalEstimado ?? prev.total_estimado,
             total_a_pagar: nextTotalAPagar,
+            autorizada_at: nextAutorizadaAt,
             cerrada_at: nextCerradaAt,
             items,
           }
@@ -1200,7 +1295,9 @@ function OrdenesCompraContent() {
           ? {
               ...o,
               estatus: nextEstado ?? o.estatus,
+              total_estimado: nextTotalEstimado ?? o.total_estimado,
               total_a_pagar: nextTotalAPagar,
+              autorizada_at: nextAutorizadaAt,
               cerrada_at: nextCerradaAt,
             }
           : o
@@ -1358,7 +1455,7 @@ function OrdenesCompraContent() {
   );
 
   const handleSavePricesAndMarkEnviada = useCallback(async () => {
-    if (!selected?.items?.length) return;
+    if (!selected?.items?.length || !selected.id) return;
     setSaving(true);
     try {
       const supabase = createSupabaseBrowserClient();
@@ -1385,24 +1482,13 @@ function OrdenesCompraContent() {
         .eq('id', selected.id);
       if (e2) throw e2;
 
-      const updatedItems = (selected.items ?? []).map((item) => ({
-        ...item,
-        precio_unitario: parseFloat(editedPrices[item.id] ?? '') || item.precio_unitario,
-        subtotal: (item.cantidad ?? 0) * (parseFloat(editedPrices[item.id] ?? '') || 0),
-      }));
-      const updatedOrden: OrdenCompra = {
-        ...selected,
-        estatus: 'enviada',
-        total_estimado: totalEstimado,
-        items: updatedItems,
-      };
-      setSelected(updatedOrden);
-      setOrdenes((prev) =>
-        prev.map((o) =>
-          o.id === selected.id ? { ...o, estatus: 'enviada', total_estimado: totalEstimado } : o
-        )
+      await refreshOrdenAfterMutation(selected.id);
+      const folio = selected.folio ?? '';
+      feedback.success(
+        folio
+          ? `OC ${folio} enviada al proveedor — los precios ya no se pueden editar`
+          : 'OC enviada al proveedor — los precios ya no se pueden editar'
       );
-      feedback.success('OC marcada como Enviada');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'No pude guardar los precios.';
       setError(msg);
@@ -1410,7 +1496,7 @@ function OrdenesCompraContent() {
     } finally {
       setSaving(false);
     }
-  }, [selected, editedPrices, feedback]);
+  }, [selected, editedPrices, refreshOrdenAfterMutation, feedback]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
