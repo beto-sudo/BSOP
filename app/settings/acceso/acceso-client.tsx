@@ -120,9 +120,11 @@ function modulosParaEmpresa(modulos: Modulo[], empresaId: string): Modulo[] {
 
 /**
  * Orden y labels de las secciones — espejo del sidebar (ADR-014).
- * `sistema` va al final como catch-all para módulos transversales.
+ * `operativa` va al inicio (Home / dashboard del giro). `sistema` va al
+ * final como catch-all para módulos transversales.
  */
 const SECCION_ORDER: readonly ModuloSeccion[] = [
+  'operativa',
   'administracion',
   'rh',
   'compras',
@@ -132,6 +134,7 @@ const SECCION_ORDER: readonly ModuloSeccion[] = [
 ] as const;
 
 const SECCION_LABELS: Record<ModuloSeccion, string> = {
+  operativa: 'Operativa',
   administracion: 'Administración',
   rh: 'Recursos Humanos',
   compras: 'Compras',
