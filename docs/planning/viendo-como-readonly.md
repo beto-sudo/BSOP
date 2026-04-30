@@ -3,10 +3,11 @@
 **Slug:** `viendo-como-readonly`
 **Empresas:** todas (cross-empresa, afecta a la feature global de impersonación)
 **Schemas afectados:** ninguno (no hay DDL; trabajo es app + cookie + helpers)
-**Estado:** planned
+**Estado:** done (cerrada 2026-04-30)
 **Dueño:** Beto
 **Creada:** 2026-04-30
-**Última actualización:** 2026-04-30 (promoción + alcance v1).
+**Cerrada:** 2026-04-30
+**Última actualización:** 2026-04-30 (Sprints 1-3 mergeados en el día — PRs #362, #363, _este PR_).
 
 ## Problema
 
@@ -93,7 +94,10 @@ Lo que esta iniciativa **no resuelve** (camino A, fuera de alcance):
 
 ## Bitácora
 
-- **2026-04-30** — Promovida a `planned`. Beto reportó en sesión que viendo como Maribel veía sus propias tareas en `/inicio` y todos los módulos accesibles en el panel DILESA. Investigación confirmó que el "Viendo como" es preview cosmético: solo cambia el filtrado del sidebar; sesión Supabase, RLS y queries siguen ejecutándose como el admin real. Beto eligió **camino B** (preview + read-only + override de userId para widgets "míos") sobre camino A (suplantación honesta de sesión) por costo: 5–10× menos trabajo y resuelve el caso de uso real.
+- **2026-04-30** — Promovida a `planned`. Beto reportó en sesión que viendo como Maribel veía sus propias tareas en `/inicio` y todos los módulos accesibles en el panel DILESA. Investigación confirmó que el "Viendo como" es preview cosmético: solo cambia el filtrado del sidebar; sesión Supabase, RLS y queries siguen ejecutándose como el admin real. Beto eligió **camino B** (preview + read-only + override de userId para widgets "míos") sobre camino A (suplantación honesta de sesión) por costo: 5–10× menos trabajo y resuelve el caso de uso real. Beto autorizó modo autónomo: CC genera y mergea PRs hasta cerrar.
+- **2026-04-30** — Sprint 1 mergeado (PR #362). Read-only enforcement end-to-end: cookie httpOnly `bsop_preview_as` + endpoints `POST /api/impersonate` (con cookie set) y `POST /api/impersonate/stop` (clear) + `proxy.ts` rechaza POST/PUT/PATCH/DELETE en `/api/**` con 403 cuando la cookie está set + `assertNotInPreview()` al inicio de ~37 mutations en 5 server actions (cortes, levantamientos, productos, requisiciones, acceso) + `useReadOnlyMode()` hook frontend + banner copy actualizado. Tests: `lib/auth/preview-guard.test.ts` (8 tests). 842 tests pass.
+- **2026-04-30** — Sprint 2 mergeado (PR #363). Override de userId server-side: `lib/auth/effective-user.ts` con `getEffectiveUser(supabase)` + endpoint `GET /api/me` + hook `useEffectiveUser()` cliente. Refactor de `MisTareasWidget`, `FechasImportantesWidget`, `app/inicio/page.tsx` (greeting), `app/inicio/juntas/page.tsx` y `TasksModule` (cuando `onlyMine`) para resolver identidad efectiva. Header se mantiene con nombre del actor real (banner ya comunica el contexto). Tests: `lib/auth/effective-user.test.ts` (8 tests). 850 tests pass.
+- **2026-04-30** — Sprint 3 cierre (este PR). [ADR-027](../adr/027_viendo_como_readonly.md) codifica V1-V5: (V1) toda mutation server-side llama `assertNotInPreview()`; (V2) personal-data reads usan `getEffectiveUser`; (V3) cookie httpOnly + sameSite=lax + path=/; (V4) caller no admin nunca puede previewear (verificación dual cliente + server); (V5) salir del preview siempre limpia la cookie. Iniciativa cerrada el mismo día que la promoción — 3 sprints en un día.
 
 ## Decisiones registradas
 
