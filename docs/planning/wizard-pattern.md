@@ -3,9 +3,10 @@
 **Slug:** `wizard-pattern`
 **Empresas:** todas
 **Schemas afectados:** n/a (UI)
-**Estado:** planned
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-04-29
+**Cerrada:** 2026-04-29
 **Última actualización:** 2026-04-29
 
 > Spin-out de `forms-pattern` Sprint 6. La evaluación de
@@ -201,3 +202,74 @@ _(append-only, escrita por Claude Code al ejecutar)_
 Beto autorizó el alcance v1 cerrado arriba y los 2 sprints. Arranca
 Sprint 1 con foundation `components/wizard/` + ADR-025 + golden
 migration `empleado-alta-wizard` en un solo PR.
+
+### 2026-04-29 · Sprint 1 mergeado — PR #342
+
+Foundation + ADR + golden migration en un solo PR contundente.
+
+- **Foundation `components/wizard/`** (6 piezas):
+  - `wizard.tsx` — `<Wizard>` orquestador con `useMemo` sobre
+    `React.Children` para extraer steps; nav helpers via context.
+  - `wizard-step.tsx` — marker component que retorna `null`; `<Wizard>`
+    pulls `props.children` y los renderea inline cuando active.
+  - `wizard-stepper.tsx` — UI de pasos con `role="list"` + `role="listitem"`
+    - `aria-current="step"`; conteo de errores por paso visitado.
+  - `wizard-actions.tsx` — Atrás/Siguiente/Submit con auto-detect del
+    estado del wizard (isFirstStep, isLastStep, submitting).
+  - `wizard-file-slot.tsx` — slot deferred que recolecta `File` en
+    memoria; UI alineada visualmente a `<FileAttachments>` (40px tile
+    - label + filename/size + Subir/Quitar); flag `exempt` para roles
+      condicional-`primer_empleo`.
+  - `wizard-context.tsx` — context interno + `useWizard()` hook público.
+
+- **ADR-025** con 7 reglas W1-W7 codificadas. Las decisiones
+  registradas en este planning doc se cristalizaron como reglas
+  citables desde futuros PRs.
+
+- **Golden migration** `components/rh/empleado-alta-wizard.tsx`:
+  - Schema zod unificado con `superRefine` para validaciones cruzadas
+    (NSS exento si `primer_empleo`; periodo de prueba requerido solo
+    si tipo_contrato es `prueba`/`capacitacion_inicial`; mínimo 1
+    beneficiario Art. 501 LFT).
+  - Cero `useState` per-field (~30 → 0).
+  - Beneficiarios via `useFieldArray` nativo de RHF (W2 evidence).
+  - Archivos via `<WizardFileSlot>` con `exempt` flag (W5 evidence).
+  - SDI auto-calc cruza pasos vía `form.watch('sueldo_mensual')` +
+    `setValue` (W1 evidence).
+  - `useDirtyConfirm` con `formState.isDirty || filesDirty` (sumamos
+    files al flag dirty porque viven fuera del schema, W6 evidence).
+  - Submit pipeline preserva el rollback multi-tabla original; reusa
+    `buildAdjuntoPath()` cuando `empresaSlug` está disponible.
+  - Caller único `components/rh/personal-module.tsx` actualizado para
+    pasar `empresaSlug` typed (`'rdb' | 'dilesa' | 'ansa' | 'coagan'`).
+
+- **Verificación**: typecheck + lint (0 errors) + 401 tests + format
+  todos verdes en local; CI verde en `Lint / Typecheck / Unit tests`
+  - `Vercel` deployment + `Vercel Preview Comments`.
+
+### 2026-04-29 · Sprint 2 — Closeout
+
+PR de cierre. Mueve `wizard-pattern` a `## Done` en `INITIATIVES.md`,
+actualiza el roadmap UI numerado para marcar la iniciativa cerrada, y
+agrega esta entrada de bitácora.
+
+Reminders en lista `Claude: BSOP`: `remindctl list "Claude: BSOP"
+--json` no devolvió ningún pendiente vivo asociado a sub-tareas de
+`wizard-pattern` (la iniciativa se ejecutó en una sola sesión sin
+fragmentar TodoWrite a Reminders persistentes). No hay barrido que
+hacer.
+
+## Outcome
+
+Pattern de wizards multi-step canónico para BSOP. 1 caso real
+migrado (alta de empleado RDB+DILESA, vía `<EmpleadoAltaWizard>`
+shared), 7 reglas W1-W7 documentadas en ADR-025. Cuando aparezca el
+segundo wizard (probable: alta proveedor con CSF multi-step, alta
+socio, alta caso administrativo), la API ya está fija y el segundo
+caller cuesta ~5-10 líneas de boilerplate (schema + steps array +
+caller-driven submit pipeline).
+
+`empleado-alta-wizard.tsx` queda como golden de referencia para el
+siguiente caller — incluye los patrones difíciles (validación
+cruzada via `superRefine`, archivos exentos condicional, SDI cruzando
+pasos, rollback multi-tabla con storage cleanup).
