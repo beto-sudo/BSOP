@@ -1,11 +1,11 @@
 # Iniciativa — Finiquito mejoras (UX + dinámica + audit trail)
 
-**Estado:** in_progress
+**Estado:** done
 **Empresas:** todas (cross-empresa, hereda DILESA + RDB; ANSA y COAGAN
 heredan automáticamente cuando capturen sus datos fiscales en
 `core.empresas`).
 **Schemas:** `core` (lectura empresas), `erp` (nueva tabla `finiquitos`).
-**Última actualización:** 2026-04-30
+**Última actualización:** 2026-04-30 (cierre)
 
 ## Problema
 
@@ -167,3 +167,18 @@ en `core.empresas`:
   "Finiquitos generados" en detalle del empleado. La migración la
   aplica Beto con `psql` post-merge + regenera `SCHEMA_REF.md` y
   `types/supabase.ts`.
+- **2026-04-30**: Sprint 2 mergeado en PR #373 e iniciativa cerrada.
+  Fricción detectada en pre-merge audit: el primer intento de aplicar
+  el SQL falló porque Beto corrió `psql -f
+supabase/migrations/20260430160000_erp_finiquitos.sql` desde `main`,
+  donde el archivo aún no existía (vivía solo en la branch del PR);
+  el comando emitió `No such file or directory` pero la cadena
+  encadenada con `&&` continuó a `npm run schema:ref` (que solo
+  cambió el timestamp), `git commit`, `git push` — quedando
+  commiteado en main un changelog vacío que SÍ pasó a producción
+  pero sin la tabla. CC bloqueó el merge hasta que Beto aplicó el
+  SQL desde `claude/finiquito-mejoras-s2` y verificó con `\d
+erp.finiquitos`. Aprendizaje: **no aplicar migraciones desde main
+  hasta que el PR esté mergeado**, o aplicar desde la branch del PR
+  antes del merge si es crítico verificar que la tabla exista en
+  producción al momento del deploy.
