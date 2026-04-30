@@ -6,7 +6,7 @@
 **Estado:** planned
 **Dueño:** Beto
 **Creada:** 2026-04-30
-**Última actualización:** 2026-04-30 (alcance v1 cerrado en la promoción — opción A: cambiar solo la vista, sin triggers ni schema nuevo).
+**Última actualización:** 2026-04-30 (Sprint 1 ejecutado en modo autónomo — migración `20260430130000_rdb_v_productos_tabla_costo_precio_realidad.sql` lista para que Beto aplique con psql; regeneración de SCHEMA_REF + types + smoke en preview pendientes post-apply).
 
 ## Problema
 
@@ -79,41 +79,47 @@ Waitry. La columna **Margen** está calculada sobre data muerta.
 
 ### Sprint 1 — Cambiar vista `rdb.v_productos_tabla`
 
-- [ ] **Migración**: `supabase/migrations/<ts>_rdb_v_productos_tabla_costo_precio_realidad.sql`
-      con `CREATE OR REPLACE VIEW rdb.v_productos_tabla` que reemplace los
-      LEFT JOIN actuales por:
-  - **`ultimo_costo`** ← subquery que toma el `precio_unitario` de la
-    línea más reciente de `erp.ordenes_compra_detalle` cuya OC esté en
-    `('recibida','cerrada')`, agrupado por `producto_id`. Decisión de
-    fuente: usar `ordenes_compra_detalle` (precio acordado/pagado) en
-    lugar de `movimientos_inventario.costo_unitario` porque
-    `movimientos_inventario` puede tener costos derivados de
-    levantamientos (ajuste físico) o transferencias, que no representan
-    "el último costo de compra" sino "el último costo registrado en
-    inventario" — distintos. Si después se prefiere recepción real,
-    se cambia.
-  - **`ultimo_precio_venta`** ← subquery que toma el `unit_price` del
-    `rdb.waitry_productos` más reciente por `product_id` (match por
-    `productos.codigo`). Reusa el patrón del JOIN existente con
-    `rdb.v_producto_ultima_venta`.
-  - **`margen_pct`** ← calculado igual que hoy pero con los nuevos
-    valores; si cualquiera es NULL, retorna NULL.
-- [ ] **Performance**: 318 productos × 2 subqueries ordenadas por fecha.
-      Validar con `EXPLAIN ANALYZE` en preview que la vista responde en
-      < 200ms. Si no, agregar índices o materializar lateral views.
-      Índices candidatos: `(producto_id, created_at DESC)` en
-      `rdb.waitry_productos`, `(producto_id, oc_recibida_at DESC)` en
-      `erp.ordenes_compra_detalle` (vía JOIN con `ordenes_compra`).
+- [x] **Migración** creada:
+      [`supabase/migrations/20260430130000_rdb_v_productos_tabla_costo_precio_realidad.sql`](../../supabase/migrations/20260430130000_rdb_v_productos_tabla_costo_precio_realidad.sql)
+      con `CREATE OR REPLACE VIEW rdb.v_productos_tabla` (preserva
+      `SECURITY INVOKER`). Implementación final con dos CTEs:
+  - **`ultimo_costo_oc`**: `DISTINCT ON (producto_id)` sobre
+    `erp.ordenes_compra_detalle` JOIN `erp.ordenes_compra` filtrado por
+    `oc.estado IN ('recibida','cerrada')` + `empresa_id = RDB`. Costo =
+    `COALESCE(ocd.precio_real, ocd.precio_unitario)` (preserva el
+    override admin del Sprint 3 de `oc-recepciones`). Ranking por
+    `COALESCE(oc.cerrada_at, oc.autorizada_at, ocd.created_at) DESC` —
+    si `cerrada_at` existe es lo más representativo de "cuándo se
+    concretó", `autorizada_at` cubre OC enviada/parcial/recibida sin
+    cerrar todavía, `created_at` de la línea es fallback.
+  - **`ultimo_precio_waitry`**: `DISTINCT ON (product_id)` sobre
+    `rdb.waitry_productos` filtrado por `product_id IS NOT NULL` +
+    `unit_price > 0` (excluye cortesías/ajustes en cero). Precio =
+    `wp.unit_price`. Ranking por `wp.created_at DESC` (fecha de
+    ingestión; suficientemente representativa — si hay drift con
+    `pedido.timestamp`, follow-up).
+  - **`margen_pct`**: `NULL` cuando `ultimo_precio_venta` o
+    `ultimo_costo` son NULL (más honesto que mostrar 100% cuando no
+    hay costo conocido).
+- [x] **Índices verificados**: `idx_ordenes_compra_detalle_producto_id`
+      (Sprint 4 FK indexes) + `waitry_productos_product_id_idx`
+      (bootstrap) cubren los `DISTINCT ON` por producto. No se agregan
+      compuestos `(producto_id, fecha DESC)` para v1 — la escala
+      actual (cientos de líneas en `ordenes_compra_detalle`, miles en
+      `waitry_productos`) tolera el sort secundario en memoria. Si el
+      smoke detecta lentitud > 200ms, follow-up con índices compuestos.
 - [ ] **Aplicar migración con psql** (Beto, manual — regla operativa
-      del repo).
-- [ ] **Regenerar SCHEMA_REF + types**: `npm run schema:ref` +
-      `npm run db:types`.
-- [ ] **CI verde**: typecheck + test:run + lint + format:check (los 4
-      checks que corre CI sobre todo el repo).
-- [ ] **Smoke test manual en preview**: abrir `/rdb/productos`, validar
-      que productos con OCs recibidas muestran costo distinto a $0 y que
-      productos vendidos en Waitry muestran precio. Comparar 5-10
-      productos contra la realidad esperada.
+      del repo; harness bloquea apply desde CC).
+- [ ] **Regenerar SCHEMA_REF + types** post-apply: `npm run schema:ref` + `npm run db:types`. Las views aparecen como `_(view)_` en
+      SCHEMA_REF y como tipos generados en `types/supabase.ts`.
+- [x] **CI verde** en pre-push: typecheck + test:run + lint +
+      format:check (los 4 checks que corre CI). El SQL no se valida en
+      CI sin DB live; el chequeo real es post-apply.
+- [ ] **Smoke test manual en preview**: tras apply, abrir
+      `/rdb/productos`, validar que productos con OCs recibidas
+      muestran costo distinto a $0 y que productos vendidos en Waitry
+      muestran precio. Comparar 5-10 productos contra realidad
+      esperada. Productos sin compra ni venta deben mostrar "—".
 
 ### Sprint 2 — Cierre
 
@@ -206,11 +212,11 @@ Waitry. La columna **Margen** está calculada sobre data muerta.
 
 ## Sprints / hitos
 
-| #   | Scope                                                                                         | Estado          | PR  |
-| --- | --------------------------------------------------------------------------------------------- | --------------- | --- |
-| 0   | Promoción: doc planning + fila en INITIATIVES.md (estado `planned`, alcance v1 cerrado)       | done 2026-04-30 | —   |
-| 1   | Migración + nueva vista `rdb.v_productos_tabla` con subqueries de costo/precio reales + smoke | pending         | —   |
-| 2   | Cierre: bitácora + decisiones + transición `planned → done` + barrido de Reminders            | pending         | —   |
+| #   | Scope                                                                                   | Estado          | PR  |
+| --- | --------------------------------------------------------------------------------------- | --------------- | --- |
+| 0   | Promoción: doc planning + fila en INITIATIVES.md (estado `planned`, alcance v1 cerrado) | done 2026-04-30 | —   |
+| 1   | Migración + nueva vista `rdb.v_productos_tabla` con CTEs costo/precio realidad + smoke  | pending apply   | —   |
+| 2   | Cierre: bitácora + decisiones + transición `planned → done` + barrido de Reminders      | pending         | —   |
 
 ## Decisiones registradas
 
@@ -248,6 +254,50 @@ Waitry. La columna **Margen** está calculada sobre data muerta.
   Si autoriza modo autónomo (CC genera PR + mergea con CI verde),
   puede cerrarse en una sesión. Si no, al ritmo de Beto.
 
+### 2026-04-30 — Decisiones de Sprint 1
+
+- **`COALESCE(precio_real, precio_unitario)` para costo**: la columna
+  `precio_real` se introdujo en Sprint 3 de `oc-recepciones` para
+  permitir override admin del precio en recepciones (trigger gate por
+  `core.fn_is_admin()`). Cuando existe `precio_real`, ese es el costo
+  realmente pagado/asentado y debe ganar sobre `precio_unitario`. Si
+  no, `precio_unitario` (precio acordado) es el costo. Consistente
+  con lo que ya hace la lógica de `total_a_pagar` al cerrar OC.
+- **Estados terminales: solo `recibida` y `cerrada`**, NO `parcial`.
+  Razón: `parcial` significa que la OC está mitad-recibida; el precio
+  podría cambiar en el remanente cuando llegue. Esperar a que pase a
+  `recibida` (todo recibido) o `cerrada` (cerrada manualmente con o
+  sin pendientes) garantiza que el costo no oscile.
+- **Ranking por `COALESCE(cerrada_at, autorizada_at, created_at)`**:
+  `cerrada_at` es la fecha más representativa de "cuándo se concretó
+  el costo"; `autorizada_at` cubre OCs en estado `recibida` que aún
+  no se cerraron; `created_at` de la línea es fallback para OCs
+  legacy sin esos timestamps. El orden refleja prioridad temporal
+  real, no del lifecycle del registro.
+- **Filtrar `unit_price > 0` en Waitry**: ventas con `unit_price = 0`
+  son cortesías, ajustes o errores de captura del POS — no
+  representan precio real cobrado y contaminarían el "último precio".
+  Productos en este filtro mantienen su precio Waitry anterior (NULL
+  si nunca tuvieron una venta cobrada).
+- **`DISTINCT ON` en lugar de `LATERAL JOIN` o subqueries
+  correlacionadas**: idiomático de Postgres, óptimo con índice en
+  `(producto_id, fecha)`. A escala actual (cientos de OCs, miles de
+  ventas Waitry, 318 productos) los índices simples por `producto_id`
+  bastan; el sort secundario por fecha en memoria es trivial. Si el
+  smoke detecta lentitud, follow-up con índices compuestos.
+- **Ranking Waitry por `wp.created_at`** en lugar de `pedido.timestamp`:
+  evita JOIN extra. `created_at` es la fecha de ingestión a BSOP, que
+  está cerca de `pedido.timestamp` salvo en backfills. Si emerge
+  drift importante, follow-up con JOIN a `waitry_pedidos`.
+- **`margen_pct` NULL si falta cualquier pieza**: regla más estricta
+  que la versión anterior (que mostraba 100% si costo era NULL/0).
+  Margen indeterminado debe leerse como "no podemos saber", no como
+  "margen perfecto".
+- **NO tocar `INITIATIVES.md` en este PR**: Sprint 1 es ejecución
+  intermedia. La transición `planned → done` se hará en Sprint 2 al
+  cierre, una sola vez (regla 1 del CLAUDE.md de proyecto sobre
+  hotspot de conflicto entre sesiones paralelas).
+
 ## Bitácora
 
 ### 2026-04-30 — Promoción
@@ -259,3 +309,28 @@ ni el último precio de venta. Investigación confirmó: la vista lee de
 desde Waitry, sin actualizaciones automáticas posteriores. Beto
 autorizó **opción A** (cambiar solo la vista) y promoción a iniciativa
 con alcance v1 cerrado en este doc. Estado inicial: `planned`.
+
+### 2026-04-30 — Sprint 1 (modo autónomo)
+
+Beto autorizó modo autónomo: "haz push y merge cuando esté en verde,
+hay otra sesión con iniciativa en paralelo". Tomado en cuenta:
+**no toco `INITIATIVES.md` en este PR** (Sprint 1 es intermedio,
+hotspot de conflicto con la sesión paralela; la transición a `done`
+se hace en Sprint 2 una sola vez).
+
+Migración creada en
+[`supabase/migrations/20260430130000_rdb_v_productos_tabla_costo_precio_realidad.sql`](../../supabase/migrations/20260430130000_rdb_v_productos_tabla_costo_precio_realidad.sql)
+con la nueva definición de `rdb.v_productos_tabla` usando dos CTEs
+(`ultimo_costo_oc` + `ultimo_precio_waitry`) con `DISTINCT ON` por
+producto. `SECURITY INVOKER` preservado. `NOTIFY pgrst, 'reload schema'`
+al final para refrescar PostgREST sin esperar el polling automático.
+
+Decisiones técnicas documentadas en sección anterior. Índices
+existentes verificados — no se agregan compuestos en v1 (escala
+actual los tolera; follow-up si smoke detecta > 200ms).
+
+Pendiente para Beto: aplicar migración con psql en main DB. Tras
+apply, regenerar `SCHEMA_REF.md` + `types/supabase.ts` (commit
+subsiguiente al PR antes de mergear, o post-merge si Beto prefiere).
+Smoke test manual en preview verifica que productos con OCs y ventas
+muestran números reales en lugar de \$0.
