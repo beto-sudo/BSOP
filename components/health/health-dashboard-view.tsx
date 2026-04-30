@@ -10,6 +10,7 @@ import { CardiacFitnessSection } from './cardiac-fitness-section';
 import {
   buildDeltaHelper,
   formatDaysAgo,
+  getRecoveryFlag,
   groupDailyAverage,
   groupDailySleep,
   isStaleSince,
@@ -25,6 +26,8 @@ import type { HealthDashboardViewProps, HeroCard } from './types';
 export function HealthDashboardView({
   latest,
   heroSleepStages,
+  heroHrv,
+  heroRestingHr,
   sleepStages,
   hrv,
   restingHr,
@@ -60,6 +63,18 @@ export function HealthDashboardView({
   const hrvDaily = useMemo(() => groupDailyAverage(hrv), [hrv]);
   const restingHrDaily = useMemo(() => groupDailyAverage(restingHr), [restingHr]);
   const wristTempDaily = useMemo(() => groupDailyAverage(wristTemp), [wristTemp]);
+  // 14-day windows feed the recovery-flag computation regardless of the
+  // active range, so the flag fires even when the user is looking at "today".
+  const heroHrvDaily = useMemo(() => groupDailyAverage(heroHrv), [heroHrv]);
+  const heroRestingHrDaily = useMemo(() => groupDailyAverage(heroRestingHr), [heroRestingHr]);
+  const hrvFlag = useMemo(
+    () => getRecoveryFlag(heroHrvDaily, { type: 'drop', threshold: 0.1 }),
+    [heroHrvDaily]
+  );
+  const rhrFlag = useMemo(
+    () => getRecoveryFlag(heroRestingHrDaily, { type: 'rise', thresholdAbs: 5 }),
+    [heroRestingHrDaily]
+  );
   const workoutSummary = useMemo(() => {
     const mixMap = new Map<string, number>();
     workouts.forEach((w) => mixMap.set(w.name, (mixMap.get(w.name) ?? 0) + 1));
@@ -104,6 +119,7 @@ export function HealthDashboardView({
       icon: Activity,
       stale: hrvStale.stale,
       staleLabel: formatDaysAgo(hrvStale.daysAgo),
+      flag: hrvFlag ?? undefined,
     },
     {
       key: 'rhr',
@@ -120,6 +136,7 @@ export function HealthDashboardView({
       icon: HeartPulse,
       stale: restHrStale.stale,
       staleLabel: formatDaysAgo(restHrStale.daysAgo),
+      flag: rhrFlag ?? undefined,
     },
     {
       key: 'temp',

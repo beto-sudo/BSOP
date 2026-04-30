@@ -288,10 +288,15 @@ function metricSeriesIn(
 export type HealthDashboardData = {
   range: HealthDashboardRange;
   latest: Record<string, HealthMetricRow | null>;
-  // Recovery hero: pulls last 14 days of sleep stages regardless of the
-  // active range so "Sleep" card always reflects last night even if the
-  // user selected "today" or a custom range with no sleep data.
+  // Recovery hero: pulls last 14 days regardless of the active range so
+  // "Sleep / HRV / RHR" cards always reflect last night even if the user
+  // selected "today" or a custom range with no recent data. The 14-day
+  // window also gives current-vs-previous deltas a stable base so the
+  // recovery flag (HRV drop > 10%, RHR rise > 5 bpm) can fire on any
+  // active range.
   heroSleepStages: HealthMetricRow[];
+  heroHrv: HealthMetricRow[];
+  heroRestingHr: HealthMetricRow[];
   // Recovery
   sleepStages: HealthMetricRow[];
   hrv: HealthMetricRow[];
@@ -333,6 +338,8 @@ export type HealthDashboardData = {
 const EMPTY_DATA_SUFFIX: Omit<HealthDashboardData, 'range' | 'errors'> = {
   latest: {},
   heroSleepStages: [],
+  heroHrv: [],
+  heroRestingHr: [],
   sleepStages: [],
   hrv: [],
   restingHr: [],
@@ -392,6 +399,8 @@ export async function getHealthDashboardData(
   const [
     latestResult,
     heroSleepRes,
+    heroHrvRes,
+    heroRestingHrRes,
     sleepStagesRes,
     hrvRes,
     restingHrRes,
@@ -432,6 +441,8 @@ export async function getHealthDashboardData(
       p_names: LATEST_METRIC_NAMES,
     }),
     metricSeriesIn(supabase, SLEEP_STAGE_METRICS, heroSleepFrom, new Date().toISOString()),
+    metricSeries(supabase, 'Heart Rate Variability', heroSleepFrom, new Date().toISOString()),
+    metricSeries(supabase, 'Resting Heart Rate', heroSleepFrom, new Date().toISOString()),
     metricSeriesIn(supabase, SLEEP_STAGE_METRICS, from, to),
     metricSeries(supabase, 'Heart Rate Variability', from, to),
     metricSeries(supabase, 'Resting Heart Rate', from, to),
@@ -499,6 +510,8 @@ export async function getHealthDashboardData(
   const errors = [
     latestResult.error?.message,
     heroSleepRes.error?.message,
+    heroHrvRes.error?.message,
+    heroRestingHrRes.error?.message,
     sleepStagesRes.error?.message,
     hrvRes.error?.message,
     restingHrRes.error?.message,
@@ -534,6 +547,8 @@ export async function getHealthDashboardData(
     range,
     latest,
     heroSleepStages: heroSleepRes.data ?? [],
+    heroHrv: heroHrvRes.data ?? [],
+    heroRestingHr: heroRestingHrRes.data ?? [],
     sleepStages: sleepStagesRes.data ?? [],
     hrv: hrvRes.data ?? [],
     restingHr: restingHrRes.data ?? [],

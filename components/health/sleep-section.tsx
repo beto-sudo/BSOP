@@ -9,6 +9,7 @@ import {
   countDaysAtOrAbove,
   filterRecentRows,
   groupDailySleep,
+  groupDailySleepEfficiency,
   groupDailySum,
   groupSleepStages,
   summarizeDailyWindow,
@@ -47,6 +48,9 @@ export function SleepSection({
   const sleepDaily = groupDailySleep(sleepStages);
   const sleepSeries = sleepDaily.slice(-trendDays);
   const breathingSeries = groupDailySum(breathing).slice(-trendDays);
+
+  const efficiencyDaily = groupDailySleepEfficiency(sleepStages);
+  const efficiency7dAvg = summarizeDailyWindow(efficiencyDaily, 7, 0);
 
   const latestSleep = sleepDaily.at(-1) ?? null;
   const sleep7dAvg = summarizeDailyWindow(sleepDaily, 7, 0);
@@ -106,7 +110,7 @@ export function SleepSection({
           </div>
         </div>
 
-        <div className="mb-6 grid gap-3 md:grid-cols-4">
+        <div className="mb-6 grid gap-3 md:grid-cols-3 xl:grid-cols-5">
           <StatPill
             label="Anoche"
             value={`${latestSleep ? formatDurationHours(latestSleep.value) : '—'} hr`}
@@ -118,6 +122,10 @@ export function SleepSection({
           <StatPill
             label="30d avg"
             value={`${sleep30dAvg == null ? '—' : formatDurationHours(sleep30dAvg)} hr`}
+          />
+          <StatPill
+            label="Eficiencia 7d"
+            value={efficiency7dAvg == null ? '—' : `${formatMetricValue(efficiency7dAvg, 0)}%`}
           />
           <StatPill
             label="Noches ≥7h (7d)"
