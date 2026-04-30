@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-26
-**Última actualización:** 2026-04-26
+**Última actualización:** 2026-04-29
 
 ## Problema
 
@@ -86,10 +86,31 @@ Mientras esto no se entienda y se cierre, los cortes RDB siguen requiriendo reco
 
 - **Fase 1 — investigación read-only.** ✅ **Cerrada 2026-04-26.** Salida: [ADR-005](../../supabase/adr/005_rdb_waitry_dedup_root_cause.md) con causa raíz, cifra histórica y 3 opciones de fix.
 - **Fase 1.5 — forense del doble-tap antes de reportar a Waitry.** ✅ **Cerrada 2026-04-26.** Salida: [ADR-006](../../supabase/adr/006_rdb_waitry_forense_doble_tap.md) con prueba definitiva (no es defecto del POS), patrones (97% en una tablet, 73% en horas pico), corrección de impacto (~$10–20k reales, no $163k crudos) y replanteo de prioridades.
-- **Fase 2.A — Opción C (cleanup mínimo).** ⏳ **En curso (PR abierto):** migración `20260426120000_rdb_waitry_c_cleanup.sql` con typo fix `'order_canceled'`, drop de `rdb.trg_procesar_venta_waitry`, mejora de `match_reason` en detector. Aplicada a DB live antes del PR.
-- **Fase 2.B — Fix del hash (compute_content_hash + backfill + re-detección).** ⏸️ Próximo. Toca producción en horario sensible → coordinar fuera de ventana operativa de Laisha (≤6am o >11pm Matamoros).
-- **Fase 2.C — UI de resolución (Opción B).** ⏸️ Después del fix del hash, cuando los pares pendientes bajen a magnitud manejable.
-- **Fase 3 — Conversación con Waitry (NO urgente).** ⏸️ Solo si después del fix del hash queda un bug operacional consistente.
+- **Fase 2.A — Opción C (cleanup mínimo).** ✅ **Cerrada 2026-04-26** vía PR [#211](https://github.com/beto-sudo/BSOP/pull/211). Migración `20260426120000_rdb_waitry_c_cleanup.sql` con typo fix `'order_canceled'`, drop de `rdb.trg_procesar_venta_waitry`, mejora de `match_reason` en detector. Aplicada a DB live antes del PR.
+- **Fase 2.B — Fix del detector (table_id + ventana 90s + re-detección).** ✅ **Cerrada 2026-04-26** vía PR [#212](https://github.com/beto-sudo/BSOP/pull/212). Migración `20260426130000_rdb_waitry_hash_fix_tableid_y_ventana.sql`. Resultado: 949 → 91 pares pendientes (−90.4%); tasa Tiendita 14% → 9.3%; pares clave del corte ancla siguen detectándose. Decisión técnica: NO se modificó `compute_content_hash` con `tableId` — análisis empírico mostró que en mostrador todas las ventas comparten `tableId 94034`, así que no discriminaba. La palanca real para el 9.3% residual es la UI manual (Fase 2.C).
+- **Fase 2.C — UI de resolución (Opción B).** ⏸️ **Próximo hito.** 91 pares pendientes hoy + los nuevos que aparezcan requieren intervención manual por SQL hasta que exista UI. Alcance v1 tentativo en sección "Próximo hito" abajo. Sin esto la iniciativa no cierra.
+- **Fase 3 — Conversación con Waitry (NO urgente).** ⏸️ Solo si después de la UI de Fase 2.C el % de doble-taps reales sigue alto y se vuelve oneroso resolverlos manualmente. Conversación sería sobre UX preventiva en su POS (warning si se intenta crear orden idéntica en ventana corta), no sobre defecto del POS (ADR-006 ya descartó eso).
+
+## Próximo hito — Fase 2.C: UI de resolución de duplicados
+
+**Problema operativo hoy:** los 91 pares pendientes en `rdb.waitry_duplicate_candidates` (y los nuevos que el detector marca cada día) requieren que alguien resuelva por SQL. Sin UI, el cajero no tiene forma de cerrar el ciclo cuando cuadra un corte con sospecha de dup.
+
+**Alcance v1 tentativo (cerrar al arrancar):**
+
+- Vista (probablemente módulo nuevo `/rdb/conciliacion-waitry` o sub-tab dentro de Cortes) que liste los pares pendientes de `rdb.waitry_duplicate_candidates` con `resolved=false`.
+- Por cada par muestra: productos + total + `seconds_apart` + `payment_methods` + `match_reason` + sugerencia del "bueno" según ADR-006.
+- Acciones por par:
+  - **Resolver como dup** → marca uno superseded_by el otro vía nuevo flag (no afecta corte cerrado, decisión registrada en audit trail).
+  - **Resolver como ventas distintas** → marca el par `resolved=true` con razón "no era dup".
+- Filtro por corte para que el cajero lo vea junto al corte que cuadra.
+- Audit trail: `resolved_by`, `resolved_at`, `resolution_note`.
+- Acceso: solo admin RDB + cajeros del módulo de cortes.
+
+**Riesgos a resolver al cerrar alcance:**
+
+- ¿Permitir resolución de pares cuyos pedidos ya viven en un corte cerrado? Decisión recomendada (preliminar): trazabilidad sin tocar totales históricos — agregar flag de "decisión a futuro" sin cambiar el corte. Pero hay que validarlo con Beto al arrancar.
+- ¿UX dentro de `/rdb/cortes` o como módulo aparte? Ambas alternativas tienen tradeoffs (menor fricción vs separación de concerns).
+- ¿Política de auto-resolución para pares con `seconds_apart < 5s` y mismo `payment_method`? Puede arrancar manual y agregarse cuando haya volumen.
 
 ## Decisiones registradas
 
