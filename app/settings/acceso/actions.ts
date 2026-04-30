@@ -26,6 +26,7 @@ export type Empresa = { id: string; nombre: string; slug: string };
 // Keep this as a pure type alias. If you need a runtime list of secciones,
 // put it in a sibling non-server file and import from there.
 export type ModuloSeccion =
+  | 'operativa'
   | 'administracion'
   | 'rh'
   | 'compras'
