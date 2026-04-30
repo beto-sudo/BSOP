@@ -754,6 +754,30 @@ function OrdenDetail({
             </div>
           )}
 
+          {orden?.estatus === 'cerrada' &&
+            orden?.total_a_pagar != null &&
+            orden.total_a_pagar > 0 && (
+              <div className="flex items-start gap-2 rounded-xl border-2 border-emerald-300 bg-emerald-50/80 p-4 text-sm print:hidden">
+                <span
+                  className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-xs font-bold text-white"
+                  aria-hidden
+                >
+                  ✓
+                </span>
+                <div>
+                  <div className="font-semibold text-emerald-900">
+                    Listo para Cuentas por Pagar ·{' '}
+                    <span className="tabular-nums">{formatCurrency(orden.total_a_pagar)}</span>
+                  </div>
+                  <div className="mt-0.5 text-xs text-emerald-800/80">
+                    Pendiente de factura y pago al proveedor. Cuando el módulo CxP esté construido,
+                    esta OC aparecerá automáticamente en su bandeja
+                    (`erp.v_oc_cerradas_pendientes_pago`).
+                  </div>
+                </div>
+              </div>
+            )}
+
           <Separator className="print:hidden" />
 
           {/* ═══ Items (both screen and print) ═══ */}
