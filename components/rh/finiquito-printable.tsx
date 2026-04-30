@@ -99,10 +99,11 @@ export function FiniquitoPrintable({
       <h1>Convenio de terminación laboral y finiquito</h1>
 
       <p>
-        En la ciudad de Piedras Negras, Coahuila, a los <strong>{formatDateLarga(fechaHoy)}</strong>
-        , comparecen <strong>{patron.razonSocial}</strong>, representada por su representante legal,
-        el señor(a) <strong>{patron.representanteLegal}</strong>, a quien en lo sucesivo se
-        denominará <strong>«EL PATRÓN»</strong>, y por la otra parte el señor(a){' '}
+        En la ciudad de <strong>{patron.municipio}</strong>, <strong>{patron.estado}</strong>, a los{' '}
+        <strong>{formatDateLarga(fechaHoy)}</strong>, comparecen{' '}
+        <strong>{patron.razonSocial}</strong>, representada por su representante legal, el señor(a){' '}
+        <strong>{patron.representanteLegal}</strong>, a quien en lo sucesivo se denominará{' '}
+        <strong>«EL PATRÓN»</strong>, y por la otra parte el señor(a){' '}
         <strong>{nombreCompleto}</strong>, a quien en lo sucesivo se denominará{' '}
         <strong>«EL TRABAJADOR»</strong>, para celebrar el presente convenio de terminación laboral
         y finiquito al tenor de las siguientes:
