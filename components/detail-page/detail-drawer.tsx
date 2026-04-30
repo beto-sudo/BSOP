@@ -33,6 +33,12 @@ import { cn } from '@/lib/utils';
  * Sub-components for body composition:
  * - `<DetailDrawerSection>` — canonical sub-section with title/description/divider (DD10).
  * - `<DetailDrawerSkeleton>` — loading placeholder (DD11).
+ *
+ * The body wrapper is `flex flex-col flex-1 min-h-0`. Children must claim the
+ * available height to scroll: either use `<DetailDrawerContent>` (recommended,
+ * already does it via `<ScrollArea h-full>`) or a custom `<ScrollArea>` with
+ * `flex-1 min-h-0`. Plain `<div>` children won't scroll — they sit at intrinsic
+ * height and overflow gets cut off.
  */
 
 export type DetailDrawerProps = {
@@ -86,7 +92,7 @@ export function DetailDrawer({
       >
         <DetailDrawerHeader title={title} description={description} meta={meta} actions={actions} />
 
-        <div className="flex-1 min-h-0">{children}</div>
+        <div className="flex-1 min-h-0 flex flex-col">{children}</div>
 
         {footer ? (
           <div className="border-t border-[var(--border)] px-6 py-3 print:hidden">{footer}</div>
