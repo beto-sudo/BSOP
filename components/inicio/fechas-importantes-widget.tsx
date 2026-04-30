@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { CalendarHeart, Cake, PartyPopper, Flag } from 'lucide-react';
 
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
+import { useEffectiveUser } from '@/components/providers';
 import { Surface } from '@/components/ui/surface';
 import { Skeleton } from '@/components/ui/skeleton';
 import { festivosEnRango, type DiaFestivo } from '@/lib/inicio/dias-festivos';
@@ -82,35 +83,19 @@ function formatFechaCorta(d: Date): string {
 
 export function FechasImportantesWidget() {
   const supabase = useMemo(() => createSupabaseERPClient(), []);
+  const { data: effective, loading: effectiveLoading } = useEffectiveUser();
   const [cumples, setCumples] = useState<Cumpleanero[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (effectiveLoading) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
       setError(null);
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user?.email) {
-          if (!cancelled) {
-            setCumples([]);
-            setLoading(false);
-          }
-          return;
-        }
-
-        const { data: coreUser } = await supabase
-          .schema('core')
-          .from('usuarios')
-          .select('id')
-          .eq('email', user.email.toLowerCase())
-          .maybeSingle();
-
-        if (!coreUser) {
+        if (!effective?.id) {
           if (!cancelled) {
             setCumples([]);
             setLoading(false);
@@ -122,7 +107,7 @@ export function FechasImportantesWidget() {
           .schema('core')
           .from('usuarios_empresas')
           .select('empresa_id')
-          .eq('usuario_id', coreUser.id)
+          .eq('usuario_id', effective.id)
           .eq('activo', true);
 
         const empresaIds = (ue ?? []).map((r: { empresa_id: string }) => r.empresa_id);
@@ -183,7 +168,7 @@ export function FechasImportantesWidget() {
     return () => {
       cancelled = true;
     };
-  }, [supabase]);
+  }, [supabase, effective, effectiveLoading]);
 
   const eventos = useMemo<EventoItem[]>(() => {
     const today = startOfDay(new Date());

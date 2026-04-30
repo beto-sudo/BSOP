@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
+import { useEffectiveUser, useReadOnlyMode } from '@/components/providers';
 import { DataTable, type Column } from '@/components/module-page';
 import {
   Dialog,
@@ -85,6 +86,8 @@ function EstadoBadge({ estado }: { estado: Junta['estado'] }) {
 function JuntasInner() {
   const router = useRouter();
   const supabase = createSupabaseERPClient();
+  const { data: effective, loading: effectiveLoading } = useEffectiveUser();
+  const readOnly = useReadOnlyMode();
 
   const [empresaIds, setEmpresaIds] = useState<string[]>([]);
   const [juntas, setJuntas] = useState<Junta[]>([]);
@@ -106,31 +109,19 @@ function JuntasInner() {
   });
 
   const fetchEmpresaIds = useCallback(async (): Promise<string[]> => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return [];
-
-    const { data: coreUser } = await supabase
-      .schema('core')
-      .from('usuarios')
-      .select('id')
-      .eq('email', (user.email ?? '').toLowerCase())
-      .maybeSingle();
-
-    if (!coreUser) return [];
+    if (!effective?.id) return [];
 
     const { data: ueData } = await supabase
       .schema('core')
       .from('usuarios_empresas')
       .select('empresa_id')
-      .eq('usuario_id', coreUser.id)
+      .eq('usuario_id', effective.id)
       .eq('activo', true);
 
     const ids = (ueData ?? []).map((r: any) => r.empresa_id as string);
     setEmpresaIds(ids);
     return ids;
-  }, [supabase]);
+  }, [supabase, effective]);
 
   const fetchJuntas = useCallback(
     async (ids: string[]) => {
@@ -155,6 +146,7 @@ function JuntasInner() {
   );
 
   useEffect(() => {
+    if (effectiveLoading) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -170,7 +162,7 @@ function JuntasInner() {
     return () => {
       cancelled = true;
     };
-  }, [fetchEmpresaIds, fetchJuntas]);
+  }, [fetchEmpresaIds, fetchJuntas, effectiveLoading]);
 
   const handleCreate = async () => {
     if (!createForm.titulo.trim() || !createForm.fecha_hora || empresaIds.length === 0) return;
@@ -302,7 +294,9 @@ function JuntasInner() {
           <Button
             size="sm"
             onClick={() => setShowCreate(true)}
-            className="rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 gap-1.5"
+            disabled={readOnly}
+            title={readOnly ? 'Salí del modo vista previa para crear juntas' : undefined}
+            className="rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 gap-1.5 disabled:opacity-50"
           >
             <Plus className="h-4 w-4" />
             Crear nueva junta
