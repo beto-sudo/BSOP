@@ -39,6 +39,9 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import type { CsfExtraccion } from '@/lib/proveedores/extract-csf';
+import { PersonasContactosSection } from './personas-contactos-section';
+import { PersonasCuentasBancariasSection } from './personas-cuentas-bancarias-section';
+import { PersonasDireccionesSection } from './personas-direcciones-section';
 
 // ─── CSF diff helpers (Sprint 3.B) ───────────────────────────────────────────
 
@@ -191,6 +194,7 @@ const proveedorColumns: Column<Proveedor>[] = [
 
 function ProveedorDetail({
   proveedor,
+  empresaId,
   open,
   onClose,
   onEdit,
@@ -201,6 +205,7 @@ function ProveedorDetail({
   membreteAlt,
 }: {
   proveedor: Proveedor | null;
+  empresaId: string;
   open: boolean;
   onClose: () => void;
   onEdit: (p: Proveedor) => void;
@@ -289,6 +294,19 @@ function ProveedorDetail({
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">Sin información de contacto</p>
+        )}
+
+        {/* Sprint 2 — secciones satélite (contactos / cuentas / direcciones).
+             Solo cuando hay persona_id (siempre debería para proveedor activo). */}
+        {proveedor.persona_id && (
+          <>
+            <PersonasContactosSection personaId={proveedor.persona_id} empresaId={empresaId} />
+            <PersonasCuentasBancariasSection
+              personaId={proveedor.persona_id}
+              empresaId={empresaId}
+            />
+            <PersonasDireccionesSection personaId={proveedor.persona_id} empresaId={empresaId} />
+          </>
         )}
 
         {proveedor.notas && (
@@ -939,6 +957,7 @@ export function ProveedoresModule({
       {/* Detail drawer */}
       <ProveedorDetail
         proveedor={selected}
+        empresaId={empresaId}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onEdit={openEdit}
