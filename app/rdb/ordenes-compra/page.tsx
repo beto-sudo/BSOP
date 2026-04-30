@@ -497,7 +497,10 @@ function OrdenDetail({
     itemId: string;
     motivo: string;
   } | null>(null);
-  const [cerrarState, setCerrarState] = useState<{ motivo: string } | null>(null);
+  const [cerrarState, setCerrarState] = useState<{
+    motivo: string;
+    mode: 'cerrar' | 'cancelar';
+  } | null>(null);
   const [overrideState, setOverrideState] = useState<{ itemId: string; value: string } | null>(
     null
   );
@@ -526,6 +529,11 @@ function OrdenDetail({
     const edit = Number(editedReceipts[item.id] ?? stored);
     return edit !== stored;
   });
+  const totalRecibidoAcumulado = items.reduce(
+    (acc, item) => acc + (item.cantidad_recibida ?? 0),
+    0
+  );
+  const noReceipts = totalRecibidoAcumulado === 0;
 
   const printTotal = items.reduce((acc, item) => {
     const qty = item.cantidad ?? 0;
@@ -1020,12 +1028,21 @@ function OrdenDetail({
 
         {/* ── Footer actions (screen only) ── */}
         <div className="space-y-3 border-t pt-4 print:hidden">
-          {editable && orden?.proveedor_id && items.length > 0 && (
-            <div className="flex justify-end">
-              <Button variant="outline" onClick={() => void onMarcarEnviada()} className="gap-2">
-                <Send className="h-4 w-4" />
-                Guardar precios y marcar Enviada
+          {editable && items.length > 0 && (
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <Button
+                variant="outline"
+                className="text-destructive hover:text-destructive"
+                onClick={() => setCerrarState({ motivo: '', mode: 'cancelar' })}
+              >
+                Cancelar OC
               </Button>
+              {orden?.proveedor_id && (
+                <Button variant="outline" onClick={() => void onMarcarEnviada()} className="gap-2">
+                  <Send className="h-4 w-4" />
+                  Guardar precios y marcar Enviada
+                </Button>
+              )}
             </div>
           )}
           {receiving && items.length > 0 && (
@@ -1034,9 +1051,14 @@ function OrdenDetail({
                 <Button
                   variant="outline"
                   className="text-destructive hover:text-destructive"
-                  onClick={() => setCerrarState({ motivo: '' })}
+                  onClick={() =>
+                    setCerrarState({
+                      motivo: '',
+                      mode: noReceipts ? 'cancelar' : 'cerrar',
+                    })
+                  }
                 >
-                  Cerrar OC
+                  {noReceipts ? 'Cancelar OC' : 'Cerrar OC'}
                 </Button>
               )}
               {hasUnsavedReceipts && (
@@ -1081,7 +1103,7 @@ function OrdenDetail({
           confirmVariant="destructive"
         />
 
-        {/* ── ConfirmDialog: Cerrar OC ── */}
+        {/* ── ConfirmDialog: Cerrar / Cancelar OC ── */}
         <ConfirmDialog
           open={cerrarState !== null}
           onOpenChange={(o) => !o && setCerrarState(null)}
@@ -1090,18 +1112,46 @@ function OrdenDetail({
             await onCerrarOrden(cerrarState.motivo);
             setCerrarState(null);
           }}
-          title="¿Cerrar orden de compra?"
+          title={
+            cerrarState?.mode === 'cancelar'
+              ? '¿Cancelar orden de compra?'
+              : '¿Cerrar orden de compra?'
+          }
           description={
             <div className="space-y-2">
-              <p>
-                Se cancelará el pendiente de{' '}
-                <span className="font-medium">{linesPending.length}</span>{' '}
-                {linesPending.length === 1 ? 'partida' : 'partidas'} y la OC pasará a estado{' '}
-                <span className="font-medium">cerrada</span>. No se podrán registrar más
-                recepciones.
-              </p>
+              {cerrarState?.mode === 'cancelar' ? (
+                <p>
+                  La OC se anulará por completo. <span className="font-medium">No</span> se esperará
+                  surtir nada del proveedor y <span className="font-medium">no</span> habrá pago. La
+                  OC quedará en estado <span className="font-medium">cancelada</span>.
+                </p>
+              ) : (
+                <p>
+                  Se cancelará el pendiente de{' '}
+                  <span className="font-medium">{linesPending.length}</span>{' '}
+                  {linesPending.length === 1 ? 'partida' : 'partidas'} y la OC pasará a estado{' '}
+                  <span className="font-medium">cerrada</span>. No se podrán registrar más
+                  recepciones. El total a pagar al proveedor se congela en{' '}
+                  <span className="font-medium">
+                    {formatCurrency(
+                      items.reduce(
+                        (acc, item) =>
+                          acc +
+                          (item.cantidad_recibida ?? 0) *
+                            (item.precio_real ?? item.precio_unitario ?? 0),
+                        0
+                      )
+                    )}
+                  </span>
+                  .
+                </p>
+              )}
               <Textarea
-                placeholder="Motivo del cierre (opcional)"
+                placeholder={
+                  cerrarState?.mode === 'cancelar'
+                    ? 'Motivo de la cancelación (opcional)'
+                    : 'Motivo del cierre (opcional)'
+                }
                 value={cerrarState?.motivo ?? ''}
                 onChange={(e) =>
                   setCerrarState((prev) => (prev ? { ...prev, motivo: e.target.value } : prev))
@@ -1110,7 +1160,7 @@ function OrdenDetail({
               />
             </div>
           }
-          confirmLabel="Cerrar OC"
+          confirmLabel={cerrarState?.mode === 'cancelar' ? 'Cancelar OC' : 'Cerrar OC'}
           confirmVariant="destructive"
         />
 
@@ -1648,13 +1698,18 @@ function OrdenesCompraContent() {
       setError(null);
       try {
         const supabase = createSupabaseBrowserClient();
-        const { error: rpcError } = await supabase.schema('erp').rpc('oc_cerrar_orden', {
+        const { data, error: rpcError } = await supabase.schema('erp').rpc('oc_cerrar_orden', {
           p_orden_id: selected.id,
           p_motivo: motivo || undefined,
         });
         if (rpcError) throw rpcError;
         await refreshOrdenAfterMutation(selected.id);
-        feedback.success('Orden de compra cerrada');
+        const estadoFinal = (data as { estado?: string } | null)?.estado ?? 'cerrada';
+        if (estadoFinal === 'cancelada') {
+          feedback.success('OC cancelada — no habrá pago al proveedor');
+        } else {
+          feedback.success('OC cerrada — total a pagar congelado');
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'No pude cerrar la OC.';
         setError(msg);
