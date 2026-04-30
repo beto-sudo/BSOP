@@ -152,7 +152,7 @@ function dedupeByKey<T>(rows: T[], keyOf: (row: T) => string): T[] {
   return Array.from(map.values());
 }
 
-function normalizeMetricRecords(metrics: unknown[]) {
+export function normalizeMetricRecords(metrics: unknown[]) {
   const records: Array<{
     metric_name: string;
     date: string;
@@ -193,16 +193,53 @@ function normalizeMetricRecords(metrics: unknown[]) {
       const sampleSource = rowSource || entrySource || 'Health Auto Export';
 
       if (isSleepAnalysis) {
+        // Two shapes coexist depending on HAE version / source:
+        //   1) Segmented (older Apple Watch): { value: "Core", qty: 0.95 }
+        //   2) Aggregated (current HAE for Sleeptracker® and recent Apple
+        //      Watch): { core: 5.6, deep: 0.85, rem: 2.13, awake: 0.11,
+        //      inBed: 8.75, asleep: 0, totalSleep: 8.58, sleepStart, sleepEnd }
+        // A `value:null, qty:null` sample silently dropped both branches —
+        // that's why 24-29 abr lost every sleep row even though ingest
+        // returned status=ok.
         const stage = typeof row.value === 'string' ? row.value.trim() : null;
         const qty = parseNumber(row.qty);
-        if (!stage || qty == null) return;
-        records.push({
-          metric_name: `Sleep ${stage}`,
-          date,
-          value: qty,
-          unit: unit ?? 'hr',
-          source: sampleSource,
-        });
+        if (stage && qty != null) {
+          records.push({
+            metric_name: `Sleep ${stage}`,
+            date,
+            value: qty,
+            unit: unit ?? 'hr',
+            source: sampleSource,
+          });
+          return;
+        }
+
+        // Aggregated: prefer sleepStart over date (which arrives as
+        // midnight-of-the-day) so the timestamp reflects the actual bedtime.
+        const aggregatedDate =
+          parseDate(row.sleepStart ?? row.start ?? row.startDate ?? row.date) ?? date;
+        const stages: Array<[keyof typeof row | string, string]> = [
+          ['core', 'Sleep Core'],
+          ['deep', 'Sleep Deep'],
+          ['rem', 'Sleep REM'],
+          ['awake', 'Sleep Awake'],
+          ['inBed', 'Sleep In Bed'],
+          ['asleep', 'Sleep Asleep'],
+        ];
+        for (const [key, metricName] of stages) {
+          const val = parseNumber(row[key as string]);
+          // Skip 0 values — Sleeptracker® always sends asleep:0, Apple Watch
+          // sends inBed:0; treating those as real measurements would pollute
+          // the dashboard averages with zero-padded noise.
+          if (val == null || val === 0) continue;
+          records.push({
+            metric_name: metricName,
+            date: aggregatedDate,
+            value: val,
+            unit: unit ?? 'hr',
+            source: sampleSource,
+          });
+        }
         return;
       }
 
