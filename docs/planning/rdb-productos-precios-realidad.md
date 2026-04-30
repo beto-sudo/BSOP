@@ -334,3 +334,76 @@ apply, regenerar `SCHEMA_REF.md` + `types/supabase.ts` (commit
 subsiguiente al PR antes de mergear, o post-merge si Beto prefiere).
 Smoke test manual en preview verifica que productos con OCs y ventas
 muestran números reales en lugar de \$0.
+
+### 2026-04-30 — Sprint 1 — Bug en primer push (cazado por CI)
+
+Primer push a PR #354 falló en **Supabase Preview check** con
+`SQLSTATE 42P16: cannot change data type of view column "ultimo_costo"
+from numeric(14,2) to numeric`. La vista anterior exponía
+`ultimo_costo` y `ultimo_precio_venta` con tipo `numeric(14,2)` (de
+`erp.productos_precios.costo` y `precio_venta`), y `CREATE OR REPLACE
+VIEW` de Postgres NO permite cambiar tipos de columnas existentes —
+el reemplazo debe preservar la firma exacta. Fix: cast explícito a
+`::numeric(14,2)` en ambas CTEs. Bug que `npm run format:check` /
+typecheck / lint local NO pueden cazar — solo se detecta aplicando la
+migración real. **Save importante de Supabase Preview check** que
+corre apply automático antes de merge.
+
+### 2026-04-30 — Sprint 2 — Cierre con corrección post-smoke
+
+Beto aplicó la migración `20260430130000` con psql en main DB
+(`CREATE VIEW`, `GRANT` × 2, `NOTIFY` exitosos). `npm run schema:ref`
+solo cambió el timestamp; `npm run db:types` no modificó
+`types/supabase.ts` (firma de columnas idéntica gracias a casts).
+
+Smoke directo confirmó margen real (Amstel Ultra \$24/\$50 = 52% en
+lugar del 0% falso del seed estático). **Pero conteo agregado mostró
+solo 52 productos con costo de OC** — Beto reportó "veo productos
+que deberían tener costo, algo no cuadra".
+
+**Investigación reveló causa raíz**:
+
+| Estado      | OCs | Productos distintos | Líneas con precio |
+| ----------- | --: | ------------------: | ----------------: |
+| `borrador`  | 155 |                 197 |               681 |
+| `cerrada`   |  18 |                  52 |                72 |
+| `cancelada` |   2 |                   3 |                 3 |
+
+Las 155 OCs en `borrador` son **histórico migrado** (47 creadas en
+2026 + 108 en 2025). No son captura nueva en curso — son data real
+registrada como borrador por convención del seed inicial, porque no
+había sistema de envío/recepción formal antes del 28-abr (cuando
+`oc-recepciones` arrancó). Mi filtro original
+`('recibida','cerrada')` las excluyó todas → la vista mostraba "—"
+para 145 productos que sí habían sido comprados.
+
+**Fix correctivo**: migración
+[`20260430150000_rdb_v_productos_tabla_incluir_borradores_historicos.sql`](../../supabase/migrations/20260430150000_rdb_v_productos_tabla_incluir_borradores_historicos.sql)
+relaja el filtro a `oc.estado <> 'cancelada'` + `oc.deleted_at IS NULL`.
+Incluye borrador, enviada, parcial, recibida, cerrada. Los
+`IS NOT NULL` sobre `producto_id` y `COALESCE(precio_real,
+precio_unitario)` siguen excluyendo borradores incompletos sin
+precio.
+
+**Smoke final con migración 20260430140000 aplicada**: **205
+productos con costo** (vs 52 inicial; **4× cobertura**). 161 con
+precio Waitry sin cambio. La mayoría del catálogo activo de RDB
+ahora refleja el costo real de su última compra.
+
+**Trade-off documentado**: si Beto crea hoy una OC nueva en
+`borrador` con precio especulativo (sin acuerdo final con proveedor),
+ese precio se considera "último costo" hasta que la OC pase a otro
+estado. Aceptable — la mentira anterior (cero histórico real) era
+peor. Para captura nueva con precios inciertos, recomendación
+operativa: dejar `precio_unitario` vacío hasta que se acuerde con el
+proveedor.
+
+Iniciativa cerrada el mismo día de la promoción — 3 PRs en modo
+autónomo (#353 promoción, #354 Sprint 1, _este PR_ Sprint 2 cierre
+con corrección operativa). Beto autorizó modo autónomo: "haz push y
+merge cuando esté en verde".
+
+`erp.productos_precios` queda intacta — sigue siendo la tabla donde
+caen INSERTs de productos creados desde la UI con precio > 0
+(override manual implícito por ahora). Multi-empresa rollout
+diferido (vista 100% RDB-específica por construcción).
