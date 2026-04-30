@@ -247,6 +247,33 @@ Hasta entonces, Reglas 1+2 deberían ser suficientes.
 
 ---
 
+## Reglas UI
+
+### Drawers — scroll y anatomía (ADR-018, ADR-026)
+
+`<DetailDrawer>` (en [components/detail-page/detail-drawer.tsx](components/detail-page/detail-drawer.tsx))
+es el wrapper canónico para drawers laterales. Hay 2 patrones que se confunden
+y rompen el scroll cuando se mezclan; ambos son válidos por separado:
+
+- **Idiomático**: usar `<DetailDrawerContent>` como hijo directo. Ya hace
+  `<ScrollArea h-full>` internamente — scrollea solo. **Default recomendado.**
+- **Custom**: meter `<ScrollArea className="flex-1 min-h-0">` raw (sin
+  `<DetailDrawerContent>`) cuando se necesita padding/print stylesheet
+  diferente al default. Funciona porque el body del drawer es flex-col
+  container (commit 3c96b45).
+
+Lo que **NO** funciona: meter `<div>` con contenido directo sin scroll
+wrapper. El body del drawer es `flex-1 min-h-0` con altura constreñida —
+el contenido se corta sin scroll. Si el contenido puede crecer (lista
+de items, form largo), siempre envolver en uno de los dos patrones.
+
+Test de regresión en [components/detail-page/detail-drawer.test.ts](components/detail-page/detail-drawer.test.ts)
+guarda los invariantes del componente base (DD7-DD11). Si CI rompe ahí,
+es porque alguien quitó `flex flex-col` del body o `pr-14` del header u
+otro contrato del DetailDrawer — restaurar antes de mergear.
+
+---
+
 ## Reglas DB
 
 - Always refer to `supabase/SCHEMA_REF.md` for exact table and column names to prevent mapping errors. Date/timestamp columns are returned in UTC, so parse them with a proper timezone.
