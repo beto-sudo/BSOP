@@ -1,7 +1,17 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
+import { PREVIEW_COOKIE_NAME } from '@/lib/auth/preview-guard';
 // NOTE: The 'core' schema must be listed in Supabase Dashboard → Settings → API → Exposed Schemas.
+
+const MUTATION_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+/**
+ * `/api/**` mutation paths that must work even while a preview session is
+ * active. Without these exemptions an admin in preview mode could not exit
+ * ("stop") and could not switch targets ("impersonate" again).
+ */
+const PREVIEW_EXEMPT_API_PATHS = new Set(['/api/impersonate', '/api/impersonate/stop']);
 
 function isPublicPath(pathname: string) {
   return (
@@ -118,6 +128,25 @@ export default async function proxy(request: NextRequest) {
     appUrl.pathname = '/';
     appUrl.search = '';
     return NextResponse.redirect(appUrl);
+  }
+
+  // Read-only enforcement while "Viendo como" is active. Reject any mutation
+  // request to /api/** when the preview cookie is set, except the management
+  // endpoints (/api/impersonate, /api/impersonate/stop) which must keep
+  // working so admins can switch targets or exit preview.
+  if (
+    MUTATION_METHODS.has(request.method) &&
+    pathname.startsWith('/api/') &&
+    !PREVIEW_EXEMPT_API_PATHS.has(pathname) &&
+    request.cookies.get(PREVIEW_COOKIE_NAME)?.value
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          'Modo vista previa activo: las acciones están deshabilitadas. Salí del preview para continuar.',
+      },
+      { status: 403 }
+    );
   }
 
   return response;

@@ -5,12 +5,24 @@ import { z } from 'zod';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { validateQuery } from '@/lib/validation';
 import { impersonateRateLimiter, extractIdentifier } from '@/lib/ratelimit';
+import { PREVIEW_COOKIE_NAME } from '@/lib/auth/preview-guard';
 
 const ImpersonateQuerySchema = z.object({
   userId: z.string().uuid('userId must be a valid UUID'),
 });
 
-export async function GET(req: NextRequest) {
+/**
+ * Starts a "Viendo como" preview session.
+ *
+ * Validates the caller is admin, computes the target user's effective
+ * permissions and returns them as JSON, then sets the `bsop_preview_as`
+ * cookie (httpOnly, sameSite=lax, path=/). The cookie marks the session
+ * as read-only end-to-end (proxy.ts blocks mutations + server actions
+ * call `assertNotInPreview()`).
+ *
+ * The cookie is cleared by `POST /api/impersonate/stop`.
+ */
+export async function POST(req: NextRequest) {
   const rate = await impersonateRateLimiter.check(extractIdentifier(req));
   if (!rate.ok) return rate.response;
 
@@ -74,6 +86,12 @@ export async function GET(req: NextRequest) {
 
   // If target is admin, return admin permissions
   if (targetUser.rol === 'admin') {
+    cookieStore.set(PREVIEW_COOKIE_NAME, targetUser.id, {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+      secure: process.env.NODE_ENV === 'production',
+    });
     return NextResponse.json({
       isAdmin: true,
       email: targetUser.email,
@@ -145,6 +163,13 @@ export async function GET(req: NextRequest) {
       write: exc.acceso_escritura ?? false,
     };
   }
+
+  cookieStore.set(PREVIEW_COOKIE_NAME, targetUser.id, {
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/',
+    secure: process.env.NODE_ENV === 'production',
+  });
 
   return NextResponse.json({
     isAdmin: false,

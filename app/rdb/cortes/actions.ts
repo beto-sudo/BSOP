@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { assertNotInPreview } from '@/lib/auth/preview-guard';
 import type { Banco, Voucher, VoucherCategoria } from '@/components/cortes/types';
 
 const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
@@ -37,6 +38,7 @@ export type AbrirCajaResult =
   | { ok: false; error: string };
 
 export async function abrirCaja(input: AbrirCajaInput): Promise<AbrirCajaResult> {
+  await assertNotInPreview();
   const supabase = await createSupabaseServerClient();
 
   const {
@@ -173,6 +175,7 @@ export type CerrarCajaInput = {
 };
 
 export async function cerrarCaja(input: CerrarCajaInput): Promise<void> {
+  await assertNotInPreview();
   const supabase = await createSupabaseServerClient();
 
   const {
@@ -239,6 +242,7 @@ export type RegistrarMovimientoInput = {
 export async function registrarMovimiento(
   input: RegistrarMovimientoInput
 ): Promise<{ id: string }> {
+  await assertNotInPreview();
   const supabase = await createSupabaseServerClient();
 
   const {
@@ -315,6 +319,7 @@ export type SubirVoucherInput = {
 export async function subirVoucher(
   input: SubirVoucherInput
 ): Promise<{ id: string; signed_url: string }> {
+  await assertNotInPreview();
   const supabase = await createSupabaseServerClient();
 
   const {
@@ -390,6 +395,7 @@ export async function subirVoucher(
 }
 
 export async function eliminarVoucher(voucher_id: string): Promise<void> {
+  await assertNotInPreview();
   const supabase = await createSupabaseServerClient();
 
   const {
@@ -509,6 +515,7 @@ export type ConfirmarVoucherInput = {
 };
 
 export async function confirmarVoucher(input: ConfirmarVoucherInput): Promise<void> {
+  await assertNotInPreview();
   const supabase = await createSupabaseServerClient();
 
   const {
@@ -555,6 +562,7 @@ export type ActualizarCategoriaVoucherInput = {
 export async function actualizarCategoriaVoucher(
   input: ActualizarCategoriaVoucherInput
 ): Promise<void> {
+  await assertNotInPreview();
   const supabase = await createSupabaseServerClient();
 
   const {

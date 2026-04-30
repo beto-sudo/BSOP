@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { assertNotInPreview } from '@/lib/auth/preview-guard';
 
 const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
 
@@ -19,6 +20,7 @@ export type UpsertRecetaInput = {
 export type UpsertRecetaResult = { ok: true } | { ok: false; error: string };
 
 export async function upsertReceta(input: UpsertRecetaInput): Promise<UpsertRecetaResult> {
+  await assertNotInPreview();
   const supabase = await createSupabaseServerClient();
 
   const {
@@ -91,6 +93,7 @@ export type UpdateCategoriaInput = {
 export type UpdateCategoriaResult = { ok: true } | { ok: false; error: string };
 
 export async function updateCategoria(input: UpdateCategoriaInput): Promise<UpdateCategoriaResult> {
+  await assertNotInPreview();
   const supabase = await createSupabaseServerClient();
 
   const {

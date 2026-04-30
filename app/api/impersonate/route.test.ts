@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 /**
- * Unit tests for `app/api/impersonate/route.ts` (GET).
+ * Unit tests for `app/api/impersonate/route.ts` (POST).
  *
  * Security-sensitive, admin-only endpoint: every branch that gates access
  * must fail closed and every branch that builds the permission payload for
@@ -192,7 +192,7 @@ function makeReq(searchParams: Record<string, string> = {}) {
 // module system — dynamic import inside each test keeps the env predictable.
 async function loadHandler() {
   const mod = await import('./route');
-  return mod.GET;
+  return mod.POST;
 }
 
 // ── Defaults ──────────────────────────────────────────────────────────────
@@ -228,31 +228,31 @@ beforeEach(() => {
 
 // ── Tests ─────────────────────────────────────────────────────────────────
 
-describe('GET /api/impersonate — rate limit', () => {
+describe('POST /api/impersonate — rate limit', () => {
   it('returns the rate-limiter response unchanged when check fails', async () => {
     const blocked = new Response(JSON.stringify({ error: 'Too many requests' }), {
       status: 429,
     });
     rateLimitResult = { ok: false, response: blocked as unknown as Response };
 
-    const GET = await loadHandler();
-    const res = await GET(makeReq({ userId: TARGET_UUID }));
+    const POST = await loadHandler();
+    const res = await POST(makeReq({ userId: TARGET_UUID }));
 
     expect(res).toBe(blocked);
   });
 
   it('proceeds past the rate limit when ok', async () => {
     // Default state is ok + admin caller + valid target → 200.
-    const GET = await loadHandler();
-    const res = await GET(makeReq({ userId: TARGET_UUID }));
+    const POST = await loadHandler();
+    const res = await POST(makeReq({ userId: TARGET_UUID }));
     expect(res.status).toBe(200);
   });
 });
 
-describe('GET /api/impersonate — query validation', () => {
+describe('POST /api/impersonate — query validation', () => {
   it('returns 400 when userId is missing', async () => {
-    const GET = await loadHandler();
-    const res = await GET(makeReq({}));
+    const POST = await loadHandler();
+    const res = await POST(makeReq({}));
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toBe('Invalid request');
@@ -260,25 +260,25 @@ describe('GET /api/impersonate — query validation', () => {
   });
 
   it('returns 400 when userId is not a valid UUID', async () => {
-    const GET = await loadHandler();
-    const res = await GET(makeReq({ userId: 'not-a-uuid' }));
+    const POST = await loadHandler();
+    const res = await POST(makeReq({ userId: 'not-a-uuid' }));
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.issues?.[0]?.path).toBe('userId');
   });
 
   it('accepts a valid UUID and continues past validation', async () => {
-    const GET = await loadHandler();
-    const res = await GET(makeReq({ userId: TARGET_UUID }));
+    const POST = await loadHandler();
+    const res = await POST(makeReq({ userId: TARGET_UUID }));
     expect(res.status).toBe(200);
   });
 });
 
-describe('GET /api/impersonate — caller authentication', () => {
+describe('POST /api/impersonate — caller authentication', () => {
   it('returns 401 when the server client has no user', async () => {
     serverGetUserResult = { data: { user: null } };
-    const GET = await loadHandler();
-    const res = await GET(makeReq({ userId: TARGET_UUID }));
+    const POST = await loadHandler();
+    const res = await POST(makeReq({ userId: TARGET_UUID }));
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body.error).toBe('Not authenticated');
@@ -288,23 +288,23 @@ describe('GET /api/impersonate — caller authentication', () => {
     serverGetUserResult = {
       data: { user: { email: '' as unknown as string } },
     };
-    const GET = await loadHandler();
-    const res = await GET(makeReq({ userId: TARGET_UUID }));
+    const POST = await loadHandler();
+    const res = await POST(makeReq({ userId: TARGET_UUID }));
     expect(res.status).toBe(401);
   });
 
   it('returns 500 when the admin client cannot be built', async () => {
     adminClientOverrideActive = true;
     adminClientOverride = null;
-    const GET = await loadHandler();
-    const res = await GET(makeReq({ userId: TARGET_UUID }));
+    const POST = await loadHandler();
+    const res = await POST(makeReq({ userId: TARGET_UUID }));
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toBe('Server config error');
   });
 });
 
-describe('GET /api/impersonate — caller authorization', () => {
+describe('POST /api/impersonate — caller authorization', () => {
   it('returns 403 when caller is not an admin', async () => {
     installAdminMock({
       callerUser: { rol: 'user' },
@@ -315,8 +315,8 @@ describe('GET /api/impersonate — caller authorization', () => {
         activo: true,
       },
     });
-    const GET = await loadHandler();
-    const res = await GET(makeReq({ userId: TARGET_UUID }));
+    const POST = await loadHandler();
+    const res = await POST(makeReq({ userId: TARGET_UUID }));
     expect(res.status).toBe(403);
     const body = await res.json();
     expect(body.error).toBe('Forbidden');
@@ -332,8 +332,8 @@ describe('GET /api/impersonate — caller authorization', () => {
         activo: true,
       },
     });
-    const GET = await loadHandler();
-    const res = await GET(makeReq({ userId: TARGET_UUID }));
+    const POST = await loadHandler();
+    const res = await POST(makeReq({ userId: TARGET_UUID }));
     expect(res.status).toBe(403);
   });
 
@@ -344,20 +344,20 @@ describe('GET /api/impersonate — caller authorization', () => {
     serverGetUserResult = {
       data: { user: { email: 'Admin@BSOP.TEST' } },
     };
-    const GET = await loadHandler();
-    const res = await GET(makeReq({ userId: TARGET_UUID }));
+    const POST = await loadHandler();
+    const res = await POST(makeReq({ userId: TARGET_UUID }));
     expect(res.status).toBe(200);
   });
 });
 
-describe('GET /api/impersonate — target lookup', () => {
+describe('POST /api/impersonate — target lookup', () => {
   it('returns 404 when the target user does not exist', async () => {
     installAdminMock({
       callerUser: { rol: 'admin' },
       targetUser: null,
     });
-    const GET = await loadHandler();
-    const res = await GET(makeReq({ userId: TARGET_UUID }));
+    const POST = await loadHandler();
+    const res = await POST(makeReq({ userId: TARGET_UUID }));
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.error).toBe('User not found or inactive');
@@ -373,13 +373,13 @@ describe('GET /api/impersonate — target lookup', () => {
         activo: false,
       },
     });
-    const GET = await loadHandler();
-    const res = await GET(makeReq({ userId: TARGET_UUID }));
+    const POST = await loadHandler();
+    const res = await POST(makeReq({ userId: TARGET_UUID }));
     expect(res.status).toBe(404);
   });
 });
 
-describe('GET /api/impersonate — admin target short-circuit', () => {
+describe('POST /api/impersonate — admin target short-circuit', () => {
   it('returns isAdmin=true with empty empresas / modulos when target has rol=admin', async () => {
     installAdminMock({
       callerUser: { rol: 'admin' },
@@ -394,8 +394,8 @@ describe('GET /api/impersonate — admin target short-circuit', () => {
       allEmpresas: [{ id: 'e-rdb', slug: 'rdb' }],
     });
 
-    const GET = await loadHandler();
-    const res = await GET(makeReq({ userId: TARGET_UUID }));
+    const POST = await loadHandler();
+    const res = await POST(makeReq({ userId: TARGET_UUID }));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({
@@ -407,7 +407,7 @@ describe('GET /api/impersonate — admin target short-circuit', () => {
   });
 });
 
-describe('GET /api/impersonate — non-admin target payload', () => {
+describe('POST /api/impersonate — non-admin target payload', () => {
   it('returns an empty empresas/modulos payload for a user with no memberships', async () => {
     installAdminMock({
       callerUser: { rol: 'admin' },
@@ -430,8 +430,8 @@ describe('GET /api/impersonate — non-admin target payload', () => {
       userExcepciones: [],
       allEmpresas: [{ id: 'e-rdb', slug: 'rdb' }],
     });
-    const GET = await loadHandler();
-    const res = await GET(makeReq({ userId: TARGET_UUID }));
+    const POST = await loadHandler();
+    const res = await POST(makeReq({ userId: TARGET_UUID }));
     const body = await res.json();
     expect(body).toEqual({
       isAdmin: false,
@@ -467,8 +467,8 @@ describe('GET /api/impersonate — non-admin target payload', () => {
       ],
     });
 
-    const GET = await loadHandler();
-    const res = await GET(makeReq({ userId: TARGET_UUID }));
+    const POST = await loadHandler();
+    const res = await POST(makeReq({ userId: TARGET_UUID }));
     const body = await res.json();
     expect(body.empresas).toEqual({
       rdb: { read: true, write: true },
@@ -517,8 +517,8 @@ describe('GET /api/impersonate — non-admin target payload', () => {
       allEmpresas: [{ id: 'e-rdb', slug: 'rdb' }],
     });
 
-    const GET = await loadHandler();
-    const res = await GET(makeReq({ userId: TARGET_UUID }));
+    const POST = await loadHandler();
+    const res = await POST(makeReq({ userId: TARGET_UUID }));
     const body = await res.json();
     expect(body.modulos).toEqual({
       'rdb.ventas': { read: true, write: true },
@@ -550,8 +550,8 @@ describe('GET /api/impersonate — non-admin target payload', () => {
       allEmpresas: [{ id: 'e-rdb', slug: 'rdb' }],
     });
 
-    const GET = await loadHandler();
-    const res = await GET(makeReq({ userId: TARGET_UUID }));
+    const POST = await loadHandler();
+    const res = await POST(makeReq({ userId: TARGET_UUID }));
     const body = await res.json();
     expect(body.empresas).toEqual({ rdb: { read: true, write: true } });
     expect(body.modulos).toEqual({});
@@ -587,8 +587,8 @@ describe('GET /api/impersonate — non-admin target payload', () => {
       allEmpresas: [{ id: 'e-rdb', slug: 'rdb' }],
     });
 
-    const GET = await loadHandler();
-    const res = await GET(makeReq({ userId: TARGET_UUID }));
+    const POST = await loadHandler();
+    const res = await POST(makeReq({ userId: TARGET_UUID }));
     const body = await res.json();
     expect(body.modulos).toEqual({
       'rdb.ventas': { read: true, write: true },
@@ -619,14 +619,14 @@ describe('GET /api/impersonate — non-admin target payload', () => {
       allEmpresas: [{ id: 'e-rdb', slug: 'rdb' }],
     });
 
-    const GET = await loadHandler();
-    const res = await GET(makeReq({ userId: TARGET_UUID }));
+    const POST = await loadHandler();
+    const res = await POST(makeReq({ userId: TARGET_UUID }));
     const body = await res.json();
     expect(body.modulos['rdb.ventas']).toEqual({ read: false, write: false });
   });
 });
 
-describe('GET /api/impersonate — exception overrides', () => {
+describe('POST /api/impersonate — exception overrides', () => {
   it('overrides role-derived modulo perms with matching exception rows', async () => {
     installAdminMock({
       callerUser: { rol: 'admin' },
@@ -657,8 +657,8 @@ describe('GET /api/impersonate — exception overrides', () => {
       allEmpresas: [{ id: 'e-rdb', slug: 'rdb' }],
     });
 
-    const GET = await loadHandler();
-    const res = await GET(makeReq({ userId: TARGET_UUID }));
+    const POST = await loadHandler();
+    const res = await POST(makeReq({ userId: TARGET_UUID }));
     const body = await res.json();
     expect(body.modulos['rdb.ventas']).toEqual({ read: true, write: false });
   });
@@ -696,8 +696,8 @@ describe('GET /api/impersonate — exception overrides', () => {
       allEmpresas: [{ id: 'e-rdb', slug: 'rdb' }],
     });
 
-    const GET = await loadHandler();
-    const res = await GET(makeReq({ userId: TARGET_UUID }));
+    const POST = await loadHandler();
+    const res = await POST(makeReq({ userId: TARGET_UUID }));
     const body = await res.json();
     expect(body.modulos['rdb.cortes']).toEqual({ read: true, write: false });
     // Role-derived perm still stands.
@@ -734,8 +734,8 @@ describe('GET /api/impersonate — exception overrides', () => {
       allEmpresas: [{ id: 'e-rdb', slug: 'rdb' }],
     });
 
-    const GET = await loadHandler();
-    const res = await GET(makeReq({ userId: TARGET_UUID }));
+    const POST = await loadHandler();
+    const res = await POST(makeReq({ userId: TARGET_UUID }));
     const body = await res.json();
     expect(body.modulos).toEqual({
       'rdb.ventas': { read: true, write: true },
@@ -772,15 +772,15 @@ describe('GET /api/impersonate — exception overrides', () => {
       allEmpresas: [{ id: 'e-rdb', slug: 'rdb' }],
     });
 
-    const GET = await loadHandler();
-    const res = await GET(makeReq({ userId: TARGET_UUID }));
+    const POST = await loadHandler();
+    const res = await POST(makeReq({ userId: TARGET_UUID }));
     const body = await res.json();
     // Exception with nulls fully revokes access (null → false).
     expect(body.modulos['rdb.ventas']).toEqual({ read: false, write: false });
   });
 });
 
-describe('GET /api/impersonate — happy-path shape', () => {
+describe('POST /api/impersonate — happy-path shape', () => {
   it('returns isAdmin=false with the target email and fully-built dicts', async () => {
     installAdminMock({
       callerUser: { rol: 'admin' },
@@ -827,8 +827,8 @@ describe('GET /api/impersonate — happy-path shape', () => {
       ],
     });
 
-    const GET = await loadHandler();
-    const res = await GET(makeReq({ userId: TARGET_UUID }));
+    const POST = await loadHandler();
+    const res = await POST(makeReq({ userId: TARGET_UUID }));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({

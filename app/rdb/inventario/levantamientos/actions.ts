@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
+import { assertNotInPreview } from '@/lib/auth/preview-guard';
 import type { Json } from '@/types/supabase';
 import {
   RDB_EMPRESA_ID,
@@ -23,6 +24,7 @@ import {
 export async function crearLevantamiento(
   input: CrearLevantamientoInput
 ): Promise<ActionResult<{ id: string; folio: string | null }>> {
+  await assertNotInPreview();
   const supabase = await createSupabaseServerClient();
 
   const {
@@ -60,6 +62,7 @@ export async function crearLevantamiento(
 export async function iniciarCaptura(
   levantamiento_id: string
 ): Promise<ActionResult<{ lineasSembradas: number }>> {
+  await assertNotInPreview();
   const supabase = await createSupabaseServerClient();
 
   const { data, error } = await supabase
@@ -78,6 +81,7 @@ export async function guardarConteo(
   producto_id: string,
   cantidad: number
 ): Promise<ActionResult> {
+  await assertNotInPreview();
   const supabase = await createSupabaseServerClient();
 
   const { error } = await supabase.schema('erp').rpc('fn_guardar_conteo', {
@@ -91,6 +95,7 @@ export async function guardarConteo(
 }
 
 export async function cerrarCaptura(levantamiento_id: string): Promise<ActionResult> {
+  await assertNotInPreview();
   const supabase = await createSupabaseServerClient();
 
   const { error } = await supabase
@@ -107,6 +112,7 @@ export async function cerrarCaptura(levantamiento_id: string): Promise<ActionRes
 // ─── Firma ────────────────────────────────────────────────────────────────────
 
 export async function firmarPaso(input: FirmarPasoInput): Promise<ActionResult<FirmarPasoData>> {
+  await assertNotInPreview();
   const supabase = await createSupabaseServerClient();
   const hdrs = await headers();
   const ipHeader =
@@ -153,6 +159,7 @@ export async function cancelarLevantamiento(
   levantamiento_id: string,
   motivo: string
 ): Promise<ActionResult> {
+  await assertNotInPreview();
   const motivoTrim = motivo.trim();
   if (!motivoTrim) {
     return { ok: false, error: 'El motivo de cancelación es requerido.' };
@@ -217,6 +224,7 @@ export async function actualizarNotaDiferencia(
   linea_id: string,
   nota: string
 ): Promise<ActionResult> {
+  await assertNotInPreview();
   const supabase = await createSupabaseServerClient();
 
   const {
