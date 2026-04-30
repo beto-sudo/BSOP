@@ -32,13 +32,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { DataTable, type Column } from '@/components/module-page';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from '@/components/ui/sheet';
+import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -382,17 +376,15 @@ function ProyectosInner() {
         />
       </TabPanel>
 
-      <Sheet open={showCreate} onOpenChange={setShowCreate}>
-        <SheetContent side="right" className="w-full max-w-xl overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Nuevo proyecto</SheetTitle>
-            <SheetDescription>
-              Captura manual para proyectos sin anteproyecto de origen (casos legacy). Los proyectos
-              nuevos normalmente nacen del botón &ldquo;Convertir a proyecto&rdquo; dentro de
-              Anteproyectos.
-            </SheetDescription>
-          </SheetHeader>
-          <Form form={createForm} onSubmit={handleCreate} className="mt-6 space-y-5">
+      <DetailDrawer
+        open={showCreate}
+        onOpenChange={setShowCreate}
+        size="md"
+        title="Nuevo proyecto"
+        description="Captura manual para proyectos sin anteproyecto de origen (casos legacy). Los proyectos nuevos normalmente nacen del botón “Convertir a proyecto” dentro de Anteproyectos."
+      >
+        <DetailDrawerContent>
+          <Form form={createForm} onSubmit={handleCreate} className="space-y-5">
             <FormField name="nombre" label="Nombre" required>
               {(field) => (
                 <Input
@@ -479,8 +471,8 @@ function ProyectosInner() {
               className="border-t-0 pt-2"
             />
           </Form>
-        </SheetContent>
-      </Sheet>
+        </DetailDrawerContent>
+      </DetailDrawer>
     </div>
   );
 }

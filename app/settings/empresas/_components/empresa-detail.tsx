@@ -5,7 +5,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
 import { FieldLabel } from '@/components/ui/field-label';
 import { Input } from '@/components/ui/input';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import {
   AlertTriangle,
   CheckCircle,
@@ -1213,7 +1213,7 @@ export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved:
       </div>
 
       {/* Drawer: Actualizar CSF */}
-      <Sheet
+      <DetailDrawer
         open={drawerOpen}
         onOpenChange={(v) => {
           if (!v) {
@@ -1225,20 +1225,17 @@ export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved:
             resetDrawer();
           }
         }}
+        size="lg"
+        title={
+          <span className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-emerald-600" />
+            Actualizar CSF — {empresa.nombre}
+          </span>
+        }
+        description="Sube el PDF de la CSF más reciente. El sistema extrae los campos y te muestra qué cambia. Puedes aplicar todo, parcial, o solo archivar el PDF como histórico."
       >
-        <SheetContent className="sm:max-w-[800px] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-emerald-600" />
-              Actualizar CSF — {empresa.nombre}
-            </SheetTitle>
-            <p className="text-xs text-muted-foreground">
-              Sube el PDF de la CSF más reciente. El sistema extrae los campos y te muestra qué
-              cambia. Puedes aplicar todo, parcial, o solo archivar el PDF como histórico.
-            </p>
-          </SheetHeader>
-
-          <div className="mt-6 space-y-4">
+        <DetailDrawerContent>
+          <div className="space-y-4">
             {/* ── Estado A: drop PDF ──────────────────────────────────────────── */}
             {!csfFile && !csfProcessing && !csfExtraccion && (
               <div className="space-y-3">
@@ -1408,8 +1405,8 @@ export function EmpresaDetail({ empresa, onSaved }: { empresa: Empresa; onSaved:
               </>
             )}
           </div>
-        </SheetContent>
-      </Sheet>
+        </DetailDrawerContent>
+      </DetailDrawer>
     </div>
   );
 }

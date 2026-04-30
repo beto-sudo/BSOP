@@ -31,13 +31,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { DataTable, type Column } from '@/components/module-page';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from '@/components/ui/sheet';
+import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -320,16 +314,15 @@ function PrototiposInner() {
         />
       </TabPanel>
 
-      <Sheet open={showCreate} onOpenChange={setShowCreate}>
-        <SheetContent side="right" className="w-full max-w-xl overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Nuevo prototipo</SheetTitle>
-            <SheetDescription>
-              Captura identidad, dimensiones, valor comercial y los 6 costos unitarios. El costo
-              total se calcula solo (GENERATED).
-            </SheetDescription>
-          </SheetHeader>
-          <Form form={createForm} onSubmit={handleCreate} className="mt-6 space-y-5">
+      <DetailDrawer
+        open={showCreate}
+        onOpenChange={setShowCreate}
+        size="md"
+        title="Nuevo prototipo"
+        description="Captura identidad, dimensiones, valor comercial y los 6 costos unitarios. El costo total se calcula solo (GENERATED)."
+      >
+        <DetailDrawerContent>
+          <Form form={createForm} onSubmit={handleCreate} className="space-y-5">
             <section className="space-y-3">
               <h3 className="text-xs font-semibold uppercase tracking-widest text-[var(--text)]/50">
                 Identidad
@@ -539,8 +532,8 @@ function PrototiposInner() {
               className="border-t-0 pt-2"
             />
           </Form>
-        </SheetContent>
-      </Sheet>
+        </DetailDrawerContent>
+      </DetailDrawer>
     </div>
   );
 }

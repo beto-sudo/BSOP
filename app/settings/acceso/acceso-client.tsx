@@ -39,13 +39,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { DetailDrawer } from '@/components/detail-page';
 import {
   Dialog,
   DialogContent,
@@ -701,400 +695,385 @@ export function AccesoClient({
       )}
 
       {/* ── User Detail Sheet ─────────────────────────────────────────────── */}
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="sm:max-w-2xl flex flex-col p-0" side="right">
-          {selectedUsuario && (
-            <>
-              <SheetHeader className="border-b border-[var(--border)] px-6 py-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <SheetTitle className="dark:text-white text-[var(--text)]">
-                      {selectedUsuario.first_name ?? selectedUsuario.email}
-                    </SheetTitle>
-                    <SheetDescription className="font-mono text-xs">
-                      {selectedUsuario.email}
-                    </SheetDescription>
-                  </div>
-                </div>
-              </SheetHeader>
+      <DetailDrawer
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        size="lg"
+        title={selectedUsuario?.first_name ?? selectedUsuario?.email ?? ''}
+        description={
+          selectedUsuario ? <span className="font-mono">{selectedUsuario.email}</span> : undefined
+        }
+      >
+        {selectedUsuario && (
+          <>
+            <ScrollArea className="flex-1 min-h-0">
+              <div className="space-y-8 px-6 py-5">
+                {/* ── Empresas section ── */}
+                <section>
+                  <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide dark:text-white/40 text-[var(--text-subtle)]">
+                    Acceso a empresas
+                  </h3>
+                  <div className="space-y-3">
+                    {empresas.length === 0 ? (
+                      <p className="text-xs dark:text-white/28 text-[var(--text)]/30">
+                        No hay empresas registradas.
+                      </p>
+                    ) : (
+                      empresas.map((emp) => {
+                        const ue = usuariosEmpresas.find(
+                          (x) => x.usuario_id === selectedUsuario.id && x.empresa_id === emp.id
+                        );
+                        const empRoles = roles.filter((r) => r.empresa_id === emp.id);
 
-              <ScrollArea className="flex-1 min-h-0">
-                <div className="space-y-8 px-6 py-5">
-                  {/* ── Empresas section ── */}
-                  <section>
-                    <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide dark:text-white/40 text-[var(--text-subtle)]">
-                      Acceso a empresas
-                    </h3>
-                    <div className="space-y-3">
-                      {empresas.length === 0 ? (
-                        <p className="text-xs dark:text-white/28 text-[var(--text)]/30">
-                          No hay empresas registradas.
-                        </p>
-                      ) : (
-                        empresas.map((emp) => {
-                          const ue = usuariosEmpresas.find(
-                            (x) => x.usuario_id === selectedUsuario.id && x.empresa_id === emp.id
-                          );
-                          const empRoles = roles.filter((r) => r.empresa_id === emp.id);
+                        return (
+                          <div
+                            key={emp.id}
+                            className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--card)] p-4"
+                          >
+                            <label className="flex cursor-pointer items-center gap-3">
+                              <input
+                                type="checkbox"
+                                disabled={isPending}
+                                checked={!!ue}
+                                onChange={(e) => {
+                                  run(() =>
+                                    setUsuarioEmpresaAcceso(
+                                      selectedUsuario.id,
+                                      emp.id,
+                                      e.target.checked
+                                    )
+                                  );
+                                }}
+                                className="h-4 w-4 cursor-pointer rounded accent-[var(--accent)]"
+                              />
+                              <span className="text-sm font-medium dark:text-white/85 text-[var(--text)]/85">
+                                Tiene acceso a {emp.nombre}
+                              </span>
+                            </label>
 
-                          return (
-                            <div
-                              key={emp.id}
-                              className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--card)] p-4"
-                            >
-                              <label className="flex cursor-pointer items-center gap-3">
-                                <input
-                                  type="checkbox"
+                            {ue && (
+                              <div className="ml-7 flex items-center gap-2">
+                                <span className="text-xs dark:text-white/50 text-[var(--text)]/50">
+                                  Rol base:
+                                </span>
+                                <Combobox
+                                  value={ue.rol_id ?? ''}
                                   disabled={isPending}
-                                  checked={!!ue}
-                                  onChange={(e) => {
+                                  onChange={(v) => {
                                     run(() =>
-                                      setUsuarioEmpresaAcceso(
-                                        selectedUsuario.id,
-                                        emp.id,
-                                        e.target.checked
-                                      )
+                                      updateUsuarioEmpresaRol(selectedUsuario.id, emp.id, v || null)
                                     );
                                   }}
-                                  className="h-4 w-4 cursor-pointer rounded accent-[var(--accent)]"
+                                  options={empRoles.map((rol) => ({
+                                    value: rol.id,
+                                    label: rol.nombre,
+                                  }))}
+                                  placeholder="Sin rol"
+                                  allowClear
+                                  size="sm"
+                                  className="w-48 text-xs"
                                 />
-                                <span className="text-sm font-medium dark:text-white/85 text-[var(--text)]/85">
-                                  Tiene acceso a {emp.nombre}
-                                </span>
-                              </label>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </section>
 
-                              {ue && (
-                                <div className="ml-7 flex items-center gap-2">
-                                  <span className="text-xs dark:text-white/50 text-[var(--text)]/50">
-                                    Rol base:
-                                  </span>
-                                  <Combobox
-                                    value={ue.rol_id ?? ''}
-                                    disabled={isPending}
-                                    onChange={(v) => {
-                                      run(() =>
-                                        updateUsuarioEmpresaRol(
-                                          selectedUsuario.id,
-                                          emp.id,
-                                          v || null
-                                        )
-                                      );
-                                    }}
-                                    options={empRoles.map((rol) => ({
-                                      value: rol.id,
-                                      label: rol.nombre,
-                                    }))}
-                                    placeholder="Sin rol"
-                                    allowClear
-                                    size="sm"
-                                    className="w-48 text-xs"
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })
+                {/* ── Excepciones section ── */}
+                <section>
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide dark:text-white/40 text-[var(--text-subtle)]">
+                      Excepciones de módulo
+                    </h3>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setAddingExcepcion((v) => !v);
+                        setNewExcEmpresaId('');
+                        setNewExcModuloId('');
+                        setNewExcLectura(false);
+                        setNewExcEscritura(false);
+                      }}
+                      className="h-7 gap-1 rounded-lg text-xs"
+                    >
+                      {addingExcepcion ? (
+                        <>
+                          <X className="h-3 w-3" /> Cancelar
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="h-3 w-3" /> Excepción
+                        </>
                       )}
-                    </div>
-                  </section>
+                    </Button>
+                  </div>
 
-                  {/* ── Excepciones section ── */}
-                  <section>
-                    <div className="mb-3 flex items-center justify-between">
-                      <h3 className="text-xs font-semibold uppercase tracking-wide dark:text-white/40 text-[var(--text-subtle)]">
-                        Excepciones de módulo
-                      </h3>
+                  {/* Add exception form */}
+                  {addingExcepcion && (
+                    <div className="mb-4 space-y-3 rounded-xl border border-dashed border-[var(--accent)]/40 bg-[var(--accent)]/5 p-4">
+                      <p className="text-xs dark:text-white/55 text-[var(--text-muted)]">
+                        Sobrescribe un permiso específico para este usuario.
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <p className="text-xs dark:text-white/45 text-[var(--text)]/45">
+                            Empresa
+                          </p>
+                          <Combobox
+                            value={newExcEmpresaId}
+                            onChange={(v) => {
+                              if (v) {
+                                setNewExcEmpresaId(v);
+                                setNewExcModuloId('');
+                              }
+                            }}
+                            options={empresas.map((emp) => ({
+                              value: emp.id,
+                              label: emp.nombre,
+                            }))}
+                            placeholder="Empresa"
+                            size="sm"
+                            className="text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs dark:text-white/45 text-[var(--text)]/45">Módulo</p>
+                          <Combobox
+                            value={newExcModuloId}
+                            onChange={(v) => {
+                              if (v) setNewExcModuloId(v);
+                            }}
+                            options={modulosExcepcion.map((mod) => ({
+                              value: mod.id,
+                              label: mod.nombre,
+                            }))}
+                            placeholder={newExcEmpresaId ? 'Módulo' : 'Selecciona empresa primero'}
+                            disabled={!newExcEmpresaId}
+                            size="sm"
+                            className="text-xs"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-4">
+                        <label className="flex cursor-pointer items-center gap-2 text-xs dark:text-white/65 text-[var(--text)]/65">
+                          <input
+                            type="checkbox"
+                            checked={newExcLectura}
+                            onChange={(e) => setNewExcLectura(e.target.checked)}
+                            className="h-3.5 w-3.5 rounded accent-[var(--accent)]"
+                          />
+                          Lectura
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-2 text-xs dark:text-white/65 text-[var(--text)]/65">
+                          <input
+                            type="checkbox"
+                            checked={newExcEscritura}
+                            onChange={(e) => setNewExcEscritura(e.target.checked)}
+                            className="h-3.5 w-3.5 rounded accent-[var(--accent)]"
+                          />
+                          Escritura
+                        </label>
+                      </div>
                       <Button
-                        variant="outline"
                         size="sm"
+                        className="w-full rounded-lg text-xs"
+                        disabled={!newExcEmpresaId || !newExcModuloId || isPending}
                         onClick={() => {
-                          setAddingExcepcion((v) => !v);
-                          setNewExcEmpresaId('');
-                          setNewExcModuloId('');
-                          setNewExcLectura(false);
-                          setNewExcEscritura(false);
+                          run(
+                            () =>
+                              upsertExcepcionUsuario({
+                                usuario_id: selectedUsuario.id,
+                                empresa_id: newExcEmpresaId,
+                                modulo_id: newExcModuloId,
+                                acceso_lectura: newExcLectura,
+                                acceso_escritura: newExcEscritura,
+                              }),
+                            () => {
+                              setAddingExcepcion(false);
+                              setNewExcEmpresaId('');
+                              setNewExcModuloId('');
+                              setNewExcLectura(false);
+                              setNewExcEscritura(false);
+                            }
+                          );
                         }}
-                        className="h-7 gap-1 rounded-lg text-xs"
                       >
-                        {addingExcepcion ? (
-                          <>
-                            <X className="h-3 w-3" /> Cancelar
-                          </>
-                        ) : (
-                          <>
-                            <Plus className="h-3 w-3" /> Excepción
-                          </>
-                        )}
+                        Guardar excepción
                       </Button>
                     </div>
+                  )}
 
-                    {/* Add exception form */}
-                    {addingExcepcion && (
-                      <div className="mb-4 space-y-3 rounded-xl border border-dashed border-[var(--accent)]/40 bg-[var(--accent)]/5 p-4">
-                        <p className="text-xs dark:text-white/55 text-[var(--text-muted)]">
-                          Sobrescribe un permiso específico para este usuario.
-                        </p>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-1">
-                            <p className="text-xs dark:text-white/45 text-[var(--text)]/45">
-                              Empresa
-                            </p>
-                            <Combobox
-                              value={newExcEmpresaId}
-                              onChange={(v) => {
-                                if (v) {
-                                  setNewExcEmpresaId(v);
-                                  setNewExcModuloId('');
-                                }
-                              }}
-                              options={empresas.map((emp) => ({
-                                value: emp.id,
-                                label: emp.nombre,
-                              }))}
-                              placeholder="Empresa"
-                              size="sm"
-                              className="text-xs"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-xs dark:text-white/45 text-[var(--text)]/45">
-                              Módulo
-                            </p>
-                            <Combobox
-                              value={newExcModuloId}
-                              onChange={(v) => {
-                                if (v) setNewExcModuloId(v);
-                              }}
-                              options={modulosExcepcion.map((mod) => ({
-                                value: mod.id,
-                                label: mod.nombre,
-                              }))}
-                              placeholder={
-                                newExcEmpresaId ? 'Módulo' : 'Selecciona empresa primero'
-                              }
-                              disabled={!newExcEmpresaId}
-                              size="sm"
-                              className="text-xs"
-                            />
-                          </div>
-                        </div>
-                        <div className="flex gap-4">
-                          <label className="flex cursor-pointer items-center gap-2 text-xs dark:text-white/65 text-[var(--text)]/65">
-                            <input
-                              type="checkbox"
-                              checked={newExcLectura}
-                              onChange={(e) => setNewExcLectura(e.target.checked)}
-                              className="h-3.5 w-3.5 rounded accent-[var(--accent)]"
-                            />
-                            Lectura
-                          </label>
-                          <label className="flex cursor-pointer items-center gap-2 text-xs dark:text-white/65 text-[var(--text)]/65">
-                            <input
-                              type="checkbox"
-                              checked={newExcEscritura}
-                              onChange={(e) => setNewExcEscritura(e.target.checked)}
-                              className="h-3.5 w-3.5 rounded accent-[var(--accent)]"
-                            />
-                            Escritura
-                          </label>
-                        </div>
-                        <Button
-                          size="sm"
-                          className="w-full rounded-lg text-xs"
-                          disabled={!newExcEmpresaId || !newExcModuloId || isPending}
-                          onClick={() => {
-                            run(
-                              () =>
-                                upsertExcepcionUsuario({
-                                  usuario_id: selectedUsuario.id,
-                                  empresa_id: newExcEmpresaId,
-                                  modulo_id: newExcModuloId,
-                                  acceso_lectura: newExcLectura,
-                                  acceso_escritura: newExcEscritura,
-                                }),
-                              () => {
-                                setAddingExcepcion(false);
-                                setNewExcEmpresaId('');
-                                setNewExcModuloId('');
-                                setNewExcLectura(false);
-                                setNewExcEscritura(false);
-                              }
-                            );
-                          }}
-                        >
-                          Guardar excepción
-                        </Button>
-                      </div>
-                    )}
-
-                    {/* Existing exceptions list */}
-                    {(() => {
-                      const userExcs = getUserExcepciones(selectedUsuario.id);
-                      if (userExcs.length === 0) {
-                        return (
-                          <p className="text-xs dark:text-white/28 text-[var(--text)]/30">
-                            Sin excepciones configuradas.
-                          </p>
-                        );
-                      }
+                  {/* Existing exceptions list */}
+                  {(() => {
+                    const userExcs = getUserExcepciones(selectedUsuario.id);
+                    if (userExcs.length === 0) {
                       return (
-                        <div className="space-y-2">
-                          {userExcs.map((ex) => (
-                            <div
-                              key={`${ex.empresa_id}-${ex.modulo_id}`}
-                              className="flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-xs"
-                            >
-                              <div>
-                                <span className="font-medium dark:text-white/80 text-[var(--text)]/80">
-                                  {getModuloNombre(ex.modulo_id)}
-                                </span>
-                                <span className="ml-1.5 dark:text-white/40 text-[var(--text-subtle)]">
-                                  en {getEmpresaNombre(ex.empresa_id)}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                {ex.acceso_lectura && (
-                                  <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-emerald-600 dark:text-emerald-400">
-                                    Lectura
-                                  </span>
-                                )}
-                                {ex.acceso_escritura && (
-                                  <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-blue-600 dark:text-blue-400">
-                                    Escritura
-                                  </span>
-                                )}
-                                {!ex.acceso_lectura && !ex.acceso_escritura && (
-                                  <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-red-500">
-                                    Denegado
-                                  </span>
-                                )}
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  disabled={isPending}
-                                  className="h-6 w-6 text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                                  onClick={() => {
-                                    run(() =>
-                                      deleteExcepcionUsuario(
-                                        ex.usuario_id,
-                                        ex.empresa_id,
-                                        ex.modulo_id
-                                      )
-                                    );
-                                  }}
-                                >
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </div>
+                        <p className="text-xs dark:text-white/28 text-[var(--text)]/30">
+                          Sin excepciones configuradas.
+                        </p>
+                      );
+                    }
+                    return (
+                      <div className="space-y-2">
+                        {userExcs.map((ex) => (
+                          <div
+                            key={`${ex.empresa_id}-${ex.modulo_id}`}
+                            className="flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-xs"
+                          >
+                            <div>
+                              <span className="font-medium dark:text-white/80 text-[var(--text)]/80">
+                                {getModuloNombre(ex.modulo_id)}
+                              </span>
+                              <span className="ml-1.5 dark:text-white/40 text-[var(--text-subtle)]">
+                                en {getEmpresaNombre(ex.empresa_id)}
+                              </span>
                             </div>
-                          ))}
-                        </div>
-                      );
-                    })()}
-                  </section>
-                </div>
-              </ScrollArea>
-
-              {/* ── Action buttons footer ── */}
-              <div className="border-t border-[var(--border)] px-6 py-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5 text-xs text-blue-600 border-blue-500/30 hover:bg-blue-500/10 hover:text-blue-700"
-                    onClick={() => {
-                      startImpersonate(
-                        selectedUsuario.id,
-                        `${selectedUsuario.first_name ?? selectedUsuario.email} (${selectedUsuario.email})`
-                      );
-                      setSheetOpen(false);
-                    }}
-                  >
-                    <Eye className="h-3 w-3" /> Ver como usuario
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={isPending}
-                    className={cn(
-                      'gap-1.5 text-xs',
-                      selectedUsuario.welcome_sent_at
-                        ? 'text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-600'
-                        : 'text-amber-600 border-amber-500/30 hover:bg-amber-500/10 hover:text-amber-700'
-                    )}
-                    onClick={() => {
-                      const action = selectedUsuario.welcome_sent_at ? 'Reenviar' : 'Enviar';
-                      if (!confirm(`¿${action} correo de bienvenida a ${selectedUsuario.email}?`))
-                        return;
-                      run(async () => {
-                        const { sendWelcomeEmailAction } = await import('./actions');
-                        const result = await sendWelcomeEmailAction(selectedUsuario.id);
-                        if (!result.success) throw new Error(result.error);
-                      });
-                    }}
-                  >
-                    <Mail className="h-3 w-3" />
-                    {selectedUsuario.welcome_sent_at ? 'Reenviar bienvenida' : 'Enviar bienvenida'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={isPending}
-                    onClick={() => {
-                      const nuevoEstado = !selectedUsuario.activo;
-                      if (
-                        !confirm(
-                          nuevoEstado
-                            ? '¿Reactivar este usuario?'
-                            : '¿Desactivar este usuario? Perderá acceso al sistema.'
-                        )
-                      )
-                        return;
-                      run(() => toggleActivo(selectedUsuario.id, nuevoEstado));
-                    }}
-                    className={cn(
-                      'gap-1.5 text-xs',
-                      selectedUsuario.activo
-                        ? 'text-red-500 border-red-500/30 hover:bg-red-500/10 hover:text-red-600'
-                        : 'text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-600'
-                    )}
-                  >
-                    {selectedUsuario.activo ? (
-                      <>
-                        <X className="h-3 w-3" /> Desactivar
-                      </>
-                    ) : (
-                      <>
-                        <ShieldCheck className="h-3 w-3" /> Reactivar
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={isPending}
-                    className="gap-1.5 text-xs text-red-500 border-red-500/30 hover:bg-red-500/10 hover:text-red-600"
-                    onClick={() => {
-                      if (
-                        !confirm(
-                          `¿Eliminar permanentemente a ${selectedUsuario.email}? Esta acción no se puede deshacer.`
-                        )
-                      )
-                        return;
-                      run(
-                        () => removeUsuario(selectedUsuario.id),
-                        () => setSheetOpen(false)
-                      );
-                    }}
-                  >
-                    <Trash2 className="h-3 w-3" /> Eliminar
-                  </Button>
-                </div>
+                            <div className="flex items-center gap-1.5">
+                              {ex.acceso_lectura && (
+                                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-emerald-600 dark:text-emerald-400">
+                                  Lectura
+                                </span>
+                              )}
+                              {ex.acceso_escritura && (
+                                <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-blue-600 dark:text-blue-400">
+                                  Escritura
+                                </span>
+                              )}
+                              {!ex.acceso_lectura && !ex.acceso_escritura && (
+                                <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-red-500">
+                                  Denegado
+                                </span>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                disabled={isPending}
+                                className="h-6 w-6 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                                onClick={() => {
+                                  run(() =>
+                                    deleteExcepcionUsuario(
+                                      ex.usuario_id,
+                                      ex.empresa_id,
+                                      ex.modulo_id
+                                    )
+                                  );
+                                }}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </section>
               </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
+            </ScrollArea>
+
+            {/* ── Action buttons footer ── */}
+            <div className="border-t border-[var(--border)] px-6 py-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-xs text-blue-600 border-blue-500/30 hover:bg-blue-500/10 hover:text-blue-700"
+                  onClick={() => {
+                    startImpersonate(
+                      selectedUsuario.id,
+                      `${selectedUsuario.first_name ?? selectedUsuario.email} (${selectedUsuario.email})`
+                    );
+                    setSheetOpen(false);
+                  }}
+                >
+                  <Eye className="h-3 w-3" /> Ver como usuario
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isPending}
+                  className={cn(
+                    'gap-1.5 text-xs',
+                    selectedUsuario.welcome_sent_at
+                      ? 'text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-600'
+                      : 'text-amber-600 border-amber-500/30 hover:bg-amber-500/10 hover:text-amber-700'
+                  )}
+                  onClick={() => {
+                    const action = selectedUsuario.welcome_sent_at ? 'Reenviar' : 'Enviar';
+                    if (!confirm(`¿${action} correo de bienvenida a ${selectedUsuario.email}?`))
+                      return;
+                    run(async () => {
+                      const { sendWelcomeEmailAction } = await import('./actions');
+                      const result = await sendWelcomeEmailAction(selectedUsuario.id);
+                      if (!result.success) throw new Error(result.error);
+                    });
+                  }}
+                >
+                  <Mail className="h-3 w-3" />
+                  {selectedUsuario.welcome_sent_at ? 'Reenviar bienvenida' : 'Enviar bienvenida'}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isPending}
+                  onClick={() => {
+                    const nuevoEstado = !selectedUsuario.activo;
+                    if (
+                      !confirm(
+                        nuevoEstado
+                          ? '¿Reactivar este usuario?'
+                          : '¿Desactivar este usuario? Perderá acceso al sistema.'
+                      )
+                    )
+                      return;
+                    run(() => toggleActivo(selectedUsuario.id, nuevoEstado));
+                  }}
+                  className={cn(
+                    'gap-1.5 text-xs',
+                    selectedUsuario.activo
+                      ? 'text-red-500 border-red-500/30 hover:bg-red-500/10 hover:text-red-600'
+                      : 'text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-600'
+                  )}
+                >
+                  {selectedUsuario.activo ? (
+                    <>
+                      <X className="h-3 w-3" /> Desactivar
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="h-3 w-3" /> Reactivar
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isPending}
+                  className="gap-1.5 text-xs text-red-500 border-red-500/30 hover:bg-red-500/10 hover:text-red-600"
+                  onClick={() => {
+                    if (
+                      !confirm(
+                        `¿Eliminar permanentemente a ${selectedUsuario.email}? Esta acción no se puede deshacer.`
+                      )
+                    )
+                      return;
+                    run(
+                      () => removeUsuario(selectedUsuario.id),
+                      () => setSheetOpen(false)
+                    );
+                  }}
+                >
+                  <Trash2 className="h-3 w-3" /> Eliminar
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+      </DetailDrawer>
 
       {/* ── Empresa Dialog ────────────────────────────────────────────────── */}
       <Dialog

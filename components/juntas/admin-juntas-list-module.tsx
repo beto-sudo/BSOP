@@ -31,13 +31,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import { DataTable, type Column } from '@/components/module-page';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from '@/components/ui/sheet';
+import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import { FilterCombobox, type FilterComboboxOption } from '@/components/ui/filter-combobox';
 import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
@@ -622,24 +616,17 @@ export function AdminJuntasListModule({
         </p>
       )}
 
-      <Sheet
+      <DetailDrawer
         open={showCreate}
         onOpenChange={(open) => {
           if (!open) setShowCreate(false);
         }}
+        size="sm"
+        title="Nueva Junta"
+        description="Selecciona el tipo de junta para iniciar"
       >
-        <SheetContent
-          side="right"
-          className="w-full sm:max-w-md border-[var(--border)] bg-[var(--card)] text-[var(--text)] overflow-y-auto"
-        >
-          <SheetHeader className="pb-2">
-            <SheetTitle className="text-[var(--text)] text-lg">Nueva Junta</SheetTitle>
-            <SheetDescription className="text-[var(--text)]/50">
-              Selecciona el tipo de junta para iniciar
-            </SheetDescription>
-          </SheetHeader>
-
-          <div className="space-y-5 py-4">
+        <DetailDrawerContent>
+          <div className="space-y-5">
             <div>
               <FieldLabel>Tipo de Junta *</FieldLabel>
               <Combobox
@@ -702,8 +689,8 @@ export function AdminJuntasListModule({
               Iniciar Junta
             </Button>
           </div>
-        </SheetContent>
-      </Sheet>
+        </DetailDrawerContent>
+      </DetailDrawer>
     </div>
   );
 }

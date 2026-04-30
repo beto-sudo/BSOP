@@ -21,13 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -361,20 +355,20 @@ function RichEditSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className="w-full sm:max-w-lg border-[var(--border)] bg-[var(--card)] text-[var(--text)] overflow-y-auto"
-      >
-        <SheetHeader className="pb-2">
-          <SheetTitle className="text-[var(--text)] text-lg">Editar Tarea</SheetTitle>
-          <SheetDescription className="text-[var(--text)]/50">
-            {selectedTask?.departamento_nombre && `${selectedTask.departamento_nombre} · `}
-            Creada {formatDate(selectedTask?.created_at ?? null)}
-          </SheetDescription>
-        </SheetHeader>
-
-        <Form form={form} onSubmit={handleSubmit} className="space-y-5 py-4">
+    <DetailDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      size="sm"
+      title="Editar Tarea"
+      description={
+        <>
+          {selectedTask?.departamento_nombre && `${selectedTask.departamento_nombre} · `}
+          Creada {formatDate(selectedTask?.created_at ?? null)}
+        </>
+      }
+    >
+      <DetailDrawerContent>
+        <Form form={form} onSubmit={handleSubmit} className="space-y-5">
           <FormField name="titulo" label="Título" required>
             {(field) => (
               <Input
@@ -573,8 +567,8 @@ function RichEditSheet({
             />
           </div>
         </Form>
-      </SheetContent>
-    </Sheet>
+      </DetailDrawerContent>
+    </DetailDrawer>
   );
 }
 

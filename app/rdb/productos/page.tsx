@@ -12,13 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FilterCombobox } from '@/components/ui/filter-combobox';
 import { Combobox } from '@/components/ui/combobox';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from '@/components/ui/sheet';
+import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import { RefreshCw, Search, Settings2, Save, X, BarChart3 } from 'lucide-react';
 import { upsertReceta, updateCategoria } from './actions';
 
@@ -651,17 +645,16 @@ export default function ProductosPage() {
         />
 
         {/* Detail/Config Drawer */}
-        <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
-          <SheetContent className="sm:max-w-[600px] overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle>Configurar Producto</SheetTitle>
-              <SheetDescription>
-                Ajusta categoría, tipo, reglas de inventario y receta de insumos.
-              </SheetDescription>
-            </SheetHeader>
-
-            {selectedProducto && (
-              <div className="mt-8 space-y-6">
+        <DetailDrawer
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+          size="md"
+          title="Configurar Producto"
+          description="Ajusta categoría, tipo, reglas de inventario y receta de insumos."
+        >
+          {selectedProducto && (
+            <DetailDrawerContent>
+              <div className="space-y-6">
                 <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
                   <div className="font-semibold text-lg">{selectedProducto.nombre}</div>
                   <div className="text-sm text-muted-foreground">
@@ -835,21 +828,19 @@ export default function ProductosPage() {
                   </Button>
                 </div>
               </div>
-            )}
-          </SheetContent>
-        </Sheet>
+            </DetailDrawerContent>
+          )}
+        </DetailDrawer>
 
         {/* Create Producto Drawer */}
-        <Sheet open={createDrawerOpen} onOpenChange={setCreateDrawerOpen}>
-          <SheetContent className="sm:max-w-[600px] overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle>Nuevo Producto</SheetTitle>
-              <SheetDescription>
-                Da de alta un producto o insumo manualmente (ej. para Órdenes de Compra o almacén
-                interno).
-              </SheetDescription>
-            </SheetHeader>
-
+        <DetailDrawer
+          open={createDrawerOpen}
+          onOpenChange={setCreateDrawerOpen}
+          size="md"
+          title="Nuevo Producto"
+          description="Da de alta un producto o insumo manualmente (ej. para Órdenes de Compra o almacén interno)."
+        >
+          <DetailDrawerContent>
             <div className="mt-8 space-y-6">
               <div className="space-y-4">
                 <div className="space-y-2">
@@ -927,8 +918,8 @@ export default function ProductosPage() {
                 </Button>
               </div>
             </div>
-          </SheetContent>
-        </Sheet>
+          </DetailDrawerContent>
+        </DetailDrawer>
       </div>
     </RequireAccess>
   );
