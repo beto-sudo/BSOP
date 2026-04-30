@@ -3,10 +3,10 @@
 **Slug:** `drawer-anatomy-polish`
 **Empresas:** todas
 **Schemas afectados:** n/a (UI)
-**Estado:** planned
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-04-30
-**Última actualización:** 2026-04-30
+**Última actualización:** 2026-04-30 (cierre)
 
 ## Problema
 
@@ -173,12 +173,12 @@ sm:justify-between sm:gap-4`. Siempre visibles. Stack en mobile,
 
 ## Sprints / hitos
 
-| #   | Sprint                                                                            | Estado  | PR  |
-| --- | --------------------------------------------------------------------------------- | ------- | --- |
-| 1   | Foundation (header fix + Section + Skeleton + Form mode + ADR-026 + golden Stock) | pending | TBD |
-| 2   | Aplicar a 7 drawers core ya migrados                                              | pending | TBD |
-| 3   | Migrar excepciones documentadas (~13 archivos)                                    | pending | TBD |
-| 4   | Cierre + smoke + Done en INITIATIVES                                              | pending | TBD |
+| #   | Sprint                                                                            | Estado | PR     |
+| --- | --------------------------------------------------------------------------------- | ------ | ------ |
+| 1   | Foundation (header fix + Section + Skeleton + Form mode + ADR-026 + golden Stock) | done   | #346   |
+| 2   | Aplicar a 7 drawers core ya migrados                                              | done   | #347   |
+| 3   | Migrar excepciones documentadas (16 archivos)                                     | done   | #348   |
+| 4   | Cierre + Done en INITIATIVES                                                      | done   | _este_ |
 
 ## Decisiones registradas
 
@@ -202,3 +202,51 @@ con CI verde.
 ## Bitácora
 
 (append-only — entradas más recientes primero)
+
+### 2026-04-30 — Sprint 4 mergeado (cierre)
+
+Iniciativa cerrada el mismo día de su promoción. 4 PRs autónomos
+mergeados con CI verde:
+
+- **#346 (Sprint 1)** — Foundation: fix `<DetailDrawerHeader>` con
+  `pr-14` (DD7), `<SheetTitle>` con `line-clamp-2 break-words` (DD8),
+  actions con stack vertical en mobile (DD9). Nuevos sub-componentes
+  `<DetailDrawerSection>` (DD10) y `<DetailDrawerSkeleton>` (DD11).
+  ADR-026 codifica DD7-DD11. Golden re-aplicación a `<StockDetailDrawer>`.
+- **#347 (Sprint 2)** — Aplicar a 7 drawers core ya migrados:
+  `<OrderDetail>` (Section + Skeleton), `<CorteDetail>` (Section +
+  Skeleton + print preservado), `<TasksUpdatesSheet>` (Section),
+  `<DocumentoCreateSheet>` (cleanup `className="sm:max-w-[640px]"`),
+  OC drawer (cleanup `sm:max-w-[700px]` → `size="lg"`).
+  `<DocumentoDetailSheet>` y `<NuevaEmpresaDrawer>` heredan DD7-DD9
+  automáticamente del componente base sin re-escritura.
+- **#348 (Sprint 3)** — Migra 16 archivos con `<Sheet>` raw a
+  `<DetailDrawer>` (cierra las "excepciones documentadas" de
+  drawer-anatomy v1 que Beto autorizó retomar): 4 DILESA list pages,
+  Settings/Empresas detail + Settings/Acceso, Productos + Requisiciones
+  - inicio Juntas en RDB, Proveedores (5 drawers) + RH puestos +
+    Departamentos + Tasks create/edit + Juntas list/detail.
+- **_este PR_ (Sprint 4)** — Cierre: planning doc → done, mover fila
+  a `## Done` en INITIATIVES.md, bitácora final.
+
+**Outcome final**:
+
+- `grep '@/components/ui/sheet' --include="*.tsx" --include="*.ts"`
+  solo regresa `components/detail-page/detail-drawer.tsx` (el wrapper
+  canónico). Cero `<Sheet>` raw en el repo. Excepción permanente:
+  `components/ui/sheet.tsx` (primitivo de shadcn).
+- Todos los drawers heredan **DD7-DD9** (header sin colisión X/título/
+  actions + mobile-friendly por construcción).
+- 30+ drawers usan tamaños canónicos `sm`/`md`/`lg`/`xl` (cero literales
+  como `sm:max-w-[600px]`/`[640px]`/`[700px]`/`[800px]`/`max-w-xl`/`md`).
+- `<DetailDrawerSection>` y `<DetailDrawerSkeleton>` adoptables opt-in.
+  Adoptados en 4 drawers (Stock + Order + Corte + TasksUpdates) en
+  Sprints 1-2; el resto los adopta cuando feature work los toque.
+- Form mode idiomático documentado: `footer={<FormActions/>}` ya en uso
+  en RH puestos + departamentos.
+
+**No quedan pendientes operativos** — la iniciativa cierra
+end-to-end. Siguiente en cola UI: ninguna iniciativa UI activa
+post-`drawer-anatomy-polish`.
+
+PR: pendiente de merge en este Sprint 4.
