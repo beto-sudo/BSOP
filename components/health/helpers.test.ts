@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { HealthMetricRow } from '@/lib/health';
-import { getRecoveryFlag, groupDailySleepEfficiency } from './helpers';
+import { classifyBand, getRecoveryFlag, groupDailySleepEfficiency, type Band } from './helpers';
 import type { Point } from './types';
 
 function row(
@@ -102,5 +102,37 @@ describe('getRecoveryFlag', () => {
   it('returns null when previous baseline is 0 (avoid divide-by-zero)', () => {
     const points = buildSeries(14, (i) => (i < 7 ? 0 : 50));
     expect(getRecoveryFlag(points, { type: 'drop', threshold: 0.1 })).toBeNull();
+  });
+});
+
+describe('classifyBand', () => {
+  const speedBands: ReadonlyArray<Band<'low' | 'mid' | 'good' | 'great'>> = [
+    { key: 'low', max: 0.8, label: 'Bajo', color: 'rose' },
+    { key: 'mid', max: 1.0, label: 'Moderado', color: 'amber' },
+    { key: 'good', max: 1.4, label: 'Bueno', color: 'lime' },
+    { key: 'great', max: Infinity, label: 'Muy bueno', color: 'emerald' },
+  ];
+
+  it('returns null for null/undefined/NaN', () => {
+    expect(classifyBand(null, speedBands)).toBeNull();
+    expect(classifyBand(undefined, speedBands)).toBeNull();
+    expect(classifyBand(Number.NaN, speedBands)).toBeNull();
+  });
+
+  it('classifies into the first matching band by ascending max', () => {
+    expect(classifyBand(0.5, speedBands)?.key).toBe('low');
+    expect(classifyBand(0.9, speedBands)?.key).toBe('mid');
+    expect(classifyBand(1.2, speedBands)?.key).toBe('good');
+    expect(classifyBand(1.5, speedBands)?.key).toBe('great');
+  });
+
+  it('treats max as inclusive (boundary lands in lower band)', () => {
+    expect(classifyBand(0.8, speedBands)?.key).toBe('low');
+    expect(classifyBand(1.0, speedBands)?.key).toBe('mid');
+    expect(classifyBand(1.4, speedBands)?.key).toBe('good');
+  });
+
+  it('falls into the catch-all band (max: Infinity) for very high values', () => {
+    expect(classifyBand(99, speedBands)?.key).toBe('great');
   });
 });

@@ -168,6 +168,34 @@ export const TONES = {
     dot: '#94a3b8',
     badge: 'border-slate-400/20 bg-slate-400/10 text-slate-200',
   },
+  walkSpeed: {
+    icon: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/25 dark:bg-emerald-400/12 dark:text-emerald-200',
+    line: '#10b981',
+    lineSoft: 'rgba(16,185,129,0.35)',
+    dot: '#34d399',
+    badge: 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200',
+  },
+  walkAsym: {
+    icon: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/25 dark:bg-amber-400/12 dark:text-amber-200',
+    line: '#d97706',
+    lineSoft: 'rgba(217,119,6,0.35)',
+    dot: '#fbbf24',
+    badge: 'border-amber-400/20 bg-amber-400/10 text-amber-200',
+  },
+  walkDouble: {
+    icon: 'border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-400/25 dark:bg-cyan-400/12 dark:text-cyan-200',
+    line: '#0891b2',
+    lineSoft: 'rgba(8,145,178,0.35)',
+    dot: '#22d3ee',
+    badge: 'border-cyan-400/20 bg-cyan-400/10 text-cyan-200',
+  },
+  stairUp: {
+    icon: 'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700 dark:border-fuchsia-400/25 dark:bg-fuchsia-400/12 dark:text-fuchsia-200',
+    line: '#c026d3',
+    lineSoft: 'rgba(192,38,211,0.35)',
+    dot: '#e879f9',
+    badge: 'border-fuchsia-400/20 bg-fuchsia-400/10 text-fuchsia-200',
+  },
 } as const;
 
 export type ToneKey = keyof typeof TONES;

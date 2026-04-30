@@ -7,6 +7,7 @@ import { formatDurationHours, formatMetricValue } from '@/lib/health';
 import { ActivitySection } from './activity-section';
 import { BodyCompositionSection } from './body-composition-section';
 import { CardiacFitnessSection } from './cardiac-fitness-section';
+import { FunctionalMovementSection } from './functional-movement-section';
 import {
   buildDeltaHelper,
   formatDaysAgo,
@@ -37,6 +38,11 @@ export function HealthDashboardView({
   sixMinWalk,
   zones,
   workouts,
+  walkingSpeed,
+  walkingAsymmetry,
+  walkingDoubleSupport,
+  stairSpeedUp,
+  stairSpeedDown,
   weight,
   bodyFat,
   bmi,
@@ -166,6 +172,16 @@ export function HealthDashboardView({
         vo2Max={vo2Max}
         sixMinWalk={sixMinWalk}
         zones={zones}
+        rangeLabel={range.trendLabel}
+      />
+
+      <FunctionalMovementSection
+        walkingSpeed={walkingSpeed}
+        walkingAsymmetry={walkingAsymmetry}
+        walkingDoubleSupport={walkingDoubleSupport}
+        stairSpeedUp={stairSpeedUp}
+        stairSpeedDown={stairSpeedDown}
+        trendDays={range.trendDays}
         rangeLabel={range.trendLabel}
       />
 
