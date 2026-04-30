@@ -228,6 +228,36 @@ export function groupDailySleepEfficiency(rows: HealthMetricRow[]): Point[] {
 }
 
 /**
+ * Classify a numeric measurement against ordered bands. Bands must be
+ * sorted by `max` ascending and the last band should have `max: Infinity`
+ * to act as a catch-all. Returns the matching band or null if value is
+ * null/NaN.
+ *
+ * Used by gait quality metrics where each metric has its own clinical
+ * thresholds (Walking Speed, Walking Asymmetry %, Double Support %, Stair
+ * Speed Up).
+ */
+export type Band<T extends string = string> = {
+  key: T;
+  max: number;
+  label: string;
+  // Tailwind color suffix: "emerald", "lime", "amber", "rose". The caller
+  // composes this into "text-emerald-500" or "bg-emerald-400" as needed.
+  color: 'emerald' | 'lime' | 'amber' | 'rose';
+};
+
+export function classifyBand<T extends string>(
+  value: number | null | undefined,
+  bands: ReadonlyArray<Band<T>>
+): Band<T> | null {
+  if (value == null || !Number.isFinite(value)) return null;
+  for (const band of bands) {
+    if (value <= band.max) return band;
+  }
+  return bands[bands.length - 1] ?? null;
+}
+
+/**
  * Compute a recovery flag for a vital that has shifted unfavorably vs the
  * previous 7-day baseline. For HRV (where lower = worse) pass type='drop'
  * and a relative threshold (0.10 = 10% drop). For resting HR (where higher

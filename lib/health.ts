@@ -308,6 +308,12 @@ export type HealthDashboardData = {
   sixMinWalk: HealthMetricRow[];
   zones: WorkoutCardiacZones[];
   workouts: HealthWorkoutRow[];
+  // Functional movement (gait quality + stair power)
+  walkingSpeed: HealthMetricRow[];
+  walkingAsymmetry: HealthMetricRow[];
+  walkingDoubleSupport: HealthMetricRow[];
+  stairSpeedUp: HealthMetricRow[];
+  stairSpeedDown: HealthMetricRow[];
   // Body composition
   weight: HealthMetricRow[];
   bodyFat: HealthMetricRow[];
@@ -349,6 +355,11 @@ const EMPTY_DATA_SUFFIX: Omit<HealthDashboardData, 'range' | 'errors'> = {
   sixMinWalk: [],
   zones: [],
   workouts: [],
+  walkingSpeed: [],
+  walkingAsymmetry: [],
+  walkingDoubleSupport: [],
+  stairSpeedUp: [],
+  stairSpeedDown: [],
   weight: [],
   bodyFat: [],
   bmi: [],
@@ -410,6 +421,11 @@ export async function getHealthDashboardData(
     sixMinWalkRes,
     workoutsRes,
     zonesRes,
+    walkingSpeedRes,
+    walkingAsymmetryRes,
+    walkingDoubleSupportRes,
+    stairSpeedUpRes,
+    stairSpeedDownRes,
     weightRes,
     bodyFatRes,
     bmiRes,
@@ -468,6 +484,11 @@ export async function getHealthDashboardData(
       p_resting_hr: CARDIAC_RESTING_HR,
       p_max_hr: CARDIAC_MAX_HR,
     }),
+    metricSeries(supabase, 'Walking Speed', from, to),
+    metricSeries(supabase, 'Walking Asymmetry Percentage', from, to),
+    metricSeries(supabase, 'Walking Double Support Percentage', from, to),
+    metricSeries(supabase, 'Stair Speed Up', from, to),
+    metricSeries(supabase, 'Stair Speed Down', from, to),
     metricSeries(supabase, 'Body Mass', from, to),
     metricSeries(supabase, 'Body Fat Percentage', from, to),
     metricSeries(supabase, 'Body Mass Index', from, to),
@@ -521,6 +542,11 @@ export async function getHealthDashboardData(
     sixMinWalkRes.error?.message,
     workoutsRes.error?.message,
     zonesRes.error?.message,
+    walkingSpeedRes.error?.message,
+    walkingAsymmetryRes.error?.message,
+    walkingDoubleSupportRes.error?.message,
+    stairSpeedUpRes.error?.message,
+    stairSpeedDownRes.error?.message,
     weightRes.error?.message,
     bodyFatRes.error?.message,
     bmiRes.error?.message,
@@ -558,6 +584,11 @@ export async function getHealthDashboardData(
     sixMinWalk: sixMinWalkRes.data ?? [],
     zones: zonesRows,
     workouts: workoutsRes.data ?? [],
+    walkingSpeed: walkingSpeedRes.data ?? [],
+    walkingAsymmetry: walkingAsymmetryRes.data ?? [],
+    walkingDoubleSupport: walkingDoubleSupportRes.data ?? [],
+    stairSpeedUp: stairSpeedUpRes.data ?? [],
+    stairSpeedDown: stairSpeedDownRes.data ?? [],
     weight: weightRes.data ?? [],
     bodyFat: bodyFatRes.data ?? [],
     bmi: bmiRes.data ?? [],
