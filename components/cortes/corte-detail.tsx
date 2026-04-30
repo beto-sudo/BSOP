@@ -3,8 +3,12 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
-import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
+import {
+  DetailDrawer,
+  DetailDrawerContent,
+  DetailDrawerSection,
+  DetailDrawerSkeleton,
+} from '@/components/detail-page';
 import { useTriggerPrint } from '@/components/print';
 import { conciliarEfectivo, conciliarTarjeta } from './conciliacion';
 import { CorteConciliacion } from './corte-conciliacion';
@@ -13,19 +17,6 @@ import { MarbeteConciliacion } from './marbete-conciliacion';
 import { RegistrarMovimientoDialog } from './registrar-movimiento-dialog';
 import type { Banco, Corte, CorteTotales, Movimiento, Voucher } from './types';
 import { VoucherLightbox } from './voucher-lightbox';
-
-function DetailSkeleton() {
-  return (
-    <div className="space-y-3">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="flex justify-between gap-4">
-          <Skeleton className="h-4 w-36" />
-          <Skeleton className="h-4 w-24" />
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export function CorteDetail({
   corte,
@@ -173,15 +164,9 @@ export function CorteDetail({
             </>
           )}
 
-          <Separator className="print:my-1" />
-
-          {/* Resumen Financiero */}
-          <div>
-            <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground print:mb-1 print:text-[9px] print:text-gray-500">
-              Resumen Financiero
-            </div>
+          <DetailDrawerSection title="Resumen Financiero" className="print:mt-1 print:pt-1">
             {loadingDetail ? (
-              <DetailSkeleton />
+              <DetailDrawerSkeleton showStats={false} lines={0} sectionRows={6} />
             ) : totales ? (
               <div className="space-y-2 text-sm print:space-y-0 print:text-[10px]">
                 <div className="flex justify-between">
@@ -245,31 +230,30 @@ export function CorteDetail({
             ) : (
               <p className="text-sm text-muted-foreground">Sin datos de totales.</p>
             )}
-          </div>
+          </DetailDrawerSection>
 
-          <Separator className="print:my-1" />
-
-          {/* Movimientos */}
-          <div>
-            <div className="mb-3 flex items-center justify-between print:mb-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground print:text-[9px] print:text-gray-500">
-                Movimientos
+          <DetailDrawerSection
+            title={
+              <span className="flex items-center justify-between gap-3">
+                <span>Movimientos</span>
+                {estaAbierto && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setRegistrarOpen(true)}
+                    aria-label="Registrar movimiento de caja"
+                    className="print:hidden"
+                  >
+                    <Plus className="mr-1.5 h-3.5 w-3.5" />
+                    Registrar
+                  </Button>
+                )}
               </span>
-              {estaAbierto && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setRegistrarOpen(true)}
-                  aria-label="Registrar movimiento de caja"
-                  className="print:hidden"
-                >
-                  <Plus className="mr-1.5 h-3.5 w-3.5" />
-                  Registrar
-                </Button>
-              )}
-            </div>
+            }
+            className="print:mt-1 print:pt-1"
+          >
             {loadingDetail ? (
-              <DetailSkeleton />
+              <DetailDrawerSkeleton showStats={false} lines={0} sectionRows={5} />
             ) : movimientos.length === 0 ? (
               <p className="text-sm text-muted-foreground print:text-[10px]">
                 Sin movimientos registrados.
@@ -321,7 +305,7 @@ export function CorteDetail({
                 })}
               </div>
             )}
-          </div>
+          </DetailDrawerSection>
 
           {(() => {
             // Fallback `?? 'voucher_tarjeta'` por compat con vouchers viejos cuyo

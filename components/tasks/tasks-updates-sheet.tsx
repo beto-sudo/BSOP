@@ -5,7 +5,7 @@
  * button in the rich table's actions cell.
  */
 
-import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
+import { DetailDrawer, DetailDrawerContent, DetailDrawerSection } from '@/components/detail-page';
 import type { ErpTask, TaskUpdateRow } from './tasks-shared';
 import { UpdateComposer, UpdatesList } from './tasks-updates';
 
@@ -39,22 +39,17 @@ export function TasksUpdatesSheet({
       description={task?.titulo ?? ''}
     >
       <DetailDrawerContent>
-        <div className="space-y-4">
-          <UpdateComposer
-            value={updateContent}
-            onChange={onUpdateContentChange}
-            onSubmit={onSaveUpdate}
-            saving={savingUpdate}
-            size="lg"
-          />
+        <UpdateComposer
+          value={updateContent}
+          onChange={onUpdateContentChange}
+          onSubmit={onSaveUpdate}
+          saving={savingUpdate}
+          size="lg"
+        />
 
-          <div className="border-t border-[var(--border)] pt-4">
-            <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50 mb-3">
-              Historial
-            </div>
-            <UpdatesList updates={updates} loading={loadingUpdates} variant="sheet" />
-          </div>
-        </div>
+        <DetailDrawerSection title="Historial">
+          <UpdatesList updates={updates} loading={loadingUpdates} variant="sheet" />
+        </DetailDrawerSection>
       </DetailDrawerContent>
     </DetailDrawer>
   );
