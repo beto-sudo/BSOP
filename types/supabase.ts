@@ -4798,6 +4798,108 @@ export type Database = {
           },
         ]
       }
+      finiquitos: {
+        Row: {
+          antiguedad_anios: number
+          antiguedad_dias: number
+          antiguedad_meses: number
+          causa: string
+          conceptos: Json
+          creado_en: string
+          creado_por: string | null
+          empleado_id: string
+          empleado_snapshot: Json
+          empresa_id: string
+          fecha_baja: string
+          fecha_convenio: string
+          fecha_ingreso: string
+          forma_pago: string
+          id: string
+          motivo_detalle: string | null
+          notas_calculo: Json
+          patron_snapshot: Json
+          referencia_pago: string | null
+          salario_minimo_diario: number
+          sdi: number | null
+          sueldo_diario: number
+          total_finiquito: number
+          total_general: number
+          total_indemnizacion: number
+          zona_salario_minimo: string
+        }
+        Insert: {
+          antiguedad_anios: number
+          antiguedad_dias: number
+          antiguedad_meses: number
+          causa: string
+          conceptos: Json
+          creado_en?: string
+          creado_por?: string | null
+          empleado_id: string
+          empleado_snapshot: Json
+          empresa_id: string
+          fecha_baja: string
+          fecha_convenio: string
+          fecha_ingreso: string
+          forma_pago: string
+          id?: string
+          motivo_detalle?: string | null
+          notas_calculo?: Json
+          patron_snapshot: Json
+          referencia_pago?: string | null
+          salario_minimo_diario: number
+          sdi?: number | null
+          sueldo_diario: number
+          total_finiquito: number
+          total_general: number
+          total_indemnizacion?: number
+          zona_salario_minimo: string
+        }
+        Update: {
+          antiguedad_anios?: number
+          antiguedad_dias?: number
+          antiguedad_meses?: number
+          causa?: string
+          conceptos?: Json
+          creado_en?: string
+          creado_por?: string | null
+          empleado_id?: string
+          empleado_snapshot?: Json
+          empresa_id?: string
+          fecha_baja?: string
+          fecha_convenio?: string
+          fecha_ingreso?: string
+          forma_pago?: string
+          id?: string
+          motivo_detalle?: string | null
+          notas_calculo?: Json
+          patron_snapshot?: Json
+          referencia_pago?: string | null
+          salario_minimo_diario?: number
+          sdi?: number | null
+          sueldo_diario?: number
+          total_finiquito?: number
+          total_general?: number
+          total_indemnizacion?: number
+          zona_salario_minimo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finiquitos_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "empleados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finiquitos_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "v_empleados_full"
+            referencedColumns: ["empleado_id"]
+          },
+        ]
+      }
       gastos: {
         Row: {
           categoria_id: string | null
