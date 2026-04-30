@@ -10,6 +10,7 @@ import { DesktopOnlyNotice } from '@/components/responsive';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { getSupabaseErrorMessage, toSupabaseError } from '@/lib/supabase-error';
 import { getLocalDayBoundsUtc } from '@/lib/timezone';
 import {
   Table,
@@ -1465,7 +1466,7 @@ function OrdenesCompraContent() {
         .sort((a, b) => (a.nombre ?? '').localeCompare(b.nombre ?? '', 'es'));
       setProveedores(provMapped);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No pude cargar las órdenes de compra.');
+      setError(getSupabaseErrorMessage(err, 'No pude cargar las órdenes de compra.'));
     } finally {
       setLoading(false);
     }
@@ -1520,7 +1521,7 @@ function OrdenesCompraContent() {
         setEditedPrices(initialPrices);
         setSelected((prev) => (prev?.id === orden.id ? { ...prev, items } : prev));
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'No pude cargar el detalle.');
+        setError(getSupabaseErrorMessage(err, 'No pude cargar el detalle.'));
       } finally {
         setLoadingItems(false);
       }
@@ -1635,9 +1636,9 @@ function OrdenesCompraContent() {
         await refreshOrdenAfterMutation(selected.id);
         feedback.success(markAll ? 'Recepción completa registrada' : 'Recepciones guardadas');
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'No pude guardar la recepción.';
+        const msg = getSupabaseErrorMessage(err, 'No pude guardar la recepción.');
         setError(msg);
-        feedback.error(err instanceof Error ? err : new Error(msg));
+        feedback.error(toSupabaseError(err, msg));
       } finally {
         setSaving(false);
       }
@@ -1662,9 +1663,9 @@ function OrdenesCompraContent() {
         await refreshOrdenAfterMutation(selected.id);
         feedback.success('Pendiente cancelado');
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'No pude cancelar el pendiente.';
+        const msg = getSupabaseErrorMessage(err, 'No pude cancelar el pendiente.');
         setError(msg);
-        feedback.error(err instanceof Error ? err : new Error(msg));
+        feedback.error(toSupabaseError(err, msg));
       } finally {
         setSaving(false);
       }
@@ -1688,9 +1689,9 @@ function OrdenesCompraContent() {
         await refreshOrdenAfterMutation(selected.id);
         feedback.success('Precio actualizado');
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'No pude actualizar el precio.';
+        const msg = getSupabaseErrorMessage(err, 'No pude actualizar el precio.');
         setError(msg);
-        feedback.error(err instanceof Error ? err : new Error(msg));
+        feedback.error(toSupabaseError(err, msg));
       } finally {
         setSaving(false);
       }
@@ -1718,9 +1719,9 @@ function OrdenesCompraContent() {
           feedback.success('OC cerrada — total a pagar congelado');
         }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'No pude cerrar la OC.';
+        const msg = getSupabaseErrorMessage(err, 'No pude cerrar la OC.');
         setError(msg);
-        feedback.error(err instanceof Error ? err : new Error(msg));
+        feedback.error(toSupabaseError(err, msg));
       } finally {
         setSaving(false);
       }
@@ -1751,7 +1752,7 @@ function OrdenesCompraContent() {
           )
         );
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'No pude asignar el proveedor.');
+        setError(getSupabaseErrorMessage(err, 'No pude asignar el proveedor.'));
       } finally {
         setSaving(false);
       }
@@ -1795,9 +1796,9 @@ function OrdenesCompraContent() {
           : 'OC enviada al proveedor — los precios ya no se pueden editar'
       );
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'No pude guardar los precios.';
+      const msg = getSupabaseErrorMessage(err, 'No pude guardar los precios.');
       setError(msg);
-      feedback.error(err instanceof Error ? err : new Error(msg));
+      feedback.error(toSupabaseError(err, msg));
     } finally {
       setSaving(false);
     }
