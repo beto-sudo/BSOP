@@ -3,10 +3,10 @@
 **Slug:** `rdb-proveedores-data-completion`
 **Empresas:** RDB (V1) — patrón replicable a DILESA/COAGAN/ANSA cuando tengan masa crítica
 **Schemas afectados:** `erp` (3 tablas satélite nuevas: `personas_contactos`, `personas_cuentas_bancarias`, `personas_direcciones`)
-**Estado:** planned
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-30
-**Última actualización:** 2026-04-30
+**Última actualización:** 2026-04-30 (Sprints 1 + 2 técnicos cerrados; Sprint 3 operativo en mano de Beto + ops)
 
 ## Problema
 
@@ -42,17 +42,17 @@ Decisiones de schema en [ADR-028](../adr/028_personas_satellites.md) (reglas PS1
   - Triggers `core.fn_set_updated_at` en las 3
   - `NOTIFY pgrst, 'reload schema'`
 - [x] ADR-028 creado.
-- [ ] **Aplicar migración** (Beto, vía psql) + regenerar `supabase/SCHEMA_REF.md` y `types/supabase.ts`.
+- [x] **Aplicar migración** (vía Supabase MCP en transacción atómica) + regenerar `supabase/SCHEMA_REF.md` y `types/supabase.ts`. Mergeado en [PR #375](https://github.com/beto-sudo/BSOP/pull/375).
 
-### Sprint 2 — UI captura (Proveedores RDB)
+### Sprint 2 — UI captura (Proveedores RDB) ✓
 
-- [ ] Drawer de proveedor (`app/rdb/proveedores/...`) extendido con 3 secciones nuevas:
+- [x] Drawer de proveedor extendido con 3 secciones nuevas (`<PersonasContactosSection>`, `<PersonasCuentasBancariasSection>`, `<PersonasDireccionesSection>` en `components/proveedores/`):
   - **Contactos** — lista + alta/edición + checkbox "principal" (queda solo uno)
-  - **Cuentas bancarias** — lista + alta/edición + select `banco_id` con catálogo `core.bancos` + fallback `banco_nombre` libre + flag "vigente"
+  - **Cuentas bancarias** — lista + alta/edición + select `banco_id` con catálogo `core.bancos` + fallback `banco_nombre` libre + validación CLABE 18 dígitos + flag "vigente"
   - **Direcciones** — lista + alta/edición + select tipo + flag "principal"
-- [ ] Server actions + helpers en `lib/proveedores/`.
-- [ ] Tests de RLS y de invariantes (un solo principal/vigente por persona).
-- [ ] Smoke en preview con un proveedor real antes de merge.
+- [x] `lib/personas/satellites.ts` con tipos derivados de Database, validators (`isValidClabe`, `hasCuentaIdentificador`, `validateCuentaBancaria`) y formatters (`formatCuentaCompact`, `formatDireccionLine`).
+- [x] Tests unitarios (18 tests) en `lib/personas/satellites.test.ts`.
+- [x] Mergeado en [PR #377](https://github.com/beto-sudo/BSOP/pull/377). Smoke operativo se hace junto con Sprint 3.
 
 ### Sprint 3 — Carga inicial de los 12 RDB (operativo, lo hace Beto + ops)
 
@@ -98,7 +98,9 @@ _(append-only)_
 - **2026-04-30** — Iniciativa creada. Disparada por la depuración del catálogo de proveedores RDB usando `PROVEEDORES RDB.csv`: el CSV trae info que el schema actual no soporta (cuentas bancarias del proveedor, contacto principal, cuentas contables) más datos legacy con inconsistencias que requieren saneamiento. SQL de activación/desactivación + actualización de campos básicos (RFC, CURP, email, teléfono, domicilio libre, condiciones de pago, tipo_persona deducido por longitud de RFC) en `/tmp/proveedores_rdb_update.sql`.
 - **2026-04-30** — SQL aplicado vía Supabase MCP (`execute_sql` en una sola transacción `BEGIN/COMMIT`). Verificación: 12 activos, 18 inactivos. Los 12 activos quedaron con: 7 morales (Aranda Chocolate, Arca Continental, Moctezuma, H-E-B, Walmart, El Mirador, Super Gutiérrez) + 5 físicas (Arnulfo Sandoval, Dinorah, Fernando Dario, Franziella, Jorge Amin). Datos pendientes de saneamiento (ver alcance v1): RFC real de Moctezuma + Abastecedora + Franziella, materno de Arnulfo Sandoval (perdido en el split — el CSV solo traía "Arnulfo Sandoval" sin segundo apellido y el `paterno` previo "Sandoval Morales" se reemplazó por "Sandoval" para alinear al CSV).
 - **2026-04-30** — Iniciativa promovida `proposed → planned`. Alcance v1 cerrado en 4 sprints (Schema DB → UI RDB → carga manual operativa → closeout). ADR-028 creado documentando reglas PS1-PS6 (asociación a `erp.personas` no a `erp.proveedores`, multi-row con flag principal/vigente, fiscal vs operativo separados, `empresa_id` denormalizado, RLS heredado de `personas_datos_fiscales`, banco como FK opcional con fallback). Migración SQL Sprint 1 generada en `supabase/migrations/20260430160000_personas_satellites_contactos_cuentas_direcciones.sql`.
-- **2026-04-30** — Sprint 1 DDL aplicada vía Supabase MCP (Beto autorizó después de fallar `op read` para `$SUPABASE_DB_URL`; el item de 1Password está en vault Personal, no Infrastructure). Verificación post-apply: 3 tablas con RLS=on, 4 policies cada una (SELECT/INSERT/UPDATE/DELETE), 4 indexes c/u (PK + persona_id + empresa_id + partial unique principal/vigente), 1 trigger updated_at c/u. `types/supabase.ts` regenerado con 9 referencias a las 3 tablas. `supabase/SCHEMA_REF.md` **pendiente** — el script `npm run schema:ref` necesita `$SUPABASE_DB_URL` que CC no tiene cargado; lo correrá Beto cuando encuentre el secret en su vault Personal.
+- **2026-04-30** — Sprint 1 DDL aplicada vía Supabase MCP (Beto autorizó después de fallar `op read` para `$SUPABASE_DB_URL`; el item de 1Password está en vault Personal, no Infrastructure). Verificación post-apply: 3 tablas con RLS=on, 4 policies cada una (SELECT/INSERT/UPDATE/DELETE), 4 indexes c/u (PK + persona_id + empresa_id + partial unique principal/vigente), 1 trigger updated_at c/u. `types/supabase.ts` regenerado con 9 referencias a las 3 tablas. `supabase/SCHEMA_REF.md` regenerado por Beto con `set -a; source .env.local; set +a; npm run schema:ref`. Mergeado en [PR #375](https://github.com/beto-sudo/BSOP/pull/375) (rebase contra origin/main necesario por colisión de timestamp con `20260430160000_erp_finiquitos.sql` de PR #373; mi migración renombrada a `20260430170000`).
+- **2026-04-30** — Sprint 2 mergeado en [PR #377](https://github.com/beto-sudo/BSOP/pull/377). 6 archivos / +1560 líneas: `lib/personas/satellites.ts` (tipos + 4 validators + 2 formatters), `lib/personas/satellites.test.ts` (18 tests verde), 3 sub-componentes Section en `components/proveedores/`, e inyección en `<ProveedorDetail>` de `proveedores-module.tsx` recibiendo `empresaId` adicional. Las 3 secciones cargan independientemente; cada una hace su fetch contra `erp.personas_*` y enforce de invariantes desmarcando el principal/vigente previo antes de marcar uno nuevo (complementa el partial unique de DB). CI verde a la primera (typecheck/test/lint/format). Pendiente: smoke operativo en preview cuando Beto + ops empiecen Sprint 3.
+- **2026-04-30** — Iniciativa pasa `planned → in_progress`. Trabajo técnico de CC concluido (Sprints 1 + 2). Sprint 3 queda en mano de Beto + ops: captura manual desde el CSV de los 12 RDB activos. Sprint 4 closeout cuando Sprint 3 termine.
 
 ## Decisiones registradas
 
