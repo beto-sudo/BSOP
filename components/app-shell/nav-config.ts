@@ -106,6 +106,7 @@ export const NAV_ITEMS: NavItem[] = [
           { label: 'Proveedores', href: '/rdb/proveedores' },
           { label: 'Requisiciones', href: '/rdb/requisiciones' },
           { label: 'Órdenes de Compra', href: '/rdb/ordenes-compra' },
+          { label: 'Recepciones', href: '/rdb/recepciones' },
         ],
       },
       {

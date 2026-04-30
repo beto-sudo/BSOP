@@ -197,6 +197,7 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   'rdb.requisiciones',
   'rdb.playtomic',
   'rdb.ordenes_compra',
+  'rdb.recepciones',
   'rdb.admin.tasks',
   'rdb.admin.juntas',
   'rdb.admin.documentos',
