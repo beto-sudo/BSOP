@@ -26,6 +26,10 @@ const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
 
 type Almacen = { id: string; nombre: string };
 
+/**
+ * @module Levantamiento — Nuevo (RDB)
+ * @responsive mobile-first
+ */
 export default function NuevoLevantamientoPage() {
   return (
     <RequireAccess empresa="rdb" modulo="rdb.inventario" write>

@@ -12,6 +12,10 @@ import { TasksModule } from '@/components/tasks/tasks-module';
  * Sin RequireAccess de empresa: el dashboard personal es para todo
  * usuario logueado; el proxy ya valida la sesión.
  */
+/**
+ * @module Inicio — Tasks
+ * @responsive responsive
+ */
 export default function Page() {
   return (
     <TasksModule

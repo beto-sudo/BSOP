@@ -98,6 +98,10 @@ const stats = ((councilData as { stats?: CouncilStats }).stats ?? {
 }) as CouncilStats;
 const councilById = Object.fromEntries(councilMembers.map((member) => [member.id, member]));
 
+/**
+ * @module R&D
+ * @responsive responsive
+ */
 export default function RndCouncilPage() {
   const { t, locale } = useLocale();
   const [selectedMemoId, setSelectedMemoId] = useState(memos[0].id);

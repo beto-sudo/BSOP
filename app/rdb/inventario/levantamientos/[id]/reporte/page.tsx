@@ -63,6 +63,10 @@ type FirmaRow = {
   comentario: string | null;
 };
 
+/**
+ * @module Levantamiento — Reporte (RDB)
+ * @responsive mobile-first
+ */
 export default function ReportePage() {
   return (
     <RequireAccess empresa="rdb" modulo="rdb.inventario">

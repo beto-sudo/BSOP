@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AlertTriangle, CheckCircle2, RefreshCw, Search, ShieldAlert } from 'lucide-react';
 
 import { RequireAccess } from '@/components/require-access';
+import { DesktopOnlyNotice } from '@/components/responsive';
 import { ActiveFiltersChip, DataTable, type Column } from '@/components/module-page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,10 +31,17 @@ const FILTER_DEFAULTS = {
   tipo: 'todos' as 'todos' | AlertType,
 };
 
+/**
+ * @module Productos — Auditoría (RDB)
+ * @responsive desktop-only
+ */
 export default function ProductosAuditoriaPage() {
   return (
     <RequireAccess empresa="rdb" modulo="rdb.productos">
-      <ProductosAuditoriaBody />
+      <DesktopOnlyNotice module="Auditoría" />
+      <div className="hidden sm:block">
+        <ProductosAuditoriaBody />
+      </div>
     </RequireAccess>
   );
 }

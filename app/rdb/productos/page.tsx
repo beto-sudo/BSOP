@@ -1,6 +1,7 @@
 'use client';
 
 import { RequireAccess } from '@/components/require-access';
+import { DesktopOnlyNotice } from '@/components/responsive';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
@@ -217,6 +218,10 @@ function CategoriaBadge({ nombre, color }: { nombre: string | null; color: strin
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+/**
+ * @module Productos (RDB)
+ * @responsive desktop-only
+ */
 export default function ProductosPage() {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -520,7 +525,8 @@ export default function ProductosPage() {
 
   return (
     <RequireAccess empresa="rdb" modulo="rdb.productos">
-      <div className="space-y-6">
+      <DesktopOnlyNotice module="Productos" />
+      <div className="hidden sm:block space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>

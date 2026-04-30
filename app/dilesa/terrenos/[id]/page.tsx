@@ -16,6 +16,7 @@
  */
 
 import { RequireAccess } from '@/components/require-access';
+import { DesktopOnlyNotice } from '@/components/responsive';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -431,10 +432,17 @@ function EtapaBadgeLarge({ etapa }: { etapa: string | null }) {
   return <Badge tone={cfg.tone}>{cfg.label}</Badge>;
 }
 
+/**
+ * @module Terreno detail (DILESA)
+ * @responsive desktop-only
+ */
 export default function TerrenoDetailPage() {
   return (
     <RequireAccess empresa="dilesa">
-      <TerrenoDetailInner />
+      <DesktopOnlyNotice module="Terrenos" />
+      <div className="hidden sm:block">
+        <TerrenoDetailInner />
+      </div>
     </RequireAccess>
   );
 }

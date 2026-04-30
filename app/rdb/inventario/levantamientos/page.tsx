@@ -86,6 +86,10 @@ const columns: Column<LevantamientoRow>[] = [
   },
 ];
 
+/**
+ * @module Levantamientos (RDB)
+ * @responsive mobile-first
+ */
 export default function LevantamientosListaPage() {
   return (
     <RequireAccess empresa="rdb" modulo="rdb.inventario">

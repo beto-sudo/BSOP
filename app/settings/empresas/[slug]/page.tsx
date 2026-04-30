@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { RequireAccess } from '@/components/require-access';
+import { DesktopOnlyNotice } from '@/components/responsive';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -204,10 +205,17 @@ function EmpresaPageInner() {
   );
 }
 
+/**
+ * @module Settings — Empresa detail
+ * @responsive desktop-only
+ */
 export default function Page() {
   return (
     <RequireAccess adminOnly>
-      <EmpresaPageInner />
+      <DesktopOnlyNotice module="Empresa" />
+      <div className="hidden sm:block">
+        <EmpresaPageInner />
+      </div>
     </RequireAccess>
   );
 }

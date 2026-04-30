@@ -66,6 +66,10 @@ type LevHeader = {
   contador_nombre: string | null;
 };
 
+/**
+ * @module Levantamiento — Diferencias (RDB)
+ * @responsive mobile-first
+ */
 export default function DiferenciasPage() {
   return (
     <RequireAccess empresa="rdb" modulo="rdb.inventario">

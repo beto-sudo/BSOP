@@ -1,6 +1,10 @@
 import { PlaceholderSection } from '@/components/ui/placeholder-section';
 import { RequireAccess } from '@/components/require-access';
 
+/**
+ * @module Family
+ * @responsive responsive
+ */
 export default function FamilyPage() {
   return (
     <RequireAccess empresa="familia">

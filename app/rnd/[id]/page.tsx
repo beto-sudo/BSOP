@@ -93,6 +93,10 @@ const councilMembers = councilData.config.council as CouncilMember[];
 const memos = councilData.memos as CouncilMemo[];
 const councilById = Object.fromEntries(councilMembers.map((member) => [member.id, member]));
 
+/**
+ * @module R&D detail
+ * @responsive responsive
+ */
 export default function RndMemoDetailPage() {
   const params = useParams();
   const id = params.id as string;

@@ -22,6 +22,7 @@ import {
   type Column,
 } from '@/components/module-page';
 import { CategoryFilterStrip } from '@/components/inventario/category-filter-strip';
+import { DesktopOnlyNotice } from '@/components/responsive';
 import { useUrlFilters } from '@/hooks/use-url-filters';
 import { Combobox } from '@/components/ui/combobox';
 import { Badge } from '@/components/ui/badge';
@@ -122,6 +123,9 @@ const stockColumns: Column<StockItem>[] = [
  * `<ModuleHeader>`, `<RoutedModuleTabs>` y `<RequireAccess>`. Esta página
  * solo aporta el contenido específico de Stock (KPIs, filtros, tabla,
  * drawer de detalle, dialog de registrar movimiento).
+ *
+ * @module Inventario — Stock (RDB)
+ * @responsive desktop-only
  */
 export default function InventarioStockPage() {
   // Stock state
@@ -222,210 +226,213 @@ export default function InventarioStockPage() {
 
   return (
     <>
-      {!loadingStock &&
-        !errorStock &&
-        (() => {
-          const s = computeStockStats(filteredStock);
-          return (
-            <ModuleKpiStrip
-              stats={[
-                {
-                  key: 'productos',
-                  label: 'Productos',
-                  value: s.productos,
-                  icon: <Boxes className="h-3.5 w-3.5" />,
-                },
-                {
-                  key: 'bajo',
-                  label: 'Bajo mínimo',
-                  value: s.bajosMinimo,
-                  icon: <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />,
-                  valueClassName: s.bajosMinimo > 0 ? 'text-amber-500' : '',
-                },
-                {
-                  key: 'sin',
-                  label: 'Sin stock',
-                  value: s.sinStock,
-                  icon: <TrendingDown className="h-3.5 w-3.5 text-destructive" />,
-                  valueClassName: s.sinStock > 0 ? 'text-destructive' : '',
-                },
-                {
-                  key: 'valor',
-                  label: 'Valor Inventario',
-                  value: formatCurrency(s.totalValue),
-                  icon: <TrendingUp className="h-3.5 w-3.5" />,
-                },
-              ]}
+      <DesktopOnlyNotice module="Inventario" />
+      <div className="hidden sm:block">
+        {!loadingStock &&
+          !errorStock &&
+          (() => {
+            const s = computeStockStats(filteredStock);
+            return (
+              <ModuleKpiStrip
+                stats={[
+                  {
+                    key: 'productos',
+                    label: 'Productos',
+                    value: s.productos,
+                    icon: <Boxes className="h-3.5 w-3.5" />,
+                  },
+                  {
+                    key: 'bajo',
+                    label: 'Bajo mínimo',
+                    value: s.bajosMinimo,
+                    icon: <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />,
+                    valueClassName: s.bajosMinimo > 0 ? 'text-amber-500' : '',
+                  },
+                  {
+                    key: 'sin',
+                    label: 'Sin stock',
+                    value: s.sinStock,
+                    icon: <TrendingDown className="h-3.5 w-3.5 text-destructive" />,
+                    valueClassName: s.sinStock > 0 ? 'text-destructive' : '',
+                  },
+                  {
+                    key: 'valor',
+                    label: 'Valor Inventario',
+                    value: formatCurrency(s.totalValue),
+                    icon: <TrendingUp className="h-3.5 w-3.5" />,
+                  },
+                ]}
+              />
+            );
+          })()}
+
+        {!loadingStock && !errorStock && (
+          <CategoryFilterStrip
+            items={filteredStock}
+            activeCategory={categoriaFiltro}
+            onSelect={(value) => setFilter('categoriaFiltro', value)}
+          />
+        )}
+
+        <ModuleFilters
+          count={
+            loadingStock
+              ? 'Cargando…'
+              : `${filteredStock.length} producto${filteredStock.length !== 1 ? 's' : ''}`
+          }
+          actions={
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => printStockList(filteredStock, fechaCorte || null)}
+                className="gap-2"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                Imprimir lista
+              </Button>
+              <Button size="sm" onClick={() => setDialogOpen(true)} className="gap-2">
+                <Plus className="h-3.5 w-3.5" />
+                Registrar Movimiento
+              </Button>
+            </div>
+          }
+        >
+          <div className="relative min-w-52">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar producto…"
+              value={search}
+              onChange={(e) => setFilter('search', e.target.value)}
+              className="pl-9"
             />
-          );
-        })()}
-
-      {!loadingStock && !errorStock && (
-        <CategoryFilterStrip
-          items={filteredStock}
-          activeCategory={categoriaFiltro}
-          onSelect={(value) => setFilter('categoriaFiltro', value)}
-        />
-      )}
-
-      <ModuleFilters
-        count={
-          loadingStock
-            ? 'Cargando…'
-            : `${filteredStock.length} producto${filteredStock.length !== 1 ? 's' : ''}`
-        }
-        actions={
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => printStockList(filteredStock, fechaCorte || null)}
-              className="gap-2"
-            >
-              <Printer className="h-3.5 w-3.5" />
-              Imprimir lista
-            </Button>
-            <Button size="sm" onClick={() => setDialogOpen(true)} className="gap-2">
-              <Plus className="h-3.5 w-3.5" />
-              Registrar Movimiento
-            </Button>
           </div>
-        }
-      >
-        <div className="relative min-w-52">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar producto…"
-            value={search}
-            onChange={(e) => setFilter('search', e.target.value)}
-            className="pl-9"
+
+          <Button
+            variant={showServicios ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFilter('showServicios', !showServicios)}
+            className="gap-2"
+          >
+            <Boxes className="h-3.5 w-3.5" />
+            Ver no inventariables
+          </Button>
+
+          <Button
+            variant={showBajoMinimo ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFilter('showBajoMinimo', !showBajoMinimo)}
+            className="gap-2"
+          >
+            <AlertTriangle className="h-3.5 w-3.5" />
+            Solo bajo mínimo
+          </Button>
+
+          <Combobox
+            value={categoriaFiltro}
+            onChange={(value) => setFilter('categoriaFiltro', value ?? '')}
+            options={[
+              'Alimentos',
+              'Bebidas',
+              'Licores',
+              'Artículos',
+              'Deportes',
+              'Consumibles',
+              'Propinas',
+            ].map((c) => ({ value: c, label: c }))}
+            placeholder="Categoría"
+            allowClear
+            size="sm"
+            className="w-40"
           />
-        </div>
 
-        <Button
-          variant={showServicios ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setFilter('showServicios', !showServicios)}
-          className="gap-2"
-        >
-          <Boxes className="h-3.5 w-3.5" />
-          Ver no inventariables
-        </Button>
-
-        <Button
-          variant={showBajoMinimo ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setFilter('showBajoMinimo', !showBajoMinimo)}
-          className="gap-2"
-        >
-          <AlertTriangle className="h-3.5 w-3.5" />
-          Solo bajo mínimo
-        </Button>
-
-        <Combobox
-          value={categoriaFiltro}
-          onChange={(value) => setFilter('categoriaFiltro', value ?? '')}
-          options={[
-            'Alimentos',
-            'Bebidas',
-            'Licores',
-            'Artículos',
-            'Deportes',
-            'Consumibles',
-            'Propinas',
-          ].map((c) => ({ value: c, label: c }))}
-          placeholder="Categoría"
-          allowClear
-          size="sm"
-          className="w-40"
-        />
-
-        <Combobox
-          value={clasificacionFiltro}
-          onChange={(value) => setFilter('clasificacionFiltro', value ?? '')}
-          options={['inventariable', 'consumible', 'merchandising', 'activo_fijo'].map((c) => ({
-            value: c,
-            label: c,
-          }))}
-          placeholder="Clasificación"
-          allowClear
-          size="sm"
-          className="w-40"
-        />
-
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Al corte:</span>
-          <input
-            type="date"
-            max={new Date().toISOString().split('T')[0]}
-            value={fechaCorte}
-            onChange={(e) => setFilter('fechaCorte', e.target.value)}
-            className="rounded-md border border-input bg-transparent px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          <Combobox
+            value={clasificacionFiltro}
+            onChange={(value) => setFilter('clasificacionFiltro', value ?? '')}
+            options={['inventariable', 'consumible', 'merchandising', 'activo_fijo'].map((c) => ({
+              value: c,
+              label: c,
+            }))}
+            placeholder="Clasificación"
+            allowClear
+            size="sm"
+            className="w-40"
           />
-          {fechaCorte && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setFilter('fechaCorte', '')}
-              className="text-xs h-7 px-2"
-            >
-              × Hoy
-            </Button>
-          )}
-        </div>
 
-        <ActiveFiltersChip count={activeCount} onClearAll={clearAll} />
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Al corte:</span>
+            <input
+              type="date"
+              max={new Date().toISOString().split('T')[0]}
+              value={fechaCorte}
+              onChange={(e) => setFilter('fechaCorte', e.target.value)}
+              className="rounded-md border border-input bg-transparent px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+            {fechaCorte && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setFilter('fechaCorte', '')}
+                className="text-xs h-7 px-2"
+              >
+                × Hoy
+              </Button>
+            )}
+          </div>
 
-        <Button variant="outline" size="icon" onClick={handleRefresh} aria-label="Actualizar">
-          <RefreshCw className={`h-4 w-4 ${loadingStock ? 'animate-spin' : ''}`} />
-        </Button>
-      </ModuleFilters>
+          <ActiveFiltersChip count={activeCount} onClearAll={clearAll} />
 
-      {errorStock && <ErrorBanner error={errorStock} onRetry={handleRefresh} />}
+          <Button variant="outline" size="icon" onClick={handleRefresh} aria-label="Actualizar">
+            <RefreshCw className={`h-4 w-4 ${loadingStock ? 'animate-spin' : ''}`} />
+          </Button>
+        </ModuleFilters>
 
-      {fechaCorte && (
-        <div className="flex items-center gap-2 rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-2 text-sm text-blue-600 dark:text-blue-400">
-          <span>📅</span>
-          <span>Inventario al cierre del {fechaLabel} — solo movimientos hasta esa fecha</span>
-        </div>
-      )}
+        {errorStock && <ErrorBanner error={errorStock} onRetry={handleRefresh} />}
 
-      <ModuleContent>
-        <DataTable<StockItem>
-          data={filteredStock}
-          columns={stockColumns}
-          rowKey="id"
-          loading={loadingStock}
-          onRowClick={(item) => {
-            setSelectedItem(item);
-            setDrawerOpen(true);
-          }}
-          initialSort={{ key: 'nombre', dir: 'asc' }}
-          emptyIcon={<Boxes className="h-8 w-8" />}
-          emptyTitle={
-            activeCount > 0 ? 'Ningún producto coincide con los filtros' : 'Aún no hay productos'
-          }
-          emptyDescription={
-            activeCount > 0
-              ? 'Limpia los filtros para ver el inventario completo.'
-              : 'Registra el primer movimiento para que aparezca aquí.'
-          }
-          showDensityToggle={false}
+        {fechaCorte && (
+          <div className="flex items-center gap-2 rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-2 text-sm text-blue-600 dark:text-blue-400">
+            <span>📅</span>
+            <span>Inventario al cierre del {fechaLabel} — solo movimientos hasta esa fecha</span>
+          </div>
+        )}
+
+        <ModuleContent>
+          <DataTable<StockItem>
+            data={filteredStock}
+            columns={stockColumns}
+            rowKey="id"
+            loading={loadingStock}
+            onRowClick={(item) => {
+              setSelectedItem(item);
+              setDrawerOpen(true);
+            }}
+            initialSort={{ key: 'nombre', dir: 'asc' }}
+            emptyIcon={<Boxes className="h-8 w-8" />}
+            emptyTitle={
+              activeCount > 0 ? 'Ningún producto coincide con los filtros' : 'Aún no hay productos'
+            }
+            emptyDescription={
+              activeCount > 0
+                ? 'Limpia los filtros para ver el inventario completo.'
+                : 'Registra el primer movimiento para que aparezca aquí.'
+            }
+            showDensityToggle={false}
+          />
+        </ModuleContent>
+
+        <StockDetailDrawer
+          item={selectedItem}
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
         />
-      </ModuleContent>
 
-      <StockDetailDrawer
-        item={selectedItem}
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-      />
-
-      <RegistrarMovimientoDialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        productos={items}
-        onSuccess={handleSuccess}
-      />
+        <RegistrarMovimientoDialog
+          open={dialogOpen}
+          onClose={() => setDialogOpen(false)}
+          productos={items}
+          onSuccess={handleSuccess}
+        />
+      </div>
     </>
   );
 }

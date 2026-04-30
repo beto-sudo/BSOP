@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
+import { DesktopOnlyNotice } from '@/components/responsive';
 import { AccesoClient } from './acceso-client';
 import type {
   Empresa,
@@ -12,6 +13,10 @@ import type {
   ExcepcionUsuario,
 } from './actions';
 
+/**
+ * @module Settings — Acceso
+ * @responsive desktop-only
+ */
 export default async function AccesoPage() {
   const cookieStore = await cookies();
   const supabase = createServerClient(
@@ -107,14 +112,19 @@ export default async function AccesoPage() {
   ]);
 
   return (
-    <AccesoClient
-      empresas={(empresas ?? []) as Empresa[]}
-      modulos={(modulos ?? []) as Modulo[]}
-      roles={(roles ?? []) as RolRecord[]}
-      permisosRol={(permisosRol ?? []) as PermisoRol[]}
-      usuarios={(usuarios ?? []) as UsuarioCore[]}
-      usuariosEmpresas={(usuariosEmpresas ?? []) as UsuarioEmpresa[]}
-      excepciones={(excepciones ?? []) as ExcepcionUsuario[]}
-    />
+    <>
+      <DesktopOnlyNotice module="Acceso" />
+      <div className="hidden sm:block">
+        <AccesoClient
+          empresas={(empresas ?? []) as Empresa[]}
+          modulos={(modulos ?? []) as Modulo[]}
+          roles={(roles ?? []) as RolRecord[]}
+          permisosRol={(permisosRol ?? []) as PermisoRol[]}
+          usuarios={(usuarios ?? []) as UsuarioCore[]}
+          usuariosEmpresas={(usuariosEmpresas ?? []) as UsuarioEmpresa[]}
+          excepciones={(excepciones ?? []) as ExcepcionUsuario[]}
+        />
+      </div>
+    </>
   );
 }

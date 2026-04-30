@@ -24,6 +24,7 @@
  */
 
 import { RequireAccess } from '@/components/require-access';
+import { DesktopOnlyNotice } from '@/components/responsive';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -875,12 +876,19 @@ function PlaceholderPanel({ title, description }: { title: string; description: 
   );
 }
 
+/**
+ * @module Anteproyectos (DILESA)
+ * @responsive desktop-only
+ */
 export default function AnteproyectosPage() {
   return (
     <RequireAccess empresa="dilesa">
-      <Suspense fallback={<div className="p-6 text-sm text-[var(--text)]/55">Cargando…</div>}>
-        <AnteproyectosInner />
-      </Suspense>
+      <DesktopOnlyNotice module="Anteproyectos" />
+      <div className="hidden sm:block">
+        <Suspense fallback={<div className="p-6 text-sm text-[var(--text)]/55">Cargando…</div>}>
+          <AnteproyectosInner />
+        </Suspense>
+      </div>
     </RequireAccess>
   );
 }

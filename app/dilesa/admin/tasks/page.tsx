@@ -5,6 +5,10 @@ import { TasksModule } from '@/components/tasks/tasks-module';
 
 const EMPRESA_ID = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479';
 
+/**
+ * @module Tasks (DILESA)
+ * @responsive responsive
+ */
 export default function Page() {
   return (
     <RequireAccess empresa="dilesa">
