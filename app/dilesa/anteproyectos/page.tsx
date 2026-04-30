@@ -30,13 +30,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { DataTable, type Column } from '@/components/module-page';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from '@/components/ui/sheet';
+import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -391,16 +385,15 @@ function AnteproyectosInner() {
         />
       </TabPanel>
 
-      <Sheet open={showCreate} onOpenChange={setShowCreate}>
-        <SheetContent side="right" className="w-full max-w-xl">
-          <SheetHeader>
-            <SheetTitle>Nuevo anteproyecto</SheetTitle>
-            <SheetDescription>
-              Solo campos esenciales — el expediente y los prototipos de referencia se capturan
-              desde el detalle.
-            </SheetDescription>
-          </SheetHeader>
-          <Form form={createForm} onSubmit={handleCreate} className="mt-6 space-y-5">
+      <DetailDrawer
+        open={showCreate}
+        onOpenChange={setShowCreate}
+        size="md"
+        title="Nuevo anteproyecto"
+        description="Solo campos esenciales — el expediente y los prototipos de referencia se capturan desde el detalle."
+      >
+        <DetailDrawerContent>
+          <Form form={createForm} onSubmit={handleCreate} className="space-y-5">
             <FormField name="nombre" label="Nombre del anteproyecto" required>
               {(field) => (
                 <Input
@@ -541,8 +534,8 @@ function AnteproyectosInner() {
               className="border-t-0 pt-2"
             />
           </Form>
-        </SheetContent>
-      </Sheet>
+        </DetailDrawerContent>
+      </DetailDrawer>
     </div>
   );
 }

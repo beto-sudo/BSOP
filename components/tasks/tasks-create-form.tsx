@@ -20,13 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -291,19 +285,15 @@ function RichCreateSheet({ open, onOpenChange, onCreate, empleadoOptions }: Task
   };
 
   return (
-    <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent
-        side="right"
-        className="w-full sm:max-w-lg border-[var(--border)] bg-[var(--card)] text-[var(--text)] overflow-y-auto"
-      >
-        <SheetHeader className="pb-2">
-          <SheetTitle className="text-[var(--text)] text-lg">Nueva Tarea</SheetTitle>
-          <SheetDescription className="text-[var(--text)]/50">
-            Completa los campos requeridos para crear una tarea
-          </SheetDescription>
-        </SheetHeader>
-
-        <Form form={form} onSubmit={handleSubmit} className="space-y-5 py-4">
+    <DetailDrawer
+      open={open}
+      onOpenChange={handleOpenChange}
+      size="sm"
+      title="Nueva Tarea"
+      description="Completa los campos requeridos para crear una tarea"
+    >
+      <DetailDrawerContent>
+        <Form form={form} onSubmit={handleSubmit} className="space-y-5">
           <FormField name="titulo" label="Título" required>
             {(field) => (
               <Input
@@ -399,7 +389,7 @@ function RichCreateSheet({ open, onOpenChange, onCreate, empleadoOptions }: Task
             stretch
           />
         </Form>
-      </SheetContent>
-    </Sheet>
+      </DetailDrawerContent>
+    </DetailDrawer>
   );
 }

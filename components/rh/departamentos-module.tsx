@@ -39,7 +39,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { DataTable } from '@/components/module-page';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet';
+import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import {
   Dialog,
   DialogContent,
@@ -519,18 +519,15 @@ export function DepartamentosModule({
 
       {/* Create / Edit form — Sheet or Dialog */}
       {createVariant === 'sheet' ? (
-        <Sheet open={showDialog} onOpenChange={setShowDialog}>
-          <SheetContent
-            side="right"
-            className="w-full max-w-md border-[var(--border)] bg-[var(--card)] text-[var(--text)]"
-          >
-            <SheetHeader>
-              <SheetTitle>{editingId ? 'Editar departamento' : 'Nuevo departamento'}</SheetTitle>
-            </SheetHeader>
-            {FormBody}
-            <SheetFooter className="gap-2">{FormActions}</SheetFooter>
-          </SheetContent>
-        </Sheet>
+        <DetailDrawer
+          open={showDialog}
+          onOpenChange={setShowDialog}
+          size="sm"
+          title={editingId ? 'Editar departamento' : 'Nuevo departamento'}
+          footer={<div className="flex flex-wrap items-center gap-2">{FormActions}</div>}
+        >
+          <DetailDrawerContent>{FormBody}</DetailDrawerContent>
+        </DetailDrawer>
       ) : (
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
           <DialogContent className="max-w-md rounded-3xl border-[var(--border)] bg-[var(--card)] text-[var(--text)]">

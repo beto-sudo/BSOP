@@ -27,13 +27,7 @@ import Image from '@tiptap/extension-image';
 import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table';
 import { EditorToolbar, MINUTA_EDITOR_STYLES } from '@/components/juntas/editor-toolbar';
 import { Combobox } from '@/components/ui/combobox';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from '@/components/ui/sheet';
+import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -1592,7 +1586,7 @@ function JuntaDetailInner() {
       </div>
 
       {/* Sheet: Agregar avance */}
-      <Sheet
+      <DetailDrawer
         open={!!showAddUpdate}
         onOpenChange={(open) => {
           if (!open) {
@@ -1600,18 +1594,12 @@ function JuntaDetailInner() {
             setUpdateForm({ contenido: '', nuevoEstado: '', nuevaFecha: '' });
           }
         }}
+        size="sm"
+        title="Agregar avance"
+        description={showAddUpdate ? (tasks.find((t) => t.id === showAddUpdate)?.titulo ?? '') : ''}
       >
-        <SheetContent
-          side="right"
-          className="w-full sm:max-w-lg border-[var(--border)] bg-[var(--card)] text-[var(--text)] overflow-y-auto"
-        >
-          <SheetHeader className="pb-2">
-            <SheetTitle className="text-[var(--text)] text-lg">Agregar avance</SheetTitle>
-            <SheetDescription className="text-[var(--text)]/50">
-              {showAddUpdate ? (tasks.find((t) => t.id === showAddUpdate)?.titulo ?? '') : ''}
-            </SheetDescription>
-          </SheetHeader>
-          <div className="space-y-5 py-4">
+        <DetailDrawerContent>
+          <div className="space-y-5">
             <div>
               <FieldLabel>Avance / Comentario *</FieldLabel>
               <Textarea
@@ -1671,8 +1659,8 @@ function JuntaDetailInner() {
               Guardar avance
             </Button>
           </div>
-        </SheetContent>
-      </Sheet>
+        </DetailDrawerContent>
+      </DetailDrawer>
 
       {/* Add task dialog */}
       <TasksCreateForm

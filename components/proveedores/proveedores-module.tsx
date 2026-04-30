@@ -16,7 +16,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { DataTable, type Column } from '@/components/module-page';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -223,91 +223,88 @@ function ProveedorDetail({
   ].filter((r) => r.value);
 
   return (
-    <Sheet
+    <DetailDrawer
       open={open}
       onOpenChange={(v) => {
         if (!v) onClose();
       }}
-    >
-      <SheetContent className="sm:max-w-[600px]">
-        {/* Membrete solo para impresión */}
-        <img
-          src={logoPath}
-          alt={membreteAlt}
-          className="hidden print:block w-full object-contain mb-6"
-        />
-        <SheetHeader>
-          <SheetTitle>{proveedor.nombre}</SheetTitle>
-          <div className="absolute right-12 top-4 hidden sm:flex gap-2 print:hidden">
-            <Button variant="outline" size="sm" onClick={() => onUpdateCsf(proveedor)}>
-              <Sparkles className="mr-2 h-4 w-4" />
-              Cargar / Actualizar CSF
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => onEdit(proveedor)}>
-              <Pencil className="mr-2 h-4 w-4" />
-              Editar
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onToggleActivo(proveedor)}
-              disabled={saving}
-            >
-              {proveedor.activo ? (
-                <Ban className="mr-2 h-4 w-4" />
-              ) : (
-                <RotateCcw className="mr-2 h-4 w-4" />
-              )}
-              {proveedor.activo ? 'Inactivar' : 'Reactivar'}
-            </Button>
-            <Button variant="outline" size="sm" onClick={triggerPrint}>
-              Imprimir
-            </Button>
-          </div>
-        </SheetHeader>
-
-        <ScrollArea className="flex-1 min-h-0 pr-1 print:h-auto">
-          <div className="mt-6 space-y-6 pb-6">
-            <Badge variant={proveedor.activo ? 'default' : 'secondary'}>
-              {proveedor.activo ? 'Activo' : 'Inactivo'}
-            </Badge>
-
-            <Separator />
-
-            {rows.length > 0 ? (
-              <div className="space-y-4">
-                {rows.map((row) => {
-                  const Icon = row.icon;
-                  return (
-                    <div key={row.label}>
-                      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        {Icon && <Icon className="h-3 w-3" />}
-                        {row.label}
-                      </div>
-                      <div className="mt-1 text-sm">{row.value}</div>
-                    </div>
-                  );
-                })}
-              </div>
+      size="md"
+      title={proveedor.nombre}
+      actions={
+        <>
+          <Button variant="outline" size="sm" onClick={() => onUpdateCsf(proveedor)}>
+            <Sparkles className="mr-2 h-4 w-4" />
+            Cargar / Actualizar CSF
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => onEdit(proveedor)}>
+            <Pencil className="mr-2 h-4 w-4" />
+            Editar
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onToggleActivo(proveedor)}
+            disabled={saving}
+          >
+            {proveedor.activo ? (
+              <Ban className="mr-2 h-4 w-4" />
             ) : (
-              <p className="text-sm text-muted-foreground">Sin información de contacto</p>
+              <RotateCcw className="mr-2 h-4 w-4" />
             )}
+            {proveedor.activo ? 'Inactivar' : 'Reactivar'}
+          </Button>
+          <Button variant="outline" size="sm" onClick={triggerPrint}>
+            Imprimir
+          </Button>
+        </>
+      }
+    >
+      {/* Membrete solo para impresión */}
+      <img
+        src={logoPath}
+        alt={membreteAlt}
+        className="hidden print:block w-full object-contain mb-6"
+      />
 
-            {proveedor.notas && (
-              <>
-                <Separator />
-                <div>
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Notas
+      <DetailDrawerContent>
+        <Badge variant={proveedor.activo ? 'default' : 'secondary'}>
+          {proveedor.activo ? 'Activo' : 'Inactivo'}
+        </Badge>
+
+        <Separator className="my-4" />
+
+        {rows.length > 0 ? (
+          <div className="space-y-4">
+            {rows.map((row) => {
+              const Icon = row.icon;
+              return (
+                <div key={row.label}>
+                  <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {Icon && <Icon className="h-3 w-3" />}
+                    {row.label}
                   </div>
-                  <p className="text-sm leading-relaxed text-muted-foreground">{proveedor.notas}</p>
+                  <div className="mt-1 text-sm">{row.value}</div>
                 </div>
-              </>
-            )}
+              );
+            })}
           </div>
-        </ScrollArea>
-      </SheetContent>
-    </Sheet>
+        ) : (
+          <p className="text-sm text-muted-foreground">Sin información de contacto</p>
+        )}
+
+        {proveedor.notas && (
+          <>
+            <Separator className="my-4" />
+            <div>
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Notas
+              </div>
+              <p className="text-sm leading-relaxed text-muted-foreground">{proveedor.notas}</p>
+            </div>
+          </>
+        )}
+      </DetailDrawerContent>
+    </DetailDrawer>
   );
 }
 
@@ -953,12 +950,14 @@ export function ProveedoresModule({
         membreteAlt={membreteAlt}
       />
 
-      <Sheet open={editDrawerOpen} onOpenChange={setEditDrawerOpen}>
-        <SheetContent className="sm:max-w-[600px] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Editar Proveedor</SheetTitle>
-          </SheetHeader>
-          <div className="mt-8 space-y-6">
+      <DetailDrawer
+        open={editDrawerOpen}
+        onOpenChange={setEditDrawerOpen}
+        size="md"
+        title="Editar Proveedor"
+      >
+        <DetailDrawerContent>
+          <div className="space-y-6">
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium leading-none">
@@ -1016,23 +1015,21 @@ export function ProveedoresModule({
               </Button>
             </div>
           </div>
-        </SheetContent>
-      </Sheet>
+        </DetailDrawerContent>
+      </DetailDrawer>
 
       {/* Create Proveedor Drawer */}
-      <Sheet
+      <DetailDrawer
         open={createDrawerOpen}
         onOpenChange={(v) => {
           setCreateDrawerOpen(v);
           if (!v) resetCreateForm();
         }}
+        size="md"
+        title="Nuevo Proveedor"
       >
-        <SheetContent className="sm:max-w-[640px] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Nuevo Proveedor</SheetTitle>
-          </SheetHeader>
-
-          <div className="mt-8 space-y-6">
+        <DetailDrawerContent>
+          <div className="space-y-6">
             {/* ── Sección CSF (Sprint 2.B) ────────────────────────── */}
             <div className="rounded-lg border border-emerald-300/40 bg-emerald-50/40 p-4 dark:bg-emerald-950/20">
               <div className="flex items-start gap-3">
@@ -1364,8 +1361,8 @@ export function ProveedoresModule({
               </Button>
             </div>
           </div>
-        </SheetContent>
-      </Sheet>
+        </DetailDrawerContent>
+      </DetailDrawer>
 
       {/* Update CSF — overlay de procesamiento (mientras Claude lee el PDF) */}
       {updateCsfProcessing && (
@@ -1405,7 +1402,7 @@ export function ProveedoresModule({
       )}
 
       {/* Modal: diff campo-por-campo (Sprint 3.B) */}
-      <Sheet
+      <DetailDrawer
         open={diffOpen}
         onOpenChange={(v) => {
           if (!v) {
@@ -1415,19 +1412,16 @@ export function ProveedoresModule({
             // aplicar exitosamente o al iniciar un nuevo update.
           }
         }}
+        size="lg"
+        title={
+          <span className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-emerald-600" />
+            Revisar cambios de la CSF
+          </span>
+        }
+        description={`${updateCsfTarget?.nombre ?? ''} — marca los campos que quieras aplicar. La CSF nueva queda archivada como histórico aunque rechaces todos los cambios.`}
       >
-        <SheetContent className="sm:max-w-[800px] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-emerald-600" />
-              Revisar cambios de la CSF
-            </SheetTitle>
-            <p className="text-xs text-muted-foreground">
-              {updateCsfTarget?.nombre} — marca los campos que quieras aplicar. La CSF nueva queda
-              archivada como histórico aunque rechaces todos los cambios.
-            </p>
-          </SheetHeader>
-
+        <DetailDrawerContent>
           <div className="mt-6 space-y-4">
             {/* Toolbar de selección */}
             <div className="flex flex-wrap items-center gap-2 border-b pb-3">
@@ -1543,19 +1537,23 @@ export function ProveedoresModule({
               </Button>
             </div>
           </div>
-        </SheetContent>
-      </Sheet>
+        </DetailDrawerContent>
+      </DetailDrawer>
 
       {/* Modal: RFC duplicado */}
-      <Sheet open={duplicadoOpen} onOpenChange={setDuplicadoOpen}>
-        <SheetContent className="sm:max-w-[480px]">
-          <SheetHeader>
-            <SheetTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
-              RFC ya registrado
-            </SheetTitle>
-          </SheetHeader>
-          <div className="mt-8 space-y-6">
+      <DetailDrawer
+        open={duplicadoOpen}
+        onOpenChange={setDuplicadoOpen}
+        size="sm"
+        title={
+          <span className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            RFC ya registrado
+          </span>
+        }
+      >
+        <DetailDrawerContent>
+          <div className="space-y-6">
             <p className="text-sm">
               El RFC{' '}
               <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
@@ -1601,8 +1599,8 @@ export function ProveedoresModule({
               Actualizar CSF&rdquo; en su detalle.
             </p>
           </div>
-        </SheetContent>
-      </Sheet>
+        </DetailDrawerContent>
+      </DetailDrawer>
     </div>
   );
 }
