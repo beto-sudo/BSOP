@@ -67,6 +67,16 @@ type OrdenCompraItem = {
   motivo_cancelacion: string | null;
 };
 
+type MovimientoRecepcion = {
+  id: string;
+  cantidad: number | null;
+  costo_unitario: number | null;
+  created_at: string | null;
+  producto_nombre: string | null;
+  producto_unidad: string | null;
+  almacen_nombre: string | null;
+};
+
 type OrdenCompra = {
   id: string;
   folio: string | null;
@@ -166,6 +176,19 @@ function formatDate(ts: string | null | undefined) {
   return new Intl.DateTimeFormat('es-MX', { timeZone: TZ, dateStyle: 'medium' }).format(
     new Date(ts)
   );
+}
+
+function formatDateTimeShort(ts: string | null | undefined) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleString('es-MX', {
+    timeZone: TZ,
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function formatDateLong(ts: string | null | undefined) {
@@ -298,6 +321,134 @@ function SummaryBar({ ordenes }: { ordenes: OrdenCompra[] }) {
   );
 }
 
+// ── RecepcionesHistorial ─────────────────────────────────────────────────────
+
+function RecepcionesHistorial({
+  ordenId,
+  movs,
+  loading,
+  totalEstimado,
+  terminal,
+  totalAPagar,
+}: {
+  ordenId: string;
+  movs: MovimientoRecepcion[];
+  loading: boolean;
+  totalEstimado: number;
+  terminal: boolean;
+  totalAPagar: number | null;
+}) {
+  const totalRecibido = movs.reduce(
+    (acc, m) => acc + (m.cantidad ?? 0) * (m.costo_unitario ?? 0),
+    0
+  );
+  const totalReferencia = terminal && totalAPagar != null ? totalAPagar : totalEstimado;
+  const pct =
+    totalReferencia > 0 ? Math.min(100, Math.round((totalRecibido / totalReferencia) * 100)) : 0;
+
+  return (
+    <div className="space-y-3 print:hidden">
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Historial de recepciones
+        </div>
+        {movs.length > 0 && (
+          <div className="text-xs text-muted-foreground">
+            {movs.length} {movs.length === 1 ? 'recepción' : 'recepciones'}
+          </div>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-full" />
+          ))}
+        </div>
+      ) : movs.length === 0 ? (
+        <div className="rounded-xl border border-dashed bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">
+          Aún no se han registrado recepciones para esta OC.
+        </div>
+      ) : (
+        <>
+          <div className="overflow-hidden rounded-xl border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Producto</TableHead>
+                  <TableHead className="text-right">Cantidad</TableHead>
+                  <TableHead className="text-right">Costo u.</TableHead>
+                  <TableHead className="text-right">Valor</TableHead>
+                  <TableHead>Almacén</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {movs.map((m) => {
+                  const cantidad = m.cantidad ?? 0;
+                  const costo = m.costo_unitario ?? 0;
+                  const valor = cantidad * costo;
+                  return (
+                    <TableRow
+                      key={m.id}
+                      className="cursor-pointer hover:bg-muted/40"
+                      onClick={() => {
+                        window.location.href = `/rdb/inventario/movimientos?focus=${m.id}`;
+                      }}
+                      title="Ver detalle del movimiento"
+                    >
+                      <TableCell className="text-xs tabular-nums text-muted-foreground">
+                        {formatDateTimeShort(m.created_at)}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {m.producto_nombre ?? '—'}
+                        {m.producto_unidad && (
+                          <span className="ml-1 text-xs text-muted-foreground">
+                            ({m.producto_unidad})
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{cantidad}</TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {costo > 0 ? formatCurrency(costo) : '—'}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums font-medium">
+                        {valor > 0 ? formatCurrency(valor) : '—'}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {m.almacen_nombre ?? '—'}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg bg-muted/40 px-4 py-2 text-sm">
+            <div>
+              <span className="font-medium">Recibido: </span>
+              <span className="tabular-nums">{formatCurrency(totalRecibido)}</span>
+              {totalReferencia > 0 && (
+                <span className="text-muted-foreground">
+                  {' '}
+                  / {formatCurrency(totalReferencia)} <span className="text-xs">({pct}%)</span>
+                </span>
+              )}
+            </div>
+            <a
+              href={`/rdb/inventario/movimientos?focus=${ordenId}`}
+              className="text-xs text-primary underline-offset-2 hover:underline"
+            >
+              Ver en inventario →
+            </a>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── OrdenDetail ───────────────────────────────────────────────────────────────
 
 function OrdenDetail({
@@ -308,6 +459,8 @@ function OrdenDetail({
   editedReceipts,
   editedPrices,
   isAdmin,
+  recepcionMovs,
+  loadingRecepcionMovs,
   onClose,
   onReceiveChange,
   onPriceChange,
@@ -326,6 +479,8 @@ function OrdenDetail({
   editedReceipts: Record<string, string>;
   editedPrices: Record<string, string>;
   isAdmin: boolean;
+  recepcionMovs: MovimientoRecepcion[];
+  loadingRecepcionMovs: boolean;
   onClose: () => void;
   onReceiveChange: (itemId: string, value: string, max: number) => void;
   onPriceChange: (itemId: string, value: string) => void;
@@ -803,6 +958,18 @@ function OrdenDetail({
             )}
           </div>
 
+          {/* ── Historial de recepciones (screen only, post-envío) ── */}
+          {!editable && orden?.id && (
+            <RecepcionesHistorial
+              ordenId={orden.id}
+              movs={recepcionMovs}
+              loading={loadingRecepcionMovs}
+              totalEstimado={orden.total_estimado ?? 0}
+              terminal={terminal}
+              totalAPagar={orden.total_a_pagar ?? null}
+            />
+          )}
+
           {/* ═══ PRINT: Control / Authorization block ═══ */}
           <div className="hidden print:block">
             {orden?.notas && (
@@ -1043,6 +1210,49 @@ function OrdenesCompraContent() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editedReceipts, setEditedReceipts] = useState<Record<string, string>>({});
   const [editedPrices, setEditedPrices] = useState<Record<string, string>>({});
+  const [recepcionMovs, setRecepcionMovs] = useState<MovimientoRecepcion[]>([]);
+  const [loadingRecepcionMovs, setLoadingRecepcionMovs] = useState(false);
+
+  const loadRecepcionMovs = useCallback(async (ordenId: string) => {
+    setLoadingRecepcionMovs(true);
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { data, error: e } = await supabase
+        .schema('erp')
+        .from('movimientos_inventario')
+        .select(
+          'id, cantidad, costo_unitario, created_at, producto:productos!producto_id(nombre, unidad), almacen:almacenes!almacen_id(nombre)'
+        )
+        .eq('empresa_id', RDB_EMPRESA_ID)
+        .eq('referencia_tipo', 'oc_recepcion')
+        .eq('referencia_id', ordenId)
+        .order('created_at', { ascending: false });
+      if (e) throw e;
+
+      type RawMov = {
+        id: string;
+        cantidad: number | null;
+        costo_unitario: number | null;
+        created_at: string | null;
+        producto: { nombre: string | null; unidad: string | null } | null;
+        almacen: { nombre: string | null } | null;
+      };
+      const mapped: MovimientoRecepcion[] = ((data ?? []) as unknown as RawMov[]).map((m) => ({
+        id: m.id,
+        cantidad: m.cantidad,
+        costo_unitario: m.costo_unitario,
+        created_at: m.created_at,
+        producto_nombre: m.producto?.nombre ?? null,
+        producto_unidad: m.producto?.unidad ?? null,
+        almacen_nombre: m.almacen?.nombre ?? null,
+      }));
+      setRecepcionMovs(mapped);
+    } catch {
+      setRecepcionMovs([]);
+    } finally {
+      setLoadingRecepcionMovs(false);
+    }
+  }, []);
 
   useEffect(() => {
     const saved = localStorage.getItem('rdb_preset_ordenes_compra');
@@ -1189,48 +1399,53 @@ function OrdenesCompraContent() {
   const focusOcId = searchParams.get('focus');
   const [autoOpenedFocusId, setAutoOpenedFocusId] = useState<string | null>(null);
 
-  const openDetail = useCallback(async (orden: OrdenCompra) => {
-    setSelected(orden);
-    setDrawerOpen(true);
-    setLoadingItems(true);
-    setEditedReceipts({});
-    setEditedPrices({});
-    try {
-      const supabase = createSupabaseBrowserClient();
-      const { data, error: itemsError } = await supabase
-        .schema('erp')
-        .from('ordenes_compra_detalle')
-        .select(
-          'id, descripcion, cantidad, cantidad_recibida, cantidad_cancelada, precio_unitario, precio_real, subtotal, motivo_cancelacion'
-        )
-        .eq('empresa_id', RDB_EMPRESA_ID)
-        .eq('orden_compra_id', orden.id)
-        .order('descripcion');
+  const openDetail = useCallback(
+    async (orden: OrdenCompra) => {
+      setSelected(orden);
+      setDrawerOpen(true);
+      setLoadingItems(true);
+      setEditedReceipts({});
+      setEditedPrices({});
+      setRecepcionMovs([]);
+      void loadRecepcionMovs(orden.id);
+      try {
+        const supabase = createSupabaseBrowserClient();
+        const { data, error: itemsError } = await supabase
+          .schema('erp')
+          .from('ordenes_compra_detalle')
+          .select(
+            'id, descripcion, cantidad, cantidad_recibida, cantidad_cancelada, precio_unitario, precio_real, subtotal, motivo_cancelacion'
+          )
+          .eq('empresa_id', RDB_EMPRESA_ID)
+          .eq('orden_compra_id', orden.id)
+          .order('descripcion');
 
-      if (itemsError) throw itemsError;
+        if (itemsError) throw itemsError;
 
-      const items = (data ?? []) as OrdenCompraItem[];
-      const initialReceipts = items.reduce<Record<string, string>>((acc, item) => {
-        acc[item.id] = String(item.cantidad_recibida ?? 0);
-        return acc;
-      }, {});
-      const initialPrices = items.reduce<Record<string, string>>((acc, item) => {
-        acc[item.id] =
-          item.precio_unitario != null && item.precio_unitario > 0
-            ? String(item.precio_unitario)
-            : '';
-        return acc;
-      }, {});
+        const items = (data ?? []) as OrdenCompraItem[];
+        const initialReceipts = items.reduce<Record<string, string>>((acc, item) => {
+          acc[item.id] = String(item.cantidad_recibida ?? 0);
+          return acc;
+        }, {});
+        const initialPrices = items.reduce<Record<string, string>>((acc, item) => {
+          acc[item.id] =
+            item.precio_unitario != null && item.precio_unitario > 0
+              ? String(item.precio_unitario)
+              : '';
+          return acc;
+        }, {});
 
-      setEditedReceipts(initialReceipts);
-      setEditedPrices(initialPrices);
-      setSelected((prev) => (prev?.id === orden.id ? { ...prev, items } : prev));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No pude cargar el detalle.');
-    } finally {
-      setLoadingItems(false);
-    }
-  }, []);
+        setEditedReceipts(initialReceipts);
+        setEditedPrices(initialPrices);
+        setSelected((prev) => (prev?.id === orden.id ? { ...prev, items } : prev));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'No pude cargar el detalle.');
+      } finally {
+        setLoadingItems(false);
+      }
+    },
+    [loadRecepcionMovs]
+  );
 
   useEffect(() => {
     if (!focusOcId || autoOpenedFocusId === focusOcId || ordenes.length === 0) return;
@@ -1250,66 +1465,70 @@ function OrdenesCompraContent() {
     setEditedPrices((prev) => ({ ...prev, [itemId]: value }));
   }, []);
 
-  const refreshOrdenAfterMutation = useCallback(async (ordenId: string) => {
-    const supabase = createSupabaseBrowserClient();
-    const { data: oRaw } = await supabase
-      .schema('erp')
-      .from('ordenes_compra')
-      .select('estado, total, total_a_pagar, autorizada_at, cerrada_at')
-      .eq('empresa_id', RDB_EMPRESA_ID)
-      .eq('id', ordenId)
-      .single();
-    const { data: itemsRaw } = await supabase
-      .schema('erp')
-      .from('ordenes_compra_detalle')
-      .select(
-        'id, descripcion, cantidad, cantidad_recibida, cantidad_cancelada, precio_unitario, precio_real, subtotal, motivo_cancelacion'
-      )
-      .eq('empresa_id', RDB_EMPRESA_ID)
-      .eq('orden_compra_id', ordenId)
-      .order('descripcion');
+  const refreshOrdenAfterMutation = useCallback(
+    async (ordenId: string) => {
+      const supabase = createSupabaseBrowserClient();
+      const { data: oRaw } = await supabase
+        .schema('erp')
+        .from('ordenes_compra')
+        .select('estado, total, total_a_pagar, autorizada_at, cerrada_at')
+        .eq('empresa_id', RDB_EMPRESA_ID)
+        .eq('id', ordenId)
+        .single();
+      const { data: itemsRaw } = await supabase
+        .schema('erp')
+        .from('ordenes_compra_detalle')
+        .select(
+          'id, descripcion, cantidad, cantidad_recibida, cantidad_cancelada, precio_unitario, precio_real, subtotal, motivo_cancelacion'
+        )
+        .eq('empresa_id', RDB_EMPRESA_ID)
+        .eq('orden_compra_id', ordenId)
+        .order('descripcion');
 
-    const items = (itemsRaw ?? []) as OrdenCompraItem[];
-    const nextEstado = oRaw?.estado ?? null;
-    const nextTotalEstimado = oRaw?.total ?? null;
-    const nextTotalAPagar = oRaw?.total_a_pagar ?? null;
-    const nextAutorizadaAt = oRaw?.autorizada_at ?? null;
-    const nextCerradaAt = oRaw?.cerrada_at ?? null;
+      const items = (itemsRaw ?? []) as OrdenCompraItem[];
+      const nextEstado = oRaw?.estado ?? null;
+      const nextTotalEstimado = oRaw?.total ?? null;
+      const nextTotalAPagar = oRaw?.total_a_pagar ?? null;
+      const nextAutorizadaAt = oRaw?.autorizada_at ?? null;
+      const nextCerradaAt = oRaw?.cerrada_at ?? null;
 
-    setSelected((prev) =>
-      prev?.id === ordenId
-        ? {
-            ...prev,
-            estatus: nextEstado ?? prev.estatus,
-            total_estimado: nextTotalEstimado ?? prev.total_estimado,
-            total_a_pagar: nextTotalAPagar,
-            autorizada_at: nextAutorizadaAt,
-            cerrada_at: nextCerradaAt,
-            items,
-          }
-        : prev
-    );
-    setOrdenes((prev) =>
-      prev.map((o) =>
-        o.id === ordenId
+      setSelected((prev) =>
+        prev?.id === ordenId
           ? {
-              ...o,
-              estatus: nextEstado ?? o.estatus,
-              total_estimado: nextTotalEstimado ?? o.total_estimado,
+              ...prev,
+              estatus: nextEstado ?? prev.estatus,
+              total_estimado: nextTotalEstimado ?? prev.total_estimado,
               total_a_pagar: nextTotalAPagar,
               autorizada_at: nextAutorizadaAt,
               cerrada_at: nextCerradaAt,
+              items,
             }
-          : o
-      )
-    );
-    setEditedReceipts(
-      items.reduce<Record<string, string>>((acc, item) => {
-        acc[item.id] = String(item.cantidad_recibida ?? 0);
-        return acc;
-      }, {})
-    );
-  }, []);
+          : prev
+      );
+      setOrdenes((prev) =>
+        prev.map((o) =>
+          o.id === ordenId
+            ? {
+                ...o,
+                estatus: nextEstado ?? o.estatus,
+                total_estimado: nextTotalEstimado ?? o.total_estimado,
+                total_a_pagar: nextTotalAPagar,
+                autorizada_at: nextAutorizadaAt,
+                cerrada_at: nextCerradaAt,
+              }
+            : o
+        )
+      );
+      setEditedReceipts(
+        items.reduce<Record<string, string>>((acc, item) => {
+          acc[item.id] = String(item.cantidad_recibida ?? 0);
+          return acc;
+        }, {})
+      );
+      void loadRecepcionMovs(ordenId);
+    },
+    [loadRecepcionMovs]
+  );
 
   const persistReception = useCallback(
     async (markAll: boolean) => {
@@ -1615,6 +1834,8 @@ function OrdenesCompraContent() {
         editedReceipts={editedReceipts}
         editedPrices={editedPrices}
         isAdmin={isAdmin}
+        recepcionMovs={recepcionMovs}
+        loadingRecepcionMovs={loadingRecepcionMovs}
         onClose={() => setDrawerOpen(false)}
         onReceiveChange={handleReceiveChange}
         onPriceChange={handlePriceChange}
