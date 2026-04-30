@@ -98,6 +98,60 @@ export type Database = {
         }
         Relationships: []
       }
+      empresa_documentos: {
+        Row: {
+          asignado_at: string
+          asignado_por: string | null
+          created_at: string
+          documento_id: string
+          empresa_id: string
+          es_default: boolean
+          id: string
+          notas: string | null
+          rol: string
+          updated_at: string | null
+        }
+        Insert: {
+          asignado_at?: string
+          asignado_por?: string | null
+          created_at?: string
+          documento_id: string
+          empresa_id: string
+          es_default?: boolean
+          id?: string
+          notas?: string | null
+          rol: string
+          updated_at?: string | null
+        }
+        Update: {
+          asignado_at?: string
+          asignado_por?: string | null
+          created_at?: string
+          documento_id?: string
+          empresa_id?: string
+          es_default?: boolean
+          id?: string
+          notas?: string | null
+          rol?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "empresa_documentos_asignado_por_fkey"
+            columns: ["asignado_por"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "empresa_documentos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       empresas: {
         Row: {
           activa: boolean | null
@@ -559,6 +613,10 @@ export type Database = {
     Functions: {
       fn_current_empresa_ids: { Args: never; Returns: string[] }
       fn_current_user_id: { Args: never; Returns: string }
+      fn_empresa_documentos_sync_escrituras_cache: {
+        Args: { p_empresa_id: string; p_rol: string }
+        Returns: undefined
+      }
       fn_has_empresa: { Args: { p_empresa_id: string }; Returns: boolean }
       fn_is_admin: { Args: never; Returns: boolean }
     }
@@ -7339,6 +7397,7 @@ export type Database = {
       health_ingest_log: {
         Row: {
           id: number
+          metrics_by_name: Json
           metrics_count: number | null
           payload_size_bytes: number | null
           received_at: string | null
@@ -7348,6 +7407,7 @@ export type Database = {
         }
         Insert: {
           id?: number
+          metrics_by_name?: Json
           metrics_count?: number | null
           payload_size_bytes?: number | null
           received_at?: string | null
@@ -7357,6 +7417,7 @@ export type Database = {
         }
         Update: {
           id?: number
+          metrics_by_name?: Json
           metrics_count?: number | null
           payload_size_bytes?: number | null
           received_at?: string | null
@@ -7845,6 +7906,7 @@ export type Database = {
       health_ingest_log: {
         Row: {
           id: number | null
+          metrics_by_name: Json | null
           metrics_count: number | null
           payload_size_bytes: number | null
           received_at: string | null
@@ -7854,6 +7916,7 @@ export type Database = {
         }
         Insert: {
           id?: number | null
+          metrics_by_name?: Json | null
           metrics_count?: number | null
           payload_size_bytes?: number | null
           received_at?: string | null
@@ -7863,6 +7926,7 @@ export type Database = {
         }
         Update: {
           id?: number | null
+          metrics_by_name?: Json | null
           metrics_count?: number | null
           payload_size_bytes?: number | null
           received_at?: string | null

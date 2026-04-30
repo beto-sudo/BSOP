@@ -152,14 +152,26 @@ function dedupeByKey<T>(rows: T[], keyOf: (row: T) => string): T[] {
   return Array.from(map.values());
 }
 
-export function normalizeMetricRecords(metrics: unknown[]) {
-  const records: Array<{
+export type NormalizeCounter = { received: number; normalized: number };
+
+export type NormalizedMetricsResult = {
+  records: Array<{
     metric_name: string;
     date: string;
     value: number;
     unit: string | null;
     source: string | null;
-  }> = [];
+  }>;
+  // Per-metric_name counters: received = # of input samples HAE included for
+  // that name, normalized = # of records the normalizer produced. The
+  // diagnostic rule "received > 0 && normalized = 0" pins the silent-drop
+  // case (e.g. shape change in HAE not yet handled here).
+  byName: Record<string, NormalizeCounter>;
+};
+
+export function normalizeMetricRecords(metrics: unknown[]): NormalizedMetricsResult {
+  const records: NormalizedMetricsResult['records'] = [];
+  const byName: Record<string, NormalizeCounter> = {};
 
   metrics.forEach((metricEntry) => {
     if (!metricEntry || typeof metricEntry !== 'object') return;
@@ -175,6 +187,11 @@ export function normalizeMetricRecords(metrics: unknown[]) {
       : ['qty'];
 
     if (!normalizedName) return;
+
+    const counterKey = metricName ?? normalizedName;
+    const counter = byName[counterKey] ?? { received: 0, normalized: 0 };
+    counter.received += data.length;
+    const recordsBefore = records.length;
 
     // Special handling: blood_pressure comes as { systolic, diastolic } — split into two metrics
     const isBloodPressure = metricName === 'blood_pressure' || normalizedName === 'Blood Pressure';
@@ -279,9 +296,12 @@ export function normalizeMetricRecords(metrics: unknown[]) {
         source: sampleSource,
       });
     });
+
+    counter.normalized += records.length - recordsBefore;
+    byName[counterKey] = counter;
   });
 
-  return records;
+  return { records, byName };
 }
 
 function toKilometers(value: number | null, units: unknown) {
@@ -461,7 +481,9 @@ export async function POST(request: NextRequest) {
 
   const payload = envelopeParsed.data;
   const data = payload.data ?? payload;
-  const metricsRaw = normalizeMetricRecords(Array.isArray(data.metrics) ? data.metrics : []);
+  const { records: metricsRaw, byName: metricsByName } = normalizeMetricRecords(
+    Array.isArray(data.metrics) ? data.metrics : []
+  );
   const workoutsRaw = normalizeWorkouts(Array.isArray(data.workouts) ? data.workouts : []);
   const ecg = normalizeEcg(Array.isArray(data.ecg) ? data.ecg : []);
   const medications = normalizeMedications(Array.isArray(data.medications) ? data.medications : []);
@@ -507,6 +529,7 @@ export async function POST(request: NextRequest) {
       workouts_count: workouts.length,
       source_ip: sourceIp,
       status: 'ok',
+      metrics_by_name: metricsByName as Json,
     });
 
     return NextResponse.json({
@@ -534,6 +557,7 @@ export async function POST(request: NextRequest) {
       workouts_count: workouts.length,
       source_ip: sourceIp,
       status: `error: ${message}`.slice(0, 1000),
+      metrics_by_name: metricsByName as Json,
     });
 
     return NextResponse.json({ error: message }, { status: 500 });
