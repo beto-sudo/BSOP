@@ -519,6 +519,9 @@ function RecepcionesContent() {
   const [dateFrom, setDateFrom] = useState(() => monthRange().from);
   const [dateTo, setDateTo] = useState(() => monthRange().to);
   const [presetKey, setPresetKey] = useState<string>('mes');
+  const [filtroEstado, setFiltroEstado] = useState<'pendientes' | 'completadas' | 'todas'>(
+    'pendientes'
+  );
 
   const handlePreset = (preset: string | null) => {
     if (!preset) return;
@@ -618,8 +621,16 @@ function RecepcionesContent() {
           'id, codigo, proveedor_id, total, total_a_pagar, estado, autorizada_at, created_at, proveedor:proveedores!proveedor_id(id, persona:personas!persona_id(nombre, apellido_paterno, apellido_materno, email, telefono, rfc))'
         )
         .eq('empresa_id', RDB_EMPRESA_ID)
-        .in('estado', ['enviada', 'parcial'])
         .order('autorizada_at', { ascending: false, nullsFirst: false });
+
+      if (filtroEstado === 'pendientes') {
+        query = query.in('estado', ['enviada', 'parcial']);
+      } else if (filtroEstado === 'completadas') {
+        query = query.in('estado', ['cerrada', 'cancelada', 'recibida']);
+      } else {
+        // 'todas' — solo OCs ya enviadas (NO borradores, esos viven en /rdb/ordenes-compra)
+        query = query.in('estado', ['enviada', 'parcial', 'cerrada', 'cancelada', 'recibida']);
+      }
 
       if (dateFrom) query = query.gte('created_at', getLocalDayBoundsUtc(dateFrom, TZ).start);
       if (dateTo) query = query.lte('created_at', getLocalDayBoundsUtc(dateTo, TZ).end);
@@ -692,7 +703,7 @@ function RecepcionesContent() {
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo]);
+  }, [dateFrom, dateTo, filtroEstado]);
 
   useEffect(() => {
     void fetchOrdenes();
@@ -781,11 +792,12 @@ function RecepcionesContent() {
       const nextTotalAPagar = oRaw?.total_a_pagar ?? null;
       const nextAutorizadaAt = oRaw?.autorizada_at ?? null;
 
-      // Si la OC pasó a estado terminal (cerrada/cancelada/recibida), sale de
-      // la bandeja de recepciones — la quitamos de la lista local y cerramos
-      // el drawer porque ya no hay nada que recibir aquí.
+      // Si la OC pasó a estado terminal (cerrada/cancelada/recibida), solo
+      // sale de la lista cuando el filtro activo es 'pendientes' — en
+      // 'completadas' o 'todas' debe quedarse visible con el estado nuevo.
       const terminal =
         nextEstado === 'cerrada' || nextEstado === 'cancelada' || nextEstado === 'recibida';
+      const dropFromList = terminal && filtroEstado === 'pendientes';
 
       setSelected((prev) =>
         prev?.id === ordenId
@@ -800,7 +812,7 @@ function RecepcionesContent() {
           : prev
       );
 
-      if (terminal) {
+      if (dropFromList) {
         setOrdenes((prev) => prev.filter((o) => o.id !== ordenId));
       } else {
         setOrdenes((prev) =>
@@ -826,7 +838,7 @@ function RecepcionesContent() {
       );
       void loadRecepcionMovs(ordenId);
     },
-    [loadRecepcionMovs]
+    [loadRecepcionMovs, filtroEstado]
   );
 
   const persistReception = useCallback(
@@ -959,8 +971,10 @@ function RecepcionesContent() {
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold tracking-tight">Recepciones</h1>
         <p className="text-sm text-muted-foreground">
-          OCs enviadas al proveedor con productos pendientes de recibir. Captura cantidades y
-          cancela pendientes que ya no van a llegar.
+          Captura recepciones contra OCs enviadas al proveedor y consulta el historial de OCs
+          completadas. Filtra por <strong>Pendientes</strong> (default) para capturar lo que va
+          llegando, o cambia a <strong>Completadas</strong> / <strong>Todas</strong> para ver OCs ya
+          cerradas o canceladas.
         </p>
       </div>
 
@@ -1012,6 +1026,18 @@ function RecepcionesContent() {
           className="w-[140px]"
         />
 
+        <Combobox
+          value={filtroEstado}
+          onChange={(v) => v && setFiltroEstado(v as 'pendientes' | 'completadas' | 'todas')}
+          options={[
+            { value: 'pendientes', label: 'Pendientes' },
+            { value: 'completadas', label: 'Completadas' },
+            { value: 'todas', label: 'Todas' },
+          ]}
+          placeholder="Estado..."
+          className="w-[140px]"
+        />
+
         <Button
           variant="outline"
           size="icon"
@@ -1024,7 +1050,19 @@ function RecepcionesContent() {
         <span className="text-sm text-muted-foreground">
           {loading
             ? 'Cargando…'
-            : `${filtered.length} ${filtered.length === 1 ? 'OC pendiente' : 'OCs pendientes'}`}
+            : `${filtered.length} ${
+                filtroEstado === 'pendientes'
+                  ? filtered.length === 1
+                    ? 'OC pendiente'
+                    : 'OCs pendientes'
+                  : filtroEstado === 'completadas'
+                    ? filtered.length === 1
+                      ? 'OC completada'
+                      : 'OCs completadas'
+                    : filtered.length === 1
+                      ? 'OC'
+                      : 'OCs'
+              }`}
           {saving ? ' · guardando…' : ''}
         </span>
       </div>
@@ -1042,8 +1080,20 @@ function RecepcionesContent() {
         loading={loading}
         onRowClick={(o) => void openDetail(o)}
         initialSort={{ key: 'autorizada_at', dir: 'desc' }}
-        emptyTitle="No hay OCs pendientes de recepción"
-        emptyDescription="Cuando alguien envíe una OC al proveedor, aparecerá aquí para que captures la recepción cuando llegue la mercancía."
+        emptyTitle={
+          filtroEstado === 'pendientes'
+            ? 'No hay OCs pendientes de recepción'
+            : filtroEstado === 'completadas'
+              ? 'No hay OCs completadas en este rango'
+              : 'No hay OCs en este rango'
+        }
+        emptyDescription={
+          filtroEstado === 'pendientes'
+            ? 'Cuando alguien envíe una OC al proveedor, aparecerá aquí para que captures la recepción cuando llegue la mercancía.'
+            : filtroEstado === 'completadas'
+              ? 'Aquí aparecen las OCs que ya cerraron, recibieron completas o se cancelaron.'
+              : 'Cambia el rango de fechas o el filtro de estado para ver más OCs.'
+        }
         showDensityToggle={false}
       />
 
