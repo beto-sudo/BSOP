@@ -5945,6 +5945,129 @@ export type Database = {
         }
         Relationships: []
       }
+      personas_contactos: {
+        Row: {
+          activo: boolean
+          created_at: string
+          email: string | null
+          empresa_id: string
+          id: string
+          nombre: string
+          notas: string | null
+          persona_id: string
+          principal: boolean
+          puesto: string | null
+          telefono: string | null
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          email?: string | null
+          empresa_id: string
+          id?: string
+          nombre: string
+          notas?: string | null
+          persona_id: string
+          principal?: boolean
+          puesto?: string | null
+          telefono?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          email?: string | null
+          empresa_id?: string
+          id?: string
+          nombre?: string
+          notas?: string | null
+          persona_id?: string
+          principal?: boolean
+          puesto?: string | null
+          telefono?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personas_contactos_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personas_contactos_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "v_empleados_full"
+            referencedColumns: ["persona_id"]
+          },
+        ]
+      }
+      personas_cuentas_bancarias: {
+        Row: {
+          banco_id: string | null
+          banco_nombre: string | null
+          clabe: string | null
+          created_at: string
+          empresa_id: string
+          id: string
+          moneda: string
+          notas: string | null
+          numero_cuenta: string | null
+          persona_id: string
+          tipo: string | null
+          updated_at: string
+          vigente: boolean
+        }
+        Insert: {
+          banco_id?: string | null
+          banco_nombre?: string | null
+          clabe?: string | null
+          created_at?: string
+          empresa_id: string
+          id?: string
+          moneda?: string
+          notas?: string | null
+          numero_cuenta?: string | null
+          persona_id: string
+          tipo?: string | null
+          updated_at?: string
+          vigente?: boolean
+        }
+        Update: {
+          banco_id?: string | null
+          banco_nombre?: string | null
+          clabe?: string | null
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          moneda?: string
+          notas?: string | null
+          numero_cuenta?: string | null
+          persona_id?: string
+          tipo?: string | null
+          updated_at?: string
+          vigente?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personas_cuentas_bancarias_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personas_cuentas_bancarias_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "v_empleados_full"
+            referencedColumns: ["persona_id"]
+          },
+        ]
+      }
       personas_datos_fiscales: {
         Row: {
           created_at: string
@@ -6037,6 +6160,81 @@ export type Database = {
             foreignKeyName: "personas_datos_fiscales_persona_id_fkey"
             columns: ["persona_id"]
             isOneToOne: true
+            referencedRelation: "v_empleados_full"
+            referencedColumns: ["persona_id"]
+          },
+        ]
+      }
+      personas_direcciones: {
+        Row: {
+          activo: boolean
+          calle: string | null
+          colonia: string | null
+          cp: string | null
+          created_at: string
+          empresa_id: string
+          estado: string | null
+          id: string
+          municipio: string | null
+          num_ext: string | null
+          num_int: string | null
+          pais: string
+          persona_id: string
+          principal: boolean
+          referencia: string | null
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          calle?: string | null
+          colonia?: string | null
+          cp?: string | null
+          created_at?: string
+          empresa_id: string
+          estado?: string | null
+          id?: string
+          municipio?: string | null
+          num_ext?: string | null
+          num_int?: string | null
+          pais?: string
+          persona_id: string
+          principal?: boolean
+          referencia?: string | null
+          tipo?: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          calle?: string | null
+          colonia?: string | null
+          cp?: string | null
+          created_at?: string
+          empresa_id?: string
+          estado?: string | null
+          id?: string
+          municipio?: string | null
+          num_ext?: string | null
+          num_int?: string | null
+          pais?: string
+          persona_id?: string
+          principal?: boolean
+          referencia?: string | null
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personas_direcciones_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personas_direcciones_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
             referencedRelation: "v_empleados_full"
             referencedColumns: ["persona_id"]
           },
