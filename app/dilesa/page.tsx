@@ -1,6 +1,9 @@
 'use client';
 
+import { useMemo } from 'react';
 import { RequireAccess } from '@/components/require-access';
+import { usePermissions } from '@/components/providers';
+import { canAccessModulo, ROUTE_TO_MODULE } from '@/lib/permissions';
 import Link from 'next/link';
 import {
   ClipboardList,
@@ -59,8 +62,8 @@ const moduleGroups: ModuleGroup[] = [
     title: 'Recursos Humanos',
     items: [
       {
-        label: 'Empleados',
-        href: '/dilesa/rh/empleados',
+        label: 'Personal',
+        href: '/dilesa/rh/personal',
         icon: Users,
         color: 'bg-emerald-500/10 text-emerald-500',
       },
@@ -118,6 +121,27 @@ const moduleGroups: ModuleGroup[] = [
  * @responsive responsive
  */
 export default function DilesaPage() {
+  const { permissions } = usePermissions();
+
+  // Filter cards by the effective user's permissions. When admin is in
+  // "Viendo como" preview, this hides modules the impersonated user cannot
+  // access — same logic the sidebar uses (canAccessModulo). Modules without
+  // a route mapping or unrecognized are shown by default.
+  const visibleGroups = useMemo(() => {
+    if (permissions.loading) return moduleGroups;
+    if (permissions.isAdmin) return moduleGroups;
+    return moduleGroups
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((item) => {
+          const moduloSlug = ROUTE_TO_MODULE[item.href];
+          if (!moduloSlug) return true;
+          return canAccessModulo(permissions, moduloSlug);
+        }),
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [permissions]);
+
   return (
     <RequireAccess empresa="dilesa">
       <div className="space-y-6">
@@ -144,7 +168,7 @@ export default function DilesaPage() {
           </div>
         </section>
 
-        {moduleGroups.map((group) => (
+        {visibleGroups.map((group) => (
           <section key={group.title} className="space-y-3">
             <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text)]/50">
               {group.title}
