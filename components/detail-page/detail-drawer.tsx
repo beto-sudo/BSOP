@@ -23,32 +23,16 @@ import { cn } from '@/lib/utils';
  *   └── DetailDrawerFooter (sticky, optional — for primary actions)
  *
  * Standardizes:
- * - Side, max-width, and base padding.
- * - Sticky scroll behaviour: header + footer stay, content scrolls.
- * - Header anatomy: title (h2 implicit via SheetTitle) + description + meta + actions.
- * - Print stylesheet: `print:max-w-full print:p-0` so the drawer prints
- *   like a full page when triggered with `window.print()`.
+ * - Side, max-width, and base padding (DD1).
+ * - Sticky scroll behaviour (DD3).
+ * - Header anatomy: title (h2 implicit via SheetTitle) + description + meta + actions (DD2).
+ * - Header reserves fixed space for the native X close button (DD7), title clamps to 2 lines (DD8),
+ *   actions stack vertically on mobile and stay visible (DD9).
+ * - Print stylesheet by construction (DD5).
  *
- * Usage:
- *
- *   <DetailDrawer
- *     open={open}
- *     onOpenChange={setOpen}
- *     title={item.nombre}
- *     description={`${item.categoria} · ${item.unidad}`}
- *     actions={<Button onClick={() => window.print()}>Imprimir</Button>}
- *   >
- *     <DetailDrawerContent>
- *       ...sections...
- *     </DetailDrawerContent>
- *   </DetailDrawer>
- *
- * For drawers with a sticky footer (e.g. Save/Cancel for an edit form),
- * pass `footer` directly:
- *
- *   <DetailDrawer ... footer={<FormActions onCancel={onClose} />}>
- *     <DetailDrawerContent>...</DetailDrawerContent>
- *   </DetailDrawer>
+ * Sub-components for body composition:
+ * - `<DetailDrawerSection>` — canonical sub-section with title/description/divider (DD10).
+ * - `<DetailDrawerSkeleton>` — loading placeholder (DD11).
  */
 
 export type DetailDrawerProps = {
@@ -58,7 +42,7 @@ export type DetailDrawerProps = {
   description?: React.ReactNode;
   /** Status meta (badges, dates) displayed under the title. */
   meta?: React.ReactNode;
-  /** Primary actions for the entity (print, edit, etc.). Top-right. */
+  /** Primary actions for the entity (print, edit, etc.). Top-right on desktop, stacked on mobile. */
   actions?: React.ReactNode;
   /** Sticky footer with primary actions. Optional. */
   footer?: React.ReactNode;
@@ -123,12 +107,13 @@ export type DetailDrawerHeaderProps = {
 /**
  * Drawer-specific header. Stand-alone when not using `<DetailDrawer>` directly.
  *
- * Layout (single row in desktop, stacked on mobile):
- *   [title + description + meta]   [actions]
+ * Layout:
+ *   - Mobile (<640px): stacked — title group on top, actions row below (DD9).
+ *   - Desktop (≥640px): single row — title group left, actions right (DD2).
  *
- * The native `SheetClose` (X button) lives in the top-right of `<SheetContent>`
- * regardless of whether `actions` is set; place secondary actions inline so
- * they don't collide with the X.
+ * The native `SheetClose` (X button, `absolute top-3 right-3`, 28×28px) lives
+ * in the top-right of `<SheetContent>`. The header reserves `pr-14` (56px) on
+ * the container so neither the title nor the actions collide with it (DD7).
  */
 export function DetailDrawerHeader({
   title,
@@ -140,22 +125,22 @@ export function DetailDrawerHeader({
   return (
     <SheetHeader
       className={cn(
-        'gap-1 border-b border-[var(--border)] px-6 pt-6 pb-4 print:px-0 print:pt-0 print:border-0',
+        'gap-1 border-b border-[var(--border)] px-6 pt-6 pb-4 pr-14 print:px-0 print:pt-0 print:pr-6 print:border-0',
         className
       )}
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0 flex-1 space-y-1">
-          <SheetTitle className="text-base font-semibold leading-tight">{title}</SheetTitle>
+          <SheetTitle className="text-base font-semibold leading-tight line-clamp-2 break-words">
+            {title}
+          </SheetTitle>
           {description ? (
             <SheetDescription className="text-xs">{description}</SheetDescription>
           ) : null}
-          {meta ? <div className="flex items-center gap-2 pt-1">{meta}</div> : null}
+          {meta ? <div className="flex flex-wrap items-center gap-2 pt-1">{meta}</div> : null}
         </div>
         {actions ? (
-          <div className="shrink-0 hidden sm:flex items-center gap-2 print:hidden mr-8">
-            {actions}
-          </div>
+          <div className="shrink-0 flex flex-wrap items-center gap-2 print:hidden">{actions}</div>
         ) : null}
       </div>
     </SheetHeader>
@@ -189,6 +174,144 @@ export function DetailDrawerContent({
     <ScrollArea className="h-full print:h-auto">
       <div className={cn('px-6 py-4 print:px-0 print:py-0', className)}>{children}</div>
     </ScrollArea>
+  );
+}
+
+export type DetailDrawerSectionProps = {
+  /** Section heading — h3 implicit. */
+  title?: React.ReactNode;
+  /** Optional muted description below the title. */
+  description?: React.ReactNode;
+  /** Render a `pt-4 border-t` separator above the section. Default `true`. */
+  divider?: boolean;
+  /** Inner padding mode. `'default'` adds top spacing between sections; `'none'` removes all spacing. Default `'default'`. */
+  padding?: 'default' | 'none';
+  className?: string;
+  children: React.ReactNode;
+};
+
+/**
+ * Canonical sub-section inside `<DetailDrawerContent>` (DD10).
+ *
+ * - `divider` adds `pt-4 border-t` for visual separation between sections.
+ * - First section in a drawer typically passes `divider={false}` to skip the
+ *   leading border (the header already has its own bottom border).
+ * - Title is rendered as `<h3 text-sm font-semibold>`, description below.
+ *
+ * Replaces ad-hoc `space-y-4`/`space-y-6` + manual `<h3>` + manual dividers
+ * patterns scattered across drawers.
+ */
+export function DetailDrawerSection({
+  title,
+  description,
+  divider = true,
+  padding = 'default',
+  className,
+  children,
+}: DetailDrawerSectionProps) {
+  return (
+    <section
+      className={cn(
+        padding === 'default' && (divider ? 'mt-4 pt-4 border-t border-[var(--border)]' : 'mt-1'),
+        padding === 'default' && 'first:mt-0 first:pt-0 first:border-t-0',
+        className
+      )}
+    >
+      {title ? (
+        <div className={cn('mb-2', description ? 'space-y-0.5' : '')}>
+          <h3 className="text-sm font-semibold text-[var(--text)]">{title}</h3>
+          {description ? <p className="text-xs text-[var(--text-subtle)]">{description}</p> : null}
+        </div>
+      ) : null}
+      {children}
+    </section>
+  );
+}
+
+export type DetailDrawerSkeletonProps = {
+  /** Show a row of stat cards at the top. Default `true`. */
+  showStats?: boolean;
+  /** Number of body lines. Default `4`. */
+  lines?: number;
+  /** Show a sub-section with rows below. Default `true`. */
+  showSection?: boolean;
+  /** Number of rows in the sub-section. Default `5`. */
+  sectionRows?: number;
+  className?: string;
+};
+
+/**
+ * Loading placeholder rendered inside `<DetailDrawerContent>` while data
+ * fetches (DD11).
+ *
+ * Does NOT include the header — the caller passes `title` to the
+ * `<DetailDrawer>` from the row that was clicked (always known in advance).
+ *
+ * Usage:
+ *
+ *   <DetailDrawer title={item.nombre} ...>
+ *     {loading
+ *       ? <DetailDrawerSkeleton />
+ *       : <DetailDrawerContent>...</DetailDrawerContent>}
+ *   </DetailDrawer>
+ */
+export function DetailDrawerSkeleton({
+  showStats = true,
+  lines = 4,
+  showSection = true,
+  sectionRows = 5,
+  className,
+}: DetailDrawerSkeletonProps) {
+  return (
+    <div
+      className={cn('px-6 py-4 print:px-0 print:py-0', className)}
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <span className="sr-only">Cargando…</span>
+      {showStats ? (
+        <div className="grid grid-cols-3 gap-3">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="rounded-lg border border-[var(--border)] bg-muted/40 px-3 py-2.5"
+            >
+              <div className="h-3 w-16 rounded bg-muted animate-pulse" />
+              <div className="mt-2 h-5 w-20 rounded bg-muted animate-pulse" />
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {lines > 0 ? (
+        <div className={cn('space-y-2', showStats && 'mt-4')}>
+          {Array.from({ length: lines }).map((_, i) => (
+            <div
+              key={i}
+              className={cn(
+                'h-3 rounded bg-muted animate-pulse',
+                i === 0 ? 'w-3/4' : i % 2 === 0 ? 'w-full' : 'w-5/6'
+              )}
+            />
+          ))}
+        </div>
+      ) : null}
+
+      {showSection ? (
+        <div className="mt-6 pt-4 border-t border-[var(--border)]">
+          <div className="h-4 w-24 rounded bg-muted animate-pulse" />
+          <div className="mt-3 space-y-2">
+            {Array.from({ length: sectionRows }).map((_, i) => (
+              <div key={i} className="flex items-center justify-between gap-3 py-1">
+                <div className="h-3 flex-1 rounded bg-muted animate-pulse" />
+                <div className="h-3 w-16 rounded bg-muted animate-pulse" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
