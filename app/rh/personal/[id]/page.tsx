@@ -487,6 +487,10 @@ function EmpleadoDetailInner() {
   );
 }
 
+/**
+ * @module Empleado detail (cross-empresa)
+ * @responsive responsive
+ */
 export default function Page() {
   return (
     <RequireAccess adminOnly>

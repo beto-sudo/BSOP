@@ -1,6 +1,7 @@
 'use client';
 
 import { RequireAccess } from '@/components/require-access';
+import { DesktopOnlyNotice } from '@/components/responsive';
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getLocalDayBoundsUtc } from '@/lib/timezone';
@@ -937,6 +938,10 @@ function todayRange(): { from: string; to: string } {
   return { from: today, to: today };
 }
 
+/**
+ * @module Requisiciones (RDB)
+ * @responsive desktop-only
+ */
 export default function RequisicionesPage() {
   const [requisiciones, setRequisiciones] = useState<Requisicion[]>([]);
   const [catalogoProductos, setCatalogoProductos] = useState<
@@ -1275,7 +1280,8 @@ export default function RequisicionesPage() {
 
   return (
     <RequireAccess empresa="rdb" modulo="rdb.requisiciones">
-      <div className="space-y-6">
+      <DesktopOnlyNotice module="Requisiciones" />
+      <div className="hidden sm:block space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Requisiciones</h1>

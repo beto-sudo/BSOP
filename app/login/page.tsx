@@ -1,5 +1,9 @@
 import { LoginCard } from './login-card';
 
+/**
+ * @module Login
+ * @responsive responsive
+ */
 export default async function LoginPage({
   searchParams,
 }: {

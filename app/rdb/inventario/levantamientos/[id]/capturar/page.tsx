@@ -53,6 +53,10 @@ type LevantamientoMeta = {
   almacen_nombre: string | null;
 };
 
+/**
+ * @module Levantamiento — Capturar (RDB)
+ * @responsive mobile-first
+ */
 export default function CapturarPage() {
   return (
     <RequireAccess empresa="rdb" modulo="rdb.inventario" write>

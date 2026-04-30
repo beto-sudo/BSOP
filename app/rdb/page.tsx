@@ -449,6 +449,10 @@ function SalesChart({ data, showComparisons }: { data: ChartPoint[]; showCompari
   );
 }
 
+/**
+ * @module RDB (landing)
+ * @responsive responsive
+ */
 export default function RdbHomePage() {
   const [range, setRange] = useState<RangeKey>('month');
   const [loading, setLoading] = useState(true);

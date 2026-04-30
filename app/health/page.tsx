@@ -21,6 +21,10 @@ function resolveRangeParams(searchParams?: Record<string, string | string[] | un
   return { preset: '7d' as const };
 }
 
+/**
+ * @module Health
+ * @responsive responsive
+ */
 export default async function HealthPage({
   searchParams,
 }: {

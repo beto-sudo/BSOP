@@ -3,9 +3,10 @@
 **Slug:** `responsive-policy`
 **Empresas:** todas
 **Schemas afectados:** n/a (UI)
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-04-26
+**Cerrada:** 2026-04-29
 **Última actualización:** 2026-04-29
 
 ## Problema
@@ -34,7 +35,10 @@ en su teléfono, la experiencia varía entre "funciona", "funciona feo" y
 - [x] Detección por viewport (CSS-driven, no UA-sniffing).
 - [x] Componentes compartidos agnósticos al perfil — el page decide.
 - [x] ADR-019 con 5 reglas (R1-R5).
-- [ ] Adopción incremental: PRs nuevos declaran perfil cuando tocan un page.
+- [x] ~~Adopción incremental~~ — Beto autorizó sprint dedicado de barrido
+      el 2026-04-29: los 70 pages del repo recibieron `@responsive` JSDoc
+      en un solo PR + `<DesktopOnlyNotice>` en los 37 desktop-only que
+      rendean contenido visual.
 
 ## Decisiones tomadas al cerrar alcance
 
@@ -69,9 +73,10 @@ en su teléfono, la experiencia varía entre "funciona", "funciona feo" y
 
 ## Sprints / hitos
 
-| #   | Sprint                                   | Estado | PR  |
-| --- | ---------------------------------------- | ------ | --- |
-| 1   | Foundation + ADR-019 + DesktopOnlyNotice | done   | TBD |
+| #   | Sprint                                                            | Estado | PR    |
+| --- | ----------------------------------------------------------------- | ------ | ----- |
+| 1   | Foundation + ADR-019 + DesktopOnlyNotice                          | done   | (pre) |
+| 2   | Barrido completo de adopción — 70 pages clasificados (B aprobado) | done   | TBD   |
 
 ## Decisiones registradas
 
@@ -95,8 +100,42 @@ Foundation:
 - `components/responsive/index.ts` — barrel export.
 - ADR-019 con 5 reglas (R1-R5).
 
-Sin migración masiva: la adopción del comentario JSDoc `@responsive` y de
-`<DesktopOnlyNotice>` es incremental — PRs nuevos respetan, pages viejos
-se actualizan cuando se tocan por feature work.
+Sin migración masiva inicialmente: la adopción del comentario JSDoc
+`@responsive` y de `<DesktopOnlyNotice>` se diseñó como incremental.
 
-PR: pendiente.
+### 2026-04-29 — Sprint 2 (barrido completo) — _este PR_
+
+Beto autorizó (opción "B" sobre la "A" de adopción incremental) un sprint
+dedicado para clasificar todos los pages en una sola pasada y dejar la
+iniciativa cerrada hoy.
+
+**Clasificación final (70 pages):**
+
+- **`mobile-first`** (6) — todos los pages bajo
+  `app/rdb/inventario/levantamientos/**`. Captura física en piso/almacén
+  desde celular (alta levantamiento, captura mobile, diferencias,
+  reporte).
+- **`desktop-only`** (38) — Cortes, Inventario Stock + Movimientos,
+  Productos (Catálogo + Recetas + Auditoría + Análisis), OC,
+  Requisiciones, Proveedores (RDB+DILESA), Ventas, Playtomic, todo el
+  backbone DILESA Inmobiliario (Proyectos + Prototipos + Anteproyectos +
+  Terrenos, listings + detail), todos los listings de RH (Personal +
+  Departamentos + Puestos en RDB+DILESA+cross), Documentos admin
+  (RDB+DILESA+cross), Personas Físicas, Settings (Acceso + Empresas +
+  redirect).
+- **`responsive`** (26) — root + login, todo `/inicio/*` (dashboard +
+  Tasks + Juntas), Health, Family, Tasks/Juntas admin de RDB+DILESA,
+  Empleado detail + contrato + finiquito (RDB+DILESA+cross), R&D, todas
+  las landings (`/dilesa`, `/rdb`, `/rh`).
+
+**Implementación:**
+
+- 70/70 pages tienen `@responsive` JSDoc.
+- 37/38 pages desktop-only tienen `<DesktopOnlyNotice>` montado +
+  contenido envuelto en `hidden sm:block`. La excepción es
+  `/settings/page.tsx` (redirect puro, no rendea UI visual).
+- Cero churn en componentes shared — el patch es 100% page-level (R5
+  honored).
+
+**Verificación:** typecheck + lint + format check + test:run todos
+verdes en local.

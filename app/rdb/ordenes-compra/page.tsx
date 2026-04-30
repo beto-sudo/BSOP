@@ -6,6 +6,7 @@
  */
 
 import { RequireAccess } from '@/components/require-access';
+import { DesktopOnlyNotice } from '@/components/responsive';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
@@ -1207,14 +1208,21 @@ function OrdenDetail({
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
+/**
+ * @module Órdenes de Compra (RDB)
+ * @responsive desktop-only
+ */
 export default function OrdenesCompraPage() {
   // useSearchParams (en OrdenesCompraContent) requiere boundary de Suspense
   // para que Next.js no falle al prerender la página estática.
   return (
     <RequireAccess empresa="rdb" modulo="rdb.ordenes_compra">
-      <Suspense fallback={null}>
-        <OrdenesCompraContent />
-      </Suspense>
+      <DesktopOnlyNotice module="Órdenes de Compra" />
+      <div className="hidden sm:block">
+        <Suspense fallback={null}>
+          <OrdenesCompraContent />
+        </Suspense>
+      </div>
     </RequireAccess>
   );
 }

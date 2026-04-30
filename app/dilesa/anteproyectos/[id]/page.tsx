@@ -25,6 +25,7 @@
  */
 
 import { RequireAccess } from '@/components/require-access';
+import { DesktopOnlyNotice } from '@/components/responsive';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -397,10 +398,17 @@ function EstadoBadgeLarge({ estado }: { estado: string | null }) {
   return <Badge tone={cfg.tone}>{cfg.label}</Badge>;
 }
 
+/**
+ * @module Anteproyecto detail (DILESA)
+ * @responsive desktop-only
+ */
 export default function AnteproyectoDetailPage() {
   return (
     <RequireAccess empresa="dilesa">
-      <AnteproyectoDetailInner />
+      <DesktopOnlyNotice module="Anteproyectos" />
+      <div className="hidden sm:block">
+        <AnteproyectoDetailInner />
+      </div>
     </RequireAccess>
   );
 }

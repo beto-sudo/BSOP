@@ -19,6 +19,10 @@ import { FechasImportantesWidget } from '@/components/inicio/fechas-importantes-
 import { useLocale } from '@/lib/i18n';
 import { getGreeting, formatLongDate } from '@/lib/datetime/greeting';
 
+/**
+ * @module Inicio (dashboard)
+ * @responsive responsive
+ */
 export default function InicioPage() {
   const { t, locale } = useLocale();
   const [userName, setUserName] = useState<string>('');

@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { ChefHat, Pencil, RefreshCw, Search } from 'lucide-react';
 
 import { RequireAccess } from '@/components/require-access';
+import { DesktopOnlyNotice } from '@/components/responsive';
 import { ActiveFiltersChip, DataTable, type Column } from '@/components/module-page';
 import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import { Button } from '@/components/ui/button';
@@ -27,10 +28,17 @@ const FILTER_DEFAULTS = {
   soloMargenNegativo: false,
 };
 
+/**
+ * @module Productos — Recetas (RDB)
+ * @responsive desktop-only
+ */
 export default function ProductosRecetasPage() {
   return (
     <RequireAccess empresa="rdb" modulo="rdb.productos">
-      <ProductosRecetasBody />
+      <DesktopOnlyNotice module="Recetas" />
+      <div className="hidden sm:block">
+        <ProductosRecetasBody />
+      </div>
     </RequireAccess>
   );
 }

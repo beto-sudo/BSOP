@@ -20,6 +20,7 @@
  */
 
 import { RequireAccess } from '@/components/require-access';
+import { DesktopOnlyNotice } from '@/components/responsive';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
@@ -430,10 +431,17 @@ function EtapaBadgeLarge({ etapa }: { etapa: string | null }) {
   return <Badge tone={cfg.tone}>{cfg.label}</Badge>;
 }
 
+/**
+ * @module Prototipo detail (DILESA)
+ * @responsive desktop-only
+ */
 export default function PrototipoDetailPage() {
   return (
     <RequireAccess empresa="dilesa">
-      <PrototipoDetailInner />
+      <DesktopOnlyNotice module="Prototipos" />
+      <div className="hidden sm:block">
+        <PrototipoDetailInner />
+      </div>
     </RequireAccess>
   );
 }

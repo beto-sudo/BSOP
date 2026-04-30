@@ -26,6 +26,7 @@
  */
 
 import { RequireAccess } from '@/components/require-access';
+import { DesktopOnlyNotice } from '@/components/responsive';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
@@ -895,12 +896,19 @@ function PlaceholderPanel({ title, description }: { title: string; description: 
   );
 }
 
+/**
+ * @module Prototipos (DILESA)
+ * @responsive desktop-only
+ */
 export default function PrototiposPage() {
   return (
     <RequireAccess empresa="dilesa">
-      <Suspense fallback={<div className="p-6 text-sm text-[var(--text)]/55">Cargando…</div>}>
-        <PrototiposInner />
-      </Suspense>
+      <DesktopOnlyNotice module="Prototipos" />
+      <div className="hidden sm:block">
+        <Suspense fallback={<div className="p-6 text-sm text-[var(--text)]/55">Cargando…</div>}>
+          <PrototiposInner />
+        </Suspense>
+      </div>
     </RequireAccess>
   );
 }

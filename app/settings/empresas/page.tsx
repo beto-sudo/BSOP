@@ -1,6 +1,7 @@
 'use client';
 
 import { RequireAccess } from '@/components/require-access';
+import { DesktopOnlyNotice } from '@/components/responsive';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
@@ -287,10 +288,17 @@ function EmpresasSettingsInner() {
   );
 }
 
+/**
+ * @module Settings — Empresas
+ * @responsive desktop-only
+ */
 export default function Page() {
   return (
     <RequireAccess adminOnly>
-      <EmpresasSettingsInner />
+      <DesktopOnlyNotice module="Empresas" />
+      <div className="hidden sm:block">
+        <EmpresasSettingsInner />
+      </div>
     </RequireAccess>
   );
 }

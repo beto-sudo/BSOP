@@ -1,6 +1,7 @@
 'use client';
 
 import { RequireAccess } from '@/components/require-access';
+import { DesktopOnlyNotice } from '@/components/responsive';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
@@ -212,6 +213,10 @@ function SectionHeader({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+/**
+ * @module Productos — Análisis (RDB)
+ * @responsive desktop-only
+ */
 export default function ProductosAnalisisPage() {
   const [metricas, setMetricas] = useState<Metrica[]>([]);
   const [categorias, setCategorias] = useState<CategoriaResumen[]>([]);
@@ -432,7 +437,8 @@ export default function ProductosAnalisisPage() {
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
     <RequireAccess empresa="rdb" modulo="rdb.productos">
-      <div className="space-y-8">
+      <DesktopOnlyNotice module="Análisis" />
+      <div className="hidden sm:block space-y-8">
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">

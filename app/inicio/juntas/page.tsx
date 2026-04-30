@@ -493,6 +493,10 @@ function JuntasInner() {
 // logueado; el proxy ya valida la sesión. Mismo patrón que `/inicio/tasks`.
 // (Antes había `<RequireAccess empresa="rdb">` hardcoded — bloqueaba acceso
 // a usuarios DILESA. Bug arreglado en Sub-PR 4 de `shared-modules-refactor`.)
+/**
+ * @module Inicio — Juntas
+ * @responsive responsive
+ */
 export default function Page() {
   return <JuntasInner />;
 }

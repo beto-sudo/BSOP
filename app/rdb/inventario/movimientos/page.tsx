@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
+import { DesktopOnlyNotice } from '@/components/responsive';
 import { RDB_EMPRESA_ID, type MovimientoRow } from '@/components/inventario/types';
 import { tipoColorClass, tipoLabel } from '@/components/inventario/utils';
 import { formatCurrency, formatDateTime } from '@/lib/format';
@@ -143,6 +144,9 @@ const movimientoColumns: Column<MovimientoRow>[] = [
  * tiene la lista de productos cargada para alimentar el combobox del
  * dialog). Si en el futuro se quiere disparar el registro desde acá, hay
  * que cargar productos también o levantar el state del dialog al layout.
+ *
+ * @module Inventario — Movimientos (RDB)
+ * @responsive desktop-only
  */
 export default function InventarioMovimientosPage() {
   const [movimientos, setMovimientos] = useState<MovimientoRow[]>([]);
@@ -227,60 +231,63 @@ export default function InventarioMovimientosPage() {
 
   return (
     <>
-      <ModuleFilters
-        count={
-          loading
-            ? 'Cargando…'
-            : `${filteredMovimientos.length} movimiento${filteredMovimientos.length !== 1 ? 's' : ''}`
-        }
-      >
-        <div className="relative min-w-52">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar producto, nota u OC…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-
-        <Combobox
-          value={origenFilter}
-          onChange={(v) => setOrigenFilter((v as OrigenKey) ?? 'todos')}
-          options={[
-            { value: 'todos', label: 'Todos los orígenes' },
-            { value: 'oc', label: 'Por compra (OC)' },
-            { value: 'venta', label: 'Venta' },
-            { value: 'manual', label: 'Manual' },
-          ]}
-          placeholder="Origen…"
-          className="w-[180px]"
-        />
-
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => void fetchMovimientos()}
-          aria-label="Actualizar"
+      <DesktopOnlyNotice module="Movimientos" />
+      <div className="hidden sm:block">
+        <ModuleFilters
+          count={
+            loading
+              ? 'Cargando…'
+              : `${filteredMovimientos.length} movimiento${filteredMovimientos.length !== 1 ? 's' : ''}`
+          }
         >
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-        </Button>
-      </ModuleFilters>
+          <div className="relative min-w-52">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar producto, nota u OC…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
 
-      {error && <ErrorBanner error={error} onRetry={() => void fetchMovimientos()} />}
+          <Combobox
+            value={origenFilter}
+            onChange={(v) => setOrigenFilter((v as OrigenKey) ?? 'todos')}
+            options={[
+              { value: 'todos', label: 'Todos los orígenes' },
+              { value: 'oc', label: 'Por compra (OC)' },
+              { value: 'venta', label: 'Venta' },
+              { value: 'manual', label: 'Manual' },
+            ]}
+            placeholder="Origen…"
+            className="w-[180px]"
+          />
 
-      <ModuleContent>
-        <DataTable<MovimientoRow>
-          data={filteredMovimientos}
-          columns={movimientoColumns}
-          rowKey="id"
-          loading={loading}
-          initialSort={{ key: 'created_at', dir: 'desc' }}
-          emptyTitle={search ? 'Ningún movimiento coincide' : 'Sin movimientos registrados'}
-          emptyDescription={search ? 'Limpia la búsqueda para ver todo.' : undefined}
-          showDensityToggle={false}
-        />
-      </ModuleContent>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => void fetchMovimientos()}
+            aria-label="Actualizar"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+        </ModuleFilters>
+
+        {error && <ErrorBanner error={error} onRetry={() => void fetchMovimientos()} />}
+
+        <ModuleContent>
+          <DataTable<MovimientoRow>
+            data={filteredMovimientos}
+            columns={movimientoColumns}
+            rowKey="id"
+            loading={loading}
+            initialSort={{ key: 'created_at', dir: 'desc' }}
+            emptyTitle={search ? 'Ningún movimiento coincide' : 'Sin movimientos registrados'}
+            emptyDescription={search ? 'Limpia la búsqueda para ver todo.' : undefined}
+            showDensityToggle={false}
+          />
+        </ModuleContent>
+      </div>
     </>
   );
 }

@@ -113,6 +113,10 @@ const moduleGroups: ModuleGroup[] = [
   },
 ];
 
+/**
+ * @module DILESA (landing)
+ * @responsive responsive
+ */
 export default function DilesaPage() {
   return (
     <RequireAccess empresa="dilesa">
