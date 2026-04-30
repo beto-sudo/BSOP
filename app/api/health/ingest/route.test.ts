@@ -3,7 +3,7 @@ import { normalizeMetricRecords } from './route';
 
 describe('normalizeMetricRecords — sleep_analysis', () => {
   it('handles segmented shape (older Apple Watch: value+qty per stage)', () => {
-    const out = normalizeMetricRecords([
+    const { records } = normalizeMetricRecords([
       {
         name: 'sleep_analysis',
         units: 'hr',
@@ -24,7 +24,7 @@ describe('normalizeMetricRecords — sleep_analysis', () => {
       },
     ]);
 
-    expect(out).toEqual([
+    expect(records).toEqual([
       {
         metric_name: 'Sleep Core',
         date: new Date('2026-04-22T03:32:00-05:00').toISOString(),
@@ -43,7 +43,7 @@ describe('normalizeMetricRecords — sleep_analysis', () => {
   });
 
   it('handles aggregated shape (current HAE: one row per night with stage props)', () => {
-    const out = normalizeMetricRecords([
+    const { records } = normalizeMetricRecords([
       {
         name: 'sleep_analysis',
         units: 'hr',
@@ -65,8 +65,8 @@ describe('normalizeMetricRecords — sleep_analysis', () => {
       },
     ]);
 
-    expect(out).toHaveLength(5);
-    const byMetric = Object.fromEntries(out.map((r) => [r.metric_name, r]));
+    expect(records).toHaveLength(5);
+    const byMetric = Object.fromEntries(records.map((r) => [r.metric_name, r]));
     expect(byMetric['Sleep Core']?.value).toBe(5.6);
     expect(byMetric['Sleep Deep']?.value).toBe(0.85);
     expect(byMetric['Sleep REM']?.value).toBe(2.13);
@@ -81,7 +81,7 @@ describe('normalizeMetricRecords — sleep_analysis', () => {
   });
 
   it('skips an aggregated row that has every stage at 0', () => {
-    const out = normalizeMetricRecords([
+    const { records } = normalizeMetricRecords([
       {
         name: 'sleep_analysis',
         units: 'hr',
@@ -100,11 +100,11 @@ describe('normalizeMetricRecords — sleep_analysis', () => {
         ],
       },
     ]);
-    expect(out).toEqual([]);
+    expect(records).toEqual([]);
   });
 
   it('falls back to date when sleepStart is missing in aggregated shape', () => {
-    const out = normalizeMetricRecords([
+    const { records } = normalizeMetricRecords([
       {
         name: 'sleep_analysis',
         units: 'hr',
@@ -117,25 +117,25 @@ describe('normalizeMetricRecords — sleep_analysis', () => {
         ],
       },
     ]);
-    expect(out).toHaveLength(1);
-    expect(out[0]?.date).toBe(new Date('2026-04-29T00:00:00-05:00').toISOString());
+    expect(records).toHaveLength(1);
+    expect(records[0]?.date).toBe(new Date('2026-04-29T00:00:00-05:00').toISOString());
   });
 
   it('drops sample with no stage data and no value/qty (the silent-drop bug)', () => {
-    const out = normalizeMetricRecords([
+    const { records } = normalizeMetricRecords([
       {
         name: 'sleep_analysis',
         units: 'hr',
         data: [{ date: '2026-04-29 00:00:00 -0500', source: 'X', value: null, qty: null }],
       },
     ]);
-    expect(out).toEqual([]);
+    expect(records).toEqual([]);
   });
 });
 
 describe('normalizeMetricRecords — blood_pressure', () => {
   it('splits systolic and diastolic into separate metrics', () => {
-    const out = normalizeMetricRecords([
+    const { records } = normalizeMetricRecords([
       {
         name: 'blood_pressure',
         units: 'mmHg',
@@ -149,9 +149,9 @@ describe('normalizeMetricRecords — blood_pressure', () => {
         ],
       },
     ]);
-    expect(out).toHaveLength(2);
-    const systolic = out.find((r) => r.metric_name === 'Blood Pressure Systolic');
-    const diastolic = out.find((r) => r.metric_name === 'Blood Pressure Diastolic');
+    expect(records).toHaveLength(2);
+    const systolic = records.find((r) => r.metric_name === 'Blood Pressure Systolic');
+    const diastolic = records.find((r) => r.metric_name === 'Blood Pressure Diastolic');
     expect(systolic?.value).toBe(143);
     expect(systolic?.unit).toBe('mmHg');
     expect(diastolic?.value).toBe(97);
@@ -161,27 +161,107 @@ describe('normalizeMetricRecords — blood_pressure', () => {
 
 describe('normalizeMetricRecords — generic qty path', () => {
   it('uses qty for simple metrics like step_count', () => {
-    const out = normalizeMetricRecords([
+    const { records } = normalizeMetricRecords([
       {
         name: 'step_count',
         units: 'steps',
         data: [{ date: '2026-04-29 12:00:00 -0500', qty: 1234, source: 'iPhone' }],
       },
     ]);
-    expect(out).toHaveLength(1);
-    expect(out[0]?.metric_name).toBe('Step Count');
-    expect(out[0]?.value).toBe(1234);
+    expect(records).toHaveLength(1);
+    expect(records[0]?.metric_name).toBe('Step Count');
+    expect(records[0]?.value).toBe(1234);
   });
 
   it('prefers Avg over qty for heart_rate (segmented stat)', () => {
-    const out = normalizeMetricRecords([
+    const { records } = normalizeMetricRecords([
       {
         name: 'heart_rate',
         units: 'count/min',
         data: [{ date: '2026-04-29 12:00:00 -0500', Avg: 72, Min: 60, Max: 90 }],
       },
     ]);
-    expect(out).toHaveLength(1);
-    expect(out[0]?.value).toBe(72);
+    expect(records).toHaveLength(1);
+    expect(records[0]?.value).toBe(72);
+  });
+});
+
+describe('normalizeMetricRecords — byName counters', () => {
+  it('tracks received and normalized counts per metric_name', () => {
+    const { byName } = normalizeMetricRecords([
+      {
+        name: 'step_count',
+        units: 'steps',
+        data: [
+          { date: '2026-04-29 12:00:00 -0500', qty: 100, source: 'iPhone' },
+          { date: '2026-04-29 13:00:00 -0500', qty: 200, source: 'iPhone' },
+        ],
+      },
+      {
+        name: 'sleep_analysis',
+        units: 'hr',
+        data: [
+          {
+            date: '2026-04-29 00:00:00 -0500',
+            source: 'Sleeptracker®',
+            core: 5,
+            deep: 1,
+            rem: 2,
+            awake: 0.1,
+            inBed: 8,
+            asleep: 0,
+          },
+        ],
+      },
+    ]);
+
+    expect(byName.step_count).toEqual({ received: 2, normalized: 2 });
+    // 1 sample → 5 stage records (asleep:0 skipped)
+    expect(byName.sleep_analysis).toEqual({ received: 1, normalized: 5 });
+  });
+
+  it('flags silent-drop case: received > 0 && normalized = 0', () => {
+    const { byName } = normalizeMetricRecords([
+      {
+        name: 'sleep_analysis',
+        units: 'hr',
+        data: [
+          // Pre-fix HAE shape change: value/qty null and no stage props
+          { date: '2026-04-29 00:00:00 -0500', source: 'X', value: null, qty: null },
+          { date: '2026-04-30 00:00:00 -0500', source: 'X', value: null, qty: null },
+        ],
+      },
+    ]);
+    expect(byName.sleep_analysis).toEqual({ received: 2, normalized: 0 });
+  });
+
+  it('counts blood_pressure correctly (1 sample → 2 records: sys + dia)', () => {
+    const { byName } = normalizeMetricRecords([
+      {
+        name: 'blood_pressure',
+        units: 'mmHg',
+        data: [
+          {
+            date: '2026-04-23 18:30:00 -0500',
+            source: 'Connect',
+            systolic: 143,
+            diastolic: 97,
+          },
+        ],
+      },
+    ]);
+    expect(byName.blood_pressure).toEqual({ received: 1, normalized: 2 });
+  });
+
+  it('returns empty byName when no metrics provided', () => {
+    const { byName } = normalizeMetricRecords([]);
+    expect(byName).toEqual({});
+  });
+
+  it('skips metrics without a name (no counter created)', () => {
+    const { byName } = normalizeMetricRecords([
+      { units: 'hr', data: [{ date: '2026-04-29', qty: 1 }] }, // no name
+    ]);
+    expect(byName).toEqual({});
   });
 });
