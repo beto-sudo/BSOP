@@ -85,6 +85,10 @@ export const NAV_ITEMS: NavItem[] = [
     icon: 'rdb-logo',
     sections: [
       {
+        label: 'Operativa',
+        children: [{ label: 'Home', href: '/rdb/home' }],
+      },
+      {
         label: 'Administración',
         children: [
           { label: 'Tareas', href: '/rdb/admin/tasks' },
