@@ -145,6 +145,14 @@ type Proveedor = {
   telefono: string | null;
   email: string | null;
   rfc: string | null;
+  curp: string | null;
+  tipo_persona: 'fisica' | 'moral' | null;
+  domicilio: string | null;
+  razon_social: string | null;
+  nombre_comercial: string | null;
+  condiciones_pago: string | null;
+  categoria: string | null;
+  /** Mantiene compatibilidad con UI previa que leía `direccion` (texto libre). */
   direccion: string | null;
   notas: string | null;
   activo: boolean;
@@ -160,26 +168,40 @@ const proveedorColumns: Column<Proveedor>[] = [
       <div className="flex items-center gap-2">
         <Truck className="h-4 w-4 shrink-0 text-muted-foreground" />
         <span className="font-medium">{p.nombre}</span>
+        {p.tipo_persona && (
+          <Badge
+            variant={p.tipo_persona === 'moral' ? 'secondary' : 'outline'}
+            className="text-[10px]"
+          >
+            {p.tipo_persona === 'moral' ? 'Moral' : 'Física'}
+          </Badge>
+        )}
       </div>
     ),
   },
   {
     key: 'contacto',
-    label: 'Contacto',
+    label: 'Email / Teléfono',
     cellClassName: 'text-sm text-muted-foreground',
-    render: (p) => p.contacto ?? '—',
-  },
-  {
-    key: 'telefono',
-    label: 'Teléfono',
-    cellClassName: 'font-mono text-sm text-muted-foreground',
-    render: (p) => p.telefono ?? '—',
+    render: (p) => (
+      <div className="flex flex-col">
+        {p.email && <span className="truncate">{p.email}</span>}
+        {p.telefono && <span className="font-mono text-xs">{p.telefono}</span>}
+        {!p.email && !p.telefono && <span>—</span>}
+      </div>
+    ),
   },
   {
     key: 'rfc',
     label: 'RFC',
     cellClassName: 'font-mono text-xs text-muted-foreground',
     render: (p) => p.rfc ?? '—',
+  },
+  {
+    key: 'condiciones_pago',
+    label: 'Condiciones',
+    cellClassName: 'text-xs text-muted-foreground',
+    render: (p) => p.condiciones_pago ?? '—',
   },
   {
     key: 'activo',
@@ -218,13 +240,31 @@ function ProveedorDetail({
   const triggerPrint = useTriggerPrint();
   if (!proveedor) return null;
 
-  const rows = [
-    { label: 'Contacto', value: proveedor.contacto, icon: null },
+  const tipoPersonaLabel =
+    proveedor.tipo_persona === 'moral'
+      ? 'Persona moral'
+      : proveedor.tipo_persona === 'fisica'
+        ? 'Persona física'
+        : null;
+
+  const rows: { label: string; value: string | null; icon: typeof Phone | null }[] = [
+    { label: 'Tipo', value: tipoPersonaLabel, icon: null },
+    { label: 'Razón social', value: proveedor.razon_social, icon: FileText },
+    { label: 'Nombre comercial', value: proveedor.nombre_comercial, icon: null },
     { label: 'Teléfono', value: proveedor.telefono, icon: Phone },
     { label: 'Email', value: proveedor.email, icon: Mail },
     { label: 'RFC', value: proveedor.rfc, icon: FileText },
-    { label: 'Dirección', value: proveedor.direccion, icon: null },
-  ].filter((r) => r.value);
+    {
+      label: 'CURP',
+      value: proveedor.tipo_persona === 'moral' ? null : proveedor.curp,
+      icon: null,
+    },
+    { label: 'Domicilio', value: proveedor.domicilio, icon: null },
+    { label: 'Condiciones de pago', value: proveedor.condiciones_pago, icon: null },
+    { label: 'Categoría', value: proveedor.categoria, icon: null },
+  ].filter((r): r is { label: string; value: string; icon: typeof Phone | null } =>
+    Boolean(r.value)
+  );
 
   return (
     <DetailDrawer
@@ -454,42 +494,70 @@ export function ProveedoresModule({
     setError(null);
     try {
       const supabase = createSupabaseBrowserClient();
+      // Para morales el "nombre comercial" o "razón social" vive en
+      // personas_datos_fiscales (cuando hay CSF cargada). Lo embebemos opcional
+      // y caemos a personas.nombre cuando no esté.
       const { data, error: err } = await supabase
         .schema('erp')
         .from('proveedores')
         .select(
-          'id, persona_id, activo, created_at, updated_at, personas!persona_id(nombre, apellido_paterno, apellido_materno, email, telefono, rfc)'
+          `id, persona_id, activo, condiciones_pago, categoria, created_at, updated_at,
+           personas!persona_id(
+             nombre, apellido_paterno, apellido_materno,
+             email, telefono, rfc, curp, tipo_persona, domicilio,
+             personas_datos_fiscales(razon_social, nombre_comercial)
+           )`
         )
         .eq('empresa_id', empresaId);
       if (err) throw err;
+      type RawDatosFiscales = {
+        razon_social: string | null;
+        nombre_comercial: string | null;
+      };
+      type RawPersona = {
+        nombre: string;
+        apellido_paterno: string | null;
+        apellido_materno: string | null;
+        email: string | null;
+        telefono: string | null;
+        rfc: string | null;
+        curp: string | null;
+        tipo_persona: 'fisica' | 'moral' | null;
+        domicilio: string | null;
+        // Embed PostgREST devuelve array (1:1, pero array por la convención)
+        personas_datos_fiscales: RawDatosFiscales[] | RawDatosFiscales | null;
+      };
       type RawProv = {
         id: string;
         persona_id: string | null;
         activo: boolean;
+        condiciones_pago: string | null;
+        categoria: string | null;
         created_at: string | null;
         updated_at: string | null;
-        personas: unknown;
+        personas: RawPersona | null;
       };
       const mapped: Proveedor[] = ((data ?? []) as unknown as RawProv[])
         .map((p) => {
-          const persona = p.personas as {
-            nombre: string;
-            apellido_paterno: string | null;
-            apellido_materno: string | null;
-            email: string | null;
-            telefono: string | null;
-            rfc: string | null;
-          } | null;
+          const persona = p.personas;
+          const dfRaw = persona?.personas_datos_fiscales;
+          const df = Array.isArray(dfRaw) ? (dfRaw[0] ?? null) : (dfRaw ?? null);
           const nombreCompleto = persona
             ? [persona.nombre, persona.apellido_paterno, persona.apellido_materno]
                 .filter((s) => s && s.trim())
                 .join(' ')
                 .trim()
             : '';
+          // Para morales preferimos nombre_comercial → razon_social → nombre.
+          // Para físicas preferimos el nombre completo armado.
+          const displayName =
+            persona?.tipo_persona === 'moral'
+              ? (df?.nombre_comercial ?? df?.razon_social ?? nombreCompleto) || '—'
+              : nombreCompleto || df?.razon_social || '—';
           return {
             id: p.id,
             persona_id: p.persona_id,
-            nombre: nombreCompleto || '—',
+            nombre: displayName,
             nombre_raw: persona?.nombre ?? null,
             apellido_paterno: persona?.apellido_paterno ?? null,
             apellido_materno: persona?.apellido_materno ?? null,
@@ -497,7 +565,14 @@ export function ProveedoresModule({
             telefono: persona?.telefono ?? null,
             email: persona?.email ?? null,
             rfc: persona?.rfc ?? null,
-            direccion: null,
+            curp: persona?.curp ?? null,
+            tipo_persona: persona?.tipo_persona ?? null,
+            domicilio: persona?.domicilio ?? null,
+            razon_social: df?.razon_social ?? null,
+            nombre_comercial: df?.nombre_comercial ?? null,
+            condiciones_pago: p.condiciones_pago,
+            categoria: p.categoria,
+            direccion: persona?.domicilio ?? null,
             notas: null,
             activo: p.activo,
             created_at: p.created_at ?? null,
