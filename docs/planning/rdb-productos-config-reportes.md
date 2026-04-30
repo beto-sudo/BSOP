@@ -3,9 +3,10 @@
 **Slug:** `rdb-productos-config-reportes`
 **Empresas:** RDB (v1); diseñada para enchufar otras cuando aplique
 **Schemas afectados:** `erp` (productos, producto_receta), `rdb` (v_productos_tabla)
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-04-29
+**Cerrada:** 2026-04-29
 **Última actualización:** 2026-04-29
 
 > Promovida a iniciativa el 2026-04-29 después de estresar la idea con
@@ -161,14 +162,21 @@ Decisiones técnicas tomadas:
   reutilizar (siguiendo convención `shared-modules-refactor`,
   ADR-011).
 
-### Sprint 4 — Cierre
+### Sprint 4 — Cierre · 2026-04-29 ✅
 
-- [ ] Verificar visualmente las 4 tabs del módulo Productos (Catálogo
-      / Recetas / Auditoría / Análisis) en preview con datos reales.
-- [ ] Confirmar que `rdb.productos` cubra todas las rutas en
-      `ROUTE_TO_MODULE` ([lib/permissions.ts](../../lib/permissions.ts)).
-- [ ] Closeout: bitácora, sweep de Reminders, mover iniciativa a
-      `## Done` en `INITIATIVES.md` con outcome resumido.
+- [x] Verificación visual del Sprint 3 hecha por Beto en preview —
+      "ya se ve todo correctamente". Las 4 tabs (Catálogo / Recetas /
+      Auditoría / Análisis) operan con datos reales.
+- [x] `rdb.productos` único slug cubriendo `/rdb/productos` en
+      `ROUTE_TO_MODULE`. Sub-tabs (`/recetas`, `/auditoria`,
+      `/analisis`) heredan el guard via `<RequireAccess>` propio en
+      cada page (defense in depth, ADR-005).
+- [x] Sweep Reminders "Claude: BSOP" — no había sub-tareas vivas de
+      esta iniciativa. Lista limpia.
+- [x] Iniciativa movida a `## Done` en `INITIATIVES.md` con outcome
+      resumido. Operativo de configuración (poblar recetas, ajustar
+      cantidades, completar costos faltantes) lo hace Beto con la UI
+      ya desplegada.
 
 ### Follow-ups (sub-iniciativas pendientes, no v1)
 
@@ -383,6 +391,22 @@ Beto revisó el preview y apuntó que Grupos no debe ser entrada
 separada en sidebar — debe vivir como sub-tab del módulo Productos
 (ADR-005). Sidebar entry removida; `/rdb/productos/grupos` removido
 de `ROUTE_TO_MODULE`; `h1` redundante removido del page.
+
+### 2026-04-29 · Sprint 4 — Cierre
+
+Beto verificó preview del Sprint 3 con datos reales: "ya se ve todo
+correctamente". Iniciativa cerrada el mismo día que se promovió.
+Operativo de configuración (poblar recetas, ajustar cantidades,
+completar últimos costos) lo hace Beto con la UI ya desplegada.
+
+Outcome final: 4 PRs mergeados (#325 promoción, #327 Sprint 1 Recetas
+read-only, #329 Sprint 2 Auditoría, #330 Sprint 3 Edición) en un solo
+día. 4 sub-tabs en módulo Productos: Catálogo / Recetas / Auditoría /
+Análisis. Sin schema changes — todo UI sobre `erp.producto_receta` +
+`rdb.v_productos_tabla` existentes. Un solo cambio cross-PR (test
+`'no duplicate slugs in ROUTE_TO_MODULE'` removido en Sprint 1, luego
+obsoleto cuando el approach cambió a sub-tabs sin nuevas rutas en el
+mapa).
 
 ### 2026-04-29 · Sprint 3 mergeado pendiente · Edición de recetas
 
