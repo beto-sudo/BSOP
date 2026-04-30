@@ -9,10 +9,14 @@ export {
   DetailDrawerContent,
   DetailDrawerFooter,
   DetailDrawerHeader,
+  DetailDrawerSection,
+  DetailDrawerSkeleton,
 } from './detail-drawer';
 export type {
   DetailDrawerContentProps,
   DetailDrawerFooterProps,
   DetailDrawerHeaderProps,
   DetailDrawerProps,
+  DetailDrawerSectionProps,
+  DetailDrawerSkeletonProps,
 } from './detail-drawer';
