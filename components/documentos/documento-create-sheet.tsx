@@ -120,7 +120,6 @@ export function DocumentoCreateSheet({
         if (!v) onClose();
       }}
       size="md"
-      className="sm:max-w-[640px]"
       title="Nuevo Documento"
     >
       <DetailDrawerContent>

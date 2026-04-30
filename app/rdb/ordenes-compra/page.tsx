@@ -555,8 +555,7 @@ function OrdenDetail({
     <DetailDrawer
       open={open}
       onOpenChange={(value) => !value && onClose()}
-      size="md"
-      className="sm:max-w-[700px]"
+      size="lg"
       title={orden?.folio ?? 'Orden de compra'}
       description={`${proveedorObj?.nombre ?? 'Sin proveedor'} · ${formatDate(orden?.fecha_emision)}${reqFolio ? ` · Req: ${reqFolio}` : ''}`}
       actions={
