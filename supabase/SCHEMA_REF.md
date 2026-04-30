@@ -2242,6 +2242,7 @@ _(sin columnas)_
 - **workouts_count** `integer` DEFAULT `0`
 - **source_ip** `text`
 - **status** `text` DEFAULT `'ok'::text`
+- **metrics_by_name** `jsonb` NOT NULL DEFAULT `'{}'::jsonb`
 
 ### `health.health_medications`
 
@@ -2435,6 +2436,7 @@ _(sin tablas ni vistas)_
 - **workouts_count** `integer`
 - **source_ip** `text`
 - **status** `text`
+- **metrics_by_name** `jsonb`
 
 ### `public.health_medications` _(view)_
 
