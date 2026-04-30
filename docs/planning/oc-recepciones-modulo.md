@@ -3,10 +3,11 @@
 **Slug:** `oc-recepciones-modulo`
 **Empresas:** RDB golden; multi-empresa diferido (igual que `oc-recepciones` y `oc-cierre-ciclo`)
 **Schemas afectados:** `core` (`modulos`, `permisos_rol`)
-**Estado:** planned
+**Estado:** done (cerrada 2026-04-30)
 **Dueño:** Beto
 **Creada:** 2026-04-30
-**Última actualización:** 2026-04-30 (promoción — alcance v1 cerrado, modo autónomo aprobado)
+**Cerrada:** 2026-04-30
+**Última actualización:** 2026-04-30 (Sprints 0-3 mergeados en el día — PRs #355, #356, #357, #359 — más Sprint 4 closeout en _este PR_).
 
 ## Problema
 
@@ -127,13 +128,13 @@ No hay forma de darle al Gerente solo la recepción de productos sin abrirle tam
 
 ## Sprints / hitos
 
-| #   | Scope                                                                                                                                      | Estado      | PR        |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------- | --------- |
-| 0   | Promoción: doc + fila en INITIATIVES.md                                                                                                    | in_progress | _este PR_ |
-| 1   | DB migración + sidebar + `permissions.ts` + `permissions.test.ts` (con PAUSA para que Beto aplique SQL antes de Sprint 2)                  | pending     | TBD       |
-| 2   | Crear `app/rdb/recepciones/page.tsx` con bandeja + drawer + acciones recibir/cancelar + historial + deep-link `?focus`                     | pending     | TBD       |
-| 3   | Limpiar `app/rdb/ordenes-compra/page.tsx`: quitar inputs de recepción + historial; agregar link cruzado a `/rdb/recepciones?focus={oc_id}` | pending     | TBD       |
-| 4   | Closeout: bitácora final + mover a `## Done` + barrer Reminders                                                                            | pending     | TBD       |
+| #   | Scope                                                                                                                                      | Estado          | PR        |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------- | --------- |
+| 0   | Promoción: doc + fila en INITIATIVES.md                                                                                                    | done 2026-04-30 | #355      |
+| 1   | DB migración + sidebar + `permissions.ts` + `permissions.test.ts` (con PAUSA para que Beto aplique SQL antes de Sprint 2)                  | done 2026-04-30 | #356      |
+| 2   | Crear `app/rdb/recepciones/page.tsx` con bandeja + drawer + acciones recibir/cancelar + historial + deep-link `?focus`                     | done 2026-04-30 | #357      |
+| 3   | Limpiar `app/rdb/ordenes-compra/page.tsx`: quitar inputs de recepción + historial; agregar link cruzado a `/rdb/recepciones?focus={oc_id}` | done 2026-04-30 | #359      |
+| 4   | Closeout: bitácora final + mover a `## Done` + barrer Reminders                                                                            | done 2026-04-30 | _este PR_ |
 
 ## Decisiones registradas
 
@@ -146,6 +147,109 @@ No hay forma de darle al Gerente solo la recepción de productos sin abrirle tam
 - **Backfill de permisos = clonar de `rdb.ordenes_compra`**: preserva status quo entre `apply` y ajuste fino. Beto luego rebaja Gerente en módulo OC y/o ajusta otros roles.
 
 ## Bitácora
+
+### 2026-04-30 — Iniciativa cerrada · 5 PRs en el día
+
+5 PRs mergeados en modo autónomo el mismo día de la promoción
+(autorización explícita de Beto: "tú generas PRs y merges hasta
+terminar"; única pausa fue para que Beto aplicara la migración SQL
+del Sprint 1 con `psql`):
+
+- **#355 (Sprint 0 — Promoción)** — `docs/planning/oc-recepciones-modulo.md`
+  - fila en `INITIATIVES.md` `## Activas`. Estado `proposed → planned`
+    con autorización de modo autónomo + 3 decisiones cerradas en este
+    documento (Comprador puede recibir vía RBAC, "cancelar pendiente"
+    se mueve a Recepciones, rol Gerente lo maneja Beto).
+
+- **#356 (Sprint 1 — DB migración + RBAC sync)** — Migración
+  `supabase/migrations/20260430140000_modulo_rdb_recepciones.sql` con
+  INSERT del slug `rdb.recepciones` en `core.modulos` (sección
+  `compras`) + backfill defensivo clonando los permisos actuales de
+  `rdb.ordenes_compra` por cada rol existente en RDB (preserva status
+  quo entre apply y ajuste fino) + `NOTIFY pgrst`. Sidebar entry en
+  `nav-config.ts` debajo de "Órdenes de Compra"; `ROUTE_TO_MODULE` y
+  `EXPECTED_DB_MODULE_SLUGS` actualizados. CI verde + Supabase Preview
+  validó la migración.
+  - **PAUSA → Beto aplica SQL**: Beto corrió `psql ... -f
+20260430140000_modulo_rdb_recepciones.sql` y obtuvo
+    `BEGIN / INSERT 0 1 / INSERT 0 6 / NOTIFY / COMMIT`. Regeneró
+    `SCHEMA_REF.md` y `types/supabase.ts`. División fina de permisos
+    por rol queda en sus manos post-merge.
+
+- **#357 (Sprint 2 — Página `/rdb/recepciones`)** — Crea
+  `app/rdb/recepciones/page.tsx` con bandeja de OCs en estado
+  `enviada/parcial` ordenadas por `autorizada_at DESC` + filtros
+  search/fechas, drawer al click con header (folio + proveedor +
+  estado + fecha de envío) + botón "Ver OC →" que navega a
+  `/rdb/ordenes-compra?focus={oc_id}`, tabla de líneas con
+  `Pedida · Recibir (input) · Pendiente`, botón × por línea para
+  cancelar pendiente con motivo (RPC `oc_cancelar_pendiente_linea`),
+  sección "Historial de recepciones" leyendo
+  `erp.movimientos_inventario` filtrado por OC, footer con `Guardar
+recepciones` + `Recibir Todo` (RPC `oc_recibir_linea` con cantidad
+  acumulada). Deep-link `?focus={oc_id}` auto-abre el drawer al
+  cargar. `<RequireAccess module="rdb.recepciones">` +
+  `<DesktopOnlyNotice>` + `hidden sm:block` (consistente con
+  `responsive-policy` desktop-only). Tras una recepción que pasa la OC
+  a estado terminal (cerrada/cancelada/recibida), la OC sale
+  automáticamente de la bandeja.
+
+- **#359 (Sprint 3 — Limpieza del page de OC)** —
+  `app/rdb/ordenes-compra/page.tsx` baja de 1943 → 1553 líneas
+  (−390 netas). Removido: componente `RecepcionesHistorial` (movido
+  a Recepciones), type `MovimientoRecepcion`, helper
+  `formatDateTimeShort`, ícono `X`, state
+  `editedReceipts/recepcionMovs/loadingRecepcionMovs`, callbacks
+  `loadRecepcionMovs/handleReceiveChange/persistReception/handleCancelarLinea`,
+  inputs editables "Recibir N" + botón × cancelar pendiente +
+  ConfirmDialog asociado, footer "Recibir Todo" / "Guardar
+  recepciones", sección "Historial de recepciones" intra-drawer.
+  Conservado: tabla de líneas con columnas Pedida/Recibida/Pendiente
+  como **read-only** post-envío, botón "Cerrar OC"/"Cancelar OC"
+  durante receiving, banner "Listo para CxP", override de precio
+  (admin). Agregado: link "Capturar recepciones →" al pie del drawer
+  cuando `estado ∈ {enviada, parcial}` que navega a
+  `/rdb/recepciones?focus={oc_id}`.
+
+- **_este PR_ (Sprint 4 — Closeout)** — Bitácora final + mover fila
+  a `## Done` de `INITIATIVES.md` + barrido de Reminders relacionados
+  en `Claude: BSOP` (2 reminders cerrados: Sprint 3 y Sprint 4
+  closeout — fueron creados antes de la regla operativa "Reminders ≠
+  TodoWrite" del CLAUDE.md global; pasos internos de sprint no
+  deberían vivir en Reminders).
+
+**Outcome operativo verificable:**
+
+- Sidebar RDB → Compras → "Recepciones" aparece para usuarios con
+  acceso al módulo.
+- Gerente (post-ajuste fino de Beto) puede entrar a `/rdb/recepciones`,
+  capturar recepciones por OC + cancelar pendientes de línea — y NO
+  ve los inputs de recepción en `/rdb/ordenes-compra` (esos viven
+  ahora solo en el módulo Recepciones).
+- Comprador/Director sigue capturando OC end-to-end en
+  `/rdb/ordenes-compra`; cuando llegue el momento de capturar
+  recepción, navega vía link cruzado "Capturar recepciones →" al
+  módulo nuevo (con `?focus={oc_id}` el drawer se abre solo).
+- Cero duplicación de lógica DB: las 3 RPCs originales
+  (`oc_recibir_linea`, `oc_cancelar_pendiente_linea`,
+  `oc_cerrar_orden`) siguen siendo el source of truth; el módulo
+  Recepciones las consume sin clonar nada.
+
+**Follow-ups documentados** (postergados, no urgentes):
+
+- **Multi-empresa rollout** sigue diferido (igual que
+  `oc-recepciones` Sprint 5 y `oc-cierre-ciclo`): cuando
+  DILESA/COAGAN/ANSA tengan masa crítica de OCs, extraer ambos pages
+  a `components/compras/` parametrizados por empresa.
+- **Refresh cross-tab**: si el Comprador y el Gerente trabajan en
+  tabs separadas, mutaciones de uno no propagan automáticamente a
+  la otra. Aceptable para v1; sub-iniciativa si emerge necesidad
+  (Supabase Realtime sobre `ordenes_compra_detalle` + Broadcast
+  Channel cross-tab).
+- **Refresh de la bandeja** post-mutación cross-page: la fila no
+  desaparece de la bandeja de OC cuando se termina la recepción
+  desde el módulo Recepciones, hasta que el Comprador refresca o
+  cambia de filtro. Mismo nivel de aceptación que el cross-tab.
 
 ### 2026-04-30 — Sprint 0 (Promoción) en marcha
 
