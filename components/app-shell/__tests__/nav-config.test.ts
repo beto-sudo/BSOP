@@ -70,8 +70,8 @@ describe('flattenNavChildren', () => {
   it('flattens grouped sections preserving order', () => {
     const rdb = NAV_ITEMS.find((i) => i.href === '/rdb')!;
     const flat = flattenNavChildren(rdb);
-    // First section first, last section last
-    expect(flat[0].href).toBe('/rdb/admin/tasks');
+    // First section first (Operativa → Home), last section last (Operaciones → Playtomic)
+    expect(flat[0].href).toBe('/rdb/home');
     expect(flat.at(-1)?.href).toBe('/rdb/playtomic');
     // Includes a known item from a middle section
     expect(flat.some((c) => c.href === '/rdb/rh/personal')).toBe(true);
