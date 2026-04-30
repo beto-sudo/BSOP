@@ -3,10 +3,11 @@
 **Slug:** `oc-cierre-ciclo`
 **Empresas:** RDB (única con OCs vivas; cuando otras empresas adopten OC heredan estas reglas)
 **Schemas afectados:** `erp` (`ordenes_compra`, `ordenes_compra_detalle`, `movimientos_inventario`) + 1 view nueva (`erp.v_oc_cerradas_pendientes_pago`)
-**Estado:** planned
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-04-29
-**Última actualización:** 2026-04-29 (promoción)
+**Cerrada:** 2026-04-29
+**Última actualización:** 2026-04-29 (Sprints 1-4 entregados en un solo ciclo autónomo: PRs #334, #335, #336, #339. 5 gaps cerrados en RDB end-to-end.)
 
 ## Problema
 
@@ -204,13 +205,13 @@ cerrada / cancelada`. Borrador no se imprime — se obliga a "Marcar
 
 ## Sprints / hitos
 
-| #   | Scope                                                                                     | Estado  | PR        |
-| --- | ----------------------------------------------------------------------------------------- | ------- | --------- |
-| 0   | Promoción: doc + fila en INITIATIVES.md                                                   | pending | _este PR_ |
-| 1   | Gates UI (imprimir/editar) + sello visual envío + refresh lista + toast contundente       | pending | TBD       |
-| 2   | Historial de recepciones intra-drawer (query + tabla + total + deep-link)                 | pending | TBD       |
-| 3   | View `erp.v_oc_cerradas_pendientes_pago` + indicador "Listo para CxP" en drawer cerrado   | pending | TBD       |
-| 4   | Cancelar OC entera (estado `cancelada` real) + sello PDF + diferenciación con "Cerrar OC" | pending | TBD       |
+| #   | Scope                                                                                     | Estado          | PR   |
+| --- | ----------------------------------------------------------------------------------------- | --------------- | ---- |
+| 0   | Promoción: doc + fila en INITIATIVES.md                                                   | done 2026-04-29 | #333 |
+| 1   | Gates UI (imprimir/editar) + sello visual envío + refresh lista + toast contundente       | done 2026-04-29 | #334 |
+| 2   | Historial de recepciones intra-drawer (query + tabla + total + deep-link)                 | done 2026-04-29 | #335 |
+| 3   | View `erp.v_oc_cerradas_pendientes_pago` + indicador "Listo para CxP" en drawer cerrado   | done 2026-04-29 | #336 |
+| 4   | Cancelar OC entera (estado `cancelada` real) + sello PDF + diferenciación con "Cerrar OC" | done 2026-04-29 | #339 |
 
 ## Decisiones registradas
 
@@ -235,6 +236,80 @@ cerrada / cancelada`. Borrador no se imprime — se obliga a "Marcar
   Beto.
 
 ## Bitácora
+
+### 2026-04-29 — Iniciativa cerrada · 5 PRs en un día
+
+5 PRs mergeados en modo autónomo el mismo día de la promoción
+(autorización explícita de Beto: "tú generas PRs y merges hasta
+terminar"):
+
+- **#333 (Sprint 0 — Promoción)** — doc planning + fila en
+  INITIATIVES.md. Conflict heredado en `INITIATIVES.md` resuelto con
+  rebase + checkout --ours sobre origin/main + reaplicación de la
+  fila (regla 2 del CLAUDE.md de proyecto).
+- **#334 (Sprint 1 — Gates UI + sello)** — `canPrint` ahora exige
+  proveedor + NO editable; banner verde "OC enviada al proveedor ·
+  fecha" para enviada/parcial; banner terminal mejorado (rojo para
+  cancelada, muted para cerrada) con fecha de cierre; sello en PDF
+  con borde de color según estado; `handleSavePricesAndMarkEnviada`
+  llama `refreshOrdenAfterMutation` post-update; toast contundente
+  "OC {folio} enviada al proveedor — los precios ya no se pueden
+  editar". Type `OrdenCompra` gana `autorizada_at`. Helper
+  `getEstadoSeal()`.
+- **#335 (Sprint 2 — Historial intra-drawer)** — sección colapsable
+  "Historial de recepciones" después de la tabla de líneas en el
+  drawer (visible solo para OCs no-editables), leyendo
+  `erp.movimientos_inventario` filtrado por `referencia_tipo='oc_recepcion'`
+  - `referencia_id=oc_id` con embed PostgREST de producto y
+    almacén. Tabla con Fecha · Producto · Cantidad · Costo unitario ·
+    Valor · Almacén; total al pie ("Recibido $X de $Y (N%)"); click en
+    fila → deep-link a `/rdb/inventario/movimientos?focus={mov_id}`;
+    empty state. Carga al abrir drawer + refresh post-mutación.
+- **#336 (Sprint 3 — Handoff CxP)** — migración nueva
+  `20260429100000_oc_v_cerradas_pendientes_pago.sql` con view
+  `erp.v_oc_cerradas_pendientes_pago` (estado='cerrada' AND
+  total_a_pagar > 0). UI: banner verde nuevo en drawer cuando OC =
+  cerrada con total_a_pagar > 0. Beto aplicó migración con psql
+  antes de mergear. SCHEMA_REF.md sync drift heredado (columna
+  `health_ingestion_logs.metrics_by_name` del PR #332) arreglado
+  como `chore(schema)` commit en el mismo PR (regla "formateo lo
+  heredado para no bloquear CI" del CLAUDE.md aplicada al SCHEMA_REF).
+- **#339 (Sprint 4 — Cancelar OC entera)** — sin migración. La RPC
+  `oc_cerrar_orden` ya retornaba estado='cancelada' si total_recibida=0
+  desde Sprint 1 de oc-recepciones; solo faltaba UI que diferencie
+  semánticamente. Botón nuevo "Cancelar OC" para borradores. Botón en
+  receiving cambia label según hay recepciones o no. ConfirmDialog
+  dinámico según `mode`. Toast lee `data.estado` de la RPC.
+
+**Métricas de éxito de la iniciativa cumplidas en RDB**:
+
+- Cero impresiones de borradores: `canPrint` ahora bloquea — verificable
+  desde el código (page.tsx:539-540).
+- Refresh de lista al marcar Enviada ≤ 1 seg: ✅ — `refreshOrdenAfterMutation`
+  re-lee state de DB y propaga a `setSelected` + `setOrdenes`.
+- Drawer auto-suficiente: ✅ — historial intra-drawer cubre el caso de
+  uso "qué pasó con la OC X" sin cambiar de pantalla.
+- OCs cerradas visibles para CxP: ✅ — view
+  `erp.v_oc_cerradas_pendientes_pago` lista para consumo cuando
+  iniciativa `cxp` arranque.
+- Cero ambigüedad de estado: ✅ — sello en drawer + sello en PDF +
+  banners + toast contundentes; los 5 estados visualmente distinguibles.
+
+**Follow-ups documentados**:
+
+- **Multi-empresa rollout** sigue diferido (igual que `oc-recepciones`
+  Sprint 5): cuando DILESA/COAGAN/ANSA tengan masa crítica de OCs,
+  extraer todo el page de RDB a `components/compras/` parametrizado
+  por empresa.
+- **`autorizada_por`**: la columna no existe en `erp.ordenes_compra`
+  (Sprint 1 madre agregó `cerrada_por` pero no `autorizada_por`). Se
+  podría añadir en una migración chica si se quiere "ENVIADA por X"
+  en el sello — hoy solo se muestra fecha. No bloquea cierre.
+- **CxP listener**: cuando el módulo CxP se construya (iniciativa
+  `cxp`, planned), su Sprint 1 consume la view; si decide modelo
+  propio, la view se reemplaza/elimina sin afectar este flujo.
+- **Devoluciones a proveedor**: sigue fuera de alcance (igual que
+  oc-recepciones). Hoy se cancela el pendiente como workaround.
 
 ### 2026-04-29 — Sprint 0 (Promoción) entregado
 
