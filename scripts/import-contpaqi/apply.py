@@ -104,6 +104,37 @@ def excel_to_personas_fields(ex: dict) -> dict:
     }
 
 
+# Mapeos para CHECK constraints de erp.empleados_compensacion
+FRECUENCIA_PAGO_MAP = {
+    "Semanal": "semanal",
+    "Quincenal": "quincenal",
+    "Catorcenal": "quincenal",  # CONTPAQi tiene catorcenal pero compensacion no — uso quincenal
+    "Mensual": "mensual",
+    "Decenal": "semanal",
+}
+
+# Código SAT (col 5 Excel) → categoría aceptada por erp.empleados_compensacion.tipo_contrato.
+# CONTPAQi 100% '01' (Sueldos y Salarios) → 'indefinido'.
+TIPO_CONTRATO_COMPENSACION_MAP = {
+    "01": "indefinido",
+    "02": "temporal",
+    "03": "por_obra",
+    "04": "honorarios",
+}
+
+
+def comp_frecuencia(periodo_excel):
+    if not periodo_excel:
+        return None
+    return FRECUENCIA_PAGO_MAP.get(periodo_excel.strip(), "semanal")
+
+
+def comp_tipo_contrato(tipo_sat):
+    if not tipo_sat:
+        return None
+    return TIPO_CONTRATO_COMPENSACION_MAP.get(str(tipo_sat).strip(), "indefinido")
+
+
 def excel_to_empleados_fields(ex: dict, empresa_slug: str) -> dict:
     """Mapea campos Excel a columnas de erp.empleados (sin empresa_id/persona_id/depto_id/puesto_id que requieren subqueries)."""
     return {
@@ -165,7 +196,7 @@ def render_insert_block(ex: dict, empresa_slug: str, snapshot_origen: str, snaps
         comp_vals = (
             f"{empresa_id_subq(empresa_slug)}, ne.id, "
             f"{sql_quote(ex.get('salario_diario'))}, {sql_quote(ex.get('sbc_parte_fija'))}, "
-            f"{sql_quote(ex.get('tipo_contrato_sat'))}, {sql_quote(ex.get('tipo_periodo'))}, "
+            f"{sql_quote(comp_tipo_contrato(ex.get('tipo_contrato_sat')))}, {sql_quote(comp_frecuencia(ex.get('tipo_periodo')))}, "
             f"{sql_quote(fecha_inicio)}, true"
         )
         inserts.append(("empleados_compensacion", comp_cols, comp_vals))
@@ -227,8 +258,10 @@ def render_update_block(ex: dict, db_empleado_id: str, db_persona_id: Optional[s
         if not empleado["motivo_baja"]:
             empleado["motivo_baja"] = ex.get("causa_baja") or "Reingreso (ciclo anterior)"
 
-    # UPDATE personas (solo donde Excel tiene valor — no sobreescribir con NULL)
-    p_sets = [f"{k} = COALESCE({sql_quote(v)}, p.{k})" for k, v in persona.items() if v is not None]
+    # UPDATE personas (solo donde Excel tiene valor — no sobreescribir con NULL).
+    # Se EXCLUYEN tipo/tipo_persona para no pisar valores especiales (ej. 'accionista').
+    p_sets = [f"{k} = COALESCE({sql_quote(v)}, p.{k})" for k, v in persona.items()
+              if v is not None and k not in ("tipo", "tipo_persona")]
     if p_sets:
         sql.append(f"-- UPDATE persona del empleado {db_empleado_id} (código Excel {ex['codigo']})")
         sql.append(f"UPDATE erp.personas p SET {', '.join(p_sets)}")
@@ -259,7 +292,7 @@ def render_update_block(ex: dict, db_empleado_id: str, db_persona_id: Optional[s
         comp_vals = (
             f"{empresa_id_subq(empresa_slug)}, {sql_quote(db_empleado_id)}, "
             f"{sql_quote(ex.get('salario_diario'))}, {sql_quote(ex.get('sbc_parte_fija'))}, "
-            f"{sql_quote(ex.get('tipo_contrato_sat'))}, {sql_quote(ex.get('tipo_periodo'))}, "
+            f"{sql_quote(comp_tipo_contrato(ex.get('tipo_contrato_sat')))}, {sql_quote(comp_frecuencia(ex.get('tipo_periodo')))}, "
             f"{sql_quote(fecha_inicio)}, true"
         )
         sql.append(f"INSERT INTO erp.empleados_compensacion ({comp_cols}) VALUES ({comp_vals});")
