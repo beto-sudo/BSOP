@@ -417,6 +417,13 @@ export function ProveedoresModule({
   const [editTelefono, setEditTelefono] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editRFC, setEditRFC] = useState('');
+  const [editCurp, setEditCurp] = useState('');
+  const [editTipoPersonaForm, setEditTipoPersonaForm] = useState<'fisica' | 'moral'>('fisica');
+  const [editDomicilio, setEditDomicilio] = useState('');
+  const [editCondicionesPago, setEditCondicionesPago] = useState('');
+  const [editCategoria, setEditCategoria] = useState('');
+  const [editRazonSocial, setEditRazonSocial] = useState('');
+  const [editNombreComercial, setEditNombreComercial] = useState('');
 
   // ─── CSF flow state (Sprint 2.B) ────────────────────────────────────────────
   const [csfFile, setCsfFile] = useState<File | null>(null);
@@ -878,33 +885,101 @@ export function ProveedoresModule({
     setEditTelefono(p.telefono ?? '');
     setEditEmail(p.email ?? '');
     setEditRFC(p.rfc ?? '');
+    setEditCurp(p.curp ?? '');
+    setEditTipoPersonaForm(p.tipo_persona ?? 'fisica');
+    setEditDomicilio(p.domicilio ?? '');
+    setEditCondicionesPago(p.condiciones_pago ?? '');
+    setEditCategoria(p.categoria ?? '');
+    setEditRazonSocial(p.razon_social ?? '');
+    setEditNombreComercial(p.nombre_comercial ?? '');
     setEditDrawerOpen(true);
   };
 
   const handleSaveEdit = async () => {
     if (!selected?.persona_id) return;
     if (!editNombre.trim()) {
-      alert('El nombre es obligatorio');
+      alert('El nombre / razón social es obligatorio');
       return;
     }
     setSavingEdit(true);
     try {
       const supabase = createSupabaseBrowserClient();
-      const { error } = await supabase
+
+      // 1) UPDATE erp.personas — campos de identidad y contacto.
+      const personasPatch = {
+        nombre: editNombre.trim(),
+        apellido_paterno:
+          editTipoPersonaForm === 'moral' ? null : editApellidoPaterno.trim() || null,
+        apellido_materno:
+          editTipoPersonaForm === 'moral' ? null : editApellidoMaterno.trim() || null,
+        telefono: editTelefono.trim() || null,
+        email: editEmail.trim() || null,
+        rfc: editRFC.trim().toUpperCase() || null,
+        curp: editTipoPersonaForm === 'moral' ? null : editCurp.trim().toUpperCase() || null,
+        tipo_persona: editTipoPersonaForm,
+        domicilio: editDomicilio.trim() || null,
+        updated_at: new Date().toISOString(),
+      };
+      const { error: errPers } = await supabase
         .schema('erp')
         .from('personas')
-        .update({
-          nombre: editNombre.trim(),
-          apellido_paterno: editApellidoPaterno.trim() || null,
-          apellido_materno: editApellidoMaterno.trim() || null,
-          telefono: editTelefono.trim() || null,
-          email: editEmail.trim() || null,
-          rfc: editRFC.trim() || null,
-          updated_at: new Date().toISOString(),
-        })
+        .update(personasPatch)
         .eq('empresa_id', empresaId)
         .eq('id', selected.persona_id);
-      if (error) throw error;
+      if (errPers) throw errPers;
+
+      // 2) UPDATE erp.proveedores — campos comerciales.
+      const proveedoresPatch = {
+        condiciones_pago: editCondicionesPago.trim() || null,
+        categoria: editCategoria.trim() || null,
+        updated_at: new Date().toISOString(),
+      };
+      const { error: errProv } = await supabase
+        .schema('erp')
+        .from('proveedores')
+        .update(proveedoresPatch)
+        .eq('empresa_id', empresaId)
+        .eq('id', selected.id);
+      if (errProv) throw errProv;
+
+      // 3) erp.personas_datos_fiscales — upsert solo si hay valor en
+      // razón social o nombre comercial. Evitamos crear filas vacías cuando
+      // el proveedor aún no tiene CSF cargada.
+      const razonTrim = editRazonSocial.trim();
+      const ncTrim = editNombreComercial.trim();
+      const { data: dfExisting } = await supabase
+        .schema('erp')
+        .from('personas_datos_fiscales')
+        .select('id')
+        .eq('empresa_id', empresaId)
+        .eq('persona_id', selected.persona_id)
+        .maybeSingle();
+
+      if (dfExisting) {
+        // Ya existe fila — actualizamos siempre (incluso a NULL si vaciaron campos).
+        const { error: errDf } = await supabase
+          .schema('erp')
+          .from('personas_datos_fiscales')
+          .update({
+            razon_social: razonTrim || null,
+            nombre_comercial: ncTrim || null,
+          })
+          .eq('id', dfExisting.id);
+        if (errDf) throw errDf;
+      } else if (razonTrim || ncTrim) {
+        // No hay fila y sí hay valor que persistir — insertamos.
+        const { error: errDf } = await supabase
+          .schema('erp')
+          .from('personas_datos_fiscales')
+          .insert({
+            empresa_id: empresaId,
+            persona_id: selected.persona_id,
+            razon_social: razonTrim || null,
+            nombre_comercial: ncTrim || null,
+          });
+        if (errDf) throw errDf;
+      }
+
       setEditDrawerOpen(false);
       await fetchProveedores();
       router.refresh();
@@ -1051,32 +1126,121 @@ export function ProveedoresModule({
       >
         <DetailDrawerContent>
           <div className="space-y-6">
+            {/* Identidad */}
             <div className="space-y-4">
               <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">Tipo de persona</label>
+                <div className="flex gap-4 text-sm">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="edit-tipo-persona"
+                      value="fisica"
+                      checked={editTipoPersonaForm === 'fisica'}
+                      onChange={() => setEditTipoPersonaForm('fisica')}
+                    />
+                    Física
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="edit-tipo-persona"
+                      value="moral"
+                      checked={editTipoPersonaForm === 'moral'}
+                      onChange={() => setEditTipoPersonaForm('moral')}
+                    />
+                    Moral
+                  </label>
+                </div>
+              </div>
+              <div className="space-y-2">
                 <label className="text-sm font-medium leading-none">
-                  Nombre / Razón Social <span className="text-destructive">*</span>
+                  {editTipoPersonaForm === 'moral' ? 'Razón social' : 'Nombre(s)'}{' '}
+                  <span className="text-destructive">*</span>
                 </label>
                 <Input value={editNombre} onChange={(e) => setEditNombre(e.target.value)} />
                 <p className="text-xs text-muted-foreground">
-                  Persona física: sólo el nombre de pila. Persona moral: razón social completa
-                  (apellidos vacíos).
+                  {editTipoPersonaForm === 'moral'
+                    ? 'Razón social completa, sin apellidos.'
+                    : 'Solo nombre(s) de pila. Apellidos van abajo.'}
                 </p>
+              </div>
+              {editTipoPersonaForm === 'fisica' && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">Apellido paterno</label>
+                    <Input
+                      value={editApellidoPaterno}
+                      onChange={(e) => setEditApellidoPaterno(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">Apellido materno</label>
+                    <Input
+                      value={editApellidoMaterno}
+                      onChange={(e) => setEditApellidoMaterno(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Datos fiscales */}
+            <div className="space-y-4">
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Datos fiscales
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium leading-none">Apellido paterno</label>
+                  <label className="text-sm font-medium leading-none">RFC</label>
                   <Input
-                    value={editApellidoPaterno}
-                    onChange={(e) => setEditApellidoPaterno(e.target.value)}
+                    value={editRFC}
+                    onChange={(e) => setEditRFC(e.target.value)}
+                    className="uppercase"
                   />
                 </div>
+                {editTipoPersonaForm === 'fisica' && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">CURP</label>
+                    <Input
+                      value={editCurp}
+                      onChange={(e) => setEditCurp(e.target.value)}
+                      className="uppercase"
+                    />
+                  </div>
+                )}
+              </div>
+              {editTipoPersonaForm === 'moral' && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium leading-none">Apellido materno</label>
+                  <label className="text-sm font-medium leading-none">Nombre comercial</label>
                   <Input
-                    value={editApellidoMaterno}
-                    onChange={(e) => setEditApellidoMaterno(e.target.value)}
+                    value={editNombreComercial}
+                    onChange={(e) => setEditNombreComercial(e.target.value)}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Si es distinto a la razón social (DBA / nombre fantasía).
+                  </p>
                 </div>
+              )}
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">
+                  Razón social (registro fiscal)
+                </label>
+                <Input
+                  value={editRazonSocial}
+                  onChange={(e) => setEditRazonSocial(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Crea una fila en personas_datos_fiscales si no existe. Para datos completos del
+                  SAT (régimen, domicilio fiscal, etc.) usa &ldquo;Cargar / Actualizar CSF&rdquo;.
+                </p>
+              </div>
+            </div>
+
+            {/* Contacto y domicilio operativo */}
+            <div className="space-y-4">
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Contacto y domicilio
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
@@ -1089,14 +1253,44 @@ export function ProveedoresModule({
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium leading-none">RFC</label>
+                <label className="text-sm font-medium leading-none">Domicilio (texto libre)</label>
                 <Input
-                  value={editRFC}
-                  onChange={(e) => setEditRFC(e.target.value)}
-                  className="uppercase"
+                  value={editDomicilio}
+                  onChange={(e) => setEditDomicilio(e.target.value)}
+                  placeholder="Calle, colonia, ciudad, CP…"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Para domicilios estructurados (varios, por tipo) usa la sección
+                  &ldquo;Direcciones&rdquo; del detalle.
+                </p>
               </div>
             </div>
+
+            {/* Comerciales */}
+            <div className="space-y-4">
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Comerciales
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium leading-none">Condiciones de pago</label>
+                  <Input
+                    value={editCondicionesPago}
+                    onChange={(e) => setEditCondicionesPago(e.target.value)}
+                    placeholder="7 días, Pago en tienda, Pedido por App…"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium leading-none">Categoría</label>
+                  <Input
+                    value={editCategoria}
+                    onChange={(e) => setEditCategoria(e.target.value)}
+                    placeholder="Insumos, Servicios, Materia prima…"
+                  />
+                </div>
+              </div>
+            </div>
+
             <div className="flex justify-end pt-6 border-t">
               <Button onClick={handleSaveEdit} disabled={savingEdit} className="gap-2">
                 {savingEdit ? (
