@@ -3,10 +3,11 @@
 **Slug:** `import-empleados-contpaqi`
 **Empresas:** DILESA, RDB
 **Schemas afectados:** `erp` (nueva tabla `empleados_pago` y `empleados_import_log`, columnas nuevas en `empleados`); `core` (columna `empresas.rpi_imss`)
-**Estado:** planned
+**Estado:** done
 **Dueño:** Claude Code (ejecuta) / Beto (decide y mergea)
 **Creada:** 2026-04-30
-**Última actualización:** 2026-04-30 (alcance v1 cerrado con 8 preguntas resueltas en chat de promoción y regla de exclusión de accionistas/consejo agregada por Beto)
+**Cerrada:** 2026-05-01
+**Última actualización:** 2026-05-01 (Sprint 6 closeout — los 8 sprints completos: schema delta, catálogos, dry-run, apply (187 acciones), paridad UI, drawer detail expandido, editor extendido, closeout)
 
 ## Problema
 
@@ -118,7 +119,27 @@ candidata`, conflictos detectados y dudas catalogadas.
   `motivo_baja = 'No presente en snapshot CONTPAQi 2026-04-30'`.
 - Reporte final con conteos y links a empleados afectados.
 
-### Sprint 5 — Closeout
+### Sprint 5 — UI Personal (paridad + drawer + editor)
+
+Sub-divido en 3 PRs tras ronda de preguntas con Beto:
+
+- **5A** — Paridad pages + tabs `Empleados` / `Accionistas` / `Todos` +
+  columnas estándar (incluye email empresa→personal fallback y
+  antigüedad) + filtros (Estado, Departamento, Antigüedad por rangos).
+  Eliminadas las flags por-empresa que causaban drift entre DILESA y
+  RDB.
+- **5B** — Page detail expandido con secciones nuevas read-only:
+  Identidad, Datos personales (sexo, estado civil, nacionalidad, lugar
+  nacimiento, domicilio), IMSS y régimen fiscal, Compensación vigente,
+  Cuenta bancaria, Puestos asignados, Contacto emergencia, Audit log
+  (`empleados_import_log`).
+- **5C** — Editor extendido: helpers `<EditField>` y `<EditCombo>`,
+  `handleSave` extendido con UPDATEs a `personas` y `empleados` y
+  upsert vigente (cierra fila + crea nueva) en `empleados_compensacion`
+  y `empleados_pago`. RFC/CURP se mantienen read-only — cambios
+  sensibles deben ir por wizard de alta.
+
+### Sprint 6 — Closeout
 
 - Bitácora, decisiones registradas, mover a `done` en `INITIATIVES.md`.
 - Barrer reminder de `Claude: BSOP`.
@@ -266,13 +287,16 @@ El resultado debe ser cero.
 
 ## Sprints / hitos
 
-| #   | Scope                                                                                                                    | Estado    | PR  |
-| --- | ------------------------------------------------------------------------------------------------------------------------ | --------- | --- |
-| 1   | Schema delta: tabla `empleados_pago` y `empleados_import_log`, columnas nuevas en `empleados` y `core.empresas.rpi_imss` | pendiente | —   |
-| 2   | Catálogos: detectar y crear puestos/departamentos faltantes en Title Case                                                | pendiente | —   |
-| 3   | Script dry-run `scripts/migrations/import-contpaqi/run.ts` con reporte markdown                                          | pendiente | —   |
-| 4   | Apply y bajas en bloque tras OK de Beto                                                                                  | pendiente | —   |
-| 5   | Closeout (bitácora, decisiones, mover a done)                                                                            | pendiente | —   |
+| #   | Scope                                                                                                                       | Estado          | PR        |
+| --- | --------------------------------------------------------------------------------------------------------------------------- | --------------- | --------- |
+| 1   | Schema delta: tabla `empleados_pago` y `empleados_import_log`, columnas nuevas en `empleados` y `core.empresas.rpi_imss`    | done 2026-05-01 | #381      |
+| 2   | Catálogos: detectar y crear puestos/departamentos faltantes en Title Case (25 inserts)                                      | done 2026-05-01 | #382      |
+| 3   | Script dry-run `scripts/import-contpaqi/dry-run.py` con reporte markdown                                                    | done 2026-05-01 | #383      |
+| 4   | Apply y bajas en bloque (187 acciones aplicadas en transacción atómica)                                                     | done 2026-05-01 | #384      |
+| 5A  | Paridad UI Personal — tabs Empleados/Accionistas/Todos, columnas estándar, filtros antigüedad, eliminadas flags por-empresa | done 2026-05-01 | #385      |
+| 5B  | Page detail expandido — secciones nuevas read-only (Identidad, Datos personales, IMSS, Compensación, Banco, Puestos, Audit) | done 2026-05-01 | #386      |
+| 5C  | Editor extendido — `<EditField>` / `<EditCombo>`, handleSave con upsert vigente en compensación y pago                      | done 2026-05-01 | #387      |
+| 6   | Closeout (bitácora, decisiones, mover a done)                                                                               | done 2026-05-01 | _este PR_ |
 
 ## Bitácora
 
@@ -289,3 +313,78 @@ El resultado debe ser cero.
   en CONTPAQi (regla de exclusión agregada al algoritmo). Doc creado,
   fila agregada en `INITIATIVES.md`, reminder de revisión final del
   dry-run pendiente en `Claude: BSOP`.
+
+### 2026-05-01
+
+- **Sprint 1 (#381)** — schema delta aplicado en prod con psql desde la
+  branch. Verificadas via Supabase MCP: tablas `empleados_pago` y
+  `empleados_import_log` creadas con 4 policies y 5 indexes cada una,
+  trigger `updated_at` activo. Columnas nuevas en `empleados`: `umf`,
+  `zona_salario`, `regimen_imss`, `tipo_prestacion`, `sindicalizado`,
+  `metodo_pago_sat`. `core.empresas.rpi_imss` agregada. Hallazgo: NO
+  existe UNIQUE en `empleados.(empresa_id, persona_id)` — solo INDEX
+  no-único, no hay que relajar nada para el caso RDB-en-DILESA.
+  Regenerados `SCHEMA_REF.md` y `types/supabase.ts`.
+- **Sprint 2 (#382)** — catálogos puestos/departamentos. 25 inserts
+  totales (18 DILESA: 4 deptos + 14 puestos; 7 RDB: 0 deptos + 7
+  puestos). Match flexible case-insensitive y sin tildes contra DB para
+  reusar lo existente (17 puestos reusan match con MAYÚSCULAS de DB,
+  ej. `JEFE DE CUADRILLA` ↔ `Jefe de Cuadrilla`). Decisiones de
+  normalización: Title Case ES, correcciones ortográficas
+  (`Mercadoctenia` → `Mercadotecnia`, `Tramites` → `Trámites`,
+  `Urbanizacion` → `Urbanización`), `Rincon del Bosque` mapea al
+  `Deportivo` ya existente. Primera versión con UUIDs hardcodeados
+  hizo fallar Supabase Preview (preview tiene DB vacía sin slugs);
+  refactor a lookup por slug arregló el FK violation.
+- **Sprint 3 (#383)** — script dry-run Python self-contained
+  `scripts/import-contpaqi/dry-run.py` (676 líneas). Lee Excel +
+  snapshots DB (en JSON, los de PII gitignored). Match por CURP → RFC
+  → fuzzy nombre+fecha_nac → numero_empleado. Reporte completo en
+  `docs/planning/import-contpaqi-dry-run-report.md`. Resultados:
+  DILESA 24 INSERT + 131 UPDATE + 6 conflict (RFCs ambiguos en DB);
+  RDB 19 INSERT + 1 UPDATE; 12 bajas candidatas. DUAL_ROUTE = 0 porque
+  los 22 RDB-en-DILESA son TODOS bajas históricas, no abren fila nueva
+  en RDB. Audit del cluster confirmado.
+- **Sprint 4 (#384)** — script apply + SQL transaccional. Decisiones
+  cerradas con Beto sobre los 6 conflicts y 12 bajas: 4 bajas se
+  aplican (Godoy, Arriaga, Martinez, Rodríguez Llamas), 6 sospechosos
+  (Santos/Chavarría) se agregan a `exclusion_baja.json` como
+  familiares no taggeados, 2 quedan flagged con datos rotos. Conflicts
+  resueltos con `update_db_id` específico + soft-deletes de duplicados
+  (códigos 006 y 085). Apply requirió **3 iteraciones** por CHECK
+  constraints: (1) script inicial; (2) fix `frecuencia_pago='Semanal'`
+  → `'semanal'` y `tipo_contrato='01'` → `'indefinido'`; (3) fix
+  `match_metodo='conflict_resolution'` → `'manual'`. Cada fallo
+  rollbackeó limpio. **187 acciones aplicadas** verificadas via MCP:
+  43 INSERT, 138 UPDATE (incluye 6 conflicts), 4 BAJA, 2 SKIP. Estado
+  prod: 234 empleados DILESA, 33 empleados RDB, 166 pagos vigentes,
+  174 compensaciones vigentes.
+- **Sprint 5A (#385)** — paridad UI Personal. Tabs Empleados (default)
+  / Accionistas / Todos en `<EmpleadosModule>`. Eliminadas flags
+  `showNumeroEmpleadoColumn`, `showEstadoColumn`, `showDeptoFilter` que
+  causaban drift entre DILESA y RDB — las 3 page wrappers ahora pasan
+  los mismos props. Filtros nuevos: Estado independiente
+  (Activos/Ex-empleados/Todos), Antigüedad por rangos (<1 año, 1-3,
+  3-5, 5-10, >10). Columnas estándar siempre visibles incluyen email
+  empresa→personal fallback y antigüedad calculada.
+- **Sprint 5B (#386)** — page detail expandido. Secciones nuevas
+  read-only: Identidad (RFC, CURP), Datos personales (sexo, estado
+  civil, nacionalidad, lugar nacimiento, telefono casa, domicilio),
+  IMSS y régimen fiscal (UMF, zona, régimen, prestación, sindicalizado,
+  método pago SAT, tipo contrato, horario, lugar trabajo, día pago,
+  funciones, periodo prueba), Compensación vigente, Cuenta bancaria,
+  Puestos asignados (multi via `empleados_puestos`), Contacto
+  emergencia, Audit log (últimas 20 entries de
+  `empleados_import_log`).
+- **Sprint 5C (#387)** — editor extendido. Helpers `<EditField>` y
+  `<EditCombo>` reusables. `handleSave` extendido para hacer UPDATE
+  en `empleados`, UPDATE en `personas`, y upsert vigente en
+  `empleados_compensacion` y `empleados_pago` (cierra fila vigente con
+  `fecha_fin = today`, crea nueva con `fecha_inicio = today`,
+  histórico preservado). Combobox para campos con valores SAT/IMSS
+  conocidos (régimen, método pago, prestación, sindicalizado, sexo,
+  estado civil, frecuencia pago, zona salario). RFC/CURP se mantienen
+  read-only — cambios sensibles deben ir por wizard de alta.
+- **Sprint 6 (este PR)** — closeout: bitácora final, mover iniciativa
+  a `done` en `INITIATIVES.md`, completado el reminder de la decisión
+  del dry-run en `Claude: BSOP`.
