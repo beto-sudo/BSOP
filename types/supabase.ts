@@ -202,6 +202,7 @@ export type Database = {
           registro_patronal_imss: string | null
           representante_legal: string | null
           rfc: string | null
+          rpi_imss: string | null
           slug: string
           solo_fiscal: boolean
           tipo_contribuyente: string
@@ -257,6 +258,7 @@ export type Database = {
           registro_patronal_imss?: string | null
           representante_legal?: string | null
           rfc?: string | null
+          rpi_imss?: string | null
           slug: string
           solo_fiscal?: boolean
           tipo_contribuyente?: string
@@ -312,6 +314,7 @@ export type Database = {
           registro_patronal_imss?: string | null
           representante_legal?: string | null
           rfc?: string | null
+          rpi_imss?: string | null
           slug?: string
           solo_fiscal?: boolean
           tipo_contribuyente?: string
@@ -4464,6 +4467,7 @@ export type Database = {
           horario: string | null
           id: string
           lugar_trabajo: string | null
+          metodo_pago_sat: string | null
           motivo_baja: string | null
           notas: string | null
           nss: string | null
@@ -4473,9 +4477,14 @@ export type Database = {
           persona_id: string
           puesto_id: string | null
           reemplaza_a: string | null
+          regimen_imss: string | null
+          sindicalizado: string | null
           telefono_empresa: string | null
           tipo_contrato: string | null
+          tipo_prestacion: string | null
+          umf: string | null
           updated_at: string | null
+          zona_salario: string | null
         }
         Insert: {
           activo?: boolean
@@ -4493,6 +4502,7 @@ export type Database = {
           horario?: string | null
           id?: string
           lugar_trabajo?: string | null
+          metodo_pago_sat?: string | null
           motivo_baja?: string | null
           notas?: string | null
           nss?: string | null
@@ -4502,9 +4512,14 @@ export type Database = {
           persona_id: string
           puesto_id?: string | null
           reemplaza_a?: string | null
+          regimen_imss?: string | null
+          sindicalizado?: string | null
           telefono_empresa?: string | null
           tipo_contrato?: string | null
+          tipo_prestacion?: string | null
+          umf?: string | null
           updated_at?: string | null
+          zona_salario?: string | null
         }
         Update: {
           activo?: boolean
@@ -4522,6 +4537,7 @@ export type Database = {
           horario?: string | null
           id?: string
           lugar_trabajo?: string | null
+          metodo_pago_sat?: string | null
           motivo_baja?: string | null
           notas?: string | null
           nss?: string | null
@@ -4531,9 +4547,14 @@ export type Database = {
           persona_id?: string
           puesto_id?: string | null
           reemplaza_a?: string | null
+          regimen_imss?: string | null
+          sindicalizado?: string | null
           telefono_empresa?: string | null
           tipo_contrato?: string | null
+          tipo_prestacion?: string | null
+          umf?: string | null
           updated_at?: string | null
+          zona_salario?: string | null
         }
         Relationships: [
           {
@@ -4652,6 +4673,143 @@ export type Database = {
           },
           {
             foreignKeyName: "empleados_compensacion_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "v_empleados_full"
+            referencedColumns: ["empleado_id"]
+          },
+        ]
+      }
+      empleados_import_log: {
+        Row: {
+          accion: string
+          created_at: string
+          diff: Json
+          empleado_id: string | null
+          empresa_id: string
+          id: string
+          match_metodo: string | null
+          notas: string | null
+          origen: string
+          persona_id: string | null
+          snapshot_fecha: string
+        }
+        Insert: {
+          accion: string
+          created_at?: string
+          diff?: Json
+          empleado_id?: string | null
+          empresa_id: string
+          id?: string
+          match_metodo?: string | null
+          notas?: string | null
+          origen: string
+          persona_id?: string | null
+          snapshot_fecha: string
+        }
+        Update: {
+          accion?: string
+          created_at?: string
+          diff?: Json
+          empleado_id?: string | null
+          empresa_id?: string
+          id?: string
+          match_metodo?: string | null
+          notas?: string | null
+          origen?: string
+          persona_id?: string | null
+          snapshot_fecha?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "empleados_import_log_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "empleados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "empleados_import_log_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "v_empleados_full"
+            referencedColumns: ["empleado_id"]
+          },
+          {
+            foreignKeyName: "empleados_import_log_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "empleados_import_log_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "v_empleados_full"
+            referencedColumns: ["persona_id"]
+          },
+        ]
+      }
+      empleados_pago: {
+        Row: {
+          banco_codigo: string | null
+          banco_nombre: string | null
+          clabe: string | null
+          created_at: string
+          empleado_id: string
+          empresa_id: string
+          fecha_fin: string | null
+          fecha_inicio: string | null
+          id: string
+          notas: string | null
+          numero_cuenta: string | null
+          sucursal: string | null
+          updated_at: string | null
+          vigente: boolean
+        }
+        Insert: {
+          banco_codigo?: string | null
+          banco_nombre?: string | null
+          clabe?: string | null
+          created_at?: string
+          empleado_id: string
+          empresa_id: string
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          id?: string
+          notas?: string | null
+          numero_cuenta?: string | null
+          sucursal?: string | null
+          updated_at?: string | null
+          vigente?: boolean
+        }
+        Update: {
+          banco_codigo?: string | null
+          banco_nombre?: string | null
+          clabe?: string | null
+          created_at?: string
+          empleado_id?: string
+          empresa_id?: string
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          id?: string
+          notas?: string | null
+          numero_cuenta?: string | null
+          sucursal?: string | null
+          updated_at?: string | null
+          vigente?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "empleados_pago_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "empleados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "empleados_pago_empleado_id_fkey"
             columns: ["empleado_id"]
             isOneToOne: false
             referencedRelation: "v_empleados_full"
