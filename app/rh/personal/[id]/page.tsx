@@ -22,7 +22,6 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { FieldLabel } from '@/components/ui/field-label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, Save, Loader2, UserX } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -157,13 +156,59 @@ function InfoRow({ label, value }: { label: string; value: string | null | numbe
   );
 }
 
-function formatMoney(n: number | null | undefined): string {
-  if (n === null || n === undefined) return '—';
-  return new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: 'MXN',
-    minimumFractionDigits: 2,
-  }).format(n);
+function EditField({
+  label,
+  value,
+  onChange,
+  type = 'text',
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: 'text' | 'date' | 'number' | 'email' | 'tel';
+  placeholder?: string;
+}) {
+  return (
+    <div>
+      <FieldLabel>{label}</FieldLabel>
+      <Input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+      />
+    </div>
+  );
+}
+
+function EditCombo({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  placeholder?: string;
+}) {
+  return (
+    <div>
+      <FieldLabel>{label}</FieldLabel>
+      <Combobox
+        value={value}
+        onChange={onChange}
+        options={options}
+        placeholder={placeholder ?? '—'}
+        allowClear
+        className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+      />
+    </div>
+  );
 }
 
 const REGIMEN_IMSS_LABELS: Record<string, string> = {
@@ -180,20 +225,6 @@ const METODO_PAGO_SAT_LABELS: Record<string, string> = {
   '02': '02 — Cheque nominativo',
   '03': '03 — Transferencia electrónica',
   '28': '28 — Tarjeta de débito',
-};
-
-const SINDICALIZADO_LABELS: Record<string, string> = {
-  C: 'Confianza',
-  S: 'Sindicalizado',
-};
-
-const SEXO_LABELS: Record<string, string> = { M: 'Masculino', F: 'Femenino' };
-const ESTADO_CIVIL_LABELS: Record<string, string> = {
-  S: 'Soltero(a)',
-  C: 'Casado(a)',
-  U: 'Unión libre',
-  V: 'Viudo(a)',
-  D: 'Divorciado(a)',
 };
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -216,7 +247,7 @@ function EmpleadoDetailInner() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Editable fields
+  // Editable fields — empleado
   const [numeroEmpleado, setNumeroEmpleado] = useState('');
   const [fechaIngreso, setFechaIngreso] = useState('');
   const [departamentoId, setDepartamentoId] = useState('');
@@ -225,6 +256,45 @@ function EmpleadoDetailInner() {
   const [fechaNacimiento, setFechaNacimiento] = useState('');
   const [telefonoEmpresa, setTelefonoEmpresa] = useState('');
   const [extension, setExtension] = useState('');
+  const [emailEmpresa, setEmailEmpresa] = useState('');
+  const [tipoContrato, setTipoContrato] = useState('');
+  const [horario, setHorario] = useState('');
+  const [lugarTrabajo, setLugarTrabajo] = useState('');
+  const [diaPago, setDiaPago] = useState('');
+  const [funciones, setFunciones] = useState('');
+  const [periodoPrueba, setPeriodoPrueba] = useState('');
+  const [umf, setUmf] = useState('');
+  const [zonaSalario, setZonaSalario] = useState('');
+  const [regimenImss, setRegimenImss] = useState('');
+  const [tipoPrestacion, setTipoPrestacion] = useState('');
+  const [sindicalizado, setSindicalizado] = useState('');
+  const [metodoPagoSat, setMetodoPagoSat] = useState('');
+  // Editable fields — persona
+  const [personaEmail, setPersonaEmail] = useState('');
+  const [personaTelefono, setPersonaTelefono] = useState('');
+  const [personaTelefonoCasa, setPersonaTelefonoCasa] = useState('');
+  const [personaSexo, setPersonaSexo] = useState('');
+  const [personaEstadoCivil, setPersonaEstadoCivil] = useState('');
+  const [personaNacionalidad, setPersonaNacionalidad] = useState('');
+  const [personaLugarNacimiento, setPersonaLugarNacimiento] = useState('');
+  const [personaDomicilio, setPersonaDomicilio] = useState('');
+  const [contactoEmergenciaNombre, setContactoEmergenciaNombre] = useState('');
+  const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState('');
+  const [contactoEmergenciaParentesco, setContactoEmergenciaParentesco] = useState('');
+  // Editable fields — compensación
+  const [compSueldoDiario, setCompSueldoDiario] = useState('');
+  const [compSueldoMensual, setCompSueldoMensual] = useState('');
+  const [compSdi, setCompSdi] = useState('');
+  const [compFrecuencia, setCompFrecuencia] = useState('');
+  const [compComisiones, setCompComisiones] = useState('');
+  const [compBonificaciones, setCompBonificaciones] = useState('');
+  const [compCompensaciones, setCompCompensaciones] = useState('');
+  // Editable fields — pago
+  const [pagoBancoCodigo, setPagoBancoCodigo] = useState('');
+  const [pagoBancoNombre, setPagoBancoNombre] = useState('');
+  const [pagoNumeroCuenta, setPagoNumeroCuenta] = useState('');
+  const [pagoClabe, setPagoClabe] = useState('');
+  const [pagoSucursal, setPagoSucursal] = useState('');
 
   const departamentoOptions = useMemo(() => {
     const opts = departamentos.map((d) => ({ value: d.id, label: d.nombre }));
@@ -283,6 +353,31 @@ function EmpleadoDetailInner() {
     setFechaNacimiento(emp.fecha_nacimiento ?? '');
     setTelefonoEmpresa(emp.telefono_empresa ?? '');
     setExtension(emp.extension ?? '');
+    setEmailEmpresa(emp.email_empresa ?? '');
+    setTipoContrato(emp.tipo_contrato ?? '');
+    setHorario(emp.horario ?? '');
+    setLugarTrabajo(emp.lugar_trabajo ?? '');
+    setDiaPago(emp.dia_pago ?? '');
+    setFunciones(emp.funciones ?? '');
+    setPeriodoPrueba(emp.periodo_prueba_dias != null ? String(emp.periodo_prueba_dias) : '');
+    setUmf(emp.umf ?? '');
+    setZonaSalario(emp.zona_salario ?? '');
+    setRegimenImss(emp.regimen_imss ?? '');
+    setTipoPrestacion(emp.tipo_prestacion ?? '');
+    setSindicalizado(emp.sindicalizado ?? '');
+    setMetodoPagoSat(emp.metodo_pago_sat ?? '');
+    const pn = normalized.persona;
+    setPersonaEmail(pn?.email ?? '');
+    setPersonaTelefono(pn?.telefono ?? '');
+    setPersonaTelefonoCasa(pn?.telefono_casa ?? '');
+    setPersonaSexo(pn?.sexo ?? '');
+    setPersonaEstadoCivil(pn?.estado_civil ?? '');
+    setPersonaNacionalidad(pn?.nacionalidad ?? '');
+    setPersonaLugarNacimiento(pn?.lugar_nacimiento ?? '');
+    setPersonaDomicilio(pn?.domicilio ?? '');
+    setContactoEmergenciaNombre(pn?.contacto_emergencia_nombre ?? '');
+    setContactoEmergenciaTelefono(pn?.contacto_emergencia_telefono ?? '');
+    setContactoEmergenciaParentesco(pn?.contacto_emergencia_parentesco ?? '');
 
     const [deptRes, puestosRes, compRes, pagoRes, puestosAsigRes, logRes] = await Promise.all([
       supabase
@@ -332,8 +427,26 @@ function EmpleadoDetailInner() {
 
     setDepartamentos(deptRes.data ?? []);
     setPuestos(puestosRes.data ?? []);
-    setCompensacion((compRes.data ?? null) as EmpleadoCompensacion | null);
-    setPago((pagoRes.data ?? null) as EmpleadoPago | null);
+    const comp = (compRes.data ?? null) as EmpleadoCompensacion | null;
+    setCompensacion(comp);
+    setCompSueldoDiario(comp?.sueldo_diario != null ? String(comp.sueldo_diario) : '');
+    setCompSueldoMensual(comp?.sueldo_mensual != null ? String(comp.sueldo_mensual) : '');
+    setCompSdi(comp?.sdi != null ? String(comp.sdi) : '');
+    setCompFrecuencia(comp?.frecuencia_pago ?? '');
+    setCompComisiones(comp?.comisiones_mensuales != null ? String(comp.comisiones_mensuales) : '');
+    setCompBonificaciones(
+      comp?.bonificaciones_mensuales != null ? String(comp.bonificaciones_mensuales) : ''
+    );
+    setCompCompensaciones(
+      comp?.compensaciones_mensuales != null ? String(comp.compensaciones_mensuales) : ''
+    );
+    const pg = (pagoRes.data ?? null) as EmpleadoPago | null;
+    setPago(pg);
+    setPagoBancoCodigo(pg?.banco_codigo ?? '');
+    setPagoBancoNombre(pg?.banco_nombre ?? '');
+    setPagoNumeroCuenta(pg?.numero_cuenta ?? '');
+    setPagoClabe(pg?.clabe ?? '');
+    setPagoSucursal(pg?.sucursal ?? '');
     const puestosNormalized = (puestosAsigRes.data ?? []).map((p: Record<string, unknown>) => ({
       ...p,
       puesto: Array.isArray(p.puesto) ? (p.puesto[0] ?? null) : p.puesto,
@@ -351,23 +464,177 @@ function EmpleadoDetailInner() {
   const handleSave = async () => {
     if (!empleado) return;
     setSaving(true);
-    const { error: err } = await supabase
+    const todayISO = new Date().toISOString().split('T')[0];
+    const trimOrNull = (s: string) => (s.trim() === '' ? null : s.trim());
+    const numOrNull = (s: string) => {
+      const v = parseFloat(s);
+      return Number.isFinite(v) ? v : null;
+    };
+    const intOrNull = (s: string) => {
+      const v = parseInt(s, 10);
+      return Number.isFinite(v) ? v : null;
+    };
+
+    // 1. UPDATE erp.empleados
+    const { error: empErr } = await supabase
       .schema('erp')
       .from('empleados')
       .update({
-        numero_empleado: numeroEmpleado.trim() || null,
+        numero_empleado: trimOrNull(numeroEmpleado),
         fecha_ingreso: fechaIngreso || null,
         departamento_id: departamentoId || null,
         puesto_id: puestoId || null,
-        nss: nss.trim() || null,
+        nss: trimOrNull(nss),
         fecha_nacimiento: fechaNacimiento || null,
-        telefono_empresa: telefonoEmpresa.trim() || null,
-        extension: extension.trim() || null,
+        telefono_empresa: trimOrNull(telefonoEmpresa),
+        extension: trimOrNull(extension),
+        email_empresa: trimOrNull(emailEmpresa),
+        tipo_contrato: trimOrNull(tipoContrato),
+        horario: trimOrNull(horario),
+        lugar_trabajo: trimOrNull(lugarTrabajo),
+        dia_pago: trimOrNull(diaPago),
+        funciones: trimOrNull(funciones),
+        periodo_prueba_dias: intOrNull(periodoPrueba),
+        umf: trimOrNull(umf),
+        zona_salario: trimOrNull(zonaSalario),
+        regimen_imss: trimOrNull(regimenImss),
+        tipo_prestacion: trimOrNull(tipoPrestacion),
+        sindicalizado: trimOrNull(sindicalizado),
+        metodo_pago_sat: trimOrNull(metodoPagoSat),
       })
       .eq('id', empleado.id);
+    if (empErr) {
+      setSaving(false);
+      alert(`Error al guardar empleado: ${empErr.message}`);
+      return;
+    }
+
+    // 2. UPDATE erp.personas
+    if (empleado.persona?.id) {
+      const { error: pErr } = await supabase
+        .schema('erp')
+        .from('personas')
+        .update({
+          email: trimOrNull(personaEmail),
+          telefono: trimOrNull(personaTelefono),
+          telefono_casa: trimOrNull(personaTelefonoCasa),
+          sexo: trimOrNull(personaSexo),
+          estado_civil: trimOrNull(personaEstadoCivil),
+          nacionalidad: trimOrNull(personaNacionalidad),
+          lugar_nacimiento: trimOrNull(personaLugarNacimiento),
+          domicilio: trimOrNull(personaDomicilio),
+          contacto_emergencia_nombre: trimOrNull(contactoEmergenciaNombre),
+          contacto_emergencia_telefono: trimOrNull(contactoEmergenciaTelefono),
+          contacto_emergencia_parentesco: trimOrNull(contactoEmergenciaParentesco),
+        })
+        .eq('id', empleado.persona.id);
+      if (pErr) {
+        setSaving(false);
+        alert(`Error al guardar persona: ${pErr.message}`);
+        return;
+      }
+    }
+
+    // 3. Upsert vigente de erp.empleados_compensacion (solo si hay datos)
+    const compChanged =
+      compSueldoDiario !==
+        (compensacion?.sueldo_diario != null ? String(compensacion.sueldo_diario) : '') ||
+      compSueldoMensual !==
+        (compensacion?.sueldo_mensual != null ? String(compensacion.sueldo_mensual) : '') ||
+      compSdi !== (compensacion?.sdi != null ? String(compensacion.sdi) : '') ||
+      compFrecuencia !== (compensacion?.frecuencia_pago ?? '') ||
+      compComisiones !==
+        (compensacion?.comisiones_mensuales != null
+          ? String(compensacion.comisiones_mensuales)
+          : '') ||
+      compBonificaciones !==
+        (compensacion?.bonificaciones_mensuales != null
+          ? String(compensacion.bonificaciones_mensuales)
+          : '') ||
+      compCompensaciones !==
+        (compensacion?.compensaciones_mensuales != null
+          ? String(compensacion.compensaciones_mensuales)
+          : '');
+    const compHasData =
+      compSueldoDiario !== '' ||
+      compSueldoMensual !== '' ||
+      compSdi !== '' ||
+      compFrecuencia !== '' ||
+      compComisiones !== '' ||
+      compBonificaciones !== '' ||
+      compCompensaciones !== '';
+    if (compChanged && compHasData) {
+      if (compensacion?.id) {
+        await supabase
+          .schema('erp')
+          .from('empleados_compensacion')
+          .update({ vigente: false, fecha_fin: todayISO })
+          .eq('id', compensacion.id);
+      }
+      const { error: cErr } = await supabase
+        .schema('erp')
+        .from('empleados_compensacion')
+        .insert({
+          empresa_id: empleado.empresa_id,
+          empleado_id: empleado.id,
+          sueldo_diario: numOrNull(compSueldoDiario),
+          sueldo_mensual: numOrNull(compSueldoMensual),
+          sdi: numOrNull(compSdi),
+          frecuencia_pago: trimOrNull(compFrecuencia),
+          comisiones_mensuales: numOrNull(compComisiones) ?? 0,
+          bonificaciones_mensuales: numOrNull(compBonificaciones) ?? 0,
+          compensaciones_mensuales: numOrNull(compCompensaciones) ?? 0,
+          fecha_inicio: todayISO,
+          vigente: true,
+        });
+      if (cErr) {
+        setSaving(false);
+        alert(`Error al guardar compensación: ${cErr.message}`);
+        return;
+      }
+    }
+
+    // 4. Upsert vigente de erp.empleados_pago (solo si hay datos)
+    const pagoChanged =
+      pagoBancoCodigo !== (pago?.banco_codigo ?? '') ||
+      pagoBancoNombre !== (pago?.banco_nombre ?? '') ||
+      pagoNumeroCuenta !== (pago?.numero_cuenta ?? '') ||
+      pagoClabe !== (pago?.clabe ?? '') ||
+      pagoSucursal !== (pago?.sucursal ?? '');
+    const pagoHasMin =
+      (pagoBancoCodigo.trim() !== '' || pagoBancoNombre.trim() !== '') &&
+      (pagoNumeroCuenta.trim() !== '' || pagoClabe.trim() !== '');
+    if (pagoChanged && pagoHasMin) {
+      if (pago?.id) {
+        await supabase
+          .schema('erp')
+          .from('empleados_pago')
+          .update({ vigente: false, fecha_fin: todayISO })
+          .eq('id', pago.id);
+      }
+      const { error: pgErr } = await supabase
+        .schema('erp')
+        .from('empleados_pago')
+        .insert({
+          empresa_id: empleado.empresa_id,
+          empleado_id: empleado.id,
+          banco_codigo: trimOrNull(pagoBancoCodigo),
+          banco_nombre: trimOrNull(pagoBancoNombre),
+          numero_cuenta: trimOrNull(pagoNumeroCuenta),
+          clabe: trimOrNull(pagoClabe),
+          sucursal: trimOrNull(pagoSucursal),
+          fecha_inicio: todayISO,
+          vigente: true,
+        });
+      if (pgErr) {
+        setSaving(false);
+        alert(`Error al guardar pago: ${pgErr.message}`);
+        return;
+      }
+    }
+
     setSaving(false);
-    if (err) alert(`Error al guardar: ${err.message}`);
-    else await fetchAll();
+    await fetchAll();
   };
 
   const handleBaja = async () => {
@@ -472,10 +739,29 @@ function EmpleadoDetailInner() {
           </div>
           <div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <InfoRow label="Nombre completo" value={fullName(empleado)} />
-            <InfoRow label="Email" value={empleado.persona?.email ?? null} />
-            <InfoRow label="Teléfono personal" value={empleado.persona?.telefono ?? null} />
             <InfoRow label="RFC" value={empleado.persona?.rfc ?? null} />
             <InfoRow label="CURP" value={empleado.persona?.curp ?? null} />
+            <EditField
+              label="Email personal"
+              value={personaEmail}
+              onChange={setPersonaEmail}
+              type="email"
+              placeholder="ej. juan@gmail.com"
+            />
+            <EditField
+              label="Email empresa"
+              value={emailEmpresa}
+              onChange={setEmailEmpresa}
+              type="email"
+              placeholder="ej. juan@dilesa.mx"
+            />
+            <EditField
+              label="Teléfono celular"
+              value={personaTelefono}
+              onChange={setPersonaTelefono}
+              type="tel"
+              placeholder="(844) 000-0000"
+            />
           </div>
         </div>
       </div>
@@ -567,23 +853,52 @@ function EmpleadoDetailInner() {
               className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
             />
           </div>
-          <InfoRow
+          <EditCombo
             label="Sexo"
-            value={SEXO_LABELS[empleado.persona?.sexo ?? ''] ?? empleado.persona?.sexo ?? null}
+            value={personaSexo}
+            onChange={setPersonaSexo}
+            options={[
+              { value: 'M', label: 'Masculino' },
+              { value: 'F', label: 'Femenino' },
+            ]}
           />
-          <InfoRow
+          <EditCombo
             label="Estado civil"
-            value={
-              ESTADO_CIVIL_LABELS[empleado.persona?.estado_civil ?? ''] ??
-              empleado.persona?.estado_civil ??
-              null
-            }
+            value={personaEstadoCivil}
+            onChange={setPersonaEstadoCivil}
+            options={[
+              { value: 'S', label: 'Soltero(a)' },
+              { value: 'C', label: 'Casado(a)' },
+              { value: 'U', label: 'Unión libre' },
+              { value: 'V', label: 'Viudo(a)' },
+              { value: 'D', label: 'Divorciado(a)' },
+            ]}
           />
-          <InfoRow label="Nacionalidad" value={empleado.persona?.nacionalidad ?? null} />
-          <InfoRow label="Lugar de nacimiento" value={empleado.persona?.lugar_nacimiento ?? null} />
-          <InfoRow label="Teléfono casa" value={empleado.persona?.telefono_casa ?? null} />
+          <EditField
+            label="Nacionalidad"
+            value={personaNacionalidad}
+            onChange={setPersonaNacionalidad}
+            placeholder="Mexicana"
+          />
+          <EditField
+            label="Lugar de nacimiento"
+            value={personaLugarNacimiento}
+            onChange={setPersonaLugarNacimiento}
+            placeholder="Ciudad, Estado"
+          />
+          <EditField
+            label="Teléfono casa"
+            value={personaTelefonoCasa}
+            onChange={setPersonaTelefonoCasa}
+            type="tel"
+          />
           <div className="sm:col-span-2 lg:col-span-3">
-            <InfoRow label="Domicilio" value={empleado.persona?.domicilio ?? null} />
+            <EditField
+              label="Domicilio"
+              value={personaDomicilio}
+              onChange={setPersonaDomicilio}
+              placeholder="Calle, número, colonia, CP, ciudad"
+            />
           </div>
         </div>
       </div>
@@ -592,92 +907,190 @@ function EmpleadoDetailInner() {
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 space-y-4">
         <SectionTitle>IMSS y régimen fiscal</SectionTitle>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <InfoRow label="UMF (Unidad Médica Familiar)" value={empleado.umf ?? null} />
-          <InfoRow label="Zona de salario mínimo" value={empleado.zona_salario ?? null} />
-          <InfoRow
+          <EditField
+            label="UMF (Unidad Médica Familiar)"
+            value={umf}
+            onChange={setUmf}
+            placeholder="79"
+          />
+          <EditCombo
+            label="Zona de salario mínimo"
+            value={zonaSalario}
+            onChange={setZonaSalario}
+            options={[
+              { value: 'A', label: 'A — Zona Libre Frontera Norte' },
+              { value: 'B', label: 'B — General' },
+              { value: 'C', label: 'C — Otra' },
+            ]}
+          />
+          <EditCombo
             label="Régimen IMSS"
-            value={
-              REGIMEN_IMSS_LABELS[empleado.regimen_imss ?? ''] ?? empleado.regimen_imss ?? null
-            }
+            value={regimenImss}
+            onChange={setRegimenImss}
+            options={Object.entries(REGIMEN_IMSS_LABELS).map(([value, label]) => ({
+              value,
+              label,
+            }))}
           />
-          <InfoRow label="Tipo de prestación" value={empleado.tipo_prestacion ?? null} />
-          <InfoRow
+          <EditCombo
+            label="Tipo de prestación"
+            value={tipoPrestacion}
+            onChange={setTipoPrestacion}
+            options={[
+              { value: 'De_Ley', label: 'De Ley' },
+              { value: 'Superior_a_Ley', label: 'Superior a Ley' },
+            ]}
+          />
+          <EditCombo
             label="Categoría laboral"
-            value={
-              SINDICALIZADO_LABELS[empleado.sindicalizado ?? ''] ?? empleado.sindicalizado ?? null
-            }
+            value={sindicalizado}
+            onChange={setSindicalizado}
+            options={[
+              { value: 'C', label: 'Confianza' },
+              { value: 'S', label: 'Sindicalizado' },
+            ]}
           />
-          <InfoRow
+          <EditCombo
             label="Método de pago SAT"
-            value={
-              METODO_PAGO_SAT_LABELS[empleado.metodo_pago_sat ?? ''] ??
-              empleado.metodo_pago_sat ??
-              null
-            }
+            value={metodoPagoSat}
+            onChange={setMetodoPagoSat}
+            options={Object.entries(METODO_PAGO_SAT_LABELS).map(([value, label]) => ({
+              value,
+              label,
+            }))}
           />
-          <InfoRow label="Tipo contrato" value={empleado.tipo_contrato ?? null} />
-          <InfoRow label="Horario / turno" value={empleado.horario ?? null} />
-          <InfoRow label="Lugar de trabajo" value={empleado.lugar_trabajo ?? null} />
-          <InfoRow label="Día de pago" value={empleado.dia_pago ?? null} />
-          <InfoRow label="Periodo de prueba (días)" value={empleado.periodo_prueba_dias ?? null} />
+          <EditField label="Tipo contrato" value={tipoContrato} onChange={setTipoContrato} />
+          <EditField
+            label="Horario / turno"
+            value={horario}
+            onChange={setHorario}
+            placeholder="Matutino"
+          />
+          <EditField label="Lugar de trabajo" value={lugarTrabajo} onChange={setLugarTrabajo} />
+          <EditField
+            label="Día de pago"
+            value={diaPago}
+            onChange={setDiaPago}
+            placeholder="Viernes"
+          />
+          <EditField
+            label="Periodo de prueba (días)"
+            value={periodoPrueba}
+            onChange={setPeriodoPrueba}
+            type="number"
+          />
         </div>
-        {empleado.funciones && (
-          <div className="pt-2">
-            <FieldLabel>Funciones</FieldLabel>
-            <p className="text-sm text-[var(--text)] whitespace-pre-wrap">{empleado.funciones}</p>
-          </div>
-        )}
+        <div className="pt-2">
+          <FieldLabel>Funciones</FieldLabel>
+          <textarea
+            value={funciones}
+            onChange={(e) => setFunciones(e.target.value)}
+            rows={3}
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-sm text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+            placeholder="Descripción de funciones del puesto"
+          />
+        </div>
       </div>
 
       {/* Compensación vigente */}
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 space-y-4">
-        <SectionTitle>Compensación vigente</SectionTitle>
-        {compensacion ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <InfoRow label="Sueldo diario" value={formatMoney(compensacion.sueldo_diario)} />
-            <InfoRow label="Sueldo mensual" value={formatMoney(compensacion.sueldo_mensual)} />
-            <InfoRow label="SDI" value={formatMoney(compensacion.sdi)} />
-            <InfoRow label="Tipo contrato" value={compensacion.tipo_contrato ?? null} />
-            <InfoRow label="Frecuencia de pago" value={compensacion.frecuencia_pago ?? null} />
-            <InfoRow label="Vigente desde" value={formatDate(compensacion.fecha_inicio)} />
-            <InfoRow
-              label="Comisiones mensuales"
-              value={formatMoney(compensacion.comisiones_mensuales)}
-            />
-            <InfoRow
-              label="Bonificaciones mensuales"
-              value={formatMoney(compensacion.bonificaciones_mensuales)}
-            />
-            <InfoRow
-              label="Compensaciones mensuales"
-              value={formatMoney(compensacion.compensaciones_mensuales)}
-            />
-          </div>
-        ) : (
-          <p className="text-sm text-[var(--text-muted)]">Sin compensación vigente registrada.</p>
-        )}
+        <div className="flex items-center justify-between">
+          <SectionTitle>Compensación vigente</SectionTitle>
+          {compensacion?.fecha_inicio && (
+            <span className="text-xs text-[var(--text-subtle)]">
+              Vigente desde {formatDate(compensacion.fecha_inicio)}
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-[var(--text-subtle)]">
+          Al guardar, los cambios cierran la fila vigente actual y crean una nueva — el histórico se
+          preserva.
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <EditField
+            label="Sueldo diario"
+            value={compSueldoDiario}
+            onChange={setCompSueldoDiario}
+            type="number"
+          />
+          <EditField
+            label="Sueldo mensual"
+            value={compSueldoMensual}
+            onChange={setCompSueldoMensual}
+            type="number"
+          />
+          <EditField label="SDI" value={compSdi} onChange={setCompSdi} type="number" />
+          <EditCombo
+            label="Frecuencia de pago"
+            value={compFrecuencia}
+            onChange={setCompFrecuencia}
+            options={[
+              { value: 'semanal', label: 'Semanal' },
+              { value: 'quincenal', label: 'Quincenal' },
+              { value: 'mensual', label: 'Mensual' },
+            ]}
+          />
+          <EditField
+            label="Comisiones mensuales"
+            value={compComisiones}
+            onChange={setCompComisiones}
+            type="number"
+          />
+          <EditField
+            label="Bonificaciones mensuales"
+            value={compBonificaciones}
+            onChange={setCompBonificaciones}
+            type="number"
+          />
+          <EditField
+            label="Compensaciones mensuales"
+            value={compCompensaciones}
+            onChange={setCompCompensaciones}
+            type="number"
+          />
+        </div>
       </div>
 
       {/* Banco / Pago vigente */}
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 space-y-4">
-        <SectionTitle>Cuenta bancaria de nómina</SectionTitle>
-        {pago ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <InfoRow
-              label="Banco"
-              value={
-                pago.banco_nombre ?? (pago.banco_codigo ? `Código ${pago.banco_codigo}` : null)
-              }
-            />
-            <InfoRow label="Código de banco" value={pago.banco_codigo ?? null} />
-            <InfoRow label="Número de cuenta" value={pago.numero_cuenta ?? null} />
-            <InfoRow label="CLABE interbancaria" value={pago.clabe ?? null} />
-            <InfoRow label="Sucursal" value={pago.sucursal ?? null} />
-            <InfoRow label="Vigente desde" value={formatDate(pago.fecha_inicio)} />
-          </div>
-        ) : (
-          <p className="text-sm text-[var(--text-muted)]">Sin cuenta bancaria registrada.</p>
-        )}
+        <div className="flex items-center justify-between">
+          <SectionTitle>Cuenta bancaria de nómina</SectionTitle>
+          {pago?.fecha_inicio && (
+            <span className="text-xs text-[var(--text-subtle)]">
+              Vigente desde {formatDate(pago.fecha_inicio)}
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-[var(--text-subtle)]">
+          Captura banco + (cuenta o CLABE). CLABE debe ser 18 dígitos. Cambios cierran la fila
+          vigente y crean una nueva.
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <EditField
+            label="Banco — código (3 dígitos)"
+            value={pagoBancoCodigo}
+            onChange={setPagoBancoCodigo}
+            placeholder="012"
+          />
+          <EditField
+            label="Banco — nombre"
+            value={pagoBancoNombre}
+            onChange={setPagoBancoNombre}
+            placeholder="BBVA"
+          />
+          <EditField label="Sucursal" value={pagoSucursal} onChange={setPagoSucursal} />
+          <EditField
+            label="Número de cuenta"
+            value={pagoNumeroCuenta}
+            onChange={setPagoNumeroCuenta}
+          />
+          <EditField
+            label="CLABE interbancaria (18 dígitos)"
+            value={pagoClabe}
+            onChange={setPagoClabe}
+            placeholder="012180000000000000"
+          />
+        </div>
       </div>
 
       {/* Puestos asignados (multi via empleados_puestos) */}
@@ -720,14 +1133,22 @@ function EmpleadoDetailInner() {
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 space-y-4">
         <SectionTitle>Contacto de emergencia</SectionTitle>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <InfoRow label="Nombre" value={empleado.persona?.contacto_emergencia_nombre ?? null} />
-          <InfoRow
-            label="Teléfono"
-            value={empleado.persona?.contacto_emergencia_telefono ?? null}
+          <EditField
+            label="Nombre"
+            value={contactoEmergenciaNombre}
+            onChange={setContactoEmergenciaNombre}
           />
-          <InfoRow
+          <EditField
+            label="Teléfono"
+            value={contactoEmergenciaTelefono}
+            onChange={setContactoEmergenciaTelefono}
+            type="tel"
+          />
+          <EditField
             label="Parentesco"
-            value={empleado.persona?.contacto_emergencia_parentesco ?? null}
+            value={contactoEmergenciaParentesco}
+            onChange={setContactoEmergenciaParentesco}
+            placeholder="Madre, Pareja, Hermano(a)..."
           />
         </div>
       </div>
