@@ -15,14 +15,7 @@ export default function Page() {
     <RequireAccess empresa="dilesa">
       <DesktopOnlyNotice module="Personal" />
       <div className="hidden sm:block">
-        <EmpleadosModule
-          empresaId={EMPRESA_ID}
-          empresaSlug="dilesa"
-          title="Personal — DILESA"
-          showNumeroEmpleadoColumn
-          showEstadoColumn
-          showDeptoFilter
-        />
+        <EmpleadosModule empresaId={EMPRESA_ID} empresaSlug="dilesa" title="Personal — DILESA" />
       </div>
     </RequireAccess>
   );
