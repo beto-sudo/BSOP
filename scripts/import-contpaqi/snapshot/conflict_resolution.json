@@ -1,0 +1,40 @@
+{
+  "DILESA": {
+    "006": {
+      "update_db_id": "7c4b6ac1-95c0-4bcf-b4f2-5bfb83146f44",
+      "soft_delete_db_ids": ["6c06e78e-b4c0-4ccc-bb57-98c2d26453db"],
+      "close_cycle": false,
+      "notas": "Hernandez Avalos Jesus Antonio. UPDATE en activa. Soft-delete duplicado mismo f_alta con RFC con guiones."
+    },
+    "082": {
+      "update_db_id": "accacabd-b0ca-4595-a02f-d164c1417ee5",
+      "soft_delete_db_ids": [],
+      "close_cycle": false,
+      "notas": "Molina Tapia Pedro. UPDATE en período actual. DB1 (864b90cd) histórico real."
+    },
+    "085": {
+      "update_db_id": "63f2cf3c-194e-42f1-930d-62d8b2dbb754",
+      "soft_delete_db_ids": ["49f0d070-3205-4a8e-928e-6bf7b207c79c"],
+      "close_cycle": false,
+      "notas": "Padilla Rodriguez Juan Manuel. UPDATE en fila f_alta match Excel. Soft-delete duplicado."
+    },
+    "098": {
+      "update_db_id": "f568a232-e01a-4b16-8986-ea84a2604257",
+      "soft_delete_db_ids": [],
+      "close_cycle": false,
+      "notas": "Barbosa Gonzalez Javier. UPDATE en período más reciente. DB1 (e83aea1c) histórico real."
+    },
+    "131": {
+      "update_db_id": "e21901be-dca8-4e3c-93a2-3bf5ddacbdf7",
+      "soft_delete_db_ids": [],
+      "close_cycle": true,
+      "notas": "Hernandez Zapata Adrian. Reingreso. UPDATE DB1 cierra ciclo (f_baja del Excel). DB2 (9bb7215f) queda activo como reingreso."
+    },
+    "169": {
+      "update_db_id": "89709bc2-6a66-4922-a48c-17fd9d687ad4",
+      "soft_delete_db_ids": [],
+      "close_cycle": false,
+      "notas": "Gonzalez Valles Cesar. UPDATE en DB1. DB2 (20ebdee6 Rolando) tiene RFC ajeno mal — flagged manual fuera de scope."
+    }
+  }
+}

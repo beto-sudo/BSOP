@@ -1,0 +1,21 @@
+{
+  "DILESA": [
+    {
+      "empleado_id": "129ec28e-d33f-4abf-85c3-0145d996f197",
+      "nombre": "Godoy Duarte Pedro"
+    },
+    {
+      "empleado_id": "79c9cc9c-bc5a-48cc-a320-ce6600519522",
+      "nombre": "Arriaga Mendoza Joel Antonio"
+    },
+    {
+      "empleado_id": "91064d2a-5039-4d33-9248-7f1a9723e99a",
+      "nombre": "Martinez Gallegos Leslie Cristal"
+    },
+    {
+      "empleado_id": "f64b48b1-1593-427e-ba21-261580c89b3f",
+      "nombre": "Rodríguez Llamas Pattsy"
+    }
+  ],
+  "RDB": []
+}

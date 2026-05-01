@@ -32,19 +32,44 @@ Requiere `openpyxl` (`pip3 install openpyxl`).
 
 ```
 scripts/import-contpaqi/
-├── dry-run.py                  # script principal (commiteado)
-├── README.md                   # este archivo
+├── dry-run.py                       # Sprint 3 — emite reporte markdown
+├── apply.py                         # Sprint 4 — emite migración SQL transaccional
+├── README.md
 ├── snapshot/
-│   ├── db_catalogos.json       # commiteado: puestos+departamentos por empresa, sin PII
-│   ├── exclusion_baja.json     # commiteado: UUIDs accionistas/comité/consejo a excluir de bajas
-│   ├── db_dilesa_empleados.json   # gitignored: contiene RFC/CURP/NSS
-│   └── db_rdb_empleados.json      # gitignored: contiene RFC/CURP/NSS
+│   ├── db_catalogos.json            # commiteado: puestos+departamentos por empresa
+│   ├── exclusion_baja.json          # commiteado: UUIDs no marcados baja (accionistas/comité/consejo + sospechosos)
+│   ├── conflict_resolution.json     # commiteado: resolución de los 6 RFC ambiguos
+│   ├── bajas_seleccionadas.json     # commiteado: bajas candidatas que se aplican
+│   ├── db_dilesa_empleados.json     # gitignored: PII (RFC/CURP/NSS)
+│   └── db_rdb_empleados.json        # gitignored: PII (RFC/CURP/NSS)
+├── sql/
+│   └── apply-2026-04-30.sql         # SQL transaccional generado por apply.py
 └── output/
-    └── dry-run-report.md       # gitignored: copia local del reporte
+    └── dry-run-report.md            # gitignored: copia local del reporte (oficial está en docs/planning/)
 ```
 
-El reporte oficial vive en
-[`docs/planning/import-contpaqi-dry-run-report.md`](../../docs/planning/import-contpaqi-dry-run-report.md).
+## Sprint 4 — apply (data migration manual, no schema)
+
+```bash
+# 1. Generar SQL
+python3 scripts/import-contpaqi/apply.py
+# → scripts/import-contpaqi/sql/apply-2026-04-30.sql
+
+# 2. Aplicar UNA SOLA VEZ con psql contra prod
+set -a && source .env.local && set +a
+psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -e \
+  -f scripts/import-contpaqi/sql/apply-2026-04-30.sql
+```
+
+**El SQL NO va a `supabase/migrations/`** porque:
+
+1. Es operación de DATOS, no de schema. El schema delta vive en la
+   migración separada `20260501000000_import_empleados_contpaqi_schema_delta.sql`.
+2. Supabase Preview genera DBs vacías desde las migrations (sin
+   `core.empresas` ni empleados existentes), por lo que la apply
+   fallaría en preview con FK violations.
+3. Re-aplicar duplicaría inserts. Convenio: se aplica una vez por
+   snapshot, audit en `erp.empleados_import_log`.
 
 ## Cómo regenerar los snapshots de DB
 

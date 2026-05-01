@@ -4,3 +4,6 @@ snapshot/db_rdb_empleados.json
 
 # Output local del dry-run — el reporte oficial vive en docs/planning/
 output/
+
+# Python cache
+__pycache__/
