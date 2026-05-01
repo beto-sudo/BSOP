@@ -1,0 +1,6 @@
+# Snapshots con PII (RFC/CURP/NSS) — regenerar via SQL en README.md
+snapshot/db_dilesa_empleados.json
+snapshot/db_rdb_empleados.json
+
+# Output local del dry-run — el reporte oficial vive en docs/planning/
+output/

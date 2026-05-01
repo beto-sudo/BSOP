@@ -1,0 +1,380 @@
+{
+  "DILESA": {
+    "id": "f5942ed4-7a6b-4c39-af18-67b9fbf7f479",
+    "departamentos": [
+      {
+        "id": "a3da4204-13ee-4b2b-96de-4afc881848fc",
+        "nombre": "Accionistas"
+      },
+      {
+        "id": "a8673a7c-f7ef-4cb4-b5e6-d917329d7b10",
+        "nombre": "Administración"
+      },
+      {
+        "id": "b412b993-0149-4522-b455-ce7e6615f165",
+        "nombre": "Compras"
+      },
+      {
+        "id": "446a66e3-d377-455b-8f6d-ef537a836eab",
+        "nombre": "Construcción"
+      },
+      {
+        "id": "311196ea-78b8-4191-b877-2cb27cb988fd",
+        "nombre": "Deportivo"
+      },
+      {
+        "id": "3314c7d7-1ad4-4d24-9920-4da39494bf16",
+        "nombre": "Evap"
+      },
+      {
+        "id": "f7b3a007-6bd2-40fc-8fbc-3669490d3f92",
+        "nombre": "Mantenimiento"
+      },
+      {
+        "id": "85361512-b75c-44de-b4e0-831f93a39bb8",
+        "nombre": "Maquinaria"
+      },
+      {
+        "id": "db675970-7afb-4232-ad09-07837cb34b7f",
+        "nombre": "Mercadotecnia"
+      },
+      {
+        "id": "dc70f03f-d9df-4ced-8e19-5914b837b69e",
+        "nombre": "Proyectos"
+      },
+      {
+        "id": "2b7352ae-cf55-43ca-87a8-b9b412d6390a",
+        "nombre": "Ventas"
+      }
+    ],
+    "puestos": [
+      {
+        "id": "77608f0e-7726-4094-9f56-c9e0959f549b",
+        "nombre": "Accionista"
+      },
+      {
+        "id": "5cb9e0d2-380f-4d2a-b8d7-607d3b9e4eef",
+        "nombre": "Administrador de Proyectos"
+      },
+      {
+        "id": "1e7ca385-8861-40c7-8644-032ae52dac21",
+        "nombre": "Almacenista"
+      },
+      {
+        "id": "51152b3e-7ffd-4ae7-b76f-2e2f2b72ac1c",
+        "nombre": "Asesor de Ventas"
+      },
+      {
+        "id": "0e020f9e-3781-4ff9-8949-c8c39a9a440d",
+        "nombre": "Asistente Administrativo"
+      },
+      {
+        "id": "7a1d59b8-bb09-46df-a22a-2b97a3dc8ee2",
+        "nombre": "Asistente de Compras"
+      },
+      {
+        "id": "0f356736-a951-4491-8e94-852ed4560a8a",
+        "nombre": "Asistente de Ventas"
+      },
+      {
+        "id": "3b26d33c-c79f-427e-a90f-39fb02a7e25f",
+        "nombre": "Asistente Ejecutivo"
+      },
+      {
+        "id": "7c97f21c-425a-498c-acbe-eb7948924ec8",
+        "nombre": "Auxiliar Administrativo"
+      },
+      {
+        "id": "5b25ceb1-95d8-458e-a749-dfe19c4d5c62",
+        "nombre": "Auxiliar de Compras"
+      },
+      {
+        "id": "0704e765-a4df-4e39-873b-7a1661f49716",
+        "nombre": "AUXILIAR DE PROYECTOS"
+      },
+      {
+        "id": "efa58be2-e1c0-49e1-960d-5870d53a390c",
+        "nombre": "AYUDANTE ALBAÑIL"
+      },
+      {
+        "id": "816b7d4e-d9d7-4da5-89d0-7f2ad2d48f2d",
+        "nombre": "Ayudante de Albañil"
+      },
+      {
+        "id": "d17d9942-4733-4dd7-a4ef-095294493bea",
+        "nombre": "AYUDANTE EN GENERAL"
+      },
+      {
+        "id": "3e8547d3-c36a-4683-869a-530a8d0a8e81",
+        "nombre": "Ayudante General"
+      },
+      {
+        "id": "b7b97fea-cdef-4293-b693-2ae73b5ca4d5",
+        "nombre": "Chofer de 5ta Rueda"
+      },
+      {
+        "id": "1ac3d133-ae1a-45e5-804a-be522d344f2e",
+        "nombre": "Chofer de Torton"
+      },
+      {
+        "id": "dc1564d9-b49f-4ffb-b71a-9915c3a51cd1",
+        "nombre": "Chofer Pipa de Agua"
+      },
+      {
+        "id": "27e05863-0b13-498f-8bc0-d5c3e849749e",
+        "nombre": "Comité Ejecutivo"
+      },
+      {
+        "id": "0610cbc1-9fa3-4ce1-834a-e1e7b7e690e6",
+        "nombre": "Consejo de Administracion"
+      },
+      {
+        "id": "df462105-237d-442c-854c-e30419b85c28",
+        "nombre": "Coordinador Deportivo"
+      },
+      {
+        "id": "4e787c0f-2332-4e59-8638-a2e50bf6aeaa",
+        "nombre": "ENTRENADOR"
+      },
+      {
+        "id": "5eea7967-28f4-4e6c-a620-f4023edc855f",
+        "nombre": "EVAP-Entrega de Vivienda y Atención Postventa"
+      },
+      {
+        "id": "bb3cda6f-27ba-4111-8bd0-b88f0c365f40",
+        "nombre": "Gerente Administrativo"
+      },
+      {
+        "id": "4d1ea870-17f5-4db0-a1b8-075860fca2a7",
+        "nombre": "Gerente Administrativo - Contador General"
+      },
+      {
+        "id": "ed282c05-dcce-47f0-8f67-f1301f923eec",
+        "nombre": "Gerente de Compras"
+      },
+      {
+        "id": "3b1746e5-2f99-435b-aeef-f4640aaac59a",
+        "nombre": "Gerente de Construcción"
+      },
+      {
+        "id": "abd3be2e-a570-41d9-8397-873d6b3834c4",
+        "nombre": "Gerente de Mantenimiento"
+      },
+      {
+        "id": "74066977-5b56-4656-b8d0-879e25a78d97",
+        "nombre": "Gerente de Maquinaria"
+      },
+      {
+        "id": "d8f0ee6d-4fd1-45d1-afa0-e125ae1b4b17",
+        "nombre": "Gerente de Maquinaria Pesada"
+      },
+      {
+        "id": "4bbe654d-22a1-40c2-960e-26c8a06b9379",
+        "nombre": "Gerente de Proyectos"
+      },
+      {
+        "id": "80f4d1d9-deab-48b0-8844-b51bcf8c2a37",
+        "nombre": "GERENTE DE PROYECTOS"
+      },
+      {
+        "id": "ccc1d0d8-8153-491a-9afa-64e2c36d5906",
+        "nombre": "Gerente de Ventas"
+      },
+      {
+        "id": "42f387a1-a5af-4428-8be5-e22522f9904e",
+        "nombre": "Gerente Deportivo"
+      },
+      {
+        "id": "53adb032-a171-47d3-9c03-4999a09a77cf",
+        "nombre": "Gerente General"
+      },
+      {
+        "id": "d54d79c7-37b0-4fb9-884e-1f3aa9026a4d",
+        "nombre": "GERENTE GENERAL DEPORTIVO"
+      },
+      {
+        "id": "b936f2c3-aac9-473c-8611-b589aa05fb5f",
+        "nombre": "Gestor de Originación de Créditos"
+      },
+      {
+        "id": "966fe930-0e5d-43cf-874d-5fe8fe6bac8b",
+        "nombre": "Gestor de Trámites"
+      },
+      {
+        "id": "9130d059-3cfb-4fc9-adf9-ba7d8b9d0f12",
+        "nombre": "Guardia de Seguridad"
+      },
+      {
+        "id": "de2a19b3-15c9-4565-bbe7-edabed1cd5d5",
+        "nombre": "Hostess"
+      },
+      {
+        "id": "84f51c99-75fd-4f95-919e-0662f36c8bf6",
+        "nombre": "Hostess Deportivo"
+      },
+      {
+        "id": "a0f43591-8872-4029-a9f7-d769bcca07a8",
+        "nombre": "Instructor Deportivo"
+      },
+      {
+        "id": "59caa000-c8e7-44ad-bf57-4ef6fe640180",
+        "nombre": "Intendencia"
+      },
+      {
+        "id": "95dd979e-88ea-4ba1-902c-40d928f24894",
+        "nombre": "Intendencia Deportivo"
+      },
+      {
+        "id": "9ec0065b-77b3-4ac1-afed-f6e14ba91707",
+        "nombre": "JEFE DE CUADRILLA"
+      },
+      {
+        "id": "3d3bc84d-828e-4519-a108-c7a865c449a3",
+        "nombre": "Líder de Mercadotecnia y Comunicación Organizacional"
+      },
+      {
+        "id": "e632ec93-1011-449c-8a58-ada3ecb4107e",
+        "nombre": "Mantenimiento"
+      },
+      {
+        "id": "6745a37a-7a96-4e65-95a5-cb9268dff2e4",
+        "nombre": "Mantenimiento de Terreno"
+      },
+      {
+        "id": "87ef69ed-3cd7-4658-a34c-ae0032db1924",
+        "nombre": "Mesero"
+      },
+      {
+        "id": "1fd6b8d9-e2f8-4203-b61f-a72f739d30a9",
+        "nombre": "Oficial Albañil"
+      },
+      {
+        "id": "a414ca52-e09c-4f55-b246-28343c74fa69",
+        "nombre": "OFICIAL ALBAÑIÑ"
+      },
+      {
+        "id": "a70074b9-5dd0-46cd-bb94-b3ba435e43a2",
+        "nombre": "OFICIAL GENERAL"
+      },
+      {
+        "id": "8120713f-d2f7-44a0-9be1-70c9a600ad87",
+        "nombre": "Operador de Excavadora"
+      },
+      {
+        "id": "5357bdde-aee0-41bd-ba86-359d2973686a",
+        "nombre": "Operador de Maquinaria Pesada"
+      },
+      {
+        "id": "04ad293e-6343-4ecc-9440-315054d43c30",
+        "nombre": "Operador de Motoniveladora"
+      },
+      {
+        "id": "b7caab1d-be09-4a6f-8b09-5505075f769f",
+        "nombre": "Operador de Retroexcavadora"
+      },
+      {
+        "id": "e0d33f0a-2dbc-4f97-9731-d5c783f5df2f",
+        "nombre": "OPERADOR DE TORTON"
+      },
+      {
+        "id": "a66205fa-8fc0-4cf3-8663-aa7d7911aaf5",
+        "nombre": "Operador de Vibro Compactador"
+      },
+      {
+        "id": "05dac8a1-68f8-4147-a4bf-fcdc8b181157",
+        "nombre": "Operador Zanjadora"
+      },
+      {
+        "id": "49eff419-4699-495a-ae45-8045d9590dd1",
+        "nombre": "Operador Zanjeadora"
+      },
+      {
+        "id": "c1a4885f-1e11-4870-9fa7-a7211484bbfd",
+        "nombre": "Pro Deportivo"
+      },
+      {
+        "id": "7b3c647f-e8f6-4e6c-8045-45b83348c029",
+        "nombre": "Prueba"
+      },
+      {
+        "id": "b4ebde6d-432f-4801-a22e-34d72b305d68",
+        "nombre": "Sub-Gerente de Proyectos"
+      },
+      {
+        "id": "c09174c1-db01-4e5d-b34e-80e66102af00",
+        "nombre": "Supervisor de Obra"
+      },
+      {
+        "id": "a86e52e5-d5af-42f1-91dd-4a9343ca4d9e",
+        "nombre": "SUPERVISOR DE URBANIZACION"
+      },
+      {
+        "id": "7f048dfb-3efb-4a36-86d4-1fe13e088a4d",
+        "nombre": "Técnico Especialista en Mantenimiento"
+      },
+      {
+        "id": "c7443c15-dbbb-4d61-a113-82510cca3185",
+        "nombre": "Velador"
+      }
+    ]
+  },
+  "RDB": {
+    "id": "e52ac307-9373-4115-b65e-1178f0c4e1aa",
+    "departamentos": [
+      {
+        "id": "1a1c11a5-22e0-4e2d-ab7b-7189949f36d7",
+        "nombre": "Accionistas"
+      },
+      {
+        "id": "0fd2d36a-dda4-4697-9a56-6dced7dece96",
+        "nombre": "Deportivo"
+      }
+    ],
+    "puestos": [
+      {
+        "id": "878f7a0b-dca4-48f8-bfaa-9df78da882ac",
+        "nombre": "Accionista"
+      },
+      {
+        "id": "87c4306c-46c5-4228-a4e5-928969b2abe6",
+        "nombre": "Auxiliar Administrativo"
+      },
+      {
+        "id": "2fc4f543-2900-49ba-98c2-70fc5e56a6de",
+        "nombre": "Comité Ejecutivo"
+      },
+      {
+        "id": "5047e023-10a9-4944-a13a-f774f86a428d",
+        "nombre": "Consejo de Administracion"
+      },
+      {
+        "id": "238adbd0-7dec-4023-b152-63a22dc6e7ba",
+        "nombre": "Coordinador Deportivo y Eventos"
+      },
+      {
+        "id": "8bcc0f09-ae05-4625-ad50-5a37ebdfc8fd",
+        "nombre": "Gerente General"
+      },
+      {
+        "id": "fe419616-8f80-48f4-ba55-fe24cb226265",
+        "nombre": "GERENTE GENERAL DEPORTIVO"
+      },
+      {
+        "id": "31d9b17c-4a8f-40d5-8a16-b5861262e550",
+        "nombre": "Hostess"
+      },
+      {
+        "id": "6b560e96-709f-4f2e-8189-cd0895f7e6c3",
+        "nombre": "Instructor Deportivo"
+      },
+      {
+        "id": "fcb58bfa-9281-4826-8598-975237c7967f",
+        "nombre": "Mantenimiento"
+      },
+      {
+        "id": "6dbc6af7-437d-440a-acee-f2b84530aeb2",
+        "nombre": "Mesero"
+      }
+    ]
+  }
+}
