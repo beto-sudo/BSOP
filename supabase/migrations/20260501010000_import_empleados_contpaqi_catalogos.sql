@@ -6,7 +6,7 @@
 -- existen aún en DB (con match case-insensitive y sin tildes).
 --
 -- Decisiones aplicadas al normalizar los nombres del Excel:
---   - Title Case en español ("de/del/la/y/..." en minúscula).
+--   - Title Case en español (de/del/la/y/... en minúscula).
 --   - Correcciones ortográficas en CONTPAQi reflejadas al normalizar:
 --       Mercadoctenia → Mercadotecnia (depto)
 --       Tecnico Especializado en Mantenimiento → Técnico Especialista en Mantenimiento (puesto, match con DB)
@@ -22,194 +22,248 @@
 --   RDB: 0 departamentos + 7 puestos = 7
 --   TOTAL: 25
 --
--- Idempotencia: usa NOT EXISTS contra match exact por nombre + empresa_id. Si la
--- migración corre dos veces, no duplica.
+-- Empresas se resuelven por slug (no UUID hardcodeado) para que la migración
+-- corra limpia en Supabase Preview (que genera DBs vacías desde las migraciones)
+-- igual que en prod. Si una empresa no existe en la DB target (caso preview),
+-- el SELECT devuelve 0 filas y el INSERT no ejecuta — sin FK violation.
+--
+-- Idempotencia: NOT EXISTS por (empresa_id, nombre). Re-aplicar no duplica.
 
 BEGIN;
 
 -- ============================================================
--- DILESA departamentos (4)
+-- DILESA (dilesa) departamentos (4)
 -- ============================================================
 INSERT INTO erp.departamentos (empresa_id, nombre)
-SELECT 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid, 'Compras'
-WHERE NOT EXISTS (
-  SELECT 1 FROM erp.departamentos
-  WHERE empresa_id = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid AND nombre = 'Compras'
-);
+SELECT e.id, 'Compras'
+FROM core.empresas e
+WHERE e.slug = 'dilesa'
+  AND NOT EXISTS (
+    SELECT 1 FROM erp.departamentos d
+    WHERE d.empresa_id = e.id AND d.nombre = 'Compras'
+  );
 
 INSERT INTO erp.departamentos (empresa_id, nombre)
-SELECT 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid, 'Evap'
-WHERE NOT EXISTS (
-  SELECT 1 FROM erp.departamentos
-  WHERE empresa_id = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid AND nombre = 'Evap'
-);
+SELECT e.id, 'Evap'
+FROM core.empresas e
+WHERE e.slug = 'dilesa'
+  AND NOT EXISTS (
+    SELECT 1 FROM erp.departamentos d
+    WHERE d.empresa_id = e.id AND d.nombre = 'Evap'
+  );
 
 INSERT INTO erp.departamentos (empresa_id, nombre)
-SELECT 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid, 'Mantenimiento'
-WHERE NOT EXISTS (
-  SELECT 1 FROM erp.departamentos
-  WHERE empresa_id = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid AND nombre = 'Mantenimiento'
-);
+SELECT e.id, 'Mantenimiento'
+FROM core.empresas e
+WHERE e.slug = 'dilesa'
+  AND NOT EXISTS (
+    SELECT 1 FROM erp.departamentos d
+    WHERE d.empresa_id = e.id AND d.nombre = 'Mantenimiento'
+  );
 
 INSERT INTO erp.departamentos (empresa_id, nombre)
-SELECT 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid, 'Mercadotecnia'
-WHERE NOT EXISTS (
-  SELECT 1 FROM erp.departamentos
-  WHERE empresa_id = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid AND nombre = 'Mercadotecnia'
-);
+SELECT e.id, 'Mercadotecnia'
+FROM core.empresas e
+WHERE e.slug = 'dilesa'
+  AND NOT EXISTS (
+    SELECT 1 FROM erp.departamentos d
+    WHERE d.empresa_id = e.id AND d.nombre = 'Mercadotecnia'
+  );
 
 -- ============================================================
--- DILESA puestos (14)
+-- DILESA (dilesa) puestos (14)
 -- ============================================================
 INSERT INTO erp.puestos (empresa_id, nombre)
-SELECT 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid, 'Auxiliar Administrativo'
-WHERE NOT EXISTS (
-  SELECT 1 FROM erp.puestos
-  WHERE empresa_id = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid AND nombre = 'Auxiliar Administrativo'
-);
+SELECT e.id, 'Auxiliar Administrativo'
+FROM core.empresas e
+WHERE e.slug = 'dilesa'
+  AND NOT EXISTS (
+    SELECT 1 FROM erp.puestos p
+    WHERE p.empresa_id = e.id AND p.nombre = 'Auxiliar Administrativo'
+  );
 
 INSERT INTO erp.puestos (empresa_id, nombre)
-SELECT 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid, 'Auxiliar de Compras'
-WHERE NOT EXISTS (
-  SELECT 1 FROM erp.puestos
-  WHERE empresa_id = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid AND nombre = 'Auxiliar de Compras'
-);
+SELECT e.id, 'Auxiliar de Compras'
+FROM core.empresas e
+WHERE e.slug = 'dilesa'
+  AND NOT EXISTS (
+    SELECT 1 FROM erp.puestos p
+    WHERE p.empresa_id = e.id AND p.nombre = 'Auxiliar de Compras'
+  );
 
 INSERT INTO erp.puestos (empresa_id, nombre)
-SELECT 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid, 'Ayudante General'
-WHERE NOT EXISTS (
-  SELECT 1 FROM erp.puestos
-  WHERE empresa_id = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid AND nombre = 'Ayudante General'
-);
+SELECT e.id, 'Ayudante General'
+FROM core.empresas e
+WHERE e.slug = 'dilesa'
+  AND NOT EXISTS (
+    SELECT 1 FROM erp.puestos p
+    WHERE p.empresa_id = e.id AND p.nombre = 'Ayudante General'
+  );
 
 INSERT INTO erp.puestos (empresa_id, nombre)
-SELECT 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid, 'Ayudante de Albañil'
-WHERE NOT EXISTS (
-  SELECT 1 FROM erp.puestos
-  WHERE empresa_id = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid AND nombre = 'Ayudante de Albañil'
-);
+SELECT e.id, 'Ayudante de Albañil'
+FROM core.empresas e
+WHERE e.slug = 'dilesa'
+  AND NOT EXISTS (
+    SELECT 1 FROM erp.puestos p
+    WHERE p.empresa_id = e.id AND p.nombre = 'Ayudante de Albañil'
+  );
 
 INSERT INTO erp.puestos (empresa_id, nombre)
-SELECT 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid, 'Gerente Administrativo'
-WHERE NOT EXISTS (
-  SELECT 1 FROM erp.puestos
-  WHERE empresa_id = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid AND nombre = 'Gerente Administrativo'
-);
+SELECT e.id, 'Gerente Administrativo'
+FROM core.empresas e
+WHERE e.slug = 'dilesa'
+  AND NOT EXISTS (
+    SELECT 1 FROM erp.puestos p
+    WHERE p.empresa_id = e.id AND p.nombre = 'Gerente Administrativo'
+  );
 
 INSERT INTO erp.puestos (empresa_id, nombre)
-SELECT 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid, 'Gerente de Mantenimiento'
-WHERE NOT EXISTS (
-  SELECT 1 FROM erp.puestos
-  WHERE empresa_id = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid AND nombre = 'Gerente de Mantenimiento'
-);
+SELECT e.id, 'Gerente de Mantenimiento'
+FROM core.empresas e
+WHERE e.slug = 'dilesa'
+  AND NOT EXISTS (
+    SELECT 1 FROM erp.puestos p
+    WHERE p.empresa_id = e.id AND p.nombre = 'Gerente de Mantenimiento'
+  );
 
 INSERT INTO erp.puestos (empresa_id, nombre)
-SELECT 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid, 'Gerente de Maquinaria Pesada'
-WHERE NOT EXISTS (
-  SELECT 1 FROM erp.puestos
-  WHERE empresa_id = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid AND nombre = 'Gerente de Maquinaria Pesada'
-);
+SELECT e.id, 'Gerente de Maquinaria Pesada'
+FROM core.empresas e
+WHERE e.slug = 'dilesa'
+  AND NOT EXISTS (
+    SELECT 1 FROM erp.puestos p
+    WHERE p.empresa_id = e.id AND p.nombre = 'Gerente de Maquinaria Pesada'
+  );
 
 INSERT INTO erp.puestos (empresa_id, nombre)
-SELECT 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid, 'Gestor de Trámites'
-WHERE NOT EXISTS (
-  SELECT 1 FROM erp.puestos
-  WHERE empresa_id = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid AND nombre = 'Gestor de Trámites'
-);
+SELECT e.id, 'Gestor de Trámites'
+FROM core.empresas e
+WHERE e.slug = 'dilesa'
+  AND NOT EXISTS (
+    SELECT 1 FROM erp.puestos p
+    WHERE p.empresa_id = e.id AND p.nombre = 'Gestor de Trámites'
+  );
 
 INSERT INTO erp.puestos (empresa_id, nombre)
-SELECT 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid, 'Guardia de Seguridad'
-WHERE NOT EXISTS (
-  SELECT 1 FROM erp.puestos
-  WHERE empresa_id = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid AND nombre = 'Guardia de Seguridad'
-);
+SELECT e.id, 'Guardia de Seguridad'
+FROM core.empresas e
+WHERE e.slug = 'dilesa'
+  AND NOT EXISTS (
+    SELECT 1 FROM erp.puestos p
+    WHERE p.empresa_id = e.id AND p.nombre = 'Guardia de Seguridad'
+  );
 
 INSERT INTO erp.puestos (empresa_id, nombre)
-SELECT 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid, 'Instructor Deportivo'
-WHERE NOT EXISTS (
-  SELECT 1 FROM erp.puestos
-  WHERE empresa_id = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid AND nombre = 'Instructor Deportivo'
-);
+SELECT e.id, 'Instructor Deportivo'
+FROM core.empresas e
+WHERE e.slug = 'dilesa'
+  AND NOT EXISTS (
+    SELECT 1 FROM erp.puestos p
+    WHERE p.empresa_id = e.id AND p.nombre = 'Instructor Deportivo'
+  );
 
 INSERT INTO erp.puestos (empresa_id, nombre)
-SELECT 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid, 'Intendencia'
-WHERE NOT EXISTS (
-  SELECT 1 FROM erp.puestos
-  WHERE empresa_id = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid AND nombre = 'Intendencia'
-);
+SELECT e.id, 'Intendencia'
+FROM core.empresas e
+WHERE e.slug = 'dilesa'
+  AND NOT EXISTS (
+    SELECT 1 FROM erp.puestos p
+    WHERE p.empresa_id = e.id AND p.nombre = 'Intendencia'
+  );
 
 INSERT INTO erp.puestos (empresa_id, nombre)
-SELECT 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid, 'Mantenimiento de Terreno'
-WHERE NOT EXISTS (
-  SELECT 1 FROM erp.puestos
-  WHERE empresa_id = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid AND nombre = 'Mantenimiento de Terreno'
-);
+SELECT e.id, 'Mantenimiento de Terreno'
+FROM core.empresas e
+WHERE e.slug = 'dilesa'
+  AND NOT EXISTS (
+    SELECT 1 FROM erp.puestos p
+    WHERE p.empresa_id = e.id AND p.nombre = 'Mantenimiento de Terreno'
+  );
 
 INSERT INTO erp.puestos (empresa_id, nombre)
-SELECT 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid, 'Oficial Albañil'
-WHERE NOT EXISTS (
-  SELECT 1 FROM erp.puestos
-  WHERE empresa_id = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid AND nombre = 'Oficial Albañil'
-);
+SELECT e.id, 'Oficial Albañil'
+FROM core.empresas e
+WHERE e.slug = 'dilesa'
+  AND NOT EXISTS (
+    SELECT 1 FROM erp.puestos p
+    WHERE p.empresa_id = e.id AND p.nombre = 'Oficial Albañil'
+  );
 
 INSERT INTO erp.puestos (empresa_id, nombre)
-SELECT 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid, 'Operador de Maquinaria Pesada'
-WHERE NOT EXISTS (
-  SELECT 1 FROM erp.puestos
-  WHERE empresa_id = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479'::uuid AND nombre = 'Operador de Maquinaria Pesada'
-);
+SELECT e.id, 'Operador de Maquinaria Pesada'
+FROM core.empresas e
+WHERE e.slug = 'dilesa'
+  AND NOT EXISTS (
+    SELECT 1 FROM erp.puestos p
+    WHERE p.empresa_id = e.id AND p.nombre = 'Operador de Maquinaria Pesada'
+  );
 
 -- ============================================================
--- RDB puestos (7)
+-- RDB (rdb) puestos (7)
 -- ============================================================
 INSERT INTO erp.puestos (empresa_id, nombre)
-SELECT 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid, 'Auxiliar Administrativo'
-WHERE NOT EXISTS (
-  SELECT 1 FROM erp.puestos
-  WHERE empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid AND nombre = 'Auxiliar Administrativo'
-);
+SELECT e.id, 'Auxiliar Administrativo'
+FROM core.empresas e
+WHERE e.slug = 'rdb'
+  AND NOT EXISTS (
+    SELECT 1 FROM erp.puestos p
+    WHERE p.empresa_id = e.id AND p.nombre = 'Auxiliar Administrativo'
+  );
 
 INSERT INTO erp.puestos (empresa_id, nombre)
-SELECT 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid, 'Coordinador Deportivo y Eventos'
-WHERE NOT EXISTS (
-  SELECT 1 FROM erp.puestos
-  WHERE empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid AND nombre = 'Coordinador Deportivo y Eventos'
-);
+SELECT e.id, 'Coordinador Deportivo y Eventos'
+FROM core.empresas e
+WHERE e.slug = 'rdb'
+  AND NOT EXISTS (
+    SELECT 1 FROM erp.puestos p
+    WHERE p.empresa_id = e.id AND p.nombre = 'Coordinador Deportivo y Eventos'
+  );
 
 INSERT INTO erp.puestos (empresa_id, nombre)
-SELECT 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid, 'Gerente General'
-WHERE NOT EXISTS (
-  SELECT 1 FROM erp.puestos
-  WHERE empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid AND nombre = 'Gerente General'
-);
+SELECT e.id, 'Gerente General'
+FROM core.empresas e
+WHERE e.slug = 'rdb'
+  AND NOT EXISTS (
+    SELECT 1 FROM erp.puestos p
+    WHERE p.empresa_id = e.id AND p.nombre = 'Gerente General'
+  );
 
 INSERT INTO erp.puestos (empresa_id, nombre)
-SELECT 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid, 'Hostess'
-WHERE NOT EXISTS (
-  SELECT 1 FROM erp.puestos
-  WHERE empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid AND nombre = 'Hostess'
-);
+SELECT e.id, 'Hostess'
+FROM core.empresas e
+WHERE e.slug = 'rdb'
+  AND NOT EXISTS (
+    SELECT 1 FROM erp.puestos p
+    WHERE p.empresa_id = e.id AND p.nombre = 'Hostess'
+  );
 
 INSERT INTO erp.puestos (empresa_id, nombre)
-SELECT 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid, 'Instructor Deportivo'
-WHERE NOT EXISTS (
-  SELECT 1 FROM erp.puestos
-  WHERE empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid AND nombre = 'Instructor Deportivo'
-);
+SELECT e.id, 'Instructor Deportivo'
+FROM core.empresas e
+WHERE e.slug = 'rdb'
+  AND NOT EXISTS (
+    SELECT 1 FROM erp.puestos p
+    WHERE p.empresa_id = e.id AND p.nombre = 'Instructor Deportivo'
+  );
 
 INSERT INTO erp.puestos (empresa_id, nombre)
-SELECT 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid, 'Mantenimiento'
-WHERE NOT EXISTS (
-  SELECT 1 FROM erp.puestos
-  WHERE empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid AND nombre = 'Mantenimiento'
-);
+SELECT e.id, 'Mantenimiento'
+FROM core.empresas e
+WHERE e.slug = 'rdb'
+  AND NOT EXISTS (
+    SELECT 1 FROM erp.puestos p
+    WHERE p.empresa_id = e.id AND p.nombre = 'Mantenimiento'
+  );
 
 INSERT INTO erp.puestos (empresa_id, nombre)
-SELECT 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid, 'Mesero'
-WHERE NOT EXISTS (
-  SELECT 1 FROM erp.puestos
-  WHERE empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid AND nombre = 'Mesero'
-);
+SELECT e.id, 'Mesero'
+FROM core.empresas e
+WHERE e.slug = 'rdb'
+  AND NOT EXISTS (
+    SELECT 1 FROM erp.puestos p
+    WHERE p.empresa_id = e.id AND p.nombre = 'Mesero'
+  );
 
 NOTIFY pgrst, 'reload schema';
 
