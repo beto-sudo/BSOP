@@ -58,6 +58,7 @@ type Empleado = {
   fecha_ingreso: string | null;
   fecha_baja: string | null;
   activo: boolean;
+  email_empresa: string | null;
   persona: {
     nombre: string;
     apellido_paterno: string | null;
@@ -73,6 +74,17 @@ type Empleado = {
     puesto: { nombre: string } | null;
   }[];
 };
+
+const ACCIONISTA_PUESTOS = new Set([
+  'Accionista',
+  'Comité Ejecutivo',
+  'Consejo de Administracion',
+  'Consejo de Administración',
+]);
+
+type TipoTab = 'empleados' | 'accionistas' | 'todos';
+type EstadoFilter = 'activos' | 'inactivos' | 'todos';
+type AntiguedadFilter = 'all' | 'lt1' | 'y1to3' | 'y3to5' | 'y5to10' | 'gt10';
 
 type Departamento = { id: string; nombre: string };
 type Puesto = { id: string; nombre: string };
@@ -112,15 +124,6 @@ export type EmpleadosModuleProps = {
    * con archivos no caben en un Dialog.
    */
   createVariant?: 'sheet' | 'dialog';
-
-  /** Show extra "No. Empleado" column (DILESA variant). */
-  showNumeroEmpleadoColumn?: boolean;
-
-  /** Show extra "Estado" badge column (DILESA variant). */
-  showEstadoColumn?: boolean;
-
-  /** Show an extra "filter by departamento" chip in the toolbar (DILESA variant). */
-  showDeptoFilter?: boolean;
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -166,6 +169,45 @@ function formatDate(d: string | null) {
   });
 }
 
+function emailToShow(emp: Empleado): string | null {
+  return emp.email_empresa || emp.persona?.email || null;
+}
+
+function antiguedadFromFechaIngreso(fechaIngreso: string | null): {
+  years: number;
+  months: number;
+  totalYears: number;
+} | null {
+  if (!fechaIngreso) return null;
+  const ingreso = new Date(fechaIngreso.includes('T') ? fechaIngreso : `${fechaIngreso}T00:00:00`);
+  if (Number.isNaN(ingreso.getTime())) return null;
+  const now = new Date();
+  let years = now.getFullYear() - ingreso.getFullYear();
+  let months = now.getMonth() - ingreso.getMonth();
+  if (now.getDate() < ingreso.getDate()) months--;
+  if (months < 0) {
+    years--;
+    months += 12;
+  }
+  return { years, months, totalYears: years + months / 12 };
+}
+
+function antiguedadStr(fechaIngreso: string | null): string {
+  const a = antiguedadFromFechaIngreso(fechaIngreso);
+  if (!a) return '—';
+  if (a.years === 0 && a.months === 0) return '< 1 mes';
+  const parts: string[] = [];
+  if (a.years > 0) parts.push(`${a.years} año${a.years === 1 ? '' : 's'}`);
+  if (a.months > 0) parts.push(`${a.months} mes${a.months === 1 ? '' : 'es'}`);
+  return parts.join(' ');
+}
+
+function isAccionista(emp: Empleado): boolean {
+  return (emp.puestos ?? []).some(
+    (p) => p.puesto?.nombre && ACCIONISTA_PUESTOS.has(p.puesto.nombre)
+  );
+}
+
 function detailHref(empresaSlug: string, id: string) {
   const prefix = empresaSlug ? `/${empresaSlug}` : '';
   return `${prefix}/rh/personal/${id}`;
@@ -179,9 +221,6 @@ export function EmpleadosModule({
   empresaSlug,
   title,
   subtitle = 'Directorio de personal',
-  showNumeroEmpleadoColumn = false,
-  showEstadoColumn = false,
-  showDeptoFilter = false,
 }: EmpleadosModuleProps) {
   const router = useRouter();
   const supabase = createSupabaseERPClient();
@@ -198,9 +237,11 @@ export function EmpleadosModule({
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<'activos' | 'inactivos'>('activos');
+  const [tipoTab, setTipoTab] = useState<TipoTab>('empleados');
+  const [estadoFilter, setEstadoFilter] = useState<EstadoFilter>('activos');
   const [search, setSearch] = useState('');
   const [filterDepto, setFilterDepto] = useState('all');
+  const [filterAntiguedad, setFilterAntiguedad] = useState<AntiguedadFilter>('all');
 
   const [showCreate, setShowCreate] = useState(false);
 
@@ -242,7 +283,7 @@ export function EmpleadosModule({
           .schema('erp')
           .from('empleados')
           .select(
-            'id, empresa_id, numero_empleado, fecha_ingreso, fecha_baja, activo, persona:persona_id(nombre, apellido_paterno, apellido_materno, email), departamento:departamento_id(nombre), puesto:puesto_id(nombre), puestos:empleados_puestos!empleado_id(puesto_id, principal, fecha_fin, puesto:puesto_id(nombre))'
+            'id, empresa_id, numero_empleado, fecha_ingreso, fecha_baja, activo, email_empresa, persona:persona_id(nombre, apellido_paterno, apellido_materno, email), departamento:departamento_id(nombre), puesto:puesto_id(nombre), puestos:empleados_puestos!empleado_id(puesto_id, principal, fecha_fin, puesto:puesto_id(nombre))'
           )
           .in('empresa_id', ids)
           .is('deleted_at', null)
@@ -368,15 +409,41 @@ export function EmpleadosModule({
   };
 
   const visible = empleados.filter((e) => {
+    // Tab tipo (Empleados / Accionistas / Todos)
+    const acc = isAccionista(e);
+    if (tipoTab === 'empleados' && acc) return false;
+    if (tipoTab === 'accionistas' && !acc) return false;
+
+    // Filtro estado (Activos / Inactivos / Todos)
     const isActive = e.activo && !e.fecha_baja;
-    if (tab === 'activos' && !isActive) return false;
-    if (tab === 'inactivos' && isActive) return false;
+    if (estadoFilter === 'activos' && !isActive) return false;
+    if (estadoFilter === 'inactivos' && isActive) return false;
+
+    // Búsqueda por nombre, RFC, CURP, email, teléfono o no. empleado
     if (search) {
-      const name = fullName(e).toLowerCase();
-      if (!name.includes(search.toLowerCase())) return false;
+      const q = search.toLowerCase();
+      const haystack = [fullName(e), e.numero_empleado, emailToShow(e)]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      if (!haystack.includes(q)) return false;
     }
-    if (showDeptoFilter && filterDepto !== 'all' && e.departamento?.nombre !== filterDepto) {
+
+    // Filtro departamento
+    if (filterDepto !== 'all' && e.departamento?.nombre !== filterDepto) {
       return false;
+    }
+
+    // Filtro antigüedad por rangos
+    if (filterAntiguedad !== 'all') {
+      const a = antiguedadFromFechaIngreso(e.fecha_ingreso);
+      if (!a) return false;
+      const t = a.totalYears;
+      if (filterAntiguedad === 'lt1' && t >= 1) return false;
+      if (filterAntiguedad === 'y1to3' && (t < 1 || t >= 3)) return false;
+      if (filterAntiguedad === 'y3to5' && (t < 3 || t >= 5)) return false;
+      if (filterAntiguedad === 'y5to10' && (t < 5 || t >= 10)) return false;
+      if (filterAntiguedad === 'gt10' && t < 10) return false;
     }
     return true;
   });
@@ -441,46 +508,80 @@ export function EmpleadosModule({
           </div>
         )}
 
-      {/* Tabs + search + optional depto filter */}
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
+      {/* Tabs Empleados / Accionistas / Todos + filtros */}
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 space-y-3">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex rounded-xl border border-[var(--border)] bg-[var(--panel)] p-1 gap-1">
-            {(['activos', 'inactivos'] as const).map((t) => (
+            {(
+              [
+                ['empleados', 'Empleados'],
+                ['accionistas', 'Accionistas'],
+                ['todos', 'Todos'],
+              ] as const
+            ).map(([t, label]) => (
               <button
                 key={t}
                 type="button"
-                onClick={() => setTab(t)}
+                onClick={() => setTipoTab(t)}
                 className={[
-                  'rounded-lg px-4 py-1.5 text-xs font-semibold capitalize transition',
-                  tab === t
+                  'rounded-lg px-4 py-1.5 text-xs font-semibold transition',
+                  tipoTab === t
                     ? 'bg-[var(--accent)] text-white shadow-sm'
                     : 'text-[var(--text)]/60 hover:text-[var(--text)]',
                 ].join(' ')}
               >
-                {t === 'activos' ? 'Activos' : 'Ex-empleados'}
+                {label}
               </button>
             ))}
           </div>
           <div className="relative min-w-48 flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-subtle)]" />
             <Input
-              placeholder="Buscar por nombre..."
+              placeholder="Buscar por nombre, código o email..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
             />
           </div>
-          {showDeptoFilter && (
-            <FilterCombobox
-              value={filterDepto}
-              onChange={setFilterDepto}
-              options={departamentos.map((d) => ({ id: d.nombre, label: d.nombre }))}
-              placeholder="Departamento"
-              searchPlaceholder="Buscar departamento..."
-              clearLabel="Todos los deptos"
-              className="w-44"
-            />
-          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <FilterCombobox
+            value={estadoFilter}
+            onChange={(v) => setEstadoFilter(v as EstadoFilter)}
+            options={[
+              { id: 'activos', label: 'Activos' },
+              { id: 'inactivos', label: 'Ex-empleados' },
+              { id: 'todos', label: 'Todos los estados' },
+            ]}
+            placeholder="Estado"
+            searchPlaceholder="Buscar estado..."
+            clearLabel="Todos los estados"
+            className="w-40"
+          />
+          <FilterCombobox
+            value={filterDepto}
+            onChange={setFilterDepto}
+            options={departamentos.map((d) => ({ id: d.nombre, label: d.nombre }))}
+            placeholder="Departamento"
+            searchPlaceholder="Buscar departamento..."
+            clearLabel="Todos los deptos"
+            className="w-44"
+          />
+          <FilterCombobox
+            value={filterAntiguedad}
+            onChange={(v) => setFilterAntiguedad(v as AntiguedadFilter)}
+            options={[
+              { id: 'lt1', label: 'Menos de 1 año' },
+              { id: 'y1to3', label: '1 a 3 años' },
+              { id: 'y3to5', label: '3 a 5 años' },
+              { id: 'y5to10', label: '5 a 10 años' },
+              { id: 'gt10', label: 'Más de 10 años' },
+            ]}
+            placeholder="Antigüedad"
+            searchPlaceholder="Buscar antigüedad..."
+            clearLabel="Cualquier antigüedad"
+            className="w-44"
+          />
         </div>
       </div>
 
@@ -521,26 +622,17 @@ export function EmpleadosModule({
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent)]/15 text-xs font-semibold text-[var(--accent)]">
                       {(titleCase(emp.persona?.nombre ?? '').charAt(0) || '?').toUpperCase()}
                     </div>
-                    <div>
-                      <div className="font-medium text-[var(--text)]">{fullName(emp)}</div>
-                      {emp.persona?.email && (
-                        <div className="text-xs text-[var(--text)]/50">{emp.persona.email}</div>
-                      )}
-                    </div>
+                    <div className="font-medium text-[var(--text)]">{fullName(emp)}</div>
                   </div>
                 ),
               },
-              ...(showNumeroEmpleadoColumn
-                ? [
-                    {
-                      key: 'numero_empleado',
-                      label: 'No. Empleado',
-                      width: 'w-28',
-                      cellClassName: 'text-sm font-mono text-[var(--text)]/60',
-                      render: (emp: Empleado) => emp.numero_empleado ?? '—',
-                    },
-                  ]
-                : []),
+              {
+                key: 'numero_empleado',
+                label: 'No.',
+                width: 'w-20',
+                cellClassName: 'text-sm font-mono text-[var(--text)]/60',
+                render: (emp) => emp.numero_empleado ?? '—',
+              },
               {
                 key: 'departamento_nombre',
                 label: 'Departamento',
@@ -575,33 +667,45 @@ export function EmpleadosModule({
                 },
               },
               {
+                key: 'email',
+                label: 'Email',
+                width: 'w-56',
+                cellClassName: 'text-xs text-[var(--text)]/60',
+                accessor: (emp) => emailToShow(emp) ?? '',
+                render: (emp) => emailToShow(emp) ?? '—',
+              },
+              {
                 key: 'fecha_ingreso',
                 label: 'Ingreso',
                 width: 'w-28',
                 cellClassName: 'text-sm text-[var(--text)]/70',
                 render: (emp) => formatDate(emp.fecha_ingreso),
               },
-              ...(showEstadoColumn
-                ? [
-                    {
-                      key: 'activo',
-                      label: 'Estado',
-                      width: 'w-16',
-                      sortable: false,
-                      render: (emp: Empleado) => (
-                        <span
-                          className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${
-                            emp.activo
-                              ? 'border-green-500/20 bg-green-500/10 text-green-400'
-                              : 'border-[var(--border)] bg-[var(--panel)] text-[var(--text-subtle)]'
-                          }`}
-                        >
-                          {emp.activo ? 'Activo' : 'Inactivo'}
-                        </span>
-                      ),
-                    },
-                  ]
-                : []),
+              {
+                key: 'antiguedad',
+                label: 'Antigüedad',
+                width: 'w-32',
+                cellClassName: 'text-sm text-[var(--text)]/70',
+                accessor: (emp) => antiguedadFromFechaIngreso(emp.fecha_ingreso)?.totalYears ?? -1,
+                render: (emp) => antiguedadStr(emp.fecha_ingreso),
+              },
+              {
+                key: 'activo',
+                label: 'Estado',
+                width: 'w-24',
+                sortable: false,
+                render: (emp) => (
+                  <span
+                    className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${
+                      emp.activo && !emp.fecha_baja
+                        ? 'border-green-500/20 bg-green-500/10 text-green-400'
+                        : 'border-[var(--border)] bg-[var(--panel)] text-[var(--text-subtle)]'
+                    }`}
+                  >
+                    {emp.activo && !emp.fecha_baja ? 'Activo' : 'Inactivo'}
+                  </span>
+                ),
+              },
               {
                 key: 'acciones',
                 label: '',
