@@ -377,7 +377,7 @@ def apply_overrides(plan: dict, conflict_resolution: dict, excel_dilesa: list[di
 
             new_record = {
                 **record,
-                "match_metodo": "conflict_resolution",
+                "match_metodo": "manual",
                 "match_db_id": update_id,
                 "diff": {"resolved_via": "conflict_resolution", "notas": res.get("notas", "")},
                 "_close_cycle_fecha_baja": ex["fecha_baja"] if close_cycle else None,
