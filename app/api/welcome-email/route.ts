@@ -3,6 +3,9 @@ import { z } from 'zod';
 import { generateWelcomeHtml, type WelcomeEmpresa } from '@/lib/welcome-email';
 import { validateBody } from '@/lib/validation';
 import { welcomeEmailRateLimiter, extractIdentifier } from '@/lib/ratelimit';
+import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { getSupabaseAdminClient } from '@/lib/supabase-admin';
+import { requireAdmin } from '@/lib/empresas/admin-guard';
 
 const LOGO_MAP: Record<string, string> = {
   rdb: 'https://bsop.io/logo-rdb.png',
@@ -25,7 +28,21 @@ export async function POST(req: NextRequest) {
   if (!parsed.ok) return parsed.response;
   const { email, firstName, usuarioId } = parsed.data;
 
-  console.log('[welcome-email-api] Received:', { email, firstName, usuarioId });
+  // Admin-only: este endpoint solo se invoca desde el flujo de alta de
+  // usuarios en `/settings/acceso`. Cerrar al rol admin elimina la superficie
+  // pública (anónima o user-rol) que podría disparar correos arbitrarios
+  // usando la cuenta Resend o inferir membresía de usuarios.
+  const userSupa = await createSupabaseServerClient();
+  const adminClient = getSupabaseAdminClient();
+  if (!adminClient) {
+    return NextResponse.json({ error: 'Server config error (admin client)' }, { status: 500 });
+  }
+  const guard = await requireAdmin(userSupa, adminClient);
+  if (!guard.ok) {
+    return NextResponse.json({ error: guard.error }, { status: guard.status });
+  }
+
+  console.log('[welcome-email-api] processing', { usuarioId });
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -50,7 +67,10 @@ export async function POST(req: NextRequest) {
     }
   );
   const usuarioEmpresas = await adminRes.json();
-  console.log('[welcome-email-api] usuarioEmpresas:', JSON.stringify(usuarioEmpresas));
+  console.log(
+    '[welcome-email-api] usuarioEmpresas count:',
+    Array.isArray(usuarioEmpresas) ? usuarioEmpresas.length : 0
+  );
 
   const empresas: WelcomeEmpresa[] = [];
 
@@ -80,7 +100,7 @@ export async function POST(req: NextRequest) {
 
   const html = generateWelcomeHtml(firstName || email, empresas);
 
-  console.log('[welcome-email-api] Sending email via Resend to:', email);
+  console.log('[welcome-email-api] Sending welcome email');
 
   const emailRes = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -97,7 +117,7 @@ export async function POST(req: NextRequest) {
   });
 
   const emailResult = await emailRes.json();
-  console.log('[welcome-email-api] Resend response:', emailRes.status, JSON.stringify(emailResult));
+  console.log('[welcome-email-api] Resend response status:', emailRes.status);
 
   if (!emailRes.ok) {
     return NextResponse.json({ error: 'Resend failed', detail: emailResult }, { status: 500 });

@@ -1,5 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any --
+ * supabase-js solo tipa el schema `public`; para `core` usamos `as any`.
+ * Mismo patrón que `lib/empresas/admin-guard.ts` y otras routes server.
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { validateBody } from '@/lib/validation';
 import { buildMinutaEmailPayload, sendMinutaEmail } from '@/lib/juntas/email';
@@ -18,6 +24,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Server config error' }, { status: 500 });
   }
 
+  // Auth gate: el endpoint dispara escritura en `erp.juntas` + `core.usuarios`
+  // + envío de minuta por email. Antes de este cambio cualquier llamador
+  // (incluso anónimo) podía cerrar cualquier junta y disparar el email.
+  // Patrón canónico: auth.getUser() + lookup `core.usuarios` por email +
+  // membresía en la empresa de la junta (admin pasa por encima).
+  const userSupa = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await userSupa.auth.getUser();
+  if (!user || !user.email) {
+    return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+  }
+
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) {
     return NextResponse.json({ error: 'RESEND_API_KEY not configured' }, { status: 500 });
@@ -25,15 +44,42 @@ export async function POST(req: NextRequest) {
 
   // Duración calculada contra created_at (arranque real) porque fecha_hora
   // viene de un datetime-local sin timezone y frecuentemente está desfasado.
+  // empresa_id se incluye para validar membresía del caller.
   const { data: existing } = await supabase
     .schema('erp')
     .from('juntas')
-    .select('fecha_hora, created_at')
+    .select('fecha_hora, created_at, empresa_id')
     .eq('id', juntaId)
     .single();
 
+  if (!existing) {
+    return NextResponse.json({ error: 'Junta no encontrada' }, { status: 404 });
+  }
+
+  // Verificación de acceso: admin global o miembro activo de la empresa.
+  const { data: coreUser } = await (supabase.schema('core') as any)
+    .from('usuarios')
+    .select('id, rol, activo')
+    .eq('email', user.email.toLowerCase())
+    .maybeSingle();
+  if (!coreUser || !coreUser.activo) {
+    return NextResponse.json({ error: 'Usuario sin acceso activo' }, { status: 403 });
+  }
+  if (coreUser.rol !== 'admin') {
+    const { data: membership } = await (supabase.schema('core') as any)
+      .from('usuarios_empresas')
+      .select('usuario_id')
+      .eq('usuario_id', coreUser.id)
+      .eq('empresa_id', existing.empresa_id)
+      .eq('activo', true)
+      .maybeSingle();
+    if (!membership) {
+      return NextResponse.json({ error: 'Sin acceso a esta empresa' }, { status: 403 });
+    }
+  }
+
   const now = new Date();
-  const startRef = existing?.created_at ?? existing?.fecha_hora;
+  const startRef = existing.created_at ?? existing.fecha_hora;
   const duracionMinutos = startRef
     ? Math.round((now.getTime() - new Date(startRef as string).getTime()) / 60000)
     : null;
