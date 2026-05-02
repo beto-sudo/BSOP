@@ -32,7 +32,16 @@ export default defineConfig({
     environment: 'node',
     globals: false,
     include: ['**/*.test.ts', '**/*.test.tsx'],
-    exclude: ['node_modules/**', '.next/**', 'tests/e2e/**'],
+    // Integration tests viven en `tests/integration/**` y corren via
+    // `npm run test:integration` (config separado). Excluirlos aquí
+    // evita que `test:run` los ejecute sin DB local arriba.
+    exclude: [
+      'node_modules/**',
+      '.next/**',
+      'tests/e2e/**',
+      'tests/integration/**',
+      '**/*.integration.test.ts',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
