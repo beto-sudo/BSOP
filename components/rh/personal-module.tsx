@@ -75,12 +75,25 @@ type Empleado = {
   }[];
 };
 
-const ACCIONISTA_PUESTOS = new Set([
-  'Accionista',
-  'Comité Ejecutivo',
-  'Consejo de Administracion',
-  'Consejo de Administración',
+// Nombres de puesto/departamento que clasifican a una persona como accionista
+// (en sentido amplio: socios, miembros del comité, consejeros). Match
+// case-insensitive y normalizado para evitar drift por tildes o casing.
+const ACCIONISTA_LABELS = new Set([
+  'accionista',
+  'accionistas',
+  'comite ejecutivo',
+  'consejo de administracion',
+  'consejero',
 ]);
+
+function normalizeLabel(s: string | null | undefined): string {
+  if (!s) return '';
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+}
+
+function matchesAccionistaLabel(s: string | null | undefined): boolean {
+  return ACCIONISTA_LABELS.has(normalizeLabel(s));
+}
 
 type TipoTab = 'empleados' | 'accionistas' | 'todos';
 type EstadoFilter = 'activos' | 'inactivos' | 'todos';
@@ -203,9 +216,18 @@ function antiguedadStr(fechaIngreso: string | null): string {
 }
 
 function isAccionista(emp: Empleado): boolean {
-  return (emp.puestos ?? []).some(
-    (p) => p.puesto?.nombre && ACCIONISTA_PUESTOS.has(p.puesto.nombre)
-  );
+  // Departamento "Accionistas" gana sobre cualquier puesto. Cubre el caso de
+  // socios cargados sin puesto formal (o con un puesto legacy/custom que no
+  // matchea ACCIONISTA_LABELS).
+  if (matchesAccionistaLabel(emp.departamento?.nombre)) return true;
+  // N:M actual (modelo desde 2026-04-27).
+  if ((emp.puestos ?? []).some((p) => matchesAccionistaLabel(p.puesto?.nombre))) {
+    return true;
+  }
+  // Campo legacy `empleados.puesto_id` directo, para empleados que aún no
+  // tienen entrada en empleados_puestos (e.g. COAGAN/ANSA pre-migración N:M).
+  if (matchesAccionistaLabel(emp.puesto?.nombre)) return true;
+  return false;
 }
 
 function detailHref(empresaSlug: string, id: string) {

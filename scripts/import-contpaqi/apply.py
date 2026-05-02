@@ -65,6 +65,47 @@ def sql_quote(v) -> str:
     return f"'{s}'"
 
 
+# Partículas que quedan en minúscula cuando NO son la primera palabra.
+# Espejo de LOWERCASE_PARTICLES en lib/name-case.ts — mantener en sync.
+_LOWERCASE_PARTICLES = {
+    "de", "del", "la", "las", "los", "y", "e",
+    "da", "das", "do", "dos", "van", "von", "der", "den",
+}
+
+
+def title_case_es(s: Optional[str]) -> Optional[str]:
+    """Title Case en español para nombres propios. Espejo de titleCase()
+    en lib/name-case.ts — los imports deben emitir SQL ya normalizado para
+    no requerir backfill posterior con scripts/normalize-personas.ts.
+    """
+    if s is None:
+        return None
+    raw = re.sub(r"\s+", " ", str(s).strip())
+    if not raw:
+        return None
+
+    def _cap_word(word: str) -> str:
+        # Respeta apóstrofo (O'Connor) y guion (Jean-Luc) capitalizando cada parte.
+        parts = re.split(r"(['’\-])", word)
+        out = []
+        for part in parts:
+            if part in ("'", "’", "-") or not part:
+                out.append(part)
+            else:
+                out.append(part[:1].upper() + part[1:].lower())
+        return "".join(out)
+
+    words = raw.split(" ")
+    result = []
+    for i, w in enumerate(words):
+        lower = w.lower()
+        if i > 0 and lower in _LOWERCASE_PARTICLES:
+            result.append(lower)
+        else:
+            result.append(_cap_word(w))
+    return " ".join(result)
+
+
 def empresa_id_subq(slug: str) -> str:
     return f"(SELECT id FROM core.empresas WHERE slug = '{slug}')"
 
@@ -84,18 +125,21 @@ def puesto_id_subq(slug: str, nombre: Optional[str]) -> str:
 
 
 def excel_to_personas_fields(ex: dict) -> dict:
-    """Mapea campos Excel a columnas de erp.personas."""
+    """Mapea campos Excel a columnas de erp.personas. Aplica Title Case a
+    los campos de nombre propio para mantener convención del wizard de RH
+    (ver lib/name-case.ts) y evitar drift que requiera backfill posterior.
+    """
     return {
-        "nombre": ex.get("nombre"),
-        "apellido_paterno": ex.get("apellido_paterno"),
-        "apellido_materno": ex.get("apellido_materno"),
+        "nombre": title_case_es(ex.get("nombre")),
+        "apellido_paterno": title_case_es(ex.get("apellido_paterno")),
+        "apellido_materno": title_case_es(ex.get("apellido_materno")),
         "rfc": ex.get("rfc"),
         "curp": ex.get("curp"),
         "nss": ex.get("nss"),
         "fecha_nacimiento": ex.get("fecha_nacimiento"),
         "sexo": ex.get("sexo"),
         "estado_civil": ex.get("estado_civil"),
-        "lugar_nacimiento": ex.get("lugar_nacimiento"),
+        "lugar_nacimiento": title_case_es(ex.get("lugar_nacimiento")),
         "domicilio": ex.get("direccion"),
         "telefono": ex.get("telefono"),
         "email": ex.get("email"),
