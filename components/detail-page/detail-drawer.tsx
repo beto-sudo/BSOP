@@ -113,13 +113,14 @@ export type DetailDrawerHeaderProps = {
 /**
  * Drawer-specific header. Stand-alone when not using `<DetailDrawer>` directly.
  *
- * Layout:
- *   - Mobile (<640px): stacked — title group on top, actions row below (DD9).
- *   - Desktop (≥640px): single row — title group left, actions right (DD2).
+ * Layout: siempre stacked — title/description/meta arriba, actions en su
+ * propio renglón debajo. Esto evita que el título se comprima cuando hay
+ * varios actions (e.g. proveedores: "Cargar/Actualizar CSF · Editar ·
+ * Inactivar · Imprimir") y mantiene consistencia entre mobile y desktop.
  *
- * The native `SheetClose` (X button, `absolute top-3 right-3`, 28×28px) lives
- * in the top-right of `<SheetContent>`. The header reserves `pr-14` (56px) on
- * the container so neither the title nor the actions collide with it (DD7).
+ * El native `SheetClose` (X button, `absolute top-3 right-3`, 28×28px) vive
+ * en el top-right de `<SheetContent>`. El header reserva `pr-14` (56px) en
+ * el container para que ni el título ni los actions choquen con la X (DD7).
  */
 export function DetailDrawerHeader({
   title,
@@ -135,20 +136,18 @@ export function DetailDrawerHeader({
         className
       )}
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-        <div className="min-w-0 flex-1 space-y-1">
-          <SheetTitle className="text-base font-semibold leading-tight line-clamp-2 break-words">
-            {title}
-          </SheetTitle>
-          {description ? (
-            <SheetDescription className="text-xs">{description}</SheetDescription>
-          ) : null}
-          {meta ? <div className="flex flex-wrap items-center gap-2 pt-1">{meta}</div> : null}
-        </div>
-        {actions ? (
-          <div className="shrink-0 flex flex-wrap items-center gap-2 print:hidden">{actions}</div>
+      <div className="min-w-0 space-y-1">
+        <SheetTitle className="text-base font-semibold leading-tight line-clamp-2 break-words">
+          {title}
+        </SheetTitle>
+        {description ? (
+          <SheetDescription className="text-xs">{description}</SheetDescription>
         ) : null}
+        {meta ? <div className="flex flex-wrap items-center gap-2 pt-1">{meta}</div> : null}
       </div>
+      {actions ? (
+        <div className="flex flex-wrap items-center gap-2 pt-2 print:hidden">{actions}</div>
+      ) : null}
     </SheetHeader>
   );
 }
