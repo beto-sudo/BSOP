@@ -217,8 +217,8 @@ ADR-011 prescribe componentes shared cross-empresa. Tres holdouts:
 | 2A  | Eliminar pages cross-empresa (`/rh/*`, `/inicio/*`)           | done        | #393      |
 | 2B  | Helper `lib/csf-diff.ts` deduplicado                          | done        | #394      |
 | 2C  | `ProveedoresModule` resuelve branding por slug                | done        | #394      |
-| 3A  | Tests `welcome-email` + `juntas/activar` + coverage threshold | in_progress | _este PR_ |
-| 3B  | Tests `documentos/extract` + `productos/actions`              | planned     | TBD       |
+| 3A  | Tests `welcome-email` + `juntas/activar` + coverage threshold | done        | #395      |
+| 3B  | Tests `documentos/extract` + `productos/actions`              | in_progress | _este PR_ |
 | 3C  | Integration tests `cortes` + `levantamientos` (con DB real)   | planned     | TBD       |
 | 4   | Refactor god components + major deps                          | planned     | TBD       |
 
@@ -333,9 +333,67 @@ iniciativa propia.
 
 ## Bitácora
 
-### 2026-05-02 — Sprint 3A en flight (este PR)
+### 2026-05-02 — Sprint 3B en flight (este PR)
 
-Arranque de Sprint 3 (test fortification). PR 3A entrega:
+Sprint 3B entrega tests para los 2 archivos del medio del Sprint 3
+(complejidad media). Mock strategy A confirmada por Beto.
+
+**Tests nuevos** (36 tests, todos pasando):
+
+- `app/rdb/productos/actions.test.ts` (19 tests):
+  - `upsertReceta`: 401 sin auth, cantidad inválida (≤0, negativa,
+    NaN, Infinity), insumo_id vacío, **self-reference (ciclo directo)**,
+    insumos no-RDB / no-inventariables, errores DB en cada step
+    (validación / delete / insert), happy path con insumos, happy
+    path con array vacío (solo borra), `assertNotInPreview` activo.
+  - `updateCategoria`: 401 sin auth, categoría no-RDB, success limpiar
+    (null), success con id válido, error update, preview guard.
+
+- `app/api/documentos/[id]/extract/route.test.ts` (17 tests):
+  - Env vars: 500 si `ANTHROPIC_API_KEY` o `OPENAI_API_KEY` faltan.
+  - Auth: 401 sin sesión.
+  - 404 si doc no existe (RLS bloquea).
+  - 500 en errores: fetch doc, admin client null, fetch adjuntos.
+  - 400 si no hay PDF principal.
+  - **Lock optimista**: 409 si lock falla (otro request lo tomó),
+    500 si query del lock lanza error, verifica que el lock se
+    aplica ANTES de llamar a Claude.
+  - **Rollback**: estado vuelve a `error` si Claude falla;
+    estado vuelve a `error` si OpenAI embedding falla.
+  - **Success path**: extrae, embebe, commitea con
+    `extraccion_status='completado'`.
+  - **File rename**: storage move se invoca cuando título estandarizado
+    difiere; NO se renombra cuando el título ya está en formato
+    estándar (respeta edición humana).
+  - **Preserva valores humanos**: `fecha_emision` y `numero_documento`
+    no se sobrescriben cuando IA devuelve null.
+
+**Mock strategy A aplicada** (decidido en Sprint 3A):
+
+- `extraction-core` mockeado al nivel de módulo (`vi.mock`) — la
+  cobertura real de Claude/OpenAI SDK vive en
+  `lib/documentos/extraction-core.test.ts`.
+- Mocks de supabase admin son fluent builders inline que branchean por
+  `(schema, table, op)` — más complejos que en Sprint 3A porque
+  `extract` toca 8+ chains distintos (lock optimista, fetch tipo,
+  commit, rollback, rename + adjunto update).
+
+**Coverage threshold bump**:
+
+- Tras Sprint 3B: 35.29% lines, 69.27% functions, 83.82% branches.
+- Threshold subido en `vitest.config.ts`: 33% lines/statements
+  (era 30), 67% functions (era 65), 80% branches (era 75). Buffer
+  ~2-3% sobre el medido.
+
+**Gap conocido (anotado, no cubierto)**:
+
+`upsertReceta` solo detecta ciclo directo (A→A) — el código fuente no
+implementa detección de ciclo indirecto (A→B→A o más profundo). Si
+surge la necesidad operativa, va como issue separada.
+
+### 2026-05-02 — Sprint 3A merged (PR #395)
+
+Arranque oficial de Sprint 3 (test fortification). PR 3A entrega:
 
 **Tests nuevos** (27 tests, todos pasando):
 
