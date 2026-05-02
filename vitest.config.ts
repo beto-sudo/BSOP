@@ -10,14 +10,12 @@ import path from 'node:path';
  * excluyen aquí.
  *
  * Coverage threshold (gradual — Sprint 3 de `tech-debt-h1-2026`):
- *   - **Sprint 3A** (este PR): baseline al 30% lines/statements,
- *     65% functions, 75% branches. Al expandir el include de solo
- *     `lib` a `lib + app/api/ + Server Actions de `app/`, el coverage
- *     real medido es ~32% lines, ~69% functions, ~84% branches —
- *     thresholds dejan ~2% de buffer para variación natural y bitan
- *     ante regresión real.
- *   - **Sprint 3B**: tests para `documentos/extract` y
- *     `productos/actions` → subir thresholds ~3-5%.
+ *   - **Sprint 3A**: baseline 30% lines/statements, 65% functions,
+ *     75% branches. Coverage medido tras 3A: ~32% lines, ~69%
+ *     functions, ~84% branches.
+ *   - **Sprint 3B** (este PR): bump a 33% lines/statements, 67%
+ *     functions, 80% branches. Coverage medido tras 3B: 35.29% lines,
+ *     69.27% functions, 83.82% branches — buffer ~2-3%.
  *   - **Sprint 3C**: integration tests para `cortes/actions` y
  *     `levantamientos/actions` → target final 40-45% lines.
  *
@@ -43,13 +41,13 @@ export default defineConfig({
         'app/api/**/_test-helpers.ts',
       ],
       thresholds: {
-        // Baseline Sprint 3A — sube en 3B y 3C. Buffer ~2% sobre el
-        // medido actual para tolerar variación natural y bitir si
-        // alguien agrega código sin tests.
-        lines: 30,
-        statements: 30,
-        functions: 65,
-        branches: 75,
+        // Sprint 3B — sube en 3C. Buffer ~2-3% sobre el medido actual
+        // para tolerar variación natural y bitir si alguien agrega
+        // código sin tests.
+        lines: 33,
+        statements: 33,
+        functions: 67,
+        branches: 80,
       },
     },
   },
