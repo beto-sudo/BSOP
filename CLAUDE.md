@@ -34,15 +34,31 @@ Reflejá el cambio de estado en `docs/strategy/INITIATIVES.md` también
 iniciativa quedó completa, movela a la sección `## Done` con fecha de
 cierre y outcome — no borres su doc de planning, queda como referencia.
 
-**Barrido de Reminders al cerrar (`* → done`):** antes de cerrar la
-iniciativa, listá los pendientes vivos en la lista `Claude: BSOP` con
-`remindctl list "Claude: BSOP" --json` y completá los que sean
-sub-tareas de la iniciativa que cierra (referencias a sus PRs, su
-slug, sub-PRs, sprints, smoke tests, closeouts). Las sub-tareas
+**Barrido obligatorio de Reminders al cerrar (`* → done`):** antes de
+mover el estado a `done` en `INITIATIVES.md` (o de reportar el cierre
+en chat), correr:
+
+```bash
+remindctl show all --list "Claude 🧭" --json
+```
+
+Y completar todo lo que matchee el slug, PRs, sub-PRs, sprints, smoke
+tests o closeouts de la iniciativa que cierra. Las sub-tareas
 históricas mueren con la iniciativa — no quedan vivas para confundir
-sesiones futuras. Ver regla global "Pendientes y calendario" en
-`~/.claude/CLAUDE.md` para el filtro de qué SÍ va a Reminders desde el
-inicio.
+sesiones futuras.
+
+Si bajo el filtro nuevo (ver regla global "Pendientes y calendario" en
+`~/.claude/CLAUDE.md`) las sub-tareas mías nunca debieron entrar a
+Reminders desde un inicio, este barrido es solo seguridad. Si encuentro
+algo cross-sesión que requiere acción operativa de Beto (ej. backfill
+manual post-merge), no lo borro — lo dejo y lo menciono explícitamente
+en el reporte de cierre.
+
+**Nota histórica:** la lista `Claude: BSOP` quedó deprecada el
+2026-05-02 a favor de `Claude 🧭` (lista global para todos los
+proyectos que manejo end-to-end). Cualquier reminder vivo en
+`Claude: BSOP` se barrió en esa fecha; sesiones futuras no agregan
+ahí.
 
 ### Roles
 
