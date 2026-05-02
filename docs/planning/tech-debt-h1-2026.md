@@ -211,14 +211,16 @@ ADR-011 prescribe componentes shared cross-empresa. Tres holdouts:
 
 ## Sprints / hitos
 
-| #   | Sprint                                              | Estado      | PR        |
-| --- | --------------------------------------------------- | ----------- | --------- |
-| 1   | Quick wins seguridad + limpieza                     | done        | #390      |
-| 2A  | Eliminar pages cross-empresa (`/rh/*`, `/inicio/*`) | done        | #393      |
-| 2B  | Helper `lib/csf-diff.ts` deduplicado                | in_progress | _este PR_ |
-| 2C  | `ProveedoresModule` resuelve branding por slug      | in_progress | _este PR_ |
-| 3   | Test fortification (mutations + APIs)               | planned     | TBD       |
-| 4   | Refactor god components + major deps                | planned     | TBD       |
+| #   | Sprint                                                        | Estado      | PR        |
+| --- | ------------------------------------------------------------- | ----------- | --------- |
+| 1   | Quick wins seguridad + limpieza                               | done        | #390      |
+| 2A  | Eliminar pages cross-empresa (`/rh/*`, `/inicio/*`)           | done        | #393      |
+| 2B  | Helper `lib/csf-diff.ts` deduplicado                          | done        | #394      |
+| 2C  | `ProveedoresModule` resuelve branding por slug                | done        | #394      |
+| 3A  | Tests `welcome-email` + `juntas/activar` + coverage threshold | in_progress | _este PR_ |
+| 3B  | Tests `documentos/extract` + `productos/actions`              | planned     | TBD       |
+| 3C  | Integration tests `cortes` + `levantamientos` (con DB real)   | planned     | TBD       |
+| 4   | Refactor god components + major deps                          | planned     | TBD       |
 
 ## Decisiones registradas
 
@@ -281,6 +283,45 @@ Outcome del reframe:
 - Sprints 2B (csf-diff) y 2C (proveedores branding) del plan original
   **se conservan** y se entregan en este PR de seguimiento.
 
+### 2026-05-02 · Sprint 3 estrategia: híbrido mocks + DB real para financiero
+
+Tensión entre el patrón actual del repo (8 route tests con mocks de
+supabase) y la memoria del proyecto ("integration tests deben pegar a
+DB real, mock/prod divergence causó incidente"). Resuelto con
+**enfoque híbrido**:
+
+- **Sprint 3A + 3B**: tests unitarios con mocks (siguiendo el patrón
+  canónico de `app/api/empresas/_test-helpers.ts` y los 8 tests
+  existentes). Cobertura rápida para validaciones de input, paths 4xx
+  y 5xx, lógica pura.
+- **Sprint 3C**: integration tests con Supabase test instance contra
+  los flujos financieros (`cortes/actions`, `levantamientos/actions`).
+  Estos son donde el incidente histórico (mock/prod divergence) más
+  duele si se repite.
+
+Mocks legítimos para validaciones / lógica pura; DB real para mutations
+financieras. No es purismo, es que el costo del setup de DB real solo
+vale en los tests donde su valor (detectar drift de schema/migración)
+supera el overhead.
+
+### 2026-05-02 · Coverage threshold en `vitest.config.ts`, no en `test:run`
+
+El threshold solo se valida cuando vitest corre con `--coverage`. Se
+configura en `vitest.config.ts` (`coverage.thresholds`) y CI llama
+`npm run test:coverage`. `npm run test:run` queda sin coverage para
+iteración local rápida.
+
+Baseline Sprint 3A: 30% lines/statements, 65% functions, 75% branches
+(coverage real medido es 31.86% lines, 68.53% functions, 83.67%
+branches; thresholds dejan ~2% buffer para variación natural sin
+permitir regresión).
+
+Subidas progresivas:
+
+- Sprint 3B: bump ~3-5% al agregar tests de `documentos/extract` y
+  `productos/actions`.
+- Sprint 3C: bump final a ~40-45% lines tras integration tests.
+
 ### 2026-05-02 · Branding centralizado limitado a Proveedores en Sprint 2C
 
 `lib/empresa-branding.ts` se introduce con `EmpresaSlug` y
@@ -292,7 +333,47 @@ iniciativa propia.
 
 ## Bitácora
 
-### 2026-05-02 — Sprint 2B + 2C en flight (este PR)
+### 2026-05-02 — Sprint 3A en flight (este PR)
+
+Arranque de Sprint 3 (test fortification). PR 3A entrega:
+
+**Tests nuevos** (27 tests, todos pasando):
+
+- `app/api/welcome-email/route.test.ts` (12 tests):
+  - Validación de inputs (email malformed, usuarioId no UUID).
+  - Rate limit (429 cuando excedido).
+  - Auth gate (401 sin sesión, 403 si caller no admin) — la salvaguarda
+    del Sprint 1 ahora con cobertura.
+  - Resend integration (200 success, 500 si Resend falla, payload
+    correcto con email + subject + html).
+  - Env vars (500 si `RESEND_API_KEY` falta).
+- `app/api/juntas/[id]/activar/route.test.ts` (15 tests):
+  - POST: 401 sin sesión, 404 si junta no existe, no activa si está
+    completada/cancelada, activa si en_curso/programada, lowercase del
+    email del JWT.
+  - DELETE: 401 sin sesión, 200 con clear correcto, lowercase email.
+
+**Coverage threshold gradual en CI**:
+
+- Expanded `vitest.config.ts` `coverage.include` de solo `lib/**` a
+  `lib/ + app/api/ + Server Actions de app/`. El `*.test.ts` y
+  `_test-helpers` se excluyen.
+- Agregado `coverage.thresholds`: 30 lines/statements, 65 functions,
+  75 branches. Coverage real medido tras Sprint 3A: 31.86% lines,
+  68.53% functions, 83.67% branches — thresholds dejan ~2% de buffer.
+- CI workflow (`.github/workflows/ci.yml`) cambia el step "Vitest —
+  unit tests" de `npm run test:run` a `npm run test:coverage` para que
+  el threshold bita.
+
+**Patrón de mocks aplicado**:
+
+Patrón canónico del repo (8 route tests existentes en
+`app/api/empresas/`) + variante inline para juntas/activar (mock más
+focal del admin client) + `vi.mock` de fetch global para welcome-email
+(Resend + Supabase REST). Sin shared `_test-helpers` nuevo — los mocks
+son específicos por route.
+
+### 2026-05-02 — Sprint 2B + 2C merged (PR #394)
 
 Closeout de Sprint 2 con los 2 changes pendientes después del reframe a
 eliminación:
