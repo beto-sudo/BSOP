@@ -1,0 +1,346 @@
+# Iniciativa — Tech debt H1 2026
+
+**Slug:** `tech-debt-h1-2026`
+**Empresas:** todas
+**Schemas afectados:** n/a (refactor + tests + seguridad app-layer)
+**Estado:** planned
+**Dueño:** Beto
+**Creada:** 2026-05-02
+**Última actualización:** 2026-05-02
+
+## Problema
+
+Audit repo-wide (2026-05-02) identificó deuda técnica acumulada con 3 huecos
+prioritarios accionables y aspectos sanos que conviene preservar.
+
+### Huecos críticos
+
+**1. Seguridad — auth gaps puntuales (alto)**
+
+- `app/api/welcome-email/route.ts` — POST sin `auth.getUser()`, usa
+  `SUPABASE_SERVICE_ROLE_KEY` para fetch `usuarios_empresas`, y loguea PII
+  (email + UUID + relaciones usuario-empresa serializadas como JSON) en
+  consola en líneas 28, 53 y 83.
+- `app/api/juntas/terminar/route.ts` — POST sin auth check, usa admin client
+  vía `getSupabaseAdminClient()`, llamado desde cliente
+  (`junta-detail-module.tsx`).
+- 15 `.rpc()` calls confían solo en tipos TypeScript (no Zod runtime).
+  RLS es la defensa real, pero validación de inputs no está en app-layer.
+
+**2. Duplicación bajo ADR-011 (alto, ~1,730 LOC eliminables)**
+
+ADR-011 prescribe componentes shared cross-empresa. Tres holdouts:
+
+- `app/rh/personal/[id]/page.tsx` (1267 LOC) reimplementa todo el detalle de
+  empleado — `EmpleadoDetailInner()` con beneficiarios, compensación, pago,
+  baja, etc. — cuando `components/rh/empleado-detail-module.tsx` ya existe
+  y está parametrizado por `empresaSlug`. La página DILESA equivalente
+  (`app/dilesa/rh/personal/[id]/page.tsx`) delega correctamente con 9 LOC.
+- `app/inicio/juntas/page.tsx` (497 LOC) reimplementa `JuntasInner()` con
+  toda la lógica de lista (fetch, filtro, crear, DataTable) cuando
+  `components/juntas/admin-juntas-list-module.tsx` ya existe. DILESA y RDB
+  delegan correctamente con 16 LOC c/u. Falta agregar `scope="user-empresas"`
+  o equivalente al módulo shared para soportar el caso `/inicio` sin
+  reimplementar.
+- CSF diff helpers (`valuesEqual`, `formatDiffValue`) duplicados ~60 LOC
+  entre `components/proveedores/proveedores-module.tsx` y
+  `app/settings/empresas/_components/empresa-detail.tsx`.
+
+**3. Test debt estructural (alto, 9% ratio)**
+
+38 archivos test sobre 431 sources. Críticos sin tests:
+
+- **Mutations financieras**: `app/rdb/cortes/actions.ts` (596 LOC, efectivo
+  en caja, hot file con 9 cambios), `app/rdb/inventario/levantamientos/actions.ts`
+  (287 LOC, firma de aprobación), `app/rdb/productos/actions.ts` (recetas
+  con dependencias circulares).
+- **APIs críticas**: `app/api/documentos/[id]/extract/route.ts` (276 LOC,
+  IA Claude+OpenAI con costo $), `app/api/welcome-email/route.ts`,
+  `app/api/juntas/[id]/activar/route.ts` (trigger automático de avances).
+
+### Huecos secundarios
+
+- **Dependencias** — `next/react/tailwind/shadcn` con `"latest"` sin pin
+  → riesgo de drift en CI por upstream. 4 majors pendientes: TypeScript
+  5.9→6.0, vitest 3.2→4.1, eslint 9.39→10.3, `@vitest/coverage-v8` 3.2→4.1.
+- **Limpieza** — 3 dirs orphan en root: `.backup-stale/` (4 backup dirs +
+  `permissions.ts.bak`, Apr 16), `sprint-dilesa-1-ui/` (`.patch` 72KB
+  abandonado, Apr 24), `tmp/*.js` (11 scripts one-off de Coda y efectivo).
+- **Observabilidad** — 503 `console.*` en el repo, sin logging estructurado.
+  Algunos logs leakean PII (welcome-email).
+- **God components** — 10 archivos >1000 LOC, top 3 con churn alto:
+  `proveedores-module.tsx` (1893 LOC, 63 hooks), `juntas/[id]/page.tsx`
+  (1803), `ordenes-compra/page.tsx` (1778). 2 excluidos por diseño:
+  `acceso-client.tsx` (ADR-010 deniega `<DataTable>`) y
+  `empleado-alta-wizard.tsx` (wizard cubierto por `wizard-pattern`).
+
+### Aspectos sanos a preservar
+
+- 28 ADRs activos, 37 planning docs vivos, sistema de iniciativas
+  funcionando.
+- 0 `@ts-ignore` / `@ts-expect-error` / `@ts-nocheck` en todo el repo.
+- Solo 7 archivos con TODO/FIXME (muy limpio).
+- 0 leaks de `process.env.*` (no `NEXT_PUBLIC_*`) a archivos client.
+- CI estricto (4 checks: typecheck + test:run + lint + format:check).
+- Husky + lint-staged en pre-commit.
+
+## Outcome esperado
+
+- 0 routes con escritura de DB sin auth gate explícito.
+- 0 logs con PII no estructurada en routes API.
+- ~1,730 LOC de duplicación eliminadas bajo ADR-011 (juntas + personal
+  consolidados).
+- Coverage subiendo de 9% → 20%+ con foco en mutations financieras y APIs
+  críticas.
+- `next/react/tailwind/shadcn` pinneadas a versiones explícitas (cero drift
+  CI por upstream).
+- Repo limpio de dirs orphan (`.backup-stale`, `sprint-dilesa-1-ui`, `tmp/`).
+
+## Alcance v1 (cerrado 2026-05-02)
+
+### Sprint 1 — Quick wins seguridad + limpieza (1 día, low risk)
+
+- [ ] Auth gate en `app/api/welcome-email/route.ts` + reducir verbosity de
+      logs PII (no loguear emails/UUIDs/relaciones serializadas).
+- [ ] Auth gate en `app/api/juntas/terminar/route.ts`.
+- [ ] Pin `next` / `react` / `react-dom` / `tailwindcss` /
+      `@tailwindcss/postcss` / `shadcn` / `@types/node` / `@types/react` /
+      `@types/react-dom` / `typescript` a versiones explícitas en
+      `package.json`.
+- [ ] Borrar `.backup-stale/` y `sprint-dilesa-1-ui/` (validar antes con
+      Beto qué se conserva). Decidir destino de `tmp/*.js` (archivar a
+      `scripts/archive/` o borrar).
+
+### Sprint 2 — Consolidación bajo ADR-011 (3-5 días)
+
+- [ ] `app/rh/personal/[id]/page.tsx` → delegar a `EmpleadoDetailModule`
+      con `empresaSlug=""` o equivalente cross-empresa (-1,250 LOC).
+- [ ] Agregar `scope="user-empresas"` (o nombre equivalente) a
+      `AdminJuntasListModule`; refactorizar `app/inicio/juntas/page.tsx`
+      para usarlo (-410 LOC).
+- [ ] Extraer `lib/csf-diff.ts` con `valuesEqual` + `formatDiffValue`,
+      deduplicado entre `proveedores-module` y `empresa-detail` (-60 LOC).
+- [ ] Parametrizar `ProveedoresModule` por `empresaSlug` (eliminar
+      acoplamiento a brand paths hardcoded).
+
+### Sprint 3 — Test fortification (5-7 días)
+
+- [ ] Tests de mutations financieras críticas:
+  - `app/rdb/cortes/actions.ts` (efectivo: abrir/cerrar caja, registrar
+    movimiento, voucher).
+  - `app/rdb/inventario/levantamientos/actions.ts` (firma aprobación).
+  - `app/rdb/productos/actions.ts` (recetas + circular deps).
+- [ ] Tests de APIs críticas:
+  - `app/api/documentos/[id]/extract/route.ts` (rollback en fallo, costo
+    de retry).
+  - `app/api/welcome-email/route.ts` (rate limit + Resend).
+  - `app/api/juntas/[id]/activar/route.ts` (trigger automático de
+    avances).
+- [ ] Threshold mínimo de coverage en CI (`vitest run --coverage`),
+      gradual: 15% baseline al cierre del Sprint, target 25% al cierre de
+      la iniciativa.
+- [ ] Decidir si los tests pegan a Supabase test instance (memoria del
+      usuario: integration tests deben ir a DB real, no mocks profundos).
+
+### Sprint 4 — Refactor god components + major deps (opcional, post Sprint 3)
+
+- [ ] Romper `components/proveedores/proveedores-module.tsx` (1893 LOC,
+      63 hooks) → extraer `CSFDiffSection` (líneas ~96-217) +
+      `ProveedorFormSection`.
+- [ ] Extraer `BeneficiariosSection` (líneas 241-406) y
+      `CompensacionSection` de `components/rh/empleado-detail-module.tsx`.
+- [ ] Extraer `RecepcionesHistorial`, `SummaryBar`, hook
+      `useEditablePrices` de `app/rdb/ordenes-compra/page.tsx`.
+- [ ] Major dep upgrades en PRs aislados:
+  - TypeScript 5.9 → 6.0 (con codemods si aplica).
+  - vitest 3.2 → 4.1 + `@vitest/coverage-v8`.
+  - eslint 9.39 → 10.3.
+- [ ] Closeout de iniciativa.
+
+## Fuera de alcance v1
+
+- **Restructuración arquitectónica grande** — no se mueven schemas, no se
+  redibujan capas. Esta iniciativa es saneamiento, no rediseño.
+- **Migrar tests a `@testing-library/react`** — repo no tiene jsdom; queda
+  fuera salvo que regresión obligue (precedente: `forms-pattern` documentó
+  esta misma exclusión).
+- **Refactor de `empleado-alta-wizard.tsx`** — wizard ya cubierto por
+  `wizard-pattern` (cerrado 2026-04-29).
+- **Refactor de `acceso-client.tsx`** — ADR-010 deniega `<DataTable>`
+  explícitamente.
+- **e2e tests nuevos** — Sprint 3 solo agrega unit/integration; suite e2e
+  existente cubre flujos UI.
+- **Refactor de routes API que ya tienen auth** — solo se cierran gates
+  faltantes, no se reescribe lógica funcional.
+- **Logging estructurado repo-wide** (`pino`/`winston`/etc.) — Sprint 1
+  solo reduce PII en logs específicos. Migrar 503 `console.*` queda como
+  iniciativa hermana si surge necesidad.
+
+## Métricas de éxito
+
+- **Seguridad** — 0 routes API con escritura sin auth gate explícito al
+  cierre de Sprint 1 (lista exhaustiva en bitácora).
+- **LOC reducción** — -1,730 LOC en pages duplicadas al cierre de Sprint 2.
+- **Coverage** — 9% baseline → 15% al cierre de Sprint 3, 25% al cierre
+  de la iniciativa (medido con `vitest run --coverage`).
+- **CI estabilidad** — 0 builds fallidos por upstream version drift en
+  deps "latest" durante 1 mes post Sprint 1.
+- **Repo housekeeping** — 0 dirs orphan en root al cierre de Sprint 1.
+
+## Riesgos
+
+- **Sprint 2 toca pages hot** (24 cambios en `juntas/[id]`, 11 en
+  `personal/[id]`). Conflictos con feature work paralelo.
+  _Mitigación_: rebase preventivo (regla del CLAUDE.md sobre hotspots) +
+  coordinar con Beto antes de arrancar; cada consolidación en su propio PR
+  para minimizar superficie de conflicto.
+- **Tests de mutations financieras** (Sprint 3) requieren fixtures de DB
+  realistas. Riesgo de tests frágiles que mockeen demasiado.
+  _Mitigación_: integration tests con Supabase test instance (DB real)
+  según memoria del usuario; cero mocks profundos de PostgREST.
+- **Major dep upgrades en Sprint 4** pueden romper código por API breaks
+  (TS 6 strict, eslint 10 rules nuevas).
+  _Mitigación_: solo si Sprints 1-3 cerraron limpio; cada major en su
+  propio PR aislable; correr codemods oficiales antes de cualquier fix
+  manual.
+- **Auth gates podrían romper integraciones legítimas** que no pasan por
+  user session (cron jobs, webhooks).
+  _Mitigación_: confirmar con Beto qué llamadores son legítimos antes de
+  cerrar el gate; preservar bypass por bearer token / `CRON_SECRET` /
+  `SERVICE_ROLE_KEY` server-side donde corresponda.
+
+## Sprints / hitos
+
+| #   | Sprint                                    | Estado  | PR  |
+| --- | ----------------------------------------- | ------- | --- |
+| 1   | Quick wins seguridad + limpieza           | planned | TBD |
+| 2   | Consolidación ADR-011 (juntas + personal) | planned | TBD |
+| 3   | Test fortification (mutations + APIs)     | planned | TBD |
+| 4   | Refactor god components + major deps      | planned | TBD |
+
+## Decisiones registradas
+
+### 2026-05-02 · Sprint 1 ejecutable por CC sin gate de Beto
+
+Sprint 1 toca exclusivamente low-risk: auth gates (cambio chico, alto
+valor), pin de versions (change-only en `package.json`), borrar dirs
+orphan (con confirmación previa de qué se conserva). CC arranca Sprint 1
+directo. Sprints 2-4 requieren OK explícito de Beto porque tocan
+superficie grande (pages hot + tests nuevos + refactor de god components).
+
+### 2026-05-02 · `acceso-client.tsx` y `empleado-alta-wizard.tsx` excluidos del refactor
+
+Auditoría de god components recomendó excluir explícitamente:
+
+- `app/settings/acceso/acceso-client.tsx` (1276 LOC) — ADR-010 deniega
+  `<DataTable>` para esta superficie por decisión de UX. Refactor cambia
+  contrato visual, no es saneamiento.
+- `components/rh/empleado-alta-wizard.tsx` (1295 LOC) — wizard justifica
+  tamaño por diseño multi-step, ya cubierto por `wizard-pattern` (cerrado
+  2026-04-29). Re-tocarlo es churn.
+
+### 2026-05-02 · Tests fortifican mutations primero, no UI
+
+Sprint 3 prioriza mutations financieras (cortes, levantamientos,
+productos) y APIs críticas (documentos/extract, welcome-email,
+juntas/activar). UI tests de componentes quedan fuera — repo no tiene
+`@testing-library/react`, instalar JSDOM es scope ajeno. La suite e2e
+de Playwright ya cubre flujos UI. Precedente: `forms-pattern` documentó
+la misma exclusión en su Sprint 1.
+
+### 2026-05-02 · Pinear deps "latest" antes que upgradear majors
+
+Sprint 1 pinea `next`/`react`/`tailwindcss`/`shadcn` a versiones
+explícitas para cerrar el riesgo de drift de CI por upstream. Los majors
+(TS 6, vitest 4, eslint 10) quedan para Sprint 4 con codemods, no se
+mezclan con el pin defensivo.
+
+## Bitácora
+
+### 2026-05-02 — Promovida a `planned`
+
+Audit completo del repo BSOP por Claude Code (parallel exploration con
+4 Explore agents para duplicación / god components / test debt /
+seguridad). Datos base:
+
+**Hot files** (last 6 months, top 10):
+
+- `INITIATIVES.md` — 87 cambios (expected, índice central).
+- `SCHEMA_REF.md` — 57 (auto-regen).
+- `types/supabase.ts` — 35 (auto-regen, 9853 LOC).
+- `app/inicio/juntas/[id]/page.tsx` — 24 cambios, 1803 LOC.
+- `app/rdb/ordenes-compra/page.tsx` — 20, 1778 LOC.
+- `app/dilesa/admin/juntas/[id]/page.tsx` — 16.
+- `components/app-shell/nav-config.ts` — 16.
+- `app/dilesa/admin/juntas/[id]/page.tsx` — 16.
+- `app/dilesa/admin/juntas/page.tsx` — 14.
+- `lib/permissions.ts` — 11 (con tests).
+
+**Largest files** (>1000 LOC, ordenado por LOC):
+
+1. `components/proveedores/proveedores-module.tsx` — 1893 LOC, 63 hooks.
+2. `app/inicio/juntas/[id]/page.tsx` — 1803.
+3. `app/rdb/ordenes-compra/page.tsx` — 1778, 24 hooks.
+4. `components/juntas/junta-detail-module.tsx` — 1760.
+5. `components/rh/empleado-detail-module.tsx` — 1596, 58 hooks.
+6. `app/rdb/requisiciones/page.tsx` — 1415, 21 hooks.
+7. `app/settings/empresas/_components/empresa-detail.tsx` — 1412, 17 hooks.
+8. `components/rh/empleado-alta-wizard.tsx` — 1295, 4 hooks (skip — wizard).
+9. `app/settings/acceso/acceso-client.tsx` — 1276, 21 hooks (skip — ADR-010).
+10. `app/rh/personal/[id]/page.tsx` — 1266 (Sprint 2 candidate, -1250 LOC).
+
+**Tests**: 38 archivos test / 431 sources = 9% ratio.
+
+**Migrations**: 211 archivos en `supabase/migrations/`.
+**Routes**: 97 (`page.tsx` + `route.ts`).
+
+**Deps**: minor patches dentro del major actual (next 16.2.1→16.2.4,
+react 19.2.4→19.2.5, supabase-js 2.103→2.105, tailwindcss 4.2.2→4.2.4).
+Majors: typescript 5.9→6.0, vitest 3.2→4.1, eslint 9.39→10.3,
+`@vitest/coverage-v8` 3.2→4.1.
+
+**Smells secundarios**:
+
+- 503 `console.*` en archivos `.ts`/`.tsx` (sin logger estructurado).
+- 33 sites creando supabase client.
+- 15 `.rpc()` calls (sin Zod runtime).
+- 7 archivos con TODO/FIXME (muy limpio).
+- 0 `@ts-ignore`/`@ts-expect-error`/`@ts-nocheck`.
+- 0 leaks `process.env.*` no `NEXT_PUBLIC_*` a archivos client.
+
+**Hallazgos seguridad concretos**:
+
+- `app/api/welcome-email/route.ts` líneas 28, 53, 83 — loguean email,
+  UUID y relaciones usuario-empresa (JSON serializado). POST sin
+  `auth.getUser()`, usa `SUPABASE_SERVICE_ROLE_KEY` directo.
+- `app/api/juntas/terminar/route.ts` — POST sin auth check, usa
+  `getSupabaseAdminClient()`, llamado desde `junta-detail-module.tsx`.
+- 15 `.rpc()` confían en tipos TS, sin Zod runtime validation.
+
+**Hallazgos duplicación concretos** (ADR-011):
+
+- `app/rh/personal/[id]/page.tsx` (1267 LOC) reimplementa el detalle
+  completo (`EmpleadoDetailInner` con toda la lógica de estado, baja,
+  beneficiarios, compensación, pago). DILESA equivalente delega correcta-
+  mente a `EmpleadoDetailModule` con 9 LOC.
+- `app/inicio/juntas/page.tsx` (497 LOC) define `JuntasInner()` con
+  410 LOC inline (fetch + filtros + crear + DataTable + columnas).
+  DILESA y RDB delegan correctamente a `AdminJuntasListModule` con
+  16 LOC c/u.
+- CSF diff helpers (`valuesEqual`, `formatDiffValue`) duplicados entre
+  `components/proveedores/proveedores-module.tsx` (líneas ~96-217) y
+  `app/settings/empresas/_components/empresa-detail.tsx` (~líneas
+  117-220), ~60 LOC.
+
+**Hallazgos test debt concretos** (top 5):
+
+1. `app/rdb/cortes/actions.ts` — efectivo en caja, hot file 9 cambios.
+2. `app/rdb/inventario/levantamientos/actions.ts` — firma aprobación.
+3. `app/api/documentos/[id]/extract/route.ts` — IA Claude+OpenAI con
+   costo $, async 60-120s sin rollback en fallo.
+4. `app/api/welcome-email/route.ts` — Resend + service role + sin auth.
+5. `app/api/juntas/[id]/activar/route.ts` — trigger automático de
+   avances, race conditions posibles.
+
+Iniciativa promovida 2026-05-02. Sprint 1 arranca tras este PR de
+promoción.
