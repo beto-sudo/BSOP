@@ -26,6 +26,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Plus, RefreshCw, Loader2, Briefcase } from 'lucide-react';
 
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
@@ -136,7 +137,7 @@ const EMPTY_FORM = {
 export function PuestosModule({
   empresaId,
   scope = 'empresa',
-  empresaSlug: _empresaSlug,
+  empresaSlug,
   title,
   subtitle = 'Catálogo de puestos y perfiles de puesto',
   createVariant = 'sheet',
@@ -144,6 +145,7 @@ export function PuestosModule({
   showEmpleadoCountColumn = false,
   showDeptoFilter = false,
 }: PuestosModuleProps) {
+  const router = useRouter();
   const supabase = createSupabaseERPClient();
   const toast = useToast();
 
@@ -557,6 +559,10 @@ export function PuestosModule({
         ) : (
           <DataTable<Puesto>
             data={visible}
+            onRowClick={(p) => {
+              const target = empresaSlug ? `/${empresaSlug}/rh/personal` : '/rh/personal';
+              router.push(`${target}?puesto_id=${p.id}`);
+            }}
             columns={[
               {
                 key: 'nombre',
