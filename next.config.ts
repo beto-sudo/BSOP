@@ -82,6 +82,10 @@ const nextConfig: NextConfig = {
     // Sprint 3 de empleados-multi-puesto: el módulo "Empleados" se renombra a
     // "Personal" en sidebar/URL. Redirects 301 permanentes para no romper
     // deep-links viejos (bookmarks, links pegados en docs/Slack, etc.).
+    //
+    // El alias cross-empresa `/rh/empleados/:path*` se eliminó en Sprint 2A
+    // de tech-debt-h1-2026 cuando se removieron las pages cross-empresa de
+    // RH (ver `docs/planning/tech-debt-h1-2026.md`).
     return [
       {
         source: '/dilesa/rh/empleados/:path*',
@@ -91,11 +95,6 @@ const nextConfig: NextConfig = {
       {
         source: '/rdb/rh/empleados/:path*',
         destination: '/rdb/rh/personal/:path*',
-        permanent: true,
-      },
-      {
-        source: '/rh/empleados/:path*',
-        destination: '/rh/personal/:path*',
         permanent: true,
       },
     ];

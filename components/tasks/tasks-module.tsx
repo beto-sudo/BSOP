@@ -28,7 +28,8 @@
  *    one exists for the empresa (original DILESA behavior).
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Plus, RefreshCw, Eye, EyeOff } from 'lucide-react';
 
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
@@ -465,6 +466,19 @@ export function TasksModule({
     if (isRich) void fetchUpdatesForTask(task.id);
   };
 
+  // Deep-link `?focus=<task_id>` (canonical pattern del repo: ordenes-compra,
+  // recepciones, productos/recetas). Auto-abre el drawer de edición cuando
+  // la lista de tasks ya cargó. Usado por `MisTareasWidget` para llevar al
+  // user directo a la tarea desde el dashboard `/inicio`.
+  // El work se hace inline (en lugar de llamar `openEdit`) porque
+  // `fetchUpdatesForTask` se declara más abajo. El guard `autoOpenedFocusRef`
+  // es un ref (no state) para evitar el "cascading renders" warning de
+  // react-hooks: con state, `setAutoOpenedFocusId` dentro del effect se
+  // suma a los otros setStates como render extra.
+  const searchParams = useSearchParams();
+  const focusTaskId = searchParams.get('focus');
+  const autoOpenedFocusRef = useRef<string | null>(null);
+
   const handleUpdate = async (formValues: TaskFormValues) => {
     if (!selectedTask) return;
     let payload: TasksUpdatePayload;
@@ -625,6 +639,33 @@ export function TasksModule({
     }
     setLoadingUpdates(false);
   };
+
+  // Auto-abrir drawer cuando llega `?focus=<task_id>` (deep-link desde
+  // `MisTareasWidget`). Sigue el patrón canónico del repo (recepciones,
+  // ordenes-compra): los setStates se esconden en un `useCallback` para
+  // que el linter no flag "cascading renders" en el effect.
+  // El guard `autoOpenedFocusRef` asegura que solo se abra una vez por
+  // ese param sin necesidad de un setState extra.
+  const openFromFocus = useCallback(
+    (task: ErpTask) => {
+      setSelectedTask(task);
+      setUpdateContent('');
+      setShowEdit(true);
+      if (isRich) void fetchUpdatesForTask(task.id);
+    },
+    // `fetchUpdatesForTask` se redefine cada render (no está memoizada);
+    // omitirla intencionalmente — la ref guard previene re-trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isRich]
+  );
+
+  useEffect(() => {
+    if (!focusTaskId || autoOpenedFocusRef.current === focusTaskId) return;
+    const task = tasks.find((t) => t.id === focusTaskId);
+    if (!task) return;
+    autoOpenedFocusRef.current = focusTaskId;
+    openFromFocus(task);
+  }, [focusTaskId, tasks, openFromFocus]);
 
   const handleOpenUpdates = (taskId: string) => {
     setShowUpdatesSheet(taskId);

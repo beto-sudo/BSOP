@@ -15,20 +15,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import {
-  AlertCircle,
-  Calendar,
-  CheckCircle2,
-  ChevronRight,
-  Clock,
-  ListTodo,
-  RefreshCw,
-} from 'lucide-react';
+import { AlertCircle, Calendar, CheckCircle2, Clock, ListTodo, RefreshCw } from 'lucide-react';
 
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import { useEffectiveUser } from '@/components/providers';
 import { Surface } from '@/components/ui/surface';
 import { Skeleton } from '@/components/ui/skeleton';
+import { empresaSlugFromId } from '@/lib/empresa-constants';
 
 type TaskRow = {
   id: string;
@@ -203,29 +196,20 @@ export function MisTareasWidget() {
 
   return (
     <Surface className="p-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--accent)]/10">
-            <ListTodo className="h-5 w-5 text-[var(--accent-soft)]" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-[var(--text)]">Mis tareas</h2>
-            <p className="text-xs text-[var(--text-muted)]">
-              {loading
-                ? 'Cargando…'
-                : totalPendientes === 0
-                  ? 'No tienes tareas pendientes'
-                  : `${totalPendientes} pendiente${totalPendientes === 1 ? '' : 's'}`}
-            </p>
-          </div>
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--accent)]/10">
+          <ListTodo className="h-5 w-5 text-[var(--accent-soft)]" />
         </div>
-        <Link
-          href="/inicio/tasks"
-          className="inline-flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-medium text-[var(--text)]/60 transition hover:bg-white/5 hover:text-[var(--text)]"
-        >
-          Ver todas
-          <ChevronRight className="h-3.5 w-3.5" />
-        </Link>
+        <div>
+          <h2 className="text-lg font-semibold text-[var(--text)]">Mis tareas</h2>
+          <p className="text-xs text-[var(--text-muted)]">
+            {loading
+              ? 'Cargando…'
+              : totalPendientes === 0
+                ? 'No tienes tareas pendientes'
+                : `${totalPendientes} pendiente${totalPendientes === 1 ? '' : 's'}`}
+          </p>
+        </div>
       </div>
 
       {error ? (
@@ -275,21 +259,38 @@ export function MisTareasWidget() {
                     </span>
                   </div>
                   <ul className="space-y-1.5">
-                    {grouped[bucket].slice(0, 10).map((t) => (
-                      <li key={t.id}>
-                        <Link
-                          href="/inicio/tasks"
-                          className="flex items-center justify-between gap-3 rounded-xl border border-transparent bg-white/[0.02] px-3 py-2.5 transition hover:border-[var(--border)] hover:bg-white/[0.04]"
-                        >
+                    {grouped[bucket].slice(0, 10).map((t) => {
+                      const slug = empresaSlugFromId(t.empresa_id);
+                      // Si la empresa no tiene módulos activos (ANSA/COAGAN
+                      // pendientes), el item se muestra sin link.
+                      const href = slug ? `/${slug}/admin/tasks?focus=${t.id}` : null;
+                      const itemContent = (
+                        <>
                           <span className="line-clamp-1 flex-1 text-sm text-[var(--text)]">
                             {t.titulo}
                           </span>
                           <span className="shrink-0 text-xs text-[var(--text)]/45">
                             {formatRelative(t.fecha_vence ?? t.fecha_compromiso, todayIso)}
                           </span>
-                        </Link>
-                      </li>
-                    ))}
+                        </>
+                      );
+                      return (
+                        <li key={t.id}>
+                          {href ? (
+                            <Link
+                              href={href}
+                              className="flex items-center justify-between gap-3 rounded-xl border border-transparent bg-white/[0.02] px-3 py-2.5 transition hover:border-[var(--border)] hover:bg-white/[0.04]"
+                            >
+                              {itemContent}
+                            </Link>
+                          ) : (
+                            <div className="flex items-center justify-between gap-3 rounded-xl border border-transparent bg-white/[0.02] px-3 py-2.5">
+                              {itemContent}
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                   {grouped[bucket].length > 10 && (
                     <p className="mt-1.5 text-right text-xs text-[var(--text-subtle)]">

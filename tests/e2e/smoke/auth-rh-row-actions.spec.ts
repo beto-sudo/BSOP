@@ -4,9 +4,12 @@
  * Locks in the UX contract introduced by `components/shared/row-actions.tsx`
  * across the 9 RH screens (3 empresas × 3 recursos):
  *
- *   • BSOP default : /rh/{departamentos,puestos,empleados}
  *   • RDB          : /rdb/rh/{departamentos,puestos,empleados}
  *   • DILESA       : /dilesa/rh/{departamentos,puestos,empleados}
+ *
+ * Las pages cross-empresa `/rh/*` se eliminaron en Sprint 2A de
+ * `tech-debt-h1-2026` — los operadores entran a `/<empresa>/rh/...`
+ * directamente.
  *
  * The test is **read-only by design** — it opens menus and confirm dialogs
  * but always cancels. No soft-delete or toggle ever persists. Safe to run
@@ -36,16 +39,12 @@ import { skipIfNoAuth } from '../helpers/auth-guard';
 // ── Matrix ──────────────────────────────────────────────────────────────────
 
 type RhRoute = {
-  empresa: 'BSOP' | 'RDB' | 'DILESA';
+  empresa: 'RDB' | 'DILESA';
   recurso: 'departamentos' | 'puestos' | 'empleados';
   path: string;
 };
 
 const ROUTES: RhRoute[] = [
-  // BSOP default
-  { empresa: 'BSOP', recurso: 'departamentos', path: '/rh/departamentos' },
-  { empresa: 'BSOP', recurso: 'puestos', path: '/rh/puestos' },
-  { empresa: 'BSOP', recurso: 'empleados', path: '/rh/personal' },
   // RDB
   { empresa: 'RDB', recurso: 'departamentos', path: '/rdb/rh/departamentos' },
   { empresa: 'RDB', recurso: 'puestos', path: '/rdb/rh/puestos' },
