@@ -32,8 +32,11 @@ jobs:
       - name: TypeScript — typecheck
         run: npm run typecheck
 
-      - name: Vitest — unit tests
-        run: npm run test:run
+      # Corremos con coverage para que el threshold de `vitest.config.ts`
+      # bita en CI (configurado gradual en Sprint 3 de tech-debt-h1-2026:
+      # 30% lines/statements, 65% functions, 75% branches en Sprint 3A).
+      - name: Vitest — unit tests + coverage threshold
+        run: npm run test:coverage
 
       - name: ESLint
         run: npm run lint
