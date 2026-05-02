@@ -333,9 +333,75 @@ iniciativa propia.
 
 ## Bitácora
 
-### 2026-05-02 — Sprint 3B en flight (este PR)
+### 2026-05-02 — Sprint 3C en flight (este PR) — unit tests parte 1
 
-Sprint 3B entrega tests para los 2 archivos del medio del Sprint 3
+Cierre del Sprint 3 con `cortes/actions` y `levantamientos/actions`.
+Estructura: parte 1 = unit tests con mocks (este commit), parte 2 =
+integration tests contra DB real con `supabase start` (commits
+posteriores cuando OrbStack esté listo en local).
+
+**Tests nuevos parte 1** (87 tests, todos pasando):
+
+- `app/rdb/cortes/actions.test.ts` (52 tests) — 9 funciones cubiertas:
+  - `abrirCaja`: validaciones, herencia de efectivo del corte previo,
+    `previo_sin_contar`, primer turno (no hay corte previo), insert
+    error, preview guard.
+  - `cerrarCaja`: cálculo de total desde denominaciones, upsert sólo
+    de las cantidades > 0, errores en update/upsert.
+  - `registrarMovimiento`: validaciones (corte_id, monto, concepto,
+    tipo, `realizadoPorNombre` desde JWT), corte debe estar abierto.
+  - `subirVoucher`: límite 10MB, mime types allowlist (jpeg/png/webp/
+    heic/heif), corte debe existir, **rollback de archivo si insert
+    falla** (regresión que la memoria del usuario menciona).
+  - `eliminarVoucher`: voucher must exist, delete row + best-effort
+    storage remove.
+  - `confirmarVoucher` / `actualizarCategoriaVoucher`: validaciones +
+    `data.length === 0 → throw` (cubre el caso de **RLS bloqueando
+    UPDATE silenciosamente**, regresión histórica documentada).
+  - `previewEfectivoInicial` / `cargarBancos` / `obtenerVouchersDelCorte`:
+    lectores con paths de error.
+
+- `app/rdb/inventario/levantamientos/actions.test.ts` (35 tests):
+  - `crearLevantamiento`: validaciones + insert path.
+  - 5 funciones que delegan a RPCs (`iniciarCaptura`, `guardarConteo`,
+    `cerrarCaptura`, `cancelarLevantamiento`, `getLineasParaCapturar`,
+    `getLineasParaRevisar`): verifica delegación con args correctos +
+    propagación de error.
+  - `firmarPaso`: 6 tests del parser `parseFirmarPasoResult` (shapes
+    inválidos retornan null + propagación de IP/user-agent headers).
+  - `cancelarLevantamiento`: motivo trim + validación de motivo vacío.
+  - `actualizarNotaDiferencia` (lógica TS rica, **10 tests**): state
+    guards (`estado === 'capturado'`), validación de contador, trim
+    a null, lookup de línea/levantamiento via admin client.
+
+**Coverage threshold bump**:
+
+- Coverage tras parte 1: **42.1% lines**, 72.08% functions, 84.21%
+  branches.
+- Threshold subido en `vitest.config.ts`:
+  - lines/statements: 33 → **40**
+  - functions: 67 → **70**
+  - branches: 80 → **82**
+- Buffer ~2% sobre el medido. Cumple el target final del Sprint 3
+  (40-45% lines).
+
+**Pendiente parte 2** — integration tests:
+
+- Setup de Supabase local (`supabase start` con OrbStack/Docker).
+- `seed.sql` con fixtures (RDB, almacén, productos, caja).
+- `vitest.integration.config.ts` separado.
+- ~5 tests críticos: levantamiento full flow (crear → conteo → 2
+  firmas → aplicar), cortes full flow (abrir → mov → cerrar →
+  verificar balance), voucher upload + storage round-trip.
+- Opt-in via `npm run test:integration` (no en CI default).
+
+OrbStack instalado en máquina local, Docker symlinks pendientes
+(requiere abrir la app). Integration tests escritos pero NO validados
+todavía — push se hace tras validación con Docker corriendo.
+
+### 2026-05-02 — Sprint 3B merged (PR #396)
+
+Sprint 3B entregó tests para los 2 archivos del medio del Sprint 3
 (complejidad media). Mock strategy A confirmada por Beto.
 
 **Tests nuevos** (36 tests, todos pasando):
