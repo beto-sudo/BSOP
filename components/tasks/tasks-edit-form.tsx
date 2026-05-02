@@ -11,7 +11,7 @@
  */
 
 import * as React from 'react';
-import { Loader2, Trash2 } from 'lucide-react';
+import { CheckCircle2, Loader2, Trash2 } from 'lucide-react';
 import { z } from 'zod';
 
 import {
@@ -354,6 +354,26 @@ function RichEditSheet({
     onOpenChange(false);
   };
 
+  const [completing, setCompleting] = React.useState(false);
+  const handleComplete = async () => {
+    if (!selectedTask) return;
+    setCompleting(true);
+    try {
+      const current = form.getValues();
+      await onSave({
+        ...current,
+        estado: 'completado',
+        porcentaje_avance: 100,
+        fecha_vence: '',
+      });
+      onOpenChange(false);
+    } finally {
+      setCompleting(false);
+    }
+  };
+  const showCompleteButton =
+    canCompleteTask && selectedTask && selectedTask.estado !== 'completado';
+
   return (
     <DetailDrawer
       open={open}
@@ -557,6 +577,25 @@ function RichEditSheet({
                 )}
               </Button>
             )}
+            {showCompleteButton && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleComplete}
+                disabled={completing}
+                className="rounded-xl border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10"
+              >
+                {completing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                    Terminar
+                  </>
+                )}
+              </Button>
+            )}
             <div className="flex-1" />
             <FormActions
               cancelLabel="Cancelar"
@@ -601,6 +640,10 @@ function BloqueoConditionalField() {
 /**
  * Range slider for `porcentaje_avance`. Doesn't use `<FormField>` because the
  * label needs to embed the live value; uses `useFormContext` directly.
+ *
+ * Llegar a 100% auto-marca la tarea como completada (mismo comportamiento
+ * que el inline avance en la tabla — `handleInlineAvanceSave` en
+ * tasks-module.tsx).
  */
 function AvanceSliderField() {
   const { watch, setValue } = useFormContext<RichEditValues>();
@@ -614,9 +657,13 @@ function AvanceSliderField() {
         max={100}
         step={5}
         value={value}
-        onChange={(e) =>
-          setValue('porcentaje_avance', Number(e.target.value), { shouldDirty: true })
-        }
+        onChange={(e) => {
+          const next = Number(e.target.value);
+          setValue('porcentaje_avance', next, { shouldDirty: true });
+          if (next === 100) {
+            setValue('estado', 'completado', { shouldDirty: true });
+          }
+        }}
         className="w-full accent-[var(--accent)]"
       />
     </div>
