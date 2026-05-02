@@ -13,11 +13,14 @@ import path from 'node:path';
  *   - **Sprint 3A**: baseline 30% lines/statements, 65% functions,
  *     75% branches. Coverage medido tras 3A: ~32% lines, ~69%
  *     functions, ~84% branches.
- *   - **Sprint 3B** (este PR): bump a 33% lines/statements, 67%
- *     functions, 80% branches. Coverage medido tras 3B: 35.29% lines,
- *     69.27% functions, 83.82% branches — buffer ~2-3%.
- *   - **Sprint 3C**: integration tests para `cortes/actions` y
- *     `levantamientos/actions` → target final 40-45% lines.
+ *   - **Sprint 3B**: bump a 33% lines/statements, 67% functions, 80%
+ *     branches. Coverage medido tras 3B: 35.29% / 69.27% / 83.82%.
+ *   - **Sprint 3C** (este PR): bump a 40% lines/statements, 70%
+ *     functions, 82% branches. Coverage medido tras unit tests 3C:
+ *     42.1% lines, 72.08% functions, 84.21% branches — buffer ~2%.
+ *     Los integration tests (cortes + levantamientos contra DB real)
+ *     corren via `npm run test:integration` (config separado), opt-in
+ *     local — no en CI default.
  *
  * El threshold solo bloquea CI cuando se corre `npm run test:coverage`
  * (lo hace el workflow `.github/workflows/ci.yml`). `npm run test:run`
@@ -29,7 +32,16 @@ export default defineConfig({
     environment: 'node',
     globals: false,
     include: ['**/*.test.ts', '**/*.test.tsx'],
-    exclude: ['node_modules/**', '.next/**', 'tests/e2e/**'],
+    // Integration tests viven en `tests/integration/**` y corren via
+    // `npm run test:integration` (config separado). Excluirlos aquí
+    // evita que `test:run` los ejecute sin DB local arriba.
+    exclude: [
+      'node_modules/**',
+      '.next/**',
+      'tests/e2e/**',
+      'tests/integration/**',
+      '**/*.integration.test.ts',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
@@ -41,13 +53,12 @@ export default defineConfig({
         'app/api/**/_test-helpers.ts',
       ],
       thresholds: {
-        // Sprint 3B — sube en 3C. Buffer ~2-3% sobre el medido actual
-        // para tolerar variación natural y bitir si alguien agrega
-        // código sin tests.
-        lines: 33,
-        statements: 33,
-        functions: 67,
-        branches: 80,
+        // Sprint 3C — buffer ~2% sobre el medido (42.1 / 72.08 / 84.21).
+        // Bita si alguien agrega código sin tests.
+        lines: 40,
+        statements: 40,
+        functions: 70,
+        branches: 82,
       },
     },
   },
