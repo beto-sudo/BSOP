@@ -19,8 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { festivosEnRango, type DiaFestivo } from '@/lib/inicio/dias-festivos';
 
 type Cumpleanero = {
-  empleado_id: string;
-  empresa_id: string;
+  persona_id: string;
   nombre_completo: string;
   fecha_nacimiento: string; // YYYY-MM-DD
 };
@@ -120,10 +119,13 @@ export function FechasImportantesWidget() {
         }
 
         // Empleados activos con fecha de nacimiento en esas empresas.
+        // Dedup por persona_id: operadores que son empleado en N empresas
+        // (accionistas con presencia multi-empresa) aparecen N veces en
+        // v_empleados_full pero su cumpleaños es uno solo.
         const { data: emp, error: empErr } = await supabase
           .schema('erp')
           .from('v_empleados_full')
-          .select('empleado_id, empresa_id, nombre_completo, fecha_nacimiento, empleado_activo')
+          .select('persona_id, nombre_completo, fecha_nacimiento, empleado_activo')
           .in('empresa_id', empresaIds)
           .not('fecha_nacimiento', 'is', null)
           .eq('empleado_activo', true);
@@ -132,29 +134,21 @@ export function FechasImportantesWidget() {
 
         if (!cancelled) {
           const rows = (emp ?? []) as Array<{
-            empleado_id: string | null;
-            empresa_id: string | null;
+            persona_id: string | null;
             nombre_completo: string | null;
             fecha_nacimiento: string | null;
           }>;
-          const mapped: Cumpleanero[] = rows
-            .filter(
-              (
-                r
-              ): r is {
-                empleado_id: string;
-                empresa_id: string;
-                nombre_completo: string | null;
-                fecha_nacimiento: string;
-              } => Boolean(r.empleado_id && r.empresa_id && r.fecha_nacimiento)
-            )
-            .map((r) => ({
-              empleado_id: r.empleado_id,
-              empresa_id: r.empresa_id,
+          const byPersona = new Map<string, Cumpleanero>();
+          for (const r of rows) {
+            if (!r.persona_id || !r.fecha_nacimiento) continue;
+            if (byPersona.has(r.persona_id)) continue;
+            byPersona.set(r.persona_id, {
+              persona_id: r.persona_id,
               nombre_completo: r.nombre_completo ?? '—',
               fecha_nacimiento: r.fecha_nacimiento,
-            }));
-          setCumples(mapped);
+            });
+          }
+          setCumples([...byPersona.values()]);
           setLoading(false);
         }
       } catch (e) {
