@@ -39,6 +39,8 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import type { CsfExtraccion } from '@/lib/proveedores/extract-csf';
+import { valuesEqual, formatDiffValue } from '@/lib/csf-diff';
+import { getEmpresaBranding, type EmpresaSlug } from '@/lib/empresa-branding';
 import { PersonasContactosSection } from './personas-contactos-section';
 import { PersonasCuentasBancariasSection } from './personas-cuentas-bancarias-section';
 import { PersonasDireccionesSection } from './personas-direcciones-section';
@@ -93,44 +95,8 @@ const FIELD_LABELS: Record<(typeof CSF_DIFF_FIELDS)[number], string> = {
   fecha_emision: 'Fecha emisión CSF',
 };
 
-function valuesEqual(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (a == null && b == null) return true;
-  if (a == null || b == null) {
-    // Trata "" y null como equivalentes (común en datos de SAT).
-    if (a === '' && b == null) return true;
-    if (b === '' && a == null) return true;
-    return false;
-  }
-  if (typeof a === 'string' && typeof b === 'string') {
-    return a.trim() === b.trim();
-  }
-  if (Array.isArray(a) && Array.isArray(b)) {
-    return JSON.stringify(a) === JSON.stringify(b);
-  }
-  if (typeof a === 'object' && typeof b === 'object') {
-    return JSON.stringify(a) === JSON.stringify(b);
-  }
-  return false;
-}
-
-function formatDiffValue(v: unknown): string {
-  if (v == null || v === '') return '—';
-  if (Array.isArray(v)) {
-    if (v.length === 0) return '— (vacío)';
-    return v
-      .map((item: unknown) => {
-        if (item && typeof item === 'object') {
-          const obj = item as Record<string, unknown>;
-          if ('codigo' in obj && 'nombre' in obj) return `${obj.codigo} · ${obj.nombre}`;
-          if ('descripcion' in obj) return String(obj.descripcion);
-        }
-        return String(item);
-      })
-      .join('\n');
-  }
-  return String(v);
-}
+// `valuesEqual` y `formatDiffValue` viven en `lib/csf-diff.ts` desde
+// Sprint 2B de tech-debt-h1-2026 (deduplicado vs. `empresa-detail.tsx`).
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -371,23 +337,16 @@ export type ProveedoresModuleProps = {
   /** UUID de `core.empresas.id` que filtra todas las queries y sirve de `empresa_id` en inserts. */
   empresaId: string;
   /**
-   * Slug en URL (`'rdb' | 'dilesa'`). Se usa como display label en el modal de
-   * RFC duplicado (uppercase) y deja la prop disponible para futura
-   * resolución de permisos.
+   * Slug en URL. Se usa como display label en el modal de RFC duplicado
+   * (uppercase) y para resolver el branding (logo / membreteAlt) vía
+   * `lib/empresa-branding.ts` (centralizado en Sprint 2C de
+   * `tech-debt-h1-2026`).
    */
-  empresaSlug: 'rdb' | 'dilesa';
-  /** Path absoluto al membrete que aparece solo al imprimir el detalle. */
-  logoPath: string;
-  /** Texto alt del membrete. */
-  membreteAlt: string;
+  empresaSlug: EmpresaSlug;
 };
 
-export function ProveedoresModule({
-  empresaId,
-  empresaSlug,
-  logoPath,
-  membreteAlt,
-}: ProveedoresModuleProps) {
+export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleProps) {
+  const { logoPath, membreteAlt } = getEmpresaBranding(empresaSlug);
   const router = useRouter();
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [loading, setLoading] = useState(true);

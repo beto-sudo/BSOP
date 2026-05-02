@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 
 import type { CsfExtraccion } from '@/lib/proveedores/extract-csf';
+import { valuesEqual, formatDiffValue } from '@/lib/csf-diff';
 import { DocumentosLegalesPanel } from './documentos-legales-panel';
 import { ImageUploader } from './image-uploader';
 
@@ -202,42 +203,8 @@ const DIFF_KEY_TO_API_KEY: Record<DiffKey, string> = {
   actividades_economicas: 'actividades_economicas',
 };
 
-function valuesEqual(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (a == null && b == null) return true;
-  if (a == null || b == null) {
-    if (a === '' && b == null) return true;
-    if (b === '' && a == null) return true;
-    return false;
-  }
-  if (typeof a === 'string' && typeof b === 'string') return a.trim() === b.trim();
-  if (Array.isArray(a) && Array.isArray(b)) return JSON.stringify(a) === JSON.stringify(b);
-  if (typeof a === 'object' && typeof b === 'object')
-    return JSON.stringify(a) === JSON.stringify(b);
-  return false;
-}
-
-function formatDiffValue(v: unknown): string {
-  if (v == null || v === '') return '—';
-  if (Array.isArray(v)) {
-    if (v.length === 0) return '— (vacío)';
-    return v
-      .map((item: unknown) => {
-        if (item && typeof item === 'object') {
-          const obj = item as Record<string, unknown>;
-          if ('actividad' in obj) {
-            const pct = obj.porcentaje ? ` (${obj.porcentaje})` : '';
-            return `${obj.orden ?? '?'}. ${obj.actividad}${pct}`;
-          }
-          if ('descripcion' in obj) return String(obj.descripcion);
-          if ('codigo' in obj && 'nombre' in obj) return `${obj.codigo} · ${obj.nombre}`;
-        }
-        return String(item);
-      })
-      .join('\n');
-  }
-  return String(v);
-}
+// `valuesEqual` y `formatDiffValue` viven en `lib/csf-diff.ts` desde
+// Sprint 2B de tech-debt-h1-2026 (deduplicado vs. `proveedores-module.tsx`).
 
 /**
  * Para un `DiffKey`, lee el valor "actual" desde la empresa y el valor "nuevo"

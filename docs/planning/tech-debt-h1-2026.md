@@ -3,7 +3,7 @@
 **Slug:** `tech-debt-h1-2026`
 **Empresas:** todas
 **Schemas afectados:** n/a (refactor + tests + seguridad app-layer)
-**Estado:** planned
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-02
 **Última actualización:** 2026-05-02
@@ -211,12 +211,14 @@ ADR-011 prescribe componentes shared cross-empresa. Tres holdouts:
 
 ## Sprints / hitos
 
-| #   | Sprint                                    | Estado  | PR  |
-| --- | ----------------------------------------- | ------- | --- |
-| 1   | Quick wins seguridad + limpieza           | planned | TBD |
-| 2   | Consolidación ADR-011 (juntas + personal) | planned | TBD |
-| 3   | Test fortification (mutations + APIs)     | planned | TBD |
-| 4   | Refactor god components + major deps      | planned | TBD |
+| #   | Sprint                                              | Estado      | PR        |
+| --- | --------------------------------------------------- | ----------- | --------- |
+| 1   | Quick wins seguridad + limpieza                     | done        | #390      |
+| 2A  | Eliminar pages cross-empresa (`/rh/*`, `/inicio/*`) | done        | #393      |
+| 2B  | Helper `lib/csf-diff.ts` deduplicado                | in_progress | _este PR_ |
+| 2C  | `ProveedoresModule` resuelve branding por slug      | in_progress | _este PR_ |
+| 3   | Test fortification (mutations + APIs)               | planned     | TBD       |
+| 4   | Refactor god components + major deps                | planned     | TBD       |
 
 ## Decisiones registradas
 
@@ -255,7 +257,122 @@ explícitas para cerrar el riesgo de drift de CI por upstream. Los majors
 (TS 6, vitest 4, eslint 10) quedan para Sprint 4 con codemods, no se
 mezclan con el pin defensivo.
 
+### 2026-05-02 · Sprint 2 reframe: eliminar en vez de consolidar
+
+El plan original de Sprint 2 era **consolidar** las pages cross-empresa
+(`/rh/personal/[id]` → `EmpleadoDetailModule`, `/inicio/juntas` →
+`AdminJuntasListModule` con `scope="user-empresas"`) — patrón ADR-011.
+Tras inventario, Beto decidió **eliminar** esas pages: los operadores
+trabajan dentro de su empresa específica, no usan vistas cross-empresa
+generales. Quedó conservada solo la categoría "cross-USUARIO": el
+dashboard `/inicio` con widgets ("Mis tareas", "Fechas importantes")
+que muestran agregados del usuario logueado, no del catálogo general.
+
+Outcome del reframe:
+
+- Sprint 2A elimina 10 pages, libera **3,773 LOC netas** (más del doble
+  que el plan de consolidación, -1,812 LOC).
+- Borra el archivo más hot del repo: `/inicio/juntas/[id]/page.tsx`
+  (1,803 LOC, 24 commits en 6 meses).
+- Items en widgets `/inicio` ahora linkean a `/<empresa>/admin/tasks?focus=<id>`
+  directo (Beto: "que ya te lleve a la tarea"). Para soportarlo se agrega
+  `?focus=` URL param a `TasksModule`, siguiendo el patrón canónico ya
+  presente en `recepciones`, `ordenes-compra`, `productos/recetas`.
+- Sprints 2B (csf-diff) y 2C (proveedores branding) del plan original
+  **se conservan** y se entregan en este PR de seguimiento.
+
+### 2026-05-02 · Branding centralizado limitado a Proveedores en Sprint 2C
+
+`lib/empresa-branding.ts` se introduce con `EmpresaSlug` y
+`getEmpresaBranding()` solo para servir a `ProveedoresModule` (las únicas
+2 pages que duplicaban `logoPath` / `membreteAlt`). Otros usos de
+branding (emails, prints, Juntas, etc.) quedan **fuera de scope** —
+extender el helper a todos los call sites es cambio mayor que merece
+iniciativa propia.
+
 ## Bitácora
+
+### 2026-05-02 — Sprint 2B + 2C en flight (este PR)
+
+Closeout de Sprint 2 con los 2 changes pendientes después del reframe a
+eliminación:
+
+**Sprint 2B — Helper `lib/csf-diff.ts` deduplicado:**
+
+- Crea `lib/csf-diff.ts` con `valuesEqual` y `formatDiffValue` unificados
+  (versión que soporta los 3 shapes que aparecen en el repo: `actividad`
+  con orden+porcentaje, `codigo`+`nombre`, y `descripcion`).
+- Crea `lib/csf-diff.test.ts` con cobertura para todos los casos:
+  null/undefined/'', strings con trim, arrays orden-sensitivos, objetos,
+  shapes específicos del SAT, fallback. ~22 tests.
+- Reemplaza implementaciones locales en
+  `components/proveedores/proveedores-module.tsx` (líneas 96-133) y
+  `app/settings/empresas/_components/empresa-detail.tsx` (líneas 205-240).
+- Saneamiento: -60 LOC duplicados, +tests sobre la lógica de diff
+  (cobertura nueva sobre las funciones que antes vivían sin tests).
+
+**Sprint 2C — `ProveedoresModule` resuelve branding por slug:**
+
+- Crea `lib/empresa-branding.ts` con tipo `EmpresaSlug` (`'dilesa' | 'rdb'`)
+  y `getEmpresaBranding(slug)` que devuelve `{ logoPath, membreteAlt }`.
+- `ProveedoresModule` elimina las props `logoPath` y `membreteAlt`,
+  resuelve internamente vía `getEmpresaBranding(empresaSlug)`.
+- Las pages `app/dilesa/proveedores/page.tsx` y
+  `app/rdb/proveedores/page.tsx` se simplifican: dejan de pasar 2 props
+  hardcoded por empresa.
+- Scope deliberadamente limitado: solo Proveedores. Otros usos de
+  branding (emails, prints, juntas, etc.) quedan fuera para no inflar
+  este PR.
+
+### 2026-05-02 — Sprint 2A merged (PR #393)
+
+Sprint 2A reframe de "consolidar" a "eliminar" cierra con resultados
+mejores que el plan original:
+
+- 18 archivos cambiados, **+115 / -3,888 = -3,773 LOC netas eliminadas**
+  (vs. -1,812 del plan de consolidación).
+- 10 pages eliminadas; el archivo más hot del repo
+  (`/inicio/juntas/[id]/page.tsx`, 1,803 LOC, 24 cambios en 6 meses)
+  desaparece.
+- `MisTareasWidget` ahora linkea cada item directo a
+  `/<empresa>/admin/tasks?focus=<id>`. Botón "Ver todas" eliminado.
+- `TasksModule` gana soporte de `?focus=<id>` siguiendo el patrón
+  canónico (recepciones, ordenes-compra, productos/recetas).
+- Helper nuevo: `empresaSlugFromId(id)` en `lib/empresa-constants.ts`
+  para que widgets cross-usuario construyan URLs por empresa desde el
+  `empresa_id` que viene de la DB.
+- Sidebar / `RouteToModule` / `proxy.ts` ya no referenciaban las pages
+  cross — limpieza sin daño colateral.
+- Tests e2e actualizados: `auth-rh-empleados.spec.ts` eliminado
+  (redundante con `auth-rh-row-actions.spec.ts`); el último reduce su
+  matriz de 9 a 6 routes (RDB + DILESA, sin BSOP cross);
+  `anon-login.spec.ts` reemplaza `/rh/personal` con
+  `/dilesa/rh/personal` y quita `/inicio/tasks`.
+
+### 2026-05-02 — Sprint 1 merged (PR #390)
+
+Sprint 1 cierra los 4 quick wins de seguridad + limpieza:
+
+- Auth gate en `app/api/welcome-email/route.ts` con `requireAdmin()` +
+  reducción de 4 `console.log` con PII (email, JSON serializado,
+  emailId) a logs operativos sin PII (solo usuarioId UUID, count, status).
+- Auth gate en `app/api/juntas/terminar/route.ts` con `auth.getUser()` +
+  membresía en empresa de la junta (admin pasa por encima).
+- 9 deps `"latest"` pinneadas a `^X.Y.Z` (`next`, `react`, `react-dom`,
+  `tailwindcss`, `@tailwindcss/postcss`, `typescript`, `@types/node`,
+  `@types/react`, `@types/react-dom`).
+- Limpieza: `sprint-dilesa-1-ui/`, `tmp/`, `.backup-stale/` — 4 tracked
+  - 9 untracked + 5 backup dirs.
+
+Hallazgo no obvio: el endpoint HTTP `/api/welcome-email` no tiene
+callers (el flujo real va por una función helper local en
+`app/settings/acceso/actions.ts`). Es código zombie. Lo cerré con auth
+gate por defensa en profundidad — candidato a borrar en sprint futuro
+si confirmamos uso cero.
+
+CI verde: 1m45s (typecheck + lint + tests + format). Beto verificó
+post-merge que welcome email funciona en preview tras agregar
+`RESEND_API_KEY` a env Preview de Vercel (estaba solo en Production).
 
 ### 2026-05-02 — Promovida a `planned`
 

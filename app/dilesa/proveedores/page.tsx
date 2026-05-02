@@ -14,12 +14,7 @@ export default function Page() {
     <RequireAccess empresa="dilesa" modulo="dilesa.proveedores">
       <DesktopOnlyNotice module="Proveedores" />
       <div className="hidden sm:block">
-        <ProveedoresModule
-          empresaId={DILESA_EMPRESA_ID}
-          empresaSlug="dilesa"
-          logoPath="/brand/dilesa/header-email.png"
-          membreteAlt="Membrete DILESA"
-        />
+        <ProveedoresModule empresaId={DILESA_EMPRESA_ID} empresaSlug="dilesa" />
       </div>
     </RequireAccess>
   );
