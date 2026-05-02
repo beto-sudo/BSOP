@@ -14,12 +14,7 @@ export default function Page() {
     <RequireAccess empresa="rdb" modulo="rdb.proveedores">
       <DesktopOnlyNotice module="Proveedores" />
       <div className="hidden sm:block">
-        <ProveedoresModule
-          empresaId={RDB_EMPRESA_ID}
-          empresaSlug="rdb"
-          logoPath="/brand/rdb/header-email.png"
-          membreteAlt="Membrete Rincón del Bosque"
-        />
+        <ProveedoresModule empresaId={RDB_EMPRESA_ID} empresaSlug="rdb" />
       </div>
     </RequireAccess>
   );
