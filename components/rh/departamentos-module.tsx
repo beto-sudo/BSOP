@@ -27,6 +27,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Plus, RefreshCw, Loader2, Network } from 'lucide-react';
 
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
@@ -110,12 +111,13 @@ const EMPTY_FORM = { nombre: '', codigo: '', padre_id: '' };
 export function DepartamentosModule({
   empresaId,
   scope = 'empresa',
-  empresaSlug: _empresaSlug,
+  empresaSlug,
   title,
   subtitle = 'Estructura organizacional',
   createVariant = 'sheet',
   showEmpleadosCount = false,
 }: DepartamentosModuleProps) {
+  const router = useRouter();
   const supabase = createSupabaseERPClient();
   const toast = useToast();
 
@@ -429,6 +431,10 @@ export function DepartamentosModule({
         ) : (
           <DataTable<Departamento>
             data={departamentos}
+            onRowClick={(d) => {
+              const target = empresaSlug ? `/${empresaSlug}/rh/personal` : '/rh/personal';
+              router.push(`${target}?departamento_id=${d.id}`);
+            }}
             columns={[
               {
                 key: 'nombre',

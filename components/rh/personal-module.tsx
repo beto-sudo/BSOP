@@ -26,7 +26,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, Plus, Search, RefreshCw, Settings, Users } from 'lucide-react';
 
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
@@ -223,6 +223,7 @@ export function EmpleadosModule({
   subtitle = 'Directorio de personal',
 }: EmpleadosModuleProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createSupabaseERPClient();
   const toast = useToast();
 
@@ -241,6 +242,9 @@ export function EmpleadosModule({
   const [estadoFilter, setEstadoFilter] = useState<EstadoFilter>('activos');
   const [search, setSearch] = useState('');
   const [filterDepto, setFilterDepto] = useState('all');
+  const [filterPuestoId, setFilterPuestoId] = useState<string>(
+    () => searchParams?.get('puesto_id') ?? 'all'
+  );
   const [filterAntiguedad, setFilterAntiguedad] = useState<AntiguedadFilter>('all');
 
   const [showCreate, setShowCreate] = useState(false);
@@ -346,6 +350,17 @@ export function EmpleadosModule({
     };
   }, [fetchEmpresaIds, fetchAll]);
 
+  // Entrada por URL: ?departamento_id=Y desde Departamentos. El catálogo se
+  // carga async, así que el mapeo id → nombre tiene que esperar al fetch.
+  // (puesto_id se aplica vía lazy useState arriba — no requiere effect.)
+  useEffect(() => {
+    const dId = searchParams?.get('departamento_id');
+    if (!dId || departamentos.length === 0) return;
+    const d = departamentos.find((x) => x.id === dId);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- URL → state one-shot tras fetch async
+    if (d) setFilterDepto(d.nombre);
+  }, [searchParams, departamentos]);
+
   const insertEmpresaId = empresaId ?? empresaIds[0] ?? null;
 
   // Política (Beto, 2026-04-27): no hay alta de empleado sin que la empresa
@@ -432,6 +447,12 @@ export function EmpleadosModule({
     // Filtro departamento
     if (filterDepto !== 'all' && e.departamento?.nombre !== filterDepto) {
       return false;
+    }
+
+    // Filtro puesto (por id, vía empleados_puestos vigentes)
+    if (filterPuestoId !== 'all') {
+      const tienePuesto = (e.puestos ?? []).some((p) => p.puesto_id === filterPuestoId);
+      if (!tienePuesto) return false;
     }
 
     // Filtro antigüedad por rangos
@@ -565,6 +586,15 @@ export function EmpleadosModule({
             placeholder="Departamento"
             searchPlaceholder="Buscar departamento..."
             clearLabel="Todos los deptos"
+            className="w-44"
+          />
+          <FilterCombobox
+            value={filterPuestoId}
+            onChange={setFilterPuestoId}
+            options={puestos.map((p) => ({ id: p.id, label: p.nombre }))}
+            placeholder="Puesto"
+            searchPlaceholder="Buscar puesto..."
+            clearLabel="Todos los puestos"
             className="w-44"
           />
           <FilterCombobox
