@@ -191,8 +191,12 @@ export async function cerrarCaja(input: CerrarCajaInput): Promise<void> {
 
   const now = new Date().toISOString();
 
-  // Actualizar corte
-  const { error } = await supabase
+  // Actualizar corte. `.select('id')` fuerza a PostgREST a devolver las filas
+  // afectadas: sin esto, un UPDATE bloqueado por RLS o sobre un corte
+  // inexistente devuelve `error: null, data: null` y el cliente recibe
+  // success silencioso mientras el corte sigue abierto. Mismo patrón que
+  // `confirmarVoucher` / `actualizarCategoriaVoucher` más abajo.
+  const { data: updated, error } = await supabase
     .schema('erp')
     .from('cortes_caja')
     .update({
@@ -203,9 +207,15 @@ export async function cerrarCaja(input: CerrarCajaInput): Promise<void> {
       updated_at: now,
     })
     .eq('empresa_id', RDB_EMPRESA_ID)
-    .eq('id', input.corte_id);
+    .eq('id', input.corte_id)
+    .select('id');
 
   if (error) throw new Error(error.message);
+  if (!updated || updated.length === 0) {
+    throw new Error(
+      'No se pudo cerrar el corte (posible RLS bloqueando UPDATE o corte inexistente).'
+    );
+  }
 
   // Guardar denominaciones (solo las que tienen cantidad > 0)
   const rows = input.denominaciones

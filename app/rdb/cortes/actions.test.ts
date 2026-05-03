@@ -40,7 +40,10 @@ let insertCorteResult: { data: { id: string } | null; error: { message: string }
 };
 
 // cerrarCaja state.
-let updateCorteError: { message: string } | null = null;
+let updateCorteResult: { data: { id: string }[]; error: { message: string } | null } = {
+  data: [{ id: 'corte-1' }],
+  error: null,
+};
 let upsertDenomError: { message: string } | null = null;
 
 // registrarMovimiento state.
@@ -194,7 +197,8 @@ function buildSupabaseMock(): any {
                 );
               }
               if (schemaName === 'erp' && tableName === 'cortes_caja' && _op === 'update') {
-                return Promise.resolve({ data: null, error: updateCorteError }).then(onFulfilled);
+                // .update().eq().eq().select('id') — devuelve array.
+                return Promise.resolve(updateCorteResult).then(onFulfilled);
               }
               if (
                 schemaName === 'erp' &&
@@ -283,7 +287,7 @@ beforeEach(() => {
   ultimoCorte = null;
   ultimoCorteError = null;
   insertCorteResult = { data: { id: 'corte-new' }, error: null };
-  updateCorteError = null;
+  updateCorteResult = { data: [{ id: 'corte-1' }], error: null };
   upsertDenomError = null;
   insertMovimientoResult = { data: { id: 'mov-1' }, error: null };
   previewData = null;
@@ -402,13 +406,23 @@ describe('cerrarCaja', () => {
   });
 
   it('throws si update del corte falla', async () => {
-    updateCorteError = { message: 'rls violation' };
+    updateCorteResult = { data: [], error: { message: 'rls violation' } };
     await expect(
       cerrarCaja({
         corte_id: 'corte-1',
         denominaciones: [{ denominacion: 100, tipo: 'billete', cantidad: 5 }],
       })
     ).rejects.toThrow(/rls violation/);
+  });
+
+  it('throws si update no afecta filas (RLS bloqueando o corte inexistente)', async () => {
+    updateCorteResult = { data: [], error: null };
+    await expect(
+      cerrarCaja({
+        corte_id: 'corte-1',
+        denominaciones: [{ denominacion: 100, tipo: 'billete', cantidad: 5 }],
+      })
+    ).rejects.toThrow(/RLS bloqueando|inexistente/i);
   });
 
   it('throws si upsert de denominaciones falla', async () => {
