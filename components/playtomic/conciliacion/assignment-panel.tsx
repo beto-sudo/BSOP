@@ -17,9 +17,13 @@ const TIMESTAMP_FMT = new Intl.DateTimeFormat('es-MX', {
 export function AssignmentPanel({
   booking,
   candidates,
+  tolerancePresetLabel,
+  onWidenWindow,
 }: {
   booking: PendingBookingWithCoverage | null;
   candidates: RankedCandidate[];
+  tolerancePresetLabel: string;
+  onWidenWindow?: () => void;
 }) {
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
 
@@ -116,14 +120,33 @@ export function AssignmentPanel({
             Candidatos en Waitry ({candidates.length})
           </h4>
           <span className="text-xs text-[var(--text-muted)]">
-            ±3h del booking · &quot;Renta Cancha Padel&quot; · pagados · no asignados
+            hasta {tolerancePresetLabel} después del booking · incluye &quot;Renta Cancha
+            Padel&quot; · pagados · no asignados
           </span>
         </div>
         {candidates.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-[var(--border)] p-3 text-sm text-[var(--text-muted)]">
-            Sin candidatos en la ventana temporal. La heurística no encontró pedidos elegibles —
-            puede que no haya pago en club registrado para esta reserva.
-          </p>
+          <div className="space-y-2 rounded-xl border border-dashed border-[var(--border)] p-3 text-sm text-[var(--text-muted)]">
+            <p>
+              Sin candidatos dentro de {tolerancePresetLabel} después del booking. Posibles razones:
+            </p>
+            <ul className="ml-4 list-disc space-y-1 text-xs">
+              <li>
+                El cliente pagó atrasado (volvió al club días después y se cobró entonces) — ampliar
+                ventana.
+              </li>
+              <li>La búsqueda en notes está activa y no hay coincidencias.</li>
+              <li>
+                El pedido en Waitry no tiene producto &quot;Renta Cancha Padel&quot; — el operador
+                lo registró con otro nombre.
+              </li>
+              <li>Realmente no hay pago en club registrado — pendiente real.</li>
+            </ul>
+            {onWidenWindow ? (
+              <Button variant="outline" size="sm" onClick={onWidenWindow}>
+                Ampliar ventana temporal
+              </Button>
+            ) : null}
+          </div>
         ) : (
           <ul className="space-y-2">
             {candidates.map((candidate) => {
@@ -138,18 +161,41 @@ export function AssignmentPanel({
                       : 'border-[var(--border)] bg-[var(--panel)]/20'
                   }`}
                 >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 font-medium text-[var(--text)]">
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2 font-medium text-[var(--text)]">
                       <span>{tsLabel}</span>
                       <span className="text-[var(--text-muted)]">·</span>
                       <span>{formatMoney(candidate.total_amount)}</span>
+                      <span
+                        className="rounded-full border border-[var(--border)] bg-[var(--panel)]/60 px-2 py-0.5 font-mono text-xs text-[var(--text-muted)]"
+                        title={candidate.order_id}
+                      >
+                        #{candidate.order_id}
+                      </span>
                       <span className="rounded-full border border-[var(--border)] bg-[var(--panel)]/60 px-2 py-0.5 text-xs text-[var(--text-muted)]">
                         score {Math.round(candidate.score)}
                       </span>
                     </div>
+                    {candidate.items.length > 0 ? (
+                      <ul className="space-y-0.5 text-xs text-[var(--text)]/80">
+                        {candidate.items.map((item, idx) => (
+                          <li
+                            key={`${candidate.order_id}-${idx}`}
+                            className="flex items-baseline gap-2"
+                          >
+                            <span className="text-[var(--text-muted)]">{item.quantity}×</span>
+                            <span className="flex-1 truncate">{item.product_name}</span>
+                            <span className="text-[var(--text-muted)]">
+                              {formatMoney(item.total_price)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                     {candidate.notes ? (
-                      <div className="text-[var(--text)]/80">
-                        notes: &quot;{candidate.notes}&quot;
+                      <div className="text-xs text-[var(--text)]/80">
+                        <span className="text-[var(--text-muted)]">notes:</span> &quot;
+                        {candidate.notes}&quot;
                       </div>
                     ) : null}
                     {candidate.reasons.length > 0 ? (

@@ -3,14 +3,28 @@
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { rankCandidates } from '@/lib/playtomic/conciliacion';
+import {
+  TIMESTAMP_TOLERANCE_PRESETS_MS,
+  rankCandidates,
+  type TimestampTolerancePreset,
+} from '@/lib/playtomic/conciliacion';
 import { AssignmentPanel } from './assignment-panel';
 import { PendingList } from './pending-list';
 import { useConciliacionData } from './use-conciliacion-data';
 
+const TOLERANCE_LABELS: Record<TimestampTolerancePreset, string> = {
+  '3h': '±3 h',
+  '1d': '±1 día',
+  '2d': '±2 días',
+  '7d': '±7 días',
+  '30d': '±30 días',
+};
+
 export function ConciliacionView() {
   const { data, loading, refreshing, error, refetch } = useConciliacionData();
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  const [tolerancePreset, setTolerancePreset] = useState<TimestampTolerancePreset>('2d');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const selectedBooking = useMemo(
     () => data.bookings.find((b) => b.booking_id === selectedBookingId) ?? null,
@@ -20,8 +34,13 @@ export function ConciliacionView() {
   const rankedCandidates = useMemo(() => {
     if (!selectedBooking) return [];
     const available = data.candidates.filter((c) => !data.assignedOrderIds.has(c.order_id));
-    return rankCandidates(selectedBooking, available);
-  }, [selectedBooking, data.candidates, data.assignedOrderIds]);
+    const ranked = rankCandidates(selectedBooking, available, {
+      toleranceMs: TIMESTAMP_TOLERANCE_PRESETS_MS[tolerancePreset],
+    });
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return ranked;
+    return ranked.filter((c) => (c.notes ?? '').toLowerCase().includes(q));
+  }, [selectedBooking, data.candidates, data.assignedOrderIds, tolerancePreset, searchQuery]);
 
   if (loading) {
     return (
@@ -66,13 +85,67 @@ export function ConciliacionView() {
         de matching es buena antes de habilitar la persistencia en S2.
       </div>
 
+      <div className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--panel)]/30 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+          <label
+            htmlFor="tolerance-preset"
+            className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]"
+          >
+            Ventana temporal
+          </label>
+          <select
+            id="tolerance-preset"
+            value={tolerancePreset}
+            onChange={(e) => setTolerancePreset(e.target.value as TimestampTolerancePreset)}
+            className="rounded-md border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-sm"
+          >
+            {(Object.keys(TIMESTAMP_TOLERANCE_PRESETS_MS) as TimestampTolerancePreset[]).map(
+              (preset) => (
+                <option key={preset} value={preset}>
+                  {TOLERANCE_LABELS[preset]}
+                </option>
+              )
+            )}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <label
+            htmlFor="notes-search"
+            className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]"
+          >
+            Buscar en notes
+          </label>
+          <input
+            id="notes-search"
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder='nombre del cliente, "efectivo", etc.'
+            className="w-64 rounded-md border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-sm"
+          />
+        </div>
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
         <PendingList
           bookings={data.bookings}
           selectedBookingId={selectedBookingId}
           onSelect={setSelectedBookingId}
         />
-        <AssignmentPanel booking={selectedBooking} candidates={rankedCandidates} />
+        <AssignmentPanel
+          booking={selectedBooking}
+          candidates={rankedCandidates}
+          tolerancePresetLabel={TOLERANCE_LABELS[tolerancePreset]}
+          onWidenWindow={
+            tolerancePreset !== '30d'
+              ? () => {
+                  const order: TimestampTolerancePreset[] = ['3h', '1d', '2d', '7d', '30d'];
+                  const next = order[order.indexOf(tolerancePreset) + 1];
+                  if (next) setTolerancePreset(next);
+                }
+              : undefined
+          }
+        />
       </div>
     </div>
   );

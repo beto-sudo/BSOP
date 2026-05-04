@@ -23,27 +23,45 @@ const baseBooking = {
 function candidate(overrides: Partial<WaitryCandidate>): WaitryCandidate {
   return {
     order_id: 'o1',
-    timestamp: '2026-04-08T01:25:00Z',
+    timestamp: '2026-04-08T01:35:00Z',
     notes: null,
     total_amount: 200,
     unit_price: 200,
     quantity: 1,
+    items: [{ product_name: 'Renta Cancha Padel', quantity: 1, unit_price: 200, total_price: 200 }],
     ...overrides,
   };
 }
 
 describe('isWithinTimestampWindow', () => {
-  it('accepts candidate within ±3h by default', () => {
+  it('accepts post-booking candidates within tolerance (default 2d)', () => {
+    // 5 min después — caso típico
+    expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-08T01:35:00Z')).toBe(true);
+    // 1 día después
+    expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-09T01:30:00Z')).toBe(true);
+    // 2 días después (justo en el límite)
+    expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-10T01:29:00Z')).toBe(true);
+  });
+
+  it('accepts pre-booking only within 30min grace (pago al llegar)', () => {
+    // 5 min antes — paga al registrarse
     expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-08T01:25:00Z')).toBe(true);
-    expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-07T22:31:00Z')).toBe(true);
+    // 25 min antes — todavía dentro del grace
+    expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-08T01:05:00Z')).toBe(true);
   });
 
-  it('rejects candidate outside ±3h', () => {
-    expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-07T22:29:00Z')).toBe(false);
-    expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-08T04:31:00Z')).toBe(false);
+  it('rejects candidates more than 30min before the booking', () => {
+    // 31 min antes — pago en cancha jamás se hace tan temprano
+    expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-08T00:59:00Z')).toBe(false);
+    // Días antes — claramente no es pago en cancha
+    expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-07T01:30:00Z')).toBe(false);
   });
 
-  it('respects custom tolerance', () => {
+  it('rejects candidates beyond the post-booking tolerance', () => {
+    expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-10T01:31:00Z')).toBe(false);
+  });
+
+  it('respects custom post tolerance', () => {
     const oneHour = 60 * 60 * 1000;
     expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-08T02:00:00Z', oneHour)).toBe(
       true
@@ -60,11 +78,36 @@ describe('isWithinTimestampWindow', () => {
 });
 
 describe('rankCandidates', () => {
-  it('filters out candidates outside the timestamp window', () => {
-    const offWindow = candidate({ order_id: 'far', timestamp: '2026-04-07T20:00:00Z' });
+  it('filters out candidates outside the timestamp window (±2d default)', () => {
+    const offWindow = candidate({ order_id: 'far', timestamp: '2026-04-04T20:00:00Z' }); // ~4d antes
     const inWindow = candidate({ order_id: 'near', timestamp: '2026-04-08T01:25:00Z' });
     const ranked = rankCandidates(baseBooking, [offWindow, inWindow]);
     expect(ranked.map((r) => r.order_id)).toEqual(['near']);
+  });
+
+  it('rejects candidates that "paid" days before the booking — pago en cancha es siempre post-booking', () => {
+    const dayBefore = candidate({
+      order_id: 'day-before',
+      timestamp: '2026-04-07T15:00:00Z',
+      notes: 'jose Luis paz',
+    });
+    const dayAfter = candidate({
+      order_id: 'day-after',
+      timestamp: '2026-04-09T01:30:00Z',
+      notes: 'jose Luis paz',
+    });
+    const ranked = rankCandidates(baseBooking, [dayBefore, dayAfter]);
+    expect(ranked.map((r) => r.order_id)).not.toContain('day-before');
+    expect(ranked.map((r) => r.order_id)).toContain('day-after');
+  });
+
+  it('accepts pre-booking pagos within the 30min grace (cliente paga al llegar)', () => {
+    const fiveBefore = candidate({
+      order_id: 'just-before',
+      timestamp: '2026-04-08T01:25:00Z',
+    });
+    const ranked = rankCandidates(baseBooking, [fiveBefore]);
+    expect(ranked.map((r) => r.order_id)).toContain('just-before');
   });
 
   it('boosts candidate when notes match the owner', () => {

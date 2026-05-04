@@ -7,6 +7,7 @@ import type {
   CoverageStatus,
   PendingBookingWithCoverage,
   WaitryCandidate,
+  WaitryItem,
 } from '@/lib/playtomic/conciliacion';
 
 type BookingRow = {
@@ -43,6 +44,7 @@ type WaitryProductoRow = {
   product_name: string;
   unit_price: number | null;
   quantity: number | null;
+  total_price: number | null;
 };
 
 export type ConciliacionData = {
@@ -74,7 +76,16 @@ export function useConciliacionData() {
       const rdb = supabase.schema('rdb');
 
       const nowIso = new Date().toISOString();
-      const ninetyDaysAgoIso = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+      const bookingsLookbackDays = 90;
+      const ninetyDaysAgoIso = new Date(
+        Date.now() - bookingsLookbackDays * 24 * 60 * 60 * 1000
+      ).toISOString();
+      // Waitry lookback = bookings + max tolerance window (30d) para cubrir
+      // pagos hechos antes del booking_start más antiguo en la lista.
+      const waitryLookbackDays = bookingsLookbackDays + 30;
+      const waitryLookbackIso = new Date(
+        Date.now() - waitryLookbackDays * 24 * 60 * 60 * 1000
+      ).toISOString();
 
       const [
         { data: pendingBookings, error: pendingErr },
@@ -95,16 +106,20 @@ export function useConciliacionData() {
           .from('waitry_pedidos')
           .select('order_id,timestamp,notes,total_amount,paid')
           .eq('paid', true)
-          .gte('timestamp', ninetyDaysAgoIso)
+          .gte('timestamp', waitryLookbackIso)
           .order('timestamp', { ascending: true })
-          .limit(5000)
+          .limit(8000)
           .returns<WaitryPedidoRow[]>(),
+        // Fetch TODOS los productos en la ventana — no solo "Renta Cancha
+        // Padel". Necesitamos los items completos del ticket para mostrarlos
+        // en el dropdown (contexto al operador). El filtro de "ticket es
+        // candidato" se hace en cliente: el ticket aplica si tiene al menos
+        // un producto "Renta Cancha Padel".
         rdb
           .from('waitry_productos')
-          .select('order_id,product_name,unit_price,quantity')
-          .eq('product_name', RENTA_CANCHA_PRODUCT)
-          .gte('created_at', ninetyDaysAgoIso)
-          .limit(10000)
+          .select('order_id,product_name,unit_price,quantity,total_price')
+          .gte('created_at', waitryLookbackIso)
+          .limit(30000)
           .returns<WaitryProductoRow[]>(),
       ]);
 
@@ -147,22 +162,36 @@ export function useConciliacionData() {
         participantsByBooking.set(p.booking_id, list);
       }
 
-      const productosByOrder = new Map<string, WaitryProductoRow>();
+      // Agrupa todos los productos por order_id para construir los items[]
+      // del candidato y para localizar el producto "Renta Cancha Padel"
+      // que alimenta unit_price/quantity de la heurística.
+      const productosByOrder = new Map<string, WaitryProductoRow[]>();
       for (const prod of waitryProductos ?? []) {
-        if (!productosByOrder.has(prod.order_id)) productosByOrder.set(prod.order_id, prod);
+        const list = productosByOrder.get(prod.order_id) ?? [];
+        list.push(prod);
+        productosByOrder.set(prod.order_id, list);
       }
 
       const candidates: WaitryCandidate[] = (waitryPedidos ?? [])
         .map((pedido) => {
-          const prod = productosByOrder.get(pedido.order_id);
-          if (!prod) return null;
+          const prods = productosByOrder.get(pedido.order_id);
+          if (!prods || prods.length === 0) return null;
+          const cancha = prods.find((p) => p.product_name === RENTA_CANCHA_PRODUCT);
+          if (!cancha) return null;
+          const items: WaitryItem[] = prods.map((p) => ({
+            product_name: p.product_name,
+            quantity: Number(p.quantity ?? 0),
+            unit_price: Number(p.unit_price ?? 0),
+            total_price: Number(p.total_price ?? 0),
+          }));
           return {
             order_id: pedido.order_id,
             timestamp: pedido.timestamp,
             notes: pedido.notes,
             total_amount: Number(pedido.total_amount ?? 0),
-            unit_price: Number(prod.unit_price ?? 0),
-            quantity: Number(prod.quantity ?? 1),
+            unit_price: Number(cancha.unit_price ?? 0),
+            quantity: Number(cancha.quantity ?? 1),
+            items,
           };
         })
         .filter((c): c is WaitryCandidate => c !== null);
