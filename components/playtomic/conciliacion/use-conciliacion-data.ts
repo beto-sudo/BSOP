@@ -87,10 +87,13 @@ export function useConciliacionData() {
         Date.now() - waitryLookbackDays * 24 * 60 * 60 * 1000
       ).toISOString();
 
+      // Paso 1: bookings + pedidos Waitry pagados + productos "Renta Cancha
+      // Padel" (filtrado para no chocar con el cap default de PostgREST de
+      // 1000 rows aunque pidamos más).
       const [
         { data: pendingBookings, error: pendingErr },
         { data: waitryPedidos, error: pedidosErr },
-        { data: waitryProductos, error: productosErr },
+        { data: canchaProductos, error: canchaErr },
       ] = await Promise.all([
         playtomic
           .from('bookings')
@@ -110,22 +113,34 @@ export function useConciliacionData() {
           .order('timestamp', { ascending: true })
           .limit(8000)
           .returns<WaitryPedidoRow[]>(),
-        // Fetch TODOS los productos en la ventana — no solo "Renta Cancha
-        // Padel". Necesitamos los items completos del ticket para mostrarlos
-        // en el dropdown (contexto al operador). El filtro de "ticket es
-        // candidato" se hace en cliente: el ticket aplica si tiene al menos
-        // un producto "Renta Cancha Padel".
         rdb
           .from('waitry_productos')
           .select('order_id,product_name,unit_price,quantity,total_price')
+          .eq('product_name', RENTA_CANCHA_PRODUCT)
           .gte('created_at', waitryLookbackIso)
-          .limit(30000)
+          .limit(8000)
           .returns<WaitryProductoRow[]>(),
       ]);
 
       if (pendingErr) throw pendingErr;
       if (pedidosErr) throw pedidosErr;
-      if (productosErr) throw productosErr;
+      if (canchaErr) throw canchaErr;
+
+      // Paso 2: con los order_ids que tienen Renta Cancha Padel, fetcheamos
+      // TODOS los items de esos pedidos (incluye F&B, otros productos) — usa
+      // `.in()` con un set acotado, ya no choca con el cap default.
+      const candidateOrderIds = Array.from(new Set((canchaProductos ?? []).map((p) => p.order_id)));
+      let waitryProductos: WaitryProductoRow[] = canchaProductos ?? [];
+      if (candidateOrderIds.length > 0) {
+        const { data: allItems, error: itemsErr } = await rdb
+          .from('waitry_productos')
+          .select('order_id,product_name,unit_price,quantity,total_price')
+          .in('order_id', candidateOrderIds)
+          .limit(20000)
+          .returns<WaitryProductoRow[]>();
+        if (itemsErr) throw itemsErr;
+        if (allItems && allItems.length > 0) waitryProductos = allItems;
+      }
 
       const bookingsList = pendingBookings ?? [];
       const bookingIds = bookingsList.map((b) => b.booking_id);
