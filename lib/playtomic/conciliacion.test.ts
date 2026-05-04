@@ -33,14 +33,18 @@ function candidate(overrides: Partial<WaitryCandidate>): WaitryCandidate {
 }
 
 describe('isWithinTimestampWindow', () => {
-  it('accepts candidate within ±3h by default', () => {
+  it('accepts candidate within ±2d by default', () => {
+    // 5min antes
     expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-08T01:25:00Z')).toBe(true);
-    expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-07T22:31:00Z')).toBe(true);
+    // 1d antes — pago al hacer reserva
+    expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-07T01:30:00Z')).toBe(true);
+    // 2d después — pago atrasado al volver al club
+    expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-10T01:29:00Z')).toBe(true);
   });
 
-  it('rejects candidate outside ±3h', () => {
-    expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-07T22:29:00Z')).toBe(false);
-    expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-08T04:31:00Z')).toBe(false);
+  it('rejects candidate outside ±2d', () => {
+    expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-06T01:29:00Z')).toBe(false);
+    expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-10T01:31:00Z')).toBe(false);
   });
 
   it('respects custom tolerance', () => {
@@ -60,11 +64,21 @@ describe('isWithinTimestampWindow', () => {
 });
 
 describe('rankCandidates', () => {
-  it('filters out candidates outside the timestamp window', () => {
-    const offWindow = candidate({ order_id: 'far', timestamp: '2026-04-07T20:00:00Z' });
+  it('filters out candidates outside the timestamp window (±2d default)', () => {
+    const offWindow = candidate({ order_id: 'far', timestamp: '2026-04-04T20:00:00Z' }); // ~4d antes
     const inWindow = candidate({ order_id: 'near', timestamp: '2026-04-08T01:25:00Z' });
     const ranked = rankCandidates(baseBooking, [offWindow, inWindow]);
     expect(ranked.map((r) => r.order_id)).toEqual(['near']);
+  });
+
+  it('keeps candidates that paid days before the booking_start (reserva pagada al reservar)', () => {
+    const dayBefore = candidate({
+      order_id: 'day-before',
+      timestamp: '2026-04-07T15:00:00Z',
+      notes: 'jose Luis paz',
+    });
+    const ranked = rankCandidates(baseBooking, [dayBefore]);
+    expect(ranked.map((r) => r.order_id)).toContain('day-before');
   });
 
   it('boosts candidate when notes match the owner', () => {

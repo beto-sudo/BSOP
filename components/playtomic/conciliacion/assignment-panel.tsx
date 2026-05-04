@@ -17,9 +17,13 @@ const TIMESTAMP_FMT = new Intl.DateTimeFormat('es-MX', {
 export function AssignmentPanel({
   booking,
   candidates,
+  tolerancePresetLabel,
+  onWidenWindow,
 }: {
   booking: PendingBookingWithCoverage | null;
   candidates: RankedCandidate[];
+  tolerancePresetLabel: string;
+  onWidenWindow?: () => void;
 }) {
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
 
@@ -116,14 +120,27 @@ export function AssignmentPanel({
             Candidatos en Waitry ({candidates.length})
           </h4>
           <span className="text-xs text-[var(--text-muted)]">
-            ±3h del booking · &quot;Renta Cancha Padel&quot; · pagados · no asignados
+            {tolerancePresetLabel} del booking · &quot;Renta Cancha Padel&quot; · pagados · no
+            asignados
           </span>
         </div>
         {candidates.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-[var(--border)] p-3 text-sm text-[var(--text-muted)]">
-            Sin candidatos en la ventana temporal. La heurística no encontró pedidos elegibles —
-            puede que no haya pago en club registrado para esta reserva.
-          </p>
+          <div className="space-y-2 rounded-xl border border-dashed border-[var(--border)] p-3 text-sm text-[var(--text-muted)]">
+            <p>Sin candidatos dentro de {tolerancePresetLabel} del booking. Posibles razones:</p>
+            <ul className="ml-4 list-disc space-y-1 text-xs">
+              <li>
+                El cliente pagó fuera de esa ventana (típico al reservar con días de anticipación o
+                pago atrasado).
+              </li>
+              <li>La búsqueda en notes está activa y no hay coincidencias.</li>
+              <li>Realmente no hay pago en club registrado — pendiente real.</li>
+            </ul>
+            {onWidenWindow ? (
+              <Button variant="outline" size="sm" onClick={onWidenWindow}>
+                Ampliar ventana temporal
+              </Button>
+            ) : null}
+          </div>
         ) : (
           <ul className="space-y-2">
             {candidates.map((candidate) => {
