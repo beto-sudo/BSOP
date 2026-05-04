@@ -48,9 +48,23 @@ export function PendingPaymentsSection({
 }) {
   return (
     <div className="border-t border-[var(--border)] pt-6">
+      <div className="mb-4 space-y-2">
+        <h3 className="text-base font-semibold text-[var(--text)]">
+          Pagos Pendientes (sin cobro online)
+        </h3>
+        <p className="text-sm text-[var(--text-muted)]">
+          Reservas marcadas como pendientes en Playtomic — no se cobraron por la app online.
+        </p>
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-[var(--text)]">
+          <strong>Nota:</strong> los cobros realizados en cancha (efectivo o tarjeta en recepción)
+          se registran en Waitry, no en Playtomic, así que aquí pueden aparecer reservas que ya
+          están pagadas en el club. Para confirmar si ya entró el pago, cruzar contra los tickets de
+          Waitry del mismo día/jugador.
+        </div>
+      </div>
       <div className="space-y-3">
         <div>
-          <h3 className="text-base font-semibold text-[var(--text)]">Resumen por Jugador</h3>
+          <h4 className="text-sm font-semibold text-[var(--text)]">Resumen por Jugador</h4>
           <p className="text-sm text-[var(--text-muted)]">
             Top 20 jugadores con saldo pendiente acumulado.
           </p>
@@ -70,7 +84,7 @@ export function PendingPaymentsSection({
                 {pendingPayments.playerSummary.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="py-10 text-center text-[var(--text)]/50">
-                      No hay pagos pendientes en este periodo.
+                      No hay pagos pendientes online en este periodo.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -108,11 +122,11 @@ export function PendingPaymentsSection({
       <div className="mt-6 space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--panel)]/35 p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="text-base font-semibold text-[var(--text)]">
+            <h4 className="text-sm font-semibold text-[var(--text)]">
               Detalle de Reservas Pendientes
-            </h3>
+            </h4>
             <p className="text-sm text-[var(--text-muted)]">
-              Listado individual de reservas pendientes.
+              Listado individual de reservas marcadas como pendientes en Playtomic.
             </p>
           </div>
           <Button variant="outline" size="sm" onClick={onToggleDetails}>
