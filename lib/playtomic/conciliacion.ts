@@ -17,13 +17,26 @@ export type PendingBookingWithCoverage = {
   assigned_waitry_orders: string[];
 };
 
+export type WaitryItem = {
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+};
+
 export type WaitryCandidate = {
   order_id: string;
   timestamp: string;
   notes: string | null;
   total_amount: number;
+  // unit_price/quantity del producto "Renta Cancha Padel" — usado por la
+  // heurística de match de monto. Si el ticket tiene varios productos,
+  // estos reflejan SOLO el de cancha.
   unit_price: number;
   quantity: number;
+  // Lista completa de productos del pedido (incluyendo F&B), para que el
+  // operador vea el contexto del ticket al decidir si lo asigna.
+  items: WaitryItem[];
 };
 
 export type RankedCandidate = WaitryCandidate & {
@@ -31,12 +44,12 @@ export type RankedCandidate = WaitryCandidate & {
   reasons: string[];
 };
 
-// Ventana temporal default: ±2 días alrededor del booking_start. Los pagos
-// en cancha no se acotan al momento del juego — el cliente puede pagar
-// días antes (al reservar) o días después (cuando vuelve al club). ±3h
-// dejaba muchas reservas sin candidatos. ±2 días cubre el caso típico
-// sin abrir la ventana hasta el infinito; para casos especiales, la UI
-// expone un control para ampliar a ±7d o más.
+// Ventana temporal asimétrica. El pago en cancha SIEMPRE ocurre después
+// del booking_start (el cliente llega a recepción al momento de jugar o
+// días después al volver al club). Pre-grace fijo de 30 minutos para
+// pagos al llegar (cliente paga al registrarse, justo antes de empezar).
+// El preset que ajusta el operador controla solo la cola POST-booking.
+const PRE_BOOKING_GRACE_MS = 30 * 60 * 1000;
 const DEFAULT_TIMESTAMP_TOLERANCE_MS = 2 * 24 * 60 * 60 * 1000;
 export const TIMESTAMP_TOLERANCE_PRESETS_MS = {
   '3h': 3 * 60 * 60 * 1000,
@@ -67,12 +80,13 @@ function nameTokens(name: string): string[] {
 export function isWithinTimestampWindow(
   bookingStart: string,
   candidateTimestamp: string,
-  toleranceMs: number = DEFAULT_TIMESTAMP_TOLERANCE_MS
+  postToleranceMs: number = DEFAULT_TIMESTAMP_TOLERANCE_MS
 ): boolean {
   const bookingMs = new Date(bookingStart).getTime();
   const candidateMs = new Date(candidateTimestamp).getTime();
   if (Number.isNaN(bookingMs) || Number.isNaN(candidateMs)) return false;
-  return Math.abs(bookingMs - candidateMs) <= toleranceMs;
+  const delta = candidateMs - bookingMs;
+  return delta >= -PRE_BOOKING_GRACE_MS && delta <= postToleranceMs;
 }
 
 export function rankCandidates(
