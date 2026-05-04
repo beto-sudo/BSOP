@@ -33,7 +33,12 @@ export type RankedCandidate = WaitryCandidate & {
 
 const DEFAULT_TIMESTAMP_TOLERANCE_MS = 3 * 60 * 60 * 1000;
 
-const ESTIMATED_PRICE_PER_PLAYER = 200;
+// Tolerancia relativa al precio esperado del booking. ±15% absorbe
+// redondeos típicos del POS y descuentos chicos sin abrir la puerta a
+// matches arbitrarios. Si el precio esperado no se puede derivar (booking
+// sin participantes capturados), se usa esta misma fracción contra el
+// total del booking como fallback.
+const AMOUNT_MATCH_TOLERANCE = 0.15;
 
 function normalizeForMatch(text: string | null | undefined): string {
   return (text ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
@@ -76,6 +81,17 @@ export function rankCandidates(
   const participantTokens = (booking.participant_names ?? []).flatMap(nameTokens);
   const ownerEmailLocal = (booking.owner_email ?? '').split('@')[0]?.toLowerCase() ?? '';
 
+  // El monto esperado por jugador se deriva del booking en sí, no de un
+  // valor hardcoded. Padel típico: $800 / 4 = $200. Tenis singles: $300 /
+  // 2 = $150. Tenis dobles, horarios con descuento, torneos, etc, todos
+  // caen naturalmente en este cálculo. Si la reserva no trae
+  // participantes capturados, dejamos `expectedPerPlayer = 0` y caemos
+  // al fallback que compara contra el total completo del booking.
+  const participantCount = booking.participant_names?.length ?? 0;
+  const bookingTotal = booking.price_amount ?? 0;
+  const expectedPerPlayer =
+    participantCount > 0 && bookingTotal > 0 ? bookingTotal / participantCount : 0;
+
   return candidates
     .filter((candidate) =>
       isWithinTimestampWindow(booking.booking_start, candidate.timestamp, tolerance)
@@ -113,10 +129,41 @@ export function rankCandidates(
         }
       }
 
-      const isPlayerSlot = Math.abs(candidate.unit_price - ESTIMATED_PRICE_PER_PLAYER) < 0.01;
-      if (isPlayerSlot) {
-        score += 8;
-        reasons.push('Monto típico de renta por jugador');
+      // Bonus por compatibilidad de monto, derivado del booking — no
+      // hardcoded. Tres niveles, no excluyentes:
+      //  1) unit_price ≈ precio esperado por jugador.
+      //  2) total_amount cubre múltiplo entero N×expectedPerPlayer
+      //     (1, 2, 3, 4… jugadores en un solo ticket).
+      //  3) total_amount ≈ total del booking completo (un jugador pagó
+      //     toda la cancha en un solo ticket).
+      if (expectedPerPlayer > 0) {
+        const tolerancePerPlayer = expectedPerPlayer * AMOUNT_MATCH_TOLERANCE;
+
+        if (Math.abs(candidate.unit_price - expectedPerPlayer) <= tolerancePerPlayer) {
+          score += 12;
+          reasons.push('Unit price coincide con el monto por jugador del booking');
+        }
+
+        for (let n = 1; n <= participantCount; n += 1) {
+          const expected = expectedPerPlayer * n;
+          if (Math.abs(candidate.total_amount - expected) <= tolerancePerPlayer * n) {
+            const reason =
+              n === 1
+                ? 'Total del ticket coincide con 1 jugador'
+                : n === participantCount
+                  ? 'Total del ticket cubre la cancha completa'
+                  : `Total del ticket coincide con ${n} jugadores`;
+            score += 6 + n * 2;
+            reasons.push(reason);
+            break;
+          }
+        }
+      } else if (bookingTotal > 0) {
+        const tolerance = bookingTotal * AMOUNT_MATCH_TOLERANCE;
+        if (Math.abs(candidate.total_amount - bookingTotal) <= tolerance) {
+          score += 10;
+          reasons.push('Total del ticket coincide con el total del booking');
+        }
       }
 
       return { ...candidate, score, reasons };

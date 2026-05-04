@@ -105,11 +105,81 @@ describe('rankCandidates', () => {
     expect(ranked[0].order_id).toBe('closer');
   });
 
-  it('rewards typical renta-cancha unit price', () => {
-    const typical = candidate({ order_id: 'typical', unit_price: 200 });
-    const atypical = candidate({ order_id: 'atypical', unit_price: 350, total_amount: 350 });
-    const ranked = rankCandidates(baseBooking, [atypical, typical]);
-    expect(ranked[0].order_id).toBe('typical');
+  it('derives the expected per-player price from the booking, not a hardcoded value', () => {
+    // Padel: $800 / 4 jugadores = $200/jugador
+    const padelBooking = { ...baseBooking, price_amount: 800 };
+    const padelCandidate = candidate({ order_id: 'padel-200', unit_price: 200, total_amount: 200 });
+    const padelOff = candidate({ order_id: 'padel-150', unit_price: 150, total_amount: 150 });
+    const padelRanked = rankCandidates(padelBooking, [padelOff, padelCandidate]);
+    expect(padelRanked[0].order_id).toBe('padel-200');
+
+    // Tenis singles: $300 / 2 jugadores = $150/jugador. Aquí $200 NO debe ganar.
+    const tenisSingles = {
+      ...baseBooking,
+      price_amount: 300,
+      participant_names: ['Player A', 'Player B'],
+    };
+    const tenisCandidate = candidate({ order_id: 'tenis-150', unit_price: 150, total_amount: 150 });
+    const padelPriceOff = candidate({ order_id: 'tenis-200', unit_price: 200, total_amount: 200 });
+    const tenisRanked = rankCandidates(tenisSingles, [padelPriceOff, tenisCandidate]);
+    expect(tenisRanked[0].order_id).toBe('tenis-150');
+
+    // Tenis dobles con descuento: $400 / 4 jugadores = $100/jugador.
+    const tenisDobles = {
+      ...baseBooking,
+      price_amount: 400,
+      participant_names: ['A', 'B', 'C', 'D'],
+    };
+    const dobleMatch = candidate({ order_id: 'doble-100', unit_price: 100, total_amount: 100 });
+    const dobleOff = candidate({ order_id: 'doble-200', unit_price: 200, total_amount: 200 });
+    const dobleRanked = rankCandidates(tenisDobles, [dobleOff, dobleMatch]);
+    expect(dobleRanked[0].order_id).toBe('doble-100');
+  });
+
+  it('rewards tickets that cover whole-court or multi-player payments', () => {
+    // Padel $800/4 = $200. Un ticket de $400 = 2 jugadores en un solo cargo.
+    const wholeCourt = candidate({
+      order_id: 'whole',
+      unit_price: 800,
+      quantity: 1,
+      total_amount: 800,
+    });
+    const halfCourt = candidate({
+      order_id: 'half',
+      unit_price: 200,
+      quantity: 2,
+      total_amount: 400,
+    });
+    const single = candidate({
+      order_id: 'single',
+      unit_price: 200,
+      quantity: 1,
+      total_amount: 200,
+    });
+    const ranked = rankCandidates(
+      baseBooking,
+      [single, halfCourt, wholeCourt].map((c, i) => ({
+        ...c,
+        timestamp: `2026-04-08T01:${20 + i}:00Z`,
+      }))
+    );
+    expect(ranked.map((r) => r.order_id)).toContain('whole');
+    expect(ranked.map((r) => r.order_id)).toContain('half');
+    expect(ranked.map((r) => r.order_id)).toContain('single');
+    // Los tres son matches válidos; la posición exacta depende de proximidad
+    // temporal. Lo importante: ninguno debe quedar fuera por monto.
+  });
+
+  it('falls back to booking total when participants are not captured', () => {
+    const noParticipants = {
+      ...baseBooking,
+      participant_names: [],
+      price_amount: 600,
+    };
+    const fullMatch = candidate({ order_id: 'full', unit_price: 600, total_amount: 600 });
+    const noMatch = candidate({ order_id: 'no', unit_price: 50, total_amount: 50 });
+    const ranked = rankCandidates(noParticipants, [noMatch, fullMatch]);
+    expect(ranked[0].order_id).toBe('full');
   });
 
   it('returns empty array when all candidates are out of window', () => {
