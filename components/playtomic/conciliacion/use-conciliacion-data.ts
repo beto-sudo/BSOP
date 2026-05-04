@@ -74,7 +74,16 @@ export function useConciliacionData() {
       const rdb = supabase.schema('rdb');
 
       const nowIso = new Date().toISOString();
-      const ninetyDaysAgoIso = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+      const bookingsLookbackDays = 90;
+      const ninetyDaysAgoIso = new Date(
+        Date.now() - bookingsLookbackDays * 24 * 60 * 60 * 1000
+      ).toISOString();
+      // Waitry lookback = bookings + max tolerance window (30d) para cubrir
+      // pagos hechos antes del booking_start más antiguo en la lista.
+      const waitryLookbackDays = bookingsLookbackDays + 30;
+      const waitryLookbackIso = new Date(
+        Date.now() - waitryLookbackDays * 24 * 60 * 60 * 1000
+      ).toISOString();
 
       const [
         { data: pendingBookings, error: pendingErr },
@@ -95,16 +104,16 @@ export function useConciliacionData() {
           .from('waitry_pedidos')
           .select('order_id,timestamp,notes,total_amount,paid')
           .eq('paid', true)
-          .gte('timestamp', ninetyDaysAgoIso)
+          .gte('timestamp', waitryLookbackIso)
           .order('timestamp', { ascending: true })
-          .limit(5000)
+          .limit(8000)
           .returns<WaitryPedidoRow[]>(),
         rdb
           .from('waitry_productos')
           .select('order_id,product_name,unit_price,quantity')
           .eq('product_name', RENTA_CANCHA_PRODUCT)
-          .gte('created_at', ninetyDaysAgoIso)
-          .limit(10000)
+          .gte('created_at', waitryLookbackIso)
+          .limit(15000)
           .returns<WaitryProductoRow[]>(),
       ]);
 

@@ -31,7 +31,21 @@ export type RankedCandidate = WaitryCandidate & {
   reasons: string[];
 };
 
-const DEFAULT_TIMESTAMP_TOLERANCE_MS = 3 * 60 * 60 * 1000;
+// Ventana temporal default: ±2 días alrededor del booking_start. Los pagos
+// en cancha no se acotan al momento del juego — el cliente puede pagar
+// días antes (al reservar) o días después (cuando vuelve al club). ±3h
+// dejaba muchas reservas sin candidatos. ±2 días cubre el caso típico
+// sin abrir la ventana hasta el infinito; para casos especiales, la UI
+// expone un control para ampliar a ±7d o más.
+const DEFAULT_TIMESTAMP_TOLERANCE_MS = 2 * 24 * 60 * 60 * 1000;
+export const TIMESTAMP_TOLERANCE_PRESETS_MS = {
+  '3h': 3 * 60 * 60 * 1000,
+  '1d': 1 * 24 * 60 * 60 * 1000,
+  '2d': 2 * 24 * 60 * 60 * 1000,
+  '7d': 7 * 24 * 60 * 60 * 1000,
+  '30d': 30 * 24 * 60 * 60 * 1000,
+} as const;
+export type TimestampTolerancePreset = keyof typeof TIMESTAMP_TOLERANCE_PRESETS_MS;
 
 // Tolerancia relativa al precio esperado del booking. ±15% absorbe
 // redondeos típicos del POS y descuentos chicos sin abrir la puerta a
