@@ -87,7 +87,7 @@ KPIs visibles en el dashboard:
   - **Dropdown/picker** de pedidos Waitry disponibles:
     - Filtrados: `product_name='Renta Cancha Padel'`, `paid=true`, no asignados a ninguna reserva.
     - Ventana temporal: ±3h del `booking_start` (configurable a futuro).
-    - Sugerencias rankeadas: notes contiene nombre del owner/participantes ↑, monto múltiplo de $200 ↑, timestamp más cercano ↑.
+    - Sugerencias rankeadas: notes contiene nombre del owner/participantes ↑, monto compatible con `booking.price_amount / participantes` (no hardcoded — soporta padel $800/4=$200, tenis singles $300/2=$150, tenis dobles $400/4=$100, descuentos por horario, etc.) ↑, timestamp más cercano ↑.
     - Cada item del dropdown muestra: hora, monto, notes, badge si match con jugador.
 - [ ] **Botón "Conciliar"** explícito cuando Σ ≥ total: cierra la asignación. Si Σ < total, queda parcial pero se puede forzar con nota explicativa (descuentos, cortesías).
 - [ ] **Filtro de la lista del dashboard principal**: las reservas con cobertura completa (`v_bookings_payment_coverage.estado = 'full'`) salen del listado de "Pagos Pendientes (sin cobro online)" del PR #406.
@@ -140,7 +140,9 @@ KPIs visibles en el dashboard:
 - **2026-05-04** — Asignación manual obligatoria, no matching ciego. Razón: alto riesgo de falsos positivos sin contexto humano (notes ambiguos, montos atípicos).
 - **2026-05-04** — Solo "Renta Cancha Padel" en scope. Razón: torneos no son canchas reservadas; F&B no aplica.
 - **2026-05-04** — Vista nueva separada (`/rdb/playtomic/conciliacion`), no inline en el dashboard. Razón: la operación de conciliar es un workflow distinto a "ver KPIs", separar concerns.
+- **2026-05-04** — La heurística de matching deriva el monto esperado del propio booking (`price_amount / participantes`), no de un valor hardcoded. Razón: tenis singles ($300/2 = $150), tenis dobles ($400/4 = $100), horarios con descuento, torneos a precios distintos. Hardcodear $200 sólo funcionaba para padel a precio estándar y rompía el resto. Tolerancia ±15% absorbe redondeos del POS.
 
 ## Bitácora
 
 - **2026-05-04** — Iniciativa promovida. Detonante: investigación de [#406](https://github.com/beto-sudo/BSOP/pull/406) (banner aclaratorio sobre pagos online vs club) + descubrimiento de que Waitry ya está integrado en BSOP (schema `rdb`, ~10K pedidos / 14K productos). Match verificado del caso del Sr. Paz Zablah (reserva 7-abr 20:30 ↔ Waitry order 16798276 con notes "jose Luis paz efectivo"). Alcance v1 cerrado tras 5 preguntas con Beto.
+- **2026-05-04** — Sprint 1 abierto en [#409](https://github.com/beto-sudo/BSOP/pull/409): migración SQL + helpers + UI read-only con ranking de candidatos por proximidad temporal + match en notes + compatibilidad de monto. Heurística de monto ajustada tras feedback de Beto para derivarse del booking en vez de hardcodear $200 (soporta tenis singles/dobles, horarios con descuento, torneos a precios distintos).
