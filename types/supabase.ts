@@ -622,6 +622,7 @@ export type Database = {
       }
       fn_has_empresa: { Args: { p_empresa_id: string }; Returns: boolean }
       fn_is_admin: { Args: never; Returns: boolean }
+      fn_persona_visible: { Args: { p_persona_id: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
@@ -8054,6 +8055,13 @@ export type Database = {
             referencedColumns: ["booking_id"]
           },
           {
+            foreignKeyName: "booking_participants_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "v_bookings_payment_coverage"
+            referencedColumns: ["booking_id"]
+          },
+          {
             foreignKeyName: "booking_participants_player_id_fkey"
             columns: ["player_id"]
             isOneToOne: false
@@ -8155,6 +8163,51 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      payment_assignments: {
+        Row: {
+          assigned_amount: number
+          assigned_at: string
+          assigned_by: string
+          booking_id: string
+          id: string
+          note: string | null
+          waitry_order_id: string
+        }
+        Insert: {
+          assigned_amount: number
+          assigned_at?: string
+          assigned_by: string
+          booking_id: string
+          id?: string
+          note?: string | null
+          waitry_order_id: string
+        }
+        Update: {
+          assigned_amount?: number
+          assigned_at?: string
+          assigned_by?: string
+          booking_id?: string
+          id?: string
+          note?: string | null
+          waitry_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_assignments_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["booking_id"]
+          },
+          {
+            foreignKeyName: "payment_assignments_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "v_bookings_payment_coverage"
+            referencedColumns: ["booking_id"]
+          },
+        ]
       }
       players: {
         Row: {
@@ -8278,6 +8331,17 @@ export type Database = {
       }
     }
     Views: {
+      v_bookings_payment_coverage: {
+        Row: {
+          assigned_total: number | null
+          assigned_waitry_orders: string[] | null
+          booking_id: string | null
+          booking_total: number | null
+          coverage_pct: number | null
+          coverage_status: string | null
+        }
+        Relationships: []
+      }
       v_ocupacion_diaria: {
         Row: {
           fecha: string | null
