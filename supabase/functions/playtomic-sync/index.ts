@@ -36,8 +36,11 @@ serve(async (req) => {
   const syncLogId = crypto.randomUUID();
   const startTime = new Date();
 
-  // We look back 48 hours and forward 14 days to catch updates and new bookings
-  const startUtc = new Date(startTime.getTime() - 48 * 60 * 60 * 1000);
+  // Lookback de 60 días: pagos en club se registran días/semanas después de la
+  // reserva (manager marca PAID en Playtomic post-juego), una ventana corta
+  // dejaba el `payment_status` congelado en PENDING aunque ya estuvieran cobradas.
+  // Lookahead de 14 días para reservas futuras nuevas o modificadas.
+  const startUtc = new Date(startTime.getTime() - 60 * 24 * 60 * 60 * 1000);
   const endUtc = new Date(startTime.getTime() + 14 * 24 * 60 * 60 * 1000);
 
   try {
