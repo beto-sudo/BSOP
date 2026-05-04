@@ -8209,6 +8209,135 @@ export type Database = {
           },
         ]
       }
+      payments_import: {
+        Row: {
+          b2b_fee_rate: number | null
+          b2b_fee_subtotal: number | null
+          b2b_fee_tax_rate: number | null
+          b2b_fee_taxes: number | null
+          b2b_fee_total: number | null
+          campaign_id: string | null
+          campaign_name: string | null
+          club_payment_id: string | null
+          corporate_name: string | null
+          currency: string | null
+          invoice_date: string | null
+          invoice_id: string | null
+          invoice_number: string | null
+          invoice_payer: string | null
+          net_amount_transferred: number | null
+          non_applicable_subtotal: number | null
+          non_applicable_taxes: number | null
+          non_applicable_total: number | null
+          origin: string | null
+          payment_date: string | null
+          payment_id: string
+          payment_method: string | null
+          payment_status: string | null
+          payment_type: string | null
+          payout_code: string | null
+          product_sku: string | null
+          refund_id: string | null
+          service_date: string | null
+          source_filename: string | null
+          sport: string | null
+          store_product_name: string | null
+          store_product_quantity: number | null
+          subtotal: number | null
+          tax_rate: number | null
+          taxes: number | null
+          total: number | null
+          uploaded_at: string
+          uploaded_by: string | null
+          user_id: string | null
+          user_name: string | null
+        }
+        Insert: {
+          b2b_fee_rate?: number | null
+          b2b_fee_subtotal?: number | null
+          b2b_fee_tax_rate?: number | null
+          b2b_fee_taxes?: number | null
+          b2b_fee_total?: number | null
+          campaign_id?: string | null
+          campaign_name?: string | null
+          club_payment_id?: string | null
+          corporate_name?: string | null
+          currency?: string | null
+          invoice_date?: string | null
+          invoice_id?: string | null
+          invoice_number?: string | null
+          invoice_payer?: string | null
+          net_amount_transferred?: number | null
+          non_applicable_subtotal?: number | null
+          non_applicable_taxes?: number | null
+          non_applicable_total?: number | null
+          origin?: string | null
+          payment_date?: string | null
+          payment_id: string
+          payment_method?: string | null
+          payment_status?: string | null
+          payment_type?: string | null
+          payout_code?: string | null
+          product_sku?: string | null
+          refund_id?: string | null
+          service_date?: string | null
+          source_filename?: string | null
+          sport?: string | null
+          store_product_name?: string | null
+          store_product_quantity?: number | null
+          subtotal?: number | null
+          tax_rate?: number | null
+          taxes?: number | null
+          total?: number | null
+          uploaded_at?: string
+          uploaded_by?: string | null
+          user_id?: string | null
+          user_name?: string | null
+        }
+        Update: {
+          b2b_fee_rate?: number | null
+          b2b_fee_subtotal?: number | null
+          b2b_fee_tax_rate?: number | null
+          b2b_fee_taxes?: number | null
+          b2b_fee_total?: number | null
+          campaign_id?: string | null
+          campaign_name?: string | null
+          club_payment_id?: string | null
+          corporate_name?: string | null
+          currency?: string | null
+          invoice_date?: string | null
+          invoice_id?: string | null
+          invoice_number?: string | null
+          invoice_payer?: string | null
+          net_amount_transferred?: number | null
+          non_applicable_subtotal?: number | null
+          non_applicable_taxes?: number | null
+          non_applicable_total?: number | null
+          origin?: string | null
+          payment_date?: string | null
+          payment_id?: string
+          payment_method?: string | null
+          payment_status?: string | null
+          payment_type?: string | null
+          payout_code?: string | null
+          product_sku?: string | null
+          refund_id?: string | null
+          service_date?: string | null
+          source_filename?: string | null
+          sport?: string | null
+          store_product_name?: string | null
+          store_product_quantity?: number | null
+          subtotal?: number | null
+          tax_rate?: number | null
+          taxes?: number | null
+          total?: number | null
+          uploaded_at?: string
+          uploaded_by?: string | null
+          user_id?: string | null
+          user_name?: string | null
+        }
+        Relationships: []
+      }
       players: {
         Row: {
           accepts_commercial: boolean | null

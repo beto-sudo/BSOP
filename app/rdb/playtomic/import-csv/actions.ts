@@ -54,12 +54,7 @@ export async function importPaymentsCsv(formData: FormData): Promise<ImportPayme
     };
   }
 
-  // `payments_import` aparece en types/supabase.ts una vez aplicada la
-  // migración 20260504210000_playtomic_payments_import.sql + `npm run db:types`.
-  // Hasta entonces, cast local para que typecheck pase. Cuando los types se
-  // regeneren, este cast deja de ser necesario y se puede quitar.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const playtomicSchema = supabase.schema('playtomic') as any;
+  const playtomicSchema = supabase.schema('playtomic');
 
   // Pre-query: identifica cuáles existen para reportar insertados vs actualizados.
   const paymentIds = rows.map((r) => r.payment_id);
@@ -74,9 +69,7 @@ export async function importPaymentsCsv(formData: FormData): Promise<ImportPayme
     if (existingErr) {
       return { ok: false, error: `Error consultando existentes: ${existingErr.message}` };
     }
-    for (const row of (existing ?? []) as { payment_id: string }[]) {
-      existingIds.add(row.payment_id);
-    }
+    for (const row of existing ?? []) existingIds.add(row.payment_id);
   }
 
   const uploadedAt = new Date().toISOString();
