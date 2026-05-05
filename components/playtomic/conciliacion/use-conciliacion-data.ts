@@ -214,42 +214,78 @@ export function useConciliacionData() {
         })
         .filter((c): c is WaitryCandidate => c !== null);
 
-      // S1: la tabla payment_assignments está vacía hasta S2 — sin asignaciones existentes.
-      // Cuando S2 implemente las server actions de write, esto consultará la tabla
-      // (vía la vista `playtomic.v_bookings_payment_coverage` ya creada en la migración).
-      const assignedOrderIds = new Set<string>();
-
-      const bookings: PendingBookingWithCoverage[] = bookingsList.map((booking) => {
-        const bookingParticipants = participantsByBooking.get(booking.booking_id) ?? [];
-        const ownerParticipant = bookingParticipants.find((p) => p.is_owner === true);
-        const ownerPlayer = ownerParticipant
-          ? playerMap.get(ownerParticipant.player_id)
-          : undefined;
-        const participantNames: string[] = [];
-        const participantEmails: string[] = [];
-        for (const p of bookingParticipants) {
-          const player = playerMap.get(p.player_id);
-          if (player?.name) participantNames.push(player.name);
-          if (player?.email) participantEmails.push(player.email);
+      // Coverage combinada (Waitry + CSV) por booking. Excluimos del listado
+      // las que ya están `full` cubiertas — el operador no las necesita
+      // conciliar manualmente. Las `partial` siguen apareciendo con su badge
+      // (parcialmente cubiertas online + falta cobrar el resto en cancha).
+      const coverageByBooking = new Map<
+        string,
+        {
+          coverage_status: CoverageStatus;
+          coverage_pct: number;
+          assigned_total: number;
+          waitry_order_ids: string[];
         }
+      >();
+      const assignedOrderIds = new Set<string>();
+      if (bookingIds.length > 0) {
+        const { data: coverageRows, error: coverageErr } = await playtomic
+          .from('v_bookings_total_coverage')
+          .select('booking_id,coverage_status,coverage_pct,combined_total,waitry_order_ids')
+          .in('booking_id', bookingIds);
+        if (coverageErr) throw coverageErr;
+        for (const row of coverageRows ?? []) {
+          if (!row.booking_id) continue;
+          coverageByBooking.set(row.booking_id, {
+            coverage_status: (row.coverage_status as CoverageStatus | null) ?? 'none',
+            coverage_pct: Number(row.coverage_pct ?? 0),
+            assigned_total: Number(row.combined_total ?? 0),
+            waitry_order_ids: row.waitry_order_ids ?? [],
+          });
+          for (const oid of row.waitry_order_ids ?? []) assignedOrderIds.add(oid);
+        }
+      }
 
-        return {
-          booking_id: booking.booking_id,
-          booking_start: booking.booking_start,
-          booking_end: booking.booking_end,
-          resource_name: booking.resource_name,
-          price_amount: Number(booking.price_amount ?? 0),
-          owner_id: booking.owner_id,
-          owner_name: ownerPlayer?.name ?? null,
-          owner_email: ownerPlayer?.email ?? null,
-          participant_names: participantNames,
-          participant_emails: participantEmails,
-          coverage_status: 'none' as CoverageStatus,
-          coverage_pct: 0,
-          assigned_total: 0,
-          assigned_waitry_orders: [] as string[],
-        };
-      });
+      const bookings: PendingBookingWithCoverage[] = bookingsList
+        // Filtra fuera las reservas con cobertura completa (Waitry+CSV).
+        // El operador solo necesita ver las que aún tienen algo que cobrar.
+        .filter(
+          (booking) =>
+            (coverageByBooking.get(booking.booking_id)?.coverage_status ?? 'none') !== 'full'
+        )
+        .map((booking) => {
+          const bookingParticipants = participantsByBooking.get(booking.booking_id) ?? [];
+          const ownerParticipant = bookingParticipants.find((p) => p.is_owner === true);
+          const ownerPlayer = ownerParticipant
+            ? playerMap.get(ownerParticipant.player_id)
+            : undefined;
+          const participantNames: string[] = [];
+          const participantEmails: string[] = [];
+          for (const p of bookingParticipants) {
+            const player = playerMap.get(p.player_id);
+            if (player?.name) participantNames.push(player.name);
+            if (player?.email) participantEmails.push(player.email);
+          }
+
+          const cov = coverageByBooking.get(booking.booking_id);
+
+          return {
+            booking_id: booking.booking_id,
+            booking_start: booking.booking_start,
+            booking_end: booking.booking_end,
+            resource_name: booking.resource_name,
+            price_amount: Number(booking.price_amount ?? 0),
+            owner_id: booking.owner_id,
+            owner_name: ownerPlayer?.name ?? null,
+            owner_email: ownerPlayer?.email ?? null,
+            participant_names: participantNames,
+            participant_emails: participantEmails,
+            coverage_status: cov?.coverage_status ?? 'none',
+            coverage_pct: cov?.coverage_pct ?? 0,
+            assigned_total: cov?.assigned_total ?? 0,
+            assigned_waitry_orders: cov?.waitry_order_ids ?? [],
+          };
+        });
 
       setData({ bookings, candidates, assignedOrderIds });
     } catch (err) {
