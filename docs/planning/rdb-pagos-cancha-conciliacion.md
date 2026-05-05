@@ -3,10 +3,10 @@
 **Slug:** `rdb-pagos-cancha-conciliacion`
 **Empresas:** RDB
 **Schemas afectados:** `playtomic` (nueva tabla `payment_assignments` + vista calculada de cobertura), lectura de `rdb.waitry_pedidos` + `rdb.waitry_productos` + `rdb.waitry_pagos`
-**Estado:** planned
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-04
-**Última actualización:** 2026-05-04 (alcance v1 cerrado tras estresar idea con Beto, 5 preguntas resueltas)
+**Última actualización:** 2026-05-04 (S2-CSV cerrado: import + cobertura combinada Waitry+CSV + filtro dashboard live; quedan S2-Waitry-write y S3)
 
 ## Problema
 
@@ -146,3 +146,22 @@ KPIs visibles en el dashboard:
 
 - **2026-05-04** — Iniciativa promovida. Detonante: investigación de [#406](https://github.com/beto-sudo/BSOP/pull/406) (banner aclaratorio sobre pagos online vs club) + descubrimiento de que Waitry ya está integrado en BSOP (schema `rdb`, ~10K pedidos / 14K productos). Match verificado del caso del Sr. Paz Zablah (reserva 7-abr 20:30 ↔ Waitry order 16798276 con notes "jose Luis paz efectivo"). Alcance v1 cerrado tras 5 preguntas con Beto.
 - **2026-05-04** — Sprint 1 abierto en [#409](https://github.com/beto-sudo/BSOP/pull/409): migración SQL + helpers + UI read-only con ranking de candidatos por proximidad temporal + match en notes + compatibilidad de monto. Heurística de monto ajustada tras feedback de Beto para derivarse del booking en vez de hardcodear $200 (soporta tenis singles/dobles, horarios con descuento, torneos a precios distintos).
+- **2026-05-04** — Iteración S1 + descubrimiento de pivote a CSV. Tras smoke test se ajustó la heurística: ventana asimétrica (pre-grace 30min, post ajustable 3h/1d/2d/7d/30d, [#410](https://github.com/beto-sudo/BSOP/pull/410)), fix del cap PostgREST de 1000 rows ([#411](https://github.com/beto-sudo/BSOP/pull/411)), y se descubrió que Playtomic Manager exporta un CSV de pagos que cubre el ~73% del problema sin tocar Waitry. Pivote estratégico: S2 reframe = CSV import primero, Waitry-write después.
+- **2026-05-04** — **S2-CSV-A mergeado** ([#412](https://github.com/beto-sudo/BSOP/pull/412)). Tabla `playtomic.payments_import`, parser puro `lib/playtomic/csv-import.ts` (15 tests verdes, formato Playtomic con `;`, comas decimales y fechas DD/MM/YYYY en CST), server action `importPaymentsCsv()` y UI `/rdb/playtomic/import-csv` con drag-drop. Primer upload del CSV de prueba: 1812 filas insertadas, 0 errores de parse. Bug post-merge: faltaban GRANTs a `authenticated` en las tablas nuevas (S1 + S2-CSV) — fixeado en [#414](https://github.com/beto-sudo/BSOP/pull/414).
+- **2026-05-04** — Cleanup de drift detectado por `drift-check.sql`: policies `service_role USING(true)` redundantes en S1 y S2-CSV (service_role bypassa RLS automáticamente). Dropeadas en [#413](https://github.com/beto-sudo/BSOP/pull/413).
+- **2026-05-04** — **S2-CSV-B mergeado** ([#415](https://github.com/beto-sudo/BSOP/pull/415)). Tres mejoras: vista combinada `playtomic.v_bookings_total_coverage` que suma Waitry+CSV por booking con match flexible (cualquier participante + ±15min), filtro del dashboard principal que excluye reservas cubiertas (validado: 551 → 441 pendientes, $30,700 limpiados), y whitelist de productos cancha ampliado de 1 a 4 patterns (padel + tenis + pickleball + "Uso cancha coach %" — 7 variantes con nombres de coaches). Cleanup tipos en [#416](https://github.com/beto-sudo/BSOP/pull/416).
+
+## Estado tras S2-CSV (snapshot 2026-05-04 noche)
+
+| Métrica                                  |                            Valor |
+| ---------------------------------------- | -------------------------------: |
+| Pendientes en BSOP                       |                    441 (era 569) |
+| Bookings auto-conciliados (Waitry o CSV) |                              189 |
+| $ identificado en CSV                    |                         ~$30,700 |
+| CSV cargado                              | 1812 filas (1 mes ~feb-mar 2026) |
+| Patterns de productos cancha reconocidos | 4 (padel/tenis/pickleball/coach) |
+
+## Pendiente para cerrar la iniciativa
+
+- **S2-Waitry-write**: server actions `assignPaymentAction` / `unassignPaymentAction` + UI funcional para asignar manualmente pedidos Waitry a las ~441 reservas que no se cubrieron via CSV (efectivo en cancha sin registrar en manager). Stash listo en branch local.
+- **S3 — Refinamiento**: parser de signature en notes Waitry para auto-conciliación con copy-paste del bloque del manager Playtomic, KPI cards en dashboard, bulk-actions, ranking inteligente de candidatos.
