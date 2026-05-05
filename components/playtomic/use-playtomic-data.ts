@@ -162,27 +162,23 @@ export function usePlaytomicData({
         // del dashboard. Usado para excluir reservas con cobertura completa
         // del listado de "Pagos Pendientes (sin cobro online)". Se hace
         // después del setData principal para no bloquear el render.
-        // `v_bookings_total_coverage` aparece en types tras aplicar
-        // la migración + regen — hasta entonces se usa cast local.
         if (bookingIds.length > 0) {
           const coverageBookingChunks = chunkArray(bookingIds, 500);
           const covered = new Set<string>();
-          const coverageSchema = schema as any;
           for (const chunk of coverageBookingChunks) {
-            const { data: coverageRows, error: coverageErr } = await coverageSchema
+            const { data: coverageRows, error: coverageErr } = await schema
               .from('v_bookings_total_coverage')
               .select('booking_id,coverage_status')
               .in('booking_id', chunk)
               .eq('coverage_status', 'full');
             if (coverageErr) {
               // No bloqueamos el dashboard si la vista falla — solo perdemos
-              // el filtro y el operador ve el listado completo (peor caso:
-              // ruido). Pasa naturalmente si la migración aún no se aplicó.
+              // el filtro y el operador ve el listado completo (peor caso: ruido).
               console.warn('coverage query failed', coverageErr);
               break;
             }
-            for (const row of (coverageRows ?? []) as { booking_id: string }[]) {
-              covered.add(row.booking_id);
+            for (const row of coverageRows ?? []) {
+              if (row.booking_id) covered.add(row.booking_id);
             }
           }
           setCoveredBookingIds(covered);
