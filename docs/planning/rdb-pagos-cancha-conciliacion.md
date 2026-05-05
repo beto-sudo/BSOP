@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-04
-**Última actualización:** 2026-05-04 (handoff — S2-CSV + iteraciones live en producción; arrancar S2-Waitry-write en sesión nueva siguiendo el plan más abajo)
+**Última actualización:** 2026-05-04 (S2-Waitry-write abierto en [#423](https://github.com/beto-sudo/BSOP/pull/423) — server actions + UI funcional; pendiente smoke en preview + merge)
 
 ## Problema
 
@@ -154,6 +154,7 @@ KPIs visibles en el dashboard:
 - **2026-05-04** — Bug detectado en `/rdb/playtomic/conciliacion`: la página seguía mostrando 457 pendientes con todas marcadas "Sin cobertura" porque el hook `use-conciliacion-data.ts` tenía hardcoded `coverage_status='none'` y nunca consumió la vista `v_bookings_total_coverage`. **Fix [#418](https://github.com/beto-sudo/BSOP/pull/418)**: el hook ahora lee la vista combinada, excluye los `full` (bajan los 106 cubiertos del listado) y propaga el coverage_status real para que el badge muestre `none/partial/full`.
 - **2026-05-04** — **Boost de coaches** ([#419](https://github.com/beto-sudo/BSOP/pull/419)). De los 457 pendientes en ventana 90d, 307 (67%) tienen un coach (Omar/Anibal/Manuel/Paco/Hugo) como owner o participante. 83 pedidos coach existen en Waitry pero solo 17 con nombre (66 son genéricos `Uso cancha coach`). Auto-match estricto solo agarra 2; en cambio el ranker ahora promueve cualquier ticket coach al top cuando la reserva tiene coach (+30 score) y bonus extra (+20) si el nombre del producto coincide con el del booking.
 - **2026-05-04** — Bug "no aparecen pedidos del 30-mar en adelante". Causa: PostgREST default de Supabase capa a ~1000 rows ignorando `.limit(8000)`. Con 5732 pedidos pagados en 120d, la query con `.order(ascending)` traía los más antiguos y dejaba fuera los recientes. **Fix paliativo [#420](https://github.com/beto-sudo/BSOP/pull/420)**: descending. **Fix de raíz [#421](https://github.com/beto-sudo/BSOP/pull/421)**: `ALTER ROLE authenticator SET pgrst.db_max_rows = '50000'` aplicado en producción — todas las queries del repo se benefician.
+- **2026-05-04** — **S2-Waitry-write abierto** ([#423](https://github.com/beto-sudo/BSOP/pull/423)). Server actions `assignPaymentAction` / `unassignPaymentAction` sobre `playtomic.payment_assignments` (validación de booking no cancelada, pedido `paid=true` con producto cancha, monto > 0, manejo de unique violation `23505`). UI funcional en `/rdb/playtomic/conciliacion`: lista de asignaciones actuales con botón Quitar, botón Conciliar wireado a iterar `selectedOrderIds` vía `useTransition`, feedback de éxito/parcial/error inline, banner "S1 read-only" retirado. Hook devuelve `assignmentsByBooking: Map<string, AssignmentDetail[]>`. CI verde, pendiente smoke en preview + merge por Beto.
 
 ## Estado tras S2-CSV (snapshot 2026-05-04 noche)
 
