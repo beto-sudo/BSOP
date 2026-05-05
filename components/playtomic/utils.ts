@@ -1,5 +1,5 @@
 import { DATE_TIME_FMT, DAY_FMT, MONTH_FMT, MXN, MXN_FULL, TZ, WEEK_FMT } from './constants';
-import type { Booking, ChartBucket, RangeKey, RevenueRow } from './types';
+import type { Booking, BookingFilters, ChartBucket, RangeKey, RevenueRow } from './types';
 
 export function nowInTz() {
   return new Date(new Date().toLocaleString('en-US', { timeZone: TZ }));
@@ -18,36 +18,50 @@ export function isoDateLocal(date: Date) {
   return `${y}-${m}-${d}`;
 }
 
-export function getRangeMeta(range: RangeKey) {
-  const to = nowInTz();
+export function getRangeMeta(
+  range: RangeKey,
+  customFromIso?: string | null,
+  customToIso?: string | null
+) {
+  const today = nowInTz();
   let from: Date;
+  let to: Date = today;
   let label: string;
 
   switch (range) {
     case '7d':
-      from = addDays(to, -6);
+      from = addDays(today, -6);
       label = 'Últimos 7 días';
       break;
     case '30d':
-      from = addDays(to, -29);
+      from = addDays(today, -29);
       label = 'Últimos 30 días';
       break;
     case 'month': {
-      from = new Date(to.getFullYear(), to.getMonth(), 1);
-      const monthName = to.toLocaleString('es-MX', { month: 'long' });
-      label = `${monthName.charAt(0).toUpperCase()}${monthName.slice(1)} ${to.getFullYear()}`;
+      from = new Date(today.getFullYear(), today.getMonth(), 1);
+      const monthName = today.toLocaleString('es-MX', { month: 'long' });
+      label = `${monthName.charAt(0).toUpperCase()}${monthName.slice(1)} ${today.getFullYear()}`;
       break;
     }
     case 'year':
-      from = new Date(to.getFullYear(), 0, 1);
-      label = `Año ${to.getFullYear()}`;
+      from = new Date(today.getFullYear(), 0, 1);
+      label = `Año ${today.getFullYear()}`;
       break;
     case 'all':
       from = new Date(2020, 0, 1);
       label = 'Todo el historial';
       break;
+    case 'custom': {
+      const safeFrom =
+        customFromIso && /^\d{4}-\d{2}-\d{2}$/.test(customFromIso) ? customFromIso : null;
+      const safeTo = customToIso && /^\d{4}-\d{2}-\d{2}$/.test(customToIso) ? customToIso : null;
+      from = safeFrom ? new Date(`${safeFrom}T12:00:00`) : addDays(today, -29);
+      to = safeTo ? new Date(`${safeTo}T12:00:00`) : today;
+      label = `${isoDateLocal(from)} → ${isoDateLocal(to)}`;
+      break;
+    }
     default:
-      from = addDays(to, -29);
+      from = addDays(today, -29);
       label = 'Últimos 30 días';
   }
 
@@ -58,6 +72,28 @@ export function getRangeMeta(range: RangeKey) {
     toIso: isoDateLocal(to),
     label,
   };
+}
+
+/**
+ * Filtra bookings en cliente según los selectores del dashboard
+ * (deporte / cancha / entrenador / actividad). El rango de fechas no se
+ * aplica aquí — la query del hook ya trae solo el rango activo. Pure
+ * function: testeable.
+ */
+export function applyBookingFilters(bookings: Booking[], filters: BookingFilters): Booking[] {
+  return bookings.filter((booking) => {
+    if (filters.sport !== 'all' && normalizeSport(booking.sport_id) !== filters.sport) return false;
+    if (filters.resource && booking.resource_name !== filters.resource) return false;
+    if (filters.coachId) {
+      const coachIds = booking.coach_ids ?? [];
+      if (!coachIds.includes(filters.coachId)) return false;
+    }
+    if (filters.activity) {
+      const activity = booking.activity_name ?? booking.course_name ?? '';
+      if (activity !== filters.activity) return false;
+    }
+    return true;
+  });
 }
 
 export function formatMoney(value: number | null | undefined, compact = false) {
