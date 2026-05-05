@@ -31,6 +31,11 @@ export function ConciliacionView() {
     [data.bookings, selectedBookingId]
   );
 
+  const existingAssignments = useMemo(
+    () => (selectedBookingId ? (data.assignmentsByBooking.get(selectedBookingId) ?? []) : []),
+    [data.assignmentsByBooking, selectedBookingId]
+  );
+
   const rankedCandidates = useMemo(() => {
     if (!selectedBooking) return [];
     const available = data.candidates.filter((c) => !data.assignedOrderIds.has(c.order_id));
@@ -78,12 +83,6 @@ export function ConciliacionView() {
           {refreshing ? 'Refrescando…' : 'Refrescar'}
         </Button>
       </header>
-
-      <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-[var(--text)]">
-        <strong>Sprint 1 — read-only:</strong> esta vista propone candidatos de Waitry para cada
-        reserva pero <em>todavía no guarda asignaciones</em>. Sirve para validar que la heurística
-        de matching es buena antes de habilitar la persistencia en S2.
-      </div>
 
       <div className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--panel)]/30 p-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
@@ -133,8 +132,10 @@ export function ConciliacionView() {
           onSelect={setSelectedBookingId}
         />
         <AssignmentPanel
+          key={selectedBookingId ?? 'none'}
           booking={selectedBooking}
           candidates={rankedCandidates}
+          existingAssignments={existingAssignments}
           tolerancePresetLabel={TOLERANCE_LABELS[tolerancePreset]}
           onWidenWindow={
             tolerancePreset !== '30d'
@@ -145,6 +146,7 @@ export function ConciliacionView() {
                 }
               : undefined
           }
+          onAfterChange={refetch}
         />
       </div>
     </div>

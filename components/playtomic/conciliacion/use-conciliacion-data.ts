@@ -49,10 +49,28 @@ type WaitryProductoRow = {
   total_price: number | null;
 };
 
+type AssignmentRow = {
+  id: string;
+  booking_id: string;
+  waitry_order_id: string;
+  assigned_amount: number;
+  assigned_at: string;
+  note: string | null;
+};
+
+export type AssignmentDetail = {
+  id: string;
+  waitry_order_id: string;
+  assigned_amount: number;
+  assigned_at: string;
+  note: string | null;
+};
+
 export type ConciliacionData = {
   bookings: PendingBookingWithCoverage[];
   candidates: WaitryCandidate[];
   assignedOrderIds: Set<string>;
+  assignmentsByBooking: Map<string, AssignmentDetail[]>;
 };
 
 // PostgREST `.or()` con patterns ilike. Cubre padel, tenis, pickleball y "Uso cancha coach...".
@@ -63,6 +81,7 @@ export function useConciliacionData() {
     bookings: [],
     candidates: [],
     assignedOrderIds: new Set(),
+    assignmentsByBooking: new Map(),
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -234,12 +253,26 @@ export function useConciliacionData() {
         }
       >();
       const assignedOrderIds = new Set<string>();
+      const assignmentsByBooking = new Map<string, AssignmentDetail[]>();
       if (bookingIds.length > 0) {
-        const { data: coverageRows, error: coverageErr } = await playtomic
-          .from('v_bookings_total_coverage')
-          .select('booking_id,coverage_status,coverage_pct,combined_total,waitry_order_ids')
-          .in('booking_id', bookingIds);
+        const [
+          { data: coverageRows, error: coverageErr },
+          { data: assignmentRows, error: assignmentsErr },
+        ] = await Promise.all([
+          playtomic
+            .from('v_bookings_total_coverage')
+            .select('booking_id,coverage_status,coverage_pct,combined_total,waitry_order_ids')
+            .in('booking_id', bookingIds),
+          playtomic
+            .from('payment_assignments')
+            .select('id,booking_id,waitry_order_id,assigned_amount,assigned_at,note')
+            .in('booking_id', bookingIds)
+            .order('assigned_at', { ascending: true })
+            .returns<AssignmentRow[]>(),
+        ]);
         if (coverageErr) throw coverageErr;
+        if (assignmentsErr) throw assignmentsErr;
+
         for (const row of coverageRows ?? []) {
           if (!row.booking_id) continue;
           coverageByBooking.set(row.booking_id, {
@@ -249,6 +282,24 @@ export function useConciliacionData() {
             waitry_order_ids: row.waitry_order_ids ?? [],
           });
           for (const oid of row.waitry_order_ids ?? []) assignedOrderIds.add(oid);
+        }
+
+        for (const row of assignmentRows ?? []) {
+          // Defensa-en-profundidad: la vista `v_bookings_total_coverage`
+          // ya incluye los waitry_order_ids asignados, pero solo para los
+          // bookings consultados. Aquí poblamos también desde la tabla
+          // directa para asegurar que cualquier order asignada (visible
+          // o no en el listado) quede excluida de los candidatos.
+          assignedOrderIds.add(row.waitry_order_id);
+          const list = assignmentsByBooking.get(row.booking_id) ?? [];
+          list.push({
+            id: row.id,
+            waitry_order_id: row.waitry_order_id,
+            assigned_amount: Number(row.assigned_amount ?? 0),
+            assigned_at: row.assigned_at,
+            note: row.note,
+          });
+          assignmentsByBooking.set(row.booking_id, list);
         }
       }
 
@@ -293,7 +344,7 @@ export function useConciliacionData() {
           };
         });
 
-      setData({ bookings, candidates, assignedOrderIds });
+      setData({ bookings, candidates, assignedOrderIds, assignmentsByBooking });
     } catch (err) {
       setError(getSupabaseErrorMessage(err, 'No se pudo cargar la conciliación.'));
     } finally {
