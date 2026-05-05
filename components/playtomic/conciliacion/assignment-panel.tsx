@@ -1,9 +1,14 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useTransition } from 'react';
+import {
+  assignPaymentAction,
+  unassignPaymentAction,
+} from '@/app/rdb/playtomic/conciliacion/actions';
 import { Button } from '@/components/ui/button';
 import { formatMoney } from '@/components/playtomic/utils';
 import type { PendingBookingWithCoverage, RankedCandidate } from '@/lib/playtomic/conciliacion';
+import type { AssignmentDetail } from './use-conciliacion-data';
 
 const TIMESTAMP_FMT = new Intl.DateTimeFormat('es-MX', {
   timeZone: 'America/Matamoros',
@@ -14,18 +19,31 @@ const TIMESTAMP_FMT = new Intl.DateTimeFormat('es-MX', {
   hour12: false,
 });
 
+type ActionFeedback =
+  | { kind: 'success'; message: string }
+  | { kind: 'partial'; message: string }
+  | { kind: 'error'; message: string };
+
 export function AssignmentPanel({
   booking,
   candidates,
+  existingAssignments,
   tolerancePresetLabel,
   onWidenWindow,
+  onAfterChange,
 }: {
   booking: PendingBookingWithCoverage | null;
   candidates: RankedCandidate[];
+  existingAssignments: AssignmentDetail[];
   tolerancePresetLabel: string;
   onWidenWindow?: () => void;
+  onAfterChange: () => void;
 }) {
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+  const [isPending, startTransition] = useTransition();
+  const [feedback, setFeedback] = useState<ActionFeedback | null>(null);
+  // El padre pasa `key={selectedBookingId}` al panel para que React
+  // remonte y reinicie selectedOrderIds/feedback al cambiar de reserva.
 
   const totalSelected = useMemo(
     () =>
@@ -54,6 +72,63 @@ export function AssignmentPanel({
       if (next.has(orderId)) next.delete(orderId);
       else next.add(orderId);
       return next;
+    });
+  }
+
+  function handleConciliar() {
+    if (!booking || selectedOrderIds.size === 0) return;
+    const toAssign = candidates.filter((c) => selectedOrderIds.has(c.order_id));
+    setFeedback(null);
+    startTransition(async () => {
+      let successes = 0;
+      const errors: string[] = [];
+      for (const c of toAssign) {
+        const res = await assignPaymentAction({
+          booking_id: booking.booking_id,
+          waitry_order_id: c.order_id,
+          assigned_amount: c.total_amount,
+        });
+        if (res.ok) {
+          successes += 1;
+        } else {
+          errors.push(`#${c.order_id}: ${res.error}`);
+        }
+      }
+
+      if (errors.length === 0) {
+        setFeedback({
+          kind: 'success',
+          message: `${successes} ${successes === 1 ? 'pedido asignado' : 'pedidos asignados'}.`,
+        });
+      } else if (successes > 0) {
+        setFeedback({
+          kind: 'partial',
+          message: `${successes} asignados, ${errors.length} fallaron: ${errors.join(' · ')}`,
+        });
+      } else {
+        setFeedback({
+          kind: 'error',
+          message: errors.join(' · '),
+        });
+      }
+
+      if (successes > 0) {
+        setSelectedOrderIds(new Set());
+        onAfterChange();
+      }
+    });
+  }
+
+  function handleQuitar(assignmentId: string) {
+    setFeedback(null);
+    startTransition(async () => {
+      const res = await unassignPaymentAction(assignmentId);
+      if (res.ok) {
+        setFeedback({ kind: 'success', message: 'Asignación quitada.' });
+        onAfterChange();
+      } else {
+        setFeedback({ kind: 'error', message: res.error });
+      }
     });
   }
 
@@ -113,6 +188,67 @@ export function AssignmentPanel({
           />
         </div>
       </div>
+
+      {feedback ? (
+        <div
+          role="status"
+          className={`rounded-xl border p-3 text-sm ${
+            feedback.kind === 'success'
+              ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+              : feedback.kind === 'partial'
+                ? 'border-amber-500/40 bg-amber-500/10 text-amber-200'
+                : 'border-red-500/40 bg-red-500/10 text-red-200'
+          }`}
+        >
+          {feedback.message}
+        </div>
+      ) : null}
+
+      {existingAssignments.length > 0 ? (
+        <div className="space-y-2">
+          <h4 className="text-sm font-semibold text-[var(--text)]">
+            Asignaciones actuales ({existingAssignments.length})
+          </h4>
+          <ul className="space-y-2">
+            {existingAssignments.map((a) => {
+              const ts = new Date(a.assigned_at);
+              const tsLabel = Number.isNaN(ts.getTime()) ? '—' : TIMESTAMP_FMT.format(ts);
+              return (
+                <li
+                  key={a.id}
+                  className="flex items-start justify-between gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm"
+                >
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2 font-medium text-[var(--text)]">
+                      <span>{formatMoney(a.assigned_amount)}</span>
+                      <span
+                        className="rounded-full border border-[var(--border)] bg-[var(--panel)]/60 px-2 py-0.5 font-mono text-xs text-[var(--text-muted)]"
+                        title={a.waitry_order_id}
+                      >
+                        #{a.waitry_order_id}
+                      </span>
+                      <span className="text-xs text-[var(--text-muted)]">{tsLabel}</span>
+                    </div>
+                    {a.note ? (
+                      <div className="text-xs text-[var(--text)]/80">
+                        <span className="text-[var(--text-muted)]">nota:</span> {a.note}
+                      </div>
+                    ) : null}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleQuitar(a.id)}
+                    disabled={isPending}
+                  >
+                    Quitar
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -208,6 +344,7 @@ export function AssignmentPanel({
                     variant={isSelected ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => toggle(candidate.order_id)}
+                    disabled={isPending}
                   >
                     {isSelected ? 'Quitar' : 'Agregar'}
                   </Button>
@@ -222,8 +359,17 @@ export function AssignmentPanel({
         <span className="text-[var(--text-muted)]">
           Selección actual: {selectedOrderIds.size} pedidos · {formatMoney(totalSelected)}
         </span>
-        <Button variant="default" size="sm" disabled title="Disponible en S2">
-          Conciliar (S2)
+        <Button
+          variant="default"
+          size="sm"
+          disabled={selectedOrderIds.size === 0 || isPending}
+          onClick={handleConciliar}
+        >
+          {isPending
+            ? 'Guardando…'
+            : selectedOrderIds.size > 0
+              ? `Conciliar (${selectedOrderIds.size})`
+              : 'Conciliar'}
         </Button>
       </footer>
     </div>
