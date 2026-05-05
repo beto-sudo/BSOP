@@ -43,6 +43,7 @@ export function usePlaytomicData({
     resources: [],
     syncs: [],
   });
+  const [coveredBookingIds, setCoveredBookingIds] = useState<Set<string>>(new Set());
 
   const fetchData = useCallback(
     async (isRefresh = false) => {
@@ -156,6 +157,38 @@ export function usePlaytomicData({
           resources: (resourcesRes.data ?? []) as ResourceRow[],
           syncs: (syncsRes.data ?? []) as SyncRow[],
         });
+
+        // Fetch cobertura combinada (Waitry + CSV) para todos los bookings
+        // del dashboard. Usado para excluir reservas con cobertura completa
+        // del listado de "Pagos Pendientes (sin cobro online)". Se hace
+        // después del setData principal para no bloquear el render.
+        // `v_bookings_total_coverage` aparece en types tras aplicar
+        // la migración + regen — hasta entonces se usa cast local.
+        if (bookingIds.length > 0) {
+          const coverageBookingChunks = chunkArray(bookingIds, 500);
+          const covered = new Set<string>();
+          const coverageSchema = schema as any;
+          for (const chunk of coverageBookingChunks) {
+            const { data: coverageRows, error: coverageErr } = await coverageSchema
+              .from('v_bookings_total_coverage')
+              .select('booking_id,coverage_status')
+              .in('booking_id', chunk)
+              .eq('coverage_status', 'full');
+            if (coverageErr) {
+              // No bloqueamos el dashboard si la vista falla — solo perdemos
+              // el filtro y el operador ve el listado completo (peor caso:
+              // ruido). Pasa naturalmente si la migración aún no se aplicó.
+              console.warn('coverage query failed', coverageErr);
+              break;
+            }
+            for (const row of (coverageRows ?? []) as { booking_id: string }[]) {
+              covered.add(row.booking_id);
+            }
+          }
+          setCoveredBookingIds(covered);
+        } else {
+          setCoveredBookingIds(new Set());
+        }
       } catch (err: any) {
         setError(err?.message ?? 'No se pudo cargar el dashboard de Playtomic');
       } finally {
@@ -170,5 +203,5 @@ export function usePlaytomicData({
     void fetchData();
   }, [fetchData]);
 
-  return { data, loading, refreshing, error, fetchData };
+  return { data, loading, refreshing, error, fetchData, coveredBookingIds };
 }

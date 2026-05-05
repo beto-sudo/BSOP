@@ -33,7 +33,7 @@ export function PlaytomicView() {
 
   const meta = useMemo(() => getRangeMeta(range), [range]);
 
-  const { data, loading, refreshing, error, fetchData } = usePlaytomicData({
+  const { data, loading, refreshing, error, fetchData, coveredBookingIds } = usePlaytomicData({
     range,
     fromIso: meta.fromIso,
     toIso: meta.toIso,
@@ -89,8 +89,11 @@ export function PlaytomicView() {
   const reconciliation = useMemo(() => computeReconciliation(data.bookings), [data.bookings]);
 
   const pendingPayments = useMemo(
-    () => computePendingPayments(data.bookings, data.participants, data.players),
-    [data.bookings, data.participants, data.players]
+    () =>
+      computePendingPayments(data.bookings, data.participants, data.players, {
+        coveredBookingIds,
+      }),
+    [data.bookings, data.participants, data.players, coveredBookingIds]
   );
 
   const exportReconciliationCsv = useCallback(() => {
