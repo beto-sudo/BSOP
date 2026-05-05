@@ -38,8 +38,13 @@ export type BookingFilters = {
   sport: SportFilter;
   /** `resource_name` exacto. `''` = todas. */
   resource: string;
-  /** Coach id de Playtomic. `''` = todos. */
-  coachId: string;
+  /**
+   * Slug del coach (omar/anibal/manuel/paco/hugo). `''` = todos.
+   * El matching lo resuelve `applyBookingFilters` contra un
+   * `bookingCoachMap` precomputado a partir de los nombres del owner
+   * y participantes — no hay registro formal de coaches en Playtomic.
+   */
+  coachSlug: string;
   /** `activity_name` o `course_name` (lo que esté presente). `''` = todas. */
   activity: string;
 };

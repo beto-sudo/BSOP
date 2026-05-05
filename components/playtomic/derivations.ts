@@ -1,3 +1,4 @@
+import { KNOWN_COACH_NAMES, type CoachSlug } from '@/lib/playtomic/conciliacion';
 import { HOUR_FMT, WEEKDAY_INDEX_MAP, WEEKDAY_KEY_FMT, WEEKDAY_LABELS } from './constants';
 import type {
   Booking,
@@ -10,6 +11,78 @@ import type {
   SyncRow,
 } from './types';
 import { isCanceledBooking, normalizeSport } from './utils';
+
+/**
+ * Capitaliza el slug del coach para mostrarlo en la UI. 'anibal' → 'Aníbal'.
+ */
+const COACH_DISPLAY_NAMES: Record<CoachSlug, string> = {
+  omar: 'Omar',
+  anibal: 'Aníbal',
+  manuel: 'Manuel',
+  paco: 'Paco',
+  hugo: 'Hugo',
+};
+
+function normalizeForCoachMatch(text: string | null | undefined): string {
+  return (text ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+}
+
+/**
+ * Detecta qué coaches conocidos están involucrados en cada booking, ya
+ * sea como owner o como participante. La identidad "coach" se infiere
+ * por matching del nombre normalizado contra `KNOWN_COACH_NAMES` (no hay
+ * registro formal en Playtomic — los coaches reservan como cualquier
+ * cliente con un descuento operativo).
+ *
+ * Devuelve: `Map<booking_id, Set<CoachSlug>>`. Bookings sin coach no
+ * aparecen en el mapa (lookup retorna `undefined`).
+ */
+export function buildBookingCoachMap(
+  bookings: Booking[],
+  participants: BookingParticipant[],
+  players: PlayerRow[]
+): Map<string, Set<CoachSlug>> {
+  // Pre-resuelve por player UNA VEZ para no rehacerlo por booking.
+  const coachSlugsByPlayer = new Map<string, Set<CoachSlug>>();
+  for (const player of players) {
+    if (!player.name) continue;
+    const norm = normalizeForCoachMatch(player.name);
+    const slugs = new Set<CoachSlug>();
+    for (const slug of KNOWN_COACH_NAMES) {
+      if (norm.includes(slug)) slugs.add(slug);
+    }
+    if (slugs.size > 0) coachSlugsByPlayer.set(player.playtomic_id, slugs);
+  }
+
+  // Agrupa participants por booking para evitar O(N×M).
+  const participantsByBooking = new Map<string, BookingParticipant[]>();
+  for (const p of participants) {
+    const list = participantsByBooking.get(p.booking_id) ?? [];
+    list.push(p);
+    participantsByBooking.set(p.booking_id, list);
+  }
+
+  const result = new Map<string, Set<CoachSlug>>();
+  for (const booking of bookings) {
+    const slugs = new Set<CoachSlug>();
+
+    if (booking.owner_id) {
+      const ownerSlugs = coachSlugsByPlayer.get(booking.owner_id);
+      if (ownerSlugs) for (const s of ownerSlugs) slugs.add(s);
+    }
+
+    const bookingParticipants = participantsByBooking.get(booking.booking_id) ?? [];
+    for (const part of bookingParticipants) {
+      if (!part.player_id) continue;
+      const partSlugs = coachSlugsByPlayer.get(part.player_id);
+      if (partSlugs) for (const s of partSlugs) slugs.add(s);
+    }
+
+    if (slugs.size > 0) result.set(booking.booking_id, slugs);
+  }
+
+  return result;
+}
 
 export type PlaytomicKpis = {
   totalBookings: number;
@@ -221,41 +294,45 @@ export function computeComputedPlayers(
 }
 
 /**
- * Calcula ranking de entrenadores a partir de `bookings.coach_ids[]`.
+ * Calcula ranking de entrenadores a partir del matching de nombres del
+ * owner/participantes contra `KNOWN_COACH_NAMES`.
  *
- * El API de Playtomic poblá `coach_ids` cuando una reserva involucra
- * a uno o más entrenadores. Aquí los expandimos (un booking con N
- * coaches contribuye N filas) y agregamos por coach_id:
+ * Modelo: en el club NO existen coaches registrados como entidad en
+ * Playtomic. Los coaches reservan como cualquier cliente con un descuento
+ * acordado. Identificamos sus reservas porque su nombre normalizado
+ * matchea uno de los slugs conocidos (omar/anibal/manuel/paco/hugo).
  *
- * - reservas: count de bookings no canceladas que mencionan el coach.
- * - revenue: sum(price_amount / coach_ids.length) — si una reserva
- *   tiene 2 coaches, cada uno se lleva la mitad. Default 1 si solo
- *   hay 1 coach (que es el caso típico).
- * - jugadores_unicos: count distinct de owner_ids que reservaron con
- *   ese coach.
- * - ultima_reserva: timestamp del booking_start más reciente.
+ * Por cada coach detectado, agregamos los bookings que lo involucran:
+ * - reservas: count de bookings no canceladas con ese coach (owner o participante).
+ * - revenue: sum(price_amount / coachesEnElBooking) — split cuando hay
+ *   varios coaches en la misma reserva (ej. clase con 2 instructores).
+ * - jugadores_unicos: count distinct de owner_ids del booking, que en este
+ *   modelo refleja "cuántas distintas dueñas de reserva han involucrado al coach".
+ * - ultima_reserva: ISO timestamp del booking_start más reciente.
  *
- * Resolución de nombre: el `coach_id` de Playtomic suele coincidir con
- * un `players.playtomic_id`. Cuando matchea, mostramos el nombre real.
- * Cuando no, fallback al id truncado (`coach_<8 chars>`).
+ * Solo retorna coaches con al menos 1 reserva en el periodo (los demás
+ * de KNOWN_COACH_NAMES no aparecen en la lista).
  */
-export function computeCoaches(bookings: Booking[], players: PlayerRow[]): CoachRow[] {
+export function computeCoaches(
+  bookings: Booking[],
+  bookingCoachMap: Map<string, Set<CoachSlug>>
+): CoachRow[] {
   type Bucket = {
     reservas: number;
     revenue: number;
     owners: Set<string>;
     last: string | null;
   };
-  const stats = new Map<string, Bucket>();
+  const stats = new Map<CoachSlug, Bucket>();
 
   for (const booking of bookings) {
     if (isCanceledBooking(booking)) continue;
-    const coaches = booking.coach_ids ?? [];
-    if (coaches.length === 0) continue;
-    const split = (booking.price_amount ?? 0) / coaches.length;
-    for (const coachId of coaches) {
-      if (!coachId) continue;
-      const bucket: Bucket = stats.get(coachId) ?? {
+    const coaches = bookingCoachMap.get(booking.booking_id);
+    if (!coaches || coaches.size === 0) continue;
+    const split = (booking.price_amount ?? 0) / coaches.size;
+
+    for (const slug of coaches) {
+      const bucket: Bucket = stats.get(slug) ?? {
         reservas: 0,
         revenue: 0,
         owners: new Set<string>(),
@@ -267,22 +344,16 @@ export function computeCoaches(bookings: Booking[], players: PlayerRow[]): Coach
       if (booking.booking_start && (!bucket.last || booking.booking_start > bucket.last)) {
         bucket.last = booking.booking_start;
       }
-      stats.set(coachId, bucket);
+      stats.set(slug, bucket);
     }
   }
 
-  const playerMap = new Map(players.map((p) => [p.playtomic_id, p]));
-
-  return Array.from(stats.entries()).map(([coachId, bucket]) => {
-    const player = playerMap.get(coachId);
-    const display = player?.name?.trim() || `coach_${coachId.slice(0, 8)}`;
-    return {
-      coach_id: coachId,
-      display_name: display,
-      reservas: bucket.reservas,
-      revenue: bucket.revenue,
-      jugadores_unicos: bucket.owners.size,
-      ultima_reserva: bucket.last,
-    };
-  });
+  return Array.from(stats.entries()).map(([slug, bucket]) => ({
+    coach_id: slug,
+    display_name: COACH_DISPLAY_NAMES[slug],
+    reservas: bucket.reservas,
+    revenue: bucket.revenue,
+    jugadores_unicos: bucket.owners.size,
+    ultima_reserva: bucket.last,
+  }));
 }

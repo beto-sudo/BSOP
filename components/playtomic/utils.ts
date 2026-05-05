@@ -77,16 +77,26 @@ export function getRangeMeta(
 /**
  * Filtra bookings en cliente según los selectores del dashboard
  * (deporte / cancha / entrenador / actividad). El rango de fechas no se
- * aplica aquí — la query del hook ya trae solo el rango activo. Pure
- * function: testeable.
+ * aplica aquí — la query del hook ya trae solo el rango activo.
+ *
+ * Para el filtro de coach pasa `bookingCoachMap` (Map<booking_id, Set<slug>>)
+ * que el view precomputa con `buildBookingCoachMap`. Si no se pasa, el
+ * filtro de coach se ignora (degraded mode) en lugar de retornar 0
+ * resultados.
+ *
+ * Pure function: testeable.
  */
-export function applyBookingFilters(bookings: Booking[], filters: BookingFilters): Booking[] {
+export function applyBookingFilters(
+  bookings: Booking[],
+  filters: BookingFilters,
+  bookingCoachMap?: Map<string, Set<string>>
+): Booking[] {
   return bookings.filter((booking) => {
     if (filters.sport !== 'all' && normalizeSport(booking.sport_id) !== filters.sport) return false;
     if (filters.resource && booking.resource_name !== filters.resource) return false;
-    if (filters.coachId) {
-      const coachIds = booking.coach_ids ?? [];
-      if (!coachIds.includes(filters.coachId)) return false;
+    if (filters.coachSlug && bookingCoachMap) {
+      const slugs = bookingCoachMap.get(booking.booking_id);
+      if (!slugs || !slugs.has(filters.coachSlug)) return false;
     }
     if (filters.activity) {
       const activity = booking.activity_name ?? booking.course_name ?? '';

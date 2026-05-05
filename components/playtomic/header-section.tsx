@@ -129,8 +129,8 @@ export function HeaderSection({
           allowClear
         />
         <Combobox
-          value={filters.coachId}
-          onChange={(value) => onFiltersChange({ ...filters, coachId: value ?? '' })}
+          value={filters.coachSlug}
+          onChange={(value) => onFiltersChange({ ...filters, coachSlug: value ?? '' })}
           options={[{ value: '', label: 'Todos los entrenadores' }, ...coachOptions]}
           allowClear
         />
