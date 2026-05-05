@@ -33,7 +33,8 @@ export function CoachesSection({
         <div>
           <h2 className="text-lg font-semibold text-[var(--text)]">Entrenadores</h2>
           <p className="text-sm text-[var(--text-muted)]">
-            Ranking de coaches por reservas e ingresos en el periodo. Una reserva con N coaches
+            Identificamos a los coaches (Omar, Aníbal, Manuel, Paco, Hugo) por matching de nombre en
+            owner o participantes — no hay registro formal en Playtomic. Una reserva con N coaches
             divide el revenue entre ellos.
           </p>
         </div>
@@ -72,11 +73,6 @@ export function CoachesSection({
                 <TableRow key={coach.coach_id}>
                   <TableCell>
                     <div className="font-medium text-[var(--text)]">{coach.display_name}</div>
-                    {coach.display_name.startsWith('coach_') ? (
-                      <div className="text-xs text-[var(--text-muted)]" title={coach.coach_id}>
-                        {coach.coach_id.slice(0, 16)}…
-                      </div>
-                    ) : null}
                   </TableCell>
                   <TableCell>{coach.reservas}</TableCell>
                   <TableCell className="text-right font-medium">

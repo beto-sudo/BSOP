@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { computeCoaches } from './derivations';
-import type { Booking, PlayerRow } from './types';
+import { buildBookingCoachMap, computeCoaches } from './derivations';
+import type { Booking, BookingParticipant, PlayerRow } from './types';
 
 const baseBooking: Booking = {
   booking_id: 'b1',
@@ -25,106 +25,135 @@ const baseBooking: Booking = {
   activity_name: null,
 };
 
+const omar: PlayerRow = {
+  playtomic_id: 'player-omar',
+  name: 'Omar Treviño',
+  email: 'omar@club.com',
+  player_type: null,
+  favorite_sport: null,
+};
+const cliente: PlayerRow = {
+  playtomic_id: 'player-1',
+  name: 'Juan Pérez',
+  email: 'juan@example.com',
+  player_type: null,
+  favorite_sport: null,
+};
+const aniba: PlayerRow = {
+  playtomic_id: 'player-anibal',
+  name: 'Aníbal González',
+  email: 'anibal@club.com',
+  player_type: null,
+  favorite_sport: null,
+};
+
+describe('buildBookingCoachMap', () => {
+  it('detecta coach cuando es owner del booking', () => {
+    const bookings: Booking[] = [{ ...baseBooking, booking_id: 'b1', owner_id: 'player-omar' }];
+    const map = buildBookingCoachMap(bookings, [], [omar]);
+    expect(map.get('b1')).toEqual(new Set(['omar']));
+  });
+
+  it('detecta coach cuando es participante (no owner)', () => {
+    const bookings: Booking[] = [{ ...baseBooking, booking_id: 'b1', owner_id: 'player-1' }];
+    const participants: BookingParticipant[] = [
+      { booking_id: 'b1', player_id: 'player-1', is_owner: true, family_member_id: null },
+      { booking_id: 'b1', player_id: 'player-omar', is_owner: false, family_member_id: null },
+    ];
+    const map = buildBookingCoachMap(bookings, participants, [cliente, omar]);
+    expect(map.get('b1')).toEqual(new Set(['omar']));
+  });
+
+  it('matchea nombres con tildes (Aníbal → anibal)', () => {
+    const bookings: Booking[] = [{ ...baseBooking, owner_id: 'player-anibal' }];
+    const map = buildBookingCoachMap(bookings, [], [aniba]);
+    expect(map.get('b1')).toEqual(new Set(['anibal']));
+  });
+
+  it('un booking puede tener múltiples coaches (clase con 2)', () => {
+    const bookings: Booking[] = [{ ...baseBooking, owner_id: 'player-omar' }];
+    const participants: BookingParticipant[] = [
+      { booking_id: 'b1', player_id: 'player-omar', is_owner: true, family_member_id: null },
+      { booking_id: 'b1', player_id: 'player-anibal', is_owner: false, family_member_id: null },
+    ];
+    const map = buildBookingCoachMap(bookings, participants, [omar, aniba]);
+    expect(map.get('b1')).toEqual(new Set(['omar', 'anibal']));
+  });
+
+  it('booking sin coach no entra al mapa', () => {
+    const bookings: Booking[] = [{ ...baseBooking, owner_id: 'player-1' }];
+    const map = buildBookingCoachMap(bookings, [], [cliente]);
+    expect(map.has('b1')).toBe(false);
+  });
+});
+
 describe('computeCoaches', () => {
-  it('ignora bookings sin coach_ids', () => {
-    const rows = computeCoaches([{ ...baseBooking, coach_ids: null }], []);
+  it('ranking vacío si el mapa no tiene entradas', () => {
+    const rows = computeCoaches([baseBooking], new Map());
     expect(rows).toHaveLength(0);
   });
 
-  it('ignora bookings cancelados', () => {
-    const rows = computeCoaches(
-      [{ ...baseBooking, coach_ids: ['omar-id'], is_canceled: true }],
-      []
-    );
+  it('ignora bookings cancelados aunque haya coach', () => {
+    const map = new Map([['b1', new Set<'omar'>(['omar'])]]);
+    const rows = computeCoaches([{ ...baseBooking, is_canceled: true }], map);
     expect(rows).toHaveLength(0);
   });
 
-  it('asigna revenue completo si solo hay 1 coach', () => {
-    const rows = computeCoaches(
-      [{ ...baseBooking, coach_ids: ['omar-id'], price_amount: 800 }],
-      []
-    );
+  it('asigna revenue completo si solo hay 1 coach en el booking', () => {
+    const map = new Map([['b1', new Set<'omar'>(['omar'])]]);
+    const rows = computeCoaches([{ ...baseBooking, price_amount: 800 }], map);
     expect(rows).toHaveLength(1);
-    expect(rows[0].coach_id).toBe('omar-id');
+    expect(rows[0].coach_id).toBe('omar');
+    expect(rows[0].display_name).toBe('Omar');
     expect(rows[0].revenue).toBe(800);
     expect(rows[0].reservas).toBe(1);
   });
 
-  it('reparte revenue entre N coaches del mismo booking', () => {
-    const rows = computeCoaches(
-      [{ ...baseBooking, coach_ids: ['omar-id', 'paco-id'], price_amount: 400 }],
-      []
-    );
-    const omar = rows.find((r) => r.coach_id === 'omar-id');
-    const paco = rows.find((r) => r.coach_id === 'paco-id');
-    expect(omar?.revenue).toBe(200);
-    expect(paco?.revenue).toBe(200);
+  it('reparte revenue cuando un booking involucra a 2 coaches', () => {
+    const map = new Map([['b1', new Set<'omar' | 'anibal'>(['omar', 'anibal'])]]);
+    const rows = computeCoaches([{ ...baseBooking, price_amount: 400 }], map);
+    const omarRow = rows.find((r) => r.coach_id === 'omar');
+    const anibalRow = rows.find((r) => r.coach_id === 'anibal');
+    expect(omarRow?.revenue).toBe(200);
+    expect(anibalRow?.revenue).toBe(200);
   });
 
   it('cuenta jugadores únicos por owner_id distinto', () => {
+    const map = new Map([
+      ['b1', new Set<'omar'>(['omar'])],
+      ['b2', new Set<'omar'>(['omar'])],
+      ['b3', new Set<'omar'>(['omar'])],
+    ]);
     const rows = computeCoaches(
       [
-        { ...baseBooking, booking_id: 'b1', coach_ids: ['omar-id'], owner_id: 'player-1' },
-        { ...baseBooking, booking_id: 'b2', coach_ids: ['omar-id'], owner_id: 'player-2' },
-        { ...baseBooking, booking_id: 'b3', coach_ids: ['omar-id'], owner_id: 'player-1' },
+        { ...baseBooking, booking_id: 'b1', owner_id: 'player-1' },
+        { ...baseBooking, booking_id: 'b2', owner_id: 'player-2' },
+        { ...baseBooking, booking_id: 'b3', owner_id: 'player-1' },
       ],
-      []
+      map
     );
-    const omar = rows.find((r) => r.coach_id === 'omar-id');
-    expect(omar?.reservas).toBe(3);
-    expect(omar?.jugadores_unicos).toBe(2);
+    expect(rows[0].reservas).toBe(3);
+    expect(rows[0].jugadores_unicos).toBe(2);
   });
 
-  it('toma la última reserva (booking_start más reciente)', () => {
+  it('toma la última reserva más reciente', () => {
+    const map = new Map([
+      ['b1', new Set<'omar'>(['omar'])],
+      ['b2', new Set<'omar'>(['omar'])],
+    ]);
     const rows = computeCoaches(
       [
-        {
-          ...baseBooking,
-          booking_id: 'b1',
-          coach_ids: ['omar-id'],
-          booking_start: '2026-04-10T18:00:00Z',
-        },
-        {
-          ...baseBooking,
-          booking_id: 'b2',
-          coach_ids: ['omar-id'],
-          booking_start: '2026-04-20T18:00:00Z',
-        },
-        {
-          ...baseBooking,
-          booking_id: 'b3',
-          coach_ids: ['omar-id'],
-          booking_start: '2026-04-15T18:00:00Z',
-        },
+        { ...baseBooking, booking_id: 'b1', booking_start: '2026-04-10T18:00:00Z' },
+        { ...baseBooking, booking_id: 'b2', booking_start: '2026-04-20T18:00:00Z' },
       ],
-      []
+      map
     );
-    const omar = rows.find((r) => r.coach_id === 'omar-id');
-    expect(omar?.ultima_reserva).toBe('2026-04-20T18:00:00Z');
+    expect(rows[0].ultima_reserva).toBe('2026-04-20T18:00:00Z');
   });
 
-  it('resuelve display_name desde players cuando matchea coach_id', () => {
-    const players: PlayerRow[] = [
-      {
-        playtomic_id: 'omar-id',
-        name: 'Omar Coach',
-        email: 'omar@club.com',
-        player_type: null,
-        favorite_sport: null,
-      },
-    ];
-    const rows = computeCoaches([{ ...baseBooking, coach_ids: ['omar-id'] }], players);
-    expect(rows[0].display_name).toBe('Omar Coach');
-  });
-
-  it('fallback a coach_<8chars> cuando no hay match en players', () => {
-    const rows = computeCoaches([{ ...baseBooking, coach_ids: ['abc12345xyz999'] }], []);
-    expect(rows[0].display_name).toBe('coach_abc12345');
-  });
-
-  it('ignora coach_ids vacíos en el array', () => {
-    const rows = computeCoaches([{ ...baseBooking, coach_ids: ['omar-id', ''] }], []);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].coach_id).toBe('omar-id');
+  it('display_name capitaliza el slug correctamente', () => {
+    const map = new Map([['b1', new Set<'anibal'>(['anibal'])]]);
+    const rows = computeCoaches([baseBooking], map);
+    expect(rows[0].display_name).toBe('Aníbal');
   });
 });
