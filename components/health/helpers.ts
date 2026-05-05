@@ -45,27 +45,44 @@ export function groupDailySum(rows: HealthMetricRow[]): Point[] {
 
 /**
  * Sleep comes in as one row per stage/segment, from two devices (Sleeptracker®
- * bed and Apple Watch). A plain average is nonsense — it ends up averaging
- * 15-min stage slivers. Correct daily total is SUM per source per day, then
- * GREATEST across sources (never double-count the two devices).
+ * bed and Apple Watch). HAE with Time Grouping = Minute fragments a single
+ * night into multiple samples whose `value` is each session's accumulated
+ * total — so naively summing them multiplies the night by N.
  *
- * `stageMetrics` controls which metric_name rows are summed — pass the sleep
- * stages that count as "asleep" (Core + Deep + REM) or all stages including
- * Awake if you want total in-bed coverage.
+ * Daily total = MAX per (source, stage) per day (collapses fragmentation),
+ * then SUM stages within a source, then MAX across sources (never double-
+ * count the two devices). Awake and In Bed are excluded: Awake is the gap
+ * between asleep stages, and In Bed is the wrap of the whole session, both
+ * would inflate the total.
  */
 export function groupDailySleep(rows: HealthMetricRow[]): Point[] {
-  const buckets = new Map<string, { sleeptracker: number; other: number }>();
+  type Stage = 'Core' | 'Deep' | 'REM';
+  type SourceBucket = Record<Stage, number>;
+  const emptySource = (): SourceBucket => ({ Core: 0, Deep: 0, REM: 0 });
+  const buckets = new Map<string, { sleeptracker: SourceBucket; other: SourceBucket }>();
   rows.forEach((row) => {
-    if (row.metric_name === 'Sleep Awake') return;
+    const stage: Stage | null =
+      row.metric_name === 'Sleep Core'
+        ? 'Core'
+        : row.metric_name === 'Sleep Deep'
+          ? 'Deep'
+          : row.metric_name === 'Sleep REM'
+            ? 'REM'
+            : null;
+    if (!stage) return;
     const key = row.date.slice(0, 10);
-    const existing = buckets.get(key) ?? { sleeptracker: 0, other: 0 };
+    const existing = buckets.get(key) ?? { sleeptracker: emptySource(), other: emptySource() };
     const isSleeptracker = (row.source ?? '').toLowerCase().includes('sleeptracker');
-    if (isSleeptracker) existing.sleeptracker += row.value;
-    else existing.other += row.value;
+    const target = isSleeptracker ? existing.sleeptracker : existing.other;
+    target[stage] = Math.max(target[stage], row.value);
     buckets.set(key, existing);
   });
   return Array.from(buckets.entries())
-    .map(([date, b]) => ({ date, value: Math.max(b.sleeptracker, b.other) }))
+    .map(([date, b]) => {
+      const st = b.sleeptracker.Core + b.sleeptracker.Deep + b.sleeptracker.REM;
+      const other = b.other.Core + b.other.Deep + b.other.REM;
+      return { date, value: Math.max(st, other) };
+    })
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
@@ -193,33 +210,54 @@ export function isStaleSince(latestIso: string | null | undefined, maxDaysStale:
  * In Bed sample) are skipped to avoid 0% / >100% noise.
  */
 export function groupDailySleepEfficiency(rows: HealthMetricRow[]): Point[] {
+  type Stage = 'Core' | 'Deep' | 'REM';
+  type AsleepBucket = Record<Stage, number>;
   type Bucket = {
-    asleepSt: number;
-    asleepOther: number;
+    asleepSt: AsleepBucket;
+    asleepOther: AsleepBucket;
     inBedSt: number;
     inBedOther: number;
   };
+  const emptyAsleep = (): AsleepBucket => ({ Core: 0, Deep: 0, REM: 0 });
   const buckets = new Map<string, Bucket>();
   rows.forEach((row) => {
     const key = row.date.slice(0, 10);
-    const existing = buckets.get(key) ?? { asleepSt: 0, asleepOther: 0, inBedSt: 0, inBedOther: 0 };
+    const existing =
+      buckets.get(key) ??
+      ({
+        asleepSt: emptyAsleep(),
+        asleepOther: emptyAsleep(),
+        inBedSt: 0,
+        inBedOther: 0,
+      } satisfies Bucket);
     const isSleeptracker = (row.source ?? '').toLowerCase().includes('sleeptracker');
     if (row.metric_name === 'Sleep In Bed') {
-      if (isSleeptracker) existing.inBedSt += row.value;
-      else existing.inBedOther += row.value;
-    } else if (
-      row.metric_name === 'Sleep Core' ||
-      row.metric_name === 'Sleep Deep' ||
-      row.metric_name === 'Sleep REM'
-    ) {
-      if (isSleeptracker) existing.asleepSt += row.value;
-      else existing.asleepOther += row.value;
+      // MAX (not SUM) — fragmented samples carry the cumulative session value.
+      if (isSleeptracker) existing.inBedSt = Math.max(existing.inBedSt, row.value);
+      else existing.inBedOther = Math.max(existing.inBedOther, row.value);
+    } else {
+      const stage: Stage | null =
+        row.metric_name === 'Sleep Core'
+          ? 'Core'
+          : row.metric_name === 'Sleep Deep'
+            ? 'Deep'
+            : row.metric_name === 'Sleep REM'
+              ? 'REM'
+              : null;
+      if (!stage) {
+        buckets.set(key, existing);
+        return;
+      }
+      const target = isSleeptracker ? existing.asleepSt : existing.asleepOther;
+      target[stage] = Math.max(target[stage], row.value);
     }
     buckets.set(key, existing);
   });
   const points: Point[] = [];
   for (const [date, b] of buckets.entries()) {
-    const asleep = Math.max(b.asleepSt, b.asleepOther);
+    const stAsleep = b.asleepSt.Core + b.asleepSt.Deep + b.asleepSt.REM;
+    const otherAsleep = b.asleepOther.Core + b.asleepOther.Deep + b.asleepOther.REM;
+    const asleep = Math.max(stAsleep, otherAsleep);
     const inBed = Math.max(b.inBedSt, b.inBedOther);
     if (asleep <= 0 || inBed <= 0) continue;
     points.push({ date, value: Math.min(100, (asleep / inBed) * 100) });
@@ -315,8 +353,12 @@ export function groupSleepStages(rows: HealthMetricRow[]) {
         { sleeptracker: number; other: number }
       >);
     const isSleeptracker = (row.source ?? '').toLowerCase().includes('sleeptracker');
-    if (isSleeptracker) existing[stage].sleeptracker += row.value;
-    else existing[stage].other += row.value;
+    // MAX, not SUM — see groupDailySleep comment on HAE Time Grouping = Minute
+    // fragmentation. Each fragment carries the full session total to date,
+    // so summing inflates the day by N.
+    if (isSleeptracker)
+      existing[stage].sleeptracker = Math.max(existing[stage].sleeptracker, row.value);
+    else existing[stage].other = Math.max(existing[stage].other, row.value);
     buckets.set(key, existing);
   });
   const entries = Array.from(buckets.entries()).sort((a, b) => a[0].localeCompare(b[0]));
