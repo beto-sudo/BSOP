@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-04
-**Última actualización:** 2026-05-04 (S2-CSV cerrado: import + cobertura combinada Waitry+CSV + filtro dashboard live; quedan S2-Waitry-write y S3)
+**Última actualización:** 2026-05-04 (handoff — S2-CSV + iteraciones live en producción; arrancar S2-Waitry-write en sesión nueva siguiendo el plan más abajo)
 
 ## Problema
 
@@ -150,6 +150,10 @@ KPIs visibles en el dashboard:
 - **2026-05-04** — **S2-CSV-A mergeado** ([#412](https://github.com/beto-sudo/BSOP/pull/412)). Tabla `playtomic.payments_import`, parser puro `lib/playtomic/csv-import.ts` (15 tests verdes, formato Playtomic con `;`, comas decimales y fechas DD/MM/YYYY en CST), server action `importPaymentsCsv()` y UI `/rdb/playtomic/import-csv` con drag-drop. Primer upload del CSV de prueba: 1812 filas insertadas, 0 errores de parse. Bug post-merge: faltaban GRANTs a `authenticated` en las tablas nuevas (S1 + S2-CSV) — fixeado en [#414](https://github.com/beto-sudo/BSOP/pull/414).
 - **2026-05-04** — Cleanup de drift detectado por `drift-check.sql`: policies `service_role USING(true)` redundantes en S1 y S2-CSV (service_role bypassa RLS automáticamente). Dropeadas en [#413](https://github.com/beto-sudo/BSOP/pull/413).
 - **2026-05-04** — **S2-CSV-B mergeado** ([#415](https://github.com/beto-sudo/BSOP/pull/415)). Tres mejoras: vista combinada `playtomic.v_bookings_total_coverage` que suma Waitry+CSV por booking con match flexible (cualquier participante + ±15min), filtro del dashboard principal que excluye reservas cubiertas (validado: 551 → 441 pendientes, $30,700 limpiados), y whitelist de productos cancha ampliado de 1 a 4 patterns (padel + tenis + pickleball + "Uso cancha coach %" — 7 variantes con nombres de coaches). Cleanup tipos en [#416](https://github.com/beto-sudo/BSOP/pull/416).
+- **2026-05-04** — Bitácora intermedia ([#417](https://github.com/beto-sudo/BSOP/pull/417)) consolidando avance de S2-CSV.
+- **2026-05-04** — Bug detectado en `/rdb/playtomic/conciliacion`: la página seguía mostrando 457 pendientes con todas marcadas "Sin cobertura" porque el hook `use-conciliacion-data.ts` tenía hardcoded `coverage_status='none'` y nunca consumió la vista `v_bookings_total_coverage`. **Fix [#418](https://github.com/beto-sudo/BSOP/pull/418)**: el hook ahora lee la vista combinada, excluye los `full` (bajan los 106 cubiertos del listado) y propaga el coverage_status real para que el badge muestre `none/partial/full`.
+- **2026-05-04** — **Boost de coaches** ([#419](https://github.com/beto-sudo/BSOP/pull/419)). De los 457 pendientes en ventana 90d, 307 (67%) tienen un coach (Omar/Anibal/Manuel/Paco/Hugo) como owner o participante. 83 pedidos coach existen en Waitry pero solo 17 con nombre (66 son genéricos `Uso cancha coach`). Auto-match estricto solo agarra 2; en cambio el ranker ahora promueve cualquier ticket coach al top cuando la reserva tiene coach (+30 score) y bonus extra (+20) si el nombre del producto coincide con el del booking.
+- **2026-05-04** — Bug "no aparecen pedidos del 30-mar en adelante". Causa: PostgREST default de Supabase capa a ~1000 rows ignorando `.limit(8000)`. Con 5732 pedidos pagados en 120d, la query con `.order(ascending)` traía los más antiguos y dejaba fuera los recientes. **Fix paliativo [#420](https://github.com/beto-sudo/BSOP/pull/420)**: descending. **Fix de raíz [#421](https://github.com/beto-sudo/BSOP/pull/421)**: `ALTER ROLE authenticator SET pgrst.db_max_rows = '50000'` aplicado en producción — todas las queries del repo se benefician.
 
 ## Estado tras S2-CSV (snapshot 2026-05-04 noche)
 
@@ -163,5 +167,85 @@ KPIs visibles en el dashboard:
 
 ## Pendiente para cerrar la iniciativa
 
-- **S2-Waitry-write**: server actions `assignPaymentAction` / `unassignPaymentAction` + UI funcional para asignar manualmente pedidos Waitry a las ~441 reservas que no se cubrieron via CSV (efectivo en cancha sin registrar en manager). Stash listo en branch local.
+- **S2-Waitry-write**: server actions de write + UI funcional. Plan detallado abajo.
 - **S3 — Refinamiento**: parser de signature en notes Waitry para auto-conciliación con copy-paste del bloque del manager Playtomic, KPI cards en dashboard, bulk-actions, ranking inteligente de candidatos.
+
+---
+
+## Handoff a S2-Waitry-write (próxima sesión)
+
+### Contexto operativo a leer al arrancar
+
+1. Esta sección + bitácora arriba.
+2. La tabla `playtomic.payment_assignments` y la vista `playtomic.v_bookings_total_coverage` ya existen en producción y tienen GRANTs correctos. Tipos están en `types/supabase.ts`.
+3. La página `/rdb/playtomic/conciliacion` ya filtra full-cubiertas y muestra coverage real (`coverage_status` propagado desde la vista combinada). El botón "Conciliar (S2)" en `assignment-panel.tsx` está disabled — eso es lo que hay que habilitar.
+4. La heurística del ranker (`lib/playtomic/conciliacion.ts`) ya soporta padel/tenis/pickleball + boost de coaches. No tocar — sigue siendo válida.
+
+### Estado de producción al iniciar S2-Waitry-write
+
+| Métrica                                                           |                                                  Valor |
+| ----------------------------------------------------------------- | -----------------------------------------------------: |
+| Pendientes en `/conciliacion` (después de filtrar full-cubiertas) |                                                   ~351 |
+| Cobertura full alcanzada por CSV                                  |                                  113 reservas, $30,700 |
+| `payment_assignments` filas                                       | 0 (vacía hasta que S2-Waitry-write empiece a poblarla) |
+| `pgrst.db_max_rows`                                               |                                                  50000 |
+
+### Alcance de S2-Waitry-write
+
+**Archivos a crear:**
+
+1. `app/rdb/playtomic/conciliacion/actions.ts` — server actions:
+   - `assignPaymentAction({ booking_id, waitry_order_id, assigned_amount, note? })` — inserta en `playtomic.payment_assignments`. Valida:
+     - Auth: `supabase.auth.getUser()` — si no, error.
+     - `assertNotInPreview()` (ver patrón en `app/rdb/cortes/actions.ts`).
+     - Booking existe y `is_canceled=false`.
+     - Pedido Waitry existe, `paid=true`, y al menos uno de sus productos pasa `isCanchaProduct(p.product_name)` (helper exportado en `lib/playtomic/conciliacion.ts`).
+     - `assigned_amount > 0`.
+     - Captura unique violation (`code === '23505'`) con mensaje "Ya está asignado a otra reserva".
+     - `revalidatePath('/rdb/playtomic/conciliacion')` y `'/rdb/playtomic'`.
+     - Retorno discriminado: `{ ok: true, id } | { ok: false, error }`.
+   - `unassignPaymentAction(assignmentId: string)` — borra por `id`. Hard delete (decisión registrada arriba).
+
+**Archivos a modificar:**
+
+2. `components/playtomic/conciliacion/assignment-panel.tsx`:
+   - Quitar `disabled` del botón "Conciliar".
+   - Al hacer click: para cada `selectedOrderIds`, llamar `assignPaymentAction(...)` con `assigned_amount = candidate.total_amount` y manejar errores con `useTransition` + state local.
+   - Tras éxito: limpiar selección, llamar `refetch()` (prop nueva del padre) para refrescar la vista.
+   - Renderizar arriba del dropdown de candidatos una lista de **asignaciones existentes** (de `booking.assigned_waitry_orders` que ya viene en el booking). Cada item con su monto + botón "Quitar" → llama `unassignPaymentAction()`.
+
+3. `components/playtomic/conciliacion/conciliacion-view.tsx`:
+   - Pasar `refetch` (ya existe en el hook) al `AssignmentPanel`.
+
+4. `components/playtomic/conciliacion/use-conciliacion-data.ts`:
+   - Devolver `assignmentsByBooking: Map<string, AssignmentDetail[]>` además de los bookings — para que el panel pueda renderizar las asignaciones con detalle (waitry_order_id, monto, fecha, note). Fetcher: `playtomic.payment_assignments.select('*').in('booking_id', bookingIds)`.
+
+**Tests:**
+
+- `lib/playtomic/conciliacion.test.ts` ya existe — no requiere cambios para S2-Waitry-write.
+- Ojo: server actions del repo no tienen tests unitarios típicamente (verificable con `find app/rdb/*/actions.ts.test.ts` — vacío). Smoke en preview es la validación operativa.
+
+**Decisiones registradas (no preguntar de nuevo):**
+
+- Hard-delete en unassign (no soft-delete — el `UNIQUE(waitry_order_id)` complica soft).
+- `assigned_amount` default = `candidate.total_amount` (no `unit_price`). El operador puede ajustar manualmente vía note.
+- Audit trail nativo via `assigned_by` + `assigned_at` (ya están en la tabla).
+
+**Decisiones pendientes (resolver al arrancar):**
+
+- ¿Permitir conciliar reservas con `Σ < total`? Mi voto: sí, queda como `partial` y el operador puede agregar nota explicativa. La vista `v_bookings_total_coverage` ya soporta partial.
+- ¿Bulk action "Asignar todos los matches con score > X automáticamente"? Mi voto: NO en S2 — empezar con click-por-click, validar el modelo, y solo si vale la pena agregar bulk en S3.
+
+### PRs aún abiertos al hacer este handoff
+
+- [#418](https://github.com/beto-sudo/BSOP/pull/418) — fix: excluir cubiertas + mostrar coverage real. **Listo para mergear.**
+- [#419](https://github.com/beto-sudo/BSOP/pull/419) — boost de coaches. **Listo para mergear.**
+- [#420](https://github.com/beto-sudo/BSOP/pull/420) — descending fix paliativo. **Cerrar sin mergear** (redundante con #421 ya aplicado).
+
+### Cómo arrancar la sesión nueva
+
+1. _"Vamos a retomar la iniciativa `rdb-pagos-cancha-conciliacion`. Lee `docs/planning/rdb-pagos-cancha-conciliacion.md` y arranca S2-Waitry-write siguiendo el plan."_
+2. Crear branch `feat/rdb-conciliacion-s2-waitry-write` desde main.
+3. Implementar archivos listados arriba.
+4. 4 checks (typecheck + tests + lint + format) antes de push.
+5. PR + watch CI + smoke en preview con un caso real (ej. asignar pedido Waitry a una reserva pendiente, verificar que sale del listado).
