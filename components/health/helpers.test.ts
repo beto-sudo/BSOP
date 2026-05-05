@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { HealthMetricRow } from '@/lib/health';
-import { classifyBand, getRecoveryFlag, groupDailySleepEfficiency, type Band } from './helpers';
+import {
+  classifyBand,
+  getRecoveryFlag,
+  groupDailySleep,
+  groupDailySleepEfficiency,
+  groupSleepStages,
+  type Band,
+} from './helpers';
 import type { Point } from './types';
 
 function row(
@@ -51,6 +58,94 @@ describe('groupDailySleepEfficiency', () => {
       row('Sleep In Bed', '2026-04-23T23:16:00.000Z', 8),
     ]);
     expect(points[0]!.value).toBe(100);
+  });
+
+  it('collapses fragmented samples per source/stage via MAX, not SUM', () => {
+    // HAE Time Grouping = Minute splits one night into N samples, each
+    // carrying the cumulative session total. Naive sum would inflate.
+    const aw = "Adalberto's Apple Watch";
+    const points = groupDailySleepEfficiency([
+      row('Sleep Core', '2026-05-05T03:37:00.000Z', 5.74, aw),
+      row('Sleep Core', '2026-05-05T06:29:00.000Z', 4.35, aw),
+      row('Sleep Core', '2026-05-05T07:49:00.000Z', 3.02, aw),
+      row('Sleep Deep', '2026-05-05T03:37:00.000Z', 0.74, aw),
+      row('Sleep Deep', '2026-05-05T06:29:00.000Z', 0.09, aw),
+      row('Sleep REM', '2026-05-05T03:37:00.000Z', 2.8, aw),
+      row('Sleep In Bed', '2026-05-05T03:37:00.000Z', 9.5, 'Sleeptracker®'),
+    ]);
+    // asleep = max stages: Core 5.74 + Deep 0.74 + REM 2.8 = 9.28
+    // inBed = 9.5
+    // efficiency = 9.28 / 9.5 ≈ 97.7 (NOT >100 from a 24h sum)
+    expect(points[0]!.value).toBeCloseTo(97.68, 1);
+  });
+});
+
+describe('groupDailySleep', () => {
+  const aw = "Adalberto's Apple Watch";
+
+  it('skips Awake and In Bed; sums Core + Deep + REM per source', () => {
+    const points = groupDailySleep([
+      row('Sleep Core', '2026-04-23T23:16:00.000Z', 5, 'Sleeptracker®'),
+      row('Sleep Deep', '2026-04-23T23:16:00.000Z', 1, 'Sleeptracker®'),
+      row('Sleep REM', '2026-04-23T23:16:00.000Z', 2, 'Sleeptracker®'),
+      row('Sleep Awake', '2026-04-23T23:16:00.000Z', 0.2, 'Sleeptracker®'), // skipped
+      row('Sleep In Bed', '2026-04-23T23:16:00.000Z', 8.8, 'Sleeptracker®'), // skipped
+    ]);
+    expect(points).toHaveLength(1);
+    expect(points[0]!.value).toBeCloseTo(8, 5);
+  });
+
+  it('collapses HAE-fragmented samples via MAX per (source, stage), not SUM', () => {
+    // Real shape from 4-5 may: Apple Watch wrote 4 samples for one night,
+    // each carrying the full session total (not segments). Sum = 24.4h
+    // (impossible). MAX per stage = ~9h (correct).
+    const points = groupDailySleep([
+      row('Sleep Core', '2026-05-05T03:37:00.000Z', 5.74, aw),
+      row('Sleep Core', '2026-05-05T06:29:00.000Z', 4.35, aw),
+      row('Sleep Core', '2026-05-05T07:49:00.000Z', 3.02, aw),
+      row('Sleep Core', '2026-05-05T09:18:00.000Z', 1.93, aw),
+      row('Sleep Deep', '2026-05-05T03:37:00.000Z', 0.74, aw),
+      row('Sleep Deep', '2026-05-05T06:29:00.000Z', 0.09, aw),
+      row('Sleep REM', '2026-05-05T03:37:00.000Z', 2.8, aw),
+      row('Sleep REM', '2026-05-05T06:29:00.000Z', 1.97, aw),
+      row('Sleep REM', '2026-05-05T07:49:00.000Z', 1.97, aw),
+      row('Sleep REM', '2026-05-05T09:18:00.000Z', 1.67, aw),
+    ]);
+    expect(points).toHaveLength(1);
+    // max Core 5.74 + max Deep 0.74 + max REM 2.8 = 9.28
+    expect(points[0]!.value).toBeCloseTo(9.28, 2);
+  });
+
+  it('takes the larger of Sleeptracker® and Apple Watch when both report', () => {
+    const points = groupDailySleep([
+      row('Sleep Core', '2026-04-23T23:16:00.000Z', 5, 'Sleeptracker®'),
+      row('Sleep Deep', '2026-04-23T23:16:00.000Z', 1, 'Sleeptracker®'),
+      row('Sleep REM', '2026-04-23T23:16:00.000Z', 2, 'Sleeptracker®'),
+      row('Sleep Core', '2026-04-23T23:16:00.000Z', 4, aw),
+      row('Sleep Deep', '2026-04-23T23:16:00.000Z', 0.3, aw),
+      row('Sleep REM', '2026-04-23T23:16:00.000Z', 1.7, aw),
+    ]);
+    // Sleeptracker total 8 vs Apple Watch total 6 → 8
+    expect(points[0]!.value).toBeCloseTo(8, 5);
+  });
+});
+
+describe('groupSleepStages', () => {
+  it('returns per-stage averages collapsed via MAX across fragmented samples', () => {
+    const aw = "Adalberto's Apple Watch";
+    const averages = groupSleepStages([
+      // Night 1: fragmented Apple Watch
+      row('Sleep Core', '2026-05-05T03:37:00.000Z', 5.74, aw),
+      row('Sleep Core', '2026-05-05T06:29:00.000Z', 4.35, aw),
+      row('Sleep Deep', '2026-05-05T03:37:00.000Z', 0.74, aw),
+      row('Sleep REM', '2026-05-05T03:37:00.000Z', 2.8, aw),
+      row('Sleep Awake', '2026-05-05T03:37:00.000Z', 0.05, aw),
+    ]);
+    // 1 night, MAX per stage (not sum across the 2 Core fragments)
+    expect(averages['Sleep Core']).toBeCloseTo(5.74, 2);
+    expect(averages['Sleep Deep']).toBeCloseTo(0.74, 2);
+    expect(averages['Sleep REM']).toBeCloseTo(2.8, 2);
+    expect(averages['Sleep Awake']).toBeCloseTo(0.05, 2);
   });
 });
 
