@@ -29,6 +29,39 @@ export function isCanchaProduct(productName: string | null | undefined): boolean
   return false;
 }
 
+/**
+ * Coaches conocidos del club. Cuando una reserva tiene a uno de estos como
+ * owner o participante, los pedidos Waitry "Uso cancha coach %" en ventana
+ * temporal se promueven en el ranker — el operador los valida visualmente.
+ *
+ * Nombres en lowercase normalizado (sin tildes). Mantener sincronizado con
+ * los productos de Waitry: ver SQL `SELECT DISTINCT product_name FROM
+ * rdb.waitry_productos WHERE product_name ILIKE 'Uso cancha coach%'`.
+ */
+const KNOWN_COACH_NAMES = ['omar', 'anibal', 'manuel', 'paco', 'hugo'] as const;
+
+function isCoachProduct(productName: string | null | undefined): boolean {
+  if (!productName) return false;
+  return productName.toLowerCase().startsWith('uso cancha coach');
+}
+
+function detectBookingCoaches(booking: {
+  owner_name: string | null;
+  participant_names: string[];
+}): string[] {
+  const allNames = [booking.owner_name, ...(booking.participant_names ?? [])].filter(
+    (n): n is string => Boolean(n)
+  );
+  const found = new Set<string>();
+  for (const name of allNames) {
+    const lower = normalizeForMatch(name);
+    for (const coach of KNOWN_COACH_NAMES) {
+      if (lower.includes(coach)) found.add(coach);
+    }
+  }
+  return Array.from(found);
+}
+
 export type PendingBookingWithCoverage = {
   booking_id: string;
   booking_start: string;
@@ -149,6 +182,9 @@ export function rankCandidates(
   const expectedPerPlayer =
     participantCount > 0 && bookingTotal > 0 ? bookingTotal / participantCount : 0;
 
+  const bookingCoaches = detectBookingCoaches(booking);
+  const isCoachBooking = bookingCoaches.length > 0;
+
   return candidates
     .filter((candidate) =>
       isWithinTimestampWindow(booking.booking_start, candidate.timestamp, tolerance)
@@ -220,6 +256,27 @@ export function rankCandidates(
         if (Math.abs(candidate.total_amount - bookingTotal) <= tolerance) {
           score += 10;
           reasons.push('Total del ticket coincide con el total del booking');
+        }
+      }
+
+      // Boost cuando la reserva involucra a un coach conocido (owner o
+      // participante) y el ticket de Waitry contiene un producto "Uso cancha
+      // coach %". 66 de 83 pedidos coach son genéricos sin nombre, así que
+      // promovemos cualquier coach-ticket en la ventana sin exigir match
+      // exacto del nombre. Si además el nombre del producto incluye un coach
+      // que sí está en el booking, bonus extra.
+      if (isCoachBooking) {
+        const coachItem = candidate.items.find((it) => isCoachProduct(it.product_name));
+        if (coachItem) {
+          score += 30;
+          reasons.push('Reserva con coach + ticket "Uso cancha coach"');
+
+          const coachItemNorm = normalizeForMatch(coachItem.product_name);
+          const exactCoachMatch = bookingCoaches.find((c) => coachItemNorm.includes(c));
+          if (exactCoachMatch) {
+            score += 20;
+            reasons.push(`Nombre del coach (${exactCoachMatch}) coincide con el ticket`);
+          }
         }
       }
 
