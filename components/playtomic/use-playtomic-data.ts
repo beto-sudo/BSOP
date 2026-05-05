@@ -64,7 +64,7 @@ export function usePlaytomicData({
         const bookingsQuery = schema
           .from('bookings')
           .select(
-            'booking_id,resource_name,sport_id,booking_start,booking_end,duration_min,price_amount,price_currency,status,is_canceled,owner_id,booking_type,origin,payment_status,synced_at'
+            'booking_id,resource_name,sport_id,booking_start,booking_end,duration_min,price_amount,price_currency,status,is_canceled,owner_id,booking_type,origin,payment_status,synced_at,coach_ids,course_id,course_name,activity_id,activity_name'
           )
           .gte('booking_start', bookingsFromBounds.start)
           .lte('booking_start', bookingsToBounds.end)

@@ -1,6 +1,7 @@
-export type RangeKey = '7d' | '30d' | 'month' | 'year' | 'all';
+export type RangeKey = '7d' | '30d' | 'month' | 'year' | 'all' | 'custom';
 export type SportFilter = 'all' | 'PADEL' | 'TENNIS';
 export type PlayerSortKey = 'name' | 'reservas' | 'gasto' | 'sport';
+export type CoachSortKey = 'name' | 'reservas' | 'revenue' | 'jugadores';
 
 export type Booking = {
   booking_id: string;
@@ -18,6 +19,29 @@ export type Booking = {
   origin: string | null;
   payment_status: string | null;
   synced_at: string | null;
+  coach_ids: string[] | null;
+  course_id: string | null;
+  course_name: string | null;
+  activity_id: string | null;
+  activity_name: string | null;
+};
+
+/**
+ * Filtros que aplica el dashboard sobre el array de `data.bookings`. NO
+ * se mandan al servidor — la query trae el rango de fechas crudo y aquí
+ * en cliente filtramos. Se aplica a KPIs, reconciliación, ocupación,
+ * jugadores, cancelaciones, entrenadores. Revenue chart usa
+ * `v_revenue_diario` directo y no responde a estos filtros (limitación
+ * conocida — la vista no agrupa por cancha/coach/actividad).
+ */
+export type BookingFilters = {
+  sport: SportFilter;
+  /** `resource_name` exacto. `''` = todas. */
+  resource: string;
+  /** Coach id de Playtomic. `''` = todos. */
+  coachId: string;
+  /** `activity_name` o `course_name` (lo que esté presente). `''` = todas. */
+  activity: string;
 };
 
 export type ReconciliationDay = {
@@ -95,6 +119,20 @@ export type ComputedPlayer = {
   gasto: number;
   favorite_sport: string | null;
   player_type: string | null;
+};
+
+export type CoachRow = {
+  /** ID crudo del coach (de `bookings.coach_ids`). Se usa como filterId. */
+  coach_id: string;
+  /** Nombre legible si el coach_id matchea con `players.playtomic_id`. */
+  display_name: string;
+  reservas: number;
+  /** Sum(price_amount) de las reservas; se reparte si hubo varios coaches. */
+  revenue: number;
+  /** Cuenta distinct de owner_ids únicos. */
+  jugadores_unicos: number;
+  /** ISO timestamp del booking más reciente del coach. */
+  ultima_reserva: string | null;
 };
 
 export type CancelPlayerRow = {

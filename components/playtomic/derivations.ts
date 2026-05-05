@@ -3,6 +3,7 @@ import type {
   Booking,
   BookingParticipant,
   CancelPlayerRow,
+  CoachRow,
   ComputedPlayer,
   DashboardData,
   PlayerRow,
@@ -215,6 +216,73 @@ export function computeComputedPlayers(
       gasto: stats.gasto,
       favorite_sport: favSport,
       player_type: player?.player_type ?? null,
+    };
+  });
+}
+
+/**
+ * Calcula ranking de entrenadores a partir de `bookings.coach_ids[]`.
+ *
+ * El API de Playtomic poblá `coach_ids` cuando una reserva involucra
+ * a uno o más entrenadores. Aquí los expandimos (un booking con N
+ * coaches contribuye N filas) y agregamos por coach_id:
+ *
+ * - reservas: count de bookings no canceladas que mencionan el coach.
+ * - revenue: sum(price_amount / coach_ids.length) — si una reserva
+ *   tiene 2 coaches, cada uno se lleva la mitad. Default 1 si solo
+ *   hay 1 coach (que es el caso típico).
+ * - jugadores_unicos: count distinct de owner_ids que reservaron con
+ *   ese coach.
+ * - ultima_reserva: timestamp del booking_start más reciente.
+ *
+ * Resolución de nombre: el `coach_id` de Playtomic suele coincidir con
+ * un `players.playtomic_id`. Cuando matchea, mostramos el nombre real.
+ * Cuando no, fallback al id truncado (`coach_<8 chars>`).
+ */
+export function computeCoaches(bookings: Booking[], players: PlayerRow[]): CoachRow[] {
+  type Bucket = {
+    reservas: number;
+    revenue: number;
+    owners: Set<string>;
+    last: string | null;
+  };
+  const stats = new Map<string, Bucket>();
+
+  for (const booking of bookings) {
+    if (isCanceledBooking(booking)) continue;
+    const coaches = booking.coach_ids ?? [];
+    if (coaches.length === 0) continue;
+    const split = (booking.price_amount ?? 0) / coaches.length;
+    for (const coachId of coaches) {
+      if (!coachId) continue;
+      const bucket: Bucket = stats.get(coachId) ?? {
+        reservas: 0,
+        revenue: 0,
+        owners: new Set<string>(),
+        last: null,
+      };
+      bucket.reservas += 1;
+      bucket.revenue += split;
+      if (booking.owner_id) bucket.owners.add(booking.owner_id);
+      if (booking.booking_start && (!bucket.last || booking.booking_start > bucket.last)) {
+        bucket.last = booking.booking_start;
+      }
+      stats.set(coachId, bucket);
+    }
+  }
+
+  const playerMap = new Map(players.map((p) => [p.playtomic_id, p]));
+
+  return Array.from(stats.entries()).map(([coachId, bucket]) => {
+    const player = playerMap.get(coachId);
+    const display = player?.name?.trim() || `coach_${coachId.slice(0, 8)}`;
+    return {
+      coach_id: coachId,
+      display_name: display,
+      reservas: bucket.reservas,
+      revenue: bucket.revenue,
+      jugadores_unicos: bucket.owners.size,
+      ultima_reserva: bucket.last,
     };
   });
 }

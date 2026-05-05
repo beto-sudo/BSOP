@@ -4,7 +4,13 @@ import { useCallback, useMemo, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSortableTable } from '@/hooks/use-sortable-table';
 import { CancellationSection } from './cancellation-section';
-import { computeCancellationAnalysis, computeComputedPlayers, computeKpis } from './derivations';
+import { CoachesSection } from './coaches-section';
+import {
+  computeCancellationAnalysis,
+  computeCoaches,
+  computeComputedPlayers,
+  computeKpis,
+} from './derivations';
 import { computePendingPayments } from './pending-payments';
 import { computeReconciliation } from './reconciliation';
 import { HeaderSection } from './header-section';
@@ -14,15 +20,44 @@ import { PlayersSection } from './players-section';
 import { ReconciliationSection } from './reconciliation-section';
 import { RevenueSection } from './revenue-section';
 import { SyncSection } from './sync-section';
-import type { ChartBucket, PendingBooking, PlayerSortKey, RangeKey, SportFilter } from './types';
+import type {
+  BookingFilters,
+  ChartBucket,
+  CoachSortKey,
+  PendingBooking,
+  PlayerSortKey,
+  RangeKey,
+} from './types';
 import { usePlaytomicData } from './use-playtomic-data';
-import { bucketRevenue, getRangeMeta, normalizeSport, pickBucketMode } from './utils';
+import {
+  applyBookingFilters,
+  bucketRevenue,
+  getRangeMeta,
+  isoDateLocal,
+  normalizeSport,
+  pickBucketMode,
+} from './utils';
+
+const DEFAULT_FILTERS: BookingFilters = {
+  sport: 'all',
+  resource: '',
+  coachId: '',
+  activity: '',
+};
 
 export function PlaytomicView() {
-  const [range, setRange] = useState<RangeKey>('30d');
-  const [sportFilter, setSportFilter] = useState<SportFilter>('all');
+  const [range, setRange] = useState<RangeKey>('month');
+  // Defaults para custom inicializan en el mes actual también — si el user
+  // cambia a "Custom" sin tocar las fechas, no se queda con un rango vacío.
+  const [customFromIso, setCustomFromIso] = useState(() => {
+    const now = new Date();
+    return isoDateLocal(new Date(now.getFullYear(), now.getMonth(), 1));
+  });
+  const [customToIso, setCustomToIso] = useState(() => isoDateLocal(new Date()));
+  const [filters, setFilters] = useState<BookingFilters>(DEFAULT_FILTERS);
   const [playerQuery, setPlayerQuery] = useState('');
   const [playerSort, setPlayerSort] = useState<PlayerSortKey>('gasto');
+  const [coachSort, setCoachSort] = useState<CoachSortKey>('revenue');
   const [showPendingDetails, setShowPendingDetails] = useState(false);
   const {
     sortKey: pendingSortKey,
@@ -31,7 +66,10 @@ export function PlaytomicView() {
     sortData: pendingSortData,
   } = useSortableTable<PendingBooking>('fecha', 'desc');
 
-  const meta = useMemo(() => getRangeMeta(range), [range]);
+  const meta = useMemo(
+    () => getRangeMeta(range, customFromIso, customToIso),
+    [range, customFromIso, customToIso]
+  );
 
   const { data, loading, refreshing, error, fetchData, coveredBookingIds } = usePlaytomicData({
     range,
@@ -39,31 +77,55 @@ export function PlaytomicView() {
     toIso: meta.toIso,
   });
 
+  const filteredBookings = useMemo(
+    () => applyBookingFilters(data.bookings, filters),
+    [data.bookings, filters]
+  );
+
+  const filteredBookingIds = useMemo(
+    () => new Set(filteredBookings.map((b) => b.booking_id)),
+    [filteredBookings]
+  );
+
+  const filteredParticipants = useMemo(
+    () => data.participants.filter((p) => filteredBookingIds.has(p.booking_id)),
+    [data.participants, filteredBookingIds]
+  );
+
   const revenueSeries = useMemo<ChartBucket[]>(() => {
     const mode = pickBucketMode(range);
     return bucketRevenue(data.revenue, meta.from, meta.to, mode);
   }, [data.revenue, meta.from, meta.to, range]);
 
-  const kpis = useMemo(() => computeKpis(data), [data]);
+  // KPIs y demás derivations operan sobre las bookings filtradas. Pasamos
+  // un "DashboardData proxy" con bookings/participants reemplazados — el
+  // resto (revenue, occupancy, players, syncs, resources) sigue siendo el
+  // dataset crudo del periodo.
+  const filteredData = useMemo(
+    () => ({ ...data, bookings: filteredBookings, participants: filteredParticipants }),
+    [data, filteredBookings, filteredParticipants]
+  );
+
+  const kpis = useMemo(() => computeKpis(filteredData), [filteredData]);
 
   const filteredOccupancy = useMemo(() => {
-    if (sportFilter === 'all') return data.occupancy;
+    if (filters.sport === 'all') return data.occupancy;
     const allowed = new Set(
       data.resources
-        .filter((resource) => normalizeSport(resource.sport_id) === sportFilter)
+        .filter((resource) => normalizeSport(resource.sport_id) === filters.sport)
         .map((resource) => resource.resource_name ?? '')
     );
     return data.occupancy.filter((row) => allowed.has(row.resource_name ?? ''));
-  }, [data.occupancy, data.resources, sportFilter]);
+  }, [data.occupancy, data.resources, filters.sport]);
 
   const cancellationAnalysis = useMemo(
-    () => computeCancellationAnalysis(data.bookings, data.players),
-    [data.bookings, data.players]
+    () => computeCancellationAnalysis(filteredBookings, data.players),
+    [filteredBookings, data.players]
   );
 
   const computedPlayers = useMemo(
-    () => computeComputedPlayers(data.bookings, data.participants, data.players),
-    [data.bookings, data.participants, data.players]
+    () => computeComputedPlayers(filteredBookings, filteredParticipants, data.players),
+    [filteredBookings, filteredParticipants, data.players]
   );
 
   const topPlayers = useMemo(() => {
@@ -86,14 +148,69 @@ export function PlaytomicView() {
     });
   }, [computedPlayers, playerQuery, playerSort]);
 
-  const reconciliation = useMemo(() => computeReconciliation(data.bookings), [data.bookings]);
+  const coaches = useMemo(
+    () => computeCoaches(filteredBookings, data.players),
+    [filteredBookings, data.players]
+  );
+
+  const sortedCoaches = useMemo(() => {
+    return [...coaches].sort((a, b) => {
+      if (coachSort === 'name') return a.display_name.localeCompare(b.display_name, 'es');
+      if (coachSort === 'reservas') return b.reservas - a.reservas;
+      if (coachSort === 'jugadores') return b.jugadores_unicos - a.jugadores_unicos;
+      return b.revenue - a.revenue;
+    });
+  }, [coaches, coachSort]);
+
+  // Opciones de los selectores: derivadas del periodo, ordenadas alfa.
+  const resourceOptions = useMemo(() => {
+    const seen = new Set<string>();
+    for (const resource of data.resources) {
+      if (resource.resource_name) seen.add(resource.resource_name);
+    }
+    for (const booking of data.bookings) {
+      if (booking.resource_name) seen.add(booking.resource_name);
+    }
+    return Array.from(seen)
+      .sort((a, b) => a.localeCompare(b, 'es'))
+      .map((name) => ({ value: name, label: name }));
+  }, [data.resources, data.bookings]);
+
+  const coachOptions = useMemo(() => {
+    const seen = new Set<string>();
+    for (const booking of data.bookings) {
+      for (const id of booking.coach_ids ?? []) {
+        if (id) seen.add(id);
+      }
+    }
+    const playerMap = new Map(data.players.map((p) => [p.playtomic_id, p.name]));
+    return Array.from(seen)
+      .map((id) => ({
+        value: id,
+        label: playerMap.get(id)?.trim() || `coach_${id.slice(0, 8)}`,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'es'));
+  }, [data.bookings, data.players]);
+
+  const activityOptions = useMemo(() => {
+    const seen = new Set<string>();
+    for (const booking of data.bookings) {
+      const name = booking.activity_name ?? booking.course_name;
+      if (name) seen.add(name);
+    }
+    return Array.from(seen)
+      .sort((a, b) => a.localeCompare(b, 'es'))
+      .map((name) => ({ value: name, label: name }));
+  }, [data.bookings]);
+
+  const reconciliation = useMemo(() => computeReconciliation(filteredBookings), [filteredBookings]);
 
   const pendingPayments = useMemo(
     () =>
-      computePendingPayments(data.bookings, data.participants, data.players, {
+      computePendingPayments(filteredBookings, filteredParticipants, data.players, {
         coveredBookingIds,
       }),
-    [data.bookings, data.participants, data.players, coveredBookingIds]
+    [filteredBookings, filteredParticipants, data.players, coveredBookingIds]
   );
 
   const exportReconciliationCsv = useCallback(() => {
@@ -144,6 +261,17 @@ export function PlaytomicView() {
         range={range}
         onRangeChange={setRange}
         rangeLabel={meta.label}
+        customFromIso={customFromIso}
+        customToIso={customToIso}
+        onCustomRangeChange={(from, to) => {
+          setCustomFromIso(from);
+          setCustomToIso(to);
+        }}
+        filters={filters}
+        onFiltersChange={setFilters}
+        resourceOptions={resourceOptions}
+        coachOptions={coachOptions}
+        activityOptions={activityOptions}
         refreshing={refreshing}
         onRefresh={() => void fetchData(true)}
       />
@@ -172,8 +300,8 @@ export function PlaytomicView() {
           />
           <RevenueSection revenueSeries={revenueSeries} />
           <OccupancySection
-            sportFilter={sportFilter}
-            onSportFilterChange={setSportFilter}
+            sportFilter={filters.sport}
+            onSportFilterChange={(sport) => setFilters((prev) => ({ ...prev, sport }))}
             filteredOccupancy={filteredOccupancy}
             resources={data.resources}
           />
@@ -185,9 +313,10 @@ export function PlaytomicView() {
             onPlayerSortChange={setPlayerSort}
             cancellationAnalysis={cancellationAnalysis}
           />
+          <CoachesSection coaches={sortedCoaches} sort={coachSort} onSortChange={setCoachSort} />
           <CancellationSection
             analysis={cancellationAnalysis}
-            totalBookings={data.bookings.length}
+            totalBookings={filteredBookings.length}
           />
           <ReconciliationSection
             reconciliation={reconciliation}
