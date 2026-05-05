@@ -1,5 +1,58 @@
 import { describe, expect, it } from 'vitest';
-import { isWithinTimestampWindow, rankCandidates, type WaitryCandidate } from './conciliacion';
+import {
+  isCanchaProduct,
+  isWithinTimestampWindow,
+  rankCandidates,
+  type WaitryCandidate,
+} from './conciliacion';
+
+describe('isCanchaProduct', () => {
+  it('accepts the exact "Renta Cancha Padel"', () => {
+    expect(isCanchaProduct('Renta Cancha Padel')).toBe(true);
+  });
+
+  it('accepts "Renta Tenis ..." variants', () => {
+    expect(isCanchaProduct('Renta Tenis Doub. 90 min')).toBe(true);
+    expect(isCanchaProduct('Renta Tenis Singles 90 min')).toBe(true);
+  });
+
+  it('accepts "Renta Pickleball ..." variants', () => {
+    expect(isCanchaProduct('Renta Pickleball Doub. 90 min')).toBe(true);
+    expect(isCanchaProduct('Renta Pickleball Doub. 60 min')).toBe(true);
+    expect(isCanchaProduct('Renta Pickleball Sing. 60 min')).toBe(true);
+    expect(isCanchaProduct('Renta Pickleball Sing 90 min')).toBe(true);
+  });
+
+  it('accepts "Uso cancha coach" variants (named coaches and PREMIUM)', () => {
+    expect(isCanchaProduct('Uso cancha coach')).toBe(true);
+    expect(isCanchaProduct('Uso cancha coach PREMIUM')).toBe(true);
+    expect(isCanchaProduct('Uso cancha coach Omar')).toBe(true);
+    expect(isCanchaProduct('Uso cancha coach Anibal')).toBe(true);
+    expect(isCanchaProduct('Uso cancha coach Manuel')).toBe(true);
+    expect(isCanchaProduct('Uso cancha coach Paco')).toBe(true);
+    expect(isCanchaProduct('Uso cancha coach PREMIUM Hugo')).toBe(true);
+  });
+
+  it('rejects equipment, academies, tournaments and unrelated products', () => {
+    expect(isCanchaProduct('Palbea Padel Overgrip')).toBe(false);
+    expect(isCanchaProduct('Pelotas Padel Head')).toBe(false);
+    expect(isCanchaProduct('Renta de Pala Adidas')).toBe(false);
+    expect(isCanchaProduct('Academia Padel')).toBe(false);
+    expect(isCanchaProduct('Academia Tenis')).toBe(false);
+    expect(isCanchaProduct('Clase de Academia Padel')).toBe(false);
+    expect(isCanchaProduct('Torneo 2do Tenis Open')).toBe(false);
+    expect(isCanchaProduct('Rey de la Cancha')).toBe(false);
+    expect(isCanchaProduct('Reina de la cancha')).toBe(false);
+    expect(isCanchaProduct('Pickle Juice')).toBe(false);
+    expect(isCanchaProduct('Coca Cola')).toBe(false);
+  });
+
+  it('rejects null/undefined/empty', () => {
+    expect(isCanchaProduct(null)).toBe(false);
+    expect(isCanchaProduct(undefined)).toBe(false);
+    expect(isCanchaProduct('')).toBe(false);
+  });
+});
 
 const baseBooking = {
   booking_start: '2026-04-08T01:30:00Z',

@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
-import type {
-  CoverageStatus,
-  PendingBookingWithCoverage,
-  WaitryCandidate,
-  WaitryItem,
+import {
+  CANCHA_PRODUCT_PATTERNS,
+  isCanchaProduct,
+  type CoverageStatus,
+  type PendingBookingWithCoverage,
+  type WaitryCandidate,
+  type WaitryItem,
 } from '@/lib/playtomic/conciliacion';
 
 type BookingRow = {
@@ -53,7 +55,8 @@ export type ConciliacionData = {
   assignedOrderIds: Set<string>;
 };
 
-const RENTA_CANCHA_PRODUCT = 'Renta Cancha Padel';
+// PostgREST `.or()` con patterns ilike. Cubre padel, tenis, pickleball y "Uso cancha coach...".
+const CANCHA_OR_FILTER = CANCHA_PRODUCT_PATTERNS.map((p) => `product_name.ilike.${p}`).join(',');
 
 export function useConciliacionData() {
   const [data, setData] = useState<ConciliacionData>({
@@ -116,7 +119,7 @@ export function useConciliacionData() {
         rdb
           .from('waitry_productos')
           .select('order_id,product_name,unit_price,quantity,total_price')
-          .eq('product_name', RENTA_CANCHA_PRODUCT)
+          .or(CANCHA_OR_FILTER)
           .gte('created_at', waitryLookbackIso)
           .limit(8000)
           .returns<WaitryProductoRow[]>(),
@@ -191,7 +194,7 @@ export function useConciliacionData() {
         .map((pedido) => {
           const prods = productosByOrder.get(pedido.order_id);
           if (!prods || prods.length === 0) return null;
-          const cancha = prods.find((p) => p.product_name === RENTA_CANCHA_PRODUCT);
+          const cancha = prods.find((p) => isCanchaProduct(p.product_name));
           if (!cancha) return null;
           const items: WaitryItem[] = prods.map((p) => ({
             product_name: p.product_name,

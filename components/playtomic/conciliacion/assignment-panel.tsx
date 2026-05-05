@@ -120,8 +120,8 @@ export function AssignmentPanel({
             Candidatos en Waitry ({candidates.length})
           </h4>
           <span className="text-xs text-[var(--text-muted)]">
-            hasta {tolerancePresetLabel} después del booking · incluye &quot;Renta Cancha
-            Padel&quot; · pagados · no asignados
+            hasta {tolerancePresetLabel} después del booking · cancha (padel/tenis/pickleball/coach)
+            · pagados · no asignados
           </span>
         </div>
         {candidates.length === 0 ? (
@@ -136,8 +136,8 @@ export function AssignmentPanel({
               </li>
               <li>La búsqueda en notes está activa y no hay coincidencias.</li>
               <li>
-                El pedido en Waitry no tiene producto &quot;Renta Cancha Padel&quot; — el operador
-                lo registró con otro nombre.
+                El pedido en Waitry no tiene un producto de cancha reconocido (padel, tenis,
+                pickleball, uso de coach) — el operador lo registró con otro nombre.
               </li>
               <li>Realmente no hay pago en club registrado — pendiente real.</li>
             </ul>

@@ -1,5 +1,34 @@
 export type CoverageStatus = 'none' | 'partial' | 'full';
 
+/**
+ * Productos de Waitry que amparan renta de cancha y, por tanto, son
+ * candidatos válidos para conciliar contra reservas Playtomic. Lista
+ * confirmada con datos reales del schema rdb.waitry_productos.
+ *
+ * Tres familias:
+ *   - "Renta Cancha Padel" (exacto, ~1834 pedidos / 60d)
+ *   - "Renta Tenis ..." y "Renta Pickleball ..." (variantes Doub./Singles, 60/90 min)
+ *   - "Uso cancha coach ..." (entrenadores con nombres: Omar, Anibal, Manuel, Paco, Hugo, + variante PREMIUM)
+ *
+ * Para PostgREST, los patterns se aplican con `.or('...ilike...,...ilike...')`.
+ * Para validación en cliente/server action se usa `isCanchaProduct()`.
+ */
+export const CANCHA_PRODUCT_PATTERNS = [
+  'Renta Cancha Padel',
+  'Renta Tenis%',
+  'Renta Pickleball%',
+  'Uso cancha coach%',
+] as const;
+
+export function isCanchaProduct(productName: string | null | undefined): boolean {
+  if (!productName) return false;
+  if (productName === 'Renta Cancha Padel') return true;
+  if (productName.startsWith('Renta Tenis ')) return true;
+  if (productName.startsWith('Renta Pickleball ')) return true;
+  if (productName.startsWith('Uso cancha coach')) return true;
+  return false;
+}
+
 export type PendingBookingWithCoverage = {
   booking_id: string;
   booking_start: string;

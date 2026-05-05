@@ -20,10 +20,12 @@ export type PendingPaymentsResult = {
 export function computePendingPayments(
   bookings: Booking[],
   participants: BookingParticipant[],
-  players: PlayerRow[]
+  players: PlayerRow[],
+  options: { coveredBookingIds?: ReadonlySet<string> } = {}
 ): PendingPaymentsResult {
   const playerMap = new Map(players.map((player) => [player.playtomic_id, player]));
   const ownerParticipantMap = new Map<string, BookingParticipant>();
+  const coveredBookingIds = options.coveredBookingIds ?? new Set<string>();
 
   participants.forEach((participant) => {
     if (participant.booking_id && participant.is_owner) {
@@ -34,7 +36,9 @@ export function computePendingPayments(
   const rowsWithSort = bookings
     .filter(
       (booking) =>
-        !isCanceledBooking(booking) && (booking.payment_status ?? '').toUpperCase() === 'PENDING'
+        !isCanceledBooking(booking) &&
+        (booking.payment_status ?? '').toUpperCase() === 'PENDING' &&
+        !coveredBookingIds.has(booking.booking_id)
     )
     .map((booking) => {
       const bookingDate = booking.booking_start ? new Date(booking.booking_start) : null;
