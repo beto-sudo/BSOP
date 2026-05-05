@@ -283,4 +283,82 @@ describe('rankCandidates', () => {
     const far2 = candidate({ order_id: 'b', timestamp: '2026-08-01T00:00:00Z' });
     expect(rankCandidates(baseBooking, [far1, far2])).toEqual([]);
   });
+
+  it('boosts coach tickets when the booking has a known coach as participant', () => {
+    const coachBooking = {
+      ...baseBooking,
+      owner_name: 'Cliente Random',
+      participant_names: ['Cliente Random', 'Omar Berlanga'],
+    };
+    const coachTicket = candidate({
+      order_id: 'coach-1',
+      timestamp: '2026-04-08T01:35:00Z',
+      total_amount: 300,
+      unit_price: 300,
+      items: [{ product_name: 'Uso cancha coach', quantity: 1, unit_price: 300, total_price: 300 }],
+    });
+    const otherTicket = candidate({
+      order_id: 'other',
+      timestamp: '2026-04-08T01:35:00Z',
+      total_amount: 200,
+      unit_price: 200,
+      items: [
+        { product_name: 'Renta Cancha Padel', quantity: 1, unit_price: 200, total_price: 200 },
+      ],
+    });
+    const ranked = rankCandidates(coachBooking, [otherTicket, coachTicket]);
+    expect(ranked[0].order_id).toBe('coach-1');
+    expect(ranked[0].reasons).toContain('Reserva con coach + ticket "Uso cancha coach"');
+  });
+
+  it('gives extra bonus when the coach name in the product matches the booking coach', () => {
+    const coachBooking = {
+      ...baseBooking,
+      owner_name: 'Omar Berlanga',
+      participant_names: ['Omar Berlanga', 'Cliente'],
+    };
+    const namedCoach = candidate({
+      order_id: 'named',
+      timestamp: '2026-04-08T01:35:00Z',
+      total_amount: 300,
+      unit_price: 300,
+      items: [
+        {
+          product_name: 'Uso cancha coach Omar',
+          quantity: 1,
+          unit_price: 300,
+          total_price: 300,
+        },
+      ],
+    });
+    const genericCoach = candidate({
+      order_id: 'generic',
+      timestamp: '2026-04-08T01:35:00Z',
+      total_amount: 300,
+      unit_price: 300,
+      items: [{ product_name: 'Uso cancha coach', quantity: 1, unit_price: 300, total_price: 300 }],
+    });
+    const ranked = rankCandidates(coachBooking, [genericCoach, namedCoach]);
+    expect(ranked[0].order_id).toBe('named');
+    expect(ranked[0].reasons.some((r) => r.includes('Nombre del coach'))).toBe(true);
+  });
+
+  it('does not boost coach tickets when the booking has no coach', () => {
+    const regularBooking = {
+      ...baseBooking,
+      owner_name: 'Cliente Sin Coach',
+      participant_names: ['Cliente Sin Coach', 'Otro Cliente'],
+    };
+    const coachTicket = candidate({
+      order_id: 'coach',
+      timestamp: '2026-04-08T01:35:00Z',
+      total_amount: 300,
+      unit_price: 300,
+      items: [
+        { product_name: 'Uso cancha coach Omar', quantity: 1, unit_price: 300, total_price: 300 },
+      ],
+    });
+    const ranked = rankCandidates(regularBooking, [coachTicket]);
+    expect(ranked[0].reasons.some((r) => r.includes('coach'))).toBe(false);
+  });
 });
