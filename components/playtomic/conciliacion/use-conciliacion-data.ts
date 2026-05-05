@@ -113,7 +113,12 @@ export function useConciliacionData() {
           .select('order_id,timestamp,notes,total_amount,paid')
           .eq('paid', true)
           .gte('timestamp', waitryLookbackIso)
-          .order('timestamp', { ascending: true })
+          // Descending: PostgREST capa a ~1000 rows por query independiente del
+          // .limit() que pidamos. Con 5K+ pedidos en 120d, ascending dejaba los
+          // más recientes (los que el operador necesita ver) FUERA del cap. Al
+          // ordenar descending, los recientes llegan primero — exactamente los
+          // que matchean con bookings que aún están abiertos para conciliar.
+          .order('timestamp', { ascending: false })
           .limit(8000)
           .returns<WaitryPedidoRow[]>(),
         rdb
@@ -121,6 +126,7 @@ export function useConciliacionData() {
           .select('order_id,product_name,unit_price,quantity,total_price')
           .or(CANCHA_OR_FILTER)
           .gte('created_at', waitryLookbackIso)
+          .order('created_at', { ascending: false })
           .limit(8000)
           .returns<WaitryProductoRow[]>(),
       ]);
