@@ -1,14 +1,3 @@
-// ==============================================================================
-// Auto-generated Supabase database types.
-// Last regenerated: 2026-05-04T09:12:02Z
-// Project ref: ybklderteyhuugzfmxbi
-// Schemas: public, core, erp, rdb, health, playtomic, dilesa, maquinaria
-//
-// DO NOT EDIT BY HAND. Regenerate via:
-//   - GitHub Actions: trigger 'DB Types' workflow manually
-//   - Local: npm run db:types (requiere supabase CLI + SUPABASE_ACCESS_TOKEN)
-// ==============================================================================
-
 export type Json =
   | string
   | number
@@ -8073,6 +8062,13 @@ export type Database = {
             referencedColumns: ["booking_id"]
           },
           {
+            foreignKeyName: "booking_participants_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "v_bookings_total_coverage"
+            referencedColumns: ["booking_id"]
+          },
+          {
             foreignKeyName: "booking_participants_player_id_fkey"
             columns: ["player_id"]
             isOneToOne: false
@@ -8216,6 +8212,13 @@ export type Database = {
             columns: ["booking_id"]
             isOneToOne: false
             referencedRelation: "v_bookings_payment_coverage"
+            referencedColumns: ["booking_id"]
+          },
+          {
+            foreignKeyName: "payment_assignments_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "v_bookings_total_coverage"
             referencedColumns: ["booking_id"]
           },
         ]
@@ -8479,6 +8482,21 @@ export type Database = {
           booking_total: number | null
           coverage_pct: number | null
           coverage_status: string | null
+        }
+        Relationships: []
+      }
+      v_bookings_total_coverage: {
+        Row: {
+          booking_id: string | null
+          booking_total: number | null
+          combined_total: number | null
+          coverage_pct: number | null
+          coverage_status: string | null
+          csv_payment_ids: string[] | null
+          csv_payments_count: number | null
+          csv_total: number | null
+          waitry_order_ids: string[] | null
+          waitry_total: number | null
         }
         Relationships: []
       }
