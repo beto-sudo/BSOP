@@ -38,7 +38,8 @@ export function isCanchaProduct(productName: string | null | undefined): boolean
  * los productos de Waitry: ver SQL `SELECT DISTINCT product_name FROM
  * rdb.waitry_productos WHERE product_name ILIKE 'Uso cancha coach%'`.
  */
-const KNOWN_COACH_NAMES = ['omar', 'anibal', 'manuel', 'paco', 'hugo'] as const;
+export const KNOWN_COACH_NAMES = ['omar', 'anibal', 'manuel', 'paco', 'hugo'] as const;
+export type CoachSlug = (typeof KNOWN_COACH_NAMES)[number];
 
 function isCoachProduct(productName: string | null | undefined): boolean {
   if (!productName) return false;

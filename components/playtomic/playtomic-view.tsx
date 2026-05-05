@@ -6,11 +6,13 @@ import { useSortableTable } from '@/hooks/use-sortable-table';
 import { CancellationSection } from './cancellation-section';
 import { CoachesSection } from './coaches-section';
 import {
+  buildBookingCoachMap,
   computeCancellationAnalysis,
   computeCoaches,
   computeComputedPlayers,
   computeKpis,
 } from './derivations';
+import { KNOWN_COACH_NAMES } from '@/lib/playtomic/conciliacion';
 import { computePendingPayments } from './pending-payments';
 import { computeReconciliation } from './reconciliation';
 import { HeaderSection } from './header-section';
@@ -41,8 +43,16 @@ import {
 const DEFAULT_FILTERS: BookingFilters = {
   sport: 'all',
   resource: '',
-  coachId: '',
+  coachSlug: '',
   activity: '',
+};
+
+const COACH_LABELS: Record<string, string> = {
+  omar: 'Omar',
+  anibal: 'Aníbal',
+  manuel: 'Manuel',
+  paco: 'Paco',
+  hugo: 'Hugo',
 };
 
 export function PlaytomicView() {
@@ -77,9 +87,17 @@ export function PlaytomicView() {
     toIso: meta.toIso,
   });
 
+  // Mapa booking_id → coaches involucrados (owner o participantes con
+  // nombre que matchea uno de los slugs conocidos). Lo precomputamos UNA
+  // vez por dataset y lo reusamos para filtrar y para ranquear.
+  const bookingCoachMap = useMemo(
+    () => buildBookingCoachMap(data.bookings, data.participants, data.players),
+    [data.bookings, data.participants, data.players]
+  );
+
   const filteredBookings = useMemo(
-    () => applyBookingFilters(data.bookings, filters),
-    [data.bookings, filters]
+    () => applyBookingFilters(data.bookings, filters, bookingCoachMap),
+    [data.bookings, filters, bookingCoachMap]
   );
 
   const filteredBookingIds = useMemo(
@@ -149,8 +167,8 @@ export function PlaytomicView() {
   }, [computedPlayers, playerQuery, playerSort]);
 
   const coaches = useMemo(
-    () => computeCoaches(filteredBookings, data.players),
-    [filteredBookings, data.players]
+    () => computeCoaches(filteredBookings, bookingCoachMap),
+    [filteredBookings, bookingCoachMap]
   );
 
   const sortedCoaches = useMemo(() => {
@@ -176,21 +194,18 @@ export function PlaytomicView() {
       .map((name) => ({ value: name, label: name }));
   }, [data.resources, data.bookings]);
 
+  // Coach options = solo los coaches conocidos que tienen al menos 1
+  // booking detectado en el periodo (filtrar la lista hardcoded contra
+  // el bookingCoachMap evita mostrar opciones vacías).
   const coachOptions = useMemo(() => {
-    const seen = new Set<string>();
-    for (const booking of data.bookings) {
-      for (const id of booking.coach_ids ?? []) {
-        if (id) seen.add(id);
-      }
+    const present = new Set<string>();
+    for (const slugs of bookingCoachMap.values()) {
+      for (const slug of slugs) present.add(slug);
     }
-    const playerMap = new Map(data.players.map((p) => [p.playtomic_id, p.name]));
-    return Array.from(seen)
-      .map((id) => ({
-        value: id,
-        label: playerMap.get(id)?.trim() || `coach_${id.slice(0, 8)}`,
-      }))
+    return KNOWN_COACH_NAMES.filter((slug) => present.has(slug))
+      .map((slug) => ({ value: slug, label: COACH_LABELS[slug] ?? slug }))
       .sort((a, b) => a.label.localeCompare(b.label, 'es'));
-  }, [data.bookings, data.players]);
+  }, [bookingCoachMap]);
 
   const activityOptions = useMemo(() => {
     const seen = new Set<string>();
