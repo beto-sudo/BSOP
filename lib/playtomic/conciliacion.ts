@@ -74,10 +74,29 @@ export type PendingBookingWithCoverage = {
   owner_email: string | null;
   participant_names: string[];
   participant_emails: string[];
+  /** `payment_status` agregado del booking en el API third-party. */
+  api_payment_status: string | null;
+  /**
+   * Estado efectivo de cobertura: solo cuenta lo trazable
+   * (Waitry asignado + CSV con origin online). NO cuenta CSV con
+   * origin='Playtomic Manager' — esos pueden ser cobros sin pasar
+   * por la caja del club.
+   */
   coverage_status: CoverageStatus;
   coverage_pct: number;
+  /** Suma trazable: waitry + online CSV. */
   assigned_total: number;
   assigned_waitry_orders: string[];
+  /** Pagos online del CSV (App / Web), ya en cuenta del club. */
+  online_csv_total: number;
+  /**
+   * Pagos en CSV con origin='Playtomic Manager' (cobros marcados onsite
+   * desde el panel web). Si > waitry_total, el flag
+   * `has_unverified_manager` indica riesgo: el manager dijo que cobró en
+   * cancha pero no hay pedido equivalente en Waitry.
+   */
+  manager_csv_total: number;
+  has_unverified_manager: boolean;
 };
 
 export type WaitryItem = {

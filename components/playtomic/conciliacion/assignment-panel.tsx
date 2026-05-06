@@ -167,11 +167,12 @@ export function AssignmentPanel({
         </dl>
       </header>
 
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)]/30 p-3">
+      <div className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--panel)]/30 p-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
           <div>
             <span className="font-medium text-[var(--text)]">
-              Cubierto (preview): {formatMoney(totalPlanned)} de {formatMoney(booking.price_amount)}
+              Cobertura trazable (preview): {formatMoney(totalPlanned)} de{' '}
+              {formatMoney(booking.price_amount)}
             </span>
             <span className="ml-2 text-[var(--text-muted)]">({coveragePct}%)</span>
           </div>
@@ -179,7 +180,7 @@ export function AssignmentPanel({
             {remaining > 0 ? `Faltan ${formatMoney(remaining)}` : 'Cubre el total'}
           </div>
         </div>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--border)]">
+        <div className="h-1.5 overflow-hidden rounded-full bg-[var(--border)]">
           <div
             className={`h-full transition-all ${
               coveragePct >= 100 ? 'bg-emerald-500' : 'bg-amber-500'
@@ -187,6 +188,42 @@ export function AssignmentPanel({
             style={{ width: `${Math.min(100, coveragePct)}%` }}
           />
         </div>
+        <ul className="space-y-1 text-xs text-[var(--text)]/80">
+          <li className="flex items-baseline justify-between gap-2">
+            <span className="text-[var(--text-muted)]">
+              Online (cliente vía app/web, ya en cuenta del club)
+            </span>
+            <span className="font-medium text-[var(--text)]">
+              {formatMoney(booking.online_csv_total)}
+            </span>
+          </li>
+          <li className="flex items-baseline justify-between gap-2">
+            <span className="text-[var(--text-muted)]">Waitry (asignado a esta reserva)</span>
+            <span className="font-medium text-[var(--text)]">
+              {formatMoney(booking.assigned_total - booking.online_csv_total)}
+            </span>
+          </li>
+          {booking.manager_csv_total > 0 ? (
+            <li
+              className={`flex items-baseline justify-between gap-2 ${
+                booking.has_unverified_manager ? 'text-rose-300' : ''
+              }`}
+            >
+              <span>
+                {booking.has_unverified_manager ? '⚠ ' : ''}
+                Marcado por manager onsite (sin Waitry equivalente)
+              </span>
+              <span className="font-medium">{formatMoney(booking.manager_csv_total)}</span>
+            </li>
+          ) : null}
+        </ul>
+        {booking.has_unverified_manager ? (
+          <p className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-2 text-xs text-rose-200">
+            El manager registró {formatMoney(booking.manager_csv_total)} como pagado en cancha desde
+            Playtomic, pero esos cobros no están en Waitry. Verifica con la caja del club y asigna
+            los pedidos Waitry correspondientes para cerrar la trazabilidad.
+          </p>
+        ) : null}
       </div>
 
       {feedback ? (

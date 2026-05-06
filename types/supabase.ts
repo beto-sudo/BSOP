@@ -8495,6 +8495,15 @@ export type Database = {
           csv_payment_ids: string[] | null
           csv_payments_count: number | null
           csv_total: number | null
+          effective_pct: number | null
+          effective_status: string | null
+          effective_total: number | null
+          has_unverified_manager: boolean | null
+          manager_csv_payment_ids: string[] | null
+          manager_csv_total: number | null
+          online_csv_payment_ids: string[] | null
+          online_csv_total: number | null
+          other_csv_total: number | null
           waitry_order_ids: string[] | null
           waitry_total: number | null
         }
