@@ -44,24 +44,66 @@ from typing import Iterator
 from openpyxl import load_workbook
 
 
-def read_excel(xlsx_path: Path) -> Iterator[tuple[str, str, str]]:
-    """Yields (codigo, nombre, rfc) for each provider row."""
+def parse_tasa(raw: str | None) -> float | None:
+    """' 8%' -> 0.08, '16%' -> 0.16, ' 8% 0%' -> 0.08 (primera), None/inválido -> None."""
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    if not s:
+        return None
+    first_token = s.split()[0]
+    if not first_token.endswith("%"):
+        return None
+    try:
+        pct = float(first_token.rstrip("%"))
+    except ValueError:
+        return None
+    val = round(pct / 100, 4)
+    if val in (0.0, 0.08, 0.16):
+        return val
+    return None
+
+
+def read_excel(xlsx_path: Path) -> Iterator[tuple[str, str, str, float | None]]:
+    """Yields (codigo, nombre, rfc, tasa_iva) for each provider.
+
+    El Excel CONTPAQi pone cada proveedor en 2 filas:
+    - Fila A: codigo, nombre, rfc, curp, cuenta, tipo_tercero, tipo_operacion
+    - Fila B: (vacío en A,B), id_fiscal, extranjero, pais, nacionalidad, tasas, ...
+
+    Recolectamos ambas y emitimos un solo registro por par.
+    """
     wb = load_workbook(xlsx_path, data_only=True)
     ws = wb.active
+    pending: tuple[str, str, str] | None = None
     for row in ws.iter_rows(values_only=True):
-        if not row or len(row) < 3:
+        if not row or len(row) < 7:
+            if pending:
+                yield (pending[0], pending[1], pending[2], None)
+                pending = None
             continue
         codigo, nombre, rfc = row[0], row[1], row[2]
-        if codigo is None or nombre is None or rfc is None:
-            continue
-        try:
-            codigo_int = int(float(codigo))
-        except (TypeError, ValueError):
-            continue
-        rfc_str = str(rfc).strip()
-        if len(rfc_str) not in (12, 13):
-            continue
-        yield (str(codigo_int), str(nombre).strip(), rfc_str)
+        if codigo is not None:
+            if pending:
+                yield (pending[0], pending[1], pending[2], None)
+                pending = None
+            try:
+                codigo_int = int(float(codigo))
+            except (TypeError, ValueError):
+                continue
+            if nombre is None or rfc is None:
+                continue
+            rfc_str = str(rfc).strip()
+            if len(rfc_str) not in (12, 13):
+                continue
+            pending = (str(codigo_int), str(nombre).strip(), rfc_str)
+        else:
+            if pending:
+                tasa = parse_tasa(row[6]) if len(row) > 6 else None
+                yield (pending[0], pending[1], pending[2], tasa)
+                pending = None
+    if pending:
+        yield (pending[0], pending[1], pending[2], None)
 
 
 def sql_quote(s: str) -> str:
@@ -80,15 +122,23 @@ def main() -> int:
         return 1
 
     rows = list(read_excel(xlsx))
-    seen: dict[str, tuple[str, str]] = {}
-    for codigo, nombre, rfc in rows:
+    seen: dict[str, tuple[str, str, float | None]] = {}
+    for codigo, nombre, rfc, tasa in rows:
         if rfc not in seen:
-            seen[rfc] = (codigo, nombre)
-    print(f"-- Leídas {len(rows)} filas, {len(seen)} RFCs únicos", file=sys.stderr)
+            seen[rfc] = (codigo, nombre, tasa)
+    sin_tasa = sum(1 for _, _, tasa in seen.values() if tasa is None)
+    print(
+        f"-- Leídas {len(rows)} filas, {len(seen)} RFCs únicos, {sin_tasa} sin tasa válida",
+        file=sys.stderr,
+    )
+
+    def fmt_tasa(t: float | None) -> str:
+        return "NULL" if t is None else f"{t}"
 
     values = [
-        f"({sql_quote(codigo)}, {sql_quote(nombre)}, {sql_quote(rfc)}, {sql_quote(derive_tipo_persona(rfc))})"
-        for rfc, (codigo, nombre) in sorted(seen.items())
+        f"({sql_quote(codigo)}, {sql_quote(nombre)}, {sql_quote(rfc)}, "
+        f"{sql_quote(derive_tipo_persona(rfc))}, {fmt_tasa(tasa)})"
+        for rfc, (codigo, nombre, tasa) in sorted(seen.items())
     ]
 
     out = sys.stdout
@@ -116,7 +166,7 @@ def main() -> int:
 
     out.write("BEGIN;\n\n")
 
-    out.write("WITH excel(codigo, nombre, rfc, tipo_persona) AS (VALUES\n  ")
+    out.write("WITH excel(codigo, nombre, rfc, tipo_persona, tasa_iva) AS (VALUES\n  ")
     out.write(",\n  ".join(values))
     out.write("\n),\n")
 
@@ -150,7 +200,7 @@ def main() -> int:
         "  SELECT rfc, id FROM inserted_personas\n"
         "),\n"
         "to_insert_proveedores AS (\n"
-        "  SELECT e.codigo, ap.persona_id\n"
+        "  SELECT e.codigo, ap.persona_id, e.tasa_iva\n"
         "  FROM excel e\n"
         "  JOIN all_personas ap ON ap.rfc = e.rfc\n"
         "  WHERE NOT EXISTS (\n"
@@ -161,8 +211,8 @@ def main() -> int:
         "  )\n"
         "),\n"
         "inserted_proveedores AS (\n"
-        "  INSERT INTO erp.proveedores (empresa_id, persona_id, codigo, activo)\n"
-        "  SELECT (SELECT id FROM dilesa), tip.persona_id, tip.codigo, true\n"
+        "  INSERT INTO erp.proveedores (empresa_id, persona_id, codigo, tasa_iva, activo)\n"
+        "  SELECT (SELECT id FROM dilesa), tip.persona_id, tip.codigo, tip.tasa_iva, true\n"
         "  FROM to_insert_proveedores tip\n"
         "  RETURNING id\n"
         ")\n"
