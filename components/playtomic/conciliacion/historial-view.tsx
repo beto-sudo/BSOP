@@ -186,8 +186,10 @@ export function HistorialView() {
     });
   }
 
-  function handleNavigateToBooking() {
-    router.push('/rdb/playtomic/conciliacion');
+  function handleNavigateToBooking(bookingId: string) {
+    // Deep-link al tab Conciliación con la reserva pre-seleccionada.
+    // ConciliacionView lee `?selected=` en mount.
+    router.push(`/rdb/playtomic/conciliacion?selected=${encodeURIComponent(bookingId)}`);
   }
 
   function handleExportCsv() {
@@ -433,7 +435,7 @@ export function HistorialView() {
                     <TableRow
                       key={`${ev.source}-${ev.row_id}`}
                       className="cursor-pointer transition-colors hover:bg-[var(--panel)]/40"
-                      onClick={handleNavigateToBooking}
+                      onClick={() => handleNavigateToBooking(ev.booking_id)}
                     >
                       <TableCell className="font-medium text-[var(--text)]">
                         {bookingValid ? FECHA_CORTA_FMT.format(bookingDate as Date) : '—'}
