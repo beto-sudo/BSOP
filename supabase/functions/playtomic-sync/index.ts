@@ -55,22 +55,9 @@ function parsePrice(priceStr?: string) {
  * Central) hay una hora ambigua. Para nuestro caso operativo (reservas
  * de cancha) ese 1 día/año con bookings raros a esa hora es aceptable.
  */
-function naiveChicagoIsoToUtc(naiveIso: string | null | undefined): string | null {
-  if (!naiveIso) return null;
-  // Si por algún motivo el API empieza a mandar con offset (Z o ±HH:MM), no tocamos.
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(naiveIso)) return naiveIso;
-
-  // Truco para descubrir el offset de America/Chicago en este instante:
-  // 1) Tomamos el naive como si fuera UTC (asIfUtc).
-  // 2) Formatemos asIfUtc en zona Chicago — el resultado es la hora wall-clock
-  //    de Chicago para ese instante UTC.
-  // 3) La diferencia entre el formato Chicago y asIfUtc nos da el offset Chicago
-  //    en milisegundos (negativo: Chicago va detrás de UTC).
-  // 4) Como el naive ES la hora wall-clock de Chicago, real UTC = asIfUtc - offset.
-  //    (offset es negativo, restar el valor negativo equivale a sumar la diferencia.)
-  const asIfUtc = new Date(naiveIso + 'Z');
-  if (Number.isNaN(asIfUtc.getTime())) return naiveIso;
-
+function chicagoOffsetMsAt(instant: Date): number {
+  // Devuelve cuántos ms está Chicago detrás de UTC en `instant`.
+  // CST = -21600000 ms (6h), CDT = -18000000 ms (5h).
   const fmt = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Chicago',
     year: 'numeric',
@@ -81,9 +68,31 @@ function naiveChicagoIsoToUtc(naiveIso: string | null | undefined): string | nul
     second: '2-digit',
     hour12: false,
   });
-  const parts = Object.fromEntries(fmt.formatToParts(asIfUtc).map((p) => [p.type, p.value]));
+  const parts = Object.fromEntries(fmt.formatToParts(instant).map((p) => [p.type, p.value]));
   const chicagoIso = `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}Z`;
-  const offsetMs = new Date(chicagoIso).getTime() - asIfUtc.getTime();
+  return new Date(chicagoIso).getTime() - instant.getTime();
+}
+
+function naiveChicagoIsoToUtc(naiveIso: string | null | undefined): string | null {
+  if (!naiveIso) return null;
+  // Si por algún motivo el API empieza a mandar con offset (Z o ±HH:MM), no tocamos.
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(naiveIso)) return naiveIso;
+
+  // El naive ISO representa el wall-clock de Chicago. Para convertirlo a UTC,
+  // necesitamos el offset de Chicago EN EL INSTANTE UTC equivalente — pero no
+  // lo sabemos antes de convertir. Resolvemos con dos iteraciones que convergen
+  // en los 2 días/año de transición DST (segundo domingo de marzo y primer
+  // domingo de noviembre).
+  const asIfUtc = new Date(naiveIso + 'Z');
+  if (Number.isNaN(asIfUtc.getTime())) return naiveIso;
+
+  // Iteración 1: usamos el naive-as-UTC como punto de partida.
+  let offsetMs = chicagoOffsetMsAt(asIfUtc);
+  // Iteración 2: usamos el UTC estimado (más preciso) para confirmar el offset.
+  // En días de transición DST, el offset puede cambiar entre asIfUtc y el real
+  // UTC, y esta segunda pasada lo corrige.
+  const estimatedUtc = new Date(asIfUtc.getTime() - offsetMs);
+  offsetMs = chicagoOffsetMsAt(estimatedUtc);
 
   return new Date(asIfUtc.getTime() - offsetMs).toISOString();
 }
