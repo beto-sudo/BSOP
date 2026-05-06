@@ -8509,6 +8509,28 @@ export type Database = {
         }
         Relationships: []
       }
+      v_conciliacion_historial: {
+        Row: {
+          amount: number | null
+          assigned_by: string | null
+          booking_id: string | null
+          booking_start: string | null
+          booking_total: number | null
+          event_at: string | null
+          owner_id: string | null
+          payment_method: string | null
+          payment_origin: string | null
+          reference_id: string | null
+          resource_name: string | null
+          row_id: string | null
+          source: string | null
+          subject: string | null
+          waitry_notes: string | null
+          waitry_order_total: number | null
+          waitry_paid_at: string | null
+        }
+        Relationships: []
+      }
       v_ocupacion_diaria: {
         Row: {
           fecha: string | null
