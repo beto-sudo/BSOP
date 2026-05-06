@@ -3,10 +3,11 @@
 **Slug:** `empresas-csf-config`
 **Empresas:** todas (las 4 SA de CV ya cargadas; UI nueva en `/settings/empresas`)
 **Schemas afectados:** `core` (lectura/escritura `core.empresas`; `audit_log`; `erp.adjuntos` para archivar PDF)
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-04-28
-**Última actualización:** 2026-04-28 (Sprint 3 mergeado: botón "Nueva empresa" + drawer `<NuevaEmpresaDrawer>` con flujo CSF→preview→create + agrupación de la lista por tipo de contribuyente — Morales / Físicas / Otros. Faltan solo Sprint 4 operativo)
+**Última actualización:** 2026-05-06
+**Cerrada:** 2026-05-06 (Sprint 4 operativo completo para empresas que operan; ANSA/COAGAN diferidos hasta arranque operativo)
 
 ## Problema
 
@@ -98,13 +99,13 @@ Empresa es estructuralmente igual al proveedor moral: mismo PDF de SAT, mismos c
 
 ## Sprints / hitos
 
-| #   | Scope                                                                                                                                  | Estado  | PR   |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------- | ------- | ---- |
-| 0   | Promoción: este doc + fila en INITIATIVES.md                                                                                           | done    | #267 |
-| 1   | Endpoints `/api/empresas/extract-csf`, `create-with-csf`, `[id]/update-csf`, `PATCH [id]` (registro patronal) + tests con fixtures CSF | done    | #269 |
-| 2   | UI drawer "Actualizar CSF" en `/settings/empresas/[slug]` + campo `registro_patronal_imss` editable + reuso `<CsfDiffModal>`           | done    | TBD  |
-| 3   | Botón "Nueva empresa" + drawer `create-with-csf` en lista `/settings/empresas` + agrupación por tipo (Morales/Físicas/Otros)           | done    | TBD  |
-| 4   | Refresh operativo: subir CSF al día de RDB/DILESA/COAGAN/ANSA + capturar `registro_patronal_imss` faltantes                            | pending | —    |
+| #   | Scope                                                                                                                                  | Estado | PR   |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------- | ------ | ---- |
+| 0   | Promoción: este doc + fila en INITIATIVES.md                                                                                           | done   | #267 |
+| 1   | Endpoints `/api/empresas/extract-csf`, `create-with-csf`, `[id]/update-csf`, `PATCH [id]` (registro patronal) + tests con fixtures CSF | done   | #269 |
+| 2   | UI drawer "Actualizar CSF" en `/settings/empresas/[slug]` + campo `registro_patronal_imss` editable + reuso `<CsfDiffModal>`           | done   | TBD  |
+| 3   | Botón "Nueva empresa" + drawer `create-with-csf` en lista `/settings/empresas` + agrupación por tipo (Morales/Físicas/Otros)           | done   | TBD  |
+| 4   | Refresh operativo: subir CSF al día de RDB/DILESA/COAGAN/ANSA + capturar `registro_patronal_imss` faltantes                            | done   | —    |
 
 ## Decisiones registradas
 
@@ -169,6 +170,31 @@ Empresa es estructuralmente igual al proveedor moral: mismo PDF de SAT, mismos c
 **Links:**
 
 - PR Sprint 2: TBD (se agregará al merge).
+
+### 2026-05-06 — Sprint 4: refresh operativo cerrado + cierre de iniciativa
+
+**Validación empírica de cumplimiento** (verificada el 2026-05-06 contra
+`core.empresas`):
+
+| Empresa      | CSF cargado (`csf_fecha_emision`) | `registro_patronal_imss` |
+| ------------ | --------------------------------- | ------------------------ |
+| RDB          | ✅                                | ✅                       |
+| DILESA       | ✅                                | ✅                       |
+| ANSA         | ✅                                | ❌ diferido              |
+| COAGAN       | ✅                                | ❌ diferido              |
+| Nigropetense | ✅                                | ❌ N/A (holding)         |
+
+**Lectura honesta:** las 4 SA de CV vivas tienen CSF cargado vía la UI
+nueva. Plus Nigropetense (5ª empresa). Los `registro_patronal_imss`
+faltantes en ANSA y COAGAN son consistentes con que esas empresas aún
+no arrancaron operativamente — solo se requiere RPI cuando hay nómina,
+y solo DILESA + RDB tienen empleados activos hoy. Beto confirmó:
+"ANSA y COAGAN se subirán en su momento, cuando arranquemos esas
+empresas".
+
+Iniciativa cerrada; rollback no procede. Cuando ANSA/COAGAN arranquen
+operativamente, capturarán su RPI usando el campo editable inline ya
+construido en Sprint 2 — no requiere reabrir esta iniciativa.
 
 ### 2026-04-28 — Sprint 3: alta nueva + agrupación por tipo
 

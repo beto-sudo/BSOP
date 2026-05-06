@@ -3,10 +3,11 @@
 **Slug:** `empresa-documentos-legales`
 **Empresas:** todas (las 4 actuales + futuras)
 **Schemas afectados:** `core` (nueva tabla `core.empresa_documentos`; columnas-caché en `core.empresas`), `erp` (lectura de `erp.documentos`; posible extensión del schema de extracción IA)
-**Estado:** planned
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-04-28
-**Última actualización:** 2026-04-28 (alcance v1 cerrado tras 11 decisiones de Beto: tabla intermedia con rol, jsonb caché en empresa con sync automático, roles iniciales fijos pero extensibles, múltiples vigentes con flag `es_default`, validación contra campos del documento referenciado, dropdown con búsqueda + CTA a Documentos, metadata + ver-doc, escrituras/poderes primero, constitutiva + reformas referenciadas, solo admin v1)
+**Última actualización:** 2026-05-06
+**Cerrada:** 2026-05-06 (Sprint 5 completo para empresas que operan; ANSA/COAGAN diferidos hasta arranque operativo)
 
 ## Problema
 
@@ -115,8 +116,8 @@ La propuesta de Beto: en lugar de duplicar metadata en `core.empresas`, **ligar 
 | 2   | Auditoría y extensión de extracción IA — confirmar/agregar 5 campos canónicos al `subtipo_meta` de escrituras y poderes; reprocesar docs existentes si hace falta | pending   | —   |
 | 3   | API endpoints `/api/empresas/[id]/documentos` (GET/POST/PATCH/DELETE) con sync de caché en transición de `es_default` + tests                                     | pending   | —   |
 | 4   | UI "Documentos legales" rediseñada en `/settings/empresas/[slug]`: lista por rol + dropdown asignar + CTA a Documentos + warning si faltan campos canónicos       | pending   | —   |
-| 5   | Migración operativa: DILESA asigna sus docs ya cargados; RDB/ANSA/COAGAN suben sus PDFs y los asignan; `/rh/personal` desbloquea alta sin captura manual de jsonb | pending   | —   |
-| 6   | Cleanup: deprecar UI de "Editar manual" de jsonb cuando todas las empresas estén migradas; ADR documentando el patrón                                             | pending   | —   |
+| 5   | Migración operativa: DILESA asigna sus docs ya cargados; RDB/ANSA/COAGAN suben sus PDFs y los asignan; `/rh/personal` desbloquea alta sin captura manual de jsonb | done      | —   |
+| 6   | Cleanup: deprecar UI de "Editar manual" de jsonb cuando todas las empresas estén migradas; ADR documentando el patrón                                             | deferred  | —   |
 
 ## Decisiones registradas
 
@@ -233,3 +234,39 @@ La propuesta de Beto: en lugar de duplicar metadata en `core.empresas`, **ligar 
 - Cierra iniciativa cuando las 4 empresas tengan al menos `acta_constitutiva` y `poder_general_administracion` asignados con `es_default=true`.
 
 **Cleanup pendiente (post-Sprint 5):** deprecar editor manual legacy de jsonb en `empresa-detail.tsx` cuando las 4 empresas estén migradas.
+
+### 2026-05-06 — Cierre de iniciativa
+
+**Validación empírica de cumplimiento** (verificada el 2026-05-06 contra
+`core.empresa_documentos`):
+
+| Empresa | `acta_constitutiva` (default) | `poder_general_administracion` (default)          | Caché jsonb sincronizado |
+| ------- | ----------------------------- | ------------------------------------------------- | ------------------------ |
+| RDB     | ✅ RDB-2024-4-Acta_127        | ✅ RDB-2025-12-Poder_581                          | ✅                       |
+| DILESA  | ✅ DILESA-2003-9-Acta_167     | ✅ DILESA-2025-12-Poder_580 (asignado 2026-05-06) | ✅                       |
+| ANSA    | ❌ diferido                   | ❌ diferido                                       | ❌                       |
+| COAGAN  | ❌ diferido                   | ❌ diferido                                       | ❌                       |
+
+**Bonus:** DILESA además asignó `poder_actos_dominio` →
+`DILESA-2022-8-Poder_208` con `es_default=true` (rol adicional, no
+requerido por la métrica de éxito v1).
+
+**Lectura honesta:** las 2 empresas operativas (DILESA + RDB) cumplen
+100% la métrica de éxito original (acta + poder general administración
+asignados con `es_default=true` y caché sincronizado). El flujo
+`/rh/personal` desbloquea alta de empleados sin captura manual de jsonb,
+como se proyectó.
+
+ANSA y COAGAN quedan diferidos por instrucción explícita de Beto: esas
+empresas aún no arrancaron operativamente. Cuando arranquen, subirán
+sus escrituras y poderes vigentes a `/<empresa>/admin/documentos`, la
+extracción IA poblará `subtipo_meta` automáticamente, y la asignación
+en `/settings/empresas/[slug]` queda en mano del operador admin —
+toolería ya en producción, no requiere reabrir esta iniciativa.
+
+**Sprint 6 (cleanup) deferred indefinidamente:** el editor manual legacy
+de jsonb sigue siendo útil como fallback para empresas que aún no
+suben PDFs (ANSA/COAGAN). Deprecación queda como sub-iniciativa cuando
+las 4 SA de CV migren completamente.
+
+Iniciativa cerrada el 2026-05-06.
