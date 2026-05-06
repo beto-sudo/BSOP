@@ -19,6 +19,7 @@ type BookingRow = {
   resource_name: string | null;
   price_amount: number | null;
   owner_id: string | null;
+  payment_status: string | null;
 };
 
 type ParticipantRow = {
@@ -119,13 +120,19 @@ export function useConciliacionData() {
       ] = await Promise.all([
         playtomic
           .from('bookings')
-          .select('booking_id,booking_start,booking_end,resource_name,price_amount,owner_id')
-          .eq('payment_status', 'PENDING')
+          .select(
+            'booking_id,booking_start,booking_end,resource_name,price_amount,owner_id,payment_status'
+          )
+          // Modelo de cobertura efectiva: incluimos PENDING + PARTIAL_PAID +
+          // PAID (los 3 pueden requerir conciliación) y filtramos en cliente
+          // por `effective_status != 'full'`. NOT_APPLICABLE queda fuera —
+          // son torneos/clases/cuentas internas, otra historia.
+          .in('payment_status', ['PENDING', 'PARTIAL_PAID', 'PAID'])
           .eq('is_canceled', false)
           .lte('booking_start', nowIso)
           .gte('booking_start', ninetyDaysAgoIso)
           .order('booking_start', { ascending: true })
-          .limit(2000)
+          .limit(5000)
           .returns<BookingRow[]>(),
         rdb
           .from('waitry_pedidos')
@@ -239,19 +246,23 @@ export function useConciliacionData() {
         })
         .filter((c): c is WaitryCandidate => c !== null);
 
-      // Coverage combinada (Waitry + CSV) por booking. Excluimos del listado
-      // las que ya están `full` cubiertas — el operador no las necesita
-      // conciliar manualmente. Las `partial` siguen apareciendo con su badge
-      // (parcialmente cubiertas online + falta cobrar el resto en cancha).
-      const coverageByBooking = new Map<
-        string,
-        {
-          coverage_status: CoverageStatus;
-          coverage_pct: number;
-          assigned_total: number;
-          waitry_order_ids: string[];
-        }
-      >();
+      // Coverage efectiva (waitry + online_csv) por booking. Modelo nuevo:
+      // - effective_status='full' → totalmente trazable, sale del listado.
+      // - 'partial' / 'none' → aparecen para conciliar contra Waitry.
+      // - has_unverified_manager=true → flag visual: el manager marcó pagos
+      //   onsite en Playtomic pero no hay pedido equivalente en Waitry. Es
+      //   el caso central que la iniciativa caza (Hector et al).
+      type CoverageEntry = {
+        effective_status: CoverageStatus;
+        effective_pct: number;
+        assigned_total: number;
+        waitry_total: number;
+        online_csv_total: number;
+        manager_csv_total: number;
+        has_unverified_manager: boolean;
+        waitry_order_ids: string[];
+      };
+      const coverageByBooking = new Map<string, CoverageEntry>();
       const assignedOrderIds = new Set<string>();
       const assignmentsByBooking = new Map<string, AssignmentDetail[]>();
       if (bookingIds.length > 0) {
@@ -261,7 +272,9 @@ export function useConciliacionData() {
         ] = await Promise.all([
           playtomic
             .from('v_bookings_total_coverage')
-            .select('booking_id,coverage_status,coverage_pct,combined_total,waitry_order_ids')
+            .select(
+              'booking_id,effective_status,effective_pct,effective_total,waitry_total,online_csv_total,manager_csv_total,has_unverified_manager,waitry_order_ids'
+            )
             .in('booking_id', bookingIds),
           playtomic
             .from('payment_assignments')
@@ -276,9 +289,13 @@ export function useConciliacionData() {
         for (const row of coverageRows ?? []) {
           if (!row.booking_id) continue;
           coverageByBooking.set(row.booking_id, {
-            coverage_status: (row.coverage_status as CoverageStatus | null) ?? 'none',
-            coverage_pct: Number(row.coverage_pct ?? 0),
-            assigned_total: Number(row.combined_total ?? 0),
+            effective_status: (row.effective_status as CoverageStatus | null) ?? 'none',
+            effective_pct: Number(row.effective_pct ?? 0),
+            assigned_total: Number(row.effective_total ?? 0),
+            waitry_total: Number(row.waitry_total ?? 0),
+            online_csv_total: Number(row.online_csv_total ?? 0),
+            manager_csv_total: Number(row.manager_csv_total ?? 0),
+            has_unverified_manager: Boolean(row.has_unverified_manager),
             waitry_order_ids: row.waitry_order_ids ?? [],
           });
           for (const oid of row.waitry_order_ids ?? []) assignedOrderIds.add(oid);
@@ -304,11 +321,13 @@ export function useConciliacionData() {
       }
 
       const bookings: PendingBookingWithCoverage[] = bookingsList
-        // Filtra fuera las reservas con cobertura completa (Waitry+CSV).
-        // El operador solo necesita ver las que aún tienen algo que cobrar.
+        // Filtra por cobertura EFECTIVA: si waitry + online_csv ya cubre el
+        // total, el booking sale del listado. Los partial y none aparecen,
+        // incluyendo bookings con `payment_status=PAID` agregado pero sin
+        // cobertura trazable (ahí está el "marcado paid sin Waitry").
         .filter(
           (booking) =>
-            (coverageByBooking.get(booking.booking_id)?.coverage_status ?? 'none') !== 'full'
+            (coverageByBooking.get(booking.booking_id)?.effective_status ?? 'none') !== 'full'
         )
         .map((booking) => {
           const bookingParticipants = participantsByBooking.get(booking.booking_id) ?? [];
@@ -337,10 +356,14 @@ export function useConciliacionData() {
             owner_email: ownerPlayer?.email ?? null,
             participant_names: participantNames,
             participant_emails: participantEmails,
-            coverage_status: cov?.coverage_status ?? 'none',
-            coverage_pct: cov?.coverage_pct ?? 0,
+            api_payment_status: booking.payment_status,
+            coverage_status: cov?.effective_status ?? 'none',
+            coverage_pct: cov?.effective_pct ?? 0,
             assigned_total: cov?.assigned_total ?? 0,
             assigned_waitry_orders: cov?.waitry_order_ids ?? [],
+            online_csv_total: cov?.online_csv_total ?? 0,
+            manager_csv_total: cov?.manager_csv_total ?? 0,
+            has_unverified_manager: Boolean(cov?.has_unverified_manager),
           };
         });
 

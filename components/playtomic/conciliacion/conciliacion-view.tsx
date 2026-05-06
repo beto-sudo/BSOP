@@ -75,8 +75,8 @@ export function ConciliacionView() {
             Conciliación Playtomic ↔ Waitry
           </h1>
           <p className="text-sm text-[var(--text-muted)]">
-            Cruza reservas pendientes en Playtomic con cobros de cancha en Waitry (padel, tenis,
-            pickleball, uso de coach). {data.bookings.length} reservas a revisar.
+            Reservas con cobertura trazable incompleta: pagos online del CSV de Playtomic Manager +
+            asignaciones Waitry no llegan al total. {data.bookings.length} reservas a revisar.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={refetch} disabled={refreshing}>
