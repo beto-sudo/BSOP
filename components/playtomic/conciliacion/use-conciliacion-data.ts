@@ -75,10 +75,27 @@ export type AssignmentDetail = {
   note: string | null;
 };
 
+export type OrderAssignmentSummary = {
+  /** Total del pedido Waitry. */
+  total: number;
+  /** Suma de assignments existentes. */
+  assigned: number;
+  /** total - assigned. Si <= 0, el pedido está consumido. */
+  remaining: number;
+  /** Cuántos bookings ya tienen asignado este pedido. */
+  bookingsCount: number;
+};
+
 export type ConciliacionData = {
   bookings: PendingBookingWithCoverage[];
   candidates: WaitryCandidate[];
-  assignedOrderIds: Set<string>;
+  /**
+   * Resumen de asignaciones por order_id. Reemplaza al viejo
+   * `assignedOrderIds: Set<string>` para soportar split-payment:
+   * un mismo pedido Waitry puede asignarse a N bookings hasta agotar
+   * `total_amount`. El UI solo excluye candidatos con `remaining <= 0`.
+   */
+  orderAssignmentSummary: Map<string, OrderAssignmentSummary>;
   assignmentsByBooking: Map<string, AssignmentDetail[]>;
   /**
    * Bookings que están en `bookings[]` pero vinieron por fetch extra
@@ -98,7 +115,7 @@ export function useConciliacionData(options?: { extraBookingId?: string | null }
   const [data, setData] = useState<ConciliacionData>({
     bookings: [],
     candidates: [],
-    assignedOrderIds: new Set(),
+    orderAssignmentSummary: new Map(),
     assignmentsByBooking: new Map(),
     outOfFilterBookings: new Set(),
   });
@@ -324,7 +341,11 @@ export function useConciliacionData(options?: { extraBookingId?: string | null }
           waitry_order_ids: string[];
         };
         const coverageByBooking = new Map<string, CoverageEntry>();
-        const assignedOrderIds = new Set<string>();
+        // order_id → { total, assigned, remaining, bookingsCount }
+        // Soporta split-payment: un mismo pedido Waitry puede asignarse a N
+        // bookings (típico cuando un coach paga 3 clases con un solo pedido).
+        // El UI solo excluye candidatos con remaining <= 0.
+        const orderAssignmentSummary = new Map<string, OrderAssignmentSummary>();
         const assignmentsByBooking = new Map<string, AssignmentDetail[]>();
         if (bookingIds.length > 0) {
           // Mismo motivo que arriba: chunkeamos para no exceder el límite de URL.
@@ -375,16 +396,13 @@ export function useConciliacionData(options?: { extraBookingId?: string | null }
               has_unverified_manager: Boolean(row.has_unverified_manager),
               waitry_order_ids: row.waitry_order_ids ?? [],
             });
-            for (const oid of row.waitry_order_ids ?? []) assignedOrderIds.add(oid);
           }
 
+          // Acumulador de assignments por order_id. Procesamos TODAS las
+          // assignments del rango (no solo las del booking actual) para
+          // calcular el remaining global de cada pedido.
+          const assignedByOrder = new Map<string, { sum: number; bookings: Set<string> }>();
           for (const row of assignmentRows ?? []) {
-            // Defensa-en-profundidad: la vista `v_bookings_total_coverage`
-            // ya incluye los waitry_order_ids asignados, pero solo para los
-            // bookings consultados. Aquí poblamos también desde la tabla
-            // directa para asegurar que cualquier order asignada (visible
-            // o no en el listado) quede excluida de los candidatos.
-            assignedOrderIds.add(row.waitry_order_id);
             const list = assignmentsByBooking.get(row.booking_id) ?? [];
             list.push({
               id: row.id,
@@ -394,6 +412,33 @@ export function useConciliacionData(options?: { extraBookingId?: string | null }
               note: row.note,
             });
             assignmentsByBooking.set(row.booking_id, list);
+
+            const entry = assignedByOrder.get(row.waitry_order_id) ?? {
+              sum: 0,
+              bookings: new Set(),
+            };
+            entry.sum += Number(row.assigned_amount ?? 0);
+            entry.bookings.add(row.booking_id);
+            assignedByOrder.set(row.waitry_order_id, entry);
+          }
+
+          // Cruzar con waitry_pedidos.total_amount para calcular remaining.
+          // Solo cubre orders dentro del lookback; orders más antiguos
+          // que asignaciones huérfanas se tratan conservadoramente como
+          // "consumidos" (remaining=0) para que no aparezcan en el pool.
+          const pedidoTotalById = new Map<string, number>();
+          for (const pedido of waitryPedidos ?? []) {
+            pedidoTotalById.set(pedido.order_id, Number(pedido.total_amount ?? 0));
+          }
+          for (const [orderId, entry] of assignedByOrder.entries()) {
+            const total = pedidoTotalById.get(orderId) ?? entry.sum;
+            const remaining = Math.max(0, total - entry.sum);
+            orderAssignmentSummary.set(orderId, {
+              total,
+              assigned: entry.sum,
+              remaining,
+              bookingsCount: entry.bookings.size,
+            });
           }
         }
 
@@ -451,7 +496,7 @@ export function useConciliacionData(options?: { extraBookingId?: string | null }
         setData({
           bookings,
           candidates,
-          assignedOrderIds,
+          orderAssignmentSummary,
           assignmentsByBooking,
           outOfFilterBookings: outOfFilterIds,
         });

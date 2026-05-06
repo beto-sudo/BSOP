@@ -56,7 +56,7 @@ export async function assignPaymentAction(input: AssignPaymentInput): Promise<As
 
   const { data: pedido, error: pedidoErr } = await rdb
     .from('waitry_pedidos')
-    .select('order_id,paid')
+    .select('order_id,paid,total_amount')
     .eq('order_id', waitryOrderId)
     .maybeSingle();
   if (pedidoErr) return { ok: false, error: `Error consultando pedido: ${pedidoErr.message}` };
@@ -81,6 +81,35 @@ export async function assignPaymentAction(input: AssignPaymentInput): Promise<As
     };
   }
 
+  // Cálculo defensivo del saldo disponible. El trigger
+  // `trg_validate_assignment_total` vuelve a validar a nivel BD con
+  // advisory lock, pero validar acá da mensaje rico al usuario sin
+  // romper la transacción.
+  const orderTotal = Number(pedido.total_amount ?? 0);
+  if (orderTotal <= 0) {
+    return { ok: false, error: 'El pedido Waitry no tiene total_amount válido.' };
+  }
+
+  const { data: existingAssignments, error: existingErr } = await playtomic
+    .from('payment_assignments')
+    .select('assigned_amount')
+    .eq('waitry_order_id', waitryOrderId);
+  if (existingErr) {
+    return { ok: false, error: `Error consultando asignaciones previas: ${existingErr.message}` };
+  }
+  const sumAssigned = (existingAssignments ?? []).reduce(
+    (acc, a) => acc + Number(a.assigned_amount ?? 0),
+    0
+  );
+  const remaining = Math.max(0, orderTotal - sumAssigned);
+  // Tolerancia 0.01 igual que en el trigger BD para redondeos.
+  if (assignedAmount > remaining + 0.01) {
+    return {
+      ok: false,
+      error: `Solo quedan $${remaining.toFixed(2)} disponibles del pedido Waitry (total $${orderTotal.toFixed(2)}, ya asignados $${sumAssigned.toFixed(2)}).`,
+    };
+  }
+
   const { data: inserted, error: insertErr } = await playtomic
     .from('payment_assignments')
     .insert({
@@ -95,7 +124,19 @@ export async function assignPaymentAction(input: AssignPaymentInput): Promise<As
 
   if (insertErr) {
     if (insertErr.code === '23505') {
-      return { ok: false, error: 'Este pedido Waitry ya está asignado a otra reserva.' };
+      return {
+        ok: false,
+        error: 'Este pedido Waitry ya tiene una asignación a esta misma reserva.',
+      };
+    }
+    if (insertErr.code === '23514') {
+      // CHECK violation desde el trigger — race condition donde otro
+      // insert paralelo consumió el saldo entre nuestra validación y
+      // el insert. Reportamos al usuario para que reintente.
+      return {
+        ok: false,
+        error: `El saldo del pedido cambió antes de guardar — refresca y vuelve a intentar. Detalle: ${insertErr.message}`,
+      };
     }
     return { ok: false, error: `Error al guardar la asignación: ${insertErr.message}` };
   }
