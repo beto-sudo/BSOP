@@ -3,10 +3,11 @@
 **Slug:** `rdb-waitry-ingesta-dedup`
 **Empresas:** RDB
 **Schemas afectados:** rdb (waitry\_\*), erp (cortes_caja, movimientos_caja, movimientos_inventario)
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-04-26
-**Última actualización:** 2026-04-29
+**Última actualización:** 2026-05-06
+**Cerrada:** 2026-05-06 (mitigación operacional externa hizo innecesaria la Fase 2.C — ver [ADR-008](../../supabase/adr/008_rdb_waitry_cierre_terminal_change.md))
 
 ## Problema
 
@@ -88,32 +89,27 @@ Mientras esto no se entienda y se cierre, los cortes RDB siguen requiriendo reco
 - **Fase 1.5 — forense del doble-tap antes de reportar a Waitry.** ✅ **Cerrada 2026-04-26.** Salida: [ADR-006](../../supabase/adr/006_rdb_waitry_forense_doble_tap.md) con prueba definitiva (no es defecto del POS), patrones (97% en una tablet, 73% en horas pico), corrección de impacto (~$10–20k reales, no $163k crudos) y replanteo de prioridades.
 - **Fase 2.A — Opción C (cleanup mínimo).** ✅ **Cerrada 2026-04-26** vía PR [#211](https://github.com/beto-sudo/BSOP/pull/211). Migración `20260426120000_rdb_waitry_c_cleanup.sql` con typo fix `'order_canceled'`, drop de `rdb.trg_procesar_venta_waitry`, mejora de `match_reason` en detector. Aplicada a DB live antes del PR.
 - **Fase 2.B — Fix del detector (table_id + ventana 90s + re-detección).** ✅ **Cerrada 2026-04-26** vía PR [#212](https://github.com/beto-sudo/BSOP/pull/212). Migración `20260426130000_rdb_waitry_hash_fix_tableid_y_ventana.sql`. Resultado: 949 → 91 pares pendientes (−90.4%); tasa Tiendita 14% → 9.3%; pares clave del corte ancla siguen detectándose. Decisión técnica: NO se modificó `compute_content_hash` con `tableId` — análisis empírico mostró que en mostrador todas las ventas comparten `tableId 94034`, así que no discriminaba. La palanca real para el 9.3% residual es la UI manual (Fase 2.C).
-- **Fase 2.C — UI de resolución (Opción B).** ⏸️ **Próximo hito.** 91 pares pendientes hoy + los nuevos que aparezcan requieren intervención manual por SQL hasta que exista UI. Alcance v1 tentativo en sección "Próximo hito" abajo. Sin esto la iniciativa no cierra.
-- **Fase 3 — Conversación con Waitry (NO urgente).** ⏸️ Solo si después de la UI de Fase 2.C el % de doble-taps reales sigue alto y se vuelve oneroso resolverlos manualmente. Conversación sería sobre UX preventiva en su POS (warning si se intenta crear orden idéntica en ventana corta), no sobre defecto del POS (ADR-006 ya descartó eso).
+- **Fase 2.C — UI de resolución (Opción B).** ✅ **N/A — no procede 2026-05-06.** RDB cambió la terminal POS Waitry de tablet Android a Windows + emulador Android el 2026-04-30, eliminando la causa raíz operacional (doble-tap del touch screen). Validación empírica el 2026-05-06: cero detecciones operativas en Pádel post-cambio (donde el detector es preciso); 8 detecciones residuales en Tiendita son falsos positivos esperados del 9.3% predicho por ADR-006. Sin flujo continuo de duplicados reales, la UI dejó de ser necesaria. Los 146 pares pendientes se resolvieron en batch SQL (`20260506223531_rdb_waitry_resolve_historic_pre_terminal_change.sql`) con clasificación por bucket. Ver [ADR-008](../../supabase/adr/008_rdb_waitry_cierre_terminal_change.md) para detalle.
+- **Fase 3 — Conversación con Waitry (NO urgente).** ✅ **N/A — no procede 2026-05-06.** La causa raíz no era el POS Waitry (lado proveedor), era el input device (tablet táctil). Cambio de hardware lo resolvió. Sin necesidad de pedir UX preventiva al proveedor.
 
-## Próximo hito — Fase 2.C: UI de resolución de duplicados
+## Cierre de la iniciativa (2026-05-06)
 
-**Problema operativo hoy:** los 91 pares pendientes en `rdb.waitry_duplicate_candidates` (y los nuevos que el detector marca cada día) requieren que alguien resuelva por SQL. Sin UI, el cajero no tiene forma de cerrar el ciclo cuando cuadra un corte con sospecha de dup.
+La iniciativa cerró sin construir Fase 2.C. La causa raíz se mitigó por
+una intervención operacional externa (cambio de terminal POS) y la UI
+de resolución dejó de ser necesaria. Ver [ADR-008](../../supabase/adr/008_rdb_waitry_cierre_terminal_change.md)
+para validación empírica, política de lectura para detecciones futuras,
+y decisión documentada.
 
-**Alcance v1 tentativo (cerrar al arrancar):**
+**Outcome final:**
 
-- Vista (probablemente módulo nuevo `/rdb/conciliacion-waitry` o sub-tab dentro de Cortes) que liste los pares pendientes de `rdb.waitry_duplicate_candidates` con `resolved=false`.
-- Por cada par muestra: productos + total + `seconds_apart` + `payment_methods` + `match_reason` + sugerencia del "bueno" según ADR-006.
-- Acciones por par:
-  - **Resolver como dup** → marca uno superseded_by el otro vía nuevo flag (no afecta corte cerrado, decisión registrada en audit trail).
-  - **Resolver como ventas distintas** → marca el par `resolved=true` con razón "no era dup".
-- Filtro por corte para que el cajero lo vea junto al corte que cuadra.
-- Audit trail: `resolved_by`, `resolved_at`, `resolution_note`.
-- Acceso: solo admin RDB + cajeros del módulo de cortes.
-
-**Riesgos a resolver al cerrar alcance:**
-
-- ¿Permitir resolución de pares cuyos pedidos ya viven en un corte cerrado? Decisión recomendada (preliminar): trazabilidad sin tocar totales históricos — agregar flag de "decisión a futuro" sin cambiar el corte. Pero hay que validarlo con Beto al arrancar.
-- ¿UX dentro de `/rdb/cortes` o como módulo aparte? Ambas alternativas tienen tradeoffs (menor fricción vs separación de concerns).
-- ¿Política de auto-resolución para pares con `seconds_apart < 5s` y mismo `payment_method`? Puede arrancar manual y agregarse cuando haya volumen.
+- 146 pares pendientes resueltos en batch (138 `historic_pre_terminal_change` + 8 `tiendita_false_positive_residual`).
+- Constraint `waitry_dup_candidates_resolution_chk` extendido con los 2 valores nuevos para soportar la clasificación.
+- Detector `rdb.check_duplicates` queda activo. Política para futuras detecciones documentada en ADR-008 §"Política para detecciones futuras".
+- Métricas de Fase v2 cumplidas via mitigación externa: 0 nuevos duplicados reales en Pádel post-cambio (operativo donde el detector es preciso).
 
 ## Decisiones registradas
 
+- **2026-05-06 (CC + Beto) — Cierre de la iniciativa sin Fase 2.C.** Beto reportó que el 2026-04-30 cambiaron la terminal POS Waitry de tablet Android stand-alone a una computadora Windows con emulador Android, y que desde entonces no se han detectado duplicaciones nuevas reportadas por cajero. CC validó empíricamente: 0 detecciones operativas en Pádel (donde el detector es preciso) post-cambio; las 8 detecciones residuales en Tiendita son los falsos positivos esperados (9.3%) ya documentados en ADR-006. La hipótesis de doble-tap por pantalla táctil queda validada como causa raíz. Decisión: cerrar iniciativa, resolver 146 pares pendientes en batch, mantener detector activo con política de lectura documentada. Detalle completo en [ADR-008](../../supabase/adr/008_rdb_waitry_cierre_terminal_change.md).
 - **2026-04-26 (CC) — Causa raíz NO está en pipeline DB.** Verificado read-only: `waitry_inbound.order_id` y `waitry_pedidos.order_id` ya tienen `UNIQUE`; trigger `process_waitry_inbound` usa `INSERT … ON CONFLICT DO UPDATE` (idempotente). Para los 6 `order_id`s sospechosos del corte ancla: 6 filas `waitry_inbound` con `payload_hash` distinto y `attempts=0` → no es replay ni retry. Origen real: doble-tap del operador en POS Waitry (no controlamos su código).
 - **2026-04-26 (CC) — Errores en doc planning corregidos al investigar:**
   - El doc decía `erp.cortes_movimientos`; la tabla real es `erp.movimientos_caja` (movimientos manuales del cajero, ej. retiros). El esquema afectado por el dup es `erp.movimientos_inventario` vía `erp.fn_trg_waitry_to_movimientos`.
@@ -130,6 +126,7 @@ Mientras esto no se entienda y se cierre, los cortes RDB siguen requiriendo reco
 
 ## Bitácora
 
+- **2026-05-06 (CC)** — Cierre de iniciativa. Beto reportó cambio de terminal POS Waitry el 2026-04-30 (tablet Android → Windows + emulador Android) que mitigó la causa raíz operacional. Validación read-only sobre `rdb.waitry_duplicate_candidates`: 0 detecciones operativas en Pádel post-cambio; 8 residuales en Tiendita son FP esperados. ADR-008 creado con causa raíz operacional + validación + política para detecciones futuras. Migración `20260506223531_rdb_waitry_resolve_historic_pre_terminal_change.sql` aplicada via MCP: extendió `waitry_dup_candidates_resolution_chk` con `historic_pre_terminal_change` y `tiendita_false_positive_residual`, marcó 138 + 8 = 146 pares como resolved. Verificado: 0 pares con `resolved=false` post-migración. Planning doc + INITIATIVES.md actualizados. Branch `feat/rdb-waitry-cierre-historico`.
 - **2026-04-26 (CC)** — Investigación Fase 1 completa. Branch `docs/rdb-waitry-ingesta-dedup-init`, commits `394e1d5` (alta de iniciativa por Cowork) + `ff60842` (chore format). Push a origin. ADR-005 creado con causa raíz, cifra histórica ($163k impacto en abril, 949 pares, 180 cortes afectados) y 3 opciones de fix (A descartada, B recomendada, C como mínimo viable). Próximo hito: Beto revisa ADR y decide alcance v2.
 - **2026-04-26 (CC)** — Forense Fase 1.5 completa. Beto pidió validar 100% que el problema es de Waitry antes de reportarles. Branch `docs/rdb-waitry-forense-pos`, PR [#210](https://github.com/beto-sudo/BSOP/pull/210) mergeado. ADR-006 creado con prueba definitiva (IDs internos del POS son distintos, es operacional), patrones (97% Tiendita, 73% horas pico, Laisha 199 dups en datos crudos), y dos correcciones materiales tras observaciones de Beto: (1) "pago registrado ≠ cobro real" — ningún cliente paga 2 veces sin reclamar, mucho del impacto inicial era inflado; (2) `compute_content_hash` con `table_name` texto causa falsos positivos sistémicos en mostrador. Recálculo honesto del impacto: ~$10–20k de descuadre operativo, no $163k.
 - **2026-04-26 (CC)** — Fase 2.A (Opción C) en curso. Branch `feat/rdb-waitry-c-cleanup`. Migración `20260426120000_rdb_waitry_c_cleanup.sql` con 3 cambios: typo fix `'order_canceled'` en `v_cortes_totales`, drop de `rdb.trg_procesar_venta_waitry()`, mejora del `match_reason` en `rdb.check_duplicates` para incluir `seconds_apart` y `payment_methods`. Aplicada vía `mcp__supabase__apply_migration` antes del PR. Verificado: view filtra correctamente por `'order_canceled'`, función dropeada, match_reason ejemplo: `"same products + amount + table (3s apart, methods=credit_card_visa+credit_card_visa)"`. SCHEMA_REF.md regenerado (solo cambia timestamp). Próximo hito: Fase 2.B — fix del `compute_content_hash` (incluir `tableId`, ventana 60–90s, considerar `orderUserId`) + backfill + re-detección. Coordinar fuera de horario operativo.
