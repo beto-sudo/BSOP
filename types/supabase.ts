@@ -8525,6 +8525,9 @@ export type Database = {
           row_id: string | null
           source: string | null
           subject: string | null
+          waitry_notes: string | null
+          waitry_order_total: number | null
+          waitry_paid_at: string | null
         }
         Relationships: []
       }

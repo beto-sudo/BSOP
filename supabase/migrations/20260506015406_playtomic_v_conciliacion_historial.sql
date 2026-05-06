@@ -20,7 +20,19 @@
 --   - payment_origin   — origin crudo del CSV (App iOS / Manager / Web); null en Waitry
 --   - event_at         — assigned_at (Waitry) o payment_date (CSV)
 --   - assigned_by      — uuid del usuario que asignó (Waitry); null en CSV
---   - subject          — nombre del jugador que pagó (CSV) o note interna (Waitry)
+--   - subject          — nombre del jugador que pagó (CSV) o note interna del operador (Waitry)
+--
+-- Columnas extra para filas Waitry (LEFT JOIN a rdb.waitry_pedidos):
+--   - waitry_notes        — texto libre del cobrador en el POS Waitry
+--                            (ej. "jose Luis paz efectivo"). Clave para
+--                            identificar al cliente cuando la asignación
+--                            no tenía nota interna.
+--   - waitry_paid_at      — timestamp del cobro físico (distinto del
+--                            assigned_at, que es cuándo el operador hizo
+--                            la conciliación en BSOP).
+--   - waitry_order_total  — total del pedido completo (puede diferir del
+--                            assigned_amount si el pedido tenía F&B
+--                            mezclado con la cancha).
 --
 -- security_invoker = true: respeta las RLS de las tablas subyacentes
 -- (mismo patrón que v_bookings_total_coverage).
@@ -47,9 +59,13 @@ SELECT
   null::text                               AS payment_origin,
   pa.assigned_at                           AS event_at,
   pa.assigned_by,
-  pa.note                                  AS subject
+  pa.note                                  AS subject,
+  wp.notes                                 AS waitry_notes,
+  wp.timestamp                             AS waitry_paid_at,
+  wp.total_amount                          AS waitry_order_total
 FROM playtomic.payment_assignments pa
-JOIN playtomic.bookings b USING (booking_id)
+JOIN playtomic.bookings b      USING (booking_id)
+LEFT JOIN rdb.waitry_pedidos wp ON wp.order_id = pa.waitry_order_id
 
 UNION ALL
 
@@ -75,7 +91,10 @@ SELECT
   p.origin                                 AS payment_origin,
   p.payment_date                           AS event_at,
   null::uuid                               AS assigned_by,
-  p.user_name                              AS subject
+  p.user_name                              AS subject,
+  null::text                               AS waitry_notes,
+  null::timestamptz                        AS waitry_paid_at,
+  null::numeric                            AS waitry_order_total
 FROM playtomic.payments_import p
 JOIN playtomic.booking_participants bp ON bp.player_id = p.user_id
 JOIN playtomic.bookings b              ON b.booking_id = bp.booking_id

@@ -465,6 +465,19 @@ export function HistorialView() {
                               {ev.payment_origin ? ` · ${ev.payment_origin}` : ''}
                             </span>
                           ) : null}
+                          {ev.source === 'waitry' && ev.waitry_paid_at ? (
+                            <span className="text-[var(--text-muted)]">
+                              ⏱ {formatEventDate(ev.waitry_paid_at)} (cobro)
+                              {ev.waitry_order_total != null && ev.waitry_order_total !== ev.amount
+                                ? ` · pedido ${formatMoney(ev.waitry_order_total)}`
+                                : ''}
+                            </span>
+                          ) : null}
+                          {ev.source === 'waitry' && ev.waitry_notes ? (
+                            <span className="text-[var(--text)]/80 italic" title={ev.waitry_notes}>
+                              📝 &ldquo;{ev.waitry_notes}&rdquo;
+                            </span>
+                          ) : null}
                           {ev.subject ? (
                             <span className="text-[var(--text-muted)]">{ev.subject}</span>
                           ) : null}

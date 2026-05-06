@@ -27,6 +27,12 @@ export type HistorialEvent = {
   /** Email del usuario que asignó (Waitry manual). null para CSV (auto). */
   assigned_by_email: string | null;
   subject: string | null;
+  /** Notes que el cobrador escribió en el POS Waitry (ej. "jose Luis paz efectivo"). null para CSV. */
+  waitry_notes: string | null;
+  /** Timestamp del cobro físico en Waitry (distinto del assigned_at). null para CSV. */
+  waitry_paid_at: string | null;
+  /** Total del pedido Waitry completo (puede incluir F&B además de cancha). null para CSV. */
+  waitry_order_total: number | null;
 };
 
 type ViewRow = {
@@ -44,6 +50,9 @@ type ViewRow = {
   event_at: string | null;
   assigned_by: string | null;
   subject: string | null;
+  waitry_notes: string | null;
+  waitry_paid_at: string | null;
+  waitry_order_total: number | null;
 };
 
 type PlayerRow = {
@@ -85,7 +94,7 @@ export function useHistorialData({ fromIso, toIso }: { fromIso: string; toIso: s
         const { data: rawRows, error: rowsErr } = await playtomic
           .from('v_conciliacion_historial')
           .select(
-            'row_id,source,booking_id,booking_start,resource_name,booking_total,owner_id,reference_id,amount,payment_method,payment_origin,event_at,assigned_by,subject'
+            'row_id,source,booking_id,booking_start,resource_name,booking_total,owner_id,reference_id,amount,payment_method,payment_origin,event_at,assigned_by,subject,waitry_notes,waitry_paid_at,waitry_order_total'
           )
           .gte('event_at', `${fromIso}T00:00:00Z`)
           .lte('event_at', `${toIso}T23:59:59Z`)
@@ -159,6 +168,9 @@ export function useHistorialData({ fromIso, toIso }: { fromIso: string; toIso: s
             assigned_by: r.assigned_by,
             assigned_by_email: r.assigned_by ? (usuarioMap.get(r.assigned_by) ?? null) : null,
             subject: r.subject,
+            waitry_notes: r.waitry_notes,
+            waitry_paid_at: r.waitry_paid_at,
+            waitry_order_total: r.waitry_order_total != null ? Number(r.waitry_order_total) : null,
           };
         });
 
