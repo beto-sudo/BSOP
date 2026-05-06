@@ -57,14 +57,32 @@ export function ConciliacionView() {
 
   const rankedCandidates = useMemo(() => {
     if (!selectedBooking) return [];
-    const available = data.candidates.filter((c) => !data.assignedOrderIds.has(c.order_id));
+    // Soporta split-payment: un mismo pedido Waitry puede asignarse a N
+    // bookings hasta agotar `total_amount`. Cada candidato lleva consigo
+    // su `remaining_amount` para que el panel sepa cuánto puede asignar.
+    const available = data.candidates
+      .map((c) => {
+        const summary = data.orderAssignmentSummary.get(c.order_id);
+        if (!summary) {
+          return { ...c, remaining_amount: c.total_amount };
+        }
+        return {
+          ...c,
+          remaining_amount: summary.remaining,
+          assigned_to_other_bookings: summary.assigned,
+          shared_with_bookings_count: summary.bookingsCount,
+        };
+      })
+      // Tolerancia 0.01 igual que en BD/action: redondeos no deben
+      // ocultar pedidos que aún tienen saldo asignable.
+      .filter((c) => (c.remaining_amount ?? c.total_amount) > 0.01);
     const ranked = rankCandidates(selectedBooking, available, {
       toleranceMs: TIMESTAMP_TOLERANCE_PRESETS_MS[tolerancePreset],
     });
     const q = searchQuery.trim().toLowerCase();
     if (!q) return ranked;
     return ranked.filter((c) => (c.notes ?? '').toLowerCase().includes(q));
-  }, [selectedBooking, data.candidates, data.assignedOrderIds, tolerancePreset, searchQuery]);
+  }, [selectedBooking, data.candidates, data.orderAssignmentSummary, tolerancePreset, searchQuery]);
 
   if (loading) {
     return (

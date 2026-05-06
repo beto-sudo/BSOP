@@ -53,13 +53,34 @@ export function AssignmentPanel({
   // El padre pasa `key={selectedBookingId}` al panel para que React
   // remonte y reinicie selectedOrderIds/feedback al cambiar de reserva.
 
-  const totalSelected = useMemo(
-    () =>
-      candidates
-        .filter((c) => selectedOrderIds.has(c.order_id))
-        .reduce((sum, c) => sum + c.total_amount, 0),
-    [candidates, selectedOrderIds]
-  );
+  // El monto a asignar de cada candidato es el menor entre:
+  //   1. El saldo disponible del pedido (`remaining_amount`, en split-payment)
+  //   2. El total faltante de la reserva
+  // Esto garantiza que un coach con 3 clases en un pedido $900 pueda asignar
+  // $300 a cada reserva sin asumir el monto fijo del ticket.
+  function amountToAssign(
+    c: { total_amount: number; remaining_amount?: number },
+    bookingRemaining: number
+  ): number {
+    const available = c.remaining_amount ?? c.total_amount;
+    return Math.min(available, bookingRemaining);
+  }
+
+  const bookingRemainingBeforeSelection = booking
+    ? Math.max(0, booking.price_amount - booking.assigned_total)
+    : 0;
+
+  const totalSelected = useMemo(() => {
+    let runningRemaining = bookingRemainingBeforeSelection;
+    let sum = 0;
+    for (const c of candidates) {
+      if (!selectedOrderIds.has(c.order_id)) continue;
+      const amt = amountToAssign(c, runningRemaining);
+      sum += amt;
+      runningRemaining = Math.max(0, runningRemaining - amt);
+    }
+    return sum;
+  }, [candidates, selectedOrderIds, bookingRemainingBeforeSelection]);
 
   if (!booking) {
     return (
@@ -89,15 +110,22 @@ export function AssignmentPanel({
     setFeedback(null);
     startTransition(async () => {
       let successes = 0;
+      let runningRemaining = bookingRemainingBeforeSelection;
       const errors: string[] = [];
       for (const c of toAssign) {
+        const amt = amountToAssign(c, runningRemaining);
+        if (amt <= 0) {
+          errors.push(`#${c.order_id}: la reserva ya quedó cubierta antes de asignar este pedido.`);
+          continue;
+        }
         const res = await assignPaymentAction({
           booking_id: booking.booking_id,
           waitry_order_id: c.order_id,
-          assigned_amount: c.total_amount,
+          assigned_amount: amt,
         });
         if (res.ok) {
           successes += 1;
+          runningRemaining = Math.max(0, runningRemaining - amt);
         } else {
           errors.push(`#${c.order_id}: ${res.error}`);
         }
@@ -341,6 +369,10 @@ export function AssignmentPanel({
             {candidates.map((candidate) => {
               const isSelected = selectedOrderIds.has(candidate.order_id);
               const tsLabel = TIMESTAMP_FMT.format(new Date(candidate.timestamp));
+              const isShared =
+                (candidate.shared_with_bookings_count ?? 0) > 0 &&
+                (candidate.assigned_to_other_bookings ?? 0) > 0;
+              const remaining = candidate.remaining_amount ?? candidate.total_amount;
               return (
                 <li
                   key={candidate.order_id}
@@ -354,7 +386,16 @@ export function AssignmentPanel({
                     <div className="flex flex-wrap items-center gap-2 font-medium text-[var(--text)]">
                       <span>{tsLabel}</span>
                       <span className="text-[var(--text-muted)]">·</span>
-                      <span>{formatMoney(candidate.total_amount)}</span>
+                      {isShared ? (
+                        <span title={`Total del ticket: ${formatMoney(candidate.total_amount)}`}>
+                          <span>{formatMoney(remaining)}</span>
+                          <span className="ml-1 text-xs text-[var(--text-muted)]">
+                            disponible de {formatMoney(candidate.total_amount)}
+                          </span>
+                        </span>
+                      ) : (
+                        <span>{formatMoney(candidate.total_amount)}</span>
+                      )}
                       <span
                         className="rounded-full border border-[var(--border)] bg-[var(--panel)]/60 px-2 py-0.5 font-mono text-xs text-[var(--text-muted)]"
                         title={candidate.order_id}
@@ -364,6 +405,14 @@ export function AssignmentPanel({
                       <span className="rounded-full border border-[var(--border)] bg-[var(--panel)]/60 px-2 py-0.5 text-xs text-[var(--text-muted)]">
                         score {Math.round(candidate.score)}
                       </span>
+                      {isShared ? (
+                        <span
+                          className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-200"
+                          title={`Asignado a ${candidate.shared_with_bookings_count} reserva${candidate.shared_with_bookings_count === 1 ? '' : 's'} previa${candidate.shared_with_bookings_count === 1 ? '' : 's'} por ${formatMoney(candidate.assigned_to_other_bookings ?? 0)}`}
+                        >
+                          Pago compartido
+                        </span>
+                      ) : null}
                     </div>
                     {candidate.items.length > 0 ? (
                       <ul className="space-y-0.5 text-xs text-[var(--text)]/80">

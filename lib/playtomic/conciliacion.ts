@@ -119,6 +119,15 @@ export type WaitryCandidate = {
   // Lista completa de productos del pedido (incluyendo F&B), para que el
   // operador vea el contexto del ticket al decidir si lo asigna.
   items: WaitryItem[];
+  // ─── Split-payment metadata (opcional) ───────────────────────────────
+  // Cuando el pedido tiene assignments previos a otros bookings, el hook
+  // popula estos campos. Si están ausentes, asumir N=0 (todo disponible).
+  /** Saldo disponible del pedido = total_amount - SUM(otras assignments). */
+  remaining_amount?: number;
+  /** Suma de assignments de este order a OTROS bookings. */
+  assigned_to_other_bookings?: number;
+  /** Cuántos bookings ya tienen asignado este pedido (incluye el current). */
+  shared_with_bookings_count?: number;
 };
 
 export type RankedCandidate = WaitryCandidate & {
