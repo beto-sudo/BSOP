@@ -33,27 +33,31 @@ function parsePrice(priceStr?: string) {
 }
 
 /**
- * Convierte un ISO string SIN offset (formato "YYYY-MM-DDTHH:MM:SS"),
- * asumido en zona "America/Chicago" (Central Time con DST EE.UU.), a un
- * ISO UTC con sufijo Z.
+ * Corrige los timestamps "naive" del third-party API de Playtomic
+ * sumándoles el ajuste DST EE.UU. cuando aplica.
  *
- * Empíricamente, el third-party API de Playtomic devuelve los campos
- * `booking_start_date` y `booking_end_date` en esa zona. Verificado vía
- * cross-check contra `payments_import.service_date` que tiene UTC
- * correcto (parseado del CSV con offset explícito):
+ * Empíricamente (verificado contra `payments_import.service_date` y
+ * `rdb.waitry_pedidos.timestamp`, ambos UTC verdaderos), el campo
+ * `booking_start_date` viene en formato "YYYY-MM-DDTHH:MM:SS" sin offset.
+ * Tratado como UTC, presenta un drift positivo durante DST EE.UU.:
  *
- *   - feb 2026 (sin DST EE.UU.): drift promedio = 0.00h.
- *   - mar 2026 (post-8mar, DST EE.UU. activo): drift promedio = ~0.85h.
- *   - abr/may 2026 (DST EE.UU.): drift promedio = ~0.90-1.00h.
+ *   - Fuera de DST EE.UU. (Chicago en CST = UTC-6): drift = 0.
+ *   - En DST EE.UU. (Chicago en CDT = UTC-5):       drift = +1h.
  *
- * El club Matamoros opera en CST puro (UTC-6, sin DST), así que NO basta
- * con un offset constante: la conversión debe respetar las reglas DST
- * de America/Chicago para que en mayo el cálculo aplique -5h y en enero
- * aplique -6h.
+ * Drift promedio por semana (drift_hrs = csv - booking_start):
+ *   - feb 2026 (pre-DST):           0.00 h
+ *   - 9-mar 2026 (DST inicia 8-mar): +0.84 h
+ *   - mar/abr/may 2026 (DST):       +0.85 a +1.00 h
  *
- * Edge case: durante la transición DST (segundo domingo de marzo, 2-3 AM
- * Central) hay una hora ambigua. Para nuestro caso operativo (reservas
- * de cancha) ese 1 día/año con bookings raros a esa hora es aceptable.
+ * El club Matamoros opera en CST puro (UTC-6, sin DST). Para alinear el
+ * `booking_start` guardado con la realidad operativa del club (que es lo
+ * que también refleja el CSV y los pedidos Waitry), sumamos al naive
+ * la diferencia entre el offset de Chicago en ese instante y el offset
+ * fijo CST. Eso da +1h en DST y 0h fuera.
+ *
+ * Edge case: durante la transición DST (2do domingo marzo, 1er domingo
+ * noviembre, 2-3 AM Central) hay una hora ambigua. Para reservas de
+ * cancha (raras a esas horas) es aceptable.
  */
 function chicagoOffsetMsAt(instant: Date): number {
   // Devuelve cuántos ms está Chicago detrás de UTC en `instant`.
@@ -73,28 +77,22 @@ function chicagoOffsetMsAt(instant: Date): number {
   return new Date(chicagoIso).getTime() - instant.getTime();
 }
 
+const CST_FIXED_OFFSET_MS = -6 * 60 * 60 * 1000; // CST puro = UTC-6 (zona Matamoros, sin DST).
+
 function naiveChicagoIsoToUtc(naiveIso: string | null | undefined): string | null {
   if (!naiveIso) return null;
   // Si por algún motivo el API empieza a mandar con offset (Z o ±HH:MM), no tocamos.
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(naiveIso)) return naiveIso;
 
-  // El naive ISO representa el wall-clock de Chicago. Para convertirlo a UTC,
-  // necesitamos el offset de Chicago EN EL INSTANTE UTC equivalente — pero no
-  // lo sabemos antes de convertir. Resolvemos con dos iteraciones que convergen
-  // en los 2 días/año de transición DST (segundo domingo de marzo y primer
-  // domingo de noviembre).
   const asIfUtc = new Date(naiveIso + 'Z');
   if (Number.isNaN(asIfUtc.getTime())) return naiveIso;
 
-  // Iteración 1: usamos el naive-as-UTC como punto de partida.
-  let offsetMs = chicagoOffsetMsAt(asIfUtc);
-  // Iteración 2: usamos el UTC estimado (más preciso) para confirmar el offset.
-  // En días de transición DST, el offset puede cambiar entre asIfUtc y el real
-  // UTC, y esta segunda pasada lo corrige.
-  const estimatedUtc = new Date(asIfUtc.getTime() - offsetMs);
-  offsetMs = chicagoOffsetMsAt(estimatedUtc);
+  // dstAdjustmentMs = cuánto adelanta Chicago respecto a CST puro EN ese
+  // instante. CDT (mayo): chicago=-5h, CST=-6h → diff = +1h. CST (febrero):
+  // chicago=-6h, CST=-6h → diff = 0.
+  const dstAdjustmentMs = chicagoOffsetMsAt(asIfUtc) - CST_FIXED_OFFSET_MS;
 
-  return new Date(asIfUtc.getTime() - offsetMs).toISOString();
+  return new Date(asIfUtc.getTime() + dstAdjustmentMs).toISOString();
 }
 
 serve(async (req) => {
