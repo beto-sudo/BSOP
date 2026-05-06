@@ -33,7 +33,17 @@ const FECHA_CORTA_FMT = new Intl.DateTimeFormat('es-MX', {
   month: 'short',
 });
 
-type SourceFilter = 'all' | HistorialSource;
+/**
+ * 'effective' = Online + Waitry (lo verdaderamente trazable, default).
+ * 'all'       = todos los canales (auditoría completa, incluye Manager).
+ * Resto       = un solo canal.
+ *
+ * Por default NO mostramos Manager: esos pagos son los que requieren
+ * conciliación contra Waitry y aparecen como pendientes en el tab
+ * Conciliación con flag ⚠. Si el operador quiere auditar el bulto, puede
+ * cambiar el filtro a 'manager' o 'all'.
+ */
+type SourceFilter = 'effective' | 'all' | HistorialSource;
 
 const SOURCE_LABELS: Record<HistorialSource, string> = {
   online: '🟢 Online',
@@ -83,7 +93,7 @@ export function HistorialView() {
   const router = useRouter();
   const [fromIso, setFromIso] = useState(() => defaultRange().fromIso);
   const [toIso, setToIso] = useState(() => defaultRange().toIso);
-  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('effective');
   const [resourceFilter, setResourceFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [isUnassigning, startUnassignTransition] = useTransition();
@@ -106,7 +116,13 @@ export function HistorialView() {
   const filteredEvents = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return events.filter((ev) => {
-      if (sourceFilter !== 'all' && ev.source !== sourceFilter) return false;
+      if (sourceFilter === 'effective') {
+        // Solo lo trazable: Online (CSV App/Web) + Waitry (manual).
+        // Manager onsite y Other quedan fuera — esos requieren conciliación.
+        if (ev.source !== 'online' && ev.source !== 'waitry') return false;
+      } else if (sourceFilter !== 'all' && ev.source !== sourceFilter) {
+        return false;
+      }
       if (resourceFilter && ev.resource_name !== resourceFilter) return false;
       if (q) {
         const haystack = [
@@ -125,15 +141,37 @@ export function HistorialView() {
     });
   }, [events, sourceFilter, resourceFilter, searchQuery]);
 
-  // Totales del periodo filtrado, agrupados por source.
-  const totals = useMemo(() => {
-    const sums = { online: 0, manager: 0, waitry: 0, other: 0, all: 0 };
-    for (const ev of filteredEvents) {
+  // KPIs por canal: respetan filtros de fecha/cancha/búsqueda, pero NO el de
+  // Origen — así el operador ve el bulto Manager incluso cuando la tabla
+  // solo muestra Online+Waitry. El KPI "Total filtrado" sí refleja el filtro
+  // completo (lo que está visible en la tabla).
+  const channelTotals = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const sums = { online: 0, manager: 0, waitry: 0, other: 0 };
+    for (const ev of events) {
+      if (resourceFilter && ev.resource_name !== resourceFilter) continue;
+      if (q) {
+        const haystack = [
+          ev.owner_name ?? '',
+          ev.subject ?? '',
+          ev.reference_id,
+          ev.payment_method ?? '',
+          ev.payment_origin ?? '',
+          ev.assigned_by_email ?? '',
+        ]
+          .join(' ')
+          .toLowerCase();
+        if (!haystack.includes(q)) continue;
+      }
       sums[ev.source] += ev.amount;
-      sums.all += ev.amount;
     }
     return sums;
-  }, [filteredEvents]);
+  }, [events, resourceFilter, searchQuery]);
+
+  const totalFiltered = useMemo(
+    () => filteredEvents.reduce((sum, ev) => sum + ev.amount, 0),
+    [filteredEvents]
+  );
 
   function handleQuitar(rowId: string) {
     setFeedback(null);
@@ -227,9 +265,10 @@ export function HistorialView() {
             Historial de cobertura por reserva
           </h1>
           <p className="text-sm text-[var(--text-muted)]">
-            Cada fila es un pago/asignación: pagos online del CSV, marcados por manager onsite, y
-            asignaciones manuales en Waitry. Click en una fila para abrir la conciliación de esa
-            reserva.
+            Eventos de cobertura efectiva por defecto: pagos online del CSV (App/Web) + asignaciones
+            manuales en Waitry. Los pagos &quot;Manager onsite&quot; (Cash/Tarjeta marcados desde el
+            panel) NO se consideran cubiertos hasta conciliarse contra Waitry — esos viven en el tab
+            Conciliación con flag ⚠. Cambia el filtro de Origen para auditarlos aquí.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -281,15 +320,16 @@ export function HistorialView() {
           </label>
           <Combobox
             value={sourceFilter}
-            onChange={(value) => setSourceFilter((value as SourceFilter) ?? 'all')}
+            onChange={(value) => setSourceFilter((value as SourceFilter) ?? 'effective')}
             options={[
-              { value: 'all', label: 'Todos' },
-              { value: 'online', label: 'Online (App/Web)' },
-              { value: 'manager', label: 'Manager onsite' },
-              { value: 'waitry', label: 'Waitry (manual)' },
-              { value: 'other', label: 'Otro' },
+              { value: 'effective', label: 'Cobertura efectiva (Online + Waitry)' },
+              { value: 'all', label: 'Todos (incluye Manager)' },
+              { value: 'online', label: 'Solo Online (App/Web)' },
+              { value: 'manager', label: 'Solo Manager onsite' },
+              { value: 'waitry', label: 'Solo Waitry (manual)' },
+              { value: 'other', label: 'Solo Otro' },
             ]}
-            className="w-44"
+            className="w-64"
           />
         </div>
         <div className="flex flex-col gap-1">
@@ -322,15 +362,25 @@ export function HistorialView() {
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-        {(['all', 'online', 'manager', 'waitry', 'other'] as const).map((key) => (
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 text-sm">
+          <div className="text-xs uppercase tracking-wide text-[var(--text-muted)]">
+            Total filtrado
+          </div>
+          <div className="mt-1 font-semibold text-[var(--text)]">{formatMoney(totalFiltered)}</div>
+          <div className="mt-0.5 text-[10px] text-[var(--text-muted)]">en la tabla</div>
+        </div>
+        {(['online', 'manager', 'waitry', 'other'] as const).map((key) => (
           <div
             key={key}
             className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 text-sm"
           >
             <div className="text-xs uppercase tracking-wide text-[var(--text-muted)]">
-              {key === 'all' ? 'Total filtrado' : SOURCE_LABELS[key]}
+              {SOURCE_LABELS[key]}
             </div>
-            <div className="mt-1 font-semibold text-[var(--text)]">{formatMoney(totals[key])}</div>
+            <div className="mt-1 font-semibold text-[var(--text)]">
+              {formatMoney(channelTotals[key])}
+            </div>
+            <div className="mt-0.5 text-[10px] text-[var(--text-muted)]">total del canal</div>
           </div>
         ))}
       </div>
