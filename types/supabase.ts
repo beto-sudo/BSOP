@@ -8506,6 +8506,9 @@ export type Database = {
           other_csv_total: number | null
           waitry_order_ids: string[] | null
           waitry_total: number | null
+          wallet_coverage: number | null
+          wallet_csv_payment_ids: string[] | null
+          wallet_payments_count: number | null
         }
         Relationships: []
       }

@@ -244,9 +244,22 @@ export function AssignmentPanel({
           <li className="flex items-baseline justify-between gap-2">
             <span className="text-[var(--text-muted)]">Waitry (asignado a esta reserva)</span>
             <span className="font-medium text-[var(--text)]">
-              {formatMoney(booking.assigned_total - booking.online_csv_total)}
+              {formatMoney(
+                booking.assigned_total - booking.online_csv_total - booking.wallet_coverage
+              )}
             </span>
           </li>
+          {booking.wallet_payments_count > 0 ? (
+            <li className="flex items-baseline justify-between gap-2">
+              <span className="text-[var(--text-muted)]">
+                Bono monedero ({booking.wallet_payments_count} jugador
+                {booking.wallet_payments_count === 1 ? '' : 'es'})
+              </span>
+              <span className="font-medium text-[var(--text)]">
+                {formatMoney(booking.wallet_coverage)}
+              </span>
+            </li>
+          ) : null}
           {booking.manager_csv_total > 0 ? (
             <li
               className={`flex items-baseline justify-between gap-2 ${

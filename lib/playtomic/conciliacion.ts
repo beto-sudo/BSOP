@@ -97,6 +97,16 @@ export type PendingBookingWithCoverage = {
    */
   manager_csv_total: number;
   has_unverified_manager: boolean;
+  /**
+   * Pagos con `payment_method='Club wallet'` (Bono monedero). El CSV los
+   * reporta con `total=0` porque el cliente usó saldo previo, pero el
+   * club ya cobró ese saldo cuando se cargó el wallet. Cada wallet
+   * payment cubre la parte proporcional del booking
+   * (price_amount / participant_count), capeada para no doblar
+   * cobertura con online/waitry.
+   */
+  wallet_payments_count: number;
+  wallet_coverage: number;
 };
 
 export type WaitryItem = {

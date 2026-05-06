@@ -338,6 +338,8 @@ export function useConciliacionData(options?: { extraBookingId?: string | null }
           online_csv_total: number;
           manager_csv_total: number;
           has_unverified_manager: boolean;
+          wallet_payments_count: number;
+          wallet_coverage: number;
           waitry_order_ids: string[];
         };
         const coverageByBooking = new Map<string, CoverageEntry>();
@@ -356,7 +358,7 @@ export function useConciliacionData(options?: { extraBookingId?: string | null }
                 playtomic
                   .from('v_bookings_total_coverage')
                   .select(
-                    'booking_id,effective_status,effective_pct,effective_total,waitry_total,online_csv_total,manager_csv_total,has_unverified_manager,waitry_order_ids'
+                    'booking_id,effective_status,effective_pct,effective_total,waitry_total,online_csv_total,manager_csv_total,has_unverified_manager,wallet_payments_count,wallet_coverage,waitry_order_ids'
                   )
                   .in('booking_id', chunk)
               )
@@ -394,6 +396,8 @@ export function useConciliacionData(options?: { extraBookingId?: string | null }
               online_csv_total: Number(row.online_csv_total ?? 0),
               manager_csv_total: Number(row.manager_csv_total ?? 0),
               has_unverified_manager: Boolean(row.has_unverified_manager),
+              wallet_payments_count: Number(row.wallet_payments_count ?? 0),
+              wallet_coverage: Number(row.wallet_coverage ?? 0),
               waitry_order_ids: row.waitry_order_ids ?? [],
             });
           }
@@ -490,6 +494,8 @@ export function useConciliacionData(options?: { extraBookingId?: string | null }
               online_csv_total: cov?.online_csv_total ?? 0,
               manager_csv_total: cov?.manager_csv_total ?? 0,
               has_unverified_manager: Boolean(cov?.has_unverified_manager),
+              wallet_payments_count: cov?.wallet_payments_count ?? 0,
+              wallet_coverage: cov?.wallet_coverage ?? 0,
             };
           });
 
