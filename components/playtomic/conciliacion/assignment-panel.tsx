@@ -28,6 +28,7 @@ export function AssignmentPanel({
   booking,
   candidates,
   existingAssignments,
+  isDeepLinkedOutOfFilter,
   tolerancePresetLabel,
   onWidenWindow,
   onAfterChange,
@@ -35,6 +36,13 @@ export function AssignmentPanel({
   booking: PendingBookingWithCoverage | null;
   candidates: RankedCandidate[];
   existingAssignments: AssignmentDetail[];
+  /**
+   * `true` cuando el booking llegó por deep-link `?selected=` desde el
+   * Historial y NO está en la lista filtrada normal (ya está full-cubierto,
+   * fuera de los 90d, etc). Se muestra un banner explicativo arriba del
+   * panel.
+   */
+  isDeepLinkedOutOfFilter?: boolean;
   tolerancePresetLabel: string;
   onWidenWindow?: () => void;
   onAfterChange: () => void;
@@ -137,6 +145,14 @@ export function AssignmentPanel({
 
   return (
     <div className="space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
+      {isDeepLinkedOutOfFilter ? (
+        <div className="rounded-xl border border-blue-500/40 bg-blue-500/10 p-3 text-sm text-blue-200">
+          <strong>Llegaste desde el Historial.</strong> Esta reserva ya tiene cobertura completa
+          (Online + Waitry suman el total) o quedó fuera del rango normal del listado, por eso no
+          aparece en la columna izquierda. La mostramos aquí para que puedas revisar/ajustar las
+          asignaciones existentes.
+        </div>
+      ) : null}
       <header className="space-y-1">
         <h3 className="text-sm font-semibold text-[var(--text)]">Detalle de reserva</h3>
         <dl className="grid gap-1 text-sm sm:grid-cols-2">

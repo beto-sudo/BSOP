@@ -22,21 +22,32 @@ const TOLERANCE_LABELS: Record<TimestampTolerancePreset, string> = {
 };
 
 export function ConciliacionView() {
-  const { data, loading, refreshing, error, refetch } = useConciliacionData();
   // Deep-link desde el tab Historial: `?selected=<bookingId>` pre-selecciona
   // la reserva. Se lee solo en mount (pattern recommended: single source of
-  // truth = state local). Si el booking no está en la lista visible (fuera
-  // de los 90d o ya full-cubierto), el panel queda vacío con su placeholder.
+  // truth = state local).
+  //
+  // El hook recibe `extraBookingId` (con el valor del query param inicial)
+  // para hacer fetch específico de ese booking si NO está en la lista
+  // filtrada (porque ya está full-cubierto, fuera del rango 90d, etc).
+  // Solo se usa el valor inicial — clicks subsiguientes en otras reservas
+  // de la lista NO disparan re-fetch.
   const searchParams = useSearchParams();
-  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(() =>
-    searchParams.get('selected')
-  );
+  const [initialSelectedId] = useState<string | null>(() => searchParams.get('selected'));
+  const { data, loading, refreshing, error, refetch } = useConciliacionData({
+    extraBookingId: initialSelectedId,
+  });
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(initialSelectedId);
   const [tolerancePreset, setTolerancePreset] = useState<TimestampTolerancePreset>('2d');
   const [searchQuery, setSearchQuery] = useState('');
 
   const selectedBooking = useMemo(
     () => data.bookings.find((b) => b.booking_id === selectedBookingId) ?? null,
     [data.bookings, selectedBookingId]
+  );
+
+  const isDeepLinkedOutOfFilter = useMemo(
+    () => Boolean(selectedBookingId && data.outOfFilterBookings.has(selectedBookingId)),
+    [data.outOfFilterBookings, selectedBookingId]
   );
 
   const existingAssignments = useMemo(
@@ -144,6 +155,7 @@ export function ConciliacionView() {
           booking={selectedBooking}
           candidates={rankedCandidates}
           existingAssignments={existingAssignments}
+          isDeepLinkedOutOfFilter={isDeepLinkedOutOfFilter}
           tolerancePresetLabel={TOLERANCE_LABELS[tolerancePreset]}
           onWidenWindow={
             tolerancePreset !== '30d'
