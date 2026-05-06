@@ -32,6 +32,71 @@ function parsePrice(priceStr?: string) {
   return { amount: parseFloat(match[1]), currency: match[2] || null };
 }
 
+/**
+ * Convierte un ISO string SIN offset (formato "YYYY-MM-DDTHH:MM:SS"),
+ * asumido en zona "America/Chicago" (Central Time con DST EE.UU.), a un
+ * ISO UTC con sufijo Z.
+ *
+ * Empíricamente, el third-party API de Playtomic devuelve los campos
+ * `booking_start_date` y `booking_end_date` en esa zona. Verificado vía
+ * cross-check contra `payments_import.service_date` que tiene UTC
+ * correcto (parseado del CSV con offset explícito):
+ *
+ *   - feb 2026 (sin DST EE.UU.): drift promedio = 0.00h.
+ *   - mar 2026 (post-8mar, DST EE.UU. activo): drift promedio = ~0.85h.
+ *   - abr/may 2026 (DST EE.UU.): drift promedio = ~0.90-1.00h.
+ *
+ * El club Matamoros opera en CST puro (UTC-6, sin DST), así que NO basta
+ * con un offset constante: la conversión debe respetar las reglas DST
+ * de America/Chicago para que en mayo el cálculo aplique -5h y en enero
+ * aplique -6h.
+ *
+ * Edge case: durante la transición DST (segundo domingo de marzo, 2-3 AM
+ * Central) hay una hora ambigua. Para nuestro caso operativo (reservas
+ * de cancha) ese 1 día/año con bookings raros a esa hora es aceptable.
+ */
+function chicagoOffsetMsAt(instant: Date): number {
+  // Devuelve cuántos ms está Chicago detrás de UTC en `instant`.
+  // CST = -21600000 ms (6h), CDT = -18000000 ms (5h).
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Chicago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(instant).map((p) => [p.type, p.value]));
+  const chicagoIso = `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}Z`;
+  return new Date(chicagoIso).getTime() - instant.getTime();
+}
+
+function naiveChicagoIsoToUtc(naiveIso: string | null | undefined): string | null {
+  if (!naiveIso) return null;
+  // Si por algún motivo el API empieza a mandar con offset (Z o ±HH:MM), no tocamos.
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(naiveIso)) return naiveIso;
+
+  // El naive ISO representa el wall-clock de Chicago. Para convertirlo a UTC,
+  // necesitamos el offset de Chicago EN EL INSTANTE UTC equivalente — pero no
+  // lo sabemos antes de convertir. Resolvemos con dos iteraciones que convergen
+  // en los 2 días/año de transición DST (segundo domingo de marzo y primer
+  // domingo de noviembre).
+  const asIfUtc = new Date(naiveIso + 'Z');
+  if (Number.isNaN(asIfUtc.getTime())) return naiveIso;
+
+  // Iteración 1: usamos el naive-as-UTC como punto de partida.
+  let offsetMs = chicagoOffsetMsAt(asIfUtc);
+  // Iteración 2: usamos el UTC estimado (más preciso) para confirmar el offset.
+  // En días de transición DST, el offset puede cambiar entre asIfUtc y el real
+  // UTC, y esta segunda pasada lo corrige.
+  const estimatedUtc = new Date(asIfUtc.getTime() - offsetMs);
+  offsetMs = chicagoOffsetMsAt(estimatedUtc);
+
+  return new Date(asIfUtc.getTime() - offsetMs).toISOString();
+}
+
 serve(async (req) => {
   const syncLogId = crypto.randomUUID();
   const startTime = new Date();
@@ -107,8 +172,20 @@ serve(async (req) => {
 
     for (const raw of allBookings) {
       const { amount, currency } = parsePrice(raw.price);
-      const bStart = raw.booking_start_date; // These come in UTC with Z or without, let's assume they are ISO UTC
-      const bEnd = raw.booking_end_date;
+      // El third-party API de Playtomic devuelve `booking_start_date` /
+      // `booking_end_date` SIN offset (formato "YYYY-MM-DDTHH:MM:SS").
+      // Empíricamente (verificado contra payments_import.service_date que
+      // tiene UTC correcto) los timestamps están en zona "America/Chicago"
+      // con DST EE.UU. automático. El club Matamoros opera en CST puro
+      // (UTC-6, sin DST). Resultado: en periodo DST EE.UU. (~mar-nov) hay
+      // 1h de drift; fuera de DST, drift = 0.
+      //
+      // Convertimos a UTC verdadero antes de guardar para que
+      // `bookings.booking_start` quede consistente con
+      // `payments_import.service_date` y la conciliación pueda usar una
+      // ventana ±15min en lugar de ±90min (TODO en otro PR).
+      const bStart = naiveChicagoIsoToUtc(raw.booking_start_date);
+      const bEnd = naiveChicagoIsoToUtc(raw.booking_end_date);
 
       const durationMin = raw.duration != null ? Math.floor(raw.duration / 60000) : null;
       const ownerId = raw.participant_info?.owner_id ? String(raw.participant_info.owner_id) : null;
