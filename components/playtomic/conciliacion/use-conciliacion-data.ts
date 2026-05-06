@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { chunkArray } from '@/components/playtomic/utils';
 import {
   CANCHA_PRODUCT_PATTERNS,
   isCanchaProduct,
@@ -11,6 +12,13 @@ import {
   type WaitryCandidate,
   type WaitryItem,
 } from '@/lib/playtomic/conciliacion';
+
+// Cloudflare/PostgREST aguanta URLs de ~8KB. Cada UUID en `.in()` consume
+// ~37 chars (36 + separador). Con CHUNK=200 quedamos en ~7.5KB por request,
+// con margen para el resto de la URL. Subir esto sin medir tira el listado
+// con HTTP 400 cuando hay >220 booking_ids en el rango (ya pasó tras el
+// refactor a cobertura efectiva, que puede traer 600+).
+const BOOKING_ID_CHUNK = 200;
 
 type BookingRow = {
   booking_id: string;
@@ -180,27 +188,44 @@ export function useConciliacionData() {
       const bookingsList = pendingBookings ?? [];
       const bookingIds = bookingsList.map((b) => b.booking_id);
 
-      let participants: ParticipantRow[] = [];
-      let players: PlayerRow[] = [];
+      const participants: ParticipantRow[] = [];
+      const players: PlayerRow[] = [];
 
       if (bookingIds.length > 0) {
-        const { data: participantRows, error: participantErr } = await playtomic
-          .from('booking_participants')
-          .select('booking_id,player_id,is_owner')
-          .in('booking_id', bookingIds)
-          .returns<ParticipantRow[]>();
-        if (participantErr) throw participantErr;
-        participants = participantRows ?? [];
+        // Chunkeamos: con 600+ booking_ids en `.in()` la URL excede 8KB y
+        // Cloudflare/PostgREST devuelven HTTP 400 Bad Request. Mismo patrón
+        // que ya usa `use-playtomic-data.ts` para el dashboard principal.
+        const bookingIdChunks = chunkArray(bookingIds, BOOKING_ID_CHUNK);
+        const participantResponses = await Promise.all(
+          bookingIdChunks.map((chunk) =>
+            playtomic
+              .from('booking_participants')
+              .select('booking_id,player_id,is_owner')
+              .in('booking_id', chunk)
+              .returns<ParticipantRow[]>()
+          )
+        );
+        for (const res of participantResponses) {
+          if (res.error) throw res.error;
+          participants.push(...(res.data ?? []));
+        }
 
         const playerIds = Array.from(new Set(participants.map((p) => p.player_id)));
         if (playerIds.length > 0) {
-          const { data: playerRows, error: playerErr } = await playtomic
-            .from('players')
-            .select('playtomic_id,name,email')
-            .in('playtomic_id', playerIds)
-            .returns<PlayerRow[]>();
-          if (playerErr) throw playerErr;
-          players = playerRows ?? [];
+          const playerIdChunks = chunkArray(playerIds, BOOKING_ID_CHUNK);
+          const playerResponses = await Promise.all(
+            playerIdChunks.map((chunk) =>
+              playtomic
+                .from('players')
+                .select('playtomic_id,name,email')
+                .in('playtomic_id', chunk)
+                .returns<PlayerRow[]>()
+            )
+          );
+          for (const res of playerResponses) {
+            if (res.error) throw res.error;
+            players.push(...(res.data ?? []));
+          }
         }
       }
 
@@ -266,25 +291,41 @@ export function useConciliacionData() {
       const assignedOrderIds = new Set<string>();
       const assignmentsByBooking = new Map<string, AssignmentDetail[]>();
       if (bookingIds.length > 0) {
-        const [
-          { data: coverageRows, error: coverageErr },
-          { data: assignmentRows, error: assignmentsErr },
-        ] = await Promise.all([
-          playtomic
-            .from('v_bookings_total_coverage')
-            .select(
-              'booking_id,effective_status,effective_pct,effective_total,waitry_total,online_csv_total,manager_csv_total,has_unverified_manager,waitry_order_ids'
+        // Mismo motivo que arriba: chunkeamos para no exceder el límite de URL.
+        const bookingIdChunks = chunkArray(bookingIds, BOOKING_ID_CHUNK);
+        const [coverageResponses, assignmentResponses] = await Promise.all([
+          Promise.all(
+            bookingIdChunks.map((chunk) =>
+              playtomic
+                .from('v_bookings_total_coverage')
+                .select(
+                  'booking_id,effective_status,effective_pct,effective_total,waitry_total,online_csv_total,manager_csv_total,has_unverified_manager,waitry_order_ids'
+                )
+                .in('booking_id', chunk)
             )
-            .in('booking_id', bookingIds),
-          playtomic
-            .from('payment_assignments')
-            .select('id,booking_id,waitry_order_id,assigned_amount,assigned_at,note')
-            .in('booking_id', bookingIds)
-            .order('assigned_at', { ascending: true })
-            .returns<AssignmentRow[]>(),
+          ),
+          Promise.all(
+            bookingIdChunks.map((chunk) =>
+              playtomic
+                .from('payment_assignments')
+                .select('id,booking_id,waitry_order_id,assigned_amount,assigned_at,note')
+                .in('booking_id', chunk)
+                .order('assigned_at', { ascending: true })
+                .returns<AssignmentRow[]>()
+            )
+          ),
         ]);
-        if (coverageErr) throw coverageErr;
-        if (assignmentsErr) throw assignmentsErr;
+
+        const coverageRows: NonNullable<(typeof coverageResponses)[number]['data']> = [];
+        for (const res of coverageResponses) {
+          if (res.error) throw res.error;
+          if (res.data) coverageRows.push(...res.data);
+        }
+        const assignmentRows: AssignmentRow[] = [];
+        for (const res of assignmentResponses) {
+          if (res.error) throw res.error;
+          if (res.data) assignmentRows.push(...res.data);
+        }
 
         for (const row of coverageRows ?? []) {
           if (!row.booking_id) continue;
