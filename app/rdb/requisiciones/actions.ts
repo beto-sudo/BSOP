@@ -222,7 +222,23 @@ export async function generarOrdenCompra(
   await assertNotInPreview();
   const { supabase } = await requireAuth();
 
-  // Load requisicion items
+  const { data: ocExistente, error: existenteErr } = await supabase
+    .schema('erp')
+    .from('ordenes_compra')
+    .select('id, codigo, estado')
+    .eq('requisicion_id', requisicionId)
+    .eq('empresa_id', RDB_EMPRESA_ID)
+    .is('deleted_at', null)
+    .in('estado', ['borrador', 'enviada'])
+    .maybeSingle();
+
+  if (existenteErr) throw new Error(existenteErr.message);
+  if (ocExistente) {
+    throw new Error(
+      `Esta requisición ya tiene una orden de compra activa: ${ocExistente.codigo} (${ocExistente.estado}).`
+    );
+  }
+
   const { data: reqItems, error: itemsErr } = await supabase
     .schema('erp')
     .from('requisiciones_detalle')
@@ -234,7 +250,6 @@ export async function generarOrdenCompra(
 
   const folio = generarFolio('OC');
 
-  // Create orden de compra
   const { data: oc, error: ocErr } = await supabase
     .schema('erp')
     .from('ordenes_compra')
@@ -247,7 +262,14 @@ export async function generarOrdenCompra(
     .select('id, codigo')
     .single();
 
-  if (ocErr) throw new Error(ocErr.message);
+  if (ocErr) {
+    if (ocErr.code === '23505') {
+      throw new Error(
+        'Esta requisición ya tiene una orden de compra activa. Refresca la página para verla.'
+      );
+    }
+    throw new Error(ocErr.message);
+  }
   if (!oc) throw new Error('Error al crear la orden de compra');
 
   // Copy items — `reqItems` is typed from the select('*') against erp.requisiciones_detalle

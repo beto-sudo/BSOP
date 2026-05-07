@@ -1026,14 +1026,36 @@ export default function RequisicionesPage() {
       const { data, error: fetchError } = await query;
       if (fetchError) throw fetchError;
 
-      const requisicionesData: Requisicion[] = (data ?? []).map((row) => ({
-        id: row.id,
-        folio: row.codigo ?? null,
-        estatus: row.autorizada_at ? 'aprobada' : 'enviada',
-        solicitado_por: row.solicitante_id ?? null,
-        aprobado_por: null,
-        fecha_solicitud: row.created_at ?? null,
-      }));
+      const requisicionIdsForOC = (data ?? []).map((row) => row.id);
+      const ocByReqId = new Map<string, string>();
+      if (requisicionIdsForOC.length > 0) {
+        const { data: ocRows } = await supabase
+          .schema('erp')
+          .from('ordenes_compra')
+          .select('codigo, requisicion_id')
+          .eq('empresa_id', RDB_EMPRESA_ID)
+          .is('deleted_at', null)
+          .in('requisicion_id', requisicionIdsForOC);
+
+        (ocRows ?? []).forEach((row) => {
+          if (row.requisicion_id && row.codigo && !ocByReqId.has(row.requisicion_id)) {
+            ocByReqId.set(row.requisicion_id, row.codigo);
+          }
+        });
+      }
+
+      const requisicionesData: Requisicion[] = (data ?? []).map((row) => {
+        const ocFolio = ocByReqId.get(row.id) ?? null;
+        return {
+          id: row.id,
+          folio: row.codigo ?? null,
+          estatus: ocFolio ? 'convertida_oc' : row.autorizada_at ? 'aprobada' : 'enviada',
+          solicitado_por: row.solicitante_id ?? null,
+          aprobado_por: null,
+          fecha_solicitud: row.created_at ?? null,
+          oc_folio: ocFolio,
+        };
+      });
 
       const { data: prodData } = await supabase
         .schema('erp')
@@ -1167,6 +1189,7 @@ export default function RequisicionesPage() {
           .select('codigo')
           .eq('empresa_id', RDB_EMPRESA_ID)
           .eq('requisicion_id', requisicion.id)
+          .is('deleted_at', null)
           .maybeSingle(),
       ]);
 
