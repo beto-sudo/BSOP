@@ -6584,6 +6584,7 @@ export type Database = {
           id: string
           limite_credito: number | null
           persona_id: string
+          tasa_iva: number | null
           updated_at: string | null
         }
         Insert: {
@@ -6597,6 +6598,7 @@ export type Database = {
           id?: string
           limite_credito?: number | null
           persona_id: string
+          tasa_iva?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -6610,6 +6612,7 @@ export type Database = {
           id?: string
           limite_credito?: number | null
           persona_id?: string
+          tasa_iva?: number | null
           updated_at?: string | null
         }
         Relationships: [

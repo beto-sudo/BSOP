@@ -118,6 +118,11 @@ type Proveedor = {
   nombre_comercial: string | null;
   condiciones_pago: string | null;
   categoria: string | null;
+  /**
+   * Tasa de IVA principal del proveedor en decimal:
+   * 0=exento, 0.08=frontera, 0.16=general. NULL si aún no se captura.
+   */
+  tasa_iva: number | null;
   /** Mantiene compatibilidad con UI previa que leía `direccion` (texto libre). */
   direccion: string | null;
   notas: string | null;
@@ -125,6 +130,12 @@ type Proveedor = {
   created_at: string | null;
   updated_at: string | null;
 };
+
+/** Renderiza la tasa decimal como porcentaje legible. NULL → '—'. */
+function formatTasaIva(t: number | null | undefined): string {
+  if (t === null || t === undefined) return '—';
+  return `${(t * 100).toFixed(0)}%`;
+}
 
 const proveedorColumns: Column<Proveedor>[] = [
   {
@@ -162,6 +173,12 @@ const proveedorColumns: Column<Proveedor>[] = [
     label: 'RFC',
     cellClassName: 'font-mono text-xs text-muted-foreground',
     render: (p) => p.rfc ?? '—',
+  },
+  {
+    key: 'tasa_iva',
+    label: 'IVA',
+    cellClassName: 'text-xs text-muted-foreground tabular-nums',
+    render: (p) => formatTasaIva(p.tasa_iva),
   },
   {
     key: 'condiciones_pago',
@@ -215,7 +232,6 @@ function ProveedorDetail({
 
   const rows: { label: string; value: string | null; icon: typeof Phone | null }[] = [
     { label: 'Tipo', value: tipoPersonaLabel, icon: null },
-    { label: 'Razón social', value: proveedor.razon_social, icon: FileText },
     { label: 'Nombre comercial', value: proveedor.nombre_comercial, icon: null },
     { label: 'Teléfono', value: proveedor.telefono, icon: Phone },
     { label: 'Email', value: proveedor.email, icon: Mail },
@@ -228,6 +244,11 @@ function ProveedorDetail({
     { label: 'Domicilio', value: proveedor.domicilio, icon: null },
     { label: 'Condiciones de pago', value: proveedor.condiciones_pago, icon: null },
     { label: 'Categoría', value: proveedor.categoria, icon: null },
+    {
+      label: 'Tasa de IVA',
+      value: proveedor.tasa_iva === null ? null : formatTasaIva(proveedor.tasa_iva),
+      icon: null,
+    },
   ].filter((r): r is { label: string; value: string; icon: typeof Phone | null } =>
     Boolean(r.value)
   );
@@ -381,8 +402,9 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
   const [editDomicilio, setEditDomicilio] = useState('');
   const [editCondicionesPago, setEditCondicionesPago] = useState('');
   const [editCategoria, setEditCategoria] = useState('');
-  const [editRazonSocial, setEditRazonSocial] = useState('');
   const [editNombreComercial, setEditNombreComercial] = useState('');
+  /** "" = sin tasa (NULL), "0" = exento, "0.08" = frontera, "0.16" = general. */
+  const [editTasaIva, setEditTasaIva] = useState<'' | '0' | '0.08' | '0.16'>('');
 
   // ─── CSF flow state (Sprint 2.B) ────────────────────────────────────────────
   const [csfFile, setCsfFile] = useState<File | null>(null);
@@ -404,6 +426,8 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
   const [newDomCp, setNewDomCp] = useState('');
   const [newDomMunicipio, setNewDomMunicipio] = useState('');
   const [newDomEstado, setNewDomEstado] = useState('');
+  /** "" = sin tasa (NULL), "0" = exento, "0.08" = frontera, "0.16" = general. */
+  const [newTasaIva, setNewTasaIva] = useState<'' | '0' | '0.08' | '0.16'>('');
 
   // Modal de duplicado por RFC
   const [duplicadoOpen, setDuplicadoOpen] = useState(false);
@@ -453,6 +477,7 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
     setNewDomCp('');
     setNewDomMunicipio('');
     setNewDomEstado('');
+    setNewTasaIva('');
   };
 
   const fetchProveedores = useCallback(async () => {
@@ -467,7 +492,7 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
         .schema('erp')
         .from('proveedores')
         .select(
-          `id, persona_id, activo, condiciones_pago, categoria, created_at, updated_at,
+          `id, persona_id, activo, condiciones_pago, categoria, tasa_iva, created_at, updated_at,
            personas!persona_id(
              nombre, apellido_paterno, apellido_materno,
              email, telefono, rfc, curp, tipo_persona, domicilio,
@@ -499,6 +524,7 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
         activo: boolean;
         condiciones_pago: string | null;
         categoria: string | null;
+        tasa_iva: number | string | null;
         created_at: string | null;
         updated_at: string | null;
         personas: RawPersona | null;
@@ -538,6 +564,12 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
             nombre_comercial: df?.nombre_comercial ?? null,
             condiciones_pago: p.condiciones_pago,
             categoria: p.categoria,
+            tasa_iva:
+              p.tasa_iva === null || p.tasa_iva === undefined
+                ? null
+                : typeof p.tasa_iva === 'string'
+                  ? Number(p.tasa_iva)
+                  : p.tasa_iva,
             direccion: persona?.domicilio ?? null,
             notas: null,
             activo: p.activo,
@@ -754,6 +786,9 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
           JSON.stringify({
             empresa_id: empresaId,
             extraccion: editedExtraccion,
+            proveedor_extras: {
+              tasa_iva: newTasaIva === '' ? null : Number(newTasaIva),
+            },
           })
         );
 
@@ -800,11 +835,15 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
 
       if (personaErr) throw personaErr;
 
-      const { error: err } = await supabase.schema('erp').from('proveedores').insert({
-        empresa_id: empresaId,
-        persona_id: persona.id,
-        activo: true,
-      });
+      const { error: err } = await supabase
+        .schema('erp')
+        .from('proveedores')
+        .insert({
+          empresa_id: empresaId,
+          persona_id: persona.id,
+          activo: true,
+          tasa_iva: newTasaIva === '' ? null : Number(newTasaIva),
+        });
 
       if (err) throw err;
 
@@ -849,8 +888,10 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
     setEditDomicilio(p.domicilio ?? '');
     setEditCondicionesPago(p.condiciones_pago ?? '');
     setEditCategoria(p.categoria ?? '');
-    setEditRazonSocial(p.razon_social ?? '');
     setEditNombreComercial(p.nombre_comercial ?? '');
+    setEditTasaIva(
+      p.tasa_iva === 0 ? '0' : p.tasa_iva === 0.08 ? '0.08' : p.tasa_iva === 0.16 ? '0.16' : ''
+    );
     setEditDrawerOpen(true);
   };
 
@@ -891,6 +932,7 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
       const proveedoresPatch = {
         condiciones_pago: editCondicionesPago.trim() || null,
         categoria: editCategoria.trim() || null,
+        tasa_iva: editTasaIva === '' ? null : Number(editTasaIva),
         updated_at: new Date().toISOString(),
       };
       const { error: errProv } = await supabase
@@ -901,10 +943,11 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
         .eq('id', selected.id);
       if (errProv) throw errProv;
 
-      // 3) erp.personas_datos_fiscales — upsert solo si hay valor en
-      // razón social o nombre comercial. Evitamos crear filas vacías cuando
-      // el proveedor aún no tiene CSF cargada.
-      const razonTrim = editRazonSocial.trim();
+      // 3) erp.personas_datos_fiscales — solo `nombre_comercial`. La razón
+      // social formal vive ahora exclusivamente en `personas.nombre` (la
+      // separación 2-campos creaba drift). Si necesitas refrescar el resto
+      // de los datos del SAT (régimen, domicilio fiscal, etc.) usa el flujo
+      // "Cargar / Actualizar CSF".
       const ncTrim = editNombreComercial.trim();
       const { data: dfExisting } = await supabase
         .schema('erp')
@@ -915,26 +958,20 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
         .maybeSingle();
 
       if (dfExisting) {
-        // Ya existe fila — actualizamos siempre (incluso a NULL si vaciaron campos).
         const { error: errDf } = await supabase
           .schema('erp')
           .from('personas_datos_fiscales')
-          .update({
-            razon_social: razonTrim || null,
-            nombre_comercial: ncTrim || null,
-          })
+          .update({ nombre_comercial: ncTrim || null })
           .eq('id', dfExisting.id);
         if (errDf) throw errDf;
-      } else if (razonTrim || ncTrim) {
-        // No hay fila y sí hay valor que persistir — insertamos.
+      } else if (ncTrim) {
         const { error: errDf } = await supabase
           .schema('erp')
           .from('personas_datos_fiscales')
           .insert({
             empresa_id: empresaId,
             persona_id: selected.persona_id,
-            razon_social: razonTrim || null,
-            nombre_comercial: ncTrim || null,
+            nombre_comercial: ncTrim,
           });
         if (errDf) throw errDf;
       }
@@ -1117,11 +1154,15 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
                   {editTipoPersonaForm === 'moral' ? 'Razón social' : 'Nombre(s)'}{' '}
                   <span className="text-destructive">*</span>
                 </label>
-                <Input value={editNombre} onChange={(e) => setEditNombre(e.target.value)} />
+                <Input
+                  value={editNombre}
+                  onChange={(e) => setEditNombre(e.target.value)}
+                  className="uppercase"
+                />
                 <p className="text-xs text-muted-foreground">
                   {editTipoPersonaForm === 'moral'
-                    ? 'Razón social completa, sin apellidos.'
-                    : 'Solo nombre(s) de pila. Apellidos van abajo.'}
+                    ? 'Razón social completa, sin apellidos. Se guarda en MAYÚSCULAS.'
+                    : 'Solo nombre(s) de pila. Apellidos van abajo. Se guarda en MAYÚSCULAS.'}
                 </p>
               </div>
               {editTipoPersonaForm === 'fisica' && (
@@ -1131,6 +1172,7 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
                     <Input
                       value={editApellidoPaterno}
                       onChange={(e) => setEditApellidoPaterno(e.target.value)}
+                      className="uppercase"
                     />
                   </div>
                   <div className="space-y-2">
@@ -1138,6 +1180,7 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
                     <Input
                       value={editApellidoMaterno}
                       onChange={(e) => setEditApellidoMaterno(e.target.value)}
+                      className="uppercase"
                     />
                   </div>
                 </div>
@@ -1181,19 +1224,6 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
                   </p>
                 </div>
               )}
-              <div className="space-y-2">
-                <label className="text-sm font-medium leading-none">
-                  Razón social (registro fiscal)
-                </label>
-                <Input
-                  value={editRazonSocial}
-                  onChange={(e) => setEditRazonSocial(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Crea una fila en personas_datos_fiscales si no existe. Para datos completos del
-                  SAT (régimen, domicilio fiscal, etc.) usa &ldquo;Cargar / Actualizar CSF&rdquo;.
-                </p>
-              </div>
             </div>
 
             {/* Contacto y domicilio operativo */}
@@ -1247,6 +1277,23 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
                     placeholder="Insumos, Servicios, Materia prima…"
                   />
                 </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">Tasa de IVA</label>
+                <select
+                  value={editTasaIva}
+                  onChange={(e) => setEditTasaIva(e.target.value as '' | '0' | '0.08' | '0.16')}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="">— sin captura</option>
+                  <option value="0">0% (exento)</option>
+                  <option value="0.08">8% (frontera)</option>
+                  <option value="0.16">16% (general)</option>
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Tasa principal del IVA que aplica el proveedor. Si maneja varias (ej. retail con
+                  productos exentos y gravados), guarda la principal.
+                </p>
               </div>
             </div>
 
@@ -1397,7 +1444,9 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
                         setNewNombre(e.target.value); // morales: nombre = razón social
                       }}
                       placeholder="EJEMPLO SA DE CV"
+                      className="uppercase"
                     />
+                    <p className="text-xs text-muted-foreground">Se guarda en MAYÚSCULAS.</p>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium leading-none">Nombre comercial</label>
@@ -1405,6 +1454,7 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
                       value={newNombreComercial}
                       onChange={(e) => setNewNombreComercial(e.target.value)}
                       placeholder="Opcional"
+                      className="uppercase"
                     />
                   </div>
                 </>
@@ -1418,7 +1468,9 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
                       value={newNombre}
                       onChange={(e) => setNewNombre(e.target.value)}
                       placeholder="Nombre de pila"
+                      className="uppercase"
                     />
+                    <p className="text-xs text-muted-foreground">Se guarda en MAYÚSCULAS.</p>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
@@ -1426,6 +1478,7 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
                       <Input
                         value={newApellidoPaterno}
                         onChange={(e) => setNewApellidoPaterno(e.target.value)}
+                        className="uppercase"
                       />
                     </div>
                     <div className="space-y-2">
@@ -1433,6 +1486,7 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
                       <Input
                         value={newApellidoMaterno}
                         onChange={(e) => setNewApellidoMaterno(e.target.value)}
+                        className="uppercase"
                       />
                     </div>
                   </div>
@@ -1561,6 +1615,26 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
                   <label className="text-sm font-medium leading-none">Email</label>
                   <Input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
                 </div>
+              </div>
+
+              {/* Tasa de IVA — común a ambos flujos. El extractor CSF NO la
+                   trae (es decisión operativa, no SAT). */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">Tasa de IVA</label>
+                <select
+                  value={newTasaIva}
+                  onChange={(e) => setNewTasaIva(e.target.value as '' | '0' | '0.08' | '0.16')}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="">— sin captura</option>
+                  <option value="0">0% (exento)</option>
+                  <option value="0.08">8% (frontera)</option>
+                  <option value="0.16">16% (general)</option>
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Tasa principal del IVA que aplica el proveedor. Puedes capturarla después desde
+                  &ldquo;Editar&rdquo;.
+                </p>
               </div>
 
               {/* Solo flujo manual: contacto + dirección legacy + notas */}

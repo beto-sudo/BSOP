@@ -193,6 +193,7 @@ export async function POST(req: NextRequest) {
     condiciones_pago: proveedor_extras?.condiciones_pago ?? null,
     limite_credito: proveedor_extras?.limite_credito ?? null,
     categoria: proveedor_extras?.categoria ?? null,
+    tasa_iva: proveedor_extras?.tasa_iva ?? null,
   };
 
   const { data: proveedor, error: proveedorErr } = await (userSupa.schema('erp') as any)
