@@ -15,11 +15,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { TZ } from '@/components/playtomic/constants';
 import { formatMoney } from '@/components/playtomic/utils';
 import { useHistorialData, type HistorialSource } from './use-historial-data';
 
 const FECHA_FMT = new Intl.DateTimeFormat('es-MX', {
-  timeZone: 'America/Matamoros',
+  timeZone: TZ,
   day: '2-digit',
   month: 'short',
   hour: '2-digit',
@@ -28,7 +29,7 @@ const FECHA_FMT = new Intl.DateTimeFormat('es-MX', {
 });
 
 const FECHA_CORTA_FMT = new Intl.DateTimeFormat('es-MX', {
-  timeZone: 'America/Matamoros',
+  timeZone: TZ,
   day: '2-digit',
   month: 'short',
 });

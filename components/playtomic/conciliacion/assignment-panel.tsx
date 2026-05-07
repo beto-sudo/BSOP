@@ -6,12 +6,13 @@ import {
   unassignPaymentAction,
 } from '@/app/rdb/playtomic/conciliacion/actions';
 import { Button } from '@/components/ui/button';
+import { TZ } from '@/components/playtomic/constants';
 import { formatMoney } from '@/components/playtomic/utils';
 import type { PendingBookingWithCoverage, RankedCandidate } from '@/lib/playtomic/conciliacion';
 import type { AssignmentDetail } from './use-conciliacion-data';
 
 const TIMESTAMP_FMT = new Intl.DateTimeFormat('es-MX', {
-  timeZone: 'America/Matamoros',
+  timeZone: TZ,
   day: '2-digit',
   month: 'short',
   hour: '2-digit',

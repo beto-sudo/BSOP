@@ -10,8 +10,6 @@
  * que el reporte se descarga con esa configuración.
  */
 
-const TZ = 'America/Matamoros';
-
 export type PaymentImportRow = {
   payment_id: string;
   club_payment_id: string | null;
@@ -118,12 +116,13 @@ export function parseAmount(value: string | undefined): number | null {
 
 /**
  * Convierte "DD/MM/YYYY HH:MM" en zona local del club a ISO UTC.
- * America/Matamoros es UTC-6 (sin DST observado en el repo — TZ constante).
  *
- * Ejemplo: "06/05/2026 20:00" → "2026-05-07T02:00:00.000Z" (en CST UTC-6).
+ * El club RDB opera con horario fijo CST (UTC-6) sin DST — así marca
+ * Playtomic Manager el reporte. Aunque America/Matamoros (frontera) sí
+ * adopta DST por sincronización con EE.UU., operativamente todas las
+ * horas del módulo Playtomic se manejan en UTC-6 estable.
  *
- * Nota: usar Intl tiene overhead. Para el volumen esperado (~2K rows) está
- * bien; si más adelante el reporte crece a >10K, considerar offset fijo.
+ * Ejemplo: "06/05/2026 20:00" → "2026-05-07T02:00:00.000Z".
  */
 export function parsePlaytomicDate(value: string | undefined): string | null {
   const t = nullable(value);
@@ -132,8 +131,8 @@ export function parsePlaytomicDate(value: string | undefined): string | null {
   if (!m) return null;
   const [, dd, mm, yyyy, hh = '00', min = '00'] = m;
 
-  // Zona del club: CST = UTC-6 fijo (no se observa DST en Matamoros desde
-  // 2022-04-03 según el repo). Construimos directamente con offset.
+  // Offset fijo UTC-6 (CST puro, sin DST). Coincide con la TZ que
+  // exporta el reporte de Playtomic Manager.
   const iso = `${yyyy}-${mm}-${dd}T${hh}:${min}:00-06:00`;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
@@ -237,5 +236,3 @@ export function parsePaymentsCsv(csvText: string): ParseResult {
 
   return { rows, errors };
 }
-
-export const _internal = { TZ };

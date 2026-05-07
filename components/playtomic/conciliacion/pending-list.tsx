@@ -8,16 +8,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { TZ } from '@/components/playtomic/constants';
 import { formatMoney } from '@/components/playtomic/utils';
 import type { PendingBookingWithCoverage } from '@/lib/playtomic/conciliacion';
 
 const FECHA_FMT = new Intl.DateTimeFormat('es-MX', {
-  timeZone: 'America/Matamoros',
+  timeZone: TZ,
   day: '2-digit',
   month: 'short',
 });
 const HORA_FMT = new Intl.DateTimeFormat('es-MX', {
-  timeZone: 'America/Matamoros',
+  timeZone: TZ,
   hour: '2-digit',
   minute: '2-digit',
   hour12: false,

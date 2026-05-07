@@ -6,9 +6,10 @@ import {
   importPaymentsCsv,
   type ImportPaymentsResult,
 } from '@/app/rdb/playtomic/import-csv/actions';
+import { TZ } from '@/components/playtomic/constants';
 
 const DATE_FMT = new Intl.DateTimeFormat('es-MX', {
-  timeZone: 'America/Matamoros',
+  timeZone: TZ,
   day: '2-digit',
   month: 'short',
   year: 'numeric',

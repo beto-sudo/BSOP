@@ -159,7 +159,12 @@ export type RankedCandidate = WaitryCandidate & {
 // Criterios duros para "auto-conciliación" en modo dry-run. Conservadores
 // a propósito — solo marca un candidato cuando hay match casi-certain por
 // la combinación de señales, no por una sola.
-const AUTO_MATCH_TIME_WINDOW_MS = 15 * 60 * 1000;
+//
+// Ventana ±120min: el cliente típico paga AL TERMINAR de jugar, no al
+// llegar. Match padel típico = 90min de juego + ~30min de plática antes
+// de ir a la caja. Verificación BD (30d): 0/12 matches "obviamente
+// correctos" caían en ±15min original, la mayoría en 31-120min.
+const AUTO_MATCH_TIME_WINDOW_MS = 120 * 60 * 1000;
 
 // Ventana temporal simétrica. La asunción original "el pago siempre
 // ocurre después del booking_start" no se sostiene: hay clientes que
