@@ -31,3 +31,19 @@
 --    mismo RFC HGO2302075C0) consolidado a HEALING GOODS (Moral,
 --    código CONTPAQi 17, canónico). 1 OC movida → total 6 OCs en
 --    el canónico. Soft-delete del dup Física.
+
+-- D) Migración de email/teléfono/domicilio de legacy → canónico.
+--    Beto observó que veía pocos proveedores con info de contacto.
+--    Causa: al hacer soft-delete del legacy (proveedor), la persona
+--    huérfana quedó con email/tel/dom intactos pero invisible en UI;
+--    el canónico (creado desde el Excel sin esa info) quedó vacío.
+--
+--    UPDATE erp.personas con COALESCE para no sobrescribir si el
+--    canónico ya tenía valor. Solo 3 de 7 legacy tenían datos:
+--    - ARNULFO SANDOVAL MORALES: tel 8781540986 + dom "Piedras Negras Coah."
+--    - DISTRIBUIDORA MOCTEZUMA: tel 8781197418 + dom "Calle Mina #406..."
+--    - JORGE AMIN MORALES AGUIRRE: email karen.aguilar@..., tel 8781452362,
+--      dom "Los doctores #2810..."
+--
+--    DAVID/JORGE/OMAR/SORIANA legacy estaban vacíos (info nunca capturada).
+--    HEALING GOODS canónico ya tenía datos más completos que el dup.
