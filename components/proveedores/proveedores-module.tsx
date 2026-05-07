@@ -232,7 +232,6 @@ function ProveedorDetail({
 
   const rows: { label: string; value: string | null; icon: typeof Phone | null }[] = [
     { label: 'Tipo', value: tipoPersonaLabel, icon: null },
-    { label: 'Razón social', value: proveedor.razon_social, icon: FileText },
     { label: 'Nombre comercial', value: proveedor.nombre_comercial, icon: null },
     { label: 'Teléfono', value: proveedor.telefono, icon: Phone },
     { label: 'Email', value: proveedor.email, icon: Mail },
@@ -403,7 +402,6 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
   const [editDomicilio, setEditDomicilio] = useState('');
   const [editCondicionesPago, setEditCondicionesPago] = useState('');
   const [editCategoria, setEditCategoria] = useState('');
-  const [editRazonSocial, setEditRazonSocial] = useState('');
   const [editNombreComercial, setEditNombreComercial] = useState('');
   /** "" = sin tasa (NULL), "0" = exento, "0.08" = frontera, "0.16" = general. */
   const [editTasaIva, setEditTasaIva] = useState<'' | '0' | '0.08' | '0.16'>('');
@@ -890,7 +888,6 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
     setEditDomicilio(p.domicilio ?? '');
     setEditCondicionesPago(p.condiciones_pago ?? '');
     setEditCategoria(p.categoria ?? '');
-    setEditRazonSocial(p.razon_social ?? '');
     setEditNombreComercial(p.nombre_comercial ?? '');
     setEditTasaIva(
       p.tasa_iva === 0 ? '0' : p.tasa_iva === 0.08 ? '0.08' : p.tasa_iva === 0.16 ? '0.16' : ''
@@ -946,10 +943,11 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
         .eq('id', selected.id);
       if (errProv) throw errProv;
 
-      // 3) erp.personas_datos_fiscales — upsert solo si hay valor en
-      // razón social o nombre comercial. Evitamos crear filas vacías cuando
-      // el proveedor aún no tiene CSF cargada.
-      const razonTrim = editRazonSocial.trim();
+      // 3) erp.personas_datos_fiscales — solo `nombre_comercial`. La razón
+      // social formal vive ahora exclusivamente en `personas.nombre` (la
+      // separación 2-campos creaba drift). Si necesitas refrescar el resto
+      // de los datos del SAT (régimen, domicilio fiscal, etc.) usa el flujo
+      // "Cargar / Actualizar CSF".
       const ncTrim = editNombreComercial.trim();
       const { data: dfExisting } = await supabase
         .schema('erp')
@@ -960,26 +958,20 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
         .maybeSingle();
 
       if (dfExisting) {
-        // Ya existe fila — actualizamos siempre (incluso a NULL si vaciaron campos).
         const { error: errDf } = await supabase
           .schema('erp')
           .from('personas_datos_fiscales')
-          .update({
-            razon_social: razonTrim || null,
-            nombre_comercial: ncTrim || null,
-          })
+          .update({ nombre_comercial: ncTrim || null })
           .eq('id', dfExisting.id);
         if (errDf) throw errDf;
-      } else if (razonTrim || ncTrim) {
-        // No hay fila y sí hay valor que persistir — insertamos.
+      } else if (ncTrim) {
         const { error: errDf } = await supabase
           .schema('erp')
           .from('personas_datos_fiscales')
           .insert({
             empresa_id: empresaId,
             persona_id: selected.persona_id,
-            razon_social: razonTrim || null,
-            nombre_comercial: ncTrim || null,
+            nombre_comercial: ncTrim,
           });
         if (errDf) throw errDf;
       }
@@ -1162,11 +1154,15 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
                   {editTipoPersonaForm === 'moral' ? 'Razón social' : 'Nombre(s)'}{' '}
                   <span className="text-destructive">*</span>
                 </label>
-                <Input value={editNombre} onChange={(e) => setEditNombre(e.target.value)} />
+                <Input
+                  value={editNombre}
+                  onChange={(e) => setEditNombre(e.target.value)}
+                  className="uppercase"
+                />
                 <p className="text-xs text-muted-foreground">
                   {editTipoPersonaForm === 'moral'
-                    ? 'Razón social completa, sin apellidos.'
-                    : 'Solo nombre(s) de pila. Apellidos van abajo.'}
+                    ? 'Razón social completa, sin apellidos. Se guarda en MAYÚSCULAS.'
+                    : 'Solo nombre(s) de pila. Apellidos van abajo. Se guarda en MAYÚSCULAS.'}
                 </p>
               </div>
               {editTipoPersonaForm === 'fisica' && (
@@ -1176,6 +1172,7 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
                     <Input
                       value={editApellidoPaterno}
                       onChange={(e) => setEditApellidoPaterno(e.target.value)}
+                      className="uppercase"
                     />
                   </div>
                   <div className="space-y-2">
@@ -1183,6 +1180,7 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
                     <Input
                       value={editApellidoMaterno}
                       onChange={(e) => setEditApellidoMaterno(e.target.value)}
+                      className="uppercase"
                     />
                   </div>
                 </div>
@@ -1223,21 +1221,6 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
                   />
                   <p className="text-xs text-muted-foreground">
                     Si es distinto a la razón social (DBA / nombre fantasía).
-                  </p>
-                </div>
-              )}
-              {editTipoPersonaForm === 'moral' && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium leading-none">Razón social SAT (CSF)</label>
-                  <Input
-                    value={editRazonSocial}
-                    onChange={(e) => setEditRazonSocial(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Razón social formal como aparece en el CSF del SAT. Suele coincidir con el campo
-                    de arriba; usa este sólo si necesitas guardar la versión exacta del registro
-                    fiscal. Para los demás datos del SAT (régimen, domicilio fiscal, etc.) usa
-                    &ldquo;Cargar / Actualizar CSF&rdquo;.
                   </p>
                 </div>
               )}
@@ -1461,7 +1444,9 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
                         setNewNombre(e.target.value); // morales: nombre = razón social
                       }}
                       placeholder="EJEMPLO SA DE CV"
+                      className="uppercase"
                     />
+                    <p className="text-xs text-muted-foreground">Se guarda en MAYÚSCULAS.</p>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium leading-none">Nombre comercial</label>
@@ -1469,6 +1454,7 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
                       value={newNombreComercial}
                       onChange={(e) => setNewNombreComercial(e.target.value)}
                       placeholder="Opcional"
+                      className="uppercase"
                     />
                   </div>
                 </>
@@ -1482,7 +1468,9 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
                       value={newNombre}
                       onChange={(e) => setNewNombre(e.target.value)}
                       placeholder="Nombre de pila"
+                      className="uppercase"
                     />
+                    <p className="text-xs text-muted-foreground">Se guarda en MAYÚSCULAS.</p>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
@@ -1490,6 +1478,7 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
                       <Input
                         value={newApellidoPaterno}
                         onChange={(e) => setNewApellidoPaterno(e.target.value)}
+                        className="uppercase"
                       />
                     </div>
                     <div className="space-y-2">
@@ -1497,6 +1486,7 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
                       <Input
                         value={newApellidoMaterno}
                         onChange={(e) => setNewApellidoMaterno(e.target.value)}
+                        className="uppercase"
                       />
                     </div>
                   </div>
