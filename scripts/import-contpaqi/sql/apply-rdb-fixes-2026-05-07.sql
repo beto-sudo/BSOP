@@ -26,3 +26,8 @@
 --
 -- Falso positivo descartado: MAS (legacy) NO es dup de SISTEMA EN
 -- PREVENCION ALARMAS (el regex matcheó "MAS" dentro de "alarmAS").
+
+-- C) Merge follow-up: HEALING GOODS S.A. DE C.V. (Física, sin código,
+--    mismo RFC HGO2302075C0) consolidado a HEALING GOODS (Moral,
+--    código CONTPAQi 17, canónico). 1 OC movida → total 6 OCs en
+--    el canónico. Soft-delete del dup Física.
