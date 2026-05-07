@@ -71,6 +71,7 @@ const baseBooking = {
     'drmorales@ventrisfertility.com',
     'gerardo.deltoro@hankat.mx',
   ],
+  resource_name: 'Padel 5 "Mueblería Guillen"',
 };
 
 function candidate(overrides: Partial<WaitryCandidate>): WaitryCandidate {
@@ -376,5 +377,73 @@ describe('rankCandidates', () => {
     });
     const ranked = rankCandidates(regularBooking, [coachTicket]);
     expect(ranked[0].reasons.some((r) => r.includes('coach'))).toBe(false);
+  });
+
+  // Las hostes copian/pegan el bloque "Pista\nPadel N \"Sponsor\"\nFecha..."
+  // del panel de Playtomic Manager directo a las notas Waitry. Este boost
+  // hace que ese match casi-perfecto suba al top automáticamente.
+  describe('court name match in notes', () => {
+    it('boosts candidates whose notes include the booking resource_name', () => {
+      const exactMatch = candidate({
+        order_id: 'exact-court',
+        notes:
+          'Pista\nPadel 5 "Mueblería Guillen"\nFecha\n7 abr 2026\nHora\n08:30 p.m.\nOrigen\nClub',
+      });
+      const noCourtInfo = candidate({ order_id: 'no-court', notes: 'efectivo' });
+      const ranked = rankCandidates(baseBooking, [noCourtInfo, exactMatch]);
+      expect(ranked[0].order_id).toBe('exact-court');
+      expect(
+        ranked[0].reasons.some((r) => r.includes('cancha exacta') || r.includes('copia/pega'))
+      ).toBe(true);
+    });
+
+    it('penalizes candidates whose notes mention a different court', () => {
+      // baseBooking is "Padel 5 ..." → nota con "Padel 1" debería tener penalty
+      const otherCourt = candidate({
+        order_id: 'other-court',
+        notes:
+          'Pista\nPadel 1 "Autos del Norte"\nFecha\n7 abr 2026\nHora\n08:30 p.m.\nOrigen\nClub',
+      });
+      const noCourtInfo = candidate({
+        order_id: 'no-court',
+        notes: 'efectivo paco palacios',
+      });
+      const ranked = rankCandidates(baseBooking, [otherCourt, noCourtInfo]);
+      // El que NO menciona cancha distinta debe ganar
+      expect(ranked[0].order_id).toBe('no-court');
+      // El otro debe tener el reason de penalty
+      const penalized = ranked.find((r) => r.order_id === 'other-court');
+      expect(penalized?.reasons.some((r) => r.includes('otra cancha'))).toBe(true);
+    });
+
+    it('does not penalize when notes have no court mention at all', () => {
+      const informalNote = candidate({
+        order_id: 'informal',
+        notes: 'jose luis paz tarjeta',
+      });
+      const ranked = rankCandidates(baseBooking, [informalNote]);
+      const r = ranked[0];
+      // No debe haber penalty por "otra cancha" — la nota no menciona ninguna
+      expect(r.reasons.some((reason) => reason.includes('otra cancha'))).toBe(false);
+      // Igual debería ganar score por match con owner
+      expect(r.reasons.some((reason) => reason.toLowerCase().includes('owner'))).toBe(true);
+    });
+
+    it('the exact court match outranks owner name match alone', () => {
+      // Misma proximidad — la nota con cancha+jugador-genérico debe ganar
+      // sobre la nota con solo el owner.
+      const ownerOnly = candidate({
+        order_id: 'owner-only',
+        timestamp: '2026-04-08T01:35:00Z',
+        notes: 'jose luis paz',
+      });
+      const courtOnly = candidate({
+        order_id: 'court-only',
+        timestamp: '2026-04-08T01:35:00Z',
+        notes: 'Pista\nPadel 5 "Mueblería Guillen"\nFecha\n7 abr 2026',
+      });
+      const ranked = rankCandidates(baseBooking, [ownerOnly, courtOnly]);
+      expect(ranked[0].order_id).toBe('court-only');
+    });
   });
 });
