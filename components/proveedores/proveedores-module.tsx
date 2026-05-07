@@ -137,6 +137,40 @@ function formatTasaIva(t: number | null | undefined): string {
   return `${(t * 100).toFixed(0)}%`;
 }
 
+/**
+ * Catálogo canónico de categorías de proveedores. Espejo del CHECK
+ * constraint `proveedores_categoria_chk` en `erp.proveedores`.
+ * Si agregas una categoría aquí, ALTER el constraint también.
+ */
+const CATEGORIAS: { value: string; label: string }[] = [
+  { value: 'notaria', label: 'Notaría' },
+  { value: 'banca', label: 'Banca' },
+  { value: 'gobierno_y_servicios_publicos', label: 'Gobierno y servicios públicos' },
+  { value: 'materiales_construccion', label: 'Materiales de construcción' },
+  { value: 'ferreteria', label: 'Ferretería' },
+  { value: 'maquinaria_y_equipos', label: 'Maquinaria y equipos' },
+  { value: 'tecnologia_y_software', label: 'Tecnología y software' },
+  { value: 'telecomunicaciones', label: 'Telecomunicaciones' },
+  { value: 'seguros', label: 'Seguros' },
+  { value: 'servicios_profesionales', label: 'Servicios profesionales' },
+  { value: 'retail_y_consumibles', label: 'Retail y consumibles' },
+  { value: 'hospedaje_y_viajes', label: 'Hospedaje y viajes' },
+  { value: 'combustibles_y_gas', label: 'Combustibles y gas' },
+  { value: 'transportes_y_fletes', label: 'Transportes y fletes' },
+  { value: 'alimentos_y_bebidas', label: 'Alimentos y bebidas' },
+  { value: 'personas_fisicas', label: 'Personas físicas' },
+  { value: 'otros', label: 'Otros' },
+];
+
+const CATEGORIA_LABEL: Record<string, string> = Object.fromEntries(
+  CATEGORIAS.map((c) => [c.value, c.label])
+);
+
+function formatCategoria(c: string | null | undefined): string {
+  if (!c) return '—';
+  return CATEGORIA_LABEL[c] ?? c;
+}
+
 const proveedorColumns: Column<Proveedor>[] = [
   {
     key: 'nombre',
@@ -179,6 +213,12 @@ const proveedorColumns: Column<Proveedor>[] = [
     label: 'IVA',
     cellClassName: 'text-xs text-muted-foreground tabular-nums',
     render: (p) => formatTasaIva(p.tasa_iva),
+  },
+  {
+    key: 'categoria',
+    label: 'Categoría',
+    cellClassName: 'text-xs text-muted-foreground',
+    render: (p) => formatCategoria(p.categoria),
   },
   {
     key: 'condiciones_pago',
@@ -243,7 +283,11 @@ function ProveedorDetail({
     },
     { label: 'Domicilio', value: proveedor.domicilio, icon: null },
     { label: 'Condiciones de pago', value: proveedor.condiciones_pago, icon: null },
-    { label: 'Categoría', value: proveedor.categoria, icon: null },
+    {
+      label: 'Categoría',
+      value: proveedor.categoria ? formatCategoria(proveedor.categoria) : null,
+      icon: null,
+    },
     {
       label: 'Tasa de IVA',
       value: proveedor.tasa_iva === null ? null : formatTasaIva(proveedor.tasa_iva),
@@ -374,6 +418,8 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [showInactivos, setShowInactivos] = useState(false);
+  /** "" = todas las categorías; valor canónico = filtra por esa. */
+  const [categoryFilter, setCategoryFilter] = useState<string>('');
   const [selected, setSelected] = useState<Proveedor | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -864,6 +910,7 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
 
   const filtered = proveedores.filter((p) => {
     if (!showInactivos && !p.activo) return false;
+    if (categoryFilter && p.categoria !== categoryFilter) return false;
     if (!search) return true;
     const q = search.toLowerCase();
     return (
@@ -1040,6 +1087,20 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
             className="pl-9"
           />
         </div>
+
+        <select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          aria-label="Filtrar por categoría"
+        >
+          <option value="">Todas las categorías</option>
+          {CATEGORIAS.map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.label}
+            </option>
+          ))}
+        </select>
 
         <Button
           variant={showInactivos ? 'default' : 'outline'}
@@ -1271,11 +1332,18 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium leading-none">Categoría</label>
-                  <Input
+                  <select
                     value={editCategoria}
                     onChange={(e) => setEditCategoria(e.target.value)}
-                    placeholder="Insumos, Servicios, Materia prima…"
-                  />
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="">— sin categoría</option>
+                    {CATEGORIAS.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div className="space-y-2">
