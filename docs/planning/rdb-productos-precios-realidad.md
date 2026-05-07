@@ -3,10 +3,11 @@
 **Slug:** `rdb-productos-precios-realidad`
 **Empresas:** RDB
 **Schemas afectados:** `rdb` (vista `v_productos_tabla`), lectura de `erp.ordenes_compra_detalle` + `rdb.waitry_productos`
-**Estado:** planned
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-04-30
-**Última actualización:** 2026-04-30 (Sprint 1 ejecutado en modo autónomo — migración `20260430130000_rdb_v_productos_tabla_costo_precio_realidad.sql` lista para que Beto aplique con psql; regeneración de SCHEMA_REF + types + smoke en preview pendientes post-apply).
+**Cerrada:** 2026-04-30
+**Última actualización:** 2026-05-07 (housekeeping — la iniciativa cerró el 2026-04-30 con Sprint 2 + corrección post-smoke. Sincronizado el estado en planning + INITIATIVES.md. La vista vive en producción y la usa el fix `requisicion-oc-precio` PR #446 como fuente de "último precio de compra" al convertir requisición → OC).
 
 ## Problema
 
