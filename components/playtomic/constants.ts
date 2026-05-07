@@ -1,4 +1,13 @@
-export const TZ = 'America/Matamoros';
+// Matamoros (frontera norte de México) sí adopta DST por sincronización
+// con EE.UU., pero el club RDB opera con horario FIJO UTC-6 (CST puro):
+// así muestra Playtomic Manager y así copian/pegan las hostes el bloque
+// "Hora 06:00 p.m. - 07:00 p.m." a las notas Waitry. Si BSOP usa
+// `America/Matamoros`, en mayo (DST activo) muestra una hora distinta y
+// rompe el match visual con las notas — caso real reportado 2026-05-07
+// (Tenis 3, owner Rogelio: BSOP mostraba 19:00, hosta había escrito
+// "06:00 p.m. = 18:00"). Forzamos `Etc/GMT+6` que es UTC-6 fijo y
+// estable todo el año.
+export const TZ = 'Etc/GMT+6';
 
 export const MXN = new Intl.NumberFormat('es-MX', {
   style: 'currency',

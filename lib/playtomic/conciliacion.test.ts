@@ -452,7 +452,7 @@ describe('rankCandidates', () => {
   // Pablo lo ve como sugerencia visual mientras concilia manual.
   describe('auto-match eligibility (dry-run)', () => {
     it('marks candidate with is_auto_match=true when all signals align', () => {
-      // Cancha exacta + nombre del owner + monto del booking completo + ±15min + saldo
+      // Cancha exacta + nombre del owner + monto del booking completo + ±90min + saldo
       const idealMatch = candidate({
         order_id: 'ideal',
         timestamp: '2026-04-08T01:35:00Z',
@@ -503,11 +503,28 @@ describe('rankCandidates', () => {
       expect(ranked[0].is_auto_match).toBe(false);
     });
 
-    it('does NOT mark when timestamp is outside ±15 min window', () => {
-      // 30 min después: dentro de la ventana ±2d default pero fuera de ±15min
+    it('marks when timestamp is within ±90 min window (cliente paga al salir)', () => {
+      // 51 min después: caso real (Tenis 3, Rogelio Villanueva 2026-05-06).
+      // El cliente jugó 60min y pagó al terminar. Antes de ampliar la
+      // ventana a 90min, este caso obvio NO se marcaba como auto-match.
+      const playedAndPaid = candidate({
+        order_id: 'paid-after-game',
+        timestamp: '2026-04-08T02:21:00Z',
+        total_amount: 800,
+        notes: 'Pista\nPadel 5 "Mueblería Guillen"\nFecha\n7 abr 2026\njose luis paz',
+        items: [
+          { product_name: 'Renta Cancha Padel', quantity: 4, unit_price: 200, total_price: 800 },
+        ],
+      });
+      const ranked = rankCandidates(baseBooking, [playedAndPaid]);
+      expect(ranked[0].is_auto_match).toBe(true);
+    });
+
+    it('does NOT mark when timestamp is outside ±90 min window', () => {
+      // 2 horas después: fuera de la ventana ampliada
       const farTimestamp = candidate({
         order_id: 'far-time',
-        timestamp: '2026-04-08T02:00:00Z',
+        timestamp: '2026-04-08T03:30:00Z',
         total_amount: 800,
         notes: 'Pista\nPadel 5 "Mueblería Guillen"\nFecha\n7 abr 2026\njose luis paz',
         items: [
