@@ -1,0 +1,24 @@
+-- Import del padrón CONTPAQi de RDB (47 proveedores, todos con RFC válido).
+-- Fuente: ~/Downloads/Padron de Proveedores DRB.xlsx
+-- Aplicado a DB live el 2026-05-07 via MCP execute_sql.
+--
+-- Estrategia:
+--   - Match contra erp.personas + erp.proveedores de RDB por RFC normalizado.
+--   - UPDATE personas existentes con nombre + tipo_persona del Excel
+--     (Beto: "nombre correcto debe ser este archivo").
+--   - UPDATE proveedores existentes con tasa_iva + codigo CONTPAQi.
+--   - INSERT personas + proveedores nuevos para los RFCs no presentes.
+--
+-- Resultado:
+--   - 47 RFCs procesados
+--   - 10 ya eran personas RDB → personas actualizadas (nombre + tipo)
+--   - 8 ya eran proveedores RDB → tasa_iva + codigo actualizados
+--   - 37 personas nuevas creadas
+--   - 39 proveedores nuevos creados (37 nuevos + 2 que ya eran personas pero no proveedores)
+--
+-- Total final: 70 proveedores RDB activos (47 del Excel + 23 legacy
+-- pre-existentes sin RFC con nombres-fragmento que requieren cleanup
+-- operativo separado).
+
+-- (SQL completo idéntico al ejecutado via MCP el 2026-05-07; no se
+--  re-aplica desde aquí. Este archivo queda como auditoría.)
