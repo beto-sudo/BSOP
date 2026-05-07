@@ -272,20 +272,51 @@ export async function generarOrdenCompra(
   }
   if (!oc) throw new Error('Error al crear la orden de compra');
 
-  // Copy items — `reqItems` is typed from the select('*') against erp.requisiciones_detalle
+  // Copy items — `reqItems` is typed from the select('*') against erp.requisiciones_detalle.
+  // Prellena `precio_unitario` con la mejor señal disponible:
+  //   1. `precio_estimado` capturado en la requisición (si > 0).
+  //   2. `ultimo_costo` del producto en `rdb.v_productos_tabla` (última OC
+  //      recibida o cerrada — fuente más confiable de "último precio de compra").
+  //   3. 0 (fallback cuando no hay histórico — el comprador captura).
+  // Quien confirma la OC verifica que el precio sigue vigente; ya no se
+  // entrega la OC vacía de precios.
   if (reqItems && reqItems.length > 0) {
+    const productoIds = reqItems
+      .map((i) => i.producto_id)
+      .filter((id): id is string => Boolean(id));
+
+    const preciosMap = new Map<string, number>();
+    if (productoIds.length > 0) {
+      const { data: preciosRows } = await supabase
+        .schema('rdb')
+        .from('v_productos_tabla')
+        .select('id, ultimo_costo')
+        .in('id', productoIds);
+      type RawPrecio = { id: string; ultimo_costo: number | string | null };
+      for (const p of (preciosRows ?? []) as RawPrecio[]) {
+        if (p.ultimo_costo === null || p.ultimo_costo === undefined) continue;
+        const n = typeof p.ultimo_costo === 'string' ? Number(p.ultimo_costo) : p.ultimo_costo;
+        if (Number.isFinite(n) && n > 0) preciosMap.set(p.id, n);
+      }
+    }
+
     const { error: ocItemsErr } = await supabase
       .schema('erp')
       .from('ordenes_compra_detalle')
       .insert(
-        reqItems.map((item) => ({
-          empresa_id: RDB_EMPRESA_ID,
-          orden_compra_id: oc.id,
-          producto_id: item.producto_id ?? null,
-          descripcion: item.descripcion,
-          cantidad: item.cantidad,
-          precio_unitario: 0,
-        }))
+        reqItems.map((item) => {
+          const estimado = item.precio_estimado != null ? Number(item.precio_estimado) : null;
+          const ultimoCosto = item.producto_id ? preciosMap.get(item.producto_id) : undefined;
+          const precio_unitario = estimado != null && estimado > 0 ? estimado : (ultimoCosto ?? 0);
+          return {
+            empresa_id: RDB_EMPRESA_ID,
+            orden_compra_id: oc.id,
+            producto_id: item.producto_id ?? null,
+            descripcion: item.descripcion,
+            cantidad: item.cantidad,
+            precio_unitario,
+          };
+        })
       );
 
     if (ocItemsErr) throw new Error(ocItemsErr.message);
