@@ -180,6 +180,24 @@ function nameTokens(name: string): string[] {
     .filter((token) => token.length >= 3);
 }
 
+// Las hostes/Pablo copian/pegan el bloque "Pista / Padel N "Sponsor" /
+// Fecha / Hora" desde el panel de Playtomic Manager a las notas Waitry.
+// Detectar la mención de cancha permite (a) boost cuando coincide con el
+// booking y (b) penalty cuando apunta a otro booking. Ejemplos reales:
+//   "Pista\nPadel 5 \"Mueblería Guillen\"\nFecha\n6 may 2026..."
+//   "Padel 1 \"Autos del Norte\""
+//   "Tenis 3"
+const COURT_NUMBER_PATTERN = /\b(padel|tenis|pickleball)\s+(\d+)\b/g;
+
+function extractCourtNumbers(text: string): Array<{ sport: string; num: string }> {
+  const norm = normalizeForMatch(text);
+  const matches: Array<{ sport: string; num: string }> = [];
+  for (const m of norm.matchAll(COURT_NUMBER_PATTERN)) {
+    matches.push({ sport: m[1] ?? '', num: m[2] ?? '' });
+  }
+  return matches;
+}
+
 export function isWithinTimestampWindow(
   bookingStart: string,
   candidateTimestamp: string,
@@ -201,6 +219,7 @@ export function rankCandidates(
     | 'owner_email'
     | 'participant_names'
     | 'participant_emails'
+    | 'resource_name'
   >,
   candidates: WaitryCandidate[],
   options: { toleranceMs?: number } = {}
@@ -259,6 +278,32 @@ export function rankCandidates(
           if (participantHit) {
             score += 25;
             reasons.push('Notes coinciden con un participante');
+          }
+        }
+
+        // Match por cancha: las hostes/Pablo copian/pegan el bloque
+        // estructurado de Playtomic ("Pista\nPadel 5 \"Mueblería Guillen\"...").
+        // Si el resource_name del booking aparece literal en la nota, es match
+        // casi-seguro. Si la nota menciona OTRA cancha del club, penalizamos
+        // fuerte para que no contamine bookings distintos.
+        if (booking.resource_name) {
+          const resourceNorm = normalizeForMatch(booking.resource_name);
+          if (resourceNorm && notesNorm.includes(resourceNorm)) {
+            score += 80;
+            reasons.push('Notes copia/pega del booking (cancha exacta)');
+          } else {
+            // Comparar court numbers: "padel 5" vs "padel 1" → mismatch.
+            const bookingCourts = extractCourtNumbers(booking.resource_name);
+            const noteCourts = extractCourtNumbers(candidate.notes ?? '');
+            if (bookingCourts.length > 0 && noteCourts.length > 0) {
+              const isMatch = noteCourts.some((nc) =>
+                bookingCourts.some((bc) => bc.sport === nc.sport && bc.num === nc.num)
+              );
+              if (!isMatch) {
+                score -= 100;
+                reasons.push('Notes apuntan a otra cancha — probablemente otro booking');
+              }
+            }
           }
         }
       }
