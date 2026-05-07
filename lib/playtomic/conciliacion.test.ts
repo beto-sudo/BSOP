@@ -446,4 +446,107 @@ describe('rankCandidates', () => {
       expect(ranked[0].order_id).toBe('court-only');
     });
   });
+
+  // Auto-match eligibility (modo dry-run): el candidato se marca con
+  // is_auto_match=true SOLO cuando cumple TODOS los criterios duros.
+  // Pablo lo ve como sugerencia visual mientras concilia manual.
+  describe('auto-match eligibility (dry-run)', () => {
+    it('marks candidate with is_auto_match=true when all signals align', () => {
+      // Cancha exacta + nombre del owner + monto del booking completo + ±15min + saldo
+      const idealMatch = candidate({
+        order_id: 'ideal',
+        timestamp: '2026-04-08T01:35:00Z',
+        total_amount: 800,
+        unit_price: 200,
+        notes:
+          'Pista\nPadel 5 "Mueblería Guillen"\nFecha\n7 abr 2026\nHora\n08:30 p.m.\njose luis paz',
+        items: [
+          { product_name: 'Renta Cancha Padel', quantity: 4, unit_price: 200, total_price: 800 },
+        ],
+      });
+      const ranked = rankCandidates(baseBooking, [idealMatch]);
+      expect(ranked[0].is_auto_match).toBe(true);
+      expect(ranked[0].auto_match_reasons?.length).toBeGreaterThan(0);
+    });
+
+    it('does NOT mark when court matches but owner/participant is not in notes', () => {
+      const courtNoOwner = candidate({
+        order_id: 'court-no-owner',
+        timestamp: '2026-04-08T01:35:00Z',
+        total_amount: 800,
+        notes: 'Pista\nPadel 5 "Mueblería Guillen"\nFecha\n7 abr 2026',
+      });
+      const ranked = rankCandidates(baseBooking, [courtNoOwner]);
+      expect(ranked[0].is_auto_match).toBe(false);
+    });
+
+    it('does NOT mark when owner is in notes but court is not', () => {
+      const ownerNoCourt = candidate({
+        order_id: 'owner-no-court',
+        timestamp: '2026-04-08T01:35:00Z',
+        total_amount: 800,
+        notes: 'jose luis paz efectivo',
+      });
+      const ranked = rankCandidates(baseBooking, [ownerNoCourt]);
+      expect(ranked[0].is_auto_match).toBe(false);
+    });
+
+    it('does NOT mark when notes mention a different court (penalty active)', () => {
+      const wrongCourt = candidate({
+        order_id: 'wrong-court',
+        timestamp: '2026-04-08T01:35:00Z',
+        total_amount: 800,
+        notes:
+          'Pista\nPadel 1 "Autos del Norte"\nFecha\n7 abr 2026\nHora\n08:30 p.m.\njose luis paz',
+      });
+      const ranked = rankCandidates(baseBooking, [wrongCourt]);
+      expect(ranked[0].is_auto_match).toBe(false);
+    });
+
+    it('does NOT mark when timestamp is outside ±15 min window', () => {
+      // 30 min después: dentro de la ventana ±2d default pero fuera de ±15min
+      const farTimestamp = candidate({
+        order_id: 'far-time',
+        timestamp: '2026-04-08T02:00:00Z',
+        total_amount: 800,
+        notes: 'Pista\nPadel 5 "Mueblería Guillen"\nFecha\n7 abr 2026\njose luis paz',
+        items: [
+          { product_name: 'Renta Cancha Padel', quantity: 4, unit_price: 200, total_price: 800 },
+        ],
+      });
+      const ranked = rankCandidates(baseBooking, [farTimestamp]);
+      expect(ranked[0].is_auto_match).toBe(false);
+    });
+
+    it('does NOT mark when amount does not match any expected bucket', () => {
+      // Monto raro: $500 con 4 jugadores ($200 c/u esperado, ±15%) — no encaja
+      const oddAmount = candidate({
+        order_id: 'odd-amount',
+        timestamp: '2026-04-08T01:35:00Z',
+        total_amount: 500,
+        unit_price: 500,
+        notes: 'Pista\nPadel 5 "Mueblería Guillen"\nFecha\n7 abr 2026\njose luis paz',
+        items: [
+          { product_name: 'Renta Cancha Padel', quantity: 1, unit_price: 500, total_price: 500 },
+        ],
+      });
+      const ranked = rankCandidates(baseBooking, [oddAmount]);
+      expect(ranked[0].is_auto_match).toBe(false);
+    });
+
+    it('does NOT mark when remaining_amount is zero (split-payment fully consumed)', () => {
+      const consumed = candidate({
+        order_id: 'consumed',
+        timestamp: '2026-04-08T01:35:00Z',
+        total_amount: 800,
+        remaining_amount: 0,
+        notes: 'Pista\nPadel 5 "Mueblería Guillen"\nFecha\n7 abr 2026\njose luis paz',
+        items: [
+          { product_name: 'Renta Cancha Padel', quantity: 4, unit_price: 200, total_price: 800 },
+        ],
+      });
+      const ranked = rankCandidates(baseBooking, [consumed]);
+      expect(ranked[0].is_auto_match).toBe(false);
+    });
+  });
 });

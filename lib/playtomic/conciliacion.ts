@@ -143,7 +143,23 @@ export type WaitryCandidate = {
 export type RankedCandidate = WaitryCandidate & {
   score: number;
   reasons: string[];
+  /**
+   * Marcado true cuando el candidato cumple criterios duros de
+   * "auto-conciliación" (modo dry-run): cancha exacta en notas + nombre
+   * de owner/participante en notas + monto coincide con bucket esperado
+   * + timestamp dentro de ±15min + pedido con saldo. Pablo lo ve como
+   * sugerencia visual mientras concilia manual; en el futuro un cron
+   * podría aplicarlo automáticamente.
+   */
+  is_auto_match?: boolean;
+  /** Razones específicas que hicieron al candidato elegible para auto-match. */
+  auto_match_reasons?: string[];
 };
+
+// Criterios duros para "auto-conciliación" en modo dry-run. Conservadores
+// a propósito — solo marca un candidato cuando hay match casi-certain por
+// la combinación de señales, no por una sola.
+const AUTO_MATCH_TIME_WINDOW_MS = 15 * 60 * 1000;
 
 // Ventana temporal simétrica. La asunción original "el pago siempre
 // ocurre después del booking_start" no se sostiene: hay clientes que
@@ -174,10 +190,27 @@ function normalizeForMatch(text: string | null | undefined): string {
   return (text ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 }
 
+// Stopwords cortos en nombres de personas (español). Filtrarlos evita
+// falsos positivos cuando el token coincide por casualidad con palabras
+// del bloque Playtomic en notas Waitry — ej. "del" (de "Gerardo Del
+// Toro") matchearía siempre con "pa[del]" en la nota estructurada.
+const NAME_TOKEN_STOPWORDS = new Set([
+  'del',
+  'los',
+  'las',
+  'san',
+  'que',
+  'por',
+  'mar',
+  'rey',
+  'sol',
+  'sur',
+]);
+
 function nameTokens(name: string): string[] {
   return normalizeForMatch(name)
     .split(/\s+/)
-    .filter((token) => token.length >= 3);
+    .filter((token) => token.length >= 3 && !NAME_TOKEN_STOPWORDS.has(token));
 }
 
 // Las hostes/Pablo copian/pegan el bloque "Pista / Padel N "Sponsor" /
@@ -366,7 +399,53 @@ export function rankCandidates(
         }
       }
 
-      return { ...candidate, score, reasons };
+      // ─── Elegibilidad para auto-conciliación (modo dry-run) ───────────
+      // Criterios DUROS, no por threshold de score: queremos certeza, no
+      // optimismo. Las cuatro señales abajo deben estar TODAS presentes:
+      const autoMatchReasons: string[] = [];
+      const candidateMsAbs = Math.abs(candidateMs - bookingMs);
+      const withinTightWindow = candidateMsAbs <= AUTO_MATCH_TIME_WINDOW_MS;
+
+      const matchedExactCourt = reasons.some(
+        (r) => r.includes('cancha exacta') || r.includes('copia/pega del booking')
+      );
+      const matchedNamesInNotes = reasons.some((r) => r.toLowerCase().includes('notes coinciden'));
+      const matchedOtherCourt = reasons.some((r) => r.includes('otra cancha'));
+      const matchedAmountBucket = reasons.some(
+        (r) =>
+          r.includes('Total del ticket coincide') ||
+          r.includes('cubre la cancha completa') ||
+          r.includes('Unit price coincide con el monto por jugador')
+      );
+
+      // Saldo del pedido: si el candidato lleva remaining_amount (split-payment
+      // tracking), respetarlo; si no, asumir que `total_amount` está disponible.
+      const candidateRemaining = candidate.remaining_amount ?? candidate.total_amount;
+      const hasUsableRemaining = candidateRemaining > 0.01;
+
+      if (
+        withinTightWindow &&
+        matchedExactCourt &&
+        matchedNamesInNotes &&
+        matchedAmountBucket &&
+        hasUsableRemaining &&
+        !matchedOtherCourt
+      ) {
+        autoMatchReasons.push('Cancha exacta en nota');
+        autoMatchReasons.push('Nombre del owner/participante en nota');
+        autoMatchReasons.push('Monto coincide con bucket esperado del booking');
+        autoMatchReasons.push('Pedido dentro de ±15 min del booking');
+      }
+
+      const isAutoMatch = autoMatchReasons.length > 0;
+
+      return {
+        ...candidate,
+        score,
+        reasons,
+        is_auto_match: isAutoMatch,
+        auto_match_reasons: isAutoMatch ? autoMatchReasons : undefined,
+      };
     })
     .sort((a, b) => b.score - a.score);
 }

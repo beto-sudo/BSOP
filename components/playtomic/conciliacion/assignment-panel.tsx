@@ -387,13 +387,16 @@ export function AssignmentPanel({
                 (candidate.shared_with_bookings_count ?? 0) > 0 &&
                 (candidate.assigned_to_other_bookings ?? 0) > 0;
               const remaining = candidate.remaining_amount ?? candidate.total_amount;
+              const isAutoMatch = candidate.is_auto_match === true;
               return (
                 <li
                   key={candidate.order_id}
                   className={`flex items-start justify-between gap-3 rounded-xl border p-3 text-sm transition-colors ${
                     isSelected
                       ? 'border-emerald-500/40 bg-emerald-500/10'
-                      : 'border-[var(--border)] bg-[var(--panel)]/20'
+                      : isAutoMatch
+                        ? 'border-cyan-500/50 bg-cyan-500/5 ring-1 ring-cyan-500/40'
+                        : 'border-[var(--border)] bg-[var(--panel)]/20'
                   }`}
                 >
                   <div className="min-w-0 flex-1 space-y-1">
@@ -425,6 +428,14 @@ export function AssignmentPanel({
                           title={`Asignado a ${candidate.shared_with_bookings_count} reserva${candidate.shared_with_bookings_count === 1 ? '' : 's'} previa${candidate.shared_with_bookings_count === 1 ? '' : 's'} por ${formatMoney(candidate.assigned_to_other_bookings ?? 0)}`}
                         >
                           Pago compartido
+                        </span>
+                      ) : null}
+                      {isAutoMatch ? (
+                        <span
+                          className="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-2 py-0.5 text-xs text-cyan-200"
+                          title={`Cumple criterios para auto-conciliación: ${(candidate.auto_match_reasons ?? []).join(' · ')}. Cuando activemos auto-conciliación, este pedido se asignaría automáticamente.`}
+                        >
+                          🤖 Sugerido auto
                         </span>
                       ) : null}
                     </div>
