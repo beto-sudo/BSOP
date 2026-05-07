@@ -1,85 +1,36 @@
 /**
  * Utilidades de formateo de nombres propios para BSOP.
  *
- * Beto migró datos desde Coda/IMSS donde muchos nombres vienen TODOS EN
- * MAYÚSCULAS. El estándar de BSOP es Title Case: primera letra de cada
- * palabra en mayúscula, el resto en minúscula — respetando preposiciones
- * comunes en español ("de", "la", "del", "y") que quedan en minúscula
- * cuando no son la primera palabra.
+ * **Política actualizada 2026-05-07**: BSOP normaliza todos los nombres
+ * de personas a MAYÚSCULAS para alinearse con la convención mexicana de
+ * SAT/CFDi/CONTPAQi. La normalización vive en el trigger DB
+ * `erp.fn_personas_uppercase_normalize` — futuras altas y edits quedan
+ * en mayúsculas automáticamente.
  *
- * Aplicar en:
- *   - UI de entry/edit antes de guardar (nuevos nombres siempre quedan limpios).
- *   - Backfills SQL one-shot para datos históricos en mayúsculas.
+ * Estas funciones quedan como **pass-through**: retornan los nombres tal
+ * cual vienen de DB (en MAYÚSCULAS post-trigger) sin re-transformar el
+ * casing. Históricamente aplicaban Title Case; ese paso se eliminó porque
+ * la DB ya garantiza la normalización canónica y el Title Case en frontend
+ * creaba la ilusión de que la DB no estaba en mayúsculas.
+ *
+ * Si en algún módulo específico se necesita Title Case para display
+ * (ej. impresión de un documento que prefiera estilizar), implementarlo
+ * localmente en ese caller — no aquí.
  */
 
-const LOWERCASE_PARTICLES = new Set([
-  'de',
-  'del',
-  'la',
-  'las',
-  'los',
-  'y',
-  'e',
-  'da',
-  'das',
-  'do',
-  'dos',
-  'van',
-  'von',
-  'der',
-  'den',
-]);
-
 /**
- * Convierte un nombre propio a Title Case preservando partículas en minúscula
- * cuando no son la primera palabra.
- *
- *   titleCase('ADALBERTO SANTOS DE LOS SANTOS')
- *     → 'Adalberto Santos de los Santos'
- *   titleCase('maria josé de la peña')
- *     → 'Maria José de la Peña'
- *   titleCase("O'CONNOR")
- *     → "O'Connor"
- *
- * Limitaciones: no intenta preservar siglas (e.g. "JR", "III") — los trata
- * como palabras normales. Si un nombre tiene abreviaturas, hay que
- * manualizar el Title Case después.
+ * Pass-through: retorna el input tal cual (la DB ya garantiza MAYÚSCULAS
+ * via trigger). Trim + colapsa espacios múltiples por higiene mínima.
  */
 export function titleCase(input: string | null | undefined): string {
   if (!input) return '';
-  const raw = String(input).trim().replace(/\s+/g, ' ');
-  if (!raw) return '';
-
-  const words = raw.split(' ');
-  return words
-    .map((word, i) => {
-      const lower = word.toLowerCase();
-      if (i > 0 && LOWERCASE_PARTICLES.has(lower)) return lower;
-      return capitalizeWord(word);
-    })
-    .join(' ');
+  return String(input).trim().replace(/\s+/g, ' ');
 }
 
 /**
- * Capitaliza una palabra respetando sub-partes separadas por apóstrofo
- * (O'Connor) o guion (Jean-Luc).
- */
-function capitalizeWord(word: string): string {
-  if (!word) return word;
-  return word
-    .split(/(['’-])/)
-    .map((part) => {
-      if (part === "'" || part === '’' || part === '-') return part;
-      if (!part) return part;
-      return part.charAt(0).toLocaleUpperCase('es') + part.slice(1).toLocaleLowerCase('es');
-    })
-    .join('');
-}
-
-/**
- * Compone el nombre completo desde los 3 campos separados (como los guarda
- * `erp.personas`). Aplica `titleCase` a cada parte por si la fuente vino en
- * mayúsculas, y filtra partes vacías.
+ * Compone el nombre completo desde los 3 campos separados (como los
+ * guarda `erp.personas`). NO transforma case — la DB tiene MAYÚSCULAS.
+ * Solo concatena partes no-vacías separadas por espacio.
  */
 export function composeFullName(
   nombre: string | null | undefined,
