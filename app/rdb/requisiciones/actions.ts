@@ -274,10 +274,11 @@ export async function generarOrdenCompra(
 
   // Copy items — `reqItems` is typed from the select('*') against erp.requisiciones_detalle.
   // Prellena `precio_unitario` con la mejor señal disponible:
-  //   1. `precio_estimado` capturado en la requisición (si > 0).
-  //   2. `ultimo_costo` del producto en `rdb.v_productos_tabla` (última OC
-  //      recibida o cerrada — fuente más confiable de "último precio de compra").
-  //   3. 0 (fallback cuando no hay histórico — el comprador captura).
+  //   1. `ultimo_costo` del producto en `rdb.v_productos_tabla` (última OC
+  //      recibida o cerrada — precio factual de la última compra).
+  //   2. `precio_estimado` capturado en la requisición (si > 0) — fallback
+  //      cuando no hay histórico de compras del producto.
+  //   3. 0 (cuando no hay ninguna de las dos — el comprador captura).
   // Quien confirma la OC verifica que el precio sigue vigente; ya no se
   // entrega la OC vacía de precios.
   if (reqItems && reqItems.length > 0) {
@@ -305,9 +306,14 @@ export async function generarOrdenCompra(
       .from('ordenes_compra_detalle')
       .insert(
         reqItems.map((item) => {
-          const estimado = item.precio_estimado != null ? Number(item.precio_estimado) : null;
           const ultimoCosto = item.producto_id ? preciosMap.get(item.producto_id) : undefined;
-          const precio_unitario = estimado != null && estimado > 0 ? estimado : (ultimoCosto ?? 0);
+          const estimado = item.precio_estimado != null ? Number(item.precio_estimado) : null;
+          const precio_unitario =
+            ultimoCosto && ultimoCosto > 0
+              ? ultimoCosto
+              : estimado != null && estimado > 0
+                ? estimado
+                : 0;
           return {
             empresa_id: RDB_EMPRESA_ID,
             orden_compra_id: oc.id,
