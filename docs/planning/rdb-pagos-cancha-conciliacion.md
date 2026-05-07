@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-04
-**Última actualización:** 2026-05-04 (S2-Waitry-write abierto en [#423](https://github.com/beto-sudo/BSOP/pull/423) — server actions + UI funcional; pendiente smoke en preview + merge)
+**Última actualización:** 2026-05-07 (refinamiento de cobertura efectiva: ventana temporal simétrica, wallet con `non_applicable_total`, boost por cancha en notes, badge dry-run de auto-conciliación)
 
 ## Problema
 
@@ -141,6 +141,9 @@ KPIs visibles en el dashboard:
 - **2026-05-04** — Solo "Renta Cancha Padel" en scope. Razón: torneos no son canchas reservadas; F&B no aplica.
 - **2026-05-04** — Vista nueva separada (`/rdb/playtomic/conciliacion`), no inline en el dashboard. Razón: la operación de conciliar es un workflow distinto a "ver KPIs", separar concerns.
 - **2026-05-04** — La heurística de matching deriva el monto esperado del propio booking (`price_amount / participantes`), no de un valor hardcoded. Razón: tenis singles ($300/2 = $150), tenis dobles ($400/4 = $100), horarios con descuento, torneos a precios distintos. Hardcodear $200 sólo funcionaba para padel a precio estándar y rompía el resto. Tolerancia ±15% absorbe redondeos del POS.
+- **2026-05-07** — Wallet payments en CSV de Playtomic Manager: `total=0` siempre, monto real está en `non_applicable_total`. Verificado en BD productiva (90d): 136 wallet payments, todos con `total=0`, todos con `non_applicable_total>0` (suma $30,550). `payment_type='Single payer'` indica que el wallet cubrió todo el booking; otros valores cubren fraccional. La heurística previa `price/N` era doble-mala: subestimaba single-payer (Dina pagó $800, modelo decía $266) y sobreestimaba fracciones con descuento. La fuente real evita ambos errores.
+- **2026-05-07** — Wellhub aparece en CSV con `origin='Playtomic Manager'` aunque sí está cobrado vía la integración. Reclasificarlo por `payment_method` (no por `origin`) lo cuenta correctamente como online, no como manager-unverified.
+- **2026-05-07** — Auto-conciliación en modo dry-run primero. Pablo ve el badge "🤖 Sugerido auto" pero sigue conciliando manual. Después de 1-2 semanas validamos tasa de acierto antes de activar cron. Razón: Beto prefiere validar antes de auto-mutar producción.
 
 ## Bitácora
 
@@ -155,6 +158,13 @@ KPIs visibles en el dashboard:
 - **2026-05-04** — **Boost de coaches** ([#419](https://github.com/beto-sudo/BSOP/pull/419)). De los 457 pendientes en ventana 90d, 307 (67%) tienen un coach (Omar/Anibal/Manuel/Paco/Hugo) como owner o participante. 83 pedidos coach existen en Waitry pero solo 17 con nombre (66 son genéricos `Uso cancha coach`). Auto-match estricto solo agarra 2; en cambio el ranker ahora promueve cualquier ticket coach al top cuando la reserva tiene coach (+30 score) y bonus extra (+20) si el nombre del producto coincide con el del booking.
 - **2026-05-04** — Bug "no aparecen pedidos del 30-mar en adelante". Causa: PostgREST default de Supabase capa a ~1000 rows ignorando `.limit(8000)`. Con 5732 pedidos pagados en 120d, la query con `.order(ascending)` traía los más antiguos y dejaba fuera los recientes. **Fix paliativo [#420](https://github.com/beto-sudo/BSOP/pull/420)**: descending. **Fix de raíz [#421](https://github.com/beto-sudo/BSOP/pull/421)**: `ALTER ROLE authenticator SET pgrst.db_max_rows = '50000'` aplicado en producción — todas las queries del repo se benefician.
 - **2026-05-04** — **S2-Waitry-write abierto** ([#423](https://github.com/beto-sudo/BSOP/pull/423)). Server actions `assignPaymentAction` / `unassignPaymentAction` sobre `playtomic.payment_assignments` (validación de booking no cancelada, pedido `paid=true` con producto cancha, monto > 0, manejo de unique violation `23505`). UI funcional en `/rdb/playtomic/conciliacion`: lista de asignaciones actuales con botón Quitar, botón Conciliar wireado a iterar `selectedOrderIds` vía `useTransition`, feedback de éxito/parcial/error inline, banner "S1 read-only" retirado. Hook devuelve `assignmentsByBooking: Map<string, AssignmentDetail[]>`. CI verde, pendiente smoke en preview + merge por Beto.
+- **2026-05-07** — **Refinamiento de cobertura efectiva** (5 PRs en sesión continua):
+  - [#436](https://github.com/beto-sudo/BSOP/pull/436) — Match window CSV de ±90min → ±15min tras drift fix v2 ([#435](https://github.com/beto-sudo/BSOP/pull/435)). Verificado: 96% pagos online en ±5min, 14 outliers eran spurious. -27 full / +40 partial reflejan precisión, no regresión.
+  - [#437](https://github.com/beto-sudo/BSOP/pull/437) — Split-payment: un pedido Waitry puede asignarse a N reservas (caso Omar Palacios coach con 3 clases en 1 pago). DROP `UNIQUE(waitry_order_id)` → ADD `UNIQUE(booking_id, waitry_order_id)` + trigger valida `SUM(assigned_amount) <= total_amount` con advisory lock. Action calcula `remaining` antes del insert con mensaje rico. UI: badge "Pago compartido" + monto disponible.
+  - [#438](https://github.com/beto-sudo/BSOP/pull/438) → reemplazado por [#448](https://github.com/beto-sudo/BSOP/pull/448) — Wellhub y Club wallet ya no marcados como "manager unverified". Reclasificación por `payment_method`: Wellhub → online; Club wallet → wallet con cobertura usando `non_applicable_total` real (NO heurística `price/N` que sub/sobreestimaba). Caso Dina: $266.67 partial → $800 full. 137 bookings nuevos a full por contar correctamente Wellhub + wallet.
+  - [#444](https://github.com/beto-sudo/BSOP/pull/444) — Ventana temporal simétrica. La asunción "pago siempre post-booking" rompe en pre-pago anticipado (caso Paco Palacios pagó 27-abr para jugar 4-may). Eliminado `PRE_BOOKING_GRACE_MS` fijo de 30min, ahora preset aplica a ambos lados.
+  - [#449](https://github.com/beto-sudo/BSOP/pull/449) — Boost por cancha en notes. Las hostes/Pablo copian/pegan el bloque "Pista / Padel N \"Sponsor\" / Fecha / Hora" desde Playtomic Manager. Match exacto del `resource_name` en notes → +80 score. Mismatch ("padel 1" vs "padel 5") → -100. Auto-pick visual cuando la nota está bien.
+  - [#450](https://github.com/beto-sudo/BSOP/pull/450) — Badge "🤖 Sugerido auto" (dry-run). `is_auto_match` se marca con criterios duros (cancha exacta + owner en notas + monto coincide + ±15min + saldo). Pablo concilia manual mientras valida tasa de acierto. Si >95% en 1-2 semanas → cron real. Bug fix descubierto: stopword "del" causaba falsos positivos por la palabra "pa**del**" — agregada blacklist `NAME_TOKEN_STOPWORDS`.
 
 ## Estado tras S2-CSV (snapshot 2026-05-04 noche)
 
