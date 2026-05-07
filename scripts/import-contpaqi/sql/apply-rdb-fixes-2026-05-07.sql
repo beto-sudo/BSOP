@@ -1,0 +1,28 @@
+-- Fixes follow-up al import RDB (PR #445).
+-- Aplicado a DB live el 2026-05-07 via MCP.
+--
+-- A) Apellidos duplicados (4 personas) — el UPDATE inicial copió el
+--    nombre completo del Excel sobre `personas.nombre` sin separar
+--    los apellidos del nombre de pila. Resultado: nombre contenía
+--    apellidos que ya estaban en apellido_paterno/materno.
+--
+--    Fix: restaurar `nombre` al nombre de pila correcto.
+--    - 727148fd... ANGEL ANIBAL PALACIOS JIMENEZ → ANGEL ANIBAL
+--    - 26fc7a9b... DINORAH JULIA RODRIGUEZ SANTOS → DINORAH JULIA
+--    - 407686db... FERNANDO DARIO ROSAS GARZA → FERNANDO DARIO
+--    - 6c21d7e8... OMAR DE JESUS PALACIOS JIMENEZ → OMAR DE JESUS
+--
+-- B) Consolidación de 7 duplicados legacy/Excel:
+--    Movimos OCs del legacy al nuevo (con RFC), soft-delete del legacy.
+--    Total OCs movidas: 77.
+--    - ARNULFO (23 OCs) → ARNULFO SANDOVAL MORALES (RFC SAMA810611QF3)
+--    - DAVID (14 OCs) → DAVID ADOLFO LOPEZ PACHECO (RFC LOPD920131QPA)
+--    - DISTRIBUIDORA MOCTEZUMA sin RFC (16 OCs) → DISTRIBUIDORA
+--      MOCTEZUMA DE PIEDRAS NEGRAS (RFC DMP620915TLA)
+--    - JORGE AMIN (18 OCs) → JORGE AMIN MORALES AGUIRRE (RFC MOAJ890216J21)
+--    - OMAR (6 OCs) → OMAR DE JESUS PALACIOS JIMENEZ (RFC PAJO891214B69)
+--    - JORGE (0 OCs) → soft-delete (legacy ambiguo, sin refs)
+--    - SORIANA (0 OCs) → soft-delete (TIENDAS SORIANA con RFC ya existe)
+--
+-- Falso positivo descartado: MAS (legacy) NO es dup de SISTEMA EN
+-- PREVENCION ALARMAS (el regex matcheó "MAS" dentro de "alarmAS").
