@@ -545,7 +545,8 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
              personas_datos_fiscales(razon_social, nombre_comercial)
            )`
         )
-        .eq('empresa_id', empresaId);
+        .eq('empresa_id', empresaId)
+        .is('deleted_at', null);
       if (err) throw err;
       type RawDatosFiscales = {
         razon_social: string | null;
