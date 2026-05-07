@@ -96,30 +96,43 @@ describe('isWithinTimestampWindow', () => {
     expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-10T01:29:00Z')).toBe(true);
   });
 
-  it('accepts pre-booking only within 30min grace (pago al llegar)', () => {
+  it('accepts pre-booking candidates within the same tolerance (pago anticipado)', () => {
+    // Caso operativo: el cliente reserva y paga en caja días antes de jugar
+    // (coach Paco Palacios pagó 27-abr para jugar 4-may). La ventana es
+    // simétrica para soportarlo.
     // 5 min antes — paga al registrarse
     expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-08T01:25:00Z')).toBe(true);
-    // 25 min antes — todavía dentro del grace
+    // 25 min antes — todavía dentro
     expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-08T01:05:00Z')).toBe(true);
+    // 1 día antes — pago anticipado típico
+    expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-07T01:30:00Z')).toBe(true);
+    // 2 días antes (justo en el límite simétrico)
+    expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-06T01:31:00Z')).toBe(true);
   });
 
-  it('rejects candidates more than 30min before the booking', () => {
-    // 31 min antes — pago en cancha jamás se hace tan temprano
-    expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-08T00:59:00Z')).toBe(false);
-    // Días antes — claramente no es pago en cancha
-    expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-07T01:30:00Z')).toBe(false);
-  });
-
-  it('rejects candidates beyond the post-booking tolerance', () => {
+  it('rejects candidates beyond the tolerance on either side', () => {
+    // 2d + 1min después
     expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-10T01:31:00Z')).toBe(false);
+    // 2d + 1min antes
+    expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-06T01:29:00Z')).toBe(false);
   });
 
-  it('respects custom post tolerance', () => {
+  it('respects custom tolerance symmetrically', () => {
     const oneHour = 60 * 60 * 1000;
+    // ±1h: 30min después → dentro
     expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-08T02:00:00Z', oneHour)).toBe(
       true
     );
+    // ±1h: 1h+1min después → fuera
     expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-08T02:31:00Z', oneHour)).toBe(
+      false
+    );
+    // ±1h: 30min antes → dentro
+    expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-08T01:00:00Z', oneHour)).toBe(
+      true
+    );
+    // ±1h: 1h+1min antes → fuera
+    expect(isWithinTimestampWindow('2026-04-08T01:30:00Z', '2026-04-08T00:29:00Z', oneHour)).toBe(
       false
     );
   });
@@ -138,7 +151,9 @@ describe('rankCandidates', () => {
     expect(ranked.map((r) => r.order_id)).toEqual(['near']);
   });
 
-  it('rejects candidates that "paid" days before the booking — pago en cancha es siempre post-booking', () => {
+  it('accepts pre-booking pagos within the symmetric tolerance (pago anticipado)', () => {
+    // Caso operativo (Paco Palacios): cliente reserva y paga en caja
+    // días antes de jugar. La ventana es simétrica para verlo.
     const dayBefore = candidate({
       order_id: 'day-before',
       timestamp: '2026-04-07T15:00:00Z',
@@ -150,11 +165,12 @@ describe('rankCandidates', () => {
       notes: 'jose Luis paz',
     });
     const ranked = rankCandidates(baseBooking, [dayBefore, dayAfter]);
-    expect(ranked.map((r) => r.order_id)).not.toContain('day-before');
+    // Ambos dentro de ±2d default → ambos aparecen
+    expect(ranked.map((r) => r.order_id)).toContain('day-before');
     expect(ranked.map((r) => r.order_id)).toContain('day-after');
   });
 
-  it('accepts pre-booking pagos within the 30min grace (cliente paga al llegar)', () => {
+  it('accepts pre-booking pagos at any distance within tolerance', () => {
     const fiveBefore = candidate({
       order_id: 'just-before',
       timestamp: '2026-04-08T01:25:00Z',

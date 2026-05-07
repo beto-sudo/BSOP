@@ -350,19 +350,20 @@ export function AssignmentPanel({
             Candidatos en Waitry ({candidates.length})
           </h4>
           <span className="text-xs text-[var(--text-muted)]">
-            hasta {tolerancePresetLabel} después del booking · cancha (padel/tenis/pickleball/coach)
-            · pagados · no asignados
+            {tolerancePresetLabel} alrededor del booking · cancha (padel/tenis/pickleball/coach) ·
+            pagados · no asignados
           </span>
         </div>
         {candidates.length === 0 ? (
           <div className="space-y-2 rounded-xl border border-dashed border-[var(--border)] p-3 text-sm text-[var(--text-muted)]">
             <p>
-              Sin candidatos dentro de {tolerancePresetLabel} después del booking. Posibles razones:
+              Sin candidatos dentro de {tolerancePresetLabel} alrededor del booking. Posibles
+              razones:
             </p>
             <ul className="ml-4 list-disc space-y-1 text-xs">
               <li>
-                El cliente pagó atrasado (volvió al club días después y se cobró entonces) — ampliar
-                ventana.
+                El cliente pagó días antes (reservó y prepagó) o días después (volvió al club a
+                cobrar) — ampliar ventana temporal.
               </li>
               <li>La búsqueda en notes está activa y no hay coincidencias.</li>
               <li>
