@@ -452,7 +452,7 @@ describe('rankCandidates', () => {
   // Pablo lo ve como sugerencia visual mientras concilia manual.
   describe('auto-match eligibility (dry-run)', () => {
     it('marks candidate with is_auto_match=true when all signals align', () => {
-      // Cancha exacta + nombre del owner + monto del booking completo + ±90min + saldo
+      // Cancha exacta + nombre del owner + monto del booking completo + ±120min + saldo
       const idealMatch = candidate({
         order_id: 'ideal',
         timestamp: '2026-04-08T01:35:00Z',
@@ -503,10 +503,9 @@ describe('rankCandidates', () => {
       expect(ranked[0].is_auto_match).toBe(false);
     });
 
-    it('marks when timestamp is within ±90 min window (cliente paga al salir)', () => {
+    it('marks when timestamp is within ±120 min window (cliente paga al salir)', () => {
       // 51 min después: caso real (Tenis 3, Rogelio Villanueva 2026-05-06).
-      // El cliente jugó 60min y pagó al terminar. Antes de ampliar la
-      // ventana a 90min, este caso obvio NO se marcaba como auto-match.
+      // El cliente jugó 60min y pagó al terminar.
       const playedAndPaid = candidate({
         order_id: 'paid-after-game',
         timestamp: '2026-04-08T02:21:00Z',
@@ -520,11 +519,26 @@ describe('rankCandidates', () => {
       expect(ranked[0].is_auto_match).toBe(true);
     });
 
-    it('does NOT mark when timestamp is outside ±90 min window', () => {
-      // 2 horas después: fuera de la ventana ampliada
+    it('marks when padel match runs the typical 90min + ~30min chat (≤120min)', () => {
+      // 110 min después: padel típico (90min de juego + 20min de plática)
+      const padelFullTime = candidate({
+        order_id: 'padel-full',
+        timestamp: '2026-04-08T03:20:00Z',
+        total_amount: 800,
+        notes: 'Pista\nPadel 5 "Mueblería Guillen"\nFecha\n7 abr 2026\njose luis paz',
+        items: [
+          { product_name: 'Renta Cancha Padel', quantity: 4, unit_price: 200, total_price: 800 },
+        ],
+      });
+      const ranked = rankCandidates(baseBooking, [padelFullTime]);
+      expect(ranked[0].is_auto_match).toBe(true);
+    });
+
+    it('does NOT mark when timestamp is outside ±120 min window', () => {
+      // 2.5 horas después: claramente fuera de la ventana ampliada
       const farTimestamp = candidate({
         order_id: 'far-time',
-        timestamp: '2026-04-08T03:30:00Z',
+        timestamp: '2026-04-08T04:00:00Z',
         total_amount: 800,
         notes: 'Pista\nPadel 5 "Mueblería Guillen"\nFecha\n7 abr 2026\njose luis paz',
         items: [
