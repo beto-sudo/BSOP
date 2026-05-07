@@ -246,6 +246,13 @@ export const CreateProveedorPayloadSchema = z.object({
       condiciones_pago: z.string().nullable().optional(),
       limite_credito: z.number().nullable().optional(),
       categoria: z.string().nullable().optional(),
+      tasa_iva: z
+        .number()
+        .nullable()
+        .optional()
+        .refine((v) => v === null || v === undefined || v === 0 || v === 0.08 || v === 0.16, {
+          message: 'tasa_iva debe ser 0, 0.08 o 0.16',
+        }),
     })
     .optional(),
 });
