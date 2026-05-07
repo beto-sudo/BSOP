@@ -145,12 +145,14 @@ export type RankedCandidate = WaitryCandidate & {
   reasons: string[];
 };
 
-// Ventana temporal asimétrica. El pago en cancha SIEMPRE ocurre después
-// del booking_start (el cliente llega a recepción al momento de jugar o
-// días después al volver al club). Pre-grace fijo de 30 minutos para
-// pagos al llegar (cliente paga al registrarse, justo antes de empezar).
-// El preset que ajusta el operador controla solo la cola POST-booking.
-const PRE_BOOKING_GRACE_MS = 30 * 60 * 1000;
+// Ventana temporal simétrica. La asunción original "el pago siempre
+// ocurre después del booking_start" no se sostiene: hay clientes que
+// reservan y pagan en caja días antes del juego (ej. coach Paco
+// Palacios pagó 27-abr para jugar 4-may). Antes la ventana solo tenía
+// 30min de pre-grace y el preset solo aplicaba a la cola post-booking,
+// dejando esos pre-pagos invisibles. Ahora el preset aplica a ambos
+// lados — el ranker pondera por proximidad temporal así que
+// candidatos lejanos quedan abajo del orden.
 const DEFAULT_TIMESTAMP_TOLERANCE_MS = 2 * 24 * 60 * 60 * 1000;
 export const TIMESTAMP_TOLERANCE_PRESETS_MS = {
   '3h': 3 * 60 * 60 * 1000,
@@ -181,13 +183,13 @@ function nameTokens(name: string): string[] {
 export function isWithinTimestampWindow(
   bookingStart: string,
   candidateTimestamp: string,
-  postToleranceMs: number = DEFAULT_TIMESTAMP_TOLERANCE_MS
+  toleranceMs: number = DEFAULT_TIMESTAMP_TOLERANCE_MS
 ): boolean {
   const bookingMs = new Date(bookingStart).getTime();
   const candidateMs = new Date(candidateTimestamp).getTime();
   if (Number.isNaN(bookingMs) || Number.isNaN(candidateMs)) return false;
-  const delta = candidateMs - bookingMs;
-  return delta >= -PRE_BOOKING_GRACE_MS && delta <= postToleranceMs;
+  const delta = Math.abs(candidateMs - bookingMs);
+  return delta <= toleranceMs;
 }
 
 export function rankCandidates(
