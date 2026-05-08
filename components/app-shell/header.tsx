@@ -55,7 +55,7 @@ export function Header({
           {sectionName === 'SANREN' && (
             <div className="flex h-[3.25rem] w-[3.25rem] shrink-0 items-center justify-center rounded-xl bg-white p-1 shadow-sm ring-1 ring-inset ring-[var(--border)]">
               <img
-                src="/logos/sanren.png"
+                src="/brand/sanren/isotipo.png"
                 alt="SANREN"
                 className="h-full w-full rounded-lg object-contain"
               />
