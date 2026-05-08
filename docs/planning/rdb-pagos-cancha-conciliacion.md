@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-04
-**Última actualización:** 2026-05-07 (refinamiento de cobertura efectiva: ventana temporal simétrica, wallet con `non_applicable_total`, boost por cancha en notes, badge dry-run de auto-conciliación)
+**Última actualización:** 2026-05-08 (fix stale en tooltip auto-match post-review Codex CLI: ±120 min, no ±15)
 
 ## Problema
 
@@ -165,6 +165,7 @@ KPIs visibles en el dashboard:
   - [#444](https://github.com/beto-sudo/BSOP/pull/444) — Ventana temporal simétrica. La asunción "pago siempre post-booking" rompe en pre-pago anticipado (caso Paco Palacios pagó 27-abr para jugar 4-may). Eliminado `PRE_BOOKING_GRACE_MS` fijo de 30min, ahora preset aplica a ambos lados.
   - [#449](https://github.com/beto-sudo/BSOP/pull/449) — Boost por cancha en notes. Las hostes/Pablo copian/pegan el bloque "Pista / Padel N \"Sponsor\" / Fecha / Hora" desde Playtomic Manager. Match exacto del `resource_name` en notes → +80 score. Mismatch ("padel 1" vs "padel 5") → -100. Auto-pick visual cuando la nota está bien.
   - [#450](https://github.com/beto-sudo/BSOP/pull/450) — Badge "🤖 Sugerido auto" (dry-run). `is_auto_match` se marca con criterios duros (cancha exacta + owner en notas + monto coincide + ±15min + saldo). Pablo concilia manual mientras valida tasa de acierto. Si >95% en 1-2 semanas → cron real. Bug fix descubierto: stopword "del" causaba falsos positivos por la palabra "pa**del**" — agregada blacklist `NAME_TOKEN_STOPWORDS`.
+- **2026-05-08** — Stale references catchadas en post-review con Codex CLI (segundo modelo). [#452](https://github.com/beto-sudo/BSOP/pull/452) había expandido la ventana de auto-match a ±120 min (`AUTO_MATCH_TIME_WINDOW_MS = 120 * 60 * 1000`) pero dejó dos sitios desincronizados: el string user-facing del tooltip "🤖 Sugerido auto" (`'Pedido dentro de ±15 min del booking'`, L442 — mentía al usuario en pagos a 16–120 min del booking) y el comentario JSDoc de `RankedCandidate.is_auto_match` (L150). **Fix [#456](https://github.com/beto-sudo/BSOP/pull/456)**: ambas referencias → ±120 min. Cambio mínimo (2 líneas), sin tocar lógica.
 
 ## Estado tras S2-CSV (snapshot 2026-05-04 noche)
 
