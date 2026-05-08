@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Building2, ChevronRight, FileText, Palette, Plus, RefreshCw } from 'lucide-react';
+import { Building2, ChevronRight, FileText, Plus, RefreshCw } from 'lucide-react';
 
 import { NuevaEmpresaDrawer } from './_components/nueva-empresa-drawer';
 
@@ -52,70 +52,70 @@ function EstatusBadge({ estatus }: { estatus: string | null }) {
   );
 }
 
-const thClass =
+// Layout compartido entre header y filas — garantiza alineación de columnas.
+// Cambiar widths aquí los aplica a ambos.
+const colLogo = 'w-16 shrink-0';
+const colNombre = 'flex-1 min-w-0';
+const colRfc = 'hidden sm:block w-36 shrink-0';
+const colEstatus = 'hidden md:flex w-28 shrink-0 items-center';
+const colRegimen = 'hidden lg:block w-48 shrink-0';
+const colDomicilio = 'hidden lg:block w-40 shrink-0';
+const colCsf = 'flex w-12 shrink-0 items-center justify-center';
+const colChevron = 'flex w-10 shrink-0 items-center justify-center';
+
+const headerCellBase =
   'px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-[var(--text)]/50';
+const bodyCellBase = 'px-4 py-3.5';
 
 function EmpresaTableRow({ e }: { e: EmpresaRow }) {
   const domicilio = [e.domicilio_municipio, e.domicilio_estado].filter(Boolean).join(', ');
   return (
-    <tr className="border-b border-[var(--border)] last:border-0 group hover:bg-[var(--panel)]/50 transition cursor-pointer">
-      <td colSpan={9} className="p-0">
-        <Link href={`/settings/empresas/${e.slug}`} className="flex items-center w-full">
-          <span className="flex items-center justify-center w-16 px-3 py-3 shrink-0">
-            {e.logo_horizontal_light_url ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={e.logo_horizontal_light_url}
-                alt={e.nombre}
-                className="h-8 w-8 object-contain"
-              />
-            ) : (
-              <div className="h-8 w-8 rounded-lg bg-[var(--panel)] flex items-center justify-center">
-                <Building2 className="h-4 w-4 text-[var(--text)]/30" />
-              </div>
-            )}
-          </span>
-          <span className="flex-1 min-w-0 px-4 py-3.5">
-            <span className="font-medium text-[var(--text)] truncate block">{e.nombre}</span>
-          </span>
-          <span className="hidden sm:block w-36 px-4 py-3.5 text-[var(--text)]/70 font-mono text-xs shrink-0">
-            {e.rfc || '—'}
-          </span>
-          <span className="hidden md:flex w-28 px-4 py-3.5 shrink-0 items-center">
-            <EstatusBadge estatus={e.estatus_sat} />
-          </span>
-          <span className="hidden lg:block w-48 px-4 py-3.5 text-[var(--text)]/60 text-xs truncate shrink-0">
-            {e.regimen_fiscal || '—'}
-          </span>
-          <span className="hidden lg:block w-40 px-4 py-3.5 text-[var(--text)]/60 text-xs truncate shrink-0">
-            {domicilio || '—'}
-          </span>
-          <span className="hidden sm:flex w-20 px-4 py-3.5 items-center justify-center shrink-0">
-            {e.color_primario ? (
-              <span className="flex items-center gap-1">
-                <span
-                  className="h-4 w-4 rounded-full border border-[var(--border)]"
-                  style={{ backgroundColor: e.color_primario }}
-                  title={e.color_primario}
-                />
-              </span>
-            ) : (
-              <Palette className="h-4 w-4 text-[var(--text)]/20" />
-            )}
-          </span>
-          <span className="flex w-12 px-4 py-3.5 items-center justify-center shrink-0">
-            {e.csf_url ? (
-              <FileText className="h-4 w-4 text-[var(--accent)]" />
-            ) : (
-              <span className="text-[var(--text)]/20 text-xs">—</span>
-            )}
-          </span>
-          <span className="flex w-10 px-3 py-3.5 items-center justify-center shrink-0 text-[var(--text)]/30 group-hover:text-[var(--text)]/60 transition">
-            <ChevronRight className="h-4 w-4" />
-          </span>
-        </Link>
-      </td>
-    </tr>
+    <Link
+      href={`/settings/empresas/${e.slug}`}
+      className="flex items-center border-b border-[var(--border)] last:border-0 group hover:bg-[var(--panel)]/50 transition"
+    >
+      <div className={`${colLogo} flex items-center justify-center px-3 py-3`}>
+        {e.logo_horizontal_light_url ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={e.logo_horizontal_light_url}
+            alt={e.nombre}
+            className="h-8 w-8 object-contain"
+          />
+        ) : (
+          <div className="h-8 w-8 rounded-lg bg-[var(--panel)] flex items-center justify-center">
+            <Building2 className="h-4 w-4 text-[var(--text)]/30" />
+          </div>
+        )}
+      </div>
+      <div className={`${colNombre} ${bodyCellBase}`}>
+        <span className="font-medium text-[var(--text)] truncate block">{e.nombre}</span>
+      </div>
+      <div className={`${colRfc} ${bodyCellBase} text-[var(--text)]/70 font-mono text-xs`}>
+        {e.rfc || '—'}
+      </div>
+      <div className={`${colEstatus} ${bodyCellBase}`}>
+        <EstatusBadge estatus={e.estatus_sat} />
+      </div>
+      <div className={`${colRegimen} ${bodyCellBase} text-[var(--text)]/60 text-xs truncate`}>
+        {e.regimen_fiscal || '—'}
+      </div>
+      <div className={`${colDomicilio} ${bodyCellBase} text-[var(--text)]/60 text-xs truncate`}>
+        {domicilio || '—'}
+      </div>
+      <div className={`${colCsf} ${bodyCellBase}`}>
+        {e.csf_url ? (
+          <FileText className="h-4 w-4 text-[var(--accent)]" />
+        ) : (
+          <span className="text-[var(--text)]/20 text-xs">—</span>
+        )}
+      </div>
+      <div
+        className={`${colChevron} px-3 py-3.5 text-[var(--text)]/30 group-hover:text-[var(--text)]/60 transition`}
+      >
+        <ChevronRight className="h-4 w-4" />
+      </div>
+    </Link>
   );
 }
 
@@ -138,26 +138,21 @@ function EmpresaGroupTable({
         </span>
       </div>
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-[var(--border)] bg-[var(--panel)]">
-              <th className={`${thClass} w-16`}>Logo</th>
-              <th className={thClass}>Nombre</th>
-              <th className={`${thClass} hidden sm:table-cell`}>RFC</th>
-              <th className={`${thClass} hidden md:table-cell`}>Estatus SAT</th>
-              <th className={`${thClass} hidden lg:table-cell`}>Régimen Fiscal</th>
-              <th className={`${thClass} hidden lg:table-cell`}>Domicilio</th>
-              <th className={`${thClass} hidden sm:table-cell w-20 text-center`}>Branding</th>
-              <th className={`${thClass} w-12 text-center`}>CSF</th>
-              <th className={`${thClass} w-10`} />
-            </tr>
-          </thead>
-          <tbody>
-            {empresas.map((e) => (
-              <EmpresaTableRow key={e.id} e={e} />
-            ))}
-          </tbody>
-        </table>
+        <div className="flex items-center border-b border-[var(--border)] bg-[var(--panel)]">
+          <div className={`${colLogo} ${headerCellBase}`}>Logo</div>
+          <div className={`${colNombre} ${headerCellBase}`}>Nombre</div>
+          <div className={`${colRfc} ${headerCellBase}`}>RFC</div>
+          <div className={`${colEstatus} ${headerCellBase}`}>Estatus SAT</div>
+          <div className={`${colRegimen} ${headerCellBase}`}>Régimen Fiscal</div>
+          <div className={`${colDomicilio} ${headerCellBase}`}>Domicilio</div>
+          <div className={`${colCsf} ${headerCellBase} justify-center`}>CSF</div>
+          <div className={`${colChevron} ${headerCellBase}`} aria-hidden />
+        </div>
+        <div>
+          {empresas.map((e) => (
+            <EmpresaTableRow key={e.id} e={e} />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -202,12 +197,17 @@ function EmpresasSettingsInner() {
       otros: [],
     };
     for (const e of empresas) {
+      if (!e.activa) continue;
+      if (e.slug === 'settings') continue;
       if (e.tipo_contribuyente === 'persona_moral') out.persona_moral.push(e);
       else if (e.tipo_contribuyente === 'persona_fisica') out.persona_fisica.push(e);
       else out.otros.push(e);
     }
     return out;
   }, [empresas]);
+
+  const totalVisibles =
+    grupos.persona_moral.length + grupos.persona_fisica.length + grupos.otros.length;
 
   return (
     <div className="space-y-6">
@@ -216,6 +216,12 @@ function EmpresasSettingsInner() {
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text)]">Empresas</h1>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
             Selecciona una empresa para ver y editar sus datos fiscales y branding
+            {!loading && empresas.length > 0 ? (
+              <span className="text-[var(--text)]/40">
+                {' · '}
+                {totalVisibles} {totalVisibles === 1 ? 'empresa' : 'empresas'}
+              </span>
+            ) : null}
           </p>
         </div>
         <div className="flex items-center gap-2">

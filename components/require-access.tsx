@@ -14,7 +14,7 @@ import { AccessDenied } from '@/components/access-denied';
 
 interface RequireAccessProps {
   children: ReactNode;
-  /** Empresa slug to check (e.g. 'rdb', 'dilesa', 'familia') */
+  /** Empresa slug to check (e.g. 'rdb', 'dilesa', 'sanren') */
   empresa?: string;
   /** Module slug to check (e.g. 'rdb.ventas') — requires read access by default */
   modulo?: string;

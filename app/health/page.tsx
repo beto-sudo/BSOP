@@ -35,7 +35,7 @@ export default async function HealthPage({
   const data = await getHealthDashboardData(requestedRange);
 
   return (
-    <RequireAccess empresa="familia">
+    <RequireAccess empresa="sanren">
       <ContentShell>
         <div className="mb-6">
           <HealthRangeSelector
