@@ -147,7 +147,7 @@ export type RankedCandidate = WaitryCandidate & {
    * Marcado true cuando el candidato cumple criterios duros de
    * "auto-conciliación" (modo dry-run): cancha exacta en notas + nombre
    * de owner/participante en notas + monto coincide con bucket esperado
-   * + timestamp dentro de ±15min + pedido con saldo. Pablo lo ve como
+   * + timestamp dentro de ±120min + pedido con saldo. Pablo lo ve como
    * sugerencia visual mientras concilia manual; en el futuro un cron
    * podría aplicarlo automáticamente.
    */
@@ -439,7 +439,7 @@ export function rankCandidates(
         autoMatchReasons.push('Cancha exacta en nota');
         autoMatchReasons.push('Nombre del owner/participante en nota');
         autoMatchReasons.push('Monto coincide con bucket esperado del booking');
-        autoMatchReasons.push('Pedido dentro de ±15 min del booking');
+        autoMatchReasons.push('Pedido dentro de ±120 min del booking');
       }
 
       const isAutoMatch = autoMatchReasons.length > 0;
