@@ -7,7 +7,7 @@ import { RequireAccess } from '@/components/require-access';
  */
 export default function FamilyPage() {
   return (
-    <RequireAccess empresa="familia">
+    <RequireAccess empresa="sanren">
       <PlaceholderSection
         icon="👨‍👩‍👧"
         title="SANREN — Coming soon"

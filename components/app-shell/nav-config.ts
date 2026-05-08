@@ -162,7 +162,7 @@ export const NAV_ITEMS: NavItem[] = [
 export const NAV_TO_EMPRESA: Record<string, string> = {
   '/dilesa': 'dilesa',
   '/rdb': 'rdb',
-  '/family': 'familia',
+  '/family': 'sanren',
   '/personas-fisicas': 'personas_fisicas',
   '/settings': 'settings',
 };
