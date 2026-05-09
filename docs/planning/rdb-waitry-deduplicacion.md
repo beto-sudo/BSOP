@@ -1,9 +1,9 @@
 # Iniciativa — RDB Waitry · Deduplicación de pedidos fantasma
 
-**Estado:** in_progress
+**Estado:** done
 **Empresas:** RDB
-**Schemas:** `rdb` (`waitry_pedidos.superseded_by_order_id`, `waitry_items_signature`, `detect_waitry_fantasma`, `refresh_waitry_superseded`, triggers en `waitry_pedidos`+`waitry_productos`)
-**Última actualización:** 2026-05-09 (Sprint 2 mergeable)
+**Schemas:** `rdb` (`waitry_pedidos.superseded_by_order_id`, `waitry_items_signature`, `detect_waitry_fantasma`, `refresh_waitry_superseded`, triggers en `waitry_pedidos`+`waitry_productos`, `v_waitry_pedidos`, `v_waitry_pedidos_con_fantasmas`)
+**Última actualización:** 2026-05-09 (Sprint 3 cierre + ADR-031)
 
 > **Diferencia vs `rdb-waitry-ingesta-dedup`** (cerrada 2026-05-06):
 > esa iniciativa atacaba duplicados por **doble-tap del operador** en
@@ -200,7 +200,8 @@ rdb.waitry_pedidos`. (`security_invoker=on` per
   Schema delta + UPDATE puntual de los 2 fantasmas detectados hoy +
   filtro inline en 3 readers (`/rdb/ventas` view + por-producto + `/rdb/home` KPIs).
   Corte del día corregido: 7 pedidos / $1,795 (no 9 / $2,445).
-- **2026-05-09 — Sprint 2 mergeable** (este PR).
+- **2026-05-09 — Sprint 2 mergeado**
+  ([PR #465](https://github.com/beto-sudo/BSOP/pull/465)).
   Función `rdb.detect_waitry_fantasma(text)` + helper
   `rdb.waitry_items_signature(text)` + `rdb.refresh_waitry_superseded(text)`
   - triggers AFTER en `waitry_pedidos` (cols clave) y `waitry_productos`
@@ -212,6 +213,28 @@ rdb.waitry_pedidos`. (`security_invoker=on` per
     cascada cancelación, span > 15 min. Index nuevo
     `waitry_pedidos_external_delivery_id_idx` (parcial WHERE NOT NULL AND
     paid=TRUE) acelera lookups del trigger live.
+- **2026-05-09 — Causa raíz operativa confirmada con Pablo** (encargado
+  RDB, vía WhatsApp). Pablo confirmó que el toggle "Cerrar pedidos de
+  mostrador luego del pago" en Waitry está **OFF intencionalmente**
+  porque al activarlo "los pedidos cobrados no le aparecen a Leslie
+  para producción". Modelo Waitry tiene trade-off forzado: cerrar al
+  cobrar (sin duplicados pero invisibles a cocina) o dejar abiertos
+  (visibles pero re-cerrables → duplicados). RDB priorizó
+  cocina-visible. Eso confirma que la solución BSOP-side es la única
+  vía sin migrar a Waitry POS (módulo extra).
+- **2026-05-09 — Sprint 3 mergeable** (este PR).
+  Vistas `rdb.v_waitry_pedidos` (canónica, excluye fantasmas) y
+  `rdb.v_waitry_pedidos_con_fantasmas` (auditoría con flag
+  `es_fantasma`), ambas `security_invoker=on` con grants
+  `authenticated`/`anon`. UI `/rdb/ventas` cambia a leer la canónica
+  por default + toggle "Mostrar duplicados" que cambia a la vista de
+  auditoría y muestra badge "Duplicado" amarillo en filas marcadas con
+  tooltip apuntando al canónico. `ventas-por-producto`, `/rdb/home`
+  KPIs (current/previous/lastYear), `/rdb/playtomic/conciliacion` y el
+  server action de asignación Playtomic→Waitry leen de la canónica
+  (rechazan asignar fantasmas con mensaje explícito). ADR-031 documenta
+  la heurística cerrada, el trade-off operativo confirmado por Pablo y
+  las reglas duras WAITRY-DEDUP-1..5. Iniciativa cierra `done`.
 
 ## Riesgos y mitigaciones
 

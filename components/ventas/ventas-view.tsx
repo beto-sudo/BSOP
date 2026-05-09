@@ -53,10 +53,13 @@ export function VentasView() {
       dateFrom: today.from,
       dateTo: today.to,
       presetKey: 'hoy',
+      showDuplicados: 'off',
     };
   }, []);
   const { filters, setFilter, setFilters, clearAll, activeCount } = useUrlFilters(filterDefaults);
-  const { search, statusFilter, corteFilter, dateFrom, dateTo, presetKey } = filters;
+  const { search, statusFilter, corteFilter, dateFrom, dateTo, presetKey, showDuplicados } =
+    filters;
+  const showFantasmas = showDuplicados === 'on';
 
   const handlePreset = (preset: string | null) => {
     if (!preset) return;
@@ -106,15 +109,16 @@ export function VentasView() {
     try {
       const supabase = createSupabaseBrowserClient();
 
-      // Filtra fantasmas detectados por bug Waitry (cierres reabiertos que la
-      // cajera re-cierra → Waitry duplica con nuevo orderId). Iniciativa
-      // rdb-waitry-deduplicacion Sprint 1; en Sprint 3 se reemplaza por
-      // SELECT contra rdb.v_waitry_pedidos + toggle "Mostrar duplicados".
+      // Iniciativa rdb-waitry-deduplicacion (ADR-031): default leemos de la
+      // vista canónica `rdb.v_waitry_pedidos` que excluye los fantasmas
+      // detectados por el bug del POS Waitry. Con el toggle "Mostrar
+      // duplicados detectados" activo cambiamos a `v_waitry_pedidos_con_fantasmas`
+      // que proyecta `es_fantasma` boolean para destacarlos en la tabla.
+      const sourceView = showFantasmas ? 'v_waitry_pedidos_con_fantasmas' : 'v_waitry_pedidos';
       let query = supabase
         .schema('rdb')
-        .from('waitry_pedidos')
+        .from(sourceView)
         .select('*')
-        .is('superseded_by_order_id', null)
         .order('timestamp', { ascending: false })
         .limit(10000);
       if (corteFilter !== 'all') {
@@ -126,13 +130,16 @@ export function VentasView() {
 
       const { data, error: err } = await query;
       if (err) throw err;
-      setPedidos(data ?? []);
+      // Cast: las vistas en types/supabase.ts tipan TODAS las columnas como
+      // nullable porque PostgREST no infiere NOT NULL de vistas. La tabla
+      // base sí garantiza id NOT NULL — los datos son sanos.
+      setPedidos((data ?? []) as Pedido[]);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error al cargar pedidos');
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo, corteFilter]);
+  }, [dateFrom, dateTo, corteFilter, showFantasmas]);
 
   useEffect(() => {
     void fetchCortes();
@@ -188,6 +195,9 @@ export function VentasView() {
       (p.status ?? '').toLowerCase().includes(q)
     );
   });
+  // Solo cuenta fantasmas cuando el toggle está ON: con OFF la query usa la
+  // vista canónica que ya los excluye, así que `pedidos` no los contiene.
+  const fantasmasCount = showFantasmas ? filtered.filter((p) => p.es_fantasma).length : undefined;
 
   const selectedCorte = corteFilter !== 'all' ? cortes.find((c) => c.id === corteFilter) : null;
 
@@ -257,6 +267,9 @@ export function VentasView() {
         count={filtered.length}
         activeCount={activeCount}
         onClearAll={clearAll}
+        showFantasmas={showFantasmas}
+        onShowFantasmasChange={(v) => setFilter('showDuplicados', v ? 'on' : 'off')}
+        fantasmasCount={fantasmasCount}
       />
 
       {/* Error */}

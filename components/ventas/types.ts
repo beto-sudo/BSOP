@@ -43,6 +43,12 @@ export type Pedido = {
   service_charge?: number | null;
   tax?: number | null;
   notes?: string | null;
+  // Dedup (rdb-waitry-deduplicacion ADR-031): cuando se carga desde la
+  // vista de auditoría `rdb.v_waitry_pedidos_con_fantasmas`, los fantasmas
+  // traen `superseded_by_order_id` no nulo y `es_fantasma=true`. La vista
+  // canónica `rdb.v_waitry_pedidos` siempre devuelve `es_fantasma=false`.
+  superseded_by_order_id?: string | null;
+  es_fantasma?: boolean | null;
   // lazy-loaded
   pagos?: Pago[];
   items?: PedidoItem[];
