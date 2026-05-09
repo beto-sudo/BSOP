@@ -2,13 +2,22 @@ import type { StockItem } from './types';
 
 /**
  * Abre una nueva ventana con el reporte imprimible de inventario:
- * tabla de productos con stock > 0 + resumen por categoría con total.
+ * tabla de productos con stock distinto de cero + resumen por categoría
+ * con total.
  *
  * Si `fechaCorte` (ISO date `YYYY-MM-DD`) viene, el reporte se etiqueta
  * como "Inventario al Corte" para esa fecha; si no, usa la fecha actual.
+ *
+ * El total cuadra exactamente con el KPI "Valor Inventario" y la
+ * tarjeta de CategoryFilterStrip — los 3 usan la misma fórmula:
+ * `sum(valor_inventario)` directo, sin clamp ni filtro client-side
+ * (la SQL ya zerea no-valuables).
  */
 export function printStockList(stock: StockItem[], fechaCorte: string | null) {
-  const totalValor = stock.reduce((s, i) => s + Math.max(0, Number(i.valor_inventario) || 0), 0);
+  // Total = suma directa de valor_inventario. La SQL ya zerea consumibles +
+  // activo_fijo (solo inventariable + merchandising contribuyen). Items con
+  // stock negativo aportan negativo: refleja la realidad, no clampeamos.
+  const totalValor = stock.reduce((s, i) => s + (Number(i.valor_inventario) || 0), 0);
   const fechaLabel = fechaCorte
     ? new Date(fechaCorte + 'T12:00:00').toLocaleDateString('es-MX', {
         day: '2-digit',
@@ -20,8 +29,10 @@ export function printStockList(stock: StockItem[], fechaCorte: string | null) {
     fechaLabel ??
     new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
 
-  // Solo productos con stock > 0 (excluir ceros y negativos del impreso — para contabilidad)
-  const stockPositivo = stock.filter((i) => Number(i.stock_actual) > 0);
+  // Excluimos solo los items con stock = 0 (ruido visual, no contribuyen al
+  // total). Mantenemos los negativos visibles en rojo: son discrepancias
+  // que el usuario debe ver en el listado físico, no esconderlas.
+  const stockMostrado = stock.filter((i) => Number(i.stock_actual) !== 0);
 
   // Agrupar por categoría para el resumen final
   const catOrder = [
@@ -34,7 +45,7 @@ export function printStockList(stock: StockItem[], fechaCorte: string | null) {
     'Propinas',
   ];
   const catMap: Record<string, { count: number; valor: number }> = {};
-  for (const item of stockPositivo) {
+  for (const item of stockMostrado) {
     const cat = item.categoria ?? 'Sin categoría';
     if (!catMap[cat]) catMap[cat] = { count: 0, valor: 0 };
     catMap[cat].count++;
@@ -59,7 +70,7 @@ export function printStockList(stock: StockItem[], fechaCorte: string | null) {
     )
     .join('');
 
-  const rows = stockPositivo
+  const rows = stockMostrado
     .map((item) => {
       const sinStock = item.stock_actual <= 0;
       const bajoMin = item.bajo_minimo;
@@ -135,7 +146,7 @@ export function printStockList(stock: StockItem[], fechaCorte: string | null) {
   </div>
   <div class="doc-meta">
     <span>${fechaCorte ? `Inventario al Corte: <strong>${fecha}</strong>` : `Inventario de Stock &mdash; <strong>${fecha}</strong>`}</span>
-    <span>${stockPositivo.length} productos registrados</span>
+    <span>${stockMostrado.length} productos registrados</span>
   </div>
 
   <!-- Tabla de inventario -->
