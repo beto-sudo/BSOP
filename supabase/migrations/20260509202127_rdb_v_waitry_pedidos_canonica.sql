@@ -98,16 +98,21 @@ COMMENT ON VIEW rdb.v_waitry_pedidos_con_fantasmas IS
 GRANT SELECT ON rdb.v_waitry_pedidos TO authenticated, anon;
 GRANT SELECT ON rdb.v_waitry_pedidos_con_fantasmas TO authenticated, anon;
 
--- Verificación inline: la vista canónica debe excluir exactamente los 39 fantasmas
+-- Verificación inline: la vista canónica debe consistir con la tabla base.
+-- El ASSERT del conteo de fantasmas (39 esperados en prod) está condicionado
+-- a que la tabla tenga datos — en Supabase Preview la DB arranca vacía y la
+-- migración debe pasar igual.
 DO $$
 DECLARE
   v_canonicos_via_view integer;
   v_canonicos_via_tabla integer;
   v_fantasmas integer;
+  v_total integer;
 BEGIN
   SELECT COUNT(*) INTO v_canonicos_via_view FROM rdb.v_waitry_pedidos;
   SELECT COUNT(*) INTO v_canonicos_via_tabla FROM rdb.waitry_pedidos WHERE superseded_by_order_id IS NULL;
   SELECT COUNT(*) INTO v_fantasmas FROM rdb.waitry_pedidos WHERE superseded_by_order_id IS NOT NULL;
+  SELECT COUNT(*) INTO v_total FROM rdb.waitry_pedidos;
 
   IF v_canonicos_via_view <> v_canonicos_via_tabla THEN
     RAISE EXCEPTION
@@ -115,14 +120,16 @@ BEGIN
       v_canonicos_via_view, v_canonicos_via_tabla;
   END IF;
 
-  IF v_fantasmas <> 39 THEN
+  -- Solo verificamos el conteo exacto cuando hay datos suficientes
+  -- (producción tiene >5k pedidos; preview arranca vacía).
+  IF v_total > 5000 AND v_fantasmas <> 39 THEN
     RAISE EXCEPTION
-      'Esperaba 39 fantasmas marcados (Sprint 2 backfill); hay %',
-      v_fantasmas;
+      'Esperaba 39 fantasmas marcados (Sprint 2 backfill); hay % de % pedidos',
+      v_fantasmas, v_total;
   END IF;
 
-  RAISE NOTICE 'Sprint 3 vista canónica OK: % canónicos, % fantasmas',
-    v_canonicos_via_view, v_fantasmas;
+  RAISE NOTICE 'Sprint 3 vista canónica OK: % canónicos, % fantasmas, % total',
+    v_canonicos_via_view, v_fantasmas, v_total;
 END;
 $$;
 
