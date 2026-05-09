@@ -41,6 +41,11 @@ export function computeStockStats(items: StockItem[]) {
   const valorables = items.filter((i) => CLASIFICACION_INVENTARIO.includes(i.clasificacion ?? ''));
   const bajosMinimo = valorables.filter((i) => i.bajo_minimo).length;
   const sinStock = valorables.filter((i) => i.stock_actual <= 0).length;
-  const totalValue = valorables.reduce((acc, curr) => acc + (curr.valor_inventario || 0), 0);
+  // valor_inventario ya viene filtrado por clasificación desde SQL (vista
+  // y RPC zerean consumibles + activo_fijo). Sumamos directo sobre todos
+  // los items para que el KPI cuadre con CategoryFilterStrip y print —
+  // los 3 deben mostrar la misma cifra (incluye items con stock negativo
+  // como discrepancias de captura, no las clampeamos).
+  const totalValue = items.reduce((acc, curr) => acc + (Number(curr.valor_inventario) || 0), 0);
   return { productos: valorables.length, bajosMinimo, sinStock, totalValue };
 }

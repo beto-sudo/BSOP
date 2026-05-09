@@ -9888,6 +9888,7 @@ export type Database = {
         Returns: {
           bajo_minimo: boolean
           categoria: string
+          clasificacion: string
           costo_unitario: number
           factor_consumo: number
           id: string
