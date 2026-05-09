@@ -297,6 +297,16 @@ sequenceDiagram
 3. `lib/permissions.test.ts` → `EXPECTED_DB_MODULE_SLUGS`.
 4. Migración SQL con `INSERT INTO core.modulos` + **backfill defensivo** en `core.permisos_rol` por cada rol existente × módulo nuevo. Sin backfill, el módulo queda **escondido** para no-admin (ver detalle en `CLAUDE.md` repo).
 
+### Sub-slugs cuando el módulo tiene tabs ([ADR-030](../adr/030_submodule_permissions.md))
+
+Cuando un módulo tiene **routed tabs** ([ADR-005](../adr/005_module_with_submodules_routed_tabs.md)), declarar 1 sub-slug por tab además del padre. Naming `<padre>.<sub>` (ej. `rdb.inventario.stock`). El padre actúa como **umbrella** (visibilidad en sidebar); los sub-slugs gobiernan **acceso real al contenido**.
+
+- `<RoutedModuleTabs>` filtra automáticamente las tabs sin permiso (campo opcional `module: '<sub-slug>'` por tab).
+- Cada sub-page tiene `<RequireAccess modulo="<sub-slug>">`. Si la page usa `useSearchParams` o `useUrlFilters`, separar el cuerpo a `<XBody/>` wrappeado por `<RequireAccess><XBody/></RequireAccess>` para evitar `missing-suspense-with-csr-bailout` en Next.js 16.
+- Backfill defensivo al introducir sub-slugs a un módulo existente: clonar `(acceso_lectura, acceso_escritura)` del padre a cada hijo. Sin backfill, los usuarios actuales pierden las tabs.
+
+Ver [reglas SS1-SS7 en ADR-030](../adr/030_submodule_permissions.md).
+
 ---
 
 ## 5. UI patterns — índice de ADRs
@@ -335,14 +345,15 @@ sequenceDiagram
 
 ### Cross-cutting
 
-| Tema                              | ADR                                                   | Patrón canónico                                           |
-| --------------------------------- | ----------------------------------------------------- | --------------------------------------------------------- |
-| Módulos compartidos cross-empresa | [ADR-011](../adr/011_shared_modules_cross_empresa.md) | thin page → `<XModule empresaSlug>` (SM1-SM6)             |
-| Responsive                        | [ADR-019](../adr/019_responsive_policy.md)            | JSDoc `@responsive` + `<DesktopOnlyNotice>` (R1-R5)       |
-| A11y baseline                     | [ADR-020](../adr/020_a11y_baseline.md)                | WCAG 2.1 AA + `@axe-core/playwright` (A1-A6)              |
-| Access denied                     | [ADR-024](../adr/024_access_denied_ux.md)             | `<AccessDenied>` + `<RequireAccess>` (AD1-AD5)            |
-| Read-only "viendo como"           | [ADR-027](../adr/027_viendo_como_readonly.md)         | cookie `bsop_preview_as` + `assertNotInPreview()` (V1-V5) |
-| Workflow CC owns planning         | [ADR-012](../adr/012_workflow_cc_owns_planning.md)    | meta-decisión sobre roles                                 |
+| Tema                               | ADR                                                   | Patrón canónico                                                          |
+| ---------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------ |
+| Módulos compartidos cross-empresa  | [ADR-011](../adr/011_shared_modules_cross_empresa.md) | thin page → `<XModule empresaSlug>` (SM1-SM6)                            |
+| Responsive                         | [ADR-019](../adr/019_responsive_policy.md)            | JSDoc `@responsive` + `<DesktopOnlyNotice>` (R1-R5)                      |
+| A11y baseline                      | [ADR-020](../adr/020_a11y_baseline.md)                | WCAG 2.1 AA + `@axe-core/playwright` (A1-A6)                             |
+| Access denied                      | [ADR-024](../adr/024_access_denied_ux.md)             | `<AccessDenied>` + `<RequireAccess>` (AD1-AD5)                           |
+| Read-only "viendo como"            | [ADR-027](../adr/027_viendo_como_readonly.md)         | cookie `bsop_preview_as` + `assertNotInPreview()` (V1-V5)                |
+| Sub-module permissions (sub-slugs) | [ADR-030](../adr/030_submodule_permissions.md)        | sub-slugs `<padre>.<sub>` + `<RoutedModuleTabs module>` filter (SS1-SS7) |
+| Workflow CC owns planning          | [ADR-012](../adr/012_workflow_cc_owns_planning.md)    | meta-decisión sobre roles                                                |
 
 ### Data / DB
 

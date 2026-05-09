@@ -3,9 +3,10 @@
 **Slug:** `submodule-permissions`
 **Empresas:** todas (cross-empresa, primer rollout en RDB)
 **Schemas afectados:** core (`modulos`, `permisos_rol` — solo data, no DDL)
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-05-09
+**Cerrada:** 2026-05-09
 **Última actualización:** 2026-05-09
 
 > Granularidad RBAC por sub-página dentro de un módulo. Hoy `core.modulos` × `core.permisos_rol` controla acceso por slug raíz (`rdb.inventario`); las tabs/sub-páginas heredan implícitamente el permiso del padre. Esta iniciativa introduce **sub-slugs como módulos hijos** (`rdb.inventario.stock`) reusando toda la maquinaria existente, e implementa el patrón en los 2 módulos con tabs hoy (`rdb.inventario` 3 tabs, `rdb.productos` 4 tabs). De aquí en adelante el diseño de cualquier módulo nuevo con sub-páginas se hace con sub-slugs desde el inicio.
@@ -110,6 +111,14 @@ Sub-slugs (`rdb.inventario.stock`, `rdb.inventario.movimientos`, `rdb.inventario
   - **`app/rdb/inventario/layout.tsx`**: TABS array gana `module` por entrada; `<RequireAccess>` umbrella removido — cada sub-page tiene gate específico ahora (alinea con `productos/layout.tsx` patrón).
   - **`app/rdb/productos/layout.tsx`**: TABS array gana `module` por entrada.
   - **Sub-pages actualizadas** (10 archivos): cada uno gate-ea con su sub-slug. Stock y Movimientos ganaron `<RequireAccess>` propio (antes heredaban del umbrella del layout). Levantamientos main + 5 sub-detalles (`[id]/page.tsx`, `[id]/capturar`, `[id]/diferencias`, `[id]/reporte`, `nuevo`) cambian de `rdb.inventario` → `rdb.inventario.levantamientos`. Productos 4 sub-pages cambian de `rdb.productos` → sus sub-slugs respectivos.
+- **2026-05-09** — Sprint 2 PR #461 — bug Vercel build pre-merge: Stock rompió con `useSearchParams() should be wrapped in a suspense boundary`. Causa: hooks dinámicos en outer component del page; antes el `<RequireAccess>` umbrella del layout forzaba bail-out de prerender, al moverlo a cada sub-page (D3) el outer component quedó como candidate a prerender estático. Fix attempt 1: `force-dynamic` — no honra para client components con `useSearchParams`. Fix attempt 2 (resolvió): refactor a `<InventarioStockBody/>` separado wrappeado por `<RequireAccess>` (mismo patrón que `app/rdb/productos/recetas/page.tsx`). RequireAccess decide montar el body según loading state — prerender estático no ejecuta los hooks dinámicos. PR #461 verde después del refactor.
+- **2026-05-09** — Sprint 3 (este PR) — closeout. Cambios:
+  - **ADR-030** [docs/adr/030_submodule_permissions.md](../adr/030_submodule_permissions.md) creado con 7 reglas SS1-SS7: sub-slug por tab (SS1), ROUTE_TO_MODULE granular (SS2), backfill defensivo al introducir sub-slugs (SS3), `<RoutedModuleTabs>` filtra tabs (SS4), cada sub-page con `<RequireAccess>` específico (SS5), body separado para hooks dinámicos (SS6), test de drift `EXPECTED_DB_MODULE_SLUGS` sync (SS7).
+  - **CLAUDE.md repo** extendido con sub-section "Sub-slugs cuando el módulo tiene tabs (ADR-030)" en "Liberación de módulo nuevo (RBAC sync)".
+  - **ARCHITECTURE.md** §4 con sub-section "Sub-slugs cuando el módulo tiene tabs (ADR-030)" + §5 (índice) con fila para ADR-030 en Cross-cutting.
+  - **INITIATIVES.md** fila movida a `## Done`.
+  - **Cleanup mention en CLAUDE.md repo**: la frase legacy "ADR-030 'Architecture-as-Index'" ajustada a "ADR formal" (el número 030 quedó tomado por sub-module-permissions).
+- **2026-05-09 — Outcome final.** Granularidad RBAC por sub-página live en producción para `rdb.inventario` (3 sub-slugs) y `rdb.productos` (4 sub-slugs), 5 roles × 7 sub-slugs = 35 rows nuevas en `permisos_rol` clonando del padre. Cero usuarios afectados (status quo preservado vía backfill). Patrón canónico documentado para módulos futuros — al diseñar un módulo nuevo con tabs, los sub-slugs se declaran desde el inicio siguiendo SS1-SS7.
 
 ## Referencias
 

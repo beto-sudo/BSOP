@@ -328,6 +328,44 @@ Tras aplicar la migración con psql, regenerar
 Ver iniciativa `modulos-catalog` (cerrada 2026-04-28) para el contexto
 y ADR-014 para la taxonomía de secciones.
 
+### Sub-slugs cuando el módulo tiene tabs (ADR-030)
+
+Cuando el módulo nuevo tiene **sub-páginas (routed tabs ADR-005)**,
+declarar 1 sub-slug por tab desde el inicio. Naming canónico
+`<padre>.<sub>` (ej. `rdb.inventario.stock`). El padre se preserva
+como umbrella (visibilidad en sidebar); los sub-slugs gobiernan acceso
+real al contenido.
+
+Implicaciones para los 4 lugares de la regla anterior:
+
+1. **Sidebar (`NAV_ITEMS`)** — solo entry para el padre (sidebar usa
+   URL default del módulo, no sub-pages).
+2. **`ROUTE_TO_MODULE`** — entry por **cada URL sub-page**, mapeando
+   a su sub-slug. La URL default `/<modulo>` apunta al sub-slug del
+   primer tab (no al padre).
+3. **`EXPECTED_DB_MODULE_SLUGS`** — incluye **el padre + cada
+   sub-slug**.
+4. **Migración SQL** — INSERT de cada sub-slug en `core.modulos`
+   (heredando `seccion` y `empresa_id` del padre vía CROSS JOIN o
+   declarando explícito) + **backfill defensivo** clonando permisos
+   del padre a cada hijo. Plantilla:
+   [supabase/migrations/20260509162620_modulos_subscope_permissions.sql](supabase/migrations/20260509162620_modulos_subscope_permissions.sql).
+
+Adicional para el código de cada sub-page:
+
+- **TABS array del layout**: agregar campo `module: '<sub-slug>'` por
+  tab. `<RoutedModuleTabs>` filtra automáticamente las tabs sin
+  permiso.
+- **Cada sub-page con `<RequireAccess modulo="<sub-slug>">`**.
+- Si la sub-page usa `useSearchParams` (directo o vía `useUrlFilters`),
+  separar el cuerpo a `<XBody/>` wrappeado por
+  `<RequireAccess><XBody/></RequireAccess>` para evitar el error de
+  Next.js 16 `missing-suspense-with-csr-bailout`. Plantillas canónicas:
+  `app/rdb/productos/recetas/page.tsx`, `app/rdb/inventario/page.tsx`.
+
+Ver ADR-030 para reglas SS1-SS7 detalladas e iniciativa
+`submodule-permissions` (cerrada 2026-05-09) para el contexto.
+
 ---
 
 ## Mantenimiento del doc master de arquitectura
@@ -342,4 +380,4 @@ y ADR-014 para la taxonomía de secciones.
 
 No se requiere PR dedicado para estos micro-updates: viajan piggyback en el PR que introduce el cambio (ADR nuevo, migración de schema, dep upgrade, etc.).
 
-Si en 2-3 meses el doc se desincroniza pese a esta regla, escalar a un ADR-030 "Architecture-as-Index" formal con proceso explícito (qué CI valida, cuándo declarar stale, ownership).
+Si en 2-3 meses el doc se desincroniza pese a esta regla, escalar a un ADR formal "Architecture-as-Index" con proceso explícito (qué CI valida, cuándo declarar stale, ownership).
