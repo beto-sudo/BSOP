@@ -29,6 +29,9 @@ export type VentasFiltersProps = {
   count: number;
   activeCount: number;
   onClearAll: () => void;
+  showFantasmas: boolean;
+  onShowFantasmasChange: (value: boolean) => void;
+  fantasmasCount?: number;
 };
 
 export function VentasFilters({
@@ -50,6 +53,9 @@ export function VentasFilters({
   count,
   activeCount,
   onClearAll,
+  showFantasmas,
+  onShowFantasmasChange,
+  fantasmasCount,
 }: VentasFiltersProps) {
   return (
     <div className="flex flex-wrap items-end gap-3">
@@ -122,6 +128,22 @@ export function VentasFilters({
 
       <Button variant="outline" size="icon" onClick={onRefresh} aria-label="Actualizar">
         <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+      </Button>
+
+      {/* Toggle "Mostrar duplicados detectados" — iniciativa
+          rdb-waitry-deduplicacion (ADR-031). Default OFF: la vista canónica
+          excluye fantasmas. ON: cambia a la vista de auditoría y los marca
+          con badge tone="warning" en VentasTable. */}
+      <Button
+        variant={showFantasmas ? 'default' : 'outline'}
+        size="sm"
+        onClick={() => onShowFantasmasChange(!showFantasmas)}
+        aria-pressed={showFantasmas}
+        title="Mostrar pedidos detectados como duplicados por bug del POS Waitry"
+      >
+        {showFantasmas
+          ? `Ocultar duplicados${typeof fantasmasCount === 'number' ? ` (${fantasmasCount})` : ''}`
+          : 'Mostrar duplicados'}
       </Button>
 
       <ActiveFiltersChip count={activeCount} onClearAll={onClearAll} />

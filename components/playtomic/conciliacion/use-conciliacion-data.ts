@@ -171,7 +171,10 @@ export function useConciliacionData(options?: { extraBookingId?: string | null }
             .limit(5000)
             .returns<BookingRow[]>(),
           rdb
-            .from('waitry_pedidos')
+            // Vista canónica excluye fantasmas (rdb-waitry-deduplicacion ADR-031);
+            // los pagos fantasma no deben aparecer como candidatos para asignar
+            // a bookings Playtomic.
+            .from('v_waitry_pedidos')
             .select('order_id,timestamp,notes,total_amount,paid')
             .eq('paid', true)
             .gte('timestamp', waitryLookbackIso)

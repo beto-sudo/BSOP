@@ -54,13 +54,23 @@ export async function assignPaymentAction(input: AssignPaymentInput): Promise<As
     return { ok: false, error: 'La reserva está cancelada — no se puede asignar pago.' };
   }
 
+  // Vista canónica: si el order_id es un fantasma marcado por la iniciativa
+  // rdb-waitry-deduplicacion (ADR-031), maybeSingle devuelve null y rechazamos
+  // la asignación — un fantasma no debe poder conciliarse contra un booking
+  // Playtomic (su pago canónico ya está en otro order_id).
   const { data: pedido, error: pedidoErr } = await rdb
-    .from('waitry_pedidos')
+    .from('v_waitry_pedidos')
     .select('order_id,paid,total_amount')
     .eq('order_id', waitryOrderId)
     .maybeSingle();
   if (pedidoErr) return { ok: false, error: `Error consultando pedido: ${pedidoErr.message}` };
-  if (!pedido) return { ok: false, error: 'El pedido Waitry no existe.' };
+  if (!pedido) {
+    return {
+      ok: false,
+      error:
+        'El pedido Waitry no existe o fue detectado como duplicado del bug del POS (ver ADR-031). Usa el order_id canónico.',
+    };
+  }
   if (!pedido.paid) {
     return { ok: false, error: 'El pedido Waitry no está marcado como pagado.' };
   }

@@ -53,12 +53,11 @@ export function VentasPorProducto({
     try {
       const supabase = createSupabaseBrowserClient();
 
-      // Filtra fantasmas (ver iniciativa rdb-waitry-deduplicacion).
+      // Vista canónica excluye fantasmas (rdb-waitry-deduplicacion ADR-031).
       let pedidosQuery = supabase
         .schema('rdb')
-        .from('waitry_pedidos')
+        .from('v_waitry_pedidos')
         .select('order_id, status')
-        .is('superseded_by_order_id', null)
         .limit(10000);
 
       if (corteFilter !== 'all') {

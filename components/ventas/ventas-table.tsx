@@ -12,7 +12,24 @@ const columns: Column<Pedido>[] = [
     key: 'order_id',
     label: 'Folio',
     cellClassName: 'font-mono text-xs font-medium',
-    render: (p) => `#${p.order_id ?? p.id}`,
+    render: (p) => (
+      <span className="inline-flex items-center gap-2">
+        <span>#{p.order_id ?? p.id}</span>
+        {p.es_fantasma ? (
+          <Badge
+            variant="outline"
+            className="border-amber-500/50 bg-amber-500/10 px-1.5 py-0 text-[10px] font-normal uppercase tracking-wide text-amber-700 dark:text-amber-400"
+            title={
+              p.superseded_by_order_id
+                ? `Detectado como duplicado del pedido #${p.superseded_by_order_id} (bug Waitry — ver ADR-031)`
+                : 'Detectado como duplicado (bug Waitry)'
+            }
+          >
+            Duplicado
+          </Badge>
+        ) : null}
+      </span>
+    ),
   },
   {
     key: 'timestamp',

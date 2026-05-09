@@ -472,12 +472,11 @@ export default function RdbHomePage() {
       const currentFromBounds = getLocalDayBoundsUtc(isoDateLocal(meta.from), TZ);
       const currentToBounds = getLocalDayBoundsUtc(isoDateLocal(meta.to), TZ);
 
-      // Filtra fantasmas Waitry (ver iniciativa rdb-waitry-deduplicacion).
+      // Vista canónica excluye fantasmas (rdb-waitry-deduplicacion ADR-031).
       const ordersCurrent = supabase
         .schema('rdb')
-        .from('waitry_pedidos')
+        .from('v_waitry_pedidos')
         .select('order_id,timestamp,total_amount,status,corte_id')
-        .is('superseded_by_order_id', null)
         .gte('timestamp', currentFromBounds.start)
         .lte('timestamp', currentToBounds.end)
         .order('timestamp', { ascending: true })
@@ -501,9 +500,8 @@ export default function RdbHomePage() {
 
               return supabase
                 .schema('rdb')
-                .from('waitry_pedidos')
+                .from('v_waitry_pedidos')
                 .select('order_id,timestamp,total_amount,status,corte_id')
-                .is('superseded_by_order_id', null)
                 .gte('timestamp', previousFromBounds.start)
                 .lte('timestamp', previousToBounds.end)
                 .order('timestamp', { ascending: true })
@@ -519,9 +517,8 @@ export default function RdbHomePage() {
 
               return supabase
                 .schema('rdb')
-                .from('waitry_pedidos')
+                .from('v_waitry_pedidos')
                 .select('order_id,timestamp,total_amount,status,corte_id')
-                .is('superseded_by_order_id', null)
                 .gte('timestamp', lastYearFromBounds.start)
                 .lte('timestamp', lastYearToBounds.end)
                 .order('timestamp', { ascending: true })

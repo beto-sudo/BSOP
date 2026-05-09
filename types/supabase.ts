@@ -9210,6 +9210,20 @@ export type Database = {
             foreignKeyName: "waitry_pagos_order_fk"
             columns: ["order_id"]
             isOneToOne: false
+            referencedRelation: "v_waitry_pedidos"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "waitry_pagos_order_fk"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_waitry_pedidos_con_fantasmas"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "waitry_pagos_order_fk"
+            columns: ["order_id"]
+            isOneToOne: false
             referencedRelation: "v_waitry_pedidos_reversa_sospechosa"
             referencedColumns: ["order_id"]
           },
@@ -9350,6 +9364,20 @@ export type Database = {
           unit_price?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "waitry_productos_order_fk"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_waitry_pedidos"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "waitry_productos_order_fk"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_waitry_pedidos_con_fantasmas"
+            referencedColumns: ["order_id"]
+          },
           {
             foreignKeyName: "waitry_productos_order_fk"
             columns: ["order_id"]
@@ -9798,6 +9826,192 @@ export type Database = {
           updated_at: string | null
         }
         Relationships: []
+      }
+      v_waitry_pedidos: {
+        Row: {
+          content_hash: string | null
+          corte_id: string | null
+          created_at: string | null
+          es_fantasma: boolean | null
+          external_delivery_id: string | null
+          id: string | null
+          last_action_at: string | null
+          layout_name: string | null
+          notes: string | null
+          order_id: string | null
+          paid: boolean | null
+          place_id: string | null
+          place_name: string | null
+          service_charge: number | null
+          status: string | null
+          superseded_by_order_id: string | null
+          table_id: number | null
+          table_name: string | null
+          tax: number | null
+          timestamp: string | null
+          total_amount: number | null
+          total_discount: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          content_hash?: string | null
+          corte_id?: string | null
+          created_at?: string | null
+          es_fantasma?: never
+          external_delivery_id?: string | null
+          id?: string | null
+          last_action_at?: string | null
+          layout_name?: string | null
+          notes?: string | null
+          order_id?: string | null
+          paid?: boolean | null
+          place_id?: string | null
+          place_name?: string | null
+          service_charge?: number | null
+          status?: string | null
+          superseded_by_order_id?: string | null
+          table_id?: number | null
+          table_name?: string | null
+          tax?: number | null
+          timestamp?: string | null
+          total_amount?: number | null
+          total_discount?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          content_hash?: string | null
+          corte_id?: string | null
+          created_at?: string | null
+          es_fantasma?: never
+          external_delivery_id?: string | null
+          id?: string | null
+          last_action_at?: string | null
+          layout_name?: string | null
+          notes?: string | null
+          order_id?: string | null
+          paid?: boolean | null
+          place_id?: string | null
+          place_name?: string | null
+          service_charge?: number | null
+          status?: string | null
+          superseded_by_order_id?: string | null
+          table_id?: number | null
+          table_name?: string | null
+          tax?: number | null
+          timestamp?: string | null
+          total_amount?: number | null
+          total_discount?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "waitry_pedidos_corte_id_fkey"
+            columns: ["corte_id"]
+            isOneToOne: false
+            referencedRelation: "v_cortes_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waitry_pedidos_corte_id_fkey"
+            columns: ["corte_id"]
+            isOneToOne: false
+            referencedRelation: "v_cortes_totales"
+            referencedColumns: ["corte_id"]
+          },
+        ]
+      }
+      v_waitry_pedidos_con_fantasmas: {
+        Row: {
+          content_hash: string | null
+          corte_id: string | null
+          created_at: string | null
+          es_fantasma: boolean | null
+          external_delivery_id: string | null
+          id: string | null
+          last_action_at: string | null
+          layout_name: string | null
+          notes: string | null
+          order_id: string | null
+          paid: boolean | null
+          place_id: string | null
+          place_name: string | null
+          service_charge: number | null
+          status: string | null
+          superseded_by_order_id: string | null
+          table_id: number | null
+          table_name: string | null
+          tax: number | null
+          timestamp: string | null
+          total_amount: number | null
+          total_discount: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          content_hash?: string | null
+          corte_id?: string | null
+          created_at?: string | null
+          es_fantasma?: never
+          external_delivery_id?: string | null
+          id?: string | null
+          last_action_at?: string | null
+          layout_name?: string | null
+          notes?: string | null
+          order_id?: string | null
+          paid?: boolean | null
+          place_id?: string | null
+          place_name?: string | null
+          service_charge?: number | null
+          status?: string | null
+          superseded_by_order_id?: string | null
+          table_id?: number | null
+          table_name?: string | null
+          tax?: number | null
+          timestamp?: string | null
+          total_amount?: number | null
+          total_discount?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          content_hash?: string | null
+          corte_id?: string | null
+          created_at?: string | null
+          es_fantasma?: never
+          external_delivery_id?: string | null
+          id?: string | null
+          last_action_at?: string | null
+          layout_name?: string | null
+          notes?: string | null
+          order_id?: string | null
+          paid?: boolean | null
+          place_id?: string | null
+          place_name?: string | null
+          service_charge?: number | null
+          status?: string | null
+          superseded_by_order_id?: string | null
+          table_id?: number | null
+          table_name?: string | null
+          tax?: number | null
+          timestamp?: string | null
+          total_amount?: number | null
+          total_discount?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "waitry_pedidos_corte_id_fkey"
+            columns: ["corte_id"]
+            isOneToOne: false
+            referencedRelation: "v_cortes_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waitry_pedidos_corte_id_fkey"
+            columns: ["corte_id"]
+            isOneToOne: false
+            referencedRelation: "v_cortes_totales"
+            referencedColumns: ["corte_id"]
+          },
+        ]
       }
       v_waitry_pedidos_reversa_sospechosa: {
         Row: {
