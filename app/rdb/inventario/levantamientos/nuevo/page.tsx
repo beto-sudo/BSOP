@@ -32,7 +32,7 @@ type Almacen = { id: string; nombre: string };
  */
 export default function NuevoLevantamientoPage() {
   return (
-    <RequireAccess empresa="rdb" modulo="rdb.inventario" write>
+    <RequireAccess empresa="rdb" modulo="rdb.inventario.levantamientos" write>
       <NuevoLevantamientoForm />
     </RequireAccess>
   );

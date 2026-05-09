@@ -118,7 +118,7 @@ type FirmaRow = {
  */
 export default function LevantamientoDetailPage() {
   return (
-    <RequireAccess empresa="rdb" modulo="rdb.inventario">
+    <RequireAccess empresa="rdb" modulo="rdb.inventario.levantamientos">
       <DetailInner />
     </RequireAccess>
   );

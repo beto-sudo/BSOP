@@ -44,8 +44,16 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   '/rdb/home': 'rdb.home',
   '/rdb/ventas': 'rdb.ventas',
   '/rdb/cortes': 'rdb.cortes',
-  '/rdb/productos': 'rdb.productos',
-  '/rdb/inventario': 'rdb.inventario',
+  // Productos: padre `rdb.productos` + 4 sub-slugs por tab (sub-slug pattern,
+  // ver `submodule-permissions` iniciativa). Cada URL apunta a su sub-slug.
+  '/rdb/productos': 'rdb.productos.catalogo',
+  '/rdb/productos/recetas': 'rdb.productos.recetas',
+  '/rdb/productos/auditoria': 'rdb.productos.auditoria',
+  '/rdb/productos/analisis': 'rdb.productos.analisis',
+  // Inventario: padre `rdb.inventario` + 3 sub-slugs por tab.
+  '/rdb/inventario': 'rdb.inventario.stock',
+  '/rdb/inventario/movimientos': 'rdb.inventario.movimientos',
+  '/rdb/inventario/levantamientos': 'rdb.inventario.levantamientos',
   '/rdb/proveedores': 'rdb.proveedores',
   '/rdb/requisiciones': 'rdb.requisiciones',
   '/rdb/playtomic': 'rdb.playtomic',

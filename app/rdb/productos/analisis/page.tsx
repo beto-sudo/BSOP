@@ -436,7 +436,7 @@ export default function ProductosAnalisisPage() {
 
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
-    <RequireAccess empresa="rdb" modulo="rdb.productos">
+    <RequireAccess empresa="rdb" modulo="rdb.productos.analisis">
       <DesktopOnlyNotice module="Análisis" />
       <div className="hidden sm:block space-y-8">
         {/* Header */}

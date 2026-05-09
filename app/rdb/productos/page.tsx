@@ -518,7 +518,7 @@ export default function ProductosPage() {
   ]);
 
   return (
-    <RequireAccess empresa="rdb" modulo="rdb.productos">
+    <RequireAccess empresa="rdb" modulo="rdb.productos.catalogo">
       <DesktopOnlyNotice module="Productos" />
       <div className="hidden sm:block space-y-6">
         {/* Header */}

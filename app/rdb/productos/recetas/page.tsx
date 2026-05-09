@@ -34,7 +34,7 @@ const FILTER_DEFAULTS = {
  */
 export default function ProductosRecetasPage() {
   return (
-    <RequireAccess empresa="rdb" modulo="rdb.productos">
+    <RequireAccess empresa="rdb" modulo="rdb.productos.recetas">
       <DesktopOnlyNotice module="Recetas" />
       <div className="hidden sm:block">
         <ProductosRecetasBody />

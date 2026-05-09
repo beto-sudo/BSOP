@@ -23,6 +23,7 @@ import {
 } from '@/components/module-page';
 import { CategoryFilterStrip } from '@/components/inventario/category-filter-strip';
 import { DesktopOnlyNotice } from '@/components/responsive';
+import { RequireAccess } from '@/components/require-access';
 import { useUrlFilters } from '@/hooks/use-url-filters';
 import { Combobox } from '@/components/ui/combobox';
 import { Badge } from '@/components/ui/badge';
@@ -225,7 +226,7 @@ export default function InventarioStockPage() {
   });
 
   return (
-    <>
+    <RequireAccess empresa="rdb" modulo="rdb.inventario.stock">
       <DesktopOnlyNotice module="Inventario" />
       <div className="hidden sm:block">
         {!loadingStock &&
@@ -433,6 +434,6 @@ export default function InventarioStockPage() {
           onSuccess={handleSuccess}
         />
       </div>
-    </>
+    </RequireAccess>
   );
 }

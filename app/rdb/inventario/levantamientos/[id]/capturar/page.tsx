@@ -59,7 +59,7 @@ type LevantamientoMeta = {
  */
 export default function CapturarPage() {
   return (
-    <RequireAccess empresa="rdb" modulo="rdb.inventario" write>
+    <RequireAccess empresa="rdb" modulo="rdb.inventario.levantamientos" write>
       <CapturarInner />
     </RequireAccess>
   );

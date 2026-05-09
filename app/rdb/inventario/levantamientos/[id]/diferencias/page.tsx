@@ -72,7 +72,7 @@ type LevHeader = {
  */
 export default function DiferenciasPage() {
   return (
-    <RequireAccess empresa="rdb" modulo="rdb.inventario">
+    <RequireAccess empresa="rdb" modulo="rdb.inventario.levantamientos">
       <DiferenciasInner />
     </RequireAccess>
   );

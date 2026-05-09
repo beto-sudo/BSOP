@@ -102,6 +102,14 @@ Sub-slugs (`rdb.inventario.stock`, `rdb.inventario.movimientos`, `rdb.inventario
 ## Bitácora
 
 - **2026-05-09** — Promoción + Sprint 1. Conversación de diseño cerró 4 decisiones (D1-D4). Migración SQL escrita pero NO aplicada — Beto aplica al revisar PR.
+- **2026-05-09** — Sprint 1 mergeado (PR #460 verde). Aplicación de migración: detectado drift histórico — `20260507171141` (PR #448 wallet fix) registrado en `supabase_migrations.schema_migrations` con timestamp distinto al archivo local `20260507171006`. Verificado vía MCP que el `name` y SQL son idénticos. Repair: `migration repair --status reverted 20260507171141` + `--status applied 20260507171006`. Cero cambios SQL en producción — solo metadata. Tras repair, `supabase db push` aplicó `20260509162620` sin issues. Verificación SQL post-apply: 7 sub-slugs en sección `inventario` (heredada del padre); backfill correcto — `rdb.inventario.{stock,movimientos,levantamientos}` con 5 roles × read=5 × write=5 idéntico al padre, `rdb.productos.{catalogo,recetas,auditoria,analisis}` con 5 roles × read=5 × write=4 idéntico al padre. SCHEMA_REF.md y types/supabase.ts regenerados (cambio menor en SCHEMA_REF, types sin diff — las nuevas filas no afectan tipos).
+- **2026-05-09** — Sprint 2 — Application layer. Cambios:
+  - **`<RoutedModuleTabs>`** extendido en [components/module-page/routed-module-tabs.tsx](../../components/module-page/routed-module-tabs.tsx) con campo opcional `module?: string` por tab. Si está set, filtra por `canAccessModulo(perms, module)`. Durante `permissions.loading` muestra todas las tabs sin filtrar (evita flash). Admin bypass aplica via `canAccessModulo`.
+  - **`ROUTE_TO_MODULE`** en [lib/permissions.ts](../../lib/permissions.ts): `/rdb/inventario`, `/rdb/inventario/movimientos`, `/rdb/inventario/levantamientos`, `/rdb/productos`, `/rdb/productos/recetas`, `/rdb/productos/auditoria`, `/rdb/productos/analisis` apuntan a sus 7 sub-slugs respectivos. Las URLs default (`/rdb/inventario` y `/rdb/productos`) apuntan al sub-slug del primer tab (`stock` y `catalogo`).
+  - **`EXPECTED_DB_MODULE_SLUGS`** en [lib/permissions.test.ts](../../lib/permissions.test.ts) extendido con los 7 sub-slugs.
+  - **`app/rdb/inventario/layout.tsx`**: TABS array gana `module` por entrada; `<RequireAccess>` umbrella removido — cada sub-page tiene gate específico ahora (alinea con `productos/layout.tsx` patrón).
+  - **`app/rdb/productos/layout.tsx`**: TABS array gana `module` por entrada.
+  - **Sub-pages actualizadas** (10 archivos): cada uno gate-ea con su sub-slug. Stock y Movimientos ganaron `<RequireAccess>` propio (antes heredaban del umbrella del layout). Levantamientos main + 5 sub-detalles (`[id]/page.tsx`, `[id]/capturar`, `[id]/diferencias`, `[id]/reporte`, `nuevo`) cambian de `rdb.inventario` → `rdb.inventario.levantamientos`. Productos 4 sub-pages cambian de `rdb.productos` → sus sub-slugs respectivos.
 
 ## Referencias
 

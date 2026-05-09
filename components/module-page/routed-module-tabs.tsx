@@ -4,6 +4,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { type ReactNode } from 'react';
 
+import { usePermissions } from '@/components/providers';
+import { canAccessModulo } from '@/lib/permissions';
+
 export interface RoutedModuleTab {
   /** Etiqueta visible del tab */
   label: ReactNode;
@@ -17,6 +20,14 @@ export interface RoutedModuleTab {
    * tab (landing) para evitar que sea match comodín.
    */
   exact?: boolean;
+  /**
+   * Slug de módulo que gate-ea este tab. Si está set, el tab se oculta
+   * cuando el usuario no tiene `acceso_lectura` al sub-slug. Si está
+   * undefined, siempre visible (compat con módulos sin granularidad de
+   * sub-slug). Patrón canónico para módulos con sub-páginas — ver
+   * iniciativa `submodule-permissions`.
+   */
+  module?: string;
 }
 
 export interface RoutedModuleTabsProps {
@@ -26,18 +37,30 @@ export interface RoutedModuleTabsProps {
 /**
  * Tabs routed (Next.js Link-based) con el mismo estilo visual que
  * `<ModuleTabs>`. El tab activo se deriva de `usePathname()`. Se oculta
- * cuando hay menos de 2 tabs (paridad con `<ModuleTabs>`).
+ * cuando hay menos de 2 tabs visibles (paridad con `<ModuleTabs>`).
+ *
+ * Si un tab declara `module`, se filtra por `canAccessModulo(perms, module)`.
+ * Durante el loading inicial de permisos, las tabs se muestran sin filtrar
+ * para evitar flash. Admin bypass aplica vía `canAccessModulo`.
  *
  * Diseñado para vivir en un `layout.tsx` compartido por las rutas hermanas
  * de un módulo (ver ADR-005 — `module-page-submodules`).
  */
 export function RoutedModuleTabs({ tabs }: RoutedModuleTabsProps) {
   const pathname = usePathname();
-  if (tabs.length < 2) return null;
+  const { permissions } = usePermissions();
+
+  // Durante loading, mostrar todas las tabs sin filtrar (evita flash).
+  // Una vez cargado, filtrar por sub-slug si el tab lo declara.
+  const visibleTabs = permissions.loading
+    ? tabs
+    : tabs.filter((tab) => !tab.module || canAccessModulo(permissions, tab.module));
+
+  if (visibleTabs.length < 2) return null;
 
   return (
     <div className="flex flex-wrap gap-2 border-b" role="tablist">
-      {tabs.map(({ label, href, exact }) => {
+      {visibleTabs.map(({ label, href, exact }) => {
         const active = exact
           ? pathname === href
           : pathname === href || pathname.startsWith(`${href}/`);

@@ -37,7 +37,7 @@ const FILTER_DEFAULTS = {
  */
 export default function ProductosAuditoriaPage() {
   return (
-    <RequireAccess empresa="rdb" modulo="rdb.productos">
+    <RequireAccess empresa="rdb" modulo="rdb.productos.auditoria">
       <DesktopOnlyNotice module="Auditoría" />
       <div className="hidden sm:block">
         <ProductosAuditoriaBody />
