@@ -7,8 +7,11 @@ las tablas viejas), `core.empresas` (lectura)
 **Estado:** proposed
 **Dueño:** Beto
 **Creada:** 2026-05-08
-**Última actualización:** 2026-05-08 (promoción tras brainstorm; alcance v1
-tentativo, falta cerrar D1-D4 antes de pasar a `planned`)
+**Última actualización:** 2026-05-08 (corte limpio adelantado al Sprint 1:
+los 4 módulos viejos nunca tuvieron captura productiva — fueron una
+migración apurada de tablas desde Coda — así que se borran al inicio en
+lugar de al final; D2 cerrada, quedan D1, D2, D3 abiertas para subir a
+`planned`)
 
 ## Problema
 
@@ -40,10 +43,16 @@ de DILESA no cabe ahí:
    institucional de los descartes con su razón.
 5. **Los lotes individuales pierden trazabilidad** una vez vendidos o
    conservados — el "proyecto" los absorbe.
+6. **Los 4 módulos UI mergeados (`Terrenos`, `Anteproyectos`, `Proyectos`,
+   `Prototipos`) nunca tuvieron captura productiva**. Fueron una migración
+   apurada de tablas desde Coda sin planeación operativa. La
+   `analytics.mv_dilesa_pipeline` está vacía precisamente por eso. No hay
+   data productiva que preservar ni flujos vivos que cuidar.
 
 Resultado operativo: la migración Coda → BSOP que llevamos arranca con un
 schema que no soporta la operación real, y va a llegar al primer caso mixto
-(Lomas del Bosque) y romperse.
+(Lomas del Bosque) y romperse. La buena noticia es que como nada se ha
+usado productivamente, podemos cortar limpio sin pérdida.
 
 ## Outcome esperado
 
@@ -56,13 +65,16 @@ schema que no soporta la operación real, y va a llegar al primer caso mixto
   ha, 156 unidades, 1 proyecto madre + 4 streams de valor / sub-proyectos)
   como prueba de fuego de la abstracción.
 - **Schema viejo (`dilesa.terrenos`, `dilesa.anteproyectos`,
-  `dilesa.proyectos`, `dilesa.prototipos` y derivadas) deprecado y
-  borrado** al final de la iniciativa. Los 4 anteproyectos vivos en Coda
-  (Lomas del Bosque + Loma Escondida + Lomas de los Encinos + Lomas de las
-  Delicias) migrados al modelo nuevo antes del corte.
-- **UI mergeada de los módulos viejos eliminada y reemplazada** por la UI
-  nueva del portafolio + proyectos. Los PRs viejos quedan como referencia en
-  git, no se pierde historial.
+  `dilesa.proyectos`, `dilesa.prototipos` y derivadas) borrado en Sprint 1**
+  (no al final) — greenfield para construir el modelo nuevo sin convivencia
+  paralela. Posible porque nada se usó productivamente: los 4 anteproyectos
+  vivos siguen en Coda, no en BSOP.
+- **UI mergeada de los 4 módulos viejos eliminada en Sprint 1** junto con el
+  schema. Los PRs viejos quedan como referencia en git, no se pierde
+  historial. Los 4 anteproyectos vivos en Coda (Lomas del Bosque + Loma
+  Escondida + Lomas de los Encinos + Lomas de las Delicias) se migran
+  **directamente desde Coda al modelo nuevo** en Sprint 4 — no del schema
+  intermedio.
 - **Plantillas editables, no fijas** por tipo de proyecto: rica para
   fraccionamiento (donde hay know-how histórico), mínimas y editables para
   los demás. Cada plantilla "gradúa" cuando completa su segundo o tercer
@@ -195,8 +207,34 @@ lotificación (agosto 2023, vigente).
 
 ## Alcance v1
 
-- [ ] **Sprint 1 — ADRs + schema base v0 en paralelo (DB-puro, sin tocar
-      schema viejo)**:
+- [ ] **Sprint 1 — Demolición (DROP schema viejo + borrado UI vieja)**:
+  - **Pausa explícita: aprobación verbal de Beto antes del DROP en
+    producción** (regla operativa de migraciones DB destructivas).
+  - Migración SQL `<timestamp>_dilesa_v1_drop.sql`:
+    - `DROP TABLE` en cascada de `dilesa.terrenos`, `dilesa.anteproyectos`,
+      `dilesa.proyectos`, `dilesa.prototipos` y todas sus derivadas
+      (incluidas vistas y RPCs específicas del schema viejo).
+    - `DROP MATERIALIZED VIEW analytics.mv_dilesa_pipeline` (vacía hoy,
+      dependía del schema viejo).
+    - Cleanup de `core.modulos`: borrar slugs de los 4 módulos viejos.
+    - `NOTIFY pgrst, 'reload schema'` al final.
+  - Borrado del UI mergeado:
+    - Pages bajo `app/dilesa/` correspondientes a los 4 módulos.
+    - Componentes específicos en `components/dilesa/...` (los del schema
+      viejo, no los compartidos con otras empresas).
+    - Helpers en `lib/dilesa/...` específicos del schema viejo.
+    - Entradas correspondientes de `NAV_ITEMS`
+      ([components/app-shell/nav-config.ts](../../components/app-shell/nav-config.ts))
+      y `ROUTE_TO_MODULE` ([lib/permissions.ts](../../lib/permissions.ts)).
+    - `EXPECTED_DB_MODULE_SLUGS` ([lib/permissions.test.ts](../../lib/permissions.test.ts))
+      quita los slugs viejos.
+  - Verificación: `grep` exhaustivo de referencias a las tablas viejas en
+    `app/`, `lib/`, `components/`, `scripts/`, `tests/`. Cero hits antes de
+    mergear.
+  - Regenerar `SCHEMA_REF.md` y `types/supabase.ts`.
+  - PR único de "demolición" — completamente reversible vía revert si Beto
+    se arrepiente.
+- [ ] **Sprint 2 — ADRs + schema base v0 (greenfield)**:
   - ADR `dilesa-taxonomia-portafolio` — Activo / Proyecto / Producto /
     Unidad como entidades raíz, discriminator + satélite por tipo, naming
     rationale.
@@ -205,9 +243,6 @@ lotificación (agosto 2023, vigente).
     departamentos). Reglas de propagación de estado, regla de prorrateo
     de CapEx compartido, ciclo: proyecto al ejecutarse genera sub-activos
     que entran al portafolio.
-  - ADR `dilesa-deprecacion-schema-v1` — plan de coexistencia paralela del
-    schema viejo y nuevo durante migración, criterio de corte, qué se
-    preserva del UI viejo (nada productivo) y qué se migra.
   - Migraciones SQL en `supabase/migrations/`:
     - `dilesa.activos` (master con discriminator + jerarquía padre/hijo)
     - `dilesa.activos_<tipo>` (satélites por tipo: `_terreno`, `_lote`,
@@ -221,20 +256,19 @@ lotificación (agosto 2023, vigente).
     - `dilesa.proyecto_tareas`, `dilesa.proyecto_hitos`,
       `dilesa.proyecto_documentos`, `dilesa.proyecto_responsables`
       (heredan patrones del módulo Tareas existente, agnóstico al tipo)
-  - Seed inicial: catálogos de tipos de Activo, tipos de Proyecto, plantilla
-    rica de fraccionamiento residencial (basada en el know-how del Coda
-    actual), plantillas mínimas para plaza/bodega/departamentos.
-  - **Schema viejo intacto**. Cero borrado en este sprint.
-  - Regenerar `SCHEMA_REF.md` y commitearlo.
-- [ ] **Sprint 2 — Caso piloto Lomas del Bosque cargado en el schema
+  - Seed inicial: catálogos de tipos de Activo, tipos de Proyecto,
+    plantilla rica de fraccionamiento residencial (basada en el know-how
+    del Coda actual), plantillas mínimas para plaza/bodega/departamentos.
+  - Regenerar `SCHEMA_REF.md` y `types/supabase.ts`.
+- [ ] **Sprint 3 — Caso piloto Lomas del Bosque cargado en el schema
       nuevo**:
   - Carga manual o vía script `scripts/migrations/lomas-del-bosque-seed.ts`
-    de los 156 unidades + proyecto madre + 7 sub-proyectos en el schema
+    de las 156 unidades + proyecto madre + 7 sub-proyectos en el schema
     nuevo.
   - Validación operativa: el modelo financiero del proyecto madre y de cada
     sub-proyecto se calcula sin pegamentos.
   - Valida la abstracción **antes** de tocar UI.
-- [ ] **Sprint 3 — UI lectura del portafolio (lista + detalle, sin captura
+- [ ] **Sprint 4 — UI lectura del portafolio (lista + detalle, sin captura
       pesada)**:
   - `/dilesa/portafolio` — lista de Activos con filtros (tipo, estado,
     municipio) + jerarquía padre/hijo (vista folder).
@@ -246,18 +280,12 @@ lotificación (agosto 2023, vigente).
   - **Test del riesgo principal**: capturar un contrato de renta de un
     local de plaza tarda <2 minutos. Si chirría la UI, refactor antes de
     seguir.
-- [ ] **Sprint 4 — Migrar los 3 anteproyectos restantes desde Coda**:
+- [ ] **Sprint 5 — Migrar los 3 anteproyectos restantes desde Coda + cierre**:
   - Loma Escondida (residencial, 27 lotes), Lomas de los Encinos
     (residencial, 354 lotes), Lomas de las Delicias (residencial, 163
-    lotes).
+    lotes) — desde Coda directo al schema nuevo (no hay schema intermedio
+    porque el viejo se borró en Sprint 1).
   - Confirmar el modelo aguanta sin contorsiones.
-- [ ] **Sprint 5 — Deprecación de schema viejo + borrado de UI vieja**:
-  - Verificar cero llamados a las tablas viejas desde el código.
-  - DROP `dilesa.terrenos`, `dilesa.anteproyectos`, `dilesa.proyectos`
-    (viejo), `dilesa.prototipos` y derivadas que el ADR de deprecación
-    enumere. **Pausa explícita aquí: aprobación verbal de Beto antes del
-    DROP en producción**.
-  - Borrar pages y componentes UI viejos.
   - Cierre de iniciativa.
 
 ## Fuera de alcance v1
@@ -289,42 +317,50 @@ lotificación (agosto 2023, vigente).
 
 ## Métricas de éxito
 
+- **Cero referencias al schema viejo** desde `app/`, `lib/`, `components/`,
+  `scripts/`, `tests/` después de Sprint 1. Verificable con grep — gate del
+  PR de demolición.
+- **Cero objetos `dilesa.*` viejos** en la base de datos después de Sprint
+  1. Verificable con `\dt dilesa.*`.
 - **Lomas del Bosque modelado completo en el schema nuevo** sin contorsiones
-  (Sprint 2). Si requiere más de 2 ALTERs al schema base para entrar, la
-  abstracción está mal y se itera antes de Sprint 3.
+  (Sprint 3). Si requiere más de 2 ALTERs al schema base para entrar, la
+  abstracción está mal y se itera antes de Sprint 4.
 - **Captura de un contrato de renta de un local de una plaza en <2 minutos**
-  con teclado en 1 mano (Sprint 3). Test del riesgo de sobre-modelado.
-- **Cero llamados al schema viejo** desde `app/`, `lib/`, `components/`,
-  `scripts/` antes del DROP (Sprint 5). Verificable con grep.
-- **Cero código del schema viejo en `dilesa.*`** después del DROP (Sprint 5).
+  con teclado en 1 mano (Sprint 4). Test del riesgo de sobre-modelado.
 - **Los 4 anteproyectos vivos en Coda** representados en el schema nuevo
-  con su modelo financiero calculado (incluido Lomas del Bosque que hoy
-  no se puede en Coda).
+  con su modelo financiero calculado al cierre (incluido Lomas del Bosque,
+  que hoy no se puede en Coda).
 
 ## Riesgos / preguntas abiertas
 
 - [ ] **D1 — Sobre-modelar la jerarquía → UI lenta**. Si capturar un contrato
       de renta de un local toma >2 minutos, la abstracción está mal aterrizada
-      en UI. Métrica de diseño explícita en Sprint 3.
-- [ ] **D2 — Convivencia paralela del schema viejo y nuevo durante la
-      migración**. Riesgo de drift si data nueva entra al viejo durante
-      Sprints 1-4. Mitigación: bloqueo de captura productiva en módulos
-      viejos al iniciar Sprint 1 (los módulos viejos hoy son scaffolding sin
-      captura real, así que el bloqueo es nominal).
-- [ ] **D3 — Cómo se modela la "regla de prorrateo" de CapEx compartido**.
+      en UI. Métrica de diseño explícita en Sprint 4.
+- [ ] **D2 — Cómo se modela la "regla de prorrateo" de CapEx compartido**.
       v1: regla declarativa por proyecto madre (default `m² beneficiados`),
       cálculo derivado. Si en Lomas del Bosque sale algo más sofisticado
-      (prorrateo por valor comercial, por densidad de uso), se itera.
-- [ ] **D4 — Los Encinos vs DILESA**. Confirmado: misma persona moral, solo
-      nickname. No requiere extender `core.empresas` ni crear tabla de
-      personas morales separada. Cierra como decisión, no como riesgo.
+      (prorrateo por valor comercial, por densidad de uso), se itera. Cierra
+      en Sprint 2 al diseñar el schema.
+- [ ] **D3 — Definición operativa del binding Unidad ↔ Producto**. ¿En qué
+      momento se "compromete" un binding y deja de ser reclasificable? ¿Al
+      firmar contrato de apartado, al firmar venta, al escriturar?
+      Operativamente para fraccionamiento, plaza en renta, plaza en venta y
+      complejo duplex puede ser distinto. Decisión a cerrar antes de Sprint
+      4 (UI de captura).
 - [ ] **Plantillas no-fraccionamiento**. Las plazas y duplex de Lomas del
       Bosque son los primeros proyectos no-vivienda con datos reales. Se
       aprenderán durante la ejecución, no se diseñarán de antemano.
-- [ ] **Definición operativa del binding Unidad ↔ Producto**. ¿En qué
-      momento se "compromete" un binding? ¿Al firmar contrato de
-      apartado, al firmar venta, al escriturar? Decisión a cerrar antes de
-      Sprint 3 (UI de captura).
+
+### Decisiones cerradas en la promoción
+
+- **Los Encinos = DILESA** — Desarrollo Inmobiliario Los Encinos S.A. de C.V.
+  es la misma persona moral; "DILESA" es solo nickname. No requiere extender
+  `core.empresas` ni crear tabla de personas morales.
+- **Corte limpio del schema viejo en Sprint 1** — los 4 módulos viejos
+  (`Terrenos`, `Anteproyectos`, `Proyectos`, `Prototipos`) nunca tuvieron
+  captura productiva, así que se borran al inicio en lugar de al final. Sin
+  riesgo de pérdida de data ni de flujos rotos. Los 4 anteproyectos vivos
+  se migran desde Coda directo al schema nuevo en Sprint 5.
 
 ## Decisiones registradas
 
