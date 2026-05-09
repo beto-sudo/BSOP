@@ -23,6 +23,8 @@ import {
 } from '@/components/module-page';
 import { CategoryFilterStrip } from '@/components/inventario/category-filter-strip';
 import { DesktopOnlyNotice } from '@/components/responsive';
+import { RequireAccess } from '@/components/require-access';
+
 import { useUrlFilters } from '@/hooks/use-url-filters';
 import { Combobox } from '@/components/ui/combobox';
 import { Badge } from '@/components/ui/badge';
@@ -127,7 +129,24 @@ const stockColumns: Column<StockItem>[] = [
  * @module Inventario — Stock (RDB)
  * @responsive desktop-only
  */
+/**
+ * Wrapper público — gate por sub-slug `rdb.inventario.stock`. El cuerpo con
+ * los hooks (`useUrlFilters` → `useSearchParams`) vive en
+ * `<InventarioStockBody>` para que `<RequireAccess>` decida si renderiza
+ * el body durante prerender. Sin esta separación, `useSearchParams` se
+ * ejecuta en el outer component y rompe el build de Next.js 16
+ * (missing-suspense-with-csr-bailout). Mismo patrón que
+ * `app/rdb/productos/recetas/page.tsx`.
+ */
 export default function InventarioStockPage() {
+  return (
+    <RequireAccess empresa="rdb" modulo="rdb.inventario.stock">
+      <InventarioStockBody />
+    </RequireAccess>
+  );
+}
+
+function InventarioStockBody() {
   // Stock state
   const [items, setItems] = useState<StockItem[]>([]);
   const [loadingStock, setLoadingStock] = useState(true);

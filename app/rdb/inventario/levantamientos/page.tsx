@@ -92,7 +92,7 @@ const columns: Column<LevantamientoRow>[] = [
  */
 export default function LevantamientosListaPage() {
   return (
-    <RequireAccess empresa="rdb" modulo="rdb.inventario">
+    <RequireAccess empresa="rdb" modulo="rdb.inventario.levantamientos">
       <LevantamientosListaInner />
     </RequireAccess>
   );

@@ -20,10 +20,10 @@ import { RoutedModuleTabs } from '@/components/module-page';
  * un wrapper extra cuando los pages ya tienen el suyo.
  */
 const TABS = [
-  { label: 'Catálogo', href: '/rdb/productos', exact: true },
-  { label: 'Recetas', href: '/rdb/productos/recetas' },
-  { label: 'Auditoría', href: '/rdb/productos/auditoria' },
-  { label: 'Análisis', href: '/rdb/productos/analisis' },
+  { label: 'Catálogo', href: '/rdb/productos', exact: true, module: 'rdb.productos.catalogo' },
+  { label: 'Recetas', href: '/rdb/productos/recetas', module: 'rdb.productos.recetas' },
+  { label: 'Auditoría', href: '/rdb/productos/auditoria', module: 'rdb.productos.auditoria' },
+  { label: 'Análisis', href: '/rdb/productos/analisis', module: 'rdb.productos.analisis' },
 ] as const;
 
 export default function ProductosLayout({ children }: { children: ReactNode }) {

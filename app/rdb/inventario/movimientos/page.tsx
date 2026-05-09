@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
 import { DesktopOnlyNotice } from '@/components/responsive';
+import { RequireAccess } from '@/components/require-access';
 import { RDB_EMPRESA_ID, type MovimientoRow } from '@/components/inventario/types';
 import { tipoColorClass, tipoLabel } from '@/components/inventario/utils';
 import { formatCurrency, formatDateTime } from '@/lib/format';
@@ -230,7 +231,7 @@ export default function InventarioMovimientosPage() {
   }, [movimientos, search, origenFilter]);
 
   return (
-    <>
+    <RequireAccess empresa="rdb" modulo="rdb.inventario.movimientos">
       <DesktopOnlyNotice module="Movimientos" />
       <div className="hidden sm:block">
         <ModuleFilters
@@ -288,6 +289,6 @@ export default function InventarioMovimientosPage() {
           />
         </ModuleContent>
       </div>
-    </>
+    </RequireAccess>
   );
 }

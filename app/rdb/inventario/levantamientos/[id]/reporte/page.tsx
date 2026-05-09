@@ -69,7 +69,7 @@ type FirmaRow = {
  */
 export default function ReportePage() {
   return (
-    <RequireAccess empresa="rdb" modulo="rdb.inventario">
+    <RequireAccess empresa="rdb" modulo="rdb.inventario.levantamientos">
       <ReporteInner />
     </RequireAccess>
   );

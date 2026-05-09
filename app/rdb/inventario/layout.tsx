@@ -1,5 +1,4 @@
 import { type ReactNode } from 'react';
-import { RequireAccess } from '@/components/require-access';
 import { ModulePage, ModuleHeader, RoutedModuleTabs } from '@/components/module-page';
 
 /**
@@ -14,24 +13,33 @@ import { ModulePage, ModuleHeader, RoutedModuleTabs } from '@/components/module-
  *
  * El strip de tabs vive aquí para que cualquier ruta del módulo (incluidos
  * sub-detalles profundos como `/levantamientos/[id]/capturar`) muestre la
- * misma navegación, manteniendo el contexto del módulo. `<RequireAccess>`
- * también vive aquí: aplica al árbol entero, los pages internos no lo
- * repiten.
+ * misma navegación, manteniendo el contexto del módulo.
+ *
+ * Cada `module` en el TABS array es un sub-slug que `<RoutedModuleTabs>`
+ * filtra automáticamente — tabs sin permiso quedan ocultas. Los gates de
+ * acceso viven en cada sub-page (ver iniciativa `submodule-permissions`),
+ * el layout solo monta tabs y wrapper visual.
  */
 const TABS = [
-  { label: 'Stock', href: '/rdb/inventario', exact: true },
-  { label: 'Movimientos', href: '/rdb/inventario/movimientos' },
-  { label: 'Levantamientos', href: '/rdb/inventario/levantamientos' },
+  { label: 'Stock', href: '/rdb/inventario', exact: true, module: 'rdb.inventario.stock' },
+  {
+    label: 'Movimientos',
+    href: '/rdb/inventario/movimientos',
+    module: 'rdb.inventario.movimientos',
+  },
+  {
+    label: 'Levantamientos',
+    href: '/rdb/inventario/levantamientos',
+    module: 'rdb.inventario.levantamientos',
+  },
 ] as const;
 
 export default function InventarioLayout({ children }: { children: ReactNode }) {
   return (
-    <RequireAccess empresa="rdb" modulo="rdb.inventario">
-      <ModulePage>
-        <ModuleHeader title="Inventario" subtitle="Control de stock y movimientos" />
-        <RoutedModuleTabs tabs={TABS} />
-        {children}
-      </ModulePage>
-    </RequireAccess>
+    <ModulePage>
+      <ModuleHeader title="Inventario" subtitle="Control de stock y movimientos" />
+      <RoutedModuleTabs tabs={TABS} />
+      {children}
+    </ModulePage>
   );
 }
