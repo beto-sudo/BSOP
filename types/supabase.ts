@@ -9238,6 +9238,7 @@ export type Database = {
           place_name: string | null
           service_charge: number | null
           status: string | null
+          superseded_by_order_id: string | null
           table_id: number | null
           table_name: string | null
           tax: number | null
@@ -9261,6 +9262,7 @@ export type Database = {
           place_name?: string | null
           service_charge?: number | null
           status?: string | null
+          superseded_by_order_id?: string | null
           table_id?: number | null
           table_name?: string | null
           tax?: number | null
@@ -9284,6 +9286,7 @@ export type Database = {
           place_name?: string | null
           service_charge?: number | null
           status?: string | null
+          superseded_by_order_id?: string | null
           table_id?: number | null
           table_name?: string | null
           tax?: number | null

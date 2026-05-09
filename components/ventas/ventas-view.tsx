@@ -106,10 +106,15 @@ export function VentasView() {
     try {
       const supabase = createSupabaseBrowserClient();
 
+      // Filtra fantasmas detectados por bug Waitry (cierres reabiertos que la
+      // cajera re-cierra → Waitry duplica con nuevo orderId). Iniciativa
+      // rdb-waitry-deduplicacion Sprint 1; en Sprint 3 se reemplaza por
+      // SELECT contra rdb.v_waitry_pedidos + toggle "Mostrar duplicados".
       let query = supabase
         .schema('rdb')
         .from('waitry_pedidos')
         .select('*')
+        .is('superseded_by_order_id', null)
         .order('timestamp', { ascending: false })
         .limit(10000);
       if (corteFilter !== 'all') {
