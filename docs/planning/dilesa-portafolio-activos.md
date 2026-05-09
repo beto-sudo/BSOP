@@ -64,8 +64,10 @@ usado productivamente, podemos cortar limpio sin pérdida.
   industrial, espectacular, casa, local, edificio). Detalle en
   [§ Modelo conceptual](#modelo-conceptual-propuesto).
 - **Caso piloto Lomas del Bosque cargado completo** en el schema nuevo (10.5
-  ha, 156 unidades, 1 proyecto madre + 4 streams de valor / sub-proyectos)
-  como prueba de fuego de la abstracción.
+  ha, 156 unidades, 1 proyecto madre + **4 streams de valor que se
+  descomponen en 7 sub-proyectos** — porque las 4 plazas comerciales son
+  sub-proyectos paralelos individuales, no uno consolidado) como prueba de
+  fuego de la abstracción.
 - **Schema viejo (`dilesa.terrenos`, `dilesa.anteproyectos`,
   `dilesa.proyectos`, `dilesa.prototipos` y derivadas) borrado en Sprint 1**
   (no al final) — greenfield para construir el modelo nuevo sin convivencia
@@ -173,7 +175,7 @@ lotificación (agosto 2023, vigente).
 | Comercial 2                                 | 3,547       | 3.4%     | 1 lote (plaza)           |
 | Comercial 3                                 | 1,605       | 1.5%     | 1 lote (plaza)           |
 | Comercial 4 (anchor)                        | 26,248      | 25.0%    | 1 lote (plaza)           |
-| Áreas verdes (5) + canales (2) + vialidades | ~36,700     | 34.1%    | infraestructura          |
+| Áreas verdes (5) + canales (2) + vialidades | ~35,700     | 34.0%    | infraestructura          |
 | **Total**                                   | **104,960** | **100%** | **156 vendibles**        |
 
 **Sub-proyectos (4 streams de valor):**
@@ -294,9 +296,12 @@ lotificación (agosto 2023, vigente).
   - `/dilesa/proyectos/[id]` — detalle de Proyecto con sub-proyectos,
     activos_input, activos_output, modelo financiero proyectado vs
     comprometido.
-  - **Test del riesgo principal**: capturar un contrato de renta de un
-    local de plaza tarda <2 minutos. Si chirría la UI, refactor antes de
-    seguir.
+  - **Test del riesgo principal**: registrar el alta de un Activo
+    jerárquico (ej. una plaza comercial nueva como Activo padre con 5
+    locales hijos, o un complejo duplex con 8 unidades hijas) tarda <2
+    minutos en captura. Si chirría la UI, refactor de la jerarquía antes
+    de seguir. (NB: esto NO incluye captura de contratos de renta vivos
+    — eso es operación continua, fuera de alcance v1.)
 - [ ] **Sprint 5 — Migrar los 3 anteproyectos restantes desde Coda + cierre**:
   - Loma Escondida (residencial, 27 lotes), Lomas de los Encinos
     (residencial, 354 lotes), Lomas de las Delicias (residencial, 163
@@ -342,17 +347,22 @@ lotificación (agosto 2023, vigente).
 - **Lomas del Bosque modelado completo en el schema nuevo** sin contorsiones
   (Sprint 3). Si requiere más de 2 ALTERs al schema base para entrar, la
   abstracción está mal y se itera antes de Sprint 4.
-- **Captura de un contrato de renta de un local de una plaza en <2 minutos**
-  con teclado en 1 mano (Sprint 4). Test del riesgo de sobre-modelado.
+- **Alta de un Activo jerárquico (plaza con N locales, o complejo duplex
+  con N unidades hijas) en <2 minutos** con teclado en 1 mano (Sprint 4).
+  Test del riesgo de sobre-modelado de la jerarquía padre/hijo. La
+  captura del contrato de renta vivo no aplica aquí — es operación
+  continua, fuera de alcance v1.
 - **Los 4 anteproyectos vivos en Coda** representados en el schema nuevo
   con su modelo financiero calculado al cierre (incluido Lomas del Bosque,
   que hoy no se puede en Coda).
 
 ## Riesgos / preguntas abiertas
 
-- [ ] **D1 — Sobre-modelar la jerarquía → UI lenta**. Si capturar un contrato
-      de renta de un local toma >2 minutos, la abstracción está mal aterrizada
-      en UI. Métrica de diseño explícita en Sprint 4.
+- [ ] **D1 — Sobre-modelar la jerarquía → UI lenta**. Si dar de alta un
+      Activo jerárquico (plaza padre + N locales hijos, o complejo duplex + N unidades hijas) toma >2 minutos, la abstracción está mal
+      aterrizada en UI. Métrica de diseño explícita en Sprint 4. La
+      captura del contrato de renta vivo está fuera de alcance v1
+      (operación continua), así que no es el caso de prueba.
 - [ ] **D2 — Cómo se modela la "regla de prorrateo" de CapEx compartido**.
       v1: regla declarativa por proyecto madre (default `m² beneficiados`),
       cálculo derivado. Si en Lomas del Bosque sale algo más sofisticado
