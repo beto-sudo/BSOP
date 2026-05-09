@@ -327,3 +327,19 @@ Tras aplicar la migración con psql, regenerar
 
 Ver iniciativa `modulos-catalog` (cerrada 2026-04-28) para el contexto
 y ADR-014 para la taxonomía de secciones.
+
+---
+
+## Mantenimiento del doc master de arquitectura
+
+`docs/architecture/ARCHITECTURE.md` es el mapa-índice canónico del stack BSOP. Vive como punto de entrada para sesiones nuevas (humanas o CC) — apunta a los ADRs autoritativos por tema en lugar de duplicar su contenido. Para que no envejezca como el original (refresh 2026-05-09 vía iniciativa `architecture-master`), seguir esta regla blanda:
+
+- **Al crear un ADR nuevo** (en `docs/adr/` o `supabase/adr/`) → agregar 1 línea al índice de §5 en `ARCHITECTURE.md`, en la sección que corresponda (Layout / Forms / Feedback / Cross-cutting / Data-DB).
+- **Al cambiar el stack** (versión mayor de Next/React/Supabase, runtime nuevo, capa nueva como Vercel Services o Edge Functions) → refresh §1 (mapa de capas mermaid) y §3 (Stack).
+- **Al introducir un schema nuevo en Postgres** → agregar a §2 (DB layer) y al diagrama mermaid de schemas en §2.
+- **Al promover una iniciativa que estaba listada como topic open** → quitar la entrada de §8.
+- **Al detectar un anti-patrón nuevo o renombrar un patrón canónico** → actualizar §6 (reglas duras) y/o §5 (índice).
+
+No se requiere PR dedicado para estos micro-updates: viajan piggyback en el PR que introduce el cambio (ADR nuevo, migración de schema, dep upgrade, etc.).
+
+Si en 2-3 meses el doc se desincroniza pese a esta regla, escalar a un ADR-030 "Architecture-as-Index" formal con proceso explícito (qué CI valida, cuándo declarar stale, ownership).
