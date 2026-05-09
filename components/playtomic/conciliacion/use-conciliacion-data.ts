@@ -198,21 +198,32 @@ export function useConciliacionData(options?: { extraBookingId?: string | null }
         if (canchaErr) throw canchaErr;
 
         // Paso 2: con los order_ids que tienen Renta Cancha Padel, fetcheamos
-        // TODOS los items de esos pedidos (incluye F&B, otros productos) — usa
-        // `.in()` con un set acotado, ya no choca con el cap default.
+        // TODOS los items de esos pedidos (incluye F&B, otros productos).
+        // Chunkeamos `.in('order_id', ...)` por la misma razón que el resto:
+        // con 120d de lookback el set llega a miles y la URL excede los ~8KB
+        // de Cloudflare/PostgREST → HTTP 400 Bad Request.
         const candidateOrderIds = Array.from(
           new Set((canchaProductos ?? []).map((p) => p.order_id))
         );
         let waitryProductos: WaitryProductoRow[] = canchaProductos ?? [];
         if (candidateOrderIds.length > 0) {
-          const { data: allItems, error: itemsErr } = await rdb
-            .from('waitry_productos')
-            .select('order_id,product_name,unit_price,quantity,total_price')
-            .in('order_id', candidateOrderIds)
-            .limit(20000)
-            .returns<WaitryProductoRow[]>();
-          if (itemsErr) throw itemsErr;
-          if (allItems && allItems.length > 0) waitryProductos = allItems;
+          const orderIdChunks = chunkArray(candidateOrderIds, BOOKING_ID_CHUNK);
+          const itemResponses = await Promise.all(
+            orderIdChunks.map((chunk) =>
+              rdb
+                .from('waitry_productos')
+                .select('order_id,product_name,unit_price,quantity,total_price')
+                .in('order_id', chunk)
+                .limit(20000)
+                .returns<WaitryProductoRow[]>()
+            )
+          );
+          const allItems: WaitryProductoRow[] = [];
+          for (const res of itemResponses) {
+            if (res.error) throw res.error;
+            if (res.data) allItems.push(...res.data);
+          }
+          if (allItems.length > 0) waitryProductos = allItems;
         }
 
         const bookingsList = pendingBookings ?? [];
