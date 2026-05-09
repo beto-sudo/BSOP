@@ -24,6 +24,13 @@ import {
 import { CategoryFilterStrip } from '@/components/inventario/category-filter-strip';
 import { DesktopOnlyNotice } from '@/components/responsive';
 import { RequireAccess } from '@/components/require-access';
+
+// Stock usa `useUrlFilters` (lee `useSearchParams`), requiere dynamic
+// rendering. Antes el `<RequireAccess>` del layout forzaba el bail-out de
+// prerender; al moverlo a cada sub-page (sub-slug pattern, iniciativa
+// `submodule-permissions`), el marker explícito viaja con la page que lo
+// necesita.
+export const dynamic = 'force-dynamic';
 import { useUrlFilters } from '@/hooks/use-url-filters';
 import { Combobox } from '@/components/ui/combobox';
 import { Badge } from '@/components/ui/badge';
