@@ -2,8 +2,8 @@
 
 **Estado:** in_progress
 **Empresas:** RDB
-**Schemas:** `rdb` (`waitry_pedidos`, `v_waitry_pedidos`, función + trigger)
-**Última actualización:** 2026-05-09
+**Schemas:** `rdb` (`waitry_pedidos.superseded_by_order_id`, `waitry_items_signature`, `detect_waitry_fantasma`, `refresh_waitry_superseded`, triggers en `waitry_pedidos`+`waitry_productos`)
+**Última actualización:** 2026-05-09 (Sprint 2 mergeable)
 
 > **Diferencia vs `rdb-waitry-ingesta-dedup`** (cerrada 2026-05-06):
 > esa iniciativa atacaba duplicados por **doble-tap del operador** en
@@ -81,7 +81,11 @@ condiciones se cumplen:
    `rdb.waitry_productos`
 4. `paid = true` en ambos
 5. `B.timestamp - A.timestamp <= 15 minutos`
-6. A.timestamp < B.timestamp (B es el segundo en aparecer)
+6. `A.timestamp < B.timestamp` (B es el segundo en aparecer); si los
+   timestamps son **idénticos** (caso real observado en `16421246`
+   ↔ `16421247`, mismo `2026-03-07 01:33:31`), se rompe el empate por
+   `A.order_id < B.order_id` — Waitry numera los `orderId` de forma
+   secuencial, así que el menor es el original.
 7. A.status NO está cancelado al momento de evaluar (si A se cancela
    posteriormente, se invierte: B se promueve a canónico)
 
@@ -192,7 +196,22 @@ rdb.waitry_pedidos`. (`security_invoker=on` per
 
 ## Bitácora
 
-(vacío — append on PR)
+- **2026-05-09 — Sprint 1 mergeado** ([PR #464](https://github.com/beto-sudo/BSOP/pull/464)).
+  Schema delta + UPDATE puntual de los 2 fantasmas detectados hoy +
+  filtro inline en 3 readers (`/rdb/ventas` view + por-producto + `/rdb/home` KPIs).
+  Corte del día corregido: 7 pedidos / $1,795 (no 9 / $2,445).
+- **2026-05-09 — Sprint 2 mergeable** (este PR).
+  Función `rdb.detect_waitry_fantasma(text)` + helper
+  `rdb.waitry_items_signature(text)` + `rdb.refresh_waitry_superseded(text)`
+  - triggers AFTER en `waitry_pedidos` (cols clave) y `waitry_productos`
+    con guard `pg_trigger_depth() > 1`. Backfill SQL nativo (CTE + self-join)
+    marcó los 37 fantasmas históricos restantes; total ahora 39 marcados.
+    Refinamiento de heurística durante backfill: timestamps idénticos
+    (caso real `16421246`↔`16421247`) requirieron tiebreaker por
+    `order_id`. 4 smoke tests pasan: par sintético, items distintos,
+    cascada cancelación, span > 15 min. Index nuevo
+    `waitry_pedidos_external_delivery_id_idx` (parcial WHERE NOT NULL AND
+    paid=TRUE) acelera lookups del trigger live.
 
 ## Riesgos y mitigaciones
 

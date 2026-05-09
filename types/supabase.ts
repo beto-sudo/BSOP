@@ -9886,6 +9886,7 @@ export type Database = {
         Args: { p_products: Json; p_table_name: string; p_total_amount: number }
         Returns: string
       }
+      detect_waitry_fantasma: { Args: { p_order_id: string }; Returns: string }
       fn_inventario_al_corte: {
         Args: { p_fecha: string }
         Returns: {
@@ -9910,6 +9911,10 @@ export type Database = {
       parse_waitry_timestamptz: {
         Args: { p_fallback_tz?: string; p_value: Json }
         Returns: string
+      }
+      refresh_waitry_superseded: {
+        Args: { p_order_id: string }
+        Returns: boolean
       }
       upsert_corte: {
         Args: {
@@ -9954,6 +9959,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      waitry_items_signature: { Args: { p_order_id: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never
