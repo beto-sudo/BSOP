@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { assertNotInPreview } from '@/lib/auth/preview-guard';
 import { parsePaymentsCsv } from '@/lib/playtomic/csv-import';
+import { upsertPaymentsRows } from '@/lib/playtomic/payments-import-upsert';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 
 export type ImportPaymentsResult =
@@ -17,8 +18,6 @@ export type ImportPaymentsResult =
       payment_date_max: string | null;
     }
   | { ok: false; error: string };
-
-const BATCH_SIZE = 100;
 
 export async function importPaymentsCsv(formData: FormData): Promise<ImportPaymentsResult> {
   await assertNotInPreview();
@@ -54,61 +53,13 @@ export async function importPaymentsCsv(formData: FormData): Promise<ImportPayme
     };
   }
 
-  const playtomicSchema = supabase.schema('playtomic');
-
-  // Pre-query: identifica cuáles existen para reportar insertados vs actualizados.
-  const paymentIds = rows.map((r) => r.payment_id);
-  const existingIds = new Set<string>();
-  const idChunkSize = 500;
-  for (let i = 0; i < paymentIds.length; i += idChunkSize) {
-    const chunk = paymentIds.slice(i, i + idChunkSize);
-    const { data: existing, error: existingErr } = await playtomicSchema
-      .from('payments_import')
-      .select('payment_id')
-      .in('payment_id', chunk);
-    if (existingErr) {
-      return { ok: false, error: `Error consultando existentes: ${existingErr.message}` };
-    }
-    for (const row of existing ?? []) existingIds.add(row.payment_id);
+  const result = await upsertPaymentsRows(supabase, rows, {
+    uploadedBy: user.id,
+    sourceFilename: file.name,
+  });
+  if (!result.ok) {
+    return { ok: false, error: result.error };
   }
-
-  const uploadedAt = new Date().toISOString();
-  const sourceFilename = file.name;
-
-  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    const batch = rows.slice(i, i + BATCH_SIZE).map((r) => ({
-      ...r,
-      uploaded_by: user.id,
-      uploaded_at: uploadedAt,
-      source_filename: sourceFilename,
-    }));
-    const { error: upsertErr } = await playtomicSchema
-      .from('payments_import')
-      .upsert(batch, { onConflict: 'payment_id' });
-    if (upsertErr) {
-      return {
-        ok: false,
-        error: `Error en upsert (batch ${Math.floor(i / BATCH_SIZE) + 1}): ${upsertErr.message}`,
-      };
-    }
-  }
-
-  // Métricas para el resumen post-upload.
-  let serviceMin: string | null = null;
-  let serviceMax: string | null = null;
-  let paymentMax: string | null = null;
-  for (const row of rows) {
-    if (row.service_date) {
-      if (!serviceMin || row.service_date < serviceMin) serviceMin = row.service_date;
-      if (!serviceMax || row.service_date > serviceMax) serviceMax = row.service_date;
-    }
-    if (row.payment_date) {
-      if (!paymentMax || row.payment_date > paymentMax) paymentMax = row.payment_date;
-    }
-  }
-
-  const rowsUpdated = rows.filter((r) => existingIds.has(r.payment_id)).length;
-  const rowsInserted = rows.length - rowsUpdated;
 
   revalidatePath('/rdb/playtomic/import-csv');
   revalidatePath('/rdb/playtomic/conciliacion');
@@ -117,11 +68,11 @@ export async function importPaymentsCsv(formData: FormData): Promise<ImportPayme
   return {
     ok: true,
     total_in_csv: rows.length,
-    rows_inserted: rowsInserted,
-    rows_updated: rowsUpdated,
+    rows_inserted: result.rows_inserted,
+    rows_updated: result.rows_updated,
     parse_errors: errors,
-    service_date_min: serviceMin,
-    service_date_max: serviceMax,
-    payment_date_max: paymentMax,
+    service_date_min: result.service_date_min,
+    service_date_max: result.service_date_max,
+    payment_date_max: result.payment_date_max,
   };
 }
