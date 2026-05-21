@@ -27,56 +27,78 @@
 --
 --   Lista de las 19 altas revisada y aprobada explícitamente por Beto
 --   (2026-05-21) antes de aplicar.
+--
+-- ROBUSTEZ:
+--   Los INSERT se condicionan a que la empresa RDB exista en core.empresas
+--   (JOIN) y a que la categoría / codigo no estén ya presentes (NOT
+--   EXISTS). Así la migración es idempotente y no-op en branches sin los
+--   datos de producción (ej. Supabase Preview), donde core.empresas está
+--   vacía y un INSERT directo violaría la FK empresa_id.
 
-WITH nuevas_categorias AS (
-  INSERT INTO erp.categorias_producto (empresa_id, nombre, color, orden)
-  VALUES
-    ('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid, 'Torneos',       '#e11d48', 91),
-    ('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid, 'Academias',     '#ea580c', 92),
-    ('e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid, 'Uso de cancha', '#0d9488', 93)
-  RETURNING id, nombre
-),
-productos_nuevos (codigo, nombre, categoria) AS (
-  VALUES
-    ('1298687', 'Torneo Pádel Open',                   'Torneos'),
-    ('1364566', 'Torneo Tenis Open',                   'Torneos'),
-    ('1298690', 'Rey de la Cancha',                    'Torneos'),
-    ('1402244', 'Torneo del amor y la amistad',        'Torneos'),
-    ('1298688', 'Reina de la Cancha',                  'Torneos'),
-    ('1298704', 'Torneo Tenis Open (2da categoría)',   'Torneos'),
-    ('1364565', 'Minitenis Tenis Open (con playera)',  'Torneos'),
-    ('1441142', 'Torneo del día de las madres',        'Torneos'),
-    ('1364567', 'Minitenis Tenis Open',                'Torneos'),
-    ('1363790', 'Torneo Master Class',                 'Torneos'),
-    ('1298709', 'Academia Tenis',                      'Academias'),
-    ('1298695', 'Clase privada (Carlos)',              'Academias'),
-    ('1436058', 'Clínica especializada',               'Academias'),
-    ('1298705', 'Clase particular (Aníbal)',           'Academias'),
-    ('1298701', 'Uso de cancha con coach',             'Uso de cancha'),
-    ('1298713', 'Uso de cancha con coach (Aníbal)',    'Uso de cancha'),
-    ('1298712', 'Uso de cancha con coach PREMIUM',     'Uso de cancha'),
-    ('1298700', 'Uso de cancha con coach PREMIUM (Omar)', 'Uso de cancha'),
-    ('1435704', 'Uso de cancha con coach PREMIUM (Hugo)', 'Uso de cancha')
-)
+-- 1. Categorías nuevas — solo si la empresa RDB existe y aún no están.
+INSERT INTO erp.categorias_producto (empresa_id, nombre, color, orden)
+SELECT e.id, v.nombre, v.color, v.orden
+FROM (VALUES
+  ('Torneos',       '#e11d48', 91),
+  ('Academias',     '#ea580c', 92),
+  ('Uso de cancha', '#0d9488', 93)
+) AS v(nombre, color, orden)
+JOIN core.empresas e ON e.id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
+WHERE NOT EXISTS (
+  SELECT 1 FROM erp.categorias_producto c
+  WHERE c.empresa_id = e.id AND c.nombre = v.nombre
+);
+
+-- 2. Productos-servicio — codigo = product_id de Waitry. Solo si la
+--    empresa existe y el codigo aún no está en su catálogo.
 INSERT INTO erp.productos (empresa_id, categoria_id, codigo, nombre, tipo, unidad, inventariable, activo)
-SELECT
-  'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid,
-  nc.id,
-  pn.codigo,
-  pn.nombre,
-  'servicio',
-  'pieza',
-  false,
-  true
-FROM productos_nuevos pn
-JOIN nuevas_categorias nc ON nc.nombre = pn.categoria;
+SELECT e.id, c.id, v.codigo, v.nombre, 'servicio', 'pieza', false, true
+FROM (VALUES
+  ('1298687', 'Torneo Pádel Open',                   'Torneos'),
+  ('1364566', 'Torneo Tenis Open',                   'Torneos'),
+  ('1298690', 'Rey de la Cancha',                    'Torneos'),
+  ('1402244', 'Torneo del amor y la amistad',        'Torneos'),
+  ('1298688', 'Reina de la Cancha',                  'Torneos'),
+  ('1298704', 'Torneo Tenis Open (2da categoría)',   'Torneos'),
+  ('1364565', 'Minitenis Tenis Open (con playera)',  'Torneos'),
+  ('1441142', 'Torneo del día de las madres',        'Torneos'),
+  ('1364567', 'Minitenis Tenis Open',                'Torneos'),
+  ('1363790', 'Torneo Master Class',                 'Torneos'),
+  ('1298709', 'Academia Tenis',                      'Academias'),
+  ('1298695', 'Clase privada (Carlos)',              'Academias'),
+  ('1436058', 'Clínica especializada',               'Academias'),
+  ('1298705', 'Clase particular (Aníbal)',           'Academias'),
+  ('1298701', 'Uso de cancha con coach',             'Uso de cancha'),
+  ('1298713', 'Uso de cancha con coach (Aníbal)',    'Uso de cancha'),
+  ('1298712', 'Uso de cancha con coach PREMIUM',     'Uso de cancha'),
+  ('1298700', 'Uso de cancha con coach PREMIUM (Omar)', 'Uso de cancha'),
+  ('1435704', 'Uso de cancha con coach PREMIUM (Hugo)', 'Uso de cancha')
+) AS v(codigo, nombre, categoria)
+JOIN core.empresas e ON e.id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
+JOIN erp.categorias_producto c ON c.empresa_id = e.id AND c.nombre = v.categoria
+WHERE NOT EXISTS (
+  SELECT 1 FROM erp.productos p
+  WHERE p.empresa_id = e.id AND p.codigo = v.codigo
+);
 
--- Verificación inline: 3 categorías nuevas + 19 productos en ellas.
+-- Verificación inline — estricta solo donde la empresa RDB existe
+-- (producción). En branches sin datos la migración es no-op y pasa igual.
 DO $$
 DECLARE
+  v_empresa_existe boolean;
   v_cats  integer;
   v_prods integer;
 BEGIN
+  SELECT EXISTS (
+    SELECT 1 FROM core.empresas
+    WHERE id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
+  ) INTO v_empresa_existe;
+
+  IF NOT v_empresa_existe THEN
+    RAISE NOTICE 'Empresa RDB ausente (branch sin datos de producción) — migración no-op.';
+    RETURN;
+  END IF;
+
   SELECT count(*) INTO v_cats
   FROM erp.categorias_producto
   WHERE empresa_id = 'e52ac307-9373-4115-b65e-1178f0c4e1aa'::uuid
