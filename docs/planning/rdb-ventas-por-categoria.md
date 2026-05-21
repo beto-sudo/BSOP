@@ -3,9 +3,10 @@
 **Slug:** `rdb-ventas-por-categoria`
 **Empresas:** RDB
 **Schemas afectados:** `rdb` (vista nueva `v_waitry_productos_categoria`), `erp` (lectura de `productos` + `categorias_producto`; alta de productos-servicio en Sprint 2)
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-05-21
+**Cerrada:** 2026-05-21
 **Última actualización:** 2026-05-21
 
 > Promovida el 2026-05-21 después de revisar el módulo de ventas de RDB
@@ -164,7 +165,7 @@ Datos de catálogo relevantes para el diseño de la vista:
 - **Sprint 1 — Vista DB + tab "Por categoría".** ✅ Entregado.
 - **Sprint 2 — Limpieza del catálogo (servicios deportivos).** ✅ Entregado.
 - **Sprint 3 — Mejoras de UX: columna categoría + drill-down.** ✅ Entregado.
-- **Sprint 4 — Cierre.** Pendiente verificación visual de Beto en preview.
+- **Sprint 4 — Cierre.** ✅ Cerrada 2026-05-21.
 
 ## Decisiones registradas
 
@@ -259,3 +260,17 @@ Mejoras pedidas por Beto tras revisar el tab en preview:
 Sin cambios de schema ni DB — todo es capa de UI sobre la vista de
 Sprint 1. Próximo: Sprint 4 — verificación visual de Beto en preview y
 cierre de la iniciativa.
+
+### 2026-05-21 · Sprint 4 — cierre
+
+Beto verificó el módulo de Ventas en producción: "se ve bien". Los tres
+sprints quedaron mergeados (#474 Sprint 1+2, #476 Sprint 3). Resultado
+final del tab "Por categoría" en `/rdb/ventas`: desglose de ventas por
+categoría para cualquier rango/corte (~98% del importe categorizado tras
+el alta de servicios deportivos), columna de categoría en "Por producto"
+y drill-down clicable entre ambos tabs.
+
+Barrido de Reminders (`Claude 🧭`): sin pendientes de la iniciativa —
+las sub-tareas vivieron en TodoWrite y murieron con cada sesión.
+Iniciativa movida a `## Done` en `INITIATIVES.md`. Estado
+`in_progress → done`.
