@@ -7,6 +7,8 @@ export type EffectiveUser = {
   /** `core.usuarios.id` of the effective user (real or impersonated). */
   id: string;
   email: string;
+  /** `core.usuarios.first_name`; null when not set. Drives the `/inicio` greeting. */
+  firstName: string | null;
   isAdmin: boolean;
   /** True only when the caller is admin AND a preview cookie is active. */
   isPreviewing: boolean;
@@ -44,7 +46,7 @@ export async function getEffectiveUser(
   const { data: caller } = await admin
     .schema('core')
     .from('usuarios')
-    .select('id, email, rol, activo')
+    .select('id, email, rol, activo, first_name')
     .eq('email', callerEmail)
     .eq('activo', true)
     .maybeSingle();
@@ -54,6 +56,7 @@ export async function getEffectiveUser(
   const callerSelf: EffectiveUser = {
     id: caller.id,
     email: caller.email,
+    firstName: caller.first_name ?? null,
     isAdmin: caller.rol === 'admin',
     isPreviewing: false,
   };
@@ -66,7 +69,7 @@ export async function getEffectiveUser(
   const { data: target } = await admin
     .schema('core')
     .from('usuarios')
-    .select('id, email, rol, activo')
+    .select('id, email, rol, activo, first_name')
     .eq('id', previewUserId)
     .eq('activo', true)
     .maybeSingle();
@@ -76,6 +79,7 @@ export async function getEffectiveUser(
   return {
     id: target.id,
     email: target.email,
+    firstName: target.first_name ?? null,
     isAdmin: target.rol === 'admin',
     isPreviewing: true,
   };

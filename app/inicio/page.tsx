@@ -30,8 +30,8 @@ export default function InicioPage() {
   const [callerName, setCallerName] = useState<string>('');
 
   useEffect(() => {
-    // Fallback to auth metadata only when there's no effective user yet
-    // (e.g. /api/me hasn't returned). Once effective is available, that wins.
+    // Auth-metadata fallback for the greeting name: used while /api/me is
+    // still loading, or when the effective user has no first_name on record.
     const supabase = createSupabaseBrowserClient();
     supabase.auth.getUser().then(({ data }) => {
       const meta = data?.user?.user_metadata as
@@ -47,7 +47,7 @@ export default function InicioPage() {
     });
   }, []);
 
-  const userName = effective?.email ? effective.email.split('@')[0] : callerName;
+  const userName = effective?.firstName || callerName;
 
   return (
     <ContentShell>

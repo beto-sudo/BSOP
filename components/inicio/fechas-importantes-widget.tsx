@@ -22,6 +22,7 @@ type Cumpleanero = {
   persona_id: string;
   nombre_completo: string;
   fecha_nacimiento: string; // YYYY-MM-DD
+  departamento: string | null;
 };
 
 type EventoItem =
@@ -125,7 +126,7 @@ export function FechasImportantesWidget() {
         const { data: emp, error: empErr } = await supabase
           .schema('erp')
           .from('v_empleados_full')
-          .select('persona_id, nombre_completo, fecha_nacimiento, empleado_activo')
+          .select('persona_id, nombre_completo, fecha_nacimiento, departamento, empleado_activo')
           .in('empresa_id', empresaIds)
           .not('fecha_nacimiento', 'is', null)
           .eq('empleado_activo', true);
@@ -137,6 +138,7 @@ export function FechasImportantesWidget() {
             persona_id: string | null;
             nombre_completo: string | null;
             fecha_nacimiento: string | null;
+            departamento: string | null;
           }>;
           const byPersona = new Map<string, Cumpleanero>();
           for (const r of rows) {
@@ -146,6 +148,7 @@ export function FechasImportantesWidget() {
               persona_id: r.persona_id,
               nombre_completo: r.nombre_completo ?? '—',
               fecha_nacimiento: r.fecha_nacimiento,
+              departamento: r.departamento ?? null,
             });
           }
           setCumples([...byPersona.values()]);
@@ -181,7 +184,7 @@ export function FechasImportantesWidget() {
         fecha: prox,
         diasFaltan: dias,
         label: c.nombre_completo,
-        subLabel: 'Cumpleaños',
+        subLabel: c.departamento ? `Cumpleaños · ${c.departamento}` : 'Cumpleaños',
       });
     }
 
@@ -266,7 +269,7 @@ export function FechasImportantesWidget() {
                     <Icon className="h-4 w-4" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="line-clamp-1 text-sm font-medium text-[var(--text)]">{e.label}</p>
+                    <p className="line-clamp-2 text-sm font-medium text-[var(--text)]">{e.label}</p>
                     <p className="line-clamp-1 text-xs text-[var(--text)]/50">{e.subLabel}</p>
                   </div>
                   <div className="shrink-0 text-right">
