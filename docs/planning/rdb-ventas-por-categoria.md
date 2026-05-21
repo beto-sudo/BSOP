@@ -162,9 +162,8 @@ Datos de catálogo relevantes para el diseño de la vista:
 ## Sprints / hitos
 
 - **Sprint 1 — Vista DB + tab "Por categoría".** ✅ Entregado.
-- **Sprint 2 — Limpieza del top-15.** Paralelo a Sprint 1; bloqueado en
-  aprobación de Beto del mapeo `product_id → categoría`.
-- **Sprint 3 — Cierre.** Pendiente Sprints 1 + 2.
+- **Sprint 2 — Limpieza del catálogo (servicios deportivos).** ✅ Entregado.
+- **Sprint 3 — Cierre.** Pendiente verificación visual de Beto en preview.
 
 ## Decisiones registradas
 
@@ -216,3 +215,25 @@ verificación visual del tab queda para Beto en preview.
 Estado de la iniciativa: `planned → in_progress`. Próximo: Sprint 2
 (limpieza del catálogo — requiere decisión de Beto sobre el mapeo de
 categorías de los servicios deportivos del top-15).
+
+### 2026-05-21 · Sprint 2 — alta de servicios deportivos en el catálogo (este PR)
+
+Migración `20260521164159_rdb_ventas_categoria_alta_servicios_deportivos.sql`:
+3 categorías nuevas en `erp.categorias_producto` (Torneos, Academias,
+Uso de cancha — orden 91-93) + 19 productos en `erp.productos` con
+`codigo` = `product_id` de Waitry. Lista revisada y aprobada
+explícitamente por Beto antes de aplicar.
+
+Hallazgo: Waitry **reutiliza `product_id`** entre productos (ej. 1298687
+factura "Torneo Pádel Open" y "Torneo Master Class"). Por eso se dio de
+alta 1 producto por `product_id` distinto, con nombre representativo;
+todos los IDs reusados agrupan productos de la misma familia, así que la
+categoría sale correcta. El mapping estable es alcance de la iniciativa
+`rdb-waitry-catalog-sync`.
+
+Cobertura post-alta (verificada vía la vista): "Sin categoría" bajó de
+24.7% a **2.1%** del importe; el ~98% restante quedó categorizado.
+Torneos quedó en 19.4% (~$575k), Academias y Uso de cancha en 1.6% c/u.
+Supera la meta de ≥95%.
+
+Próximo: Sprint 3 — verificación visual de Beto en preview y cierre.
