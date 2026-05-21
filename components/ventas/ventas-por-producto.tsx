@@ -7,12 +7,17 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { DataTable, type Column } from '@/components/module-page';
 import { formatCurrency } from '@/lib/format';
-import { Download, Package, Search } from 'lucide-react';
+import { Download, Package, Search, X } from 'lucide-react';
 import { TZ } from './utils';
+import { CategoriaBadge } from './categoria-badge';
+import type { CategoriaFilter } from './types';
 
 type ProductoAgg = {
   product_id: string;
   product_name: string;
+  categoria_id: string | null;
+  categoria_nombre: string | null;
+  categoria_color: string | null;
   unidades: number;
   importe: number;
   pedidos: number;
@@ -20,10 +25,13 @@ type ProductoAgg = {
   pct_total: number;
 };
 
-type WaitryItemRow = {
+type CategoriaItemRow = {
   order_id: string;
   product_id: string | null;
   product_name: string;
+  categoria_id: string | null;
+  categoria_nombre: string | null;
+  categoria_color: string | null;
   quantity: number | null;
   total_price: number | null;
 };
@@ -34,6 +42,8 @@ export type VentasPorProductoProps = {
   corteFilter: string;
   search: string;
   onSearchChange: (value: string) => void;
+  categoriaFilter: CategoriaFilter | null;
+  onClearCategoriaFilter: () => void;
 };
 
 export function VentasPorProducto({
@@ -42,6 +52,8 @@ export function VentasPorProducto({
   corteFilter,
   search,
   onSearchChange,
+  categoriaFilter,
+  onClearCategoriaFilter,
 }: VentasPorProductoProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -82,17 +94,21 @@ export function VentasPorProducto({
         return;
       }
 
+      // v_waitry_productos_categoria enriquece cada línea con su categoría
+      // del catálogo (rdb-ventas-por-categoria Sprint 1).
       const CHUNK = 500;
-      const allItems: WaitryItemRow[] = [];
+      const allItems: CategoriaItemRow[] = [];
       for (let i = 0; i < validOrderIds.length; i += CHUNK) {
         const chunk = validOrderIds.slice(i, i + CHUNK);
         const { data: items, error: itemsErr } = await supabase
           .schema('rdb')
-          .from('waitry_productos')
-          .select('order_id, product_id, product_name, quantity, total_price')
+          .from('v_waitry_productos_categoria')
+          .select(
+            'order_id, product_id, product_name, categoria_id, categoria_nombre, categoria_color, quantity, total_price'
+          )
           .in('order_id', chunk);
         if (itemsErr) throw itemsErr;
-        allItems.push(...((items ?? []) as WaitryItemRow[]));
+        allItems.push(...((items ?? []) as CategoriaItemRow[]));
       }
 
       const agg = new Map<
@@ -100,6 +116,9 @@ export function VentasPorProducto({
         {
           product_id: string;
           product_name: string;
+          categoria_id: string | null;
+          categoria_nombre: string | null;
+          categoria_color: string | null;
           unidades: number;
           importe: number;
           ordersSet: Set<string>;
@@ -119,6 +138,11 @@ export function VentasPorProducto({
           agg.set(key, {
             product_id: it.product_id ?? key,
             product_name: it.product_name,
+            // Un product_id resuelve siempre a la misma categoría vía la
+            // vista, así que la primera línea define la del producto.
+            categoria_id: it.categoria_id,
+            categoria_nombre: it.categoria_nombre,
+            categoria_color: it.categoria_color,
             unidades,
             importe,
             ordersSet: new Set([it.order_id]),
@@ -130,6 +154,9 @@ export function VentasPorProducto({
       const result: ProductoAgg[] = Array.from(agg.values()).map((a) => ({
         product_id: a.product_id,
         product_name: a.product_name,
+        categoria_id: a.categoria_id,
+        categoria_nombre: a.categoria_nombre,
+        categoria_color: a.categoria_color,
         unidades: a.unidades,
         importe: a.importe,
         pedidos: a.ordersSet.size,
@@ -150,10 +177,21 @@ export function VentasPorProducto({
   }, [fetchData]);
 
   const filtered = useMemo(() => {
-    if (!search) return rows;
-    const q = search.toLowerCase();
-    return rows.filter((r) => r.product_name.toLowerCase().includes(q));
-  }, [rows, search]);
+    let r = rows;
+    // Filtro de categoría — llega del drill-down desde el tab "Por
+    // categoría". id null = fila "Sin categoría".
+    if (categoriaFilter) {
+      r =
+        categoriaFilter.id === null
+          ? r.filter((x) => x.categoria_id == null)
+          : r.filter((x) => x.categoria_id === categoriaFilter.id);
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      r = r.filter((x) => x.product_name.toLowerCase().includes(q));
+    }
+    return r;
+  }, [rows, search, categoriaFilter]);
 
   const totals = useMemo(
     () => ({
@@ -165,7 +203,15 @@ export function VentasPorProducto({
   );
 
   const exportCsv = () => {
-    const header = ['Producto', 'Unidades', 'Importe', 'Pedidos', 'Ticket prom.', '% del total'];
+    const header = [
+      'Producto',
+      'Categoría',
+      'Unidades',
+      'Importe',
+      'Pedidos',
+      'Ticket prom.',
+      '% del total',
+    ];
     const lines = [header.join(',')];
     // Sort by importe desc to match the visible table default sort.
     const sorted = [...filtered].sort((a, b) => b.importe - a.importe);
@@ -173,6 +219,7 @@ export function VentasPorProducto({
       lines.push(
         [
           `"${r.product_name.replace(/"/g, '""')}"`,
+          `"${(r.categoria_nombre ?? 'Sin categoría').replace(/"/g, '""')}"`,
           r.unidades.toString(),
           r.importe.toFixed(2),
           r.pedidos.toString(),
@@ -227,6 +274,20 @@ export function VentasPorProducto({
             className="pl-9"
           />
         </div>
+        {categoriaFilter && (
+          <div className="flex items-center gap-1.5 rounded-lg border bg-muted/40 py-1 pl-2 pr-1">
+            <span className="text-xs text-muted-foreground">Categoría:</span>
+            <CategoriaBadge nombre={categoriaFilter.nombre} color={categoriaFilter.color} />
+            <button
+              type="button"
+              onClick={onClearCategoriaFilter}
+              className="rounded p-0.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              aria-label="Quitar filtro de categoría"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
         <Button
           variant="outline"
           size="sm"
@@ -247,7 +308,11 @@ export function VentasPorProducto({
         onRetry={() => void fetchData()}
         initialSort={{ key: 'importe', dir: 'desc' }}
         emptyIcon={<Package className="h-8 w-8 opacity-50" />}
-        emptyTitle="Sin ventas en el rango seleccionado"
+        emptyTitle={
+          categoriaFilter
+            ? `Sin ventas de ${categoriaFilter.nombre} en el rango seleccionado`
+            : 'Sin ventas en el rango seleccionado'
+        }
         showDensityToggle={false}
       />
     </div>
@@ -259,6 +324,13 @@ const productoColumns: Column<ProductoAgg>[] = [
     key: 'product_name',
     label: 'Producto',
     cellClassName: 'font-medium',
+  },
+  {
+    key: 'categoria_nombre',
+    label: 'Categoría',
+    render: (r) => (
+      <CategoriaBadge nombre={r.categoria_nombre ?? 'Sin categoría'} color={r.categoria_color} />
+    ),
   },
   {
     key: 'unidades',

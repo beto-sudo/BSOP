@@ -62,3 +62,7 @@ export const STATUS_OPTIONS: StatusOption[] = [
   { value: 'pending', label: 'Pendiente' },
   { value: 'cancelled', label: 'Cancelado' },
 ];
+
+// Filtro de categoría que viaja del tab "Por categoría" al tab "Por
+// producto" en el drill-down. id null = fila "Sin categoría".
+export type CategoriaFilter = { id: string | null; nombre: string; color: string | null };

@@ -113,4 +113,26 @@ test.describe('RDB › Ventas', () => {
     expect(bodyText).toContain('Importe total');
     expect(bodyText).toContain('Categorías con venta');
   });
+
+  test('drill-down de categoría abre "Por producto" filtrado', async ({ page }) => {
+    await page.waitForTimeout(2500);
+
+    const tab = page.getByRole('button', { name: 'Por categoría' });
+    const isVisible = await tab.isVisible().catch(() => false);
+    if (!isVisible) return; // access denied for this user — skip interaction
+
+    await tab.click();
+    await page.waitForTimeout(1800);
+
+    const rows = page.locator('table tbody tr');
+    if ((await rows.count()) === 0) return; // no data in range
+
+    // Click en una categoría → cambia al tab "Por producto" con el filtro
+    // de categoría activo (el chip trae un botón para quitarlo).
+    await rows.first().click();
+    await page.waitForTimeout(1200);
+
+    const clearBtn = page.getByRole('button', { name: 'Quitar filtro de categoría' });
+    await expect(clearBtn).toBeVisible({ timeout: 4000 });
+  });
 });

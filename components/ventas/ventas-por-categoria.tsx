@@ -5,11 +5,12 @@ import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getLocalDayBoundsUtc } from '@/lib/timezone';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { DataTable, type Column } from '@/components/module-page';
 import { formatCurrency } from '@/lib/format';
 import { Download, Search, Tags } from 'lucide-react';
 import { TZ } from './utils';
+import { CategoriaBadge } from './categoria-badge';
+import type { CategoriaFilter } from './types';
 
 // Las líneas de venta cuyo producto no resuelve a una categoría del
 // catálogo (product_id sin match en erp.productos.codigo, o producto sin
@@ -43,6 +44,7 @@ export type VentasPorCategoriaProps = {
   corteFilter: string;
   search: string;
   onSearchChange: (value: string) => void;
+  onCategoriaClick: (categoria: CategoriaFilter) => void;
 };
 
 export function VentasPorCategoria({
@@ -51,6 +53,7 @@ export function VentasPorCategoria({
   corteFilter,
   search,
   onSearchChange,
+  onCategoriaClick,
 }: VentasPorCategoriaProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -261,36 +264,19 @@ export function VentasPorCategoria({
         loading={loading}
         error={error}
         onRetry={() => void fetchData()}
+        onRowClick={(r) =>
+          onCategoriaClick({
+            id: r.categoria_id === SIN_CATEGORIA_KEY ? null : r.categoria_id,
+            nombre: r.categoria_nombre,
+            color: r.categoria_color,
+          })
+        }
         initialSort={{ key: 'importe', dir: 'desc' }}
         emptyIcon={<Tags className="h-8 w-8 opacity-50" />}
         emptyTitle="Sin ventas en el rango seleccionado"
         showDensityToggle={false}
       />
     </div>
-  );
-}
-
-// Badge de categoría con color hex del catálogo. Sin color (incluida la
-// fila "Sin categoría") cae a un badge outline neutro.
-function CategoriaBadge({ nombre, color }: { nombre: string; color: string | null }) {
-  if (!color)
-    return (
-      <Badge variant="outline" className="text-xs">
-        {nombre}
-      </Badge>
-    );
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium"
-      style={{
-        borderColor: `${color}40`,
-        backgroundColor: `${color}10`,
-        color,
-      }}
-    >
-      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
-      {nombre}
-    </span>
   );
 }
 

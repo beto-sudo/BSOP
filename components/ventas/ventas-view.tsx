@@ -27,7 +27,7 @@ import { VentasFilters } from './ventas-filters';
 import { VentasTable } from './ventas-table';
 import { VentasPorProducto } from './ventas-por-producto';
 import { VentasPorCategoria } from './ventas-por-categoria';
-import type { CorteOption, Pedido } from './types';
+import type { CategoriaFilter, CorteOption, Pedido } from './types';
 import { TZ, rangeForPreset, todayRange } from './utils';
 
 type VentasTab = 'pedidos' | 'por-producto' | 'por-categoria';
@@ -40,6 +40,7 @@ export function VentasView() {
   const [error, setError] = useState<string | null>(null);
   const [productoSearch, setProductoSearch] = useState('');
   const [categoriaSearch, setCategoriaSearch] = useState('');
+  const [categoriaFilter, setCategoriaFilter] = useState<CategoriaFilter | null>(null);
   const [cortes, setCortes] = useState<CorteOption[]>([]);
 
   // URL-synced filter defaults are captured once at mount (today's date range).
@@ -72,6 +73,15 @@ export function VentasView() {
       setFilter('presetKey', preset);
     }
   };
+
+  // Drill-down: hacer click en una categoría del tab "Por categoría" abre
+  // el tab "Por producto" filtrado a esa categoría. Las fechas y el corte
+  // son globales a VentasView, así que el rango seleccionado se preserva.
+  const handleCategoriaClick = (cat: CategoriaFilter) => {
+    setCategoriaFilter(cat);
+    setTab('por-producto');
+  };
+
   const [selected, setSelected] = useState<Pedido | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -300,6 +310,8 @@ export function VentasView() {
           corteFilter={corteFilter}
           search={productoSearch}
           onSearchChange={setProductoSearch}
+          categoriaFilter={categoriaFilter}
+          onClearCategoriaFilter={() => setCategoriaFilter(null)}
         />
       )}
       {tab === 'por-categoria' && (
@@ -309,6 +321,7 @@ export function VentasView() {
           corteFilter={corteFilter}
           search={categoriaSearch}
           onSearchChange={setCategoriaSearch}
+          onCategoriaClick={handleCategoriaClick}
         />
       )}
     </div>
