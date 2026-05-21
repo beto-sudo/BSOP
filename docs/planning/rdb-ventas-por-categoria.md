@@ -163,7 +163,8 @@ Datos de catálogo relevantes para el diseño de la vista:
 
 - **Sprint 1 — Vista DB + tab "Por categoría".** ✅ Entregado.
 - **Sprint 2 — Limpieza del catálogo (servicios deportivos).** ✅ Entregado.
-- **Sprint 3 — Cierre.** Pendiente verificación visual de Beto en preview.
+- **Sprint 3 — Mejoras de UX: columna categoría + drill-down.** ✅ Entregado.
+- **Sprint 4 — Cierre.** Pendiente verificación visual de Beto en preview.
 
 ## Decisiones registradas
 
@@ -237,3 +238,24 @@ Torneos quedó en 19.4% (~$575k), Academias y Uso de cancha en 1.6% c/u.
 Supera la meta de ≥95%.
 
 Próximo: Sprint 3 — verificación visual de Beto en preview y cierre.
+
+### 2026-05-21 · Sprint 3 — columna categoría + drill-down (este PR)
+
+Mejoras pedidas por Beto tras revisar el tab en preview:
+
+- **Columna "Categoría"** en el tab "Por producto". El componente ahora
+  lee de `rdb.v_waitry_productos_categoria` (en vez de `waitry_productos`)
+  y muestra la categoría de cada producto con su badge de color; también
+  va al CSV exportado.
+- **Drill-down**: hacer click en una fila del tab "Por categoría" abre el
+  tab "Por producto" filtrado a esa categoría, preservando el rango de
+  fechas/corte (ya son globales a `VentasView`). El filtro se muestra
+  como un chip removible. La fila "Sin categoría" también es navegable.
+- `CategoriaBadge` extraído a `components/ventas/categoria-badge.tsx`
+  (lo comparten los tabs "Por producto" y "Por categoría").
+- Tipo `CategoriaFilter` en `components/ventas/types.ts`. Smoke test
+  extendido con el caso del drill-down.
+
+Sin cambios de schema ni DB — todo es capa de UI sobre la vista de
+Sprint 1. Próximo: Sprint 4 — verificación visual de Beto en preview y
+cierre de la iniciativa.
