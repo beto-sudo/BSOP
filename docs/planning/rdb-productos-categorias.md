@@ -3,7 +3,7 @@
 **Slug:** `rdb-productos-categorias`
 **Empresas:** RDB
 **Schemas afectados:** `core` (`modulos`, `permisos_rol` — sub-slug nuevo), `erp` (lectura de `categorias_producto` + `productos`)
-**Estado:** planned
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-21
 **Última actualización:** 2026-05-21
@@ -101,8 +101,8 @@ en v1 y sigue siendo vía SQL/migración. Beto eligió esta opción sobre
 
 ## Sprints / hitos
 
-- **Sprint 1 — Tab "Categorías" + drill-down.** Listo para arrancar.
-- **Sprint 2 — Cierre.** Pendiente Sprint 1.
+- **Sprint 1 — Tab "Categorías" + drill-down.** ✅ Entregado.
+- **Sprint 2 — Cierre.** Pendiente verificación visual de Beto en preview.
 
 ## Decisiones registradas
 
@@ -128,3 +128,26 @@ promover:
 
 Doc de planning creado + fila agregada a `INITIATIVES.md` (estado
 `planned`). Próximo: Sprint 1 (tab "Categorías" + drill-down).
+
+### 2026-05-21 · Sprint 1 — tab "Categorías" + drill-down (este PR)
+
+Migración `20260521181718`: sub-slug `rdb.productos.categorias` en
+`core.modulos` (hereda `empresa_id` + `seccion` del padre `rdb.productos`)
+
+- backfill de `core.permisos_rol` clonando del padre — 5 roles. Aplicada
+  a producción. Migración solo-INSERT: `SCHEMA_REF.md` / `types` sin cambio
+  estructural.
+
+Página `app/rdb/productos/categorias/page.tsx`: lista las categorías
+activas de RDB con su badge de color y conteo de productos; filas
+clicables. Entry en `TABS` (`layout.tsx`, 2ª posición tras Catálogo),
+`ROUTE_TO_MODULE` y `EXPECTED_DB_MODULE_SLUGS`. Drill-down: click en una
+categoría → `/rdb/productos?categoria=<id>`; el filtro de categoría del
+Catálogo se volvió URL-aware leyendo `?categoria` de `window.location` en
+un `useEffect` al montar — evita el Suspense boundary que exigiría
+`useSearchParams` (el page del Catálogo es un componente único grande,
+sin `<XBody/>` separado). Smoke test
+`auth-rdb-productos-categorias.spec.ts`.
+
+Estado de la iniciativa: `planned → in_progress`. Próximo: Sprint 2
+(verificación visual de Beto en preview + cierre).

@@ -254,6 +254,15 @@ export default function ProductosPage() {
   const [newInventariable, setNewInventariable] = useState(true);
   const [creating, setCreating] = useState(false);
 
+  // Drill-down desde la tab Categorías: si la URL trae ?categoria=<id>,
+  // pre-selecciona ese filtro al montar. Se lee de window.location en vez
+  // de useSearchParams para no requerir un Suspense boundary (ADR-030) —
+  // este page es un componente único grande, sin <XBody/> separado.
+  useEffect(() => {
+    const cat = new URLSearchParams(window.location.search).get('categoria');
+    if (cat) setCategoriaFilter(cat);
+  }, []);
+
   const fetchProductos = useCallback(async () => {
     setLoading(true);
     setError(null);
