@@ -44,9 +44,10 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   '/rdb/home': 'rdb.home',
   '/rdb/ventas': 'rdb.ventas',
   '/rdb/cortes': 'rdb.cortes',
-  // Productos: padre `rdb.productos` + 4 sub-slugs por tab (sub-slug pattern,
+  // Productos: padre `rdb.productos` + 5 sub-slugs por tab (sub-slug pattern,
   // ver `submodule-permissions` iniciativa). Cada URL apunta a su sub-slug.
   '/rdb/productos': 'rdb.productos.catalogo',
+  '/rdb/productos/categorias': 'rdb.productos.categorias',
   '/rdb/productos/recetas': 'rdb.productos.recetas',
   '/rdb/productos/auditoria': 'rdb.productos.auditoria',
   '/rdb/productos/analisis': 'rdb.productos.analisis',

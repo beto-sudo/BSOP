@@ -195,6 +195,7 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   // RDB Productos sub-slugs (sub-slug pattern, iniciativa
   // `submodule-permissions`, migración 20260509162620).
   'rdb.productos.catalogo',
+  'rdb.productos.categorias',
   'rdb.productos.recetas',
   'rdb.productos.auditoria',
   'rdb.productos.analisis',
