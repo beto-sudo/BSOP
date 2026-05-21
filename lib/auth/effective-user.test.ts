@@ -24,8 +24,20 @@ vi.mock('@/lib/supabase-admin', () => ({
 }));
 
 type Script = {
-  caller?: { id: string; email: string; rol: string; activo: boolean } | null;
-  target?: { id: string; email: string; rol: string; activo: boolean } | null;
+  caller?: {
+    id: string;
+    email: string;
+    rol: string;
+    activo: boolean;
+    first_name: string | null;
+  } | null;
+  target?: {
+    id: string;
+    email: string;
+    rol: string;
+    activo: boolean;
+    first_name: string | null;
+  } | null;
 };
 
 function installAdmin(script: Script) {
@@ -72,7 +84,13 @@ beforeEach(() => {
   adminClientOverrideActive = false;
   adminClientOverride = null;
   installAdmin({
-    caller: { id: CALLER_UUID, email: 'caller@bsop.test', rol: 'user', activo: true },
+    caller: {
+      id: CALLER_UUID,
+      email: 'caller@bsop.test',
+      rol: 'user',
+      activo: true,
+      first_name: 'Caller',
+    },
   });
 });
 
@@ -96,6 +114,7 @@ describe('getEffectiveUser', () => {
     expect(result).toEqual({
       id: CALLER_UUID,
       email: 'caller@bsop.test',
+      firstName: 'Caller',
       isAdmin: false,
       isPreviewing: false,
     });
@@ -111,13 +130,20 @@ describe('getEffectiveUser', () => {
 
   it('returns the caller when admin and no cookie', async () => {
     installAdmin({
-      caller: { id: CALLER_UUID, email: 'admin@bsop.test', rol: 'admin', activo: true },
+      caller: {
+        id: CALLER_UUID,
+        email: 'admin@bsop.test',
+        rol: 'admin',
+        activo: true,
+        first_name: 'Admin',
+      },
     });
     const { getEffectiveUser } = await import('./effective-user');
     const result = await getEffectiveUser(fakeSupabase('admin@bsop.test'));
     expect(result).toEqual({
       id: CALLER_UUID,
       email: 'admin@bsop.test',
+      firstName: 'Admin',
       isAdmin: true,
       isPreviewing: false,
     });
@@ -126,14 +152,27 @@ describe('getEffectiveUser', () => {
   it('returns the target when admin with valid cookie', async () => {
     cookieStoreState.value = TARGET_UUID;
     installAdmin({
-      caller: { id: CALLER_UUID, email: 'admin@bsop.test', rol: 'admin', activo: true },
-      target: { id: TARGET_UUID, email: 'target@bsop.test', rol: 'user', activo: true },
+      caller: {
+        id: CALLER_UUID,
+        email: 'admin@bsop.test',
+        rol: 'admin',
+        activo: true,
+        first_name: 'Admin',
+      },
+      target: {
+        id: TARGET_UUID,
+        email: 'target@bsop.test',
+        rol: 'user',
+        activo: true,
+        first_name: 'Target',
+      },
     });
     const { getEffectiveUser } = await import('./effective-user');
     const result = await getEffectiveUser(fakeSupabase('admin@bsop.test'));
     expect(result).toEqual({
       id: TARGET_UUID,
       email: 'target@bsop.test',
+      firstName: 'Target',
       isAdmin: false,
       isPreviewing: true,
     });
@@ -142,7 +181,13 @@ describe('getEffectiveUser', () => {
   it('falls back to caller when admin and cookie target is not found', async () => {
     cookieStoreState.value = TARGET_UUID;
     installAdmin({
-      caller: { id: CALLER_UUID, email: 'admin@bsop.test', rol: 'admin', activo: true },
+      caller: {
+        id: CALLER_UUID,
+        email: 'admin@bsop.test',
+        rol: 'admin',
+        activo: true,
+        first_name: 'Admin',
+      },
       target: null,
     });
     const { getEffectiveUser } = await import('./effective-user');

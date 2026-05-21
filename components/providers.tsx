@@ -67,6 +67,7 @@ export function useReadOnlyMode(): boolean {
 export type EffectiveUserData = {
   id: string;
   email: string;
+  firstName: string | null;
   isAdmin: boolean;
   isPreviewing: boolean;
 };
