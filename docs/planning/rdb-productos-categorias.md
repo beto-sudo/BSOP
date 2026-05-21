@@ -3,9 +3,10 @@
 **Slug:** `rdb-productos-categorias`
 **Empresas:** RDB
 **Schemas afectados:** `core` (`modulos`, `permisos_rol` — sub-slug nuevo), `erp` (lectura de `categorias_producto` + `productos`)
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-05-21
+**Cerrada:** 2026-05-21
 **Última actualización:** 2026-05-21
 
 > Promovida el 2026-05-21. El catálogo de categorías de productos
@@ -102,7 +103,7 @@ en v1 y sigue siendo vía SQL/migración. Beto eligió esta opción sobre
 ## Sprints / hitos
 
 - **Sprint 1 — Tab "Categorías" + drill-down.** ✅ Entregado.
-- **Sprint 2 — Cierre.** Pendiente verificación visual de Beto en preview.
+- **Sprint 2 — Cierre.** ✅ Cerrada 2026-05-21.
 
 ## Decisiones registradas
 
@@ -150,3 +151,14 @@ sin `<XBody/>` separado). Smoke test
 
 Estado de la iniciativa: `planned → in_progress`. Próximo: Sprint 2
 (verificación visual de Beto en preview + cierre).
+
+### 2026-05-21 · Sprint 2 — cierre
+
+Beto mergeó el PR de Sprint 1 (#479). La tab "Categorías" del módulo
+Productos está en producción: lista las categorías de RDB con su color y
+conteo de productos, y el drill-down lleva al tab Catálogo filtrado a la
+categoría elegida.
+
+Barrido de Reminders (`Claude 🧭`): sin pendientes de la iniciativa —
+las sub-tareas vivieron en TodoWrite. Iniciativa movida a `## Done` en
+`INITIATIVES.md`. Estado `in_progress → done`.
