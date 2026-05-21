@@ -132,11 +132,10 @@ Doc de planning creado + fila agregada a `INITIATIVES.md` (estado
 ### 2026-05-21 · Sprint 1 — tab "Categorías" + drill-down (este PR)
 
 Migración `20260521181718`: sub-slug `rdb.productos.categorias` en
-`core.modulos` (hereda `empresa_id` + `seccion` del padre `rdb.productos`)
-
-- backfill de `core.permisos_rol` clonando del padre — 5 roles. Aplicada
-  a producción. Migración solo-INSERT: `SCHEMA_REF.md` / `types` sin cambio
-  estructural.
+`core.modulos` (hereda `empresa_id` y `seccion` del padre
+`rdb.productos`), más backfill de `core.permisos_rol` clonando del padre
+para los 5 roles. Aplicada a producción. Migración solo-INSERT:
+`SCHEMA_REF.md` y `types/supabase.ts` sin cambio estructural.
 
 Página `app/rdb/productos/categorias/page.tsx`: lista las categorías
 activas de RDB con su badge de color y conteo de productos; filas
