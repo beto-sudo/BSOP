@@ -97,4 +97,20 @@ test.describe('RDB › Ventas', () => {
     const panel = page.locator('[role="dialog"]');
     await expect(panel).toBeVisible({ timeout: 4000 });
   });
+
+  test('"Por categoría" tab renders its report', async ({ page }) => {
+    await page.waitForTimeout(2500);
+
+    const tab = page.getByRole('button', { name: 'Por categoría' });
+    const isVisible = await tab.isVisible().catch(() => false);
+    if (!isVisible) return; // access denied for this user — skip interaction
+
+    await tab.click();
+    await page.waitForTimeout(1800);
+
+    // The tab always renders its three KPI cards (even with no data).
+    const bodyText = await page.evaluate(() => document.body.innerText);
+    expect(bodyText).toContain('Importe total');
+    expect(bodyText).toContain('Categorías con venta');
+  });
 });

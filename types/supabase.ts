@@ -1,14 +1,3 @@
-// ==============================================================================
-// Auto-generated Supabase database types.
-// Last regenerated: 2026-05-11T10:29:38Z
-// Project ref: ybklderteyhuugzfmxbi
-// Schemas: public, core, erp, rdb, health, playtomic, dilesa, maquinaria
-//
-// DO NOT EDIT BY HAND. Regenerate via:
-//   - GitHub Actions: trigger 'DB Types' workflow manually
-//   - Local: npm run db:types (requiere supabase CLI + SUPABASE_ACCESS_TOKEN)
-// ==============================================================================
-
 export type Json =
   | string
   | number
@@ -9790,6 +9779,13 @@ export type Database = {
             referencedRelation: "v_productos_tabla"
             referencedColumns: ["categoria_id"]
           },
+          {
+            foreignKeyName: "productos_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "v_waitry_productos_categoria"
+            referencedColumns: ["categoria_id"]
+          },
         ]
       }
       v_producto_ultima_venta: {
@@ -10103,6 +10099,53 @@ export type Database = {
           similarity_score: number | null
         }
         Relationships: []
+      }
+      v_waitry_productos_categoria: {
+        Row: {
+          categoria_color: string | null
+          categoria_id: string | null
+          categoria_nombre: string | null
+          categoria_orden: number | null
+          created_at: string | null
+          id: string | null
+          order_id: string | null
+          product_id: string | null
+          product_name: string | null
+          producto_catalogo_id: string | null
+          quantity: number | null
+          total_price: number | null
+          unit_price: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "waitry_productos_order_fk"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_waitry_pedidos"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "waitry_productos_order_fk"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_waitry_pedidos_con_fantasmas"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "waitry_productos_order_fk"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_waitry_pedidos_reversa_sospechosa"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "waitry_productos_order_fk"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "waitry_pedidos"
+            referencedColumns: ["order_id"]
+          },
+        ]
       }
     }
     Functions: {
