@@ -26,10 +26,11 @@ import { SummaryBar } from './summary-bar';
 import { VentasFilters } from './ventas-filters';
 import { VentasTable } from './ventas-table';
 import { VentasPorProducto } from './ventas-por-producto';
+import { VentasPorCategoria } from './ventas-por-categoria';
 import type { CorteOption, Pedido } from './types';
 import { TZ, rangeForPreset, todayRange } from './utils';
 
-type VentasTab = 'pedidos' | 'por-producto';
+type VentasTab = 'pedidos' | 'por-producto' | 'por-categoria';
 
 export function VentasView() {
   const [tab, setTab] = useState<VentasTab>('pedidos');
@@ -38,6 +39,7 @@ export function VentasView() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [productoSearch, setProductoSearch] = useState('');
+  const [categoriaSearch, setCategoriaSearch] = useState('');
   const [cortes, setCortes] = useState<CorteOption[]>([]);
 
   // URL-synced filter defaults are captured once at mount (today's date range).
@@ -226,6 +228,7 @@ export function VentasView() {
           [
             ['pedidos', 'Pedidos'],
             ['por-producto', 'Por producto'],
+            ['por-categoria', 'Por categoría'],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -275,7 +278,7 @@ export function VentasView() {
       {/* Error */}
       {error ? <ErrorBanner error={error} onRetry={() => void fetchPedidos()} /> : null}
 
-      {tab === 'pedidos' ? (
+      {tab === 'pedidos' && (
         <>
           <VentasTable
             pedidos={filtered}
@@ -289,13 +292,23 @@ export function VentasView() {
             onClose={() => setDrawerOpen(false)}
           />
         </>
-      ) : (
+      )}
+      {tab === 'por-producto' && (
         <VentasPorProducto
           dateFrom={dateFrom}
           dateTo={dateTo}
           corteFilter={corteFilter}
           search={productoSearch}
           onSearchChange={setProductoSearch}
+        />
+      )}
+      {tab === 'por-categoria' && (
+        <VentasPorCategoria
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          corteFilter={corteFilter}
+          search={categoriaSearch}
+          onSearchChange={setCategoriaSearch}
         />
       )}
     </div>
