@@ -1102,43 +1102,97 @@ export type Database = {
         Row: {
           activo_id: string
           areas_afectacion_m2: number | null
+          corredor_nombre: string | null
+          corredor_telefono: string | null
           created_at: string
+          decision_actual: string | null
           empresa_id: string
+          estatus_propiedad: string | null
+          etapa: string | null
           factibilidad_agua: boolean | null
           factibilidad_drenaje: boolean | null
           factibilidad_electricidad: boolean | null
           factibilidad_vialidad: boolean | null
+          fecha_ultima_revision: string | null
           notas: string | null
+          objetivo: string | null
+          origen: string | null
+          precio_ofertado_m2: number | null
+          precio_solicitado_m2: number | null
+          prioridad: string | null
+          propietario_nombre: string | null
+          propietario_telefono: string | null
+          responsable: string | null
+          siguiente_accion: string | null
+          tipo_terreno: string | null
           updated_at: string
           uso_suelo: string | null
+          valor_objetivo_compra: number | null
+          zona_sector: string | null
           zonificacion: string | null
         }
         Insert: {
           activo_id: string
           areas_afectacion_m2?: number | null
+          corredor_nombre?: string | null
+          corredor_telefono?: string | null
           created_at?: string
+          decision_actual?: string | null
           empresa_id: string
+          estatus_propiedad?: string | null
+          etapa?: string | null
           factibilidad_agua?: boolean | null
           factibilidad_drenaje?: boolean | null
           factibilidad_electricidad?: boolean | null
           factibilidad_vialidad?: boolean | null
+          fecha_ultima_revision?: string | null
           notas?: string | null
+          objetivo?: string | null
+          origen?: string | null
+          precio_ofertado_m2?: number | null
+          precio_solicitado_m2?: number | null
+          prioridad?: string | null
+          propietario_nombre?: string | null
+          propietario_telefono?: string | null
+          responsable?: string | null
+          siguiente_accion?: string | null
+          tipo_terreno?: string | null
           updated_at?: string
           uso_suelo?: string | null
+          valor_objetivo_compra?: number | null
+          zona_sector?: string | null
           zonificacion?: string | null
         }
         Update: {
           activo_id?: string
           areas_afectacion_m2?: number | null
+          corredor_nombre?: string | null
+          corredor_telefono?: string | null
           created_at?: string
+          decision_actual?: string | null
           empresa_id?: string
+          estatus_propiedad?: string | null
+          etapa?: string | null
           factibilidad_agua?: boolean | null
           factibilidad_drenaje?: boolean | null
           factibilidad_electricidad?: boolean | null
           factibilidad_vialidad?: boolean | null
+          fecha_ultima_revision?: string | null
           notas?: string | null
+          objetivo?: string | null
+          origen?: string | null
+          precio_ofertado_m2?: number | null
+          precio_solicitado_m2?: number | null
+          prioridad?: string | null
+          propietario_nombre?: string | null
+          propietario_telefono?: string | null
+          responsable?: string | null
+          siguiente_accion?: string | null
+          tipo_terreno?: string | null
           updated_at?: string
           uso_suelo?: string | null
+          valor_objetivo_compra?: number | null
+          zona_sector?: string | null
           zonificacion?: string | null
         }
         Relationships: [
@@ -1644,6 +1698,13 @@ export type Database = {
       }
       proyectos: {
         Row: {
+          area_m2: number | null
+          area_vendible_m2: number | null
+          areas_verdes_m2: number | null
+          costo_comercializacion: number | null
+          costo_construccion: number | null
+          costo_terreno: number | null
+          costo_urbanizacion: number | null
           created_at: string
           deleted_at: string | null
           documentos: Json
@@ -1651,7 +1712,9 @@ export type Database = {
           estado: string
           fecha_fin_estimada: string | null
           fecha_inicio: string | null
+          fecha_licencia: string | null
           id: string
+          lotes_proyectados: number | null
           nombre: string
           notas: string | null
           plantilla_id: string | null
@@ -1663,6 +1726,13 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          area_m2?: number | null
+          area_vendible_m2?: number | null
+          areas_verdes_m2?: number | null
+          costo_comercializacion?: number | null
+          costo_construccion?: number | null
+          costo_terreno?: number | null
+          costo_urbanizacion?: number | null
           created_at?: string
           deleted_at?: string | null
           documentos?: Json
@@ -1670,7 +1740,9 @@ export type Database = {
           estado?: string
           fecha_fin_estimada?: string | null
           fecha_inicio?: string | null
+          fecha_licencia?: string | null
           id?: string
+          lotes_proyectados?: number | null
           nombre: string
           notas?: string | null
           plantilla_id?: string | null
@@ -1682,6 +1754,13 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          area_m2?: number | null
+          area_vendible_m2?: number | null
+          areas_verdes_m2?: number | null
+          costo_comercializacion?: number | null
+          costo_construccion?: number | null
+          costo_terreno?: number | null
+          costo_urbanizacion?: number | null
           created_at?: string
           deleted_at?: string | null
           documentos?: Json
@@ -1689,7 +1768,9 @@ export type Database = {
           estado?: string
           fecha_fin_estimada?: string | null
           fecha_inicio?: string | null
+          fecha_licencia?: string | null
           id?: string
+          lotes_proyectados?: number | null
           nombre?: string
           notas?: string | null
           plantilla_id?: string | null
