@@ -7,13 +7,13 @@ las tablas viejas), `core.empresas` (lectura)
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-08
-**Última actualización:** 2026-05-21 (Sprint 1 — Demolición completado y
-mergeado, PR #482: schema `dilesa` v1 borrado en prod, UI vieja eliminada.
-La iniciativa pasa a `in_progress`. Próximo: Sprint 2 — ADRs + schema base
-v0 del modelo Portafolio de Activos. Modo de ejecución: autónomo con
-checkpoints — pausa para OK de Beto al aplicar el schema nuevo (S2), cargar
-Lomas del Bosque (S3) y migrar los 3 anteproyectos (S5). D1-D3 abiertas:
-D2/D3 se cierran en S2, D1 en S4)
+**Última actualización:** 2026-05-21 (Sprints 1 y 2 completados. S1 —
+Demolición: schema v1 borrado en prod. S2 — schema base v2: 22 tablas del
+modelo Portafolio de Activos aplicadas en prod, ADRs 009/010 mergeados.
+Próximo: Sprint 4 — UI del módulo portafolio. Sprint 3 (carga del piloto
+Lomas del Bosque) se difiere hasta tener los datos de Coda — Beto pidió el
+módulo "listo para importar". D1 abierta (test <2min, S4); D2 cerrada en
+ADR-010; D3 abierta, se cierra antes de captura)
 
 ## Problema
 
@@ -429,6 +429,16 @@ lotificación (agosto 2023, vigente).
   local. Se alinearon los archivos locales renombrándolos a los timestamps
   de la DB (commit `chore`, contenido intacto, sin re-ejecución). Drift
   pre-existente ajeno a DILESA — desatascado de paso.
+- **2026-05-21 — Los 11 satélites de activo se crean de una vez,
+  diseñados con criterio de dominio.** El schema base iba a llevar
+  satélites solo de `terreno` y `lote` (los del piloto), agregando los
+  demás on-demand. Beto pidió meter los 11 de una vez: la importación de
+  Coda traerá espectaculares, unipolares y casas además de
+  terrenos/lotes, y fragmentar el schema en migraciones sucesivas no
+  conviene. Además, **los satélites NO se basan en Coda** (que está
+  deficiente) — se diseñan con campos de criterio de dominio inmobiliario;
+  la importación llenará lo que traiga y los campos sin dato quedan NULL,
+  a completar después.
 
 ## Bitácora
 
@@ -451,3 +461,18 @@ lotificación (agosto 2023, vigente).
   juntas. `SCHEMA_REF.md` + `types/supabase.ts` regenerados (−3,538 LOC).
   Verificado en prod: schema vacío, cero objetos huérfanos. Iniciativa a
   `in_progress`. Próximo: Sprint 2 — ADRs + schema base v0.
+- **2026-05-21 — Sprint 2 (ADRs + schema base v2) completado.** PRs #484
+  (ADRs 009 taxonomía + 010 jerarquía) y #485 (schema base) mergeados.
+  Migración `20260521215517_dilesa_v2_schema_base.sql` aplicada en prod:
+  **22 tablas** — `activos` (master) + 11 satélites por tipo (terreno,
+  lote, espectacular, unipolar, casa, departamento, local, plaza,
+  edificio, nave, infraestructura), `proyectos`, `proyectos_plantillas`,
+  `productos`, `unidades`, `proyecto_activos`, `proyecto_prorrateo`,
+  `proyecto_tareas/hitos/documentos/responsables`. Todas con RLS, trigger
+  updated_at, índices. Decisión de Beto durante el sprint: meter los 11
+  satélites de una vez (no on-demand), diseñados con criterio de dominio
+  inmobiliario en lugar de copiar el Coda deficiente — la importación
+  llenará lo que traiga, los huecos se completan después. `SCHEMA_REF.md`
+  - `types/supabase.ts` regenerados. Verificado en prod: 22 tablas.
+    Próximo: Sprint 4 — UI del módulo portafolio (Sprint 3, carga del
+    piloto Lomas del Bosque, se hace cuando estén los datos de Coda).
