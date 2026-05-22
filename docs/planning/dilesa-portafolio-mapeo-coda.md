@@ -4,7 +4,7 @@
 > Mapea las tablas del Coda DILESA (`ZNxWl_DI2D`) al schema v2.
 > Beto valida este mapeo + los ajustes de schema **antes** de importar.
 >
-> Estado: **propuesta — pendiente de validación de Beto.**
+> Estado: **validado por Beto — Fases 1 y 2 importadas a producción.**
 > Fecha: 2026-05-22.
 
 ## Cómo leer esto

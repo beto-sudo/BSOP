@@ -1701,6 +1701,7 @@ export type Database = {
           area_m2: number | null
           area_vendible_m2: number | null
           areas_verdes_m2: number | null
+          clave_interna: string | null
           costo_comercializacion: number | null
           costo_construccion: number | null
           costo_terreno: number | null
@@ -1729,6 +1730,7 @@ export type Database = {
           area_m2?: number | null
           area_vendible_m2?: number | null
           areas_verdes_m2?: number | null
+          clave_interna?: string | null
           costo_comercializacion?: number | null
           costo_construccion?: number | null
           costo_terreno?: number | null
@@ -1757,6 +1759,7 @@ export type Database = {
           area_m2?: number | null
           area_vendible_m2?: number | null
           areas_verdes_m2?: number | null
+          clave_interna?: string | null
           costo_comercializacion?: number | null
           costo_construccion?: number | null
           costo_terreno?: number | null
