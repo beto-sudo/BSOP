@@ -633,7 +633,1206 @@ export type Database = {
   }
   dilesa: {
     Tables: {
-      [_ in never]: never
+      activo_casa: {
+        Row: {
+          activo_id: string
+          ano_construccion: number | null
+          banos: number | null
+          cochera_autos: number | null
+          created_at: string
+          empresa_id: string
+          estado_conservacion: string | null
+          m2_construccion: number | null
+          m2_terreno: number | null
+          niveles: number | null
+          notas: string | null
+          recamaras: number | null
+          updated_at: string
+        }
+        Insert: {
+          activo_id: string
+          ano_construccion?: number | null
+          banos?: number | null
+          cochera_autos?: number | null
+          created_at?: string
+          empresa_id: string
+          estado_conservacion?: string | null
+          m2_construccion?: number | null
+          m2_terreno?: number | null
+          niveles?: number | null
+          notas?: string | null
+          recamaras?: number | null
+          updated_at?: string
+        }
+        Update: {
+          activo_id?: string
+          ano_construccion?: number | null
+          banos?: number | null
+          cochera_autos?: number | null
+          created_at?: string
+          empresa_id?: string
+          estado_conservacion?: string | null
+          m2_construccion?: number | null
+          m2_terreno?: number | null
+          niveles?: number | null
+          notas?: string | null
+          recamaras?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activo_casa_activo_id_fkey"
+            columns: ["activo_id"]
+            isOneToOne: true
+            referencedRelation: "activos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activo_departamento: {
+        Row: {
+          activo_id: string
+          banos: number | null
+          cajones_estacionamiento: number | null
+          created_at: string
+          empresa_id: string
+          m2_construccion: number | null
+          mantenimiento_mensual: number | null
+          nivel: number | null
+          notas: string | null
+          recamaras: number | null
+          tiene_balcon: boolean | null
+          updated_at: string
+        }
+        Insert: {
+          activo_id: string
+          banos?: number | null
+          cajones_estacionamiento?: number | null
+          created_at?: string
+          empresa_id: string
+          m2_construccion?: number | null
+          mantenimiento_mensual?: number | null
+          nivel?: number | null
+          notas?: string | null
+          recamaras?: number | null
+          tiene_balcon?: boolean | null
+          updated_at?: string
+        }
+        Update: {
+          activo_id?: string
+          banos?: number | null
+          cajones_estacionamiento?: number | null
+          created_at?: string
+          empresa_id?: string
+          m2_construccion?: number | null
+          mantenimiento_mensual?: number | null
+          nivel?: number | null
+          notas?: string | null
+          recamaras?: number | null
+          tiene_balcon?: boolean | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activo_departamento_activo_id_fkey"
+            columns: ["activo_id"]
+            isOneToOne: true
+            referencedRelation: "activos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activo_edificio: {
+        Row: {
+          activo_id: string
+          cajones_estacionamiento: number | null
+          created_at: string
+          elevadores: number | null
+          empresa_id: string
+          m2_construccion_total: number | null
+          m2_rentable_total: number | null
+          niveles: number | null
+          notas: string | null
+          updated_at: string
+          uso: string | null
+        }
+        Insert: {
+          activo_id: string
+          cajones_estacionamiento?: number | null
+          created_at?: string
+          elevadores?: number | null
+          empresa_id: string
+          m2_construccion_total?: number | null
+          m2_rentable_total?: number | null
+          niveles?: number | null
+          notas?: string | null
+          updated_at?: string
+          uso?: string | null
+        }
+        Update: {
+          activo_id?: string
+          cajones_estacionamiento?: number | null
+          created_at?: string
+          elevadores?: number | null
+          empresa_id?: string
+          m2_construccion_total?: number | null
+          m2_rentable_total?: number | null
+          niveles?: number | null
+          notas?: string | null
+          updated_at?: string
+          uso?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activo_edificio_activo_id_fkey"
+            columns: ["activo_id"]
+            isOneToOne: true
+            referencedRelation: "activos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activo_espectacular: {
+        Row: {
+          activo_id: string
+          alto_m: number | null
+          ancho_m: number | null
+          anunciante_actual: string | null
+          caras: number | null
+          contrato_vigente_hasta: string | null
+          created_at: string
+          empresa_id: string
+          iluminado: boolean | null
+          notas: string | null
+          orientacion: string | null
+          renta_mensual: number | null
+          trafico_estimado_diario: number | null
+          updated_at: string
+          vialidad: string | null
+        }
+        Insert: {
+          activo_id: string
+          alto_m?: number | null
+          ancho_m?: number | null
+          anunciante_actual?: string | null
+          caras?: number | null
+          contrato_vigente_hasta?: string | null
+          created_at?: string
+          empresa_id: string
+          iluminado?: boolean | null
+          notas?: string | null
+          orientacion?: string | null
+          renta_mensual?: number | null
+          trafico_estimado_diario?: number | null
+          updated_at?: string
+          vialidad?: string | null
+        }
+        Update: {
+          activo_id?: string
+          alto_m?: number | null
+          ancho_m?: number | null
+          anunciante_actual?: string | null
+          caras?: number | null
+          contrato_vigente_hasta?: string | null
+          created_at?: string
+          empresa_id?: string
+          iluminado?: boolean | null
+          notas?: string | null
+          orientacion?: string | null
+          renta_mensual?: number | null
+          trafico_estimado_diario?: number | null
+          updated_at?: string
+          vialidad?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activo_espectacular_activo_id_fkey"
+            columns: ["activo_id"]
+            isOneToOne: true
+            referencedRelation: "activos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activo_infraestructura: {
+        Row: {
+          activo_id: string
+          created_at: string
+          empresa_id: string
+          entregado_a_municipio: boolean | null
+          estado_mantenimiento: string | null
+          longitud_m: number | null
+          notas: string | null
+          subtipo: string | null
+          updated_at: string
+        }
+        Insert: {
+          activo_id: string
+          created_at?: string
+          empresa_id: string
+          entregado_a_municipio?: boolean | null
+          estado_mantenimiento?: string | null
+          longitud_m?: number | null
+          notas?: string | null
+          subtipo?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activo_id?: string
+          created_at?: string
+          empresa_id?: string
+          entregado_a_municipio?: boolean | null
+          estado_mantenimiento?: string | null
+          longitud_m?: number | null
+          notas?: string | null
+          subtipo?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activo_infraestructura_activo_id_fkey"
+            columns: ["activo_id"]
+            isOneToOne: true
+            referencedRelation: "activos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activo_local: {
+        Row: {
+          activo_id: string
+          banos: number | null
+          created_at: string
+          empresa_id: string
+          estado_obra: string | null
+          frente_m: number | null
+          giro_permitido: string | null
+          m2_rentable: number | null
+          notas: string | null
+          planta: string | null
+          tiene_bodega: boolean | null
+          updated_at: string
+        }
+        Insert: {
+          activo_id: string
+          banos?: number | null
+          created_at?: string
+          empresa_id: string
+          estado_obra?: string | null
+          frente_m?: number | null
+          giro_permitido?: string | null
+          m2_rentable?: number | null
+          notas?: string | null
+          planta?: string | null
+          tiene_bodega?: boolean | null
+          updated_at?: string
+        }
+        Update: {
+          activo_id?: string
+          banos?: number | null
+          created_at?: string
+          empresa_id?: string
+          estado_obra?: string | null
+          frente_m?: number | null
+          giro_permitido?: string | null
+          m2_rentable?: number | null
+          notas?: string | null
+          planta?: string | null
+          tiene_bodega?: boolean | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activo_local_activo_id_fkey"
+            columns: ["activo_id"]
+            isOneToOne: true
+            referencedRelation: "activos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activo_lote: {
+        Row: {
+          activo_id: string
+          condicion: string | null
+          created_at: string
+          empresa_id: string
+          fondo_m: number | null
+          frente_m: number | null
+          manzana: string | null
+          notas: string | null
+          numero_lote: string | null
+          updated_at: string
+        }
+        Insert: {
+          activo_id: string
+          condicion?: string | null
+          created_at?: string
+          empresa_id: string
+          fondo_m?: number | null
+          frente_m?: number | null
+          manzana?: string | null
+          notas?: string | null
+          numero_lote?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activo_id?: string
+          condicion?: string | null
+          created_at?: string
+          empresa_id?: string
+          fondo_m?: number | null
+          frente_m?: number | null
+          manzana?: string | null
+          notas?: string | null
+          numero_lote?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activo_lote_activo_id_fkey"
+            columns: ["activo_id"]
+            isOneToOne: true
+            referencedRelation: "activos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activo_nave: {
+        Row: {
+          activo_id: string
+          altura_libre_m: number | null
+          andenes_carga: number | null
+          created_at: string
+          empresa_id: string
+          m2_patio: number | null
+          m2_techados: number | null
+          notas: string | null
+          subestacion_electrica: boolean | null
+          updated_at: string
+          uso_suelo_industrial: boolean | null
+        }
+        Insert: {
+          activo_id: string
+          altura_libre_m?: number | null
+          andenes_carga?: number | null
+          created_at?: string
+          empresa_id: string
+          m2_patio?: number | null
+          m2_techados?: number | null
+          notas?: string | null
+          subestacion_electrica?: boolean | null
+          updated_at?: string
+          uso_suelo_industrial?: boolean | null
+        }
+        Update: {
+          activo_id?: string
+          altura_libre_m?: number | null
+          andenes_carga?: number | null
+          created_at?: string
+          empresa_id?: string
+          m2_patio?: number | null
+          m2_techados?: number | null
+          notas?: string | null
+          subestacion_electrica?: boolean | null
+          updated_at?: string
+          uso_suelo_industrial?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activo_nave_activo_id_fkey"
+            columns: ["activo_id"]
+            isOneToOne: true
+            referencedRelation: "activos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activo_plaza: {
+        Row: {
+          activo_id: string
+          anchor_nombre: string | null
+          area_comun_m2: number | null
+          area_rentable_total_m2: number | null
+          cajones_estacionamiento: number | null
+          created_at: string
+          empresa_id: string
+          locales_totales: number | null
+          notas: string | null
+          tiene_anchor: boolean | null
+          updated_at: string
+        }
+        Insert: {
+          activo_id: string
+          anchor_nombre?: string | null
+          area_comun_m2?: number | null
+          area_rentable_total_m2?: number | null
+          cajones_estacionamiento?: number | null
+          created_at?: string
+          empresa_id: string
+          locales_totales?: number | null
+          notas?: string | null
+          tiene_anchor?: boolean | null
+          updated_at?: string
+        }
+        Update: {
+          activo_id?: string
+          anchor_nombre?: string | null
+          area_comun_m2?: number | null
+          area_rentable_total_m2?: number | null
+          cajones_estacionamiento?: number | null
+          created_at?: string
+          empresa_id?: string
+          locales_totales?: number | null
+          notas?: string | null
+          tiene_anchor?: boolean | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activo_plaza_activo_id_fkey"
+            columns: ["activo_id"]
+            isOneToOne: true
+            referencedRelation: "activos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activo_terreno: {
+        Row: {
+          activo_id: string
+          areas_afectacion_m2: number | null
+          created_at: string
+          empresa_id: string
+          factibilidad_agua: boolean | null
+          factibilidad_drenaje: boolean | null
+          factibilidad_electricidad: boolean | null
+          factibilidad_vialidad: boolean | null
+          notas: string | null
+          updated_at: string
+          uso_suelo: string | null
+          zonificacion: string | null
+        }
+        Insert: {
+          activo_id: string
+          areas_afectacion_m2?: number | null
+          created_at?: string
+          empresa_id: string
+          factibilidad_agua?: boolean | null
+          factibilidad_drenaje?: boolean | null
+          factibilidad_electricidad?: boolean | null
+          factibilidad_vialidad?: boolean | null
+          notas?: string | null
+          updated_at?: string
+          uso_suelo?: string | null
+          zonificacion?: string | null
+        }
+        Update: {
+          activo_id?: string
+          areas_afectacion_m2?: number | null
+          created_at?: string
+          empresa_id?: string
+          factibilidad_agua?: boolean | null
+          factibilidad_drenaje?: boolean | null
+          factibilidad_electricidad?: boolean | null
+          factibilidad_vialidad?: boolean | null
+          notas?: string | null
+          updated_at?: string
+          uso_suelo?: string | null
+          zonificacion?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activo_terreno_activo_id_fkey"
+            columns: ["activo_id"]
+            isOneToOne: true
+            referencedRelation: "activos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activo_unipolar: {
+        Row: {
+          activo_id: string
+          alto_m: number | null
+          altura_poste_m: number | null
+          ancho_m: number | null
+          anunciante_actual: string | null
+          caras: number | null
+          contrato_vigente_hasta: string | null
+          created_at: string
+          empresa_id: string
+          iluminado: boolean | null
+          notas: string | null
+          orientacion: string | null
+          renta_mensual: number | null
+          trafico_estimado_diario: number | null
+          updated_at: string
+          vialidad: string | null
+        }
+        Insert: {
+          activo_id: string
+          alto_m?: number | null
+          altura_poste_m?: number | null
+          ancho_m?: number | null
+          anunciante_actual?: string | null
+          caras?: number | null
+          contrato_vigente_hasta?: string | null
+          created_at?: string
+          empresa_id: string
+          iluminado?: boolean | null
+          notas?: string | null
+          orientacion?: string | null
+          renta_mensual?: number | null
+          trafico_estimado_diario?: number | null
+          updated_at?: string
+          vialidad?: string | null
+        }
+        Update: {
+          activo_id?: string
+          alto_m?: number | null
+          altura_poste_m?: number | null
+          ancho_m?: number | null
+          anunciante_actual?: string | null
+          caras?: number | null
+          contrato_vigente_hasta?: string | null
+          created_at?: string
+          empresa_id?: string
+          iluminado?: boolean | null
+          notas?: string | null
+          orientacion?: string | null
+          renta_mensual?: number | null
+          trafico_estimado_diario?: number | null
+          updated_at?: string
+          vialidad?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activo_unipolar_activo_id_fkey"
+            columns: ["activo_id"]
+            isOneToOne: true
+            referencedRelation: "activos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activos: {
+        Row: {
+          activo_padre_id: string | null
+          area_m2: number | null
+          clave_catastral: string | null
+          clave_interna: string | null
+          created_at: string
+          deleted_at: string | null
+          direccion_referencia: string | null
+          documentos: Json
+          empresa_id: string
+          estado: string
+          estado_geo: string | null
+          id: string
+          latitud: number | null
+          longitud: number | null
+          municipio: string | null
+          nombre: string
+          notas: string | null
+          numero_escritura: string | null
+          situacion_legal: string | null
+          tipo: string
+          updated_at: string
+          valor_estimado: number | null
+        }
+        Insert: {
+          activo_padre_id?: string | null
+          area_m2?: number | null
+          clave_catastral?: string | null
+          clave_interna?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          direccion_referencia?: string | null
+          documentos?: Json
+          empresa_id: string
+          estado?: string
+          estado_geo?: string | null
+          id?: string
+          latitud?: number | null
+          longitud?: number | null
+          municipio?: string | null
+          nombre: string
+          notas?: string | null
+          numero_escritura?: string | null
+          situacion_legal?: string | null
+          tipo: string
+          updated_at?: string
+          valor_estimado?: number | null
+        }
+        Update: {
+          activo_padre_id?: string | null
+          area_m2?: number | null
+          clave_catastral?: string | null
+          clave_interna?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          direccion_referencia?: string | null
+          documentos?: Json
+          empresa_id?: string
+          estado?: string
+          estado_geo?: string | null
+          id?: string
+          latitud?: number | null
+          longitud?: number | null
+          municipio?: string | null
+          nombre?: string
+          notas?: string | null
+          numero_escritura?: string | null
+          situacion_legal?: string | null
+          tipo?: string
+          updated_at?: string
+          valor_estimado?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activos_activo_padre_id_fkey"
+            columns: ["activo_padre_id"]
+            isOneToOne: false
+            referencedRelation: "activos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      productos: {
+        Row: {
+          atributos: Json
+          costo_referencia: number | null
+          created_at: string
+          deleted_at: string | null
+          descripcion: string | null
+          empresa_id: string
+          id: string
+          nombre: string
+          proyecto_id: string
+          updated_at: string
+          valor_comercial_referencia: number | null
+        }
+        Insert: {
+          atributos?: Json
+          costo_referencia?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id: string
+          id?: string
+          nombre: string
+          proyecto_id: string
+          updated_at?: string
+          valor_comercial_referencia?: number | null
+        }
+        Update: {
+          atributos?: Json
+          costo_referencia?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string
+          id?: string
+          nombre?: string
+          proyecto_id?: string
+          updated_at?: string
+          valor_comercial_referencia?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "productos_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proyecto_activos: {
+        Row: {
+          activo_id: string
+          created_at: string
+          empresa_id: string
+          id: string
+          notas: string | null
+          proyecto_id: string
+          rol: string
+        }
+        Insert: {
+          activo_id: string
+          created_at?: string
+          empresa_id: string
+          id?: string
+          notas?: string | null
+          proyecto_id: string
+          rol: string
+        }
+        Update: {
+          activo_id?: string
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          notas?: string | null
+          proyecto_id?: string
+          rol?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proyecto_activos_activo_id_fkey"
+            columns: ["activo_id"]
+            isOneToOne: false
+            referencedRelation: "activos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proyecto_activos_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proyecto_documentos: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          empresa_id: string
+          id: string
+          nombre: string
+          notas: string | null
+          proyecto_id: string
+          tipo: string | null
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          empresa_id: string
+          id?: string
+          nombre: string
+          notas?: string | null
+          proyecto_id: string
+          tipo?: string | null
+          url: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          empresa_id?: string
+          id?: string
+          nombre?: string
+          notas?: string | null
+          proyecto_id?: string
+          tipo?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proyecto_documentos_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proyecto_hitos: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          descripcion: string | null
+          empresa_id: string
+          estado: string
+          fecha_objetivo: string | null
+          fecha_real: string | null
+          id: string
+          nombre: string
+          orden: number
+          proyecto_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id: string
+          estado?: string
+          fecha_objetivo?: string | null
+          fecha_real?: string | null
+          id?: string
+          nombre: string
+          orden?: number
+          proyecto_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string
+          estado?: string
+          fecha_objetivo?: string | null
+          fecha_real?: string | null
+          id?: string
+          nombre?: string
+          orden?: number
+          proyecto_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proyecto_hitos_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proyecto_prorrateo: {
+        Row: {
+          created_at: string
+          empresa_id: string
+          id: string
+          notas: string | null
+          porcentaje: number
+          proyecto_madre_id: string
+          sub_proyecto_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: string
+          id?: string
+          notas?: string | null
+          porcentaje: number
+          proyecto_madre_id: string
+          sub_proyecto_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          notas?: string | null
+          porcentaje?: number
+          proyecto_madre_id?: string
+          sub_proyecto_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proyecto_prorrateo_proyecto_madre_id_fkey"
+            columns: ["proyecto_madre_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proyecto_prorrateo_sub_proyecto_id_fkey"
+            columns: ["sub_proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proyecto_responsables: {
+        Row: {
+          created_at: string
+          empleado_id: string | null
+          empresa_id: string
+          externo: boolean
+          id: string
+          nombre_externo: string | null
+          proyecto_id: string
+          rol: string
+        }
+        Insert: {
+          created_at?: string
+          empleado_id?: string | null
+          empresa_id: string
+          externo?: boolean
+          id?: string
+          nombre_externo?: string | null
+          proyecto_id: string
+          rol: string
+        }
+        Update: {
+          created_at?: string
+          empleado_id?: string | null
+          empresa_id?: string
+          externo?: boolean
+          id?: string
+          nombre_externo?: string | null
+          proyecto_id?: string
+          rol?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proyecto_responsables_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proyecto_tareas: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          descripcion: string | null
+          empresa_id: string
+          estado: string
+          fecha_completada: string | null
+          fecha_limite: string | null
+          id: string
+          orden: number
+          prioridad: string
+          proyecto_id: string
+          responsable_id: string | null
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id: string
+          estado?: string
+          fecha_completada?: string | null
+          fecha_limite?: string | null
+          id?: string
+          orden?: number
+          prioridad?: string
+          proyecto_id: string
+          responsable_id?: string | null
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string
+          estado?: string
+          fecha_completada?: string | null
+          fecha_limite?: string | null
+          id?: string
+          orden?: number
+          prioridad?: string
+          proyecto_id?: string
+          responsable_id?: string | null
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proyecto_tareas_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proyectos: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          documentos: Json
+          empresa_id: string
+          estado: string
+          fecha_fin_estimada: string | null
+          fecha_inicio: string | null
+          id: string
+          nombre: string
+          notas: string | null
+          plantilla_id: string | null
+          presupuesto_estimado: number | null
+          proyecto_padre_id: string | null
+          proyecto_predecesor_id: string | null
+          regla_prorrateo: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          documentos?: Json
+          empresa_id: string
+          estado?: string
+          fecha_fin_estimada?: string | null
+          fecha_inicio?: string | null
+          id?: string
+          nombre: string
+          notas?: string | null
+          plantilla_id?: string | null
+          presupuesto_estimado?: number | null
+          proyecto_padre_id?: string | null
+          proyecto_predecesor_id?: string | null
+          regla_prorrateo?: string
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          documentos?: Json
+          empresa_id?: string
+          estado?: string
+          fecha_fin_estimada?: string | null
+          fecha_inicio?: string | null
+          id?: string
+          nombre?: string
+          notas?: string | null
+          plantilla_id?: string | null
+          presupuesto_estimado?: number | null
+          proyecto_padre_id?: string | null
+          proyecto_predecesor_id?: string | null
+          regla_prorrateo?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proyectos_plantilla_id_fkey"
+            columns: ["plantilla_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos_plantillas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proyectos_proyecto_padre_id_fkey"
+            columns: ["proyecto_padre_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proyectos_proyecto_predecesor_id_fkey"
+            columns: ["proyecto_predecesor_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proyectos_plantillas: {
+        Row: {
+          created_at: string
+          definicion: Json
+          deleted_at: string | null
+          descripcion: string | null
+          empresa_id: string | null
+          es_oficial: boolean
+          id: string
+          nombre: string
+          tipo_proyecto: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          definicion?: Json
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string | null
+          es_oficial?: boolean
+          id?: string
+          nombre: string
+          tipo_proyecto: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          definicion?: Json
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string | null
+          es_oficial?: boolean
+          id?: string
+          nombre?: string
+          tipo_proyecto?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      unidades: {
+        Row: {
+          activo_id: string | null
+          area_m2: number | null
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          estado: string
+          id: string
+          identificador: string
+          notas: string | null
+          precio: number | null
+          producto_id: string | null
+          proyecto_id: string
+          updated_at: string
+        }
+        Insert: {
+          activo_id?: string | null
+          area_m2?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          estado?: string
+          id?: string
+          identificador: string
+          notas?: string | null
+          precio?: number | null
+          producto_id?: string | null
+          proyecto_id: string
+          updated_at?: string
+        }
+        Update: {
+          activo_id?: string | null
+          area_m2?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          estado?: string
+          id?: string
+          identificador?: string
+          notas?: string | null
+          precio?: number | null
+          producto_id?: string | null
+          proyecto_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "unidades_activo_id_fkey"
+            columns: ["activo_id"]
+            isOneToOne: false
+            referencedRelation: "activos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unidades_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unidades_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
