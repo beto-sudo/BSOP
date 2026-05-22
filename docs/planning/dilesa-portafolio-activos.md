@@ -7,14 +7,12 @@ las tablas viejas), `core.empresas` (lectura)
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-08
-**Última actualización:** 2026-05-22 (Sprints 1, 2 y 4 completados. S1 —
-Demolición. S2 — schema base v2 (22 tablas en prod). S4 — UI del módulo
-portafolio: pages Portafolio y Proyectos (lista de lectura) en prod,
-módulos registrados en `core.modulos`. El módulo está navegable en
-producción, vacío y listo para importar los datos de Coda. Próximo:
-Sprint 3 (carga del piloto Lomas del Bosque) + Sprint 5 (migrar los 3
-anteproyectos restantes), al tener los datos de Coda; y la fase de
-captura/detalle de la UI tras cerrar D1 y D3. D2 cerrada en ADR-010)
+**Última actualización:** 2026-05-22 (Sprints 1, 2 y 4 completados;
+Sprint 3 en curso — importación desde Coda por fases: Fase 1 (25
+terrenos) y Fase 2 (5 anteproyectos + 8 proyectos) cargadas en prod.
+Próximo: Fase 3 (lotes + casas) y Fase 4 (ventas, requiere extender el
+schema con tablas de comercialización). D2 cerrada en ADR-010; D1 y D3
+abren la fase de captura/detalle de la UI.)
 
 ## Problema
 
@@ -440,6 +438,19 @@ lotificación (agosto 2023, vigente).
   deficiente) — se diseñan con campos de criterio de dominio inmobiliario;
   la importación llenará lo que traiga y los campos sin dato quedan NULL,
   a completar después.
+- **2026-05-22 — `proyectos.clave_interna` usa `UNIQUE` con NULLs
+  distintos, a diferencia de `activos.clave_interna`.** El primer intento
+  de la migración de Fase 2 copió el constraint de `activos`
+  (`UNIQUE NULLS NOT DISTINCT`) y falló al aplicarse: los 5 anteproyectos
+  no tienen `clave_interna` (solo los proyectos `tipo=desarrollo` la
+  tienen, ← "Abreviación" de Coda), y `NULLS NOT DISTINCT` trata varios
+  NULL como duplicados. Se corrigió a `UNIQUE (empresa_id, clave_interna)`
+  con la semántica default (NULLs distintos): la clave es opcional, varias
+  filas sin clave son legítimas, y el constraint solo impide dos códigos
+  no nulos iguales por empresa. **Pendiente flagueado:** `activos` tiene
+  el mismo `NULLS NOT DISTINCT` — hoy no molesta (los 25 terrenos traen
+  clave), pero la Fase 3 (lotes + casas, que no traen código corto)
+  chocará con él. Se corrige al preparar la migración de Fase 3.
 
 ## Bitácora
 
@@ -494,3 +505,27 @@ lotificación (agosto 2023, vigente).
   Próximo: Sprint 3 (carga del piloto Lomas del Bosque) + Sprint 5
   (migrar los 3 anteproyectos restantes), ambos al tener los datos de
   Coda; y la fase de captura/detalle de la UI tras cerrar D1 y D3.
+- **2026-05-22 — Sprint 3 reencuadrado: importación desde Coda por
+  fases.** El Sprint 3 del plan ("cargar el piloto Lomas del Bosque") se
+  reencuadró por decisión de Beto a una importación completa del Coda
+  DILESA (`ZNxWl_DI2D`) en 4 fases: terrenos → anteproyectos/proyectos →
+  lotes/casas → ventas. El mapeo Coda → schema v2 vive en
+  [dilesa-portafolio-mapeo-coda.md](dilesa-portafolio-mapeo-coda.md),
+  validado por Beto.
+  - **Fase 1 (PR #489)** — `scripts/import_dilesa_terrenos.ts` cargó 25
+    terrenos en `dilesa.activos` (tipo `terreno`) + `activo_terreno`. La
+    migración `20260522123710_dilesa_v2_ajustes_importacion.sql` extendió
+    el satélite `activo_terreno` (+18 campos de adquisición/gestión),
+    agregó el estado `descartado` a `activos` y +9 columnas de alcance/
+    costos a `proyectos`.
+  - **Fase 2 (este PR)** — `scripts/import_dilesa_proyectos.ts` cargó 5
+    anteproyectos (tipo `anteproyecto`) + 8 proyectos (tipo `desarrollo`)
+    en `dilesa.proyectos`, con 5 vínculos `proyecto_activos` (rol `input`)
+    al terreno de origen y `proyecto_predecesor_id` poblado en los 2
+    proyectos que vienen de un anteproyecto convertido. La migración
+    `20260522131315_dilesa_proyectos_clave_interna.sql` agregó la columna
+    `proyectos.clave_interna` (← "Abreviación" de Coda), que el mapeo
+    preveía pero la migración de ajustes de Fase 1 omitió. Verificado en
+    prod: 13 proyectos, claves y vínculos correctos.
+    Próximo: Fase 3 (lotes + casas) y Fase 4 (ventas — requiere extender el
+    schema con tablas de comercialización, inexistentes en v2).
