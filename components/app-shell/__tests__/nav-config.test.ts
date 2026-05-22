@@ -100,7 +100,7 @@ describe('getActiveSection', () => {
 describe('getSectionLabelKey', () => {
   it('returns the labelKey of the matching top-level item', () => {
     expect(getSectionLabelKey('/rdb/ventas')).toBe('Rincón del Bosque');
-    expect(getSectionLabelKey('/dilesa/proyectos')).toBe('DILESA');
+    expect(getSectionLabelKey('/dilesa/proveedores')).toBe('DILESA');
     expect(getSectionLabelKey('/settings/acceso')).toBe('nav.settings');
   });
 
