@@ -1851,46 +1851,70 @@ export type Database = {
         Row: {
           activo_id: string | null
           area_m2: number | null
+          calle: string | null
           created_at: string
           deleted_at: string | null
           empresa_id: string
+          es_esquina: boolean | null
           estado: string
           id: string
           identificador: string
+          m2_construccion: number | null
+          manzana: string | null
           notas: string | null
+          numero_lote: string | null
+          numero_oficial: string | null
           precio: number | null
           producto_id: string | null
           proyecto_id: string
+          tiene_frente_verde: boolean | null
+          tipo_lote: string | null
           updated_at: string
         }
         Insert: {
           activo_id?: string | null
           area_m2?: number | null
+          calle?: string | null
           created_at?: string
           deleted_at?: string | null
           empresa_id: string
+          es_esquina?: boolean | null
           estado?: string
           id?: string
           identificador: string
+          m2_construccion?: number | null
+          manzana?: string | null
           notas?: string | null
+          numero_lote?: string | null
+          numero_oficial?: string | null
           precio?: number | null
           producto_id?: string | null
           proyecto_id: string
+          tiene_frente_verde?: boolean | null
+          tipo_lote?: string | null
           updated_at?: string
         }
         Update: {
           activo_id?: string | null
           area_m2?: number | null
+          calle?: string | null
           created_at?: string
           deleted_at?: string | null
           empresa_id?: string
+          es_esquina?: boolean | null
           estado?: string
           id?: string
           identificador?: string
+          m2_construccion?: number | null
+          manzana?: string | null
           notas?: string | null
+          numero_lote?: string | null
+          numero_oficial?: string | null
           precio?: number | null
           producto_id?: string | null
           proyecto_id?: string
+          tiene_frente_verde?: boolean | null
+          tipo_lote?: string | null
           updated_at?: string
         }
         Relationships: [
