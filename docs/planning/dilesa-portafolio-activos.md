@@ -4,18 +4,16 @@
 **Empresas:** DILESA (Desarrollo Inmobiliario Los Encinos S.A. de C.V.)
 **Schemas afectados:** `dilesa` (rediseño completo del schema, deprecación de
 las tablas viejas), `core.empresas` (lectura)
-**Estado:** planned
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-08
-**Última actualización:** 2026-05-21 (promovida a `planned`: alcance v1
-cerrado, arranca Sprint 1 — Demolición. Modo de ejecución acordado:
-autónomo con checkpoints — CC ejecuta y mergea con CI verde, pausa para
-OK de Beto en los 4 momentos de riesgo (DROP en S1, schema nuevo en S2,
-carga de Lomas del Bosque en S3, migración de los 3 anteproyectos en S5).
-D1-D3 no bloquean el arranque: D2/D3 se cierran en S2, D1 en S4. Corte
-limpio adelantado al Sprint 1 — los 4 módulos viejos nunca tuvieron
-captura productiva; D-questions renumeradas, listado canónico en
-§ Riesgos / preguntas abiertas)
+**Última actualización:** 2026-05-21 (Sprint 1 — Demolición completado y
+mergeado, PR #482: schema `dilesa` v1 borrado en prod, UI vieja eliminada.
+La iniciativa pasa a `in_progress`. Próximo: Sprint 2 — ADRs + schema base
+v0 del modelo Portafolio de Activos. Modo de ejecución: autónomo con
+checkpoints — pausa para OK de Beto al aplicar el schema nuevo (S2), cargar
+Lomas del Bosque (S3) y migrar los 3 anteproyectos (S5). D1-D3 abiertas:
+D2/D3 se cierran en S2, D1 en S4)
 
 ## Problema
 
@@ -410,6 +408,27 @@ lotificación (agosto 2023, vigente).
   esa MV. La migración `_dilesa_v1_drop.sql` borra esa fila junto con la
   MV. Fuera de eso, el reconocimiento confirmó cero dependencias
   cross-schema ocultas — el DROP CASCADE de `dilesa` es seguro.
+- **2026-05-21 — El schema `dilesa` v1 no estaba vacío; se procedió con el
+  DROP igual.** El manifiesto de row-counts previo al DROP encontró 87
+  filas (26 terrenos, 12 prototipos, 11 anteproyectos, 8 proyectos, + refs
+  y catálogos), todas cargadas en un batch el 2026-04-23 — el import
+  apurado desde Coda, no captura productiva en BSOP. Beto confirmó
+  proceder: Coda es la fuente viva y la data se re-migra desde ahí en S3 y
+  S5. Snapshot CSV defensivo de las 87 filas archivado fuera del repo.
+  Nota: el conteo real de anteproyectos (11) supera los 4 que el plan
+  asumía — el alcance de re-migración de S3/S5 se confirma leyendo Coda.
+- **2026-05-21 — `analytics.refresh_all()` también referenciaba
+  `mv_dilesa_pipeline`.** La verificación contra el catálogo de Postgres
+  durante el Sprint 1 encontró que la función `refresh_all()` tenía la MV
+  hardcodeada en un array — hallazgo que el reconocimiento inicial no
+  detectó. La migración la corrige (quita la MV del array) para no romper
+  el refresh.
+- **2026-05-21 — Drift de timestamps en 3 migraciones Waitry, reparado.**
+  `supabase db push` se bloqueó: `schema_migrations` de prod tenía 3
+  migraciones Waitry (9-may) con timestamp ~1 min distinto al del archivo
+  local. Se alinearon los archivos locales renombrándolos a los timestamps
+  de la DB (commit `chore`, contenido intacto, sin re-ejecución). Drift
+  pre-existente ajeno a DILESA — desatascado de paso.
 
 ## Bitácora
 
@@ -420,3 +439,15 @@ lotificación (agosto 2023, vigente).
   el caso Lomas del Bosque), review de codex y ultrareview (PRs #457 y
   #458, ya mergeados), y reconocimiento del inventario de demolición.
   Alcance v1 cerrado en 5 sprints. Próximo: Sprint 1 — Demolición.
+- **2026-05-21 — Sprint 1 (Demolición) completado.** PR #482 mergeado.
+  Migración `20260521201557_dilesa_v1_drop.sql` aplicada en prod:
+  `DROP SCHEMA dilesa CASCADE` (31 tablas + 4 vistas + ~30 triggers — "drop
+  cascades to 35 other objects") + recreación del schema vacío; DROP de
+  `analytics.mv_dilesa_pipeline` + cleanup de `metric_dictionary` y del
+  array de `refresh_all()`; borrado de los 4 slugs en `core.modulos`.
+  Código: −8,716 LOC — 8 pages + 1 API route + 4 componentes + 9 scripts
+  `migrate_dilesa_*` + `dilesa-migrate-shared` + `dilesa-constants`;
+  launcher, nav y permisos limpios; `status-tokens.ts` podado a lo de
+  juntas. `SCHEMA_REF.md` + `types/supabase.ts` regenerados (−3,538 LOC).
+  Verificado en prod: schema vacío, cero objetos huérfanos. Iniciativa a
+  `in_progress`. Próximo: Sprint 2 — ADRs + schema base v0.
