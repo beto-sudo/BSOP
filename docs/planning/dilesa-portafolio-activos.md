@@ -7,13 +7,14 @@ las tablas viejas), `core.empresas` (lectura)
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-08
-**Última actualización:** 2026-05-21 (Sprints 1 y 2 completados. S1 —
-Demolición: schema v1 borrado en prod. S2 — schema base v2: 22 tablas del
-modelo Portafolio de Activos aplicadas en prod, ADRs 009/010 mergeados.
-Próximo: Sprint 4 — UI del módulo portafolio. Sprint 3 (carga del piloto
-Lomas del Bosque) se difiere hasta tener los datos de Coda — Beto pidió el
-módulo "listo para importar". D1 abierta (test <2min, S4); D2 cerrada en
-ADR-010; D3 abierta, se cierra antes de captura)
+**Última actualización:** 2026-05-22 (Sprints 1, 2 y 4 completados. S1 —
+Demolición. S2 — schema base v2 (22 tablas en prod). S4 — UI del módulo
+portafolio: pages Portafolio y Proyectos (lista de lectura) en prod,
+módulos registrados en `core.modulos`. El módulo está navegable en
+producción, vacío y listo para importar los datos de Coda. Próximo:
+Sprint 3 (carga del piloto Lomas del Bosque) + Sprint 5 (migrar los 3
+anteproyectos restantes), al tener los datos de Coda; y la fase de
+captura/detalle de la UI tras cerrar D1 y D3. D2 cerrada en ADR-010)
 
 ## Problema
 
@@ -476,3 +477,20 @@ lotificación (agosto 2023, vigente).
   - `types/supabase.ts` regenerados. Verificado en prod: 22 tablas.
     Próximo: Sprint 4 — UI del módulo portafolio (Sprint 3, carga del
     piloto Lomas del Bosque, se hace cuando estén los datos de Coda).
+- **2026-05-22 — Sprint 4 (UI del módulo portafolio) completado.** PR #487
+  mergeado. Migración `20260521225606` aplicada en prod: módulos
+  `dilesa.portafolio` y `dilesa.proyectos` registrados en `core.modulos`
+  con backfill de permisos (verificado: 2 roles c/u). UI: pages
+  `/dilesa/portafolio` (lista de activos) y `/dilesa/proyectos` (lista de
+  proyectos) con `DataTable`, filtros (búsqueda + tipo) y `RequireAccess`;
+  sección "Inmobiliario" en el sidebar de DILESA. v0 es lista de lectura
+  — el detalle rico (jerarquía, sub-proyectos, modelo financiero) y la
+  captura/alta quedan como entregable posterior (dependen de D1 y D3).
+  Nota de ejecución: el trabajo nocturno se interrumpió ~1h por una caída
+  temporal del clasificador de Bash (infra) a mitad del Sprint 4; el
+  código quedó guardado y se retomó sin pérdida. **Verificación visual en
+  browser pendiente de Beto** — la UI auth-gated requiere login y CC no
+  puede autenticar; el build de Vercel y el Supabase Preview pasaron.
+  Próximo: Sprint 3 (carga del piloto Lomas del Bosque) + Sprint 5
+  (migrar los 3 anteproyectos restantes), ambos al tener los datos de
+  Coda; y la fase de captura/detalle de la UI tras cerrar D1 y D3.
