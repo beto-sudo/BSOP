@@ -555,3 +555,13 @@ lotificación (agosto 2023, vigente).
     se crearon `activos` — ver Decisiones registradas.
     Próximo: Fase 4 (ventas — pipeline de 17 fases documentado en el
     mapeo § 6, requiere extender el schema con tablas de comercialización).
+- **2026-05-22 — Sprint 4 (detalle de lectura) — drawer de detalle de
+  proyecto.** Tras cargar las 1,590 unidades (Fase 3) no había forma de
+  verlas en la UI: las listas de Sprint 4 eran planas, sin drill-down. Se
+  agregó `components/dilesa/proyecto-detail-drawer.tsx`: click en una fila
+  de `/dilesa/proyectos` abre un `DetailDrawer` con la ficha del proyecto
+  (alcance + costos) y la tabla de sus `dilesa.unidades`, filtrable por
+  estado y tipo de lote. Es el detalle de lectura que el Sprint 4 había
+  diferido — no depende de D1/D3 (esos gatean la captura/alta, no la
+  lectura). Pendiente aún: detalle de activos (mismo patrón) y el modelo
+  financiero proyectado vs comprometido.

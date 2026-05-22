@@ -13,62 +13,34 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { DataTable, type Column } from '@/components/module-page';
 import { Badge } from '@/components/ui/badge';
-import type { BadgeTone } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Landmark, RefreshCw, Search } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
-
-type Proyecto = {
-  id: string;
-  tipo: string;
-  nombre: string;
-  estado: string;
-  fecha_inicio: string | null;
-  presupuesto_estimado: number | null;
-  proyecto_padre_id: string | null;
-};
-
-const TIPO_LABEL: Record<string, string> = {
-  anteproyecto: 'Anteproyecto',
-  desarrollo: 'Desarrollo',
-  remodelacion: 'Remodelación',
-  reconversion: 'Reconversión',
-  subdivision: 'Subdivisión',
-  comercializacion: 'Comercialización',
-  operacion: 'Operación',
-};
-
-const ESTADO_TONE: Record<string, BadgeTone> = {
-  propuesta: 'neutral',
-  analisis: 'info',
-  aprobado: 'info',
-  ejecutando: 'warning',
-  completado: 'success',
-  archivado: 'neutral',
-};
-
-const ESTADO_LABEL: Record<string, string> = {
-  propuesta: 'Propuesta',
-  analisis: 'Análisis',
-  aprobado: 'Aprobado',
-  ejecutando: 'Ejecutando',
-  completado: 'Completado',
-  archivado: 'Archivado',
-};
+import {
+  ProyectoDetailDrawer,
+  type ProyectoDetalle,
+  TIPO_LABEL,
+  ESTADO_TONE,
+  ESTADO_LABEL,
+} from './proyecto-detail-drawer';
 
 export function ProyectosModule({ empresaId }: { empresaId: string }) {
-  const [proyectos, setProyectos] = useState<Proyecto[]>([]);
+  const [proyectos, setProyectos] = useState<ProyectoDetalle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState<string>('');
+  const [selected, setSelected] = useState<ProyectoDetalle | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const fetchProyectos = useCallback(
     () =>
       createSupabaseBrowserClient()
         .schema('dilesa')
         .from('proyectos')
-        .select('id, tipo, nombre, estado, fecha_inicio, presupuesto_estimado, proyecto_padre_id')
+        .select(
+          'id, tipo, nombre, estado, clave_interna, proyecto_padre_id, fecha_inicio, fecha_fin_estimada, fecha_licencia, area_m2, area_vendible_m2, areas_verdes_m2, lotes_proyectados, presupuesto_estimado, costo_terreno, costo_urbanizacion, costo_construccion, costo_comercializacion, notas'
+        )
         .eq('empresa_id', empresaId)
         .is('deleted_at', null)
         .order('nombre'),
@@ -83,7 +55,7 @@ export function ProyectosModule({ empresaId }: { empresaId: string }) {
       setError(getSupabaseErrorMessage(err, 'No se pudieron cargar los proyectos.'));
       setProyectos([]);
     } else {
-      setProyectos((data ?? []) as Proyecto[]);
+      setProyectos((data ?? []) as ProyectoDetalle[]);
     }
     setLoading(false);
   }, [fetchProyectos]);
@@ -98,7 +70,7 @@ export function ProyectosModule({ empresaId }: { empresaId: string }) {
         setError(getSupabaseErrorMessage(err, 'No se pudieron cargar los proyectos.'));
         setProyectos([]);
       } else {
-        setProyectos((data ?? []) as Proyecto[]);
+        setProyectos((data ?? []) as ProyectoDetalle[]);
       }
       setLoading(false);
     });
@@ -116,7 +88,7 @@ export function ProyectosModule({ empresaId }: { empresaId: string }) {
     });
   }, [proyectos, search, tipoFiltro]);
 
-  const columns: Column<Proyecto>[] = [
+  const columns: Column<ProyectoDetalle>[] = [
     { key: 'nombre', label: 'Nombre', type: 'text', sticky: true, width: 'min-w-[220px]' },
     {
       key: 'tipo',
@@ -196,11 +168,17 @@ export function ProyectosModule({ empresaId }: { empresaId: string }) {
         loading={loading}
         error={error}
         onRetry={() => void cargar()}
+        onRowClick={(p) => {
+          setSelected(p);
+          setDrawerOpen(true);
+        }}
         initialSort={{ key: 'nombre', dir: 'asc' }}
         emptyTitle="Sin proyectos"
         emptyDescription="Aún no hay proyectos. Se llenará al importar los datos de Coda."
         emptyIcon={<Landmark className="h-6 w-6" />}
       />
+
+      <ProyectoDetailDrawer proyecto={selected} open={drawerOpen} onOpenChange={setDrawerOpen} />
     </div>
   );
 }
