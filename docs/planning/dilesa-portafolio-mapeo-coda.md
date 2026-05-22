@@ -283,11 +283,92 @@ están en `Prototipos-Viejo` — quedan para captura posterior.
 
 ---
 
-## 6. Ventas → Fase 4 (referencia — no se importa en Fase 3)
+## 6. Ventas → schema de comercialización (Fase 4)
 
-El proceso de ventas de DILESA está documentado en Coda (`grid-a4b0evIc3U`)
-como un **pipeline de 17 fases ordenadas**, cada una con su rol
-responsable, acciones, documentos obligatorios y correos automatizados:
+**Fuente:** la tabla `Clientes` de Coda (`grid-mMIXWCSfyr`) — **1,429 filas**,
+cada una la compra de una unidad por un cliente, 175 columnas. Complementan
+`Depositos Clientes` (`grid-Foeo80pE3s`, pagos) y `Fase de Venta`
+(`grid-a4b0evIc3U`, definición de las 17 fases del pipeline).
+
+El schema v2 no tiene comercialización. Fase 4 agrega 4 tablas a `dilesa` y
+**reusa `erp.personas`** para el comprador (validado con Beto — `erp.personas`
+está documentada "base para empleados, proveedores y clientes" y ya tiene
+los campos del comprador).
+
+### Tablas nuevas
+
+- **`erp.personas`** (reuso, `tipo='cliente'`) — el comprador como persona.
+- **`dilesa.ventas`** — la transacción: liga `persona_id` (→ `erp.personas`,
+  FK cross-schema) y `unidad_id` (→ `dilesa.unidades`); montos, crédito,
+  comisiones, fase actual, KYC/PLD de la operación.
+- **`dilesa.venta_fases`** — log del pipeline: una fila por fase alcanzada
+  (`venta_id`, `fase`, `posicion`, `fecha`, `registrado_por`, `notas`).
+  Reemplaza las 17 columnas planas de Coda y es el timeline del pipeline.
+- **`dilesa.venta_fase_catalogo`** — las 17 fases definidas (nombre,
+  posición, rol). Seed.
+- **`dilesa.venta_pagos`** — los depósitos del cliente (1:N).
+
+### 6.1 Clientes → `erp.personas` (el comprador, `tipo='cliente'`)
+
+| Columna Coda                                    | Destino                                  | Nota                                           |
+| ----------------------------------------------- | ---------------------------------------- | ---------------------------------------------- |
+| Nombre                                          | `personas.nombre`                        |                                                |
+| Apellido Paterno / Materno                      | `personas.apellido_paterno` / `_materno` |                                                |
+| email                                           | `personas.email`                         |                                                |
+| Telefono                                        | `personas.telefono`                      |                                                |
+| CURP                                            | `personas.curp`                          | clave de deduplicación                         |
+| RFC                                             | `personas.rfc`                           | clave de deduplicación (fallback)              |
+| NSS                                             | `personas.nss`                           |                                                |
+| Fecha de Nacimiento                             | `personas.fecha_nacimiento`              |                                                |
+| Nacionalidad                                    | `personas.nacionalidad`                  |                                                |
+| Personalidad                                    | `personas.tipo_persona`                  | física / moral                                 |
+| Compra Soltero/Casado                           | `personas.estado_civil`                  |                                                |
+| Calle/Numero/Colonia/CP/Ciudad/Estado Domicilio | `personas.domicilio`                     | concatenado a texto (v1); estructurado después |
+| —                                               | `personas.tipo = 'cliente'`              | constante                                      |
+
+**Dedup:** upsert por `(empresa_id, CURP)` — si la persona ya existe (otra
+compra, o ya es proveedor) se reusa; si no, se crea.
+
+### 6.2 Clientes → `dilesa.ventas` (la transacción)
+
+| Columna Coda                                                      | Destino `ventas`                                                  | Nota                             |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------- | -------------------------------- |
+| Inventario (lookup)                                               | `unidad_id`                                                       | resuelve a `dilesa.unidades`     |
+| (la persona ↑)                                                    | `persona_id`                                                      | → `erp.personas` (cross-schema)  |
+| Fase de Venta                                                     | `fase_actual`                                                     |                                  |
+| Posición Fase de Venta                                            | `fase_posicion`                                                   | 1-17                             |
+| Tipo de Credito                                                   | `tipo_credito`                                                    | Infonavit / Hipotecario / …      |
+| Valor Comercial                                                   | `valor_comercial`                                                 |                                  |
+| Valor de Escrituración                                            | `valor_escrituracion`                                             |                                  |
+| Precio De Asignación                                              | `precio_asignacion`                                               |                                  |
+| Monto de Credito Titular / Co-Titular                             | `monto_credito_titular` / `_cotitular`                            |                                  |
+| Numero del Crédito Titular/Co-Titular e Institución               | `credito_titular_ref` / `_cotitular_ref`                          |                                  |
+| Enganche Requerido                                                | `enganche_requerido`                                              |                                  |
+| Descuento Otorgado Total                                          | `descuento_total`                                                 |                                  |
+| Comision Vendedor / Gerencia de Ventas                            | `comision_vendedor` / `comision_gerencia`                         |                                  |
+| Anticipo Comision por Asignacion                                  | `anticipo_comision`                                               |                                  |
+| Vendedor (person)                                                 | `vendedor`                                                        | texto; link a empleados, después |
+| Notario / Casa Valuadora                                          | `notario` / `casa_valuadora`                                      | texto                            |
+| Monto Avalúo / Gastos Escrituración                               | `monto_avaluo` / `gastos_escrituracion`                           |                                  |
+| #Escritura / Fecha de Escritura                                   | `numero_escritura` / `fecha_escritura`                            |                                  |
+| Persona Políticamente Expuesta                                    | `es_pep`                                                          | KYC/PLD de la operación          |
+| Actividad Ocupacion o Profesion                                   | `ocupacion`                                                       | KYC/PLD                          |
+| Numero de Credencial INE                                          | `ine_numero`                                                      | KYC/PLD                          |
+| Forma de Pago / Uso de Efectivo / Conocimiento Dueño Beneficiario | `forma_pago` / `uso_efectivo` / `conocimiento_dueno_beneficiario` | cuestionario PLD                 |
+| Motivo por el cual se libera inventario                           | `motivo_desasignacion`                                            | si fue desasignada               |
+| (de F📅Desasigna)                                                 | `estado`                                                          | `activa` / `desasignada`         |
+
+> **KYC/PLD en `ventas`, no en `personas`:** PEP, ocupación, INE, forma de
+> pago, uso de efectivo se capturan **por operación** (cuestionario PLD del
+> trámite), no son atributos atemporales de la persona. Evita además
+> extender la tabla compartida `erp.personas`.
+
+### 6.3 Las 17 fechas del pipeline → `dilesa.venta_fases`
+
+Las 17 columnas `F📅<fase>` de Coda → una fila en `venta_fases` por cada
+fase con fecha (`venta_id`, `fase`, `posicion`, `fecha`). Reemplaza las
+columnas planas — eran limitación de Coda. El catálogo
+`venta_fase_catalogo` (seed) define las 17 fases:
 
 | #   | Fase                       | Rol (Coda)          |
 | --- | -------------------------- | ------------------- |
@@ -309,12 +390,61 @@ responsable, acciones, documentos obligatorios y correos automatizados:
 | 16  | Comisión Pagada            | Comité              |
 | 17  | Operación Terminada        | Administración      |
 
-Fase 4 implementará este pipeline. Requiere extender el schema v2 con
-estructura de comercialización (clientes, ventas, fases de venta con sus
-documentos y correos) — no existe en v2. El `unidades.estado` de Fase 3
-es la proyección gruesa de este pipeline (terminada → asignada → vendida
-→ escriturada → entregada); el seguimiento fino de 17 fases por cliente
-es de Fase 4.
+`registrado_por` (quién avanzó la fase) queda NULL en lo importado — Coda
+no expone su log de actividad por API. Se llena hacia adelante cuando BSOP
+captura. Ver § 6.6.
+
+### 6.4 Depósitos → `dilesa.venta_pagos`
+
+Tabla `Depositos Clientes` de Coda (`grid-Foeo80pE3s`), ligada al cliente:
+
+| Columna Coda     | Destino `venta_pagos`              |
+| ---------------- | ---------------------------------- |
+| Cliente (lookup) | `venta_id` (resuelve vía la venta) |
+| Fecha Deposito   | `fecha`                            |
+| Monto Deposito   | `monto`                            |
+| Tipo de Deposito | `tipo`                             |
+
+### 6.5 No se importan en Fase 4 (Ventas)
+
+- **Expediente digital** — ~18 columnas de PDF adjuntos. **No es "no se
+  importa"**: se migra como **Fase 4.5** dedicada — ver § 6.7.
+- **Derivados** — las 16 columnas `D⏱<fase>` (duración), Tiempo en Fase,
+  Cronología, Datos de Operación, Año-Mes Escritura, Saldo Cliente,
+  Depositos Recibidos, Venta Futuro, Valor Real Venta — fórmulas; se
+  recalculan en vista.
+- **Posventa** — Encuesta Satisfacción, Revisión Pre-Entrega — fase
+  posterior.
+- **Estado del inventario** — Estatus Inventario, Avance, DTU, fechas de
+  obra: ya viven en `dilesa.unidades` (Fase 3).
+- **Botones y metadata de Coda** — \*Desasigna, \*Autoriza Comisión,
+  Created by, Row ID, etc.
+
+### 6.6 Activity log (timeline de actividad)
+
+Beto pidió un timeline de quién/cuándo/qué. **BSOP ya lo tiene** (ADR-023):
+`core.audit_log` (auditoría genérica) + el componente `<ActivityLog>`. El
+timeline del pipeline sale de `venta_fases`; el log fino de cambios de
+campo, de `core.audit_log`, que se llena en los puntos de captura cuando
+se construya la UI de ventas. El log interno de Coda no es exportable por
+API — el historial granular viejo no migra.
+
+### 6.7 Expediente digital → `erp.adjuntos` (Fase 4.5)
+
+Cada cliente de Coda trae ~18 columnas de PDF (CURP, actas, INE, CSF,
+contrato, avalúo, recibos, carta notarial, checklists, pagaré…). Es el
+expediente legal/PLD de la venta — necesario para soporte. **No requiere
+schema nuevo**: `erp.adjuntos` es la tabla de adjuntos polimórficos
+(`entidad_tipo`, `entidad_id`, `rol`, `url`, `tipo_mime`, `tamano_bytes`).
+Cada PDF → una fila con `entidad_tipo='venta'`, `entidad_id` = la venta,
+`rol` = tipo de documento.
+
+La migración es un **job dedicado (Fase 4.5)**, separado del import de
+datos de Fase 4: los PDFs viven en el storage de Coda y hay que
+descargarlos y re-alojarlos en Supabase Storage (decenas de miles de
+archivos). Corre **después** de Fase 4 (necesita los `venta_id`). Hacia
+adelante, la UI de ventas sube los expedientes nuevos directo a
+`erp.adjuntos`.
 
 ---
 
@@ -359,17 +489,30 @@ es de Fase 4.
    muestra capturada en UI) choca al segundo NULL. Se arregla de paso
    a `UNIQUE` normal (NULLs distintos), igual que `proyectos.clave_interna`.
 
+### Para Fase 4 (Ventas)
+
+8. **Crear 4 tablas nuevas en `dilesa`** (detalle en § 6): `ventas`,
+   `venta_fases`, `venta_fase_catalogo`, `venta_pagos` — con RLS, trigger
+   `updated_at`, índices. `ventas.persona_id` es FK **cross-schema** a
+   `erp.personas`.
+9. **Seed de `venta_fase_catalogo`** con las 17 fases (§ 6.3).
+10. **`erp.personas` no se extiende** — ya tiene los campos del comprador
+    (nombre, contacto, RFC, CURP, NSS, fecha_nacimiento, domicilio,
+    nacionalidad, estado_civil). Los compradores entran con `tipo='cliente'`.
+
 ## Orden de importación
 
 1. ✅ **Terrenos** (Fase 1, PR #489) → `activos` + `activo_terreno`.
 2. ✅ **Anteproyectos + Proyectos** (Fase 2, PR #490) → `proyectos` +
    `proyecto_activos`.
-3. **Inventario** (Fase 3) → `unidades` + `productos`. No crea `activos`
-   (ver § 4).
-4. **Ventas** (Fase 4) → requiere extender el schema con tablas de
-   comercialización (clientes, ventas/contratos) — no existen en v2.
-   Aporta el "a quién" y el detalle de contrato/pago/comisión.
-   Pipeline de 17 fases documentado en § 6.
+3. ✅ **Inventario** (Fase 3, PR #491) → `unidades` + `productos`. No crea
+   `activos` (ver § 4).
+4. **Ventas** (Fase 4) → `erp.personas` (cliente, `tipo='cliente'`) +
+   `dilesa.ventas` + `venta_fases` + `venta_fase_catalogo` + `venta_pagos`.
+   Aporta el "a quién" y el pipeline de 17 fases. Detalle completo en § 6.
+5. **Expediente digital** (Fase 4.5) → `erp.adjuntos`. Job de migración de
+   archivos (descarga de Coda + re-alojo en Supabase Storage). Corre
+   después de Fase 4 — necesita los `venta_id`. Ver § 6.7.
 
 Cada fase es un script reproducible en `scripts/`; se valida un lote
 antes del siguiente.
