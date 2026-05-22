@@ -91,9 +91,11 @@ COMMENT ON TABLE dilesa.activos IS
   'Portafolio de activos DILESA (master). Discriminador `tipo`; campos específicos por tipo en satélites dilesa.activo_<tipo>. Jerarquía padre/hijo via activo_padre_id. Ver ADR-009/010.';
 
 -- ════════════════════════════════════════════════════════════════════════════
--- 2) Satélites de activo (1:1 con el master, por tipo)
---    Solo se crean los tipos con campos propios usados ya por el piloto
---    Lomas del Bosque (terreno, lote). Los demás se agregan on-demand.
+-- 2) Satélites de activo (1:1 con el master, uno por tipo)
+--    Un satélite por cada tipo de activo con campos propios. Diseñados con
+--    criterio de dominio inmobiliario — NO copiados de Coda (que está
+--    deficiente). La importación desde Coda llenará lo que traiga; los
+--    campos sin dato quedan NULL y se completan después.
 -- ════════════════════════════════════════════════════════════════════════════
 CREATE TABLE dilesa.activo_terreno (
   activo_id  uuid PRIMARY KEY REFERENCES dilesa.activos(id) ON DELETE CASCADE,
@@ -150,6 +152,273 @@ CREATE TRIGGER dilesa_activo_lote_updated_at
   FOR EACH ROW EXECUTE FUNCTION core.fn_set_updated_at();
 COMMENT ON TABLE dilesa.activo_lote IS
   'Satélite 1:1 de dilesa.activos para tipo=lote: manzana, número, condición, dimensiones.';
+
+-- activo_espectacular — estructura publicitaria tipo panel
+CREATE TABLE dilesa.activo_espectacular (
+  activo_id  uuid PRIMARY KEY REFERENCES dilesa.activos(id) ON DELETE CASCADE,
+  empresa_id uuid NOT NULL REFERENCES core.empresas(id) ON DELETE RESTRICT,
+  caras                   integer,
+  ancho_m                 numeric(8, 2),
+  alto_m                  numeric(8, 2),
+  iluminado               boolean,
+  orientacion             text,
+  vialidad                text,
+  trafico_estimado_diario integer,
+  anunciante_actual       text,
+  renta_mensual           numeric(14, 2),
+  contrato_vigente_hasta  date,
+  notas      text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE dilesa.activo_espectacular ENABLE ROW LEVEL SECURITY;
+CREATE POLICY activo_espectacular_select ON dilesa.activo_espectacular
+  FOR SELECT TO authenticated
+  USING (core.fn_has_empresa(empresa_id) OR core.fn_is_admin());
+CREATE POLICY activo_espectacular_write ON dilesa.activo_espectacular
+  FOR ALL TO authenticated
+  USING (core.fn_has_empresa(empresa_id) OR core.fn_is_admin())
+  WITH CHECK (core.fn_has_empresa(empresa_id) OR core.fn_is_admin());
+CREATE TRIGGER dilesa_activo_espectacular_updated_at
+  BEFORE UPDATE ON dilesa.activo_espectacular
+  FOR EACH ROW EXECUTE FUNCTION core.fn_set_updated_at();
+COMMENT ON TABLE dilesa.activo_espectacular IS
+  'Satélite 1:1 de dilesa.activos para tipo=espectacular: panel publicitario sobre estructura.';
+
+-- activo_unipolar — panel publicitario sobre poste único
+CREATE TABLE dilesa.activo_unipolar (
+  activo_id  uuid PRIMARY KEY REFERENCES dilesa.activos(id) ON DELETE CASCADE,
+  empresa_id uuid NOT NULL REFERENCES core.empresas(id) ON DELETE RESTRICT,
+  caras                   integer,
+  ancho_m                 numeric(8, 2),
+  alto_m                  numeric(8, 2),
+  altura_poste_m          numeric(8, 2),
+  iluminado               boolean,
+  orientacion             text,
+  vialidad                text,
+  trafico_estimado_diario integer,
+  anunciante_actual       text,
+  renta_mensual           numeric(14, 2),
+  contrato_vigente_hasta  date,
+  notas      text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE dilesa.activo_unipolar ENABLE ROW LEVEL SECURITY;
+CREATE POLICY activo_unipolar_select ON dilesa.activo_unipolar
+  FOR SELECT TO authenticated
+  USING (core.fn_has_empresa(empresa_id) OR core.fn_is_admin());
+CREATE POLICY activo_unipolar_write ON dilesa.activo_unipolar
+  FOR ALL TO authenticated
+  USING (core.fn_has_empresa(empresa_id) OR core.fn_is_admin())
+  WITH CHECK (core.fn_has_empresa(empresa_id) OR core.fn_is_admin());
+CREATE TRIGGER dilesa_activo_unipolar_updated_at
+  BEFORE UPDATE ON dilesa.activo_unipolar
+  FOR EACH ROW EXECUTE FUNCTION core.fn_set_updated_at();
+COMMENT ON TABLE dilesa.activo_unipolar IS
+  'Satélite 1:1 de dilesa.activos para tipo=unipolar: panel publicitario sobre poste único.';
+
+-- activo_casa — vivienda unifamiliar
+CREATE TABLE dilesa.activo_casa (
+  activo_id  uuid PRIMARY KEY REFERENCES dilesa.activos(id) ON DELETE CASCADE,
+  empresa_id uuid NOT NULL REFERENCES core.empresas(id) ON DELETE RESTRICT,
+  recamaras           integer,
+  banos               numeric(4, 1),
+  m2_construccion     numeric(10, 2),
+  m2_terreno          numeric(10, 2),
+  niveles             integer,
+  cochera_autos       integer,
+  ano_construccion    integer,
+  estado_conservacion text,
+  notas      text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE dilesa.activo_casa ENABLE ROW LEVEL SECURITY;
+CREATE POLICY activo_casa_select ON dilesa.activo_casa
+  FOR SELECT TO authenticated
+  USING (core.fn_has_empresa(empresa_id) OR core.fn_is_admin());
+CREATE POLICY activo_casa_write ON dilesa.activo_casa
+  FOR ALL TO authenticated
+  USING (core.fn_has_empresa(empresa_id) OR core.fn_is_admin())
+  WITH CHECK (core.fn_has_empresa(empresa_id) OR core.fn_is_admin());
+CREATE TRIGGER dilesa_activo_casa_updated_at
+  BEFORE UPDATE ON dilesa.activo_casa
+  FOR EACH ROW EXECUTE FUNCTION core.fn_set_updated_at();
+COMMENT ON TABLE dilesa.activo_casa IS
+  'Satélite 1:1 de dilesa.activos para tipo=casa: vivienda unifamiliar.';
+
+-- activo_departamento — unidad habitacional en edificio/complejo
+CREATE TABLE dilesa.activo_departamento (
+  activo_id  uuid PRIMARY KEY REFERENCES dilesa.activos(id) ON DELETE CASCADE,
+  empresa_id uuid NOT NULL REFERENCES core.empresas(id) ON DELETE RESTRICT,
+  recamaras               integer,
+  banos                   numeric(4, 1),
+  m2_construccion         numeric(10, 2),
+  nivel                   integer,
+  tiene_balcon            boolean,
+  cajones_estacionamiento integer,
+  mantenimiento_mensual   numeric(12, 2),
+  notas      text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE dilesa.activo_departamento ENABLE ROW LEVEL SECURITY;
+CREATE POLICY activo_departamento_select ON dilesa.activo_departamento
+  FOR SELECT TO authenticated
+  USING (core.fn_has_empresa(empresa_id) OR core.fn_is_admin());
+CREATE POLICY activo_departamento_write ON dilesa.activo_departamento
+  FOR ALL TO authenticated
+  USING (core.fn_has_empresa(empresa_id) OR core.fn_is_admin())
+  WITH CHECK (core.fn_has_empresa(empresa_id) OR core.fn_is_admin());
+CREATE TRIGGER dilesa_activo_departamento_updated_at
+  BEFORE UPDATE ON dilesa.activo_departamento
+  FOR EACH ROW EXECUTE FUNCTION core.fn_set_updated_at();
+COMMENT ON TABLE dilesa.activo_departamento IS
+  'Satélite 1:1 de dilesa.activos para tipo=departamento: unidad habitacional en edificio o complejo.';
+
+-- activo_local — local comercial
+CREATE TABLE dilesa.activo_local (
+  activo_id  uuid PRIMARY KEY REFERENCES dilesa.activos(id) ON DELETE CASCADE,
+  empresa_id uuid NOT NULL REFERENCES core.empresas(id) ON DELETE RESTRICT,
+  m2_rentable    numeric(10, 2),
+  frente_m       numeric(8, 2),
+  planta         text,
+  giro_permitido text,
+  tiene_bodega   boolean,
+  banos          integer,
+  estado_obra    text,
+  notas      text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT activo_local_estado_obra_check
+    CHECK (estado_obra IS NULL OR estado_obra IN ('obra_gris','acabados','habilitado'))
+);
+ALTER TABLE dilesa.activo_local ENABLE ROW LEVEL SECURITY;
+CREATE POLICY activo_local_select ON dilesa.activo_local
+  FOR SELECT TO authenticated
+  USING (core.fn_has_empresa(empresa_id) OR core.fn_is_admin());
+CREATE POLICY activo_local_write ON dilesa.activo_local
+  FOR ALL TO authenticated
+  USING (core.fn_has_empresa(empresa_id) OR core.fn_is_admin())
+  WITH CHECK (core.fn_has_empresa(empresa_id) OR core.fn_is_admin());
+CREATE TRIGGER dilesa_activo_local_updated_at
+  BEFORE UPDATE ON dilesa.activo_local
+  FOR EACH ROW EXECUTE FUNCTION core.fn_set_updated_at();
+COMMENT ON TABLE dilesa.activo_local IS
+  'Satélite 1:1 de dilesa.activos para tipo=local: local comercial.';
+
+-- activo_plaza — plaza comercial (activo padre de locales)
+CREATE TABLE dilesa.activo_plaza (
+  activo_id  uuid PRIMARY KEY REFERENCES dilesa.activos(id) ON DELETE CASCADE,
+  empresa_id uuid NOT NULL REFERENCES core.empresas(id) ON DELETE RESTRICT,
+  locales_totales         integer,
+  area_rentable_total_m2  numeric(12, 2),
+  area_comun_m2           numeric(12, 2),
+  cajones_estacionamiento integer,
+  tiene_anchor            boolean,
+  anchor_nombre           text,
+  notas      text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE dilesa.activo_plaza ENABLE ROW LEVEL SECURITY;
+CREATE POLICY activo_plaza_select ON dilesa.activo_plaza
+  FOR SELECT TO authenticated
+  USING (core.fn_has_empresa(empresa_id) OR core.fn_is_admin());
+CREATE POLICY activo_plaza_write ON dilesa.activo_plaza
+  FOR ALL TO authenticated
+  USING (core.fn_has_empresa(empresa_id) OR core.fn_is_admin())
+  WITH CHECK (core.fn_has_empresa(empresa_id) OR core.fn_is_admin());
+CREATE TRIGGER dilesa_activo_plaza_updated_at
+  BEFORE UPDATE ON dilesa.activo_plaza
+  FOR EACH ROW EXECUTE FUNCTION core.fn_set_updated_at();
+COMMENT ON TABLE dilesa.activo_plaza IS
+  'Satélite 1:1 de dilesa.activos para tipo=plaza: plaza comercial, activo padre de locales.';
+
+-- activo_edificio — edificio (oficinas / mixto / habitacional)
+CREATE TABLE dilesa.activo_edificio (
+  activo_id  uuid PRIMARY KEY REFERENCES dilesa.activos(id) ON DELETE CASCADE,
+  empresa_id uuid NOT NULL REFERENCES core.empresas(id) ON DELETE RESTRICT,
+  niveles                 integer,
+  m2_rentable_total       numeric(12, 2),
+  m2_construccion_total   numeric(12, 2),
+  elevadores              integer,
+  uso                     text,
+  cajones_estacionamiento integer,
+  notas      text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE dilesa.activo_edificio ENABLE ROW LEVEL SECURITY;
+CREATE POLICY activo_edificio_select ON dilesa.activo_edificio
+  FOR SELECT TO authenticated
+  USING (core.fn_has_empresa(empresa_id) OR core.fn_is_admin());
+CREATE POLICY activo_edificio_write ON dilesa.activo_edificio
+  FOR ALL TO authenticated
+  USING (core.fn_has_empresa(empresa_id) OR core.fn_is_admin())
+  WITH CHECK (core.fn_has_empresa(empresa_id) OR core.fn_is_admin());
+CREATE TRIGGER dilesa_activo_edificio_updated_at
+  BEFORE UPDATE ON dilesa.activo_edificio
+  FOR EACH ROW EXECUTE FUNCTION core.fn_set_updated_at();
+COMMENT ON TABLE dilesa.activo_edificio IS
+  'Satélite 1:1 de dilesa.activos para tipo=edificio.';
+
+-- activo_nave — nave industrial
+CREATE TABLE dilesa.activo_nave (
+  activo_id  uuid PRIMARY KEY REFERENCES dilesa.activos(id) ON DELETE CASCADE,
+  empresa_id uuid NOT NULL REFERENCES core.empresas(id) ON DELETE RESTRICT,
+  m2_techados           numeric(12, 2),
+  m2_patio              numeric(12, 2),
+  altura_libre_m        numeric(8, 2),
+  andenes_carga         integer,
+  subestacion_electrica boolean,
+  uso_suelo_industrial  boolean,
+  notas      text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE dilesa.activo_nave ENABLE ROW LEVEL SECURITY;
+CREATE POLICY activo_nave_select ON dilesa.activo_nave
+  FOR SELECT TO authenticated
+  USING (core.fn_has_empresa(empresa_id) OR core.fn_is_admin());
+CREATE POLICY activo_nave_write ON dilesa.activo_nave
+  FOR ALL TO authenticated
+  USING (core.fn_has_empresa(empresa_id) OR core.fn_is_admin())
+  WITH CHECK (core.fn_has_empresa(empresa_id) OR core.fn_is_admin());
+CREATE TRIGGER dilesa_activo_nave_updated_at
+  BEFORE UPDATE ON dilesa.activo_nave
+  FOR EACH ROW EXECUTE FUNCTION core.fn_set_updated_at();
+COMMENT ON TABLE dilesa.activo_nave IS
+  'Satélite 1:1 de dilesa.activos para tipo=nave: nave industrial / bodega.';
+
+-- activo_infraestructura — vialidades, canales, áreas verdes, equipamiento
+CREATE TABLE dilesa.activo_infraestructura (
+  activo_id  uuid PRIMARY KEY REFERENCES dilesa.activos(id) ON DELETE CASCADE,
+  empresa_id uuid NOT NULL REFERENCES core.empresas(id) ON DELETE RESTRICT,
+  subtipo               text,
+  longitud_m            numeric(12, 2),
+  estado_mantenimiento  text,
+  entregado_a_municipio boolean,
+  notas      text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT activo_infraestructura_subtipo_check
+    CHECK (subtipo IS NULL OR subtipo IN ('vialidad','canal','area_verde','equipamiento'))
+);
+ALTER TABLE dilesa.activo_infraestructura ENABLE ROW LEVEL SECURITY;
+CREATE POLICY activo_infraestructura_select ON dilesa.activo_infraestructura
+  FOR SELECT TO authenticated
+  USING (core.fn_has_empresa(empresa_id) OR core.fn_is_admin());
+CREATE POLICY activo_infraestructura_write ON dilesa.activo_infraestructura
+  FOR ALL TO authenticated
+  USING (core.fn_has_empresa(empresa_id) OR core.fn_is_admin())
+  WITH CHECK (core.fn_has_empresa(empresa_id) OR core.fn_is_admin());
+CREATE TRIGGER dilesa_activo_infraestructura_updated_at
+  BEFORE UPDATE ON dilesa.activo_infraestructura
+  FOR EACH ROW EXECUTE FUNCTION core.fn_set_updated_at();
+COMMENT ON TABLE dilesa.activo_infraestructura IS
+  'Satélite 1:1 de dilesa.activos para tipo=infraestructura: vialidades, canales, áreas verdes, equipamiento.';
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- 3) dilesa.proyectos_plantillas — plantillas editables por tipo de proyecto
