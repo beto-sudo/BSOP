@@ -4,16 +4,18 @@
 **Empresas:** DILESA (Desarrollo Inmobiliario Los Encinos S.A. de C.V.)
 **Schemas afectados:** `dilesa` (rediseño completo del schema, deprecación de
 las tablas viejas), `core.empresas` (lectura)
-**Estado:** proposed
+**Estado:** planned
 **Dueño:** Beto
 **Creada:** 2026-05-08
-**Última actualización:** 2026-05-08 (corte limpio adelantado al Sprint 1:
-los 4 módulos viejos nunca tuvieron captura productiva — fueron una
-migración apurada de tablas desde Coda — así que se borran al inicio en
-lugar de al final; D-questions renumeradas tras este cambio: la "D2
-coexistencia paralela" original se elimina por irrelevante con el corte
-limpio, quedan **D1-D3 nuevas** abiertas para subir a `planned`. Listado
-canónico en § Riesgos / preguntas abiertas)
+**Última actualización:** 2026-05-21 (promovida a `planned`: alcance v1
+cerrado, arranca Sprint 1 — Demolición. Modo de ejecución acordado:
+autónomo con checkpoints — CC ejecuta y mergea con CI verde, pausa para
+OK de Beto en los 4 momentos de riesgo (DROP en S1, schema nuevo en S2,
+carga de Lomas del Bosque en S3, migración de los 3 anteproyectos en S5).
+D1-D3 no bloquean el arranque: D2/D3 se cierran en S2, D1 en S4. Corte
+limpio adelantado al Sprint 1 — los 4 módulos viejos nunca tuvieron
+captura productiva; D-questions renumeradas, listado canónico en
+§ Riesgos / preguntas abiertas)
 
 ## Problema
 
@@ -393,6 +395,28 @@ lotificación (agosto 2023, vigente).
 
 (append-only, escrito por Claude Code al ejecutar)
 
+- **2026-05-21 — Modo de ejecución: autónomo con checkpoints.** CC ejecuta
+  y mergea cada sprint con CI verde de forma autónoma; pausa para OK
+  verbal de Beto en los 4 momentos de riesgo: aplicar el DROP (S1), aplicar
+  el schema nuevo (S2), cargar la data real de Lomas del Bosque (S3),
+  migrar los 3 anteproyectos restantes desde Coda (S5). Sprint 4 (UI)
+  corre sin interrupciones. Razón: balance velocidad/control — los sprints
+  con DDL destructivo o data productiva tienen checkpoint humano; los de
+  código puro no.
+- **2026-05-21 — Sprint 1 incluye cleanup de `analytics.metric_dictionary`.**
+  El reconocimiento previo al arranque encontró que además de
+  `analytics.mv_dilesa_pipeline`, hay una fila en
+  `analytics.metric_dictionary` (`dilesa_lote_dias_pipeline`) que apunta a
+  esa MV. La migración `_dilesa_v1_drop.sql` borra esa fila junto con la
+  MV. Fuera de eso, el reconocimiento confirmó cero dependencias
+  cross-schema ocultas — el DROP CASCADE de `dilesa` es seguro.
+
 ## Bitácora
 
 (append-only, escrito por Claude Code al ejecutar)
+
+- **2026-05-21 — Iniciativa promovida a `planned`.** Tras brainstorm
+  (modelo Portafolio ↔ Proyectos con jerarquía padre/hijo, validado contra
+  el caso Lomas del Bosque), review de codex y ultrareview (PRs #457 y
+  #458, ya mergeados), y reconocimiento del inventario de demolición.
+  Alcance v1 cerrado en 5 sprints. Próximo: Sprint 1 — Demolición.
