@@ -181,6 +181,8 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   'dilesa.rh.puestos',
   'dilesa.rh.departamentos',
   'dilesa.proveedores',
+  'dilesa.portafolio',
+  'dilesa.proyectos',
 
   // RDB
   'rdb.home',
