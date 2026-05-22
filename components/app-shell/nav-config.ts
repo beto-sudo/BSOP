@@ -68,6 +68,13 @@ export const NAV_ITEMS: NavItem[] = [
         label: 'Compras',
         children: [{ label: 'Proveedores', href: '/dilesa/proveedores' }],
       },
+      {
+        label: 'Inmobiliario',
+        children: [
+          { label: 'Portafolio', href: '/dilesa/portafolio' },
+          { label: 'Proyectos', href: '/dilesa/proyectos' },
+        ],
+      },
     ],
   },
   {
