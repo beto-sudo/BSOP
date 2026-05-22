@@ -8,12 +8,13 @@ las tablas viejas), `core.empresas` (lectura)
 **Dueño:** Beto
 **Creada:** 2026-05-08
 **Última actualización:** 2026-05-22 (Sprints 1, 2 y 4 completados;
-Sprint 3 en curso — importación desde Coda por fases: Fase 1 (25
-terrenos), Fase 2 (5 anteproyectos + 8 proyectos) y Fase 3 (1,590
-unidades + 14 productos) cargadas en prod. Próximo: Fase 4 (ventas —
-pipeline de 17 fases, requiere extender el schema con tablas de
-comercialización). D2 cerrada en ADR-010; D1 y D3 abren la fase de
-captura/detalle de la UI.)
+Sprint 3 — importación desde Coda — con Fases 1 (25 terrenos), 2 (13
+proyectos), 3 (1,590 unidades + 14 productos) y **4 (1,425 ventas + 1,107
+personas + 13,936 fases de pipeline + 1,087 pagos)** cargadas en prod.
+Próximo: Fase 4.5 (job de migración del expediente digital — PDFs de
+Coda a Supabase Storage + `erp.adjuntos`); UI de detalle de venta + de
+activo; activity log. D2 cerrada en ADR-010; D1 y D3 abren la fase de
+captura/alta de la UI.)
 
 ## Problema
 
@@ -464,6 +465,26 @@ lotificación (agosto 2023, vigente).
   desincorporado" pero se descartó: duplicaría cada unidad sin agregar
   trazabilidad. La escrituración (no la entrega) es la desincorporación.
   Detalle: mapeo §§ 4-5.
+- **2026-05-22 — El comprador reusa `erp.personas` (tipo='cliente'), no
+  una tabla `dilesa.clientes` propia.** Decisión de Beto al diseñar Fase 4:
+  un comprador es una persona, y `erp.personas` ya es la tabla canónica
+  ("base para empleados, proveedores y clientes" por documentación). Ya
+  tenía todos los campos (CURP, RFC, NSS, fecha_nacimiento, domicilio,
+  nacionalidad, estado_civil) — no se extendió. La FK queda cross-schema
+  (`dilesa.ventas.persona_id → erp.personas.id`); supabase-js no embebe
+  joins cross-schema, los reads piden dos queries — patrón ya usado en
+  BSOP. Los campos KYC/PLD (PEP, ocupación, INE, forma de pago, uso de
+  efectivo) viven en `dilesa.ventas` y no en `erp.personas` porque son del
+  trámite, no atributos atemporales de la persona — además evita
+  extender la tabla compartida. Detalle: mapeo § 6.
+- **2026-05-22 — `dilesa.ventas.unidad_id` nullable.** Originalmente NOT
+  NULL; cambiado a nullable al ver el shape de los datos: ~210 de 1,425
+  ventas son desasignaciones viejas a las que Coda ya no les amarra la
+  unidad (ni en `Inventario` ni en `Inventario Desasignado`). NOT NULL
+  habría obligado a tirar esas filas o inventar un vínculo. Nullable
+  conserva la venta completa (comprador, montos, pipeline, motivo) — solo
+  pierde la referencia a la unidad, que ya estaba perdida en Coda. El
+  import reporta el conteo de las sin unidad.
 
 ## Bitácora
 
@@ -565,3 +586,20 @@ lotificación (agosto 2023, vigente).
   diferido — no depende de D1/D3 (esos gatean la captura/alta, no la
   lectura). Pendiente aún: detalle de activos (mismo patrón) y el modelo
   financiero proyectado vs comprometido.
+- **2026-05-22 — Sprint 3 — Fase 4 (Ventas) completada.**
+  `scripts/import_dilesa_ventas.ts` cargó las 1,429 filas de la tabla
+  `Clientes` de Coda al schema de comercialización nuevo: **1,425 ventas**
+  (4 omitidas sin nombre) ligadas a 1,107 personas nuevas en `erp.personas`
+  (tipo='cliente', dedup por CURP), 318 reusadas; **13,936 filas de
+  `venta_fases`** (el timeline del pipeline de 17 fases, ~10 fases por
+  venta); **1,087 `venta_pagos`** (de 1,096 depósitos, 9 huérfanos
+  omitidos). 210 ventas con `unidad_id` NULL (desasignaciones viejas sin
+  vínculo recuperable). La migración
+  `20260522212328_dilesa_v2_comercializacion.sql` creó 4 tablas
+  (`ventas`, `venta_fase_catalogo`, `venta_fases`, `venta_pagos`) con
+  RLS, triggers e índices; seed del catálogo de 17 fases. La FK
+  `dilesa.ventas.persona_id → erp.personas.id` es cross-schema —
+  `erp.personas` ya estaba documentada "base para empleados, proveedores
+  y clientes" y tiene todos los campos del comprador (no se extendió).
+  El expediente digital (PDFs) queda para Fase 4.5 (job de migración de
+  archivos). Próximo: Fase 4.5 + UI de detalle de venta + activity log.

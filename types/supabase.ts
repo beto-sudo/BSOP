@@ -1941,6 +1941,270 @@ export type Database = {
           },
         ]
       }
+      venta_fase_catalogo: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          descripcion: string | null
+          empresa_id: string
+          id: string
+          nombre: string
+          posicion: number
+          rol: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id: string
+          id?: string
+          nombre: string
+          posicion: number
+          rol?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string
+          id?: string
+          nombre?: string
+          posicion?: number
+          rol?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      venta_fases: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          fase: string
+          fecha: string | null
+          id: string
+          notas: string | null
+          posicion: number | null
+          registrado_por: string | null
+          updated_at: string
+          venta_id: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          fase: string
+          fecha?: string | null
+          id?: string
+          notas?: string | null
+          posicion?: number | null
+          registrado_por?: string | null
+          updated_at?: string
+          venta_id: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          fase?: string
+          fecha?: string | null
+          id?: string
+          notas?: string | null
+          posicion?: number | null
+          registrado_por?: string | null
+          updated_at?: string
+          venta_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venta_fases_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "ventas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      venta_pagos: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          fecha: string | null
+          id: string
+          monto: number
+          notas: string | null
+          tipo: string | null
+          updated_at: string
+          venta_id: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          fecha?: string | null
+          id?: string
+          monto: number
+          notas?: string | null
+          tipo?: string | null
+          updated_at?: string
+          venta_id: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          fecha?: string | null
+          id?: string
+          monto?: number
+          notas?: string | null
+          tipo?: string | null
+          updated_at?: string
+          venta_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venta_pagos_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "ventas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ventas: {
+        Row: {
+          anticipo_comision: number | null
+          casa_valuadora: string | null
+          comision_gerencia: number | null
+          comision_vendedor: number | null
+          conocimiento_dueno_beneficiario: string | null
+          created_at: string
+          credito_cotitular_ref: string | null
+          credito_titular_ref: string | null
+          deleted_at: string | null
+          descuento_total: number | null
+          empresa_id: string
+          enganche_requerido: number | null
+          es_pep: boolean | null
+          estado: string
+          fase_actual: string | null
+          fase_posicion: number | null
+          fecha_escritura: string | null
+          forma_pago: string | null
+          gastos_escrituracion: number | null
+          id: string
+          ine_numero: string | null
+          monto_avaluo: number | null
+          monto_credito_cotitular: number | null
+          monto_credito_titular: number | null
+          motivo_desasignacion: string | null
+          notario: string | null
+          notas: string | null
+          numero_escritura: string | null
+          ocupacion: string | null
+          persona_id: string
+          precio_asignacion: number | null
+          tipo_credito: string | null
+          unidad_id: string | null
+          updated_at: string
+          uso_efectivo: string | null
+          valor_comercial: number | null
+          valor_escrituracion: number | null
+          vendedor: string | null
+        }
+        Insert: {
+          anticipo_comision?: number | null
+          casa_valuadora?: string | null
+          comision_gerencia?: number | null
+          comision_vendedor?: number | null
+          conocimiento_dueno_beneficiario?: string | null
+          created_at?: string
+          credito_cotitular_ref?: string | null
+          credito_titular_ref?: string | null
+          deleted_at?: string | null
+          descuento_total?: number | null
+          empresa_id: string
+          enganche_requerido?: number | null
+          es_pep?: boolean | null
+          estado?: string
+          fase_actual?: string | null
+          fase_posicion?: number | null
+          fecha_escritura?: string | null
+          forma_pago?: string | null
+          gastos_escrituracion?: number | null
+          id?: string
+          ine_numero?: string | null
+          monto_avaluo?: number | null
+          monto_credito_cotitular?: number | null
+          monto_credito_titular?: number | null
+          motivo_desasignacion?: string | null
+          notario?: string | null
+          notas?: string | null
+          numero_escritura?: string | null
+          ocupacion?: string | null
+          persona_id: string
+          precio_asignacion?: number | null
+          tipo_credito?: string | null
+          unidad_id?: string | null
+          updated_at?: string
+          uso_efectivo?: string | null
+          valor_comercial?: number | null
+          valor_escrituracion?: number | null
+          vendedor?: string | null
+        }
+        Update: {
+          anticipo_comision?: number | null
+          casa_valuadora?: string | null
+          comision_gerencia?: number | null
+          comision_vendedor?: number | null
+          conocimiento_dueno_beneficiario?: string | null
+          created_at?: string
+          credito_cotitular_ref?: string | null
+          credito_titular_ref?: string | null
+          deleted_at?: string | null
+          descuento_total?: number | null
+          empresa_id?: string
+          enganche_requerido?: number | null
+          es_pep?: boolean | null
+          estado?: string
+          fase_actual?: string | null
+          fase_posicion?: number | null
+          fecha_escritura?: string | null
+          forma_pago?: string | null
+          gastos_escrituracion?: number | null
+          id?: string
+          ine_numero?: string | null
+          monto_avaluo?: number | null
+          monto_credito_cotitular?: number | null
+          monto_credito_titular?: number | null
+          motivo_desasignacion?: string | null
+          notario?: string | null
+          notas?: string | null
+          numero_escritura?: string | null
+          ocupacion?: string | null
+          persona_id?: string
+          precio_asignacion?: number | null
+          tipo_credito?: string | null
+          unidad_id?: string | null
+          updated_at?: string
+          uso_efectivo?: string | null
+          valor_comercial?: number | null
+          valor_escrituracion?: number | null
+          vendedor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ventas_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
