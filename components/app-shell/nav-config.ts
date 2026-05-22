@@ -68,15 +68,6 @@ export const NAV_ITEMS: NavItem[] = [
         label: 'Compras',
         children: [{ label: 'Proveedores', href: '/dilesa/proveedores' }],
       },
-      {
-        label: 'Operaciones',
-        children: [
-          { label: 'Terrenos', href: '/dilesa/terrenos' },
-          { label: 'Prototipos', href: '/dilesa/prototipos' },
-          { label: 'Anteproyectos', href: '/dilesa/anteproyectos' },
-          { label: 'Proyectos', href: '/dilesa/proyectos' },
-        ],
-      },
     ],
   },
   {

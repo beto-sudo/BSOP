@@ -181,11 +181,6 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   'dilesa.rh.puestos',
   'dilesa.rh.departamentos',
   'dilesa.proveedores',
-  // DILESA Inmobiliario (Sprint 2 de modulos-catalog)
-  'dilesa.terrenos',
-  'dilesa.prototipos',
-  'dilesa.anteproyectos',
-  'dilesa.proyectos',
 
   // RDB
   'rdb.home',
