@@ -9,10 +9,11 @@ las tablas viejas), `core.empresas` (lectura)
 **Creada:** 2026-05-08
 **Última actualización:** 2026-05-22 (Sprints 1, 2 y 4 completados;
 Sprint 3 en curso — importación desde Coda por fases: Fase 1 (25
-terrenos) y Fase 2 (5 anteproyectos + 8 proyectos) cargadas en prod.
-Próximo: Fase 3 (lotes + casas) y Fase 4 (ventas, requiere extender el
-schema con tablas de comercialización). D2 cerrada en ADR-010; D1 y D3
-abren la fase de captura/detalle de la UI.)
+terrenos), Fase 2 (5 anteproyectos + 8 proyectos) y Fase 3 (1,590
+unidades + 14 productos) cargadas en prod. Próximo: Fase 4 (ventas —
+pipeline de 17 fases, requiere extender el schema con tablas de
+comercialización). D2 cerrada en ADR-010; D1 y D3 abren la fase de
+captura/detalle de la UI.)
 
 ## Problema
 
@@ -451,6 +452,18 @@ lotificación (agosto 2023, vigente).
   el mismo `NULLS NOT DISTINCT` — hoy no molesta (los 25 terrenos traen
   clave), pero la Fase 3 (lotes + casas, que no traen código corto)
   chocará con él. Se corrige al preparar la migración de Fase 3.
+- **2026-05-22 — Inventario de Coda → solo `unidades`, sin crear
+  `activos`.** Las 1,590 filas de la tabla Inventario (lotes/casas de 6
+  fraccionamientos, la mayoría ya vendidas) se importaron a
+  `dilesa.unidades` + 14 `productos`. **No se crearon filas en
+  `dilesa.activos`**: el portafolio de activos es lo que DILESA tiene/
+  gestiona (los 25 terrenos), no el historial de casas vendidas. La
+  trazabilidad —qué se vendió, qué prototipo, ciclo de vida— vive completa
+  en `unidades`; `unidades.activo_id` queda NULL, se llena después si una
+  unidad se conserva como activo de portafolio. Beto consideró "activo
+  desincorporado" pero se descartó: duplicaría cada unidad sin agregar
+  trazabilidad. La escrituración (no la entrega) es la desincorporación.
+  Detalle: mapeo §§ 4-5.
 
 ## Bitácora
 
@@ -529,3 +542,16 @@ lotificación (agosto 2023, vigente).
     prod: 13 proyectos, claves y vínculos correctos.
     Próximo: Fase 3 (lotes + casas) y Fase 4 (ventas — requiere extender el
     schema con tablas de comercialización, inexistentes en v2).
+  - **Fase 3 (este PR)** — `scripts/import_dilesa_inventario.ts` cargó las
+    1,590 filas de la tabla Inventario de Coda en `dilesa.unidades` (cada
+    lote/casa con su ciclo de vida) + 14 `dilesa.productos` (prototipos
+    por proyecto). Verificado en prod: 1,590 unidades en 6 proyectos, 0
+    sin proyecto, 218 sin prototipo (lotes comerciales/áreas verdes,
+    esperado), 1,372 con casa construida. La migración
+    `20260522191342_dilesa_unidades_inventario_ajustes.sql` extendió
+    `unidades` (+8 columnas físicas), reemplazó el `CHECK` de
+    `unidades.estado` por el ciclo real de 8 estados, y arregló
+    `activos.clave_interna` (`NULLS NOT DISTINCT` → `UNIQUE` normal). No
+    se crearon `activos` — ver Decisiones registradas.
+    Próximo: Fase 4 (ventas — pipeline de 17 fases documentado en el
+    mapeo § 6, requiere extender el schema con tablas de comercialización).

@@ -158,7 +158,169 @@ sus estados. No son columnas del proyecto.
 
 ---
 
+## 4. Inventario → `dilesa.unidades` (+ `dilesa.productos` vía § 5)
+
+**1,590 filas en Coda.** No hay tablas separadas de "Lotes" y "Casas": la
+tabla `Inventario` es el grano. Cada fila es un **lote**; si tiene casa
+construida, la casa son columnas más en la misma fila (M² de Construcción,
+Prototipo, fechas de obra). Composición: 1,220 interés social, 320
+residencial medio, 22 áreas verdes de donación municipal, 15 residencial,
+12 comercial, 1 equipamiento. 1,105 vendidas, 1,072 entregadas — es el
+historial operativo real de 6 fraccionamientos.
+
+### Decisión: cada fila → una `unidades`, sin crear `activos`
+
+(Validada por Beto 2026-05-22.) Cada fila de Inventario → 1 fila en
+`dilesa.unidades`, ligada a su proyecto y su prototipo. **No se crean
+filas en `dilesa.activos`.** Razón:
+
+- El portafolio de `activos` es lo que DILESA tiene/gestiona — hoy, los
+  25 terrenos. 1,105 de las 1,590 unidades ya se vendieron: son casas que
+  ya no son de DILESA. Crearlas como activo solo para marcarlas
+  `desincorporado` duplica cada unidad y llena el portafolio de ruido.
+- La trazabilidad que importa —qué se vendió, qué prototipo, cuándo se
+  escrituró— vive completa en `unidades`: la unidad ES el registro de la
+  pieza, `producto_id` dice el prototipo, `estado` dice si se vendió/
+  escrituró. El comprador ("a quién") es Fase 4 (ventas), e igual con o
+  sin fila en `activos`.
+- `unidades.activo_id` queda NULL. El schema lo diseñó así: "se llena
+  cuando la unidad se libera al portafolio" — acción deliberada y futura
+  (ej. una casa muestra que DILESA conserve, un lote retirado de venta
+  para reserva), no un hecho masivo del historial.
+
+La regla operativa de Beto —"se desincorpora cuando se escritura"— se
+modela como un valor de `unidades.estado` (`escriturada`), no como un
+`activos.estado`: la escrituración es el estado terminal del ciclo de
+vida de la unidad.
+
+### Mapeo Inventario → `unidades`
+
+| Columna Coda                      | Destino v2               | Nota                        |
+| --------------------------------- | ------------------------ | --------------------------- |
+| ID Inventario (Manzana+Lote)      | `unidades.identificador` | ej. `M19-L8`                |
+| Proyecto                          | `unidades.proyecto_id`   | lookup al proyecto (Fase 2) |
+| Prototipo                         | `unidades.producto_id`   | → producto del catálogo § 5 |
+| Superficie Lote M²                | `unidades.area_m2`       |                             |
+| Precio de Venta                   | `unidades.precio`        | precio de venta/lista       |
+| Fase de Proyecto + Estatus Ventas | `unidades.estado`        | mapeo de valores ↓          |
+
+`unidades` v2 es delgada (identificador, estado, área, precio, notas);
+los campos físicos del lote/casa no caben — requieren extender el schema
+(ver Ajustes § Fase 3). Campos **🆕 a agregar** a `unidades`:
+
+| Columna Coda       | Campo nuevo `unidades` | Tipo                                                                              |
+| ------------------ | ---------------------- | --------------------------------------------------------------------------------- |
+| Manzana            | `manzana`              | text                                                                              |
+| Lote               | `numero_lote`          | text                                                                              |
+| Calle              | `calle`                | text                                                                              |
+| Número Oficial     | `numero_oficial`       | text                                                                              |
+| Tipo de Lote       | `tipo_lote`            | text (Interés Social / Residencial Medio / Comercial / Área Verde / Equipamiento) |
+| Esquina            | `es_esquina`           | boolean                                                                           |
+| Frente Verde       | `tiene_frente_verde`   | boolean                                                                           |
+| M² de Construcción | `m2_construccion`      | numeric — > 0 si hay casa construida                                              |
+
+### Mapeo de `unidades.estado`
+
+Ciclo de vida de la unidad, cruce de "Fase de Proyecto" (avance de obra) y
+"Estatus Ventas". El detalle de ventas (Estatus Ventas) gana cuando está
+presente; si no, manda la fase de obra.
+
+| Coda                                                            | `unidades.estado`              |
+| --------------------------------------------------------------- | ------------------------------ |
+| Fase = Planeación                                               | `planeada`                     |
+| Fase = Lotes                                                    | `lote_urbanizado`              |
+| Fase = Construcción                                             | `en_construccion`              |
+| Fase = Terminada / Paquete RUV / Extracción / Seguro, sin venta | `terminada`                    |
+| Estatus Ventas = Asignada                                       | `asignada`                     |
+| Fase = Vendida, sin estatus fino de ventas                      | `vendida`                      |
+| Estatus Ventas = Escriturada                                    | `escriturada` (desincorporada) |
+| Estatus Ventas = Entregada                                      | `entregada`                    |
+
+Orden del ciclo (validado con Beto 2026-05-22):
+`planeada → lote_urbanizado → en_construccion → terminada → asignada →
+vendida → escriturada → entregada`. La **escrituración ocurre antes de la
+entrega** — es el paso 11 del pipeline de ventas (§ 6) y la
+desincorporación: la unidad deja de ser de DILESA. "Entregada" es el
+milestone físico posterior.
+
+### No se importan (Inventario) en Fase 3
+
+- **Detalle de ventas** — Estatus Ventas fino, Fecha Escritura/Asignada/
+  Entregada, Vendedor, ID Cliente, Valor Comercial/Excedente/Frente Verde/
+  Esquina. Es Fase 4 (ventas): el "a quién" y el contrato. Fase 3 solo
+  deja el `estado` correcto (la unidad sabe que se vendió); Fase 4 ata
+  comprador, contrato y montos.
+- **Pipeline RUV/DTU** — Fecha DTU, Fecha Paquete RUV, Fecha Extracción,
+  Fecha Seguro Calidad, Frente RUV, Avance %, Estatus de Construcción
+  fino. Workflow del Coda v1 (registro ante el RUV); estado operativo
+  ajeno al modelo v2. Se omite.
+- **Derivado** — Antigüedad, Días de Construcción, Meses para Terminar,
+  Valor Venta Futuro — fórmulas.
+- **Botones de Coda** — *Agrega a Frente RUV, *Registra DTU, etc.
+
+---
+
+## 5. Prototipos → `dilesa.productos`
+
+`dilesa.productos` es el catálogo de unidad-tipo **por proyecto**
+(`proyecto_id` NOT NULL). En Coda el catálogo de modelos es global
+(`Prototipos-Viejo`: código, Clasificación Inmobiliaria, Nombre) y cada
+fila de Inventario referencia un `Prototipo`.
+
+**Estrategia:** derivar los productos de los pares **(proyecto, prototipo)
+distintos** que aparecen en Inventario. Cada par → una fila en `productos`:
+
+| Origen                     | Destino v2              | Nota                             |
+| -------------------------- | ----------------------- | -------------------------------- |
+| Prototipo (código)         | `productos.nombre`      |                                  |
+| Clasificación Inmobiliaria | `productos.atributos`   | jsonb `{"clasificacion": "..."}` |
+| Proyecto de la fila        | `productos.proyecto_id` |                                  |
+
+Un mismo prototipo usado en varios proyectos genera una fila de
+`productos` por proyecto — coherente con el modelo (catálogo del
+proyecto, no global). Los atributos finos (recámaras, baños, m²) no
+están en `Prototipos-Viejo` — quedan para captura posterior.
+
+---
+
+## 6. Ventas → Fase 4 (referencia — no se importa en Fase 3)
+
+El proceso de ventas de DILESA está documentado en Coda (`grid-a4b0evIc3U`)
+como un **pipeline de 17 fases ordenadas**, cada una con su rol
+responsable, acciones, documentos obligatorios y correos automatizados:
+
+| #   | Fase                       | Rol (Coda)          |
+| --- | -------------------------- | ------------------- |
+| 1   | Solicitud de Asignación    | Todos               |
+| 2   | Asignada                   | Gerencia General    |
+| 3   | Formalizada                | Gerencia General    |
+| 4   | Solicitud de Avalúo        | Gerencia de Ventas  |
+| 5   | Avalúo Cerrado             | Gerencia de Ventas  |
+| 6   | Inscrita                   | Gerencia de Ventas  |
+| 7   | Solicitud de Dictaminación | Gerencia de Ventas  |
+| 8   | Dictaminada                | Gerencia de Ventas  |
+| 9   | Validación Patronal        | Vendedores          |
+| 10  | Firmas Programadas         | Gerencia General    |
+| 11  | Escriturada                | Comité              |
+| 12  | Detonada                   | Administración      |
+| 13  | Facturada                  | Administración      |
+| 14  | Preparada para Entrega     | Atención a Clientes |
+| 15  | Entregada                  | Atención a Clientes |
+| 16  | Comisión Pagada            | Comité              |
+| 17  | Operación Terminada        | Administración      |
+
+Fase 4 implementará este pipeline. Requiere extender el schema v2 con
+estructura de comercialización (clientes, ventas, fases de venta con sus
+documentos y correos) — no existe en v2. El `unidades.estado` de Fase 3
+es la proyección gruesa de este pipeline (terminada → asignada → vendida
+→ escriturada → entregada); el seguimiento fino de 17 fases por cliente
+es de Fase 4.
+
+---
+
 ## Ajustes de schema necesarios antes de importar
+
+### Para Fases 1–2 (aplicadas)
 
 1. **Extender `dilesa.activo_terreno`** con los 18 campos de adquisición/
    gestión de la § 1 (decisión A, ya aprobada por Beto).
@@ -178,13 +340,36 @@ sus estados. No son columnas del proyecto.
    en proyectos se puede usar `proyecto_tareas` para "siguiente acción"
    en vez de una columna. A decidir.
 
-## Orden de importación (confirmado con Beto)
+> Nota: la migración de ajustes `20260522123710` omitió
+> `proyectos.clave_interna`; se agregó después en `20260522131315`.
 
-1. **Terrenos** → `activos` + `activo_terreno`. Sin dependencias.
-2. **Anteproyectos + Proyectos** → `proyectos` + `proyecto_activos`.
-3. **Lotes + Casas** → `activos` (tipo lote/casa) + satélites + `unidades`.
-4. **Ventas** → requiere extender el schema con tablas de comercialización
-   (no existen en v2). Se planea al llegar.
+### Para Fase 3 (Inventario → unidades)
+
+5. **Extender `dilesa.unidades`** con los 8 campos físicos del lote/casa
+   de la § 4 (manzana, numero_lote, calle, numero_oficial, tipo_lote,
+   es_esquina, tiene_frente_verde, m2_construccion).
+6. **`CHECK` de `unidades.estado`** con el ciclo de vida de la § 4
+   (planeada, lote_urbanizado, en_construccion, terminada, asignada,
+   vendida, escriturada, entregada). Hoy `estado` es text libre con
+   default `planeada`.
+7. **Arreglar `activos.clave_interna`** — el schema base v2 le puso
+   `UNIQUE NULLS NOT DISTINCT`. Con la decisión de la § 4 (Fase 3 no
+   crea activos) este bug ya no bloquea la importación, pero sigue
+   siendo un landmine: cualquier activo futuro sin clave (una casa
+   muestra capturada en UI) choca al segundo NULL. Se arregla de paso
+   a `UNIQUE` normal (NULLs distintos), igual que `proyectos.clave_interna`.
+
+## Orden de importación
+
+1. ✅ **Terrenos** (Fase 1, PR #489) → `activos` + `activo_terreno`.
+2. ✅ **Anteproyectos + Proyectos** (Fase 2, PR #490) → `proyectos` +
+   `proyecto_activos`.
+3. **Inventario** (Fase 3) → `unidades` + `productos`. No crea `activos`
+   (ver § 4).
+4. **Ventas** (Fase 4) → requiere extender el schema con tablas de
+   comercialización (clientes, ventas/contratos) — no existen en v2.
+   Aporta el "a quién" y el detalle de contrato/pago/comisión.
+   Pipeline de 17 fases documentado en § 6.
 
 Cada fase es un script reproducible en `scripts/`; se valida un lote
 antes del siguiente.
