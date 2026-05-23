@@ -9,9 +9,14 @@
  * Detalle completo de una venta DILESA — 5 secciones:
  *   1. Datos del cliente (`erp.personas`, cross-schema).
  *   2. Datos de la venta — ficha + KYC/PLD + notas.
- *   3. Pipeline — `<ActivityLog>` alimentado por `dilesa.venta_fases`.
+ *   3. Pipeline — 17 fases con docs asociados (cargados vs. faltantes).
  *   4. Pagos — `dilesa.venta_pagos` con sus adjuntos.
  *   5. Expediente digital — `erp.adjuntos` agrupados por rol.
+ *
+ * Pipeline (sección 3): cada fase declara qué documento(s) de rol son
+ * el "soporte" para concluirla (`FASE_ROLES`). El pipeline muestra los
+ * cargados como chips clickeables y los faltantes como chips outline
+ * gris — esa es la base del proceso de captura que se viene.
  *
  * Lectura pura — captura/edición es entregable posterior.
  */
@@ -19,11 +24,9 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ExternalLink, FileText } from 'lucide-react';
+import { ArrowLeft, Check, Circle, ExternalLink, FileText } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import { ActivityLog } from '@/components/activity-log/activity-log';
-import type { ActivityEvent } from '@/components/activity-log/types';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -139,9 +142,56 @@ const moneyFmt = new Intl.NumberFormat('es-MX', {
   maximumFractionDigits: 0,
 });
 
-const PIPELINE_TONES = {
-  fase_pipeline: { label: 'Pipeline', tone: 'info' as BadgeTone },
+/**
+ * Mapping fase → roles de adjuntos esperados. Cada fase del pipeline
+ * tiene cero o más documentos asociados que se deben cargar al
+ * concluirla. La UI muestra los cargados como chips clickeables y los
+ * faltantes como chips outline gris.
+ */
+const FASE_ROLES: Record<string, string[]> = {
+  'Solicitud de Asignación': ['solicitud_asignacion'],
+  Asignada: ['aviso_pld', 'expediente_digital', 'ficu', 'aviso_privacidad'],
+  Formalizada: ['contrato_promesa'],
+  'Solicitud de Avalúo': [],
+  'Avalúo Cerrado': ['avaluo_comercial'],
+  Inscrita: [],
+  'Solicitud de Dictaminación': ['aprobacion_credito'],
+  Dictaminada: [
+    'carta_instruccion_notarial',
+    'constancia_credito_titular',
+    'constancia_credito_cotitular',
+  ],
+  'Validación Patronal': ['validacion_patronal'],
+  'Firmas Programadas': [],
+  Escriturada: ['pagare'],
+  Detonada: ['imagen_detonacion'],
+  Facturada: ['factura', 'nota_credito'],
+  'Preparada para Entrega': ['checklist_pre_entrega'],
+  Entregada: ['checklist_entrega'],
+  'Comisión Pagada': [],
+  'Operación Terminada': [],
 };
+
+/** Las 17 fases canónicas en orden — para mostrar incluso las no alcanzadas. */
+const FASES_ORDEN: Array<{ pos: number; nombre: string }> = [
+  { pos: 1, nombre: 'Solicitud de Asignación' },
+  { pos: 2, nombre: 'Asignada' },
+  { pos: 3, nombre: 'Formalizada' },
+  { pos: 4, nombre: 'Solicitud de Avalúo' },
+  { pos: 5, nombre: 'Avalúo Cerrado' },
+  { pos: 6, nombre: 'Inscrita' },
+  { pos: 7, nombre: 'Solicitud de Dictaminación' },
+  { pos: 8, nombre: 'Dictaminada' },
+  { pos: 9, nombre: 'Validación Patronal' },
+  { pos: 10, nombre: 'Firmas Programadas' },
+  { pos: 11, nombre: 'Escriturada' },
+  { pos: 12, nombre: 'Detonada' },
+  { pos: 13, nombre: 'Facturada' },
+  { pos: 14, nombre: 'Preparada para Entrega' },
+  { pos: 15, nombre: 'Entregada' },
+  { pos: 16, nombre: 'Comisión Pagada' },
+  { pos: 17, nombre: 'Operación Terminada' },
+];
 
 function fmtMoney(n: number | null): string | null {
   return n == null ? null : moneyFmt.format(n);
@@ -311,36 +361,58 @@ function DetailInner() {
     );
   }, [persona]);
 
-  const pipelineEvents = useMemo<ActivityEvent[]>(
-    () =>
-      fases
-        .filter((f) => f.fecha)
-        .sort((a, b) => (a.posicion ?? 0) - (b.posicion ?? 0))
-        .map((f) => ({
-          id: f.id,
-          at: new Date(`${f.fecha}T12:00:00`).toISOString(),
-          type: 'fase_pipeline',
-          actor: null,
-          summary: `${f.posicion ? `${f.posicion}. ` : ''}${f.fase}`,
-        })),
-    [fases]
-  );
-
   const adjuntosVenta = useMemo(
     () => adjuntos.filter((a) => a.entidad_tipo === 'venta'),
     [adjuntos]
   );
-  const adjuntosPorRol = useMemo(() => {
+  // Mapa rol → adjuntos cargados. Sirve para el pipeline (docs por fase)
+  // y para el expediente (lista completa agrupada por rol).
+  const adjuntosPorRolMap = useMemo(() => {
     const m = new Map<string, Adjunto[]>();
     for (const a of adjuntosVenta) {
       const arr = m.get(a.rol) ?? [];
       arr.push(a);
       m.set(a.rol, arr);
     }
-    return [...m.entries()].sort((a, b) =>
-      (ROL_LABEL[a[0]] ?? a[0]).localeCompare(ROL_LABEL[b[0]] ?? b[0])
-    );
+    return m;
   }, [adjuntosVenta]);
+  const adjuntosPorRol = useMemo(
+    () =>
+      [...adjuntosPorRolMap.entries()].sort((a, b) =>
+        (ROL_LABEL[a[0]] ?? a[0]).localeCompare(ROL_LABEL[b[0]] ?? b[0])
+      ),
+    [adjuntosPorRolMap]
+  );
+
+  // Pipeline combinado: una fila por cada una de las 17 fases, con su
+  // fecha (si alcanzada), docs cargados (clickeables) y docs faltantes
+  // (chip outline gris). Es el "lugar donde se avanza fase por fase
+  // subiendo el soporte" — la vista que se va a evolucionar.
+  const pipelineRows = useMemo(() => {
+    const fasesByName = new Map(fases.map((f) => [f.fase, f]));
+    return FASES_ORDEN.map(({ pos, nombre }) => {
+      const f = fasesByName.get(nombre);
+      const roles = FASE_ROLES[nombre] ?? [];
+      const cargados = roles.flatMap((r) =>
+        (adjuntosPorRolMap.get(r) ?? []).map((a) => ({ ...a, rol: r }))
+      );
+      const rolesCargados = new Set(cargados.map((a) => a.rol));
+      const faltantes = roles.filter((r) => !rolesCargados.has(r));
+      return {
+        pos,
+        nombre,
+        fecha: f?.fecha ?? null,
+        alcanzada: !!f?.fecha,
+        cargados,
+        faltantes,
+      };
+    });
+  }, [fases, adjuntosPorRolMap]);
+
+  const pipelineAlcanzadas = useMemo(
+    () => pipelineRows.filter((r) => r.alcanzada).length,
+    [pipelineRows]
+  );
 
   const adjuntosPorPago = useMemo(() => {
     const m = new Map<string, Adjunto[]>();
@@ -509,8 +581,58 @@ function DetailInner() {
         ) : null}
       </Section>
 
-      <Section title="Pipeline" description={`${pipelineEvents.length} de 17 fases alcanzadas`}>
-        <ActivityLog events={pipelineEvents} tones={PIPELINE_TONES} />
+      <Section title="Pipeline" description={`${pipelineAlcanzadas} de 17 fases alcanzadas`}>
+        <ol className="space-y-1">
+          {pipelineRows.map((r) => (
+            <li
+              key={r.pos}
+              className={
+                'flex items-start gap-3 rounded-md px-2 py-1.5 ' +
+                (r.alcanzada ? 'bg-[var(--bg)]/40' : 'opacity-60')
+              }
+            >
+              {/* Status circle + posición */}
+              <div className="flex w-8 shrink-0 items-center gap-1.5 pt-0.5">
+                {r.alcanzada ? (
+                  <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                ) : (
+                  <Circle className="h-3.5 w-3.5 text-[var(--text)]/30" />
+                )}
+                <span className="font-mono text-[10px] tabular-nums text-[var(--text)]/40">
+                  {r.pos}
+                </span>
+              </div>
+
+              {/* Nombre + fecha */}
+              <div className="min-w-[200px] shrink-0">
+                <div className="text-sm font-medium text-[var(--text)]">{r.nombre}</div>
+                <div className="text-[11px] text-[var(--text)]/50">
+                  {r.fecha ? fmtFecha(r.fecha) : '—'}
+                </div>
+              </div>
+
+              {/* Docs cargados + faltantes */}
+              <div className="flex flex-1 flex-wrap items-center gap-1">
+                {r.cargados.map((a) => (
+                  <AdjuntoLink key={a.id} a={a} compact />
+                ))}
+                {r.faltantes.map((rol) => (
+                  <span
+                    key={rol}
+                    className="inline-flex items-center gap-1 rounded border border-dashed border-[var(--border)] px-1.5 py-0.5 text-[10px] text-[var(--text)]/40"
+                    title={`Falta cargar: ${ROL_LABEL[rol] ?? rol}`}
+                  >
+                    <FileText className="h-2.5 w-2.5" />
+                    {ROL_LABEL[rol] ?? rol}
+                  </span>
+                ))}
+                {r.cargados.length === 0 && r.faltantes.length === 0 ? (
+                  <span className="text-[10px] text-[var(--text)]/30">—</span>
+                ) : null}
+              </div>
+            </li>
+          ))}
+        </ol>
       </Section>
 
       <Section
