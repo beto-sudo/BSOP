@@ -38,15 +38,26 @@ if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('Faltan credenciales de Supa
 
 const DILESA_EMPRESA_ID = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479';
 
-/** Los 5 scripts a correr en orden. Orden importa: terrenos → proyectos
- *  → inventario (unidades) → ventas → expediente (depende de IDs de ventas). */
-const SCRIPTS: Array<{ name: string; path: string }> = [
-  { name: 'Terrenos', path: 'scripts/import_dilesa_terrenos.ts' },
-  { name: 'Proyectos', path: 'scripts/import_dilesa_proyectos.ts' },
-  { name: 'Inventario', path: 'scripts/import_dilesa_inventario.ts' },
+/**
+ * Por default el cron diario corre solo los 2 scripts que cambian a diario:
+ * **ventas** (avance de fases, clientes nuevos, datos editados) y
+ * **expediente** (PDFs nuevos cargados a Coda). Con FULL=1 corre los 5,
+ * incluyendo terrenos/proyectos/inventario — esos cambian rara vez (meses
+ * entre cambios) y sus scripts usan DELETE+CASCADE que truena con FK de
+ * ventas (pendiente refactorearlos a UPSERT).
+ */
+const FULL = process.env.FULL === '1';
+const DAILY_SCRIPTS: Array<{ name: string; path: string }> = [
   { name: 'Ventas', path: 'scripts/import_dilesa_ventas.ts' },
   { name: 'Expediente', path: 'scripts/import_dilesa_expediente.ts' },
 ];
+const FULL_SCRIPTS: Array<{ name: string; path: string }> = [
+  { name: 'Terrenos', path: 'scripts/import_dilesa_terrenos.ts' },
+  { name: 'Proyectos', path: 'scripts/import_dilesa_proyectos.ts' },
+  { name: 'Inventario', path: 'scripts/import_dilesa_inventario.ts' },
+  ...DAILY_SCRIPTS,
+];
+const SCRIPTS = FULL ? FULL_SCRIPTS : DAILY_SCRIPTS;
 
 type StepResult = {
   name: string;
@@ -107,9 +118,21 @@ async function runScript(script: { name: string; path: string }): Promise<StepRe
   const start = Date.now();
   return new Promise((resolve) => {
     const out: string[] = [];
+    const prefix = `  [${script.name}] `;
     const child = spawn('npx', ['tsx', script.path], { env: process.env });
-    child.stdout.on('data', (b: Buffer) => out.push(b.toString()));
-    child.stderr.on('data', (b: Buffer) => out.push(b.toString()));
+    // Forward stdout/stderr a parent en vivo (no esperar al final) — sin
+    // esto, GH Actions log no muestra progreso del child y cualquier
+    // timeout/cancelación deja al usuario sin info de qué estaba haciendo.
+    child.stdout.on('data', (b: Buffer) => {
+      const s = b.toString();
+      out.push(s);
+      for (const line of s.split('\n')) if (line) console.log(prefix + line);
+    });
+    child.stderr.on('data', (b: Buffer) => {
+      const s = b.toString();
+      out.push(s);
+      for (const line of s.split('\n')) if (line) console.error(prefix + line);
+    });
     child.on('close', (code) => {
       const durationMs = Date.now() - start;
       const output = out.join('');

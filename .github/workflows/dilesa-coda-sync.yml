@@ -24,6 +24,11 @@ name: DILESA Coda Sync
 
 on:
   workflow_dispatch:
+    inputs:
+      full:
+        description: 'Refresh completo (incluye terrenos/proyectos/inventario) — por default solo ventas + expediente'
+        type: boolean
+        default: false
   schedule:
     - cron: '0 9 * * *'
 
@@ -35,7 +40,7 @@ jobs:
   sync:
     name: Sync Coda → BSOP
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     env:
       CODA_API_KEY: ${{ secrets.CODA_API_KEY }}
@@ -44,6 +49,7 @@ jobs:
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       NOTIFY_EMAIL: ${{ secrets.NOTIFY_EMAIL }}
       SYNC_FROM_EMAIL: ${{ secrets.SYNC_FROM_EMAIL }}
+      FULL: ${{ inputs.full && '1' || '' }}
 
     steps:
       - name: Checkout
@@ -60,3 +66,21 @@ jobs:
 
       - name: Run sync wrapper
         run: npx tsx scripts/run-dilesa-sync.ts
+
+      # Si el wrapper falla o el job es cancelado por timeout, manda un email
+      # breve directo (sin pasar por el wrapper que ya murió).
+      - name: Notify on failure or cancel
+        if: failure() || cancelled()
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          STATUS: ${{ job.status }}
+        run: |
+          curl -sS -X POST https://api.resend.com/emails \
+            -H "Authorization: Bearer $RESEND_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"from\": \"${SYNC_FROM_EMAIL:-BSOP Sync <sync@anorte.com>}\",
+              \"to\": [\"$NOTIFY_EMAIL\"],
+              \"subject\": \"✗✗ Sync DILESA Coda→BSOP — $STATUS\",
+              \"html\": \"<p>El job de sync terminó con estado <b>$STATUS</b> antes de poder generar el reporte normal.</p><p><a href='\\\"$RUN_URL\\\"'>Ver log en GitHub Actions</a></p>\"
+            }" || echo "Resend POST falló — revisa secrets RESEND_API_KEY + NOTIFY_EMAIL"

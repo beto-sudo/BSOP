@@ -291,41 +291,63 @@ async function main() {
   const { data: pagos } = await sb
     .schema('dilesa')
     .from('venta_pagos')
-    .select('id, venta_id, fecha, monto, tipo')
+    .select('id, venta_id, coda_row_id, fecha, monto, tipo')
     .eq('empresa_id', empresaId)
     .is('deleted_at', null);
   const pagosArr = (
     (pagos ?? []) as Array<{
       id: string;
       venta_id: string;
+      coda_row_id: string | null;
       fecha: string | null;
       monto: number;
       tipo: string | null;
     }>
   ).filter((p) => ventaSet.has(p.venta_id));
-  const pagoByKey = new Map<string, string>();
+  // Match 1:1 por coda_row_id (estable). Fallback al match por
+  // (venta_id|fecha|monto) sólo para pagos pre-import que no tienen
+  // coda_row_id todavía (no debería pasar después del primer re-import).
+  const pagoByCodaId = new Map<string, string>();
+  const pagoByLegacyKey = new Map<string, string>();
   for (const p of pagosArr) {
-    const key = `${p.venta_id}|${p.fecha ?? ''}|${p.monto}`;
-    pagoByKey.set(key, p.id);
+    if (p.coda_row_id) pagoByCodaId.set(p.coda_row_id, p.id);
+    else pagoByLegacyKey.set(`${p.venta_id}|${p.fecha ?? ''}|${p.monto}`, p.id);
   }
   console.log(`Pagos en alcance: ${pagosArr.length}`);
 
-  // Adjuntos ya migrados (idempotencia).
+  // Adjuntos ya migrados (idempotencia). PAGINADO en chunks de 1000 — sin
+  // esto supabase-js corta a 1000 filas, el script ve los rows 1001+ como
+  // "no existentes", los re-descarga y crea duplicados.
   const pagoSet = new Set(pagosArr.map((p) => p.id));
-  const { data: existing } = await sb
-    .schema('erp')
-    .from('adjuntos')
-    .select('entidad_tipo, entidad_id, rol, metadata')
-    .eq('empresa_id', empresaId)
-    .in('entidad_tipo', ['venta', 'venta_pago']);
+  type ExistingRow = {
+    entidad_tipo: string;
+    entidad_id: string;
+    rol: string;
+    metadata: { coda_source_url?: string } | null;
+  };
+  const PAGE = 1000;
+  const existing: ExistingRow[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await sb
+      .schema('erp')
+      .from('adjuntos')
+      .select('entidad_tipo, entidad_id, rol, metadata')
+      .eq('empresa_id', empresaId)
+      .in('entidad_tipo', ['venta', 'venta_pago'])
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`Error leyendo adjuntos existentes: ${error.message}`);
+    const rows = (data ?? []) as ExistingRow[];
+    existing.push(...rows);
+    if (rows.length < PAGE) break;
+  }
+  console.log(`Adjuntos existentes leídos: ${existing.length}`);
   const existingKey = new Set<string>();
-  for (const a of existing ?? []) {
-    const meta = a.metadata as { coda_source_url?: string } | null;
-    const src = meta?.coda_source_url;
+  for (const a of existing) {
+    const src = a.metadata?.coda_source_url;
     if (!src) continue;
     const inScope =
-      (a.entidad_tipo === 'venta' && ventaSet.has(a.entidad_id as string)) ||
-      (a.entidad_tipo === 'venta_pago' && pagoSet.has(a.entidad_id as string));
+      (a.entidad_tipo === 'venta' && ventaSet.has(a.entidad_id)) ||
+      (a.entidad_tipo === 'venta_pago' && pagoSet.has(a.entidad_id));
     if (!inScope) continue;
     existingKey.add(`${a.entidad_tipo}|${a.entidad_id}|${a.rol}|${src}`);
   }
@@ -374,31 +396,37 @@ async function main() {
   for (const [vId, name] of nameByVenta) ventaByClienteName.set(name, vId);
 
   for (const row of dRows) {
-    const clienteRaw = row.values[dClienteCol ?? ''];
-    const clienteName =
-      typeof clienteRaw === 'string'
-        ? clienteRaw
-        : Array.isArray(clienteRaw) && clienteRaw[0] && typeof clienteRaw[0] === 'object'
-          ? ((clienteRaw[0] as { name?: string }).name ?? '')
-          : clienteRaw && typeof clienteRaw === 'object'
-            ? ((clienteRaw as { name?: string }).name ?? '')
-            : '';
-    if (!clienteName) continue;
-    const ventaId = ventaByClienteName.get(clienteName);
-    if (!ventaId) continue;
+    // Match primario por coda_row_id del depósito (1:1 garantizado).
+    let pagoId = pagoByCodaId.get(row.id);
+    let ventaId: string | undefined;
 
-    const fecha = dateStr(row.values[dFechaCol ?? '']);
-    // Monto en rich format viene como { @type: MonetaryAmount, amount, currency }.
-    const montoRaw = row.values[dMontoCol ?? ''];
-    const monto =
-      typeof montoRaw === 'number'
-        ? montoRaw
-        : montoRaw && typeof montoRaw === 'object' && 'amount' in montoRaw
-          ? Number((montoRaw as { amount: number | string }).amount)
-          : parseFloat(String(montoRaw).replace(/[^0-9.\-]/g, ''));
-    const pagoKey = `${ventaId}|${fecha ?? ''}|${monto}`;
-    const pagoId = pagoByKey.get(pagoKey);
-    if (!pagoId) continue;
+    if (!pagoId) {
+      // Fallback al matching legacy por (venta_id|fecha|monto) para pagos
+      // pre-import sin coda_row_id. Después del primer re-import con la
+      // migración 20260523183156 todos los pagos tienen coda_row_id.
+      const clienteRaw = row.values[dClienteCol ?? ''];
+      const clienteName =
+        typeof clienteRaw === 'string'
+          ? clienteRaw
+          : Array.isArray(clienteRaw) && clienteRaw[0] && typeof clienteRaw[0] === 'object'
+            ? ((clienteRaw[0] as { name?: string }).name ?? '')
+            : clienteRaw && typeof clienteRaw === 'object'
+              ? ((clienteRaw as { name?: string }).name ?? '')
+              : '';
+      if (!clienteName) continue;
+      ventaId = ventaByClienteName.get(clienteName);
+      if (!ventaId) continue;
+      const fecha = dateStr(row.values[dFechaCol ?? '']);
+      const montoRaw = row.values[dMontoCol ?? ''];
+      const monto =
+        typeof montoRaw === 'number'
+          ? montoRaw
+          : montoRaw && typeof montoRaw === 'object' && 'amount' in montoRaw
+            ? Number((montoRaw as { amount: number | string }).amount)
+            : parseFloat(String(montoRaw).replace(/[^0-9.\-]/g, ''));
+      pagoId = pagoByLegacyKey.get(`${ventaId}|${fecha ?? ''}|${monto}`);
+      if (!pagoId) continue;
+    }
 
     for (const { col, rol } of PAGO_ATTACHMENT_COLS) {
       const cid = getColId(dm, col);
