@@ -283,20 +283,26 @@ async function main() {
   const ventaByCodaId = new Map<string, string>();
   for (const v of ventasAll) ventaByCodaId.set(v.coda_row_id, v.id);
 
-  // venta_pagos en alcance.
+  // venta_pagos en alcance — `.eq(empresa_id)` + filtro JS por ventaSet
+  // para evitar `.in(venta_id, 1425 uuids[])` que rebasa el límite de
+  // URL de Cloudflare (HTTP 400). Ver memoria `feedback_supabase_in_url_limit`.
   const ventaIds = ventasAll.map((v) => v.id);
+  const ventaSet = new Set(ventaIds);
   const { data: pagos } = await sb
     .schema('dilesa')
     .from('venta_pagos')
     .select('id, venta_id, fecha, monto, tipo')
-    .in('venta_id', ventaIds.length ? ventaIds : ['00000000-0000-0000-0000-000000000000']);
-  const pagosArr = (pagos ?? []) as Array<{
-    id: string;
-    venta_id: string;
-    fecha: string | null;
-    monto: number;
-    tipo: string | null;
-  }>;
+    .eq('empresa_id', empresaId)
+    .is('deleted_at', null);
+  const pagosArr = (
+    (pagos ?? []) as Array<{
+      id: string;
+      venta_id: string;
+      fecha: string | null;
+      monto: number;
+      tipo: string | null;
+    }>
+  ).filter((p) => ventaSet.has(p.venta_id));
   const pagoByKey = new Map<string, string>();
   for (const p of pagosArr) {
     const key = `${p.venta_id}|${p.fecha ?? ''}|${p.monto}`;
@@ -305,7 +311,6 @@ async function main() {
   console.log(`Pagos en alcance: ${pagosArr.length}`);
 
   // Adjuntos ya migrados (idempotencia).
-  const ventaSet = new Set(ventaIds);
   const pagoSet = new Set(pagosArr.map((p) => p.id));
   const { data: existing } = await sb
     .schema('erp')
