@@ -73,6 +73,7 @@ export const NAV_ITEMS: NavItem[] = [
         children: [
           { label: 'Portafolio', href: '/dilesa/portafolio' },
           { label: 'Proyectos', href: '/dilesa/proyectos' },
+          { label: 'Ventas', href: '/dilesa/ventas' },
         ],
       },
     ],
