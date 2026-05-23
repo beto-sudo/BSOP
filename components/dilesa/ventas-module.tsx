@@ -23,19 +23,20 @@ import { VentaDetailDrawer, type VentaDetalle } from './venta-detail-drawer';
 type VentaRow = {
   id: string;
   persona_id: string;
+  unidad_id: string | null;
   estado: string;
   fase_actual: string | null;
   fase_posicion: number | null;
   precio_asignacion: number | null;
   tipo_credito: string | null;
   vendedor: string | null;
-  unidad: {
-    identificador: string;
-    proyecto: { nombre: string } | null;
-  } | null;
 };
 
-type VentaListaRow = VentaRow & { cliente: string; proyectoNombre: string };
+type VentaListaRow = VentaRow & {
+  cliente: string;
+  unidadIdentificador: string | null;
+  proyectoNombre: string;
+};
 
 const ESTADO_TONE: Record<string, BadgeTone> = {
   activa: 'info',
@@ -63,18 +64,57 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
     error?: string;
   }> => {
     const sb = createSupabaseBrowserClient();
+    // Sin embeds para evitar quirks de PostgREST cuando el nombre de la
+    // tabla embebida existe en otros schemas (proyectos también en `erp`).
+    // 4 queries: ventas + unidades + proyectos + personas (cross-schema).
     const { data: rawVentas, error: vErr } = await sb
       .schema('dilesa')
       .from('ventas')
       .select(
-        'id, persona_id, estado, fase_actual, fase_posicion, precio_asignacion, tipo_credito, vendedor, unidad:unidades(identificador, proyecto:proyectos(nombre))'
+        'id, persona_id, unidad_id, estado, fase_actual, fase_posicion, precio_asignacion, tipo_credito, vendedor'
       )
       .eq('empresa_id', empresaId)
       .is('deleted_at', null);
     if (vErr) return { error: getSupabaseErrorMessage(vErr, 'No se pudieron cargar las ventas.') };
-    const ventasArr = (rawVentas ?? []) as unknown as VentaRow[];
-    // Personas cross-schema: una segunda query con .in() (memoria
-    // reference_supabase_cross_schema_fk).
+    const ventasArr = (rawVentas ?? []) as VentaRow[];
+
+    const unidadIds = [
+      ...new Set(ventasArr.map((v) => v.unidad_id).filter((x): x is string => !!x)),
+    ];
+    const unidadMap = new Map<string, { identificador: string; proyecto_id: string | null }>();
+    const proyectoMap = new Map<string, string>();
+    if (unidadIds.length) {
+      const { data: uns, error: uErr } = await sb
+        .schema('dilesa')
+        .from('unidades')
+        .select('id, identificador, proyecto_id')
+        .in('id', unidadIds);
+      if (uErr)
+        return { error: getSupabaseErrorMessage(uErr, 'No se pudieron cargar las unidades.') };
+      for (const u of uns ?? []) {
+        unidadMap.set(u.id as string, {
+          identificador: u.identificador as string,
+          proyecto_id: (u.proyecto_id as string | null) ?? null,
+        });
+      }
+      const proyectoIds = [
+        ...new Set(
+          (uns ?? []).map((u) => u.proyecto_id as string | null).filter((x): x is string => !!x)
+        ),
+      ];
+      if (proyectoIds.length) {
+        const { data: prjs, error: prjErr } = await sb
+          .schema('dilesa')
+          .from('proyectos')
+          .select('id, nombre')
+          .in('id', proyectoIds);
+        if (prjErr)
+          return { error: getSupabaseErrorMessage(prjErr, 'No se pudieron cargar los proyectos.') };
+        for (const p of prjs ?? []) proyectoMap.set(p.id as string, p.nombre as string);
+      }
+    }
+
+    // Personas cross-schema (memoria reference_supabase_cross_schema_fk).
     const personaIds = [...new Set(ventasArr.map((v) => v.persona_id))];
     const personaMap = new Map<string, string>();
     if (personaIds.length) {
@@ -90,12 +130,17 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
         personaMap.set(p.id as string, nombre || '(sin nombre)');
       }
     }
+
     return {
-      data: ventasArr.map((v) => ({
-        ...v,
-        cliente: personaMap.get(v.persona_id) ?? '(sin comprador)',
-        proyectoNombre: v.unidad?.proyecto?.nombre ?? '',
-      })),
+      data: ventasArr.map((v) => {
+        const u = v.unidad_id ? unidadMap.get(v.unidad_id) : null;
+        return {
+          ...v,
+          cliente: personaMap.get(v.persona_id) ?? '(sin comprador)',
+          unidadIdentificador: u?.identificador ?? null,
+          proyectoNombre: u?.proyecto_id ? (proyectoMap.get(u.proyecto_id) ?? '') : '',
+        };
+      }),
     };
   }, [empresaId]);
 
@@ -159,11 +204,10 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
     { key: 'cliente', label: 'Comprador', type: 'text', sticky: true, width: 'min-w-[260px]' },
     { key: 'proyectoNombre', label: 'Proyecto', type: 'text' },
     {
-      key: 'unidad',
+      key: 'unidadIdentificador',
       label: 'Unidad',
-      type: 'custom',
-      accessor: (v) => v.unidad?.identificador ?? '',
-      render: (v) => v.unidad?.identificador ?? '—',
+      type: 'text',
+      render: (v) => v.unidadIdentificador ?? '—',
     },
     {
       key: 'fase_actual',
@@ -196,7 +240,7 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
       fase_posicion: v.fase_posicion,
       tipo_credito: v.tipo_credito,
       cliente: v.cliente,
-      unidadIdentificador: v.unidad?.identificador ?? null,
+      unidadIdentificador: v.unidadIdentificador,
       proyectoNombre: v.proyectoNombre || null,
     });
     setDrawerOpen(true);
