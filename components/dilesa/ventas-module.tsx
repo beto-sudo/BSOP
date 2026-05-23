@@ -75,7 +75,10 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
       )
       .eq('empresa_id', empresaId)
       .is('deleted_at', null);
-    if (vErr) return { error: getSupabaseErrorMessage(vErr, 'No se pudieron cargar las ventas.') };
+    if (vErr) {
+      console.error('[ventas] fetch ventas error:', vErr, JSON.stringify(vErr));
+      return { error: getSupabaseErrorMessage(vErr, 'No se pudieron cargar las ventas.') };
+    }
     const ventasArr = (rawVentas ?? []) as VentaRow[];
 
     const unidadIds = [
