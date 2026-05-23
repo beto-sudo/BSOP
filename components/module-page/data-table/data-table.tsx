@@ -66,6 +66,7 @@ export function DataTable<T extends Record<string, unknown>>({
   emptyIcon,
   className,
   toolbar,
+  maxHeight,
 }: DataTableProps<T>) {
   // Filtrar columnas con `showIf` falso (DT2 del ADR).
   const visibleColumns = useMemo(
@@ -118,6 +119,7 @@ export function DataTable<T extends Record<string, unknown>>({
           sticky.header && 'overflow-auto',
           'print:overflow-visible print:rounded-none print:border-0'
         )}
+        style={maxHeight ? { maxHeight } : undefined}
       >
         <Table>
           <TableHeader

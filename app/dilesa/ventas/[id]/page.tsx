@@ -83,7 +83,11 @@ type Persona = {
   domicilio: string | null;
 };
 
-type UnidadInfo = { identificador: string; proyecto_id: string | null };
+type UnidadInfo = {
+  identificador: string;
+  proyecto_id: string | null;
+  producto_id: string | null;
+};
 type Fase = { id: string; fase: string; posicion: number | null; fecha: string | null };
 type Pago = { id: string; fecha: string | null; monto: number; tipo: string | null };
 type Adjunto = {
@@ -170,6 +174,7 @@ function DetailInner() {
   const [persona, setPersona] = useState<Persona | null>(null);
   const [unidad, setUnidad] = useState<UnidadInfo | null>(null);
   const [proyectoNombre, setProyectoNombre] = useState<string | null>(null);
+  const [prototipoNombre, setPrototipoNombre] = useState<string | null>(null);
   const [fases, setFases] = useState<Fase[]>([]);
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [adjuntos, setAdjuntos] = useState<Adjunto[]>([]);
@@ -232,7 +237,7 @@ function DetailInner() {
           ? sb
               .schema('dilesa')
               .from('unidades')
-              .select('identificador, proyecto_id')
+              .select('identificador, proyecto_id, producto_id')
               .eq('id', ventaRow.unidad_id)
               .maybeSingle()
           : Promise.resolve({ data: null, error: null }),
@@ -249,21 +254,30 @@ function DetailInner() {
       setPersona((pRes.data as unknown as Persona) ?? null);
       setFases((fRes.data ?? []) as Fase[]);
       setPagos((pagosRes.data ?? []) as Pago[]);
-      const uData = uRes.data as { identificador: string; proyecto_id: string | null } | null;
+      const uData = uRes.data as UnidadInfo | null;
       setUnidad(uData);
 
-      if (uData?.proyecto_id) {
-        const { data: prj } = await sb
-          .schema('dilesa')
-          .from('proyectos')
-          .select('nombre')
-          .eq('id', uData.proyecto_id)
-          .maybeSingle();
-        if (!activo) return;
-        setProyectoNombre((prj?.nombre as string | null) ?? null);
-      } else {
-        setProyectoNombre(null);
-      }
+      const [prjRes, prodRes] = await Promise.all([
+        uData?.proyecto_id
+          ? sb
+              .schema('dilesa')
+              .from('proyectos')
+              .select('nombre')
+              .eq('id', uData.proyecto_id)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+        uData?.producto_id
+          ? sb
+              .schema('dilesa')
+              .from('productos')
+              .select('nombre')
+              .eq('id', uData.producto_id)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+      ]);
+      if (!activo) return;
+      setProyectoNombre((prjRes.data?.nombre as string | null) ?? null);
+      setPrototipoNombre((prodRes.data?.nombre as string | null) ?? null);
 
       const pagoIds = ((pagosRes.data ?? []) as Pago[]).map((p) => p.id);
       const allIds = [ventaRow.id, ...pagoIds];
@@ -366,6 +380,7 @@ function DetailInner() {
     [
       ['Proyecto', proyectoNombre],
       ['Unidad', unidad?.identificador ?? null],
+      ['Prototipo', prototipoNombre],
       ['Tipo de crédito', venta.tipo_credito],
       ['Vendedor', venta.vendedor],
       ['Notario', venta.notario],

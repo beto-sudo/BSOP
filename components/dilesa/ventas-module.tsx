@@ -28,6 +28,7 @@ type VentaRow = {
   fase_actual: string | null;
   fase_posicion: number | null;
   precio_asignacion: number | null;
+  valor_comercial: number | null;
   tipo_credito: string | null;
   vendedor: string | null;
 };
@@ -36,6 +37,9 @@ type VentaListaRow = VentaRow & {
   cliente: string;
   unidadIdentificador: string | null;
   proyectoNombre: string;
+  prototipo: string | null;
+  /** Precio efectivo: `precio_asignacion ?? valor_comercial`. */
+  precio: number | null;
 };
 
 const ESTADO_TONE: Record<string, BadgeTone> = {
@@ -70,7 +74,7 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
       .schema('dilesa')
       .from('ventas')
       .select(
-        'id, persona_id, unidad_id, estado, fase_actual, fase_posicion, precio_asignacion, tipo_credito, vendedor'
+        'id, persona_id, unidad_id, estado, fase_actual, fase_posicion, precio_asignacion, valor_comercial, tipo_credito, vendedor'
       )
       .eq('empresa_id', empresaId)
       .is('deleted_at', null);
@@ -79,21 +83,26 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
     }
     const ventasArr = (rawVentas ?? []) as VentaRow[];
 
-    // Unidades + proyectos: `.eq(empresa_id)` en lugar de `.in(ids[])` para
-    // evitar URLs > 8KB (Cloudflare rechaza con HTTP 400 "Bad Request").
+    // Unidades + productos (prototipo) + proyectos: `.eq(empresa_id)` en
+    // lugar de `.in(ids[])` para evitar URLs > 8KB (Cloudflare rechaza con
+    // HTTP 400 "Bad Request").
     const { data: uns, error: uErr } = await sb
       .schema('dilesa')
       .from('unidades')
-      .select('id, identificador, proyecto_id')
+      .select('id, identificador, proyecto_id, producto_id')
       .eq('empresa_id', empresaId);
     if (uErr) {
       return { error: getSupabaseErrorMessage(uErr, 'No se pudieron cargar las unidades.') };
     }
-    const unidadMap = new Map<string, { identificador: string; proyecto_id: string | null }>();
+    const unidadMap = new Map<
+      string,
+      { identificador: string; proyecto_id: string | null; producto_id: string | null }
+    >();
     for (const u of uns ?? []) {
       unidadMap.set(u.id as string, {
         identificador: u.identificador as string,
         proyecto_id: (u.proyecto_id as string | null) ?? null,
+        producto_id: (u.producto_id as string | null) ?? null,
       });
     }
 
@@ -107,6 +116,18 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
     }
     const proyectoMap = new Map<string, string>();
     for (const p of prjs ?? []) proyectoMap.set(p.id as string, p.nombre as string);
+
+    const { data: prods, error: prodErr } = await sb
+      .schema('dilesa')
+      .from('productos')
+      .select('id, nombre')
+      .eq('empresa_id', empresaId)
+      .is('deleted_at', null);
+    if (prodErr) {
+      return { error: getSupabaseErrorMessage(prodErr, 'No se pudieron cargar los prototipos.') };
+    }
+    const productoMap = new Map<string, string>();
+    for (const p of prods ?? []) productoMap.set(p.id as string, p.nombre as string);
 
     // Personas cross-schema — mismo patrón `.eq(empresa_id) + tipo='cliente'`.
     const { data: personas, error: pErr } = await sb
@@ -132,6 +153,11 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
           cliente: personaMap.get(v.persona_id) ?? '(sin comprador)',
           unidadIdentificador: u?.identificador ?? null,
           proyectoNombre: u?.proyecto_id ? (proyectoMap.get(u.proyecto_id) ?? '') : '',
+          prototipo: u?.producto_id ? (productoMap.get(u.producto_id) ?? null) : null,
+          // Coda dejó vacío `Precio de Asignación` en 813/1,425 (57%); para
+          // esas ventas el `Valor Comercial` (precio de lista) es lo
+          // disponible. Fallback evita columna mayoritariamente vacía.
+          precio: v.precio_asignacion ?? v.valor_comercial,
         };
       }),
     };
@@ -203,6 +229,12 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
       render: (v) => v.unidadIdentificador ?? '—',
     },
     {
+      key: 'prototipo',
+      label: 'Prototipo',
+      type: 'text',
+      render: (v) => v.prototipo ?? '—',
+    },
+    {
       key: 'fase_actual',
       label: 'Fase',
       type: 'custom',
@@ -210,7 +242,7 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
       render: (v) =>
         v.fase_actual ? <Badge tone="neutral">{v.fase_actual}</Badge> : <span>—</span>,
     },
-    { key: 'precio_asignacion', label: 'Precio', type: 'currency' },
+    { key: 'precio', label: 'Precio', type: 'currency' },
     {
       key: 'estado',
       label: 'Estado',
@@ -307,6 +339,7 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
         emptyTitle="Sin ventas"
         emptyDescription="Aún no hay ventas en DILESA."
         emptyIcon={<Receipt className="h-6 w-6" />}
+        maxHeight="calc(100vh - 280px)"
       />
     </div>
   );

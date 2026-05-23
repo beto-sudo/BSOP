@@ -98,4 +98,11 @@ export interface DataTableProps<T> {
   className?: string;
   /** Extra content rendered above the table (right of density toggle). */
   toolbar?: ReactNode;
+  /**
+   * CSS max-height for the scroll wrapper. Opt-in. When set, the wrapper
+   * scrolls vertically and the sticky header sticks to the wrapper top
+   * (sin esto el scroll vertical lo hace el window y el sticky no aplica).
+   * Ej. `'calc(100vh - 280px)'`.
+   */
+  maxHeight?: string;
 }
