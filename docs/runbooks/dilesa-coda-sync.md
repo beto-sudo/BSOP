@@ -20,7 +20,7 @@ Antes del primer run hay que cargar 5 secrets en GitHub:
    | `RESEND_API_KEY`            | API key de Resend         | `op read "op://Infrastructure/RESEND_API_KEY/credential"`                                                                    |
    | `NOTIFY_EMAIL`              | `beto@anorte.com`         | Hardcoded                                                                                                                    |
 
-2. **Opcional** — `SYNC_FROM_EMAIL` (default `BSOP Sync <sync@anorte.com>`). Si el dominio remitente no está verificado en Resend, el email cae a spam o falla; usa uno que esté verificado.
+2. **Opcional** — `SYNC_FROM_EMAIL` (default `BSOP Sync <noreply@bsop.io>`, dominio ya verificado en Resend). Si quieres override, asegúrate que el dominio esté verificado en Resend o el email falla con 422.
 
 3. Verifica vía CLI:
    ```bash
@@ -69,7 +69,7 @@ Wrapper [`scripts/run-dilesa-sync.ts`](../../scripts/run-dilesa-sync.ts):
 
 - Verifica `gh secret list` — los 5 secrets están seteados.
 - Revisa el log del workflow — la última línea debe decir `✔ Email enviado a ...`.
-- Si dice `✗ Resend error 4xx` — revisa si el dominio del `from:` (default `sync@anorte.com`) está verificado en Resend. Si no, set `SYNC_FROM_EMAIL` a un dominio verificado.
+- Si dice `✗ Resend error 4xx` (típico 422 "The domain is invalid") — el dominio del `from:` no está verificado en Resend. Default es `noreply@bsop.io` que ya está verificado; si overrideaste `SYNC_FROM_EMAIL`, asegúrate que ese dominio también lo esté.
 
 ### El job toma > 45 min
 
