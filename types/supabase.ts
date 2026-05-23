@@ -2078,6 +2078,7 @@ export type Database = {
         Row: {
           anticipo_comision: number | null
           casa_valuadora: string | null
+          coda_row_id: string | null
           comision_gerencia: number | null
           comision_vendedor: number | null
           conocimiento_dueno_beneficiario: string | null
@@ -2118,6 +2119,7 @@ export type Database = {
         Insert: {
           anticipo_comision?: number | null
           casa_valuadora?: string | null
+          coda_row_id?: string | null
           comision_gerencia?: number | null
           comision_vendedor?: number | null
           conocimiento_dueno_beneficiario?: string | null
@@ -2158,6 +2160,7 @@ export type Database = {
         Update: {
           anticipo_comision?: number | null
           casa_valuadora?: string | null
+          coda_row_id?: string | null
           comision_gerencia?: number | null
           comision_vendedor?: number | null
           conocimiento_dueno_beneficiario?: string | null

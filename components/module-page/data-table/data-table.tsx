@@ -9,14 +9,7 @@ import {
   type ColumnDef,
   type SortingState,
 } from '@tanstack/react-table';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ChevronDown, ChevronUp, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EmptyState } from '../empty-state';
@@ -66,6 +59,7 @@ export function DataTable<T extends Record<string, unknown>>({
   emptyIcon,
   className,
   toolbar,
+  maxHeight,
 }: DataTableProps<T>) {
   // Filtrar columnas con `showIf` falso (DT2 del ADR).
   const visibleColumns = useMemo(
@@ -112,14 +106,19 @@ export function DataTable<T extends Record<string, unknown>>({
         </div>
       ) : null}
 
+      {/* Wrapper único — el `<Table>` componente envuelve internamente en
+          un div con `overflow-x-auto`, que rompe el sticky del header
+          (crea un scroll-context interior). Por eso usamos `<table>` HTML
+          directo. */}
       <div
         className={cn(
           'rounded-xl border bg-card',
           sticky.header && 'overflow-auto',
           'print:overflow-visible print:rounded-none print:border-0'
         )}
+        style={maxHeight ? { maxHeight } : undefined}
       >
-        <Table>
+        <table className="w-full caption-bottom text-sm">
           <TableHeader
             className={cn(
               sticky.header &&
@@ -241,7 +240,7 @@ export function DataTable<T extends Record<string, unknown>>({
               ))
             )}
           </TableBody>
-        </Table>
+        </table>
       </div>
     </div>
   );

@@ -618,3 +618,18 @@ lotificación (agosto 2023, vigente).
   recibir 429 de `codahosted.io`. Próximo: UI de detalle de venta +
   detalle de activo + activity log; los 5 fallos pueden re-correrse
   manualmente o quedan como cargas faltantes documentadas.
+- **2026-05-23 — Sprint 4 (UI ventas) — módulo y drawer de venta.** Se
+  agregó el módulo `/dilesa/ventas`: migración `20260523020248` registra
+  `dilesa.ventas` en `core.modulos` (sección operaciones) + backfill de
+  permisos a los 2 roles. `components/dilesa/ventas-module.tsx` lista
+  filtrable (comprador, proyecto, fase, estado, vendedor) — datos
+  cross-schema (`erp.personas` para comprador, vía dos queries por la
+  regla de cross-schema FK). `components/dilesa/venta-detail-drawer.tsx`
+  abre al click: datos del cliente (persona), ficha de venta (33 campos
+  - KYC/PLD), **pipeline timeline con `<ActivityLog>` (ADR-023)
+    alimentado por `venta_fases`**, tabla de pagos con suma, y expediente
+    digital (adjuntos de Fase 4.5 con descarga vía proxy
+    `/api/adjuntos/<path>`). RBAC 4-places sincronizado (nav-config +
+    ROUTE_TO_MODULE + EXPECTED_DB_MODULE_SLUGS + migración). Próximo: UI
+    de detalle de activo (mismo patrón) + edición/captura cuando se
+    resuelvan D1 y D3.

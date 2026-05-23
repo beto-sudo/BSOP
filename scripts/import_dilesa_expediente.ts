@@ -108,12 +108,6 @@ function safeFilename(name: string): string {
   );
 }
 
-/** Quita el sufijo de modelo del Inventario de Coda: "M3-L9-LDLE-ISC" → "M3-L9-LDLE". */
-function stripModel(inv: string | null): string | null {
-  if (!inv) return null;
-  return inv.replace(/-[^-]+$/, '');
-}
-
 function getColId(cm: Map<string, string>, name: string): string | undefined {
   return cm.get(name.toLowerCase().trim());
 }
@@ -256,17 +250,20 @@ async function main() {
     console.log('Sin filtro — todas las ventas DILESA');
   }
 
-  // ── Lookups: ventas → persona/unidad → match ────────────────────────────────
+  // ── Lookups: ventas → match por coda_row_id (llave estable) ─────────────────
+  // Antes: matching por (CURP|identificador_unidad) — colapsaba 1-a-N cuando
+  // múltiples ventas tenían CURP basura o cuando un cliente tenía varias
+  // re-asignaciones a la misma unidad. Ahora se usa coda_row_id directo.
   const { data: ventas } = await sb
     .schema('dilesa')
     .from('ventas')
-    .select('id, persona_id, unidad_id, created_at')
-    .eq('empresa_id', empresaId);
+    .select('id, unidad_id, coda_row_id')
+    .eq('empresa_id', empresaId)
+    .not('coda_row_id', 'is', null);
   let ventasAll = (ventas ?? []) as Array<{
     id: string;
-    persona_id: string;
     unidad_id: string | null;
-    created_at: string;
+    coda_row_id: string;
   }>;
 
   if (proyectoId) {
@@ -281,54 +278,31 @@ async function main() {
   }
   console.log(`Ventas en alcance: ${ventasAll.length}`);
 
-  const personaIds = [...new Set(ventasAll.map((v) => v.persona_id))];
-  const unidadIds = [...new Set(ventasAll.map((v) => v.unidad_id).filter(Boolean) as string[])];
+  // Map directo coda_row_id → venta_id. Único 1:1 por unique index parcial
+  // sobre (empresa_id, coda_row_id) WHERE coda_row_id IS NOT NULL.
+  const ventaByCodaId = new Map<string, string>();
+  for (const v of ventasAll) ventaByCodaId.set(v.coda_row_id, v.id);
 
-  const { data: personas } = await sb
-    .schema('erp')
-    .from('personas')
-    .select('id, curp')
-    .in('id', personaIds);
-  const curpById = new Map(
-    (personas ?? []).map((p) => [
-      p.id as string,
-      (p.curp as string | null)?.trim().toUpperCase() ?? null,
-    ])
-  );
-
-  const { data: unidades } = await sb
-    .schema('dilesa')
-    .from('unidades')
-    .select('id, identificador')
-    .in('id', unidadIds.length ? unidadIds : ['00000000-0000-0000-0000-000000000000']);
-  const idById = new Map((unidades ?? []).map((u) => [u.id as string, u.identificador as string]));
-
-  // Map (curp|identificador) → venta (la más reciente si hay varias).
-  const ventaByKey = new Map<string, { id: string; created_at: string }>();
-  for (const v of ventasAll) {
-    const curp = curpById.get(v.persona_id);
-    const inv = v.unidad_id ? idById.get(v.unidad_id) : null;
-    if (!curp || !inv) continue;
-    const key = `${curp}|${inv}`;
-    const prev = ventaByKey.get(key);
-    if (!prev || v.created_at > prev.created_at)
-      ventaByKey.set(key, { id: v.id, created_at: v.created_at });
-  }
-
-  // venta_pagos en alcance.
+  // venta_pagos en alcance — `.eq(empresa_id)` + filtro JS por ventaSet
+  // para evitar `.in(venta_id, 1425 uuids[])` que rebasa el límite de
+  // URL de Cloudflare (HTTP 400). Ver memoria `feedback_supabase_in_url_limit`.
   const ventaIds = ventasAll.map((v) => v.id);
+  const ventaSet = new Set(ventaIds);
   const { data: pagos } = await sb
     .schema('dilesa')
     .from('venta_pagos')
     .select('id, venta_id, fecha, monto, tipo')
-    .in('venta_id', ventaIds.length ? ventaIds : ['00000000-0000-0000-0000-000000000000']);
-  const pagosArr = (pagos ?? []) as Array<{
-    id: string;
-    venta_id: string;
-    fecha: string | null;
-    monto: number;
-    tipo: string | null;
-  }>;
+    .eq('empresa_id', empresaId)
+    .is('deleted_at', null);
+  const pagosArr = (
+    (pagos ?? []) as Array<{
+      id: string;
+      venta_id: string;
+      fecha: string | null;
+      monto: number;
+      tipo: string | null;
+    }>
+  ).filter((p) => ventaSet.has(p.venta_id));
   const pagoByKey = new Map<string, string>();
   for (const p of pagosArr) {
     const key = `${p.venta_id}|${p.fecha ?? ''}|${p.monto}`;
@@ -337,7 +311,6 @@ async function main() {
   console.log(`Pagos en alcance: ${pagosArr.length}`);
 
   // Adjuntos ya migrados (idempotencia).
-  const ventaSet = new Set(ventaIds);
   const pagoSet = new Set(pagosArr.map((p) => p.id));
   const { data: existing } = await sb
     .schema('erp')
@@ -364,43 +337,24 @@ async function main() {
   const cRows = await coda.listRowsAll<Record<string, unknown>>(CODA_DOC, CODA_CLIENTES, {
     valueFormat: 'rich',
   });
-  const curpCodaCol = getColId(cm, 'CURP');
-  const invCodaCol = getColId(cm, 'Inventario');
   const nameByVenta = new Map<string, string>(); // venta_id → cliente row name (para matchear pagos)
 
   const targets: Target[] = [];
 
   for (const row of cRows) {
-    // CURP en rich viene envuelto en backticks (Coda code formatting) — se quitan.
-    const curpRaw = row.values[curpCodaCol ?? ''];
-    const curp = curpRaw ? String(curpRaw).replace(/`+/g, '').trim().toUpperCase() : null;
-    const invRaw = row.values[invCodaCol ?? ''] as
-      | { url?: string; name?: string }
-      | string
-      | unknown;
-    // En rich, Inventario lookup viene como objeto/array. Lo simple: pasar a string vía display.
-    const invStr =
-      typeof invRaw === 'string'
-        ? invRaw
-        : Array.isArray(invRaw) && invRaw[0] && typeof invRaw[0] === 'object'
-          ? ((invRaw[0] as { name?: string }).name ?? '')
-          : invRaw && typeof invRaw === 'object'
-            ? ((invRaw as { name?: string }).name ?? '')
-            : '';
-    const inv = stripModel(invStr || null);
-    if (!curp || !inv) continue;
-    const v = ventaByKey.get(`${curp}|${inv}`);
-    if (!v) continue;
-    nameByVenta.set(v.id, row.name);
+    // Match 1:1 por coda_row_id (no por CURP|inv — eso colapsaba duplicados).
+    const ventaId = ventaByCodaId.get(row.id);
+    if (!ventaId) continue;
+    nameByVenta.set(ventaId, row.name);
 
     for (const { col, rol } of VENTA_ATTACHMENT_COLS) {
       const cid = getColId(cm, col);
       if (!cid) continue;
       const atts = normalizeAttachments(row.values[cid]);
       for (const a of atts) {
-        const k = `venta|${v.id}|${rol}|${a.url}`;
+        const k = `venta|${ventaId}|${rol}|${a.url}`;
         if (existingKey.has(k)) continue;
-        targets.push({ entidad_tipo: 'venta', entidad_id: v.id, rol, attachment: a });
+        targets.push({ entidad_tipo: 'venta', entidad_id: ventaId, rol, attachment: a });
       }
     }
   }

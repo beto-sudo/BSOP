@@ -69,6 +69,23 @@ function mapTipoPersona(v: string | null): string {
   return (v ?? '').toLowerCase().includes('moral') ? 'moral' : 'fisica';
 }
 
+/**
+ * CURP "real" para dedup. Rechaza basura histórica de Coda — antes de
+ * que el campo fuera requerido los llenaban con `X`, `XXXXXXXXXX`, etc.
+ * Si esto regresa false, la persona NO se dedupea por CURP (se inserta
+ * como persona nueva).
+ *
+ * Una CURP real es 18 chars alfanum (4 letras + 6 dígitos + 6 chars +
+ * 2 chars). Aquí solo chequeamos longitud y que no sea puro `X`.
+ */
+function isCurpValid(c: string | null | undefined): boolean {
+  if (!c) return false;
+  const s = c.trim().toUpperCase();
+  if (s.length !== 18) return false;
+  if (/^X+$/.test(s)) return false;
+  return true;
+}
+
 /** Boolean opcional: "" → null, "No" → false, "Sí" → true. */
 function boolOpt(v: unknown): boolean | null {
   const s = str(v);
@@ -125,7 +142,7 @@ async function main() {
     (unidades ?? []).map((u) => [u.identificador as string, u.id as string])
   );
 
-  // personas existentes de DILESA: CURP → id (para dedup).
+  // personas existentes de DILESA: CURP → id (para dedup, sólo CURPs válidos).
   const { data: personas, error: pErr } = await sb
     .schema('erp')
     .from('personas')
@@ -134,7 +151,8 @@ async function main() {
   if (pErr) throw new Error(`Error leyendo personas: ${pErr.message}`);
   const curpMap = new Map<string, string>();
   for (const p of personas ?? []) {
-    if (p.curp) curpMap.set((p.curp as string).trim().toUpperCase(), p.id as string);
+    const c = p.curp as string | null;
+    if (isCurpValid(c)) curpMap.set(c!.trim().toUpperCase(), p.id as string);
   }
 
   // ── Parseo de cada fila de Clientes ─────────────────────────────────────────
@@ -144,6 +162,11 @@ async function main() {
       const nombre = str(pick(v, cm, 'Nombre'));
       if (!nombre) return null; // sin nombre no es una venta — se omite
 
+      // CURP "real" para dedup. Si Coda tiene basura (X, XXX, etc.) se
+      // guarda igual en la persona pero NO se usa como llave de dedup.
+      const curpRaw = str(pick(v, cm, 'CURP'));
+      const curp = curpRaw?.trim().toUpperCase() ?? null;
+
       const persona = {
         empresa_id: empresaId,
         tipo: 'cliente',
@@ -152,7 +175,7 @@ async function main() {
         apellido_materno: str(pick(v, cm, 'Apellido Materno')),
         email: str(pick(v, cm, 'email')),
         telefono: str(pick(v, cm, 'Telefono')),
-        curp: str(pick(v, cm, 'CURP')),
+        curp,
         rfc: str(pick(v, cm, 'RFC')),
         nss: str(pick(v, cm, 'NSS')),
         fecha_nacimiento: dateStr(pick(v, cm, 'Fecha de Nacimiento')),
@@ -176,6 +199,7 @@ async function main() {
 
       const venta = {
         empresa_id: empresaId,
+        coda_row_id: row.id, // llave estable para re-imports + match expediente
         unidad_id: unidadId,
         estado: desasignada ? 'desasignada' : 'activa',
         fase_actual: str(pick(v, cm, 'Fase de Venta')),
@@ -215,7 +239,7 @@ async function main() {
         fecha: dateStr(v[cm.get(f.col.toLowerCase()) ?? '']),
       })).filter((f) => f.fecha !== null);
 
-      return { clienteName: row.name, persona, venta, fases };
+      return { clienteName: row.name, codaRowId: row.id, persona, venta, fases };
     })
     .filter((r): r is NonNullable<typeof r> => r !== null);
 
@@ -228,7 +252,9 @@ async function main() {
   }));
 
   const sinUnidad = registros.filter((r) => !r.venta.unidad_id).length;
-  const sinCurp = registros.filter((r) => !r.persona.curp).length;
+  // "Sin CURP útil" = CURP basura (XXX, len!=18) o vacío → no se dedupea,
+  // se inserta persona nueva por cada venta.
+  const sinCurpUtil = registros.filter((r) => !isCurpValid(r.persona.curp)).length;
   const totalFases = registros.reduce((n, r) => n + r.fases.length, 0);
 
   if (DRY_RUN) {
@@ -237,16 +263,16 @@ async function main() {
       `Ventas a importar:       ${registros.length} (omitidas sin nombre: ${cRows.length - registros.length})`
     );
     console.log(`  sin unidad resuelta:   ${sinUnidad}`);
-    console.log(`  sin CURP (no dedup):   ${sinCurp}`);
+    console.log(`  sin CURP útil:         ${sinCurpUtil} (basura o vacío — persona nueva c/u)`);
     console.log(`Filas venta_fases:       ${totalFases}`);
     console.log(`Depósitos:               ${depositos.length}`);
     const curpsNuevos = new Set(
       registros
-        .map((r) => r.persona.curp?.trim().toUpperCase())
+        .map((r) => (isCurpValid(r.persona.curp) ? r.persona.curp!.trim().toUpperCase() : null))
         .filter((c): c is string => !!c && !curpMap.has(c))
     );
     console.log(
-      `Personas nuevas (CURP):  ${curpsNuevos.size}  (existentes reusadas: ${registros.length - curpsNuevos.size - sinCurp})`
+      `Personas nuevas (CURP):  ${curpsNuevos.size}  (CURPs existentes reusados: ${registros.length - curpsNuevos.size - sinCurpUtil})`
     );
     return;
   }
@@ -259,12 +285,42 @@ async function main() {
     .eq('empresa_id', empresaId);
   if (delErr) throw new Error(`Error limpiando ventas previas: ${delErr.message}`);
 
-  // ── Personas: upsert por CURP ───────────────────────────────────────────────
-  // Con CURP: se insertan las nuevas en lote y se mapean por CURP.
+  // Cleanup de personas-basura preexistentes: las que tenían CURP "X"/"XXX"
+  // y fueron mergeadas erróneamente. Después del DELETE de ventas, quedan
+  // huérfanas (sin venta referenciándolas). Las borramos antes de re-insertar
+  // para no acumular ghost personas. Sólo borramos las que NO tienen ninguna
+  // venta en NINGÚN schema referenciándolas (idempotencia segura).
+  const huerfanasIds = (personas ?? [])
+    .filter((p) => {
+      const c = p.curp as string | null;
+      if (c === null) return false; // sin CURP — pudo ser legítima
+      const s = c.trim().toUpperCase();
+      // CURP basura: vacío, len != 18, o puro X
+      return s === '' || s.length !== 18 || /^X+$/.test(s);
+    })
+    .map((p) => p.id as string);
+  if (huerfanasIds.length > 0) {
+    const { error: delPErr } = await sb
+      .schema('erp')
+      .from('personas')
+      .delete()
+      .in('id', huerfanasIds);
+    if (delPErr) {
+      console.warn(
+        `⚠ No se pudieron borrar ${huerfanasIds.length} personas-basura (probable FK a otra tabla): ${delPErr.message}`
+      );
+    } else {
+      console.log(`✔ Borradas ${huerfanasIds.length} personas-basura (CURP inválido).`);
+    }
+  }
+
+  // ── Personas: upsert por CURP (sólo si CURP es válida) ─────────────────────
+  // Con CURP válida: se insertan las nuevas en lote y se mapean por CURP.
   const nuevasConCurp = new Map<string, (typeof registros)[number]['persona']>();
   for (const r of registros) {
-    const curp = r.persona.curp?.trim().toUpperCase();
-    if (curp && !curpMap.has(curp) && !nuevasConCurp.has(curp)) {
+    if (!isCurpValid(r.persona.curp)) continue;
+    const curp = r.persona.curp!.trim().toUpperCase();
+    if (!curpMap.has(curp) && !nuevasConCurp.has(curp)) {
       nuevasConCurp.set(curp, r.persona);
     }
   }
@@ -279,23 +335,30 @@ async function main() {
       if (p.curp) curpMap.set((p.curp as string).trim().toUpperCase(), p.id as string);
     }
   }
-  // Sin CURP: se insertan en orden y se enlazan por posición.
-  const sinCurpRegs = registros.filter((r) => !r.persona.curp);
+  // CURP inválida (basura o vacía): se insertan en orden y se enlazan por
+  // posición. UNA persona por registro — NO se dedupea por CURP basura
+  // (antes mergeaba todos los XXXXXXXXXX en una sola persona).
+  const sinCurpRegs = registros.filter((r) => !isCurpValid(r.persona.curp));
   const sinCurpIds: string[] = [];
   if (sinCurpRegs.length > 0) {
-    const { data: ins, error } = await sb
-      .schema('erp')
-      .from('personas')
-      .insert(sinCurpRegs.map((r) => r.persona))
-      .select('id');
-    if (error) throw new Error(`Error insertando personas sin CURP: ${error.message}`);
-    sinCurpIds.push(...(ins ?? []).map((p) => p.id as string));
+    // Insertar en chunks para evitar payloads enormes.
+    const CHUNK_P = 300;
+    for (let i = 0; i < sinCurpRegs.length; i += CHUNK_P) {
+      const slice = sinCurpRegs.slice(i, i + CHUNK_P);
+      const { data: ins, error } = await sb
+        .schema('erp')
+        .from('personas')
+        .insert(slice.map((r) => r.persona))
+        .select('id');
+      if (error) throw new Error(`Error insertando personas sin CURP útil: ${error.message}`);
+      sinCurpIds.push(...(ins ?? []).map((p) => p.id as string));
+    }
   }
   const sinCurpPersonaId = new Map(sinCurpRegs.map((r, i) => [r, sinCurpIds[i]]));
 
   const personaIdDe = (r: (typeof registros)[number]): string => {
-    const curp = r.persona.curp?.trim().toUpperCase();
-    return curp ? curpMap.get(curp)! : sinCurpPersonaId.get(r)!;
+    if (isCurpValid(r.persona.curp)) return curpMap.get(r.persona.curp!.trim().toUpperCase())!;
+    return sinCurpPersonaId.get(r)!;
   };
 
   // ── Ventas (en lotes; RETURNING preserva el orden del VALUES) ────────────────
