@@ -6,11 +6,12 @@
  * Iniciativa dilesa-portafolio-activos · Sprint 4 (UI ventas). Lista
  * filtrable de las ventas importadas en Fase 4: comprador (cross-schema
  * a `erp.personas`), unidad+proyecto (same-schema embed), fase actual,
- * precio, vendedor. Click en una fila abre `VentaDetailDrawer` con la
- * ficha completa, pipeline (de `venta_fases`), pagos y expediente.
+ * precio, vendedor. Click en una fila navega a `/dilesa/ventas/[id]`
+ * con la ficha completa, pipeline (de `venta_fases`), pagos y expediente.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { DataTable, type Column } from '@/components/module-page';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +19,6 @@ import type { BadgeTone } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Receipt, RefreshCw, Search } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
-import { VentaDetailDrawer, type VentaDetalle } from './venta-detail-drawer';
 
 type VentaRow = {
   id: string;
@@ -48,6 +48,7 @@ const ESTADO_LABEL: Record<string, string> = {
 };
 
 export function VentasModule({ empresaId }: { empresaId: string }) {
+  const router = useRouter();
   const [ventas, setVentas] = useState<VentaListaRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,8 +56,6 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
   const [proyectoFiltro, setProyectoFiltro] = useState('');
   const [faseFiltro, setFaseFiltro] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState('');
-  const [selected, setSelected] = useState<VentaDetalle | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Fetch puro: regresa data o mensaje de error, NO toca state.
   const fetchVentas = useCallback(async (): Promise<{
@@ -76,7 +75,6 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
       .eq('empresa_id', empresaId)
       .is('deleted_at', null);
     if (vErr) {
-      console.error('[ventas] fetch ventas error:', vErr, JSON.stringify(vErr));
       return { error: getSupabaseErrorMessage(vErr, 'No se pudieron cargar las ventas.') };
     }
     const ventasArr = (rawVentas ?? []) as VentaRow[];
@@ -89,7 +87,6 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
       .select('id, identificador, proyecto_id')
       .eq('empresa_id', empresaId);
     if (uErr) {
-      console.error('[ventas] fetch unidades error:', uErr, JSON.stringify(uErr));
       return { error: getSupabaseErrorMessage(uErr, 'No se pudieron cargar las unidades.') };
     }
     const unidadMap = new Map<string, { identificador: string; proyecto_id: string | null }>();
@@ -106,7 +103,6 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
       .select('id, nombre')
       .eq('empresa_id', empresaId);
     if (prjErr) {
-      console.error('[ventas] fetch proyectos error:', prjErr, JSON.stringify(prjErr));
       return { error: getSupabaseErrorMessage(prjErr, 'No se pudieron cargar los proyectos.') };
     }
     const proyectoMap = new Map<string, string>();
@@ -120,7 +116,6 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
       .eq('empresa_id', empresaId)
       .eq('tipo', 'cliente');
     if (pErr) {
-      console.error('[ventas] fetch personas error:', pErr, JSON.stringify(pErr));
       return { error: getSupabaseErrorMessage(pErr, 'No se pudieron cargar los compradores.') };
     }
     const personaMap = new Map<string, string>();
@@ -157,10 +152,8 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
   // Carga inicial: los setState van solo dentro de `.then` para no
   // dispararse síncronamente dentro del effect.
   useEffect(() => {
-    console.log('[ventas] effect fired, fetching');
     let activo = true;
     void fetchVentas().then(({ data, error: e }) => {
-      console.log('[ventas] fetch resolved', { data: data?.length, error: e });
       if (!activo) return;
       if (e) {
         setError(e);
@@ -232,18 +225,7 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
   ];
 
   const onRowClick = (v: VentaListaRow) => {
-    setSelected({
-      id: v.id,
-      persona_id: v.persona_id,
-      estado: v.estado,
-      fase_actual: v.fase_actual,
-      fase_posicion: v.fase_posicion,
-      tipo_credito: v.tipo_credito,
-      cliente: v.cliente,
-      unidadIdentificador: v.unidadIdentificador,
-      proyectoNombre: v.proyectoNombre || null,
-    });
-    setDrawerOpen(true);
+    router.push(`/dilesa/ventas/${v.id}`);
   };
 
   return (
@@ -326,8 +308,6 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
         emptyDescription="Aún no hay ventas en DILESA."
         emptyIcon={<Receipt className="h-6 w-6" />}
       />
-
-      <VentaDetailDrawer venta={selected} open={drawerOpen} onOpenChange={setDrawerOpen} />
     </div>
   );
 }
