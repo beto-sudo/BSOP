@@ -12,10 +12,9 @@ Sprint 3 — importación desde Coda — con Fases 1 (25 terrenos), 2 (13
 proyectos), 3 (1,590 unidades + 14 productos) y **4 (1,425 ventas + 1,107
 personas + 13,936 fases de pipeline + 1,087 pagos)** cargadas en prod.
 Fase 4.5 (9,320 PDFs / 8.3 GB del expediente digital → `erp.adjuntos` +
-Supabase Storage) completa. Próximo: UI de detalle de venta + de activo
-
-- activity log. D2 cerrada en ADR-010; D1 y D3 abren la fase de
-  captura/alta de la UI.)
+Supabase Storage) completa. Próximo: UI de detalle de venta, de activo, y
+activity log. D2 cerrada en ADR-010; D1 y D3 abren la fase de
+captura/alta de la UI.)
 
 ## Problema
 
