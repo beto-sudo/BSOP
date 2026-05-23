@@ -142,17 +142,32 @@ async function main() {
     (unidades ?? []).map((u) => [u.identificador as string, u.id as string])
   );
 
-  // personas existentes de DILESA: CURP → id (para dedup, sólo CURPs válidos).
+  // personas existentes de DILESA: CURP → id (dedup primario), nombre → id
+  // (dedup secundario para CURPs basura — evita duplicar personas-sin-CURP
+  // en cada run del cron, que acumulaba huérfanas).
   const { data: personas, error: pErr } = await sb
     .schema('erp')
     .from('personas')
-    .select('id, curp')
-    .eq('empresa_id', empresaId);
+    .select('id, curp, nombre, apellido_paterno, apellido_materno, tipo')
+    .eq('empresa_id', empresaId)
+    .eq('tipo', 'cliente');
   if (pErr) throw new Error(`Error leyendo personas: ${pErr.message}`);
   const curpMap = new Map<string, string>();
+  const nameKey = (n: string | null, ap: string | null, am: string | null): string =>
+    [n, ap, am].map((s) => (s ?? '').trim().toLowerCase().replace(/\s+/g, ' ')).join('|');
+  const nameMap = new Map<string, string>();
   for (const p of personas ?? []) {
     const c = p.curp as string | null;
-    if (isCurpValid(c)) curpMap.set(c!.trim().toUpperCase(), p.id as string);
+    if (isCurpValid(c)) {
+      curpMap.set(c!.trim().toUpperCase(), p.id as string);
+    } else {
+      const k = nameKey(
+        p.nombre as string,
+        p.apellido_paterno as string,
+        p.apellido_materno as string
+      );
+      if (k.replace(/\|/g, '').length > 0) nameMap.set(k, p.id as string);
+    }
   }
 
   // ── Parseo de cada fila de Clientes ─────────────────────────────────────────
@@ -243,8 +258,10 @@ async function main() {
     })
     .filter((r): r is NonNullable<typeof r> => r !== null);
 
-  // Depósitos parseados (se ligan por nombre de cliente más abajo).
+  // Depósitos parseados (se ligan por nombre de cliente más abajo). Guardamos
+  // `coda_row_id` (row.id de Coda Depositos Clientes) para UPSERT estable.
   const depositos = dRows.map((row) => ({
+    codaRowId: row.id,
     clienteName: str(pick(row.values, dm, 'Cliente')),
     fecha: dateStr(pick(row.values, dm, 'Fecha Deposito')),
     monto: num(pick(row.values, dm, 'Monto Deposito')),
@@ -277,47 +294,13 @@ async function main() {
     return;
   }
 
-  // Idempotencia: limpiar ventas previas (venta_fases + venta_pagos caen por CASCADE).
-  // **Solo borra las que vinieron de Coda** (coda_row_id NOT NULL). Las ventas
-  // creadas nativas en BSOP (sin coda_row_id) se preservan — esto deja el
-  // script seguro de correr en cron diario durante el período de transición,
-  // donde algunas ventas pueden estar siendo capturadas directamente en BSOP.
-  const { error: delErr } = await sb
-    .schema('dilesa')
-    .from('ventas')
-    .delete()
-    .eq('empresa_id', empresaId)
-    .not('coda_row_id', 'is', null);
-  if (delErr) throw new Error(`Error limpiando ventas previas: ${delErr.message}`);
-
-  // Cleanup de personas-basura preexistentes: las que tenían CURP "X"/"XXX"
-  // y fueron mergeadas erróneamente. Después del DELETE de ventas, quedan
-  // huérfanas (sin venta referenciándolas). Las borramos antes de re-insertar
-  // para no acumular ghost personas. Sólo borramos las que NO tienen ninguna
-  // venta en NINGÚN schema referenciándolas (idempotencia segura).
-  const huerfanasIds = (personas ?? [])
-    .filter((p) => {
-      const c = p.curp as string | null;
-      if (c === null) return false; // sin CURP — pudo ser legítima
-      const s = c.trim().toUpperCase();
-      // CURP basura: vacío, len != 18, o puro X
-      return s === '' || s.length !== 18 || /^X+$/.test(s);
-    })
-    .map((p) => p.id as string);
-  if (huerfanasIds.length > 0) {
-    const { error: delPErr } = await sb
-      .schema('erp')
-      .from('personas')
-      .delete()
-      .in('id', huerfanasIds);
-    if (delPErr) {
-      console.warn(
-        `⚠ No se pudieron borrar ${huerfanasIds.length} personas-basura (probable FK a otra tabla): ${delPErr.message}`
-      );
-    } else {
-      console.log(`✔ Borradas ${huerfanasIds.length} personas-basura (CURP inválido).`);
-    }
-  }
+  // No hay DELETE — usamos UPSERT por (empresa_id, coda_row_id) para preservar
+  // venta.id estable a través de re-imports. Si borráramos+reinsertáramos las
+  // ventas, los venta_ids cambiarían y los ~11k adjuntos del expediente que
+  // apuntan a esos IDs (erp.adjuntos.entidad_id) quedarían huérfanos.
+  //
+  // Las ventas creadas nativas en BSOP (sin coda_row_id) se preservan
+  // intactas — no las tocamos.
 
   // ── Personas: upsert por CURP (sólo si CURP es válida) ─────────────────────
   // Con CURP válida: se insertan las nuevas en lote y se mapean por CURP.
@@ -340,71 +323,106 @@ async function main() {
       if (p.curp) curpMap.set((p.curp as string).trim().toUpperCase(), p.id as string);
     }
   }
-  // CURP inválida (basura o vacía): se insertan en orden y se enlazan por
-  // posición. UNA persona por registro — NO se dedupea por CURP basura
-  // (antes mergeaba todos los XXXXXXXXXX en una sola persona).
+  // CURP inválida (basura o vacía): dedup por nombre completo. Si una persona
+  // con el mismo (nombre, apellido_paterno, apellido_materno) ya existe en
+  // DILESA, se reusa su id; si no, se inserta. Esto evita acumular duplicados
+  // entre runs del cron.
   const sinCurpRegs = registros.filter((r) => !isCurpValid(r.persona.curp));
-  const sinCurpIds: string[] = [];
-  if (sinCurpRegs.length > 0) {
-    // Insertar en chunks para evitar payloads enormes.
+  const sinCurpKey = (r: (typeof registros)[number]): string =>
+    nameKey(r.persona.nombre, r.persona.apellido_paterno, r.persona.apellido_materno);
+  const nuevasSinCurp = new Map<string, (typeof registros)[number]['persona']>();
+  for (const r of sinCurpRegs) {
+    const k = sinCurpKey(r);
+    if (!nameMap.has(k) && !nuevasSinCurp.has(k)) nuevasSinCurp.set(k, r.persona);
+  }
+  if (nuevasSinCurp.size > 0) {
+    const entries = [...nuevasSinCurp.entries()];
     const CHUNK_P = 300;
-    for (let i = 0; i < sinCurpRegs.length; i += CHUNK_P) {
-      const slice = sinCurpRegs.slice(i, i + CHUNK_P);
+    for (let i = 0; i < entries.length; i += CHUNK_P) {
+      const slice = entries.slice(i, i + CHUNK_P);
       const { data: ins, error } = await sb
         .schema('erp')
         .from('personas')
-        .insert(slice.map((r) => r.persona))
-        .select('id');
+        .insert(slice.map(([, p]) => p))
+        .select('id, nombre, apellido_paterno, apellido_materno');
       if (error) throw new Error(`Error insertando personas sin CURP útil: ${error.message}`);
-      sinCurpIds.push(...(ins ?? []).map((p) => p.id as string));
+      for (const p of ins ?? []) {
+        const k = nameKey(
+          p.nombre as string,
+          p.apellido_paterno as string,
+          p.apellido_materno as string
+        );
+        nameMap.set(k, p.id as string);
+      }
     }
   }
-  const sinCurpPersonaId = new Map(sinCurpRegs.map((r, i) => [r, sinCurpIds[i]]));
 
   const personaIdDe = (r: (typeof registros)[number]): string => {
     if (isCurpValid(r.persona.curp)) return curpMap.get(r.persona.curp!.trim().toUpperCase())!;
-    return sinCurpPersonaId.get(r)!;
+    return nameMap.get(sinCurpKey(r))!;
   };
 
-  // ── Ventas (en lotes; RETURNING preserva el orden del VALUES) ────────────────
+  // ── Ventas: UPSERT por (empresa_id, coda_row_id) ────────────────────────────
+  // Preserva venta.id estable a través de re-imports → adjuntos asociados a
+  // venta.id (`erp.adjuntos.entidad_id`) NO se huerfanan.
+  // codaRowIdToVentaId es 1:1 garantizado por el unique index parcial
+  // ventas_coda_row_id_empresa_uq. Mapea cada coda_row_id de Coda al
+  // venta.id de BSOP — usado para fases (no usar clienteName como llave,
+  // se rompe con re-asignaciones que comparten nombre).
+  const codaRowIdToVentaId = new Map<string, string>();
   const nameToVentaId = new Map<string, string>();
   let okV = 0;
   const CHUNK = 300;
-  const fasesInserts: Array<Record<string, unknown>> = [];
   for (let i = 0; i < registros.length; i += CHUNK) {
     const chunk = registros.slice(i, i + CHUNK);
     const ventaRows = chunk.map((r) => ({ ...r.venta, persona_id: personaIdDe(r) }));
-    const { data: ins, error } = await sb
+    const { data: ups, error } = await sb
       .schema('dilesa')
       .from('ventas')
-      .insert(ventaRows)
-      .select('id');
+      .upsert(ventaRows, { onConflict: 'empresa_id,coda_row_id' })
+      .select('id, coda_row_id');
     if (error) {
       console.error(`✗ chunk ventas [${i}..${i + chunk.length}): ${error.message}`);
       continue;
     }
-    const ids = (ins ?? []).map((x) => x.id as string);
-    chunk.forEach((r, j) => {
-      const ventaId = ids[j];
+    for (const u of ups ?? []) {
+      codaRowIdToVentaId.set(u.coda_row_id as string, u.id as string);
+    }
+    chunk.forEach((r) => {
+      const ventaId = codaRowIdToVentaId.get(r.codaRowId);
       if (!ventaId) return;
       okV++;
+      // Para mapear pagos por clienteName más abajo. Si hay re-asignaciones
+      // (mismo nombre, distinto codaRowId), gana la última — los pagos
+      // realmente se ligan a la venta más reciente vía clienteName.
       if (r.clienteName) nameToVentaId.set(r.clienteName, ventaId);
-      for (const f of r.fases) {
-        fasesInserts.push({ empresa_id: empresaId, venta_id: ventaId, ...f });
-      }
     });
   }
 
-  // ── venta_fases ─────────────────────────────────────────────────────────────
+  // ── venta_fases: UPSERT por (venta_id, fase) ────────────────────────────────
+  // Existing unique constraint `venta_fases_uk` permite hacerlo sin DELETE.
+  const fasesInserts: Array<Record<string, unknown>> = [];
+  for (const r of registros) {
+    const vid = codaRowIdToVentaId.get(r.codaRowId);
+    if (!vid) continue;
+    for (const f of r.fases) {
+      fasesInserts.push({ empresa_id: empresaId, venta_id: vid, ...f });
+    }
+  }
   let okF = 0;
   for (let i = 0; i < fasesInserts.length; i += 500) {
     const chunk = fasesInserts.slice(i, i + 500);
-    const { error } = await sb.schema('dilesa').from('venta_fases').insert(chunk);
+    const { error } = await sb
+      .schema('dilesa')
+      .from('venta_fases')
+      .upsert(chunk, { onConflict: 'venta_id,fase' });
     if (error) console.error(`✗ chunk venta_fases [${i}): ${error.message}`);
     else okF += chunk.length;
   }
 
-  // ── venta_pagos (depósitos ligados por nombre de cliente) ────────────────────
+  // ── venta_pagos: UPSERT por (empresa_id, coda_row_id) ───────────────────────
+  // Igual razón que ventas: preserva venta_pago.id estable → adjuntos
+  // con entidad_tipo='venta_pago' no se huerfanan.
   let okP = 0;
   let pagosHuerfanos = 0;
   const pagoInserts: Array<Record<string, unknown>> = [];
@@ -416,6 +434,7 @@ async function main() {
     }
     pagoInserts.push({
       empresa_id: empresaId,
+      coda_row_id: d.codaRowId,
       venta_id: ventaId,
       fecha: d.fecha,
       monto: d.monto ?? 0,
@@ -424,13 +443,16 @@ async function main() {
   }
   for (let i = 0; i < pagoInserts.length; i += 500) {
     const chunk = pagoInserts.slice(i, i + 500);
-    const { error } = await sb.schema('dilesa').from('venta_pagos').insert(chunk);
+    const { error } = await sb
+      .schema('dilesa')
+      .from('venta_pagos')
+      .upsert(chunk, { onConflict: 'empresa_id,coda_row_id' });
     if (error) console.error(`✗ chunk venta_pagos [${i}): ${error.message}`);
     else okP += chunk.length;
   }
 
   console.log(
-    `\n✔ Importadas ${okV}/${registros.length} ventas, ${okF} fases de pipeline, ` +
+    `\n✔ UPSERT ${okV}/${registros.length} ventas, ${okF} fases (UPSERT por venta_id+fase), ` +
       `${okP} pagos${pagosHuerfanos ? ` (${pagosHuerfanos} depósitos sin venta — omitidos)` : ''}.`
   );
 }

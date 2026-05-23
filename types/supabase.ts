@@ -2029,6 +2029,7 @@ export type Database = {
       }
       venta_pagos: {
         Row: {
+          coda_row_id: string | null
           created_at: string
           deleted_at: string | null
           empresa_id: string
@@ -2041,6 +2042,7 @@ export type Database = {
           venta_id: string
         }
         Insert: {
+          coda_row_id?: string | null
           created_at?: string
           deleted_at?: string | null
           empresa_id: string
@@ -2053,6 +2055,7 @@ export type Database = {
           venta_id: string
         }
         Update: {
+          coda_row_id?: string | null
           created_at?: string
           deleted_at?: string | null
           empresa_id?: string
