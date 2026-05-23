@@ -1,0 +1,62 @@
+name: DILESA Coda Sync
+
+# Refresh nocturno del schema dilesa desde Coda. Corre los 5 imports en
+# serie (terrenos → proyectos → inventario → ventas → expediente) y
+# manda email con resumen vía Resend (siempre — éxito o fallo).
+#
+# Idempotente: las ventas creadas nativas en BSOP (sin coda_row_id) se
+# preservan. Los adjuntos de expediente solo se descargan/suben si son
+# nuevos (dedup por metadata->>'coda_source_url').
+#
+# Se ejecuta:
+#   - Manualmente desde la pestaña Actions (workflow_dispatch)
+#   - Automáticamente cada día a las 09:00 UTC (= 03:00 CST sin DST)
+#
+# Secrets requeridos (Settings → Secrets and variables → Actions):
+#   - CODA_API_KEY                       — coda.io API token
+#   - NEXT_PUBLIC_SUPABASE_URL           — https://<ref>.supabase.co
+#   - SUPABASE_SERVICE_ROLE_KEY          — service role (bypasses RLS)
+#   - RESEND_API_KEY                     — para enviar el email de reporte
+#   - NOTIFY_EMAIL                       — destinatario del reporte (ej. beto@anorte.com)
+#   - SYNC_FROM_EMAIL  (opcional)        — From: header (default: BSOP Sync <sync@anorte.com>)
+#
+# Runbook completo: docs/runbooks/dilesa-coda-sync.md
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 9 * * *'
+
+concurrency:
+  group: dilesa-coda-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync Coda → BSOP
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      CODA_API_KEY: ${{ secrets.CODA_API_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      NOTIFY_EMAIL: ${{ secrets.NOTIFY_EMAIL }}
+      SYNC_FROM_EMAIL: ${{ secrets.SYNC_FROM_EMAIL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run sync wrapper
+        run: npx tsx scripts/run-dilesa-sync.ts
