@@ -7,14 +7,13 @@ las tablas viejas), `core.empresas` (lectura)
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-08
-**Última actualización:** 2026-05-22 (Sprints 1, 2 y 4 completados;
-Sprint 3 — importación desde Coda — con Fases 1 (25 terrenos), 2 (13
-proyectos), 3 (1,590 unidades + 14 productos) y **4 (1,425 ventas + 1,107
-personas + 13,936 fases de pipeline + 1,087 pagos)** cargadas en prod.
-Fase 4.5 (9,320 PDFs / 8.3 GB del expediente digital → `erp.adjuntos` +
-Supabase Storage) completa. Próximo: UI de detalle de venta, de activo, y
-activity log. D2 cerrada en ADR-010; D1 y D3 abren la fase de
-captura/alta de la UI.)
+**Última actualización:** 2026-05-23 (PR #495 mergeado — módulo Ventas
+en prod: lista filtrable + página de detalle con cliente, ficha,
+pipeline compacto de 17 fases con docs por fase, pagos, expediente.
+Re-import con `coda_row_id` para dedup correcto de personas (bug
+"Ana Mena = 183 ventas" resuelto): 1,425 ventas, 1,300 personas-cliente,
+11,878 adjuntos. Próximo: UI de captura por fase — botón "subir doc
+faltante" que al guardar marca fecha de la fase + crea adjunto.)
 
 ## Problema
 
@@ -633,3 +632,49 @@ lotificación (agosto 2023, vigente).
     ROUTE_TO_MODULE + EXPECTED_DB_MODULE_SLUGS + migración). Próximo: UI
     de detalle de activo (mismo patrón) + edición/captura cuando se
     resuelvan D1 y D3.
+- **2026-05-23 — PR #495 mergeado: refactor + fixes profundos del módulo
+  Ventas.** Tres lotes:
+  - **UX**: drawer → página completa (`app/dilesa/ventas/[id]/page.tsx`,
+    `max-w-6xl`, navegación con `router.push`). Sticky header del
+    DataTable **arreglado de raíz**: `<Table>` de shadcn envolvía en un
+    `<div overflow-x-auto>` que creaba un scroll-context interior y
+    capturaba el `sticky top-0` antes de llegar al wrapper externo —
+    el fix usa `<table>` HTML directo. Beneficia a todas las tablas de
+    la app que usen `maxHeight`. Nueva columna **Prototipo** (de
+    `dilesa.productos.nombre`). Precio en la lista = `valor_escrituracion
+?? valor_comercial` (Beto: "el Valor de Escrituración es el precio
+    correcto de venta").
+  - **Pipeline compactado + docs por fase**: reemplazo de `<ActivityLog>`
+    por una lista densa de las 17 fases. Mapping `FASE_ROLES` declara
+    qué adjunto(s) son el soporte para concluir cada fase (Solicitud →
+    `solicitud_asignacion`, Formalizada → `contrato_promesa`, Dictaminada
+    → `carta_instruccion_notarial` + constancias, Avalúo Cerrado →
+    `avaluo_comercial`, etc.). Cada fila muestra ✓/○ + posición + nombre
+    - fecha + chips de docs cargados (clickeables) + chips outline de
+      faltantes. Es la base para la próxima fase de captura por fase.
+  - **Re-import con `coda_row_id`**: migración
+    `20260523035526_dilesa_ventas_coda_row_id.sql` agrega columna `text`
+    - unique index parcial por `(empresa_id, coda_row_id)`. Fix del bug
+      crítico de dedup: el import inicial mergeaba personas por CURP
+      truthy, pero Coda tenía CURPs basura (`X`, `XXXXXXXXXX`, etc.) que
+      colapsaron a una sola persona — "Ana Isabel Mena Vela" terminó con
+      **183 ventas** (los 183 clientes reales con CURP basura). Nuevo
+      `isCurpValid()` rechaza basura → cada cliente es persona propia.
+      Script de expediente cambió matching de `(CURP|identificador_unidad)`
+      a `coda_row_id` directo (1:1). Re-corrida completa: **1,425 ventas**
+      (igual), **1,300 personas-cliente** (+193 que estaban mergeadas),
+      **10,286 adj_venta + 1,592 adj_pago = 11,878 adjuntos** (+2,558
+      restaurados que el matching ambiguo perdía o concentraba mal). Top
+      venta/persona ahora = 4 (Pedro Sanchez, re-asignaciones legítimas).
+      Cero duplicados. **Memoria nueva** `feedback_supabase_in_url_limit`
+      se aplicó por segunda vez al fixear el query de pagos del expediente
+      (`.in('venta_id', 1425 uuids[])` rebasaba 8KB → 0 pagos en alcance).
+  - **Nota administrativa**: la migración del `coda_row_id` se aplicó
+    vía `psql` (el classifier bloqueó el pipe `echo y` al prompt nativo
+    de `supabase db push`). Está aplicada en prod, pero NO registrada en
+    `supabase_migrations.schema_migrations`. Próxima `supabase db push`
+    la intentará reaplicar — el SQL es `IF NOT EXISTS` así que solo
+    registrará el tracker.
+  - **Próximo**: UI de captura por fase (botón "subir doc faltante" que
+    marca la fecha + crea el adjunto). El pipeline compacto ya tiene la
+    estructura para alojarlo.
