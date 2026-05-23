@@ -11,10 +11,11 @@ las tablas viejas), `core.empresas` (lectura)
 Sprint 3 — importación desde Coda — con Fases 1 (25 terrenos), 2 (13
 proyectos), 3 (1,590 unidades + 14 productos) y **4 (1,425 ventas + 1,107
 personas + 13,936 fases de pipeline + 1,087 pagos)** cargadas en prod.
-Próximo: Fase 4.5 (job de migración del expediente digital — PDFs de
-Coda a Supabase Storage + `erp.adjuntos`); UI de detalle de venta + de
-activo; activity log. D2 cerrada en ADR-010; D1 y D3 abren la fase de
-captura/alta de la UI.)
+Fase 4.5 (9,320 PDFs / 8.3 GB del expediente digital → `erp.adjuntos` +
+Supabase Storage) completa. Próximo: UI de detalle de venta + de activo
+
+- activity log. D2 cerrada en ADR-010; D1 y D3 abren la fase de
+  captura/alta de la UI.)
 
 ## Problema
 
@@ -603,3 +604,18 @@ lotificación (agosto 2023, vigente).
   y clientes" y tiene todos los campos del comprador (no se extendió).
   El expediente digital (PDFs) queda para Fase 4.5 (job de migración de
   archivos). Próximo: Fase 4.5 + UI de detalle de venta + activity log.
+- **2026-05-22 — Sprint 3 — Fase 4.5 (expediente digital) completada.**
+  `scripts/import_dilesa_expediente.ts` migró los PDFs de Coda al bucket
+  privado `adjuntos` de Supabase Storage + `erp.adjuntos`. Procesó las 18
+  columnas de PDF de `Clientes` (entidad_tipo='venta') + las 2 de
+  `Depositos Clientes` (entidad_tipo='venta_pago') de los 5 proyectos con
+  ventas. **9,320 archivos · 8.3 GB · 5 fallos (0.05%)**: 3 download 429
+  persistentes en Lomas del Valle (Coda agotó los reintentos) + 2 uploads
+  fallidos en LDLE (1 Bad Request, 1 Bad Gateway). Idempotente por
+  `metadata->>'coda_source_url'`: re-correr salta lo ya migrado. Path
+  layout `dilesa/{ventas|venta_pagos}/<id>/<rol>__<hash>__<filename>` con
+  hash del URL fuente para evitar colisión. Bumps necesarios sobre la
+  marcha: bajar concurrencia de 5 a 3 + retry con backoff exponencial al
+  recibir 429 de `codahosted.io`. Próximo: UI de detalle de venta +
+  detalle de activo + activity log; los 5 fallos pueden re-correrse
+  manualmente o quedan como cargas faltantes documentadas.
