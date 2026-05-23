@@ -92,8 +92,10 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
         .from('unidades')
         .select('id, identificador, proyecto_id')
         .in('id', unidadIds);
-      if (uErr)
+      if (uErr) {
+        console.error('[ventas] fetch unidades error:', uErr, JSON.stringify(uErr));
         return { error: getSupabaseErrorMessage(uErr, 'No se pudieron cargar las unidades.') };
+      }
       for (const u of uns ?? []) {
         unidadMap.set(u.id as string, {
           identificador: u.identificador as string,
@@ -111,8 +113,10 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
           .from('proyectos')
           .select('id, nombre')
           .in('id', proyectoIds);
-        if (prjErr)
+        if (prjErr) {
+          console.error('[ventas] fetch proyectos error:', prjErr, JSON.stringify(prjErr));
           return { error: getSupabaseErrorMessage(prjErr, 'No se pudieron cargar los proyectos.') };
+        }
         for (const p of prjs ?? []) proyectoMap.set(p.id as string, p.nombre as string);
       }
     }
@@ -126,8 +130,10 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
         .from('personas')
         .select('id, nombre, apellido_paterno, apellido_materno')
         .in('id', personaIds);
-      if (pErr)
+      if (pErr) {
+        console.error('[ventas] fetch personas error:', pErr, JSON.stringify(pErr));
         return { error: getSupabaseErrorMessage(pErr, 'No se pudieron cargar los compradores.') };
+      }
       for (const p of personas ?? []) {
         const nombre = [p.nombre, p.apellido_paterno, p.apellido_materno].filter(Boolean).join(' ');
         personaMap.set(p.id as string, nombre || '(sin nombre)');
@@ -162,8 +168,10 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
   // Carga inicial: los setState van solo dentro de `.then` para no
   // dispararse síncronamente dentro del effect.
   useEffect(() => {
+    console.log('[ventas] effect fired, fetching');
     let activo = true;
     void fetchVentas().then(({ data, error: e }) => {
+      console.log('[ventas] fetch resolved', { data: data?.length, error: e });
       if (!activo) return;
       if (e) {
         setError(e);
