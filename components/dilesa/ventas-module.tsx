@@ -81,63 +81,52 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
     }
     const ventasArr = (rawVentas ?? []) as VentaRow[];
 
-    const unidadIds = [
-      ...new Set(ventasArr.map((v) => v.unidad_id).filter((x): x is string => !!x)),
-    ];
+    // Unidades + proyectos: `.eq(empresa_id)` en lugar de `.in(ids[])` para
+    // evitar URLs > 8KB (Cloudflare rechaza con HTTP 400 "Bad Request").
+    const { data: uns, error: uErr } = await sb
+      .schema('dilesa')
+      .from('unidades')
+      .select('id, identificador, proyecto_id')
+      .eq('empresa_id', empresaId);
+    if (uErr) {
+      console.error('[ventas] fetch unidades error:', uErr, JSON.stringify(uErr));
+      return { error: getSupabaseErrorMessage(uErr, 'No se pudieron cargar las unidades.') };
+    }
     const unidadMap = new Map<string, { identificador: string; proyecto_id: string | null }>();
-    const proyectoMap = new Map<string, string>();
-    if (unidadIds.length) {
-      const { data: uns, error: uErr } = await sb
-        .schema('dilesa')
-        .from('unidades')
-        .select('id, identificador, proyecto_id')
-        .in('id', unidadIds);
-      if (uErr) {
-        console.error('[ventas] fetch unidades error:', uErr, JSON.stringify(uErr));
-        return { error: getSupabaseErrorMessage(uErr, 'No se pudieron cargar las unidades.') };
-      }
-      for (const u of uns ?? []) {
-        unidadMap.set(u.id as string, {
-          identificador: u.identificador as string,
-          proyecto_id: (u.proyecto_id as string | null) ?? null,
-        });
-      }
-      const proyectoIds = [
-        ...new Set(
-          (uns ?? []).map((u) => u.proyecto_id as string | null).filter((x): x is string => !!x)
-        ),
-      ];
-      if (proyectoIds.length) {
-        const { data: prjs, error: prjErr } = await sb
-          .schema('dilesa')
-          .from('proyectos')
-          .select('id, nombre')
-          .in('id', proyectoIds);
-        if (prjErr) {
-          console.error('[ventas] fetch proyectos error:', prjErr, JSON.stringify(prjErr));
-          return { error: getSupabaseErrorMessage(prjErr, 'No se pudieron cargar los proyectos.') };
-        }
-        for (const p of prjs ?? []) proyectoMap.set(p.id as string, p.nombre as string);
-      }
+    for (const u of uns ?? []) {
+      unidadMap.set(u.id as string, {
+        identificador: u.identificador as string,
+        proyecto_id: (u.proyecto_id as string | null) ?? null,
+      });
     }
 
-    // Personas cross-schema (memoria reference_supabase_cross_schema_fk).
-    const personaIds = [...new Set(ventasArr.map((v) => v.persona_id))];
+    const { data: prjs, error: prjErr } = await sb
+      .schema('dilesa')
+      .from('proyectos')
+      .select('id, nombre')
+      .eq('empresa_id', empresaId);
+    if (prjErr) {
+      console.error('[ventas] fetch proyectos error:', prjErr, JSON.stringify(prjErr));
+      return { error: getSupabaseErrorMessage(prjErr, 'No se pudieron cargar los proyectos.') };
+    }
+    const proyectoMap = new Map<string, string>();
+    for (const p of prjs ?? []) proyectoMap.set(p.id as string, p.nombre as string);
+
+    // Personas cross-schema — mismo patrón `.eq(empresa_id) + tipo='cliente'`.
+    const { data: personas, error: pErr } = await sb
+      .schema('erp')
+      .from('personas')
+      .select('id, nombre, apellido_paterno, apellido_materno')
+      .eq('empresa_id', empresaId)
+      .eq('tipo', 'cliente');
+    if (pErr) {
+      console.error('[ventas] fetch personas error:', pErr, JSON.stringify(pErr));
+      return { error: getSupabaseErrorMessage(pErr, 'No se pudieron cargar los compradores.') };
+    }
     const personaMap = new Map<string, string>();
-    if (personaIds.length) {
-      const { data: personas, error: pErr } = await sb
-        .schema('erp')
-        .from('personas')
-        .select('id, nombre, apellido_paterno, apellido_materno')
-        .in('id', personaIds);
-      if (pErr) {
-        console.error('[ventas] fetch personas error:', pErr, JSON.stringify(pErr));
-        return { error: getSupabaseErrorMessage(pErr, 'No se pudieron cargar los compradores.') };
-      }
-      for (const p of personas ?? []) {
-        const nombre = [p.nombre, p.apellido_paterno, p.apellido_materno].filter(Boolean).join(' ');
-        personaMap.set(p.id as string, nombre || '(sin nombre)');
-      }
+    for (const p of personas ?? []) {
+      const nombre = [p.nombre, p.apellido_paterno, p.apellido_materno].filter(Boolean).join(' ');
+      personaMap.set(p.id as string, nombre || '(sin nombre)');
     }
 
     return {
