@@ -278,11 +278,16 @@ async function main() {
   }
 
   // Idempotencia: limpiar ventas previas (venta_fases + venta_pagos caen por CASCADE).
+  // **Solo borra las que vinieron de Coda** (coda_row_id NOT NULL). Las ventas
+  // creadas nativas en BSOP (sin coda_row_id) se preservan — esto deja el
+  // script seguro de correr en cron diario durante el período de transición,
+  // donde algunas ventas pueden estar siendo capturadas directamente en BSOP.
   const { error: delErr } = await sb
     .schema('dilesa')
     .from('ventas')
     .delete()
-    .eq('empresa_id', empresaId);
+    .eq('empresa_id', empresaId)
+    .not('coda_row_id', 'is', null);
   if (delErr) throw new Error(`Error limpiando ventas previas: ${delErr.message}`);
 
   // Cleanup de personas-basura preexistentes: las que tenían CURP "X"/"XXX"
