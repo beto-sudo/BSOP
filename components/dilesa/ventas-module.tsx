@@ -27,7 +27,7 @@ type VentaRow = {
   estado: string;
   fase_actual: string | null;
   fase_posicion: number | null;
-  precio_asignacion: number | null;
+  valor_escrituracion: number | null;
   valor_comercial: number | null;
   tipo_credito: string | null;
   vendedor: string | null;
@@ -38,7 +38,7 @@ type VentaListaRow = VentaRow & {
   unidadIdentificador: string | null;
   proyectoNombre: string;
   prototipo: string | null;
-  /** Precio efectivo: `precio_asignacion ?? valor_comercial`. */
+  /** Precio efectivo: `valor_escrituracion ?? valor_comercial`. */
   precio: number | null;
 };
 
@@ -74,7 +74,7 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
       .schema('dilesa')
       .from('ventas')
       .select(
-        'id, persona_id, unidad_id, estado, fase_actual, fase_posicion, precio_asignacion, valor_comercial, tipo_credito, vendedor'
+        'id, persona_id, unidad_id, estado, fase_actual, fase_posicion, valor_escrituracion, valor_comercial, tipo_credito, vendedor'
       )
       .eq('empresa_id', empresaId)
       .is('deleted_at', null);
@@ -154,10 +154,9 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
           unidadIdentificador: u?.identificador ?? null,
           proyectoNombre: u?.proyecto_id ? (proyectoMap.get(u.proyecto_id) ?? '') : '',
           prototipo: u?.producto_id ? (productoMap.get(u.producto_id) ?? null) : null,
-          // Coda dejó vacío `Precio de Asignación` en 813/1,425 (57%); para
-          // esas ventas el `Valor Comercial` (precio de lista) es lo
-          // disponible. Fallback evita columna mayoritariamente vacía.
-          precio: v.precio_asignacion ?? v.valor_comercial,
+          // `Valor de Escrituración` es el precio correcto de venta (Beto);
+          // fallback a `Valor Comercial` para las que aún no escrituran.
+          precio: v.valor_escrituracion ?? v.valor_comercial,
         };
       }),
     };
