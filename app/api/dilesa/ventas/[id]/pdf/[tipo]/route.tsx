@@ -6,6 +6,7 @@
  * Tipos soportados:
  *   - solicitud-asignacion
  *   - aviso-privacidad
+ *   - ficu
  *
  * Auth: la sesión de Supabase. La RLS de `dilesa.ventas` decide si el
  * usuario puede leerla — vendedor solo sus propias ventas; otros roles
@@ -20,8 +21,10 @@ import { renderToBuffer } from '@react-pdf/renderer';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { SolicitudAsignacionPDF, type SolicitudData } from '@/lib/dilesa/pdf/solicitud-asignacion';
 import { AvisoPrivacidadPDF, type AvisoPrivacidadData } from '@/lib/dilesa/pdf/aviso-privacidad';
+import { FicuPDF, type FicuData } from '@/lib/dilesa/pdf/ficu';
+import { evaluarRiesgo } from '@/lib/dilesa/ficu/riesgo';
 
-const TIPOS = ['solicitud-asignacion', 'aviso-privacidad'] as const;
+const TIPOS = ['solicitud-asignacion', 'aviso-privacidad', 'ficu'] as const;
 type TipoPdf = (typeof TIPOS)[number];
 
 export async function GET(
@@ -41,7 +44,7 @@ export async function GET(
     .schema('dilesa')
     .from('ventas')
     .select(
-      'id, persona_id, unidad_id, tipo_credito, vendedor, monto_credito_titular, monto_credito_cotitular, created_at'
+      'id, persona_id, unidad_id, tipo_credito, vendedor, monto_credito_titular, monto_credito_cotitular, created_at, es_pep, ocupacion, ine_numero, forma_pago, uso_efectivo'
     )
     .eq('id', id)
     .is('deleted_at', null)
@@ -50,11 +53,13 @@ export async function GET(
     return NextResponse.json({ error: 'Venta no encontrada' }, { status: 404 });
   }
 
-  // Persona (cliente) cross-schema
+  // Persona (cliente) cross-schema — FICU necesita todos los campos
   const { data: persona } = await sb
     .schema('erp')
     .from('personas')
-    .select('nombre, apellido_paterno, apellido_materno')
+    .select(
+      'nombre, apellido_paterno, apellido_materno, fecha_nacimiento, curp, rfc, email, telefono, nacionalidad, tipo_persona, domicilio'
+    )
     .eq('id', venta.persona_id)
     .maybeSingle();
   const clienteNombre =
@@ -132,6 +137,54 @@ export async function GET(
     };
     const buf = await renderToBuffer(<AvisoPrivacidadPDF data={data} />);
     return pdfResponse(buf, `aviso-privacidad-${identificacionInventario || id}.pdf`);
+  }
+
+  if (tipo === 'ficu') {
+    const riesgo = evaluarRiesgo({
+      tipoPersona: persona?.tipo_persona,
+      nacionalidad: persona?.nacionalidad,
+      esPep: venta.es_pep,
+      formaPago: venta.forma_pago,
+      usoEfectivo: venta.uso_efectivo,
+    });
+    const fechaNac = persona?.fecha_nacimiento
+      ? new Date(`${persona.fecha_nacimiento}T00:00:00`).toLocaleDateString('es-MX', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        })
+      : '—';
+    const data: FicuData = {
+      fechaTexto,
+      nombres: (persona?.nombre ?? '').toUpperCase(),
+      apellidoPaterno: (persona?.apellido_paterno ?? '').toUpperCase(),
+      apellidoMaterno: (persona?.apellido_materno ?? '').toUpperCase(),
+      fechaNacimientoTexto: fechaNac,
+      curp: (persona?.curp ?? '').toUpperCase(),
+      rfc: (persona?.rfc ?? '').toUpperCase(),
+      identificacion: {
+        tipo: 'INE / Credencial para Votar',
+        numero: venta.ine_numero ?? '',
+        autoridad: 'Instituto Nacional Electoral',
+        vigencia: 'Vigente',
+      },
+      domicilio: { integrado: persona?.domicilio ?? null },
+      telefono: persona?.telefono ?? '',
+      correo: persona?.email ?? '',
+      personalidad: (persona?.tipo_persona ?? 'persona física').toUpperCase(),
+      nacionalidad: (persona?.nacionalidad ?? '').toUpperCase(),
+      esPep: !!venta.es_pep,
+      formaPago: (venta.forma_pago ?? '').toUpperCase(),
+      usoEfectivo: (venta.uso_efectivo ?? '').toUpperCase(),
+      ocupacion: (venta.ocupacion ?? '').toUpperCase(),
+      criteriosRiesgo: riesgo.criterios,
+      scoreTotal: riesgo.scoreTotal,
+      clasificacionRiesgo: riesgo.clasificacion,
+      clienteNombre,
+      identificacionInventario,
+    };
+    const buf = await renderToBuffer(<FicuPDF data={data} />);
+    return pdfResponse(buf, `ficu-${identificacionInventario || id}.pdf`);
   }
 
   // solicitud-asignacion
