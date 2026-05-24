@@ -10,6 +10,8 @@
 import { renderToFile } from '@react-pdf/renderer';
 import { SolicitudAsignacionPDF } from '../lib/dilesa/pdf/solicitud-asignacion';
 import { AvisoPrivacidadPDF } from '../lib/dilesa/pdf/aviso-privacidad';
+import { FicuPDF } from '../lib/dilesa/pdf/ficu';
+import { evaluarRiesgo } from '../lib/dilesa/ficu/riesgo';
 
 const solicitudData = {
   fechaTexto: '24 de Mayo del 2026',
@@ -49,12 +51,55 @@ const avisoData = {
   identificacionInventario: 'M3-L9-LDLE-ISC',
 };
 
+const riesgo = evaluarRiesgo({
+  tipoPersona: 'PERSONA FÍSICA',
+  nacionalidad: 'MEXICANA',
+  esPep: false,
+  formaPago: 'FINANCIAMIENTO HIPOTECARIO',
+  usoEfectivo: 'SIN USO DE EFECTIVO',
+});
+
+const ficuData = {
+  fechaTexto: '24 de Mayo del 2026',
+  nombres: 'JUAN ANTONIO',
+  apellidoPaterno: 'HERNANDEZ',
+  apellidoMaterno: 'MUÑOZ',
+  fechaNacimientoTexto: '25 de Diciembre del 1990',
+  curp: 'HEMJ901225HCLRXN03',
+  rfc: 'HEMJ9012251C1',
+  identificacion: {
+    tipo: 'INE / Credencial para Votar',
+    numero: '1649603399',
+    autoridad: 'Instituto Nacional Electoral',
+    vigencia: 'Vigente',
+  },
+  domicilio: {
+    integrado: 'SONORA #1038, COL. SAN JOAQUIN, PIEDRAS NEGRAS, COAHUILA, CP 26094, MÉXICO',
+  },
+  telefono: '8781228408',
+  correo: 'antoniohernandez2009_@hotmail.com',
+  personalidad: 'PERSONA FÍSICA',
+  nacionalidad: 'MEXICANA',
+  esPep: false,
+  formaPago: 'FINANCIAMIENTO HIPOTECARIO',
+  usoEfectivo: 'SIN USO DE EFECTIVO',
+  ocupacion: 'OTRAS OCUPACIONES - AGENTE ADUANAL',
+  criteriosRiesgo: riesgo.criterios,
+  scoreTotal: riesgo.scoreTotal,
+  clasificacionRiesgo: riesgo.clasificacion,
+  clienteNombre: 'JUAN ANTONIO HERNANDEZ MUÑOZ',
+  identificacionInventario: 'M3-L9-LDLE-ISC',
+};
+
 async function main() {
   await renderToFile(<SolicitudAsignacionPDF data={solicitudData} />, '/tmp/solicitud-preview.pdf');
   console.log('✔ /tmp/solicitud-preview.pdf');
 
   await renderToFile(<AvisoPrivacidadPDF data={avisoData} />, '/tmp/aviso-preview.pdf');
   console.log('✔ /tmp/aviso-preview.pdf');
+
+  await renderToFile(<FicuPDF data={ficuData} />, '/tmp/ficu-preview.pdf');
+  console.log('✔ /tmp/ficu-preview.pdf');
 }
 
 main().catch((e) => {

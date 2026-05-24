@@ -546,6 +546,7 @@ function DetailInner() {
           label="Solicitud de Asignación"
         />
         <PdfDownloadLink ventaId={venta.id} tipo="aviso-privacidad" label="Aviso de Privacidad" />
+        <PdfDownloadLink ventaId={venta.id} tipo="ficu" label="FICU" />
       </div>
 
       <Section title="Datos del cliente">
@@ -777,7 +778,7 @@ function PdfDownloadLink({
   label,
 }: {
   ventaId: string;
-  tipo: 'solicitud-asignacion' | 'aviso-privacidad';
+  tipo: 'solicitud-asignacion' | 'aviso-privacidad' | 'ficu';
   label: string;
 }) {
   return (
