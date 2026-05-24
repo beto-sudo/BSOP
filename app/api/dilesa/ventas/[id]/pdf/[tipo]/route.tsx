@@ -7,6 +7,7 @@
  *   - solicitud-asignacion
  *   - aviso-privacidad
  *   - ficu
+ *   - promesa-compraventa
  *
  * Auth: la sesión de Supabase. La RLS de `dilesa.ventas` decide si el
  * usuario puede leerla — vendedor solo sus propias ventas; otros roles
@@ -22,10 +23,26 @@ import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { SolicitudAsignacionPDF, type SolicitudData } from '@/lib/dilesa/pdf/solicitud-asignacion';
 import { AvisoPrivacidadPDF, type AvisoPrivacidadData } from '@/lib/dilesa/pdf/aviso-privacidad';
 import { FicuPDF, type FicuData } from '@/lib/dilesa/pdf/ficu';
+import { PromesaCompraventaPDF, type PromesaData } from '@/lib/dilesa/pdf/promesa-compraventa';
 import { evaluarRiesgo } from '@/lib/dilesa/ficu/riesgo';
 
-const TIPOS = ['solicitud-asignacion', 'aviso-privacidad', 'ficu'] as const;
+const TIPOS = ['solicitud-asignacion', 'aviso-privacidad', 'ficu', 'promesa-compraventa'] as const;
 type TipoPdf = (typeof TIPOS)[number];
+
+const MESES_ES = [
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
+];
 
 export async function GET(
   _req: Request,
@@ -137,6 +154,92 @@ export async function GET(
     };
     const buf = await renderToBuffer(<AvisoPrivacidadPDF data={data} />);
     return pdfResponse(buf, `aviso-privacidad-${identificacionInventario || id}.pdf`);
+  }
+
+  if (tipo === 'promesa-compraventa') {
+    // Co-titular: si hay monto_credito_cotitular > 0, buscar persona cotitular
+    // Por ahora no hay FK explícita persona_cotitular_id en ventas, sólo el ref
+    // textual. Se deja el co-titular opcional; en sprint 7c se modela la FK.
+    // Si la unidad no se pudo cargar (raro), no podemos generar el contrato.
+    if (!venta.unidad_id) {
+      return NextResponse.json(
+        { error: 'La venta no tiene unidad asignada — no se puede generar el contrato.' },
+        { status: 400 }
+      );
+    }
+    const { data: unidadFull } = await sb
+      .schema('dilesa')
+      .from('unidades')
+      .select('manzana, numero_lote, area_m2, proyecto_id, producto_id')
+      .eq('id', venta.unidad_id)
+      .maybeSingle();
+    const [{ data: proyectoFull }, { data: productoFull }] = await Promise.all([
+      unidadFull?.proyecto_id
+        ? sb
+            .schema('dilesa')
+            .from('proyectos')
+            .select('nombre')
+            .eq('id', unidadFull.proyecto_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      unidadFull?.producto_id
+        ? sb
+            .schema('dilesa')
+            .from('productos')
+            .select('nombre')
+            .eq('id', unidadFull.producto_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+
+    const precio =
+      Number(venta.monto_credito_titular ?? 0) + Number(venta.monto_credito_cotitular ?? 0);
+    const arras1pct = Math.round(precio * 0.01);
+    const arras10pct = Math.round(precio * 0.1);
+    const modeloSufijo = productoFull?.nombre ? (productoFull.nombre.split('-').pop() ?? '') : '';
+
+    const data: PromesaData = {
+      fechaTexto,
+      horaTexto: fechaCreado.toLocaleTimeString('es-MX', {
+        hour: 'numeric',
+        minute: '2-digit',
+      }),
+      diaTexto: String(fechaCreado.getDate()),
+      mesTexto: MESES_ES[fechaCreado.getMonth()],
+      anioTexto: String(fechaCreado.getFullYear()),
+      comprador: {
+        nombre: clienteNombre.toUpperCase(),
+        curp: persona?.curp ?? null,
+        rfc: persona?.rfc ?? null,
+        estadoCivil: null, // TODO sprint-7c: capturar estado civil en form
+        profesion: venta.ocupacion ?? null,
+        domicilio: persona?.domicilio ?? null,
+        ineNumero: venta.ine_numero ?? null,
+      },
+      coTitular: null, // TODO sprint-7c: agregar FK persona_cotitular_id
+      inmueble: {
+        fraccionamiento: proyectoFull?.nombre ?? '',
+        lote: unidadFull?.numero_lote ?? '',
+        manzana: unidadFull?.manzana ?? '',
+        superficieM2: Number(unidadFull?.area_m2 ?? 0),
+        modeloVivienda: modeloSufijo,
+        identificacionInventario,
+      },
+      operacion: {
+        precio,
+        enganche1pct: arras1pct,
+        arras10pct,
+        tipoCredito: venta.tipo_credito ?? '',
+      },
+      folio: `${(clienteNombre || '')
+        .split(/\s+/)
+        .map((p) => p[0]?.toUpperCase())
+        .filter(Boolean)
+        .slice(0, 3)
+        .join('')}-${identificacionInventario}-${fechaCreado.toLocaleString('es-MX')}`,
+    };
+    const buf = await renderToBuffer(<PromesaCompraventaPDF data={data} />);
+    return pdfResponse(buf, `promesa-compraventa-${identificacionInventario || id}.pdf`);
   }
 
   if (tipo === 'ficu') {
