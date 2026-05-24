@@ -20,7 +20,9 @@ Antes del primer run hay que cargar 5 secrets en GitHub:
    | `RESEND_API_KEY`            | API key de Resend         | `op read "op://Infrastructure/RESEND_API_KEY/credential"`                                                                    |
    | `NOTIFY_EMAIL`              | `beto@anorte.com`         | Hardcoded                                                                                                                    |
 
-2. **Opcional** — `SYNC_FROM_EMAIL` (default `BSOP Sync <noreply@bsop.io>`, dominio ya verificado en Resend). Si quieres override, asegúrate que el dominio esté verificado en Resend o el email falla con 422.
+2. **Opcional** — `SYNC_FROM_EMAIL`. Default `BSOP Sync <onboarding@resend.dev>` (dominio reservado de Resend que funciona con cualquier API key). Para usar un dominio propio (más pro: `BSOP Sync <sync@anorte.com>` o `noreply@bsop.io`):
+   1. Verifica el dominio en Resend → Domains → Add Domain → agregar los DNS records que Resend te da
+   2. Carga el secret: `printf 'BSOP Sync <sync@tudominio.com>' | gh secret set SYNC_FROM_EMAIL -R beto-sudo/BSOP`
 
 3. Verifica vía CLI:
    ```bash
@@ -69,7 +71,7 @@ Wrapper [`scripts/run-dilesa-sync.ts`](../../scripts/run-dilesa-sync.ts):
 
 - Verifica `gh secret list` — los 5 secrets están seteados.
 - Revisa el log del workflow — la última línea debe decir `✔ Email enviado a ...`.
-- Si dice `✗ Resend error 4xx` (típico 422 "The domain is invalid") — el dominio del `from:` no está verificado en Resend. Default es `noreply@bsop.io` que ya está verificado; si overrideaste `SYNC_FROM_EMAIL`, asegúrate que ese dominio también lo esté.
+- Si dice `✗ Resend error 4xx` (típico 422 "The domain is invalid") — el dominio del `from:` no está verificado en Resend. Default es `onboarding@resend.dev` que siempre funciona. Si overrideaste `SYNC_FROM_EMAIL`, asegúrate que ese dominio esté verificado.
 
 ### El job toma > 45 min
 

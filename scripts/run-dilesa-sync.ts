@@ -30,7 +30,10 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY ?? '';
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL ?? '';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
-const FROM_EMAIL = process.env.SYNC_FROM_EMAIL ?? 'BSOP Sync <noreply@bsop.io>';
+// `onboarding@resend.dev` es el dominio reservado de Resend que funciona con
+// cualquier API key. Para usar un dominio propio (más pro), verifícalo en
+// Resend → Domains y override con el secret SYNC_FROM_EMAIL.
+const FROM_EMAIL = process.env.SYNC_FROM_EMAIL ?? 'BSOP Sync <onboarding@resend.dev>';
 
 if (!RESEND_API_KEY) throw new Error('Falta RESEND_API_KEY');
 if (!NOTIFY_EMAIL) throw new Error('Falta NOTIFY_EMAIL');

@@ -79,7 +79,7 @@ jobs:
             -H "Authorization: Bearer $RESEND_API_KEY" \
             -H "Content-Type: application/json" \
             -d "{
-              \"from\": \"${SYNC_FROM_EMAIL:-BSOP Sync <noreply@bsop.io>}\",
+              \"from\": \"${SYNC_FROM_EMAIL:-BSOP Sync <onboarding@resend.dev>}\",
               \"to\": [\"$NOTIFY_EMAIL\"],
               \"subject\": \"✗✗ Sync DILESA Coda→BSOP — $STATUS\",
               \"html\": \"<p>El job de sync terminó con estado <b>$STATUS</b> antes de poder generar el reporte normal.</p><p><a href='\\\"$RUN_URL\\\"'>Ver log en GitHub Actions</a></p>\"
