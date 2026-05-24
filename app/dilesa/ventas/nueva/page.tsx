@@ -86,11 +86,6 @@ const moneyFmt = new Intl.NumberFormat('es-MX', {
   maximumFractionDigits: 0,
 });
 
-function todayISO(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-}
-
 function money(n: number | null | undefined): string {
   if (n == null) return '—';
   return moneyFmt.format(Number(n));
@@ -121,13 +116,16 @@ function NuevaSolicitudForm() {
   const [loadingMeta, setLoadingMeta] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Form state
+  // Form state. Proyecto → unidad en cascada: vendedor primero filtra por
+  // proyecto y luego ve solo las unidades disponibles de ese proyecto.
+  const [proyectoId, setProyectoId] = useState<string>('');
   const [unidadId, setUnidadId] = useState<string>('');
   const [tipoCreditoId, setTipoCreditoId] = useState<string>('');
   const [promocionId, setPromocionId] = useState<string>('');
   const [montoCreditoTitular, setMontoCreditoTitular] = useState<string>('');
   const [montoCreditoCotitular, setMontoCreditoCotitular] = useState<string>('');
-  const [fechaSolicitud, setFechaSolicitud] = useState<string>(todayISO);
+  // La fecha + hora de la solicitud la setea el servidor al guardar (now()).
+  // Importante para orden FIFO en Fase 2 cuando hay inventario limitado.
 
   // Cliente: modo (existente o nuevo)
   const [clienteModo, setClienteModo] = useState<'existente' | 'nuevo'>('nuevo');
@@ -268,6 +266,27 @@ function NuevaSolicitudForm() {
     };
   }, [sb, unidadId, tipoCreditoId, montoCreditoTitular, montoCreditoCotitular]);
 
+  // ── Proyectos con unidades disponibles + unidades del proyecto elegido ────
+  const proyectosConUnidades = useMemo(() => {
+    const m = new Map<string, { id: string; nombre: string; disponibles: number }>();
+    for (const u of unidades) {
+      const prev = m.get(u.proyecto_id);
+      if (prev) prev.disponibles++;
+      else m.set(u.proyecto_id, { id: u.proyecto_id, nombre: u.proyecto_nombre, disponibles: 1 });
+    }
+    return [...m.values()].sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [unidades]);
+
+  const unidadesDelProyecto = useMemo(
+    () =>
+      proyectoId
+        ? unidades
+            .filter((u) => u.proyecto_id === proyectoId)
+            .sort((a, b) => a.identificador.localeCompare(b.identificador))
+        : [],
+    [unidades, proyectoId]
+  );
+
   // ── Filtrar promociones aplicables a la unidad ──────────────────────────────
   const promocionesAplicables = useMemo(() => {
     const unidad = unidades.find((u) => u.id === unidadId);
@@ -374,7 +393,9 @@ function NuevaSolicitudForm() {
           venta_id: ventaId,
           fase: 'Solicitud de Asignación',
           posicion: 1,
-          fecha: fechaSolicitud,
+          // fecha (date) = hoy; created_at (timestamptz) = now() vía default.
+          // Para FIFO en Fase 2 se ordena por created_at, que conserva la hora.
+          fecha: new Date().toISOString().slice(0, 10),
           registrado_por: user?.id ?? null,
         });
       if (fErr) {
@@ -559,17 +580,37 @@ function NuevaSolicitudForm() {
       {/* ── Operación ── */}
       <Section title="Operación">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Proyecto *">
+            <select
+              className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm"
+              value={proyectoId}
+              onChange={(e) => {
+                setProyectoId(e.target.value);
+                setUnidadId(''); // reset unidad al cambiar proyecto
+              }}
+            >
+              <option value="">— selecciona —</option>
+              {proyectosConUnidades.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nombre} · {p.disponibles} disponibles
+                </option>
+              ))}
+            </select>
+          </Field>
           <Field label="Unidad disponible *">
             <select
               className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm"
               value={unidadId}
               onChange={(e) => setUnidadId(e.target.value)}
+              disabled={!proyectoId}
             >
-              <option value="">— selecciona —</option>
-              {unidades.map((u) => (
+              <option value="">
+                {proyectoId ? '— selecciona —' : '— primero elige un proyecto —'}
+              </option>
+              {unidadesDelProyecto.map((u) => (
                 <option key={u.id} value={u.id}>
-                  {u.proyecto_nombre} · {u.identificador}
-                  {u.prototipo_nombre ? ` (${u.prototipo_nombre})` : ''}
+                  {u.identificador}
+                  {u.prototipo_nombre ? `-${u.prototipo_nombre.split('-').pop()}` : ''}
                   {u.area_m2 ? ` · ${u.area_m2}m²` : ''}
                   {u.es_esquina ? ' · esquina' : ''}
                   {u.tiene_frente_verde ? ' · frente verde' : ''}
@@ -608,13 +649,6 @@ function NuevaSolicitudForm() {
                 </option>
               ))}
             </select>
-          </Field>
-          <Field label="Fecha solicitud">
-            <Input
-              type="date"
-              value={fechaSolicitud}
-              onChange={(e) => setFechaSolicitud(e.target.value)}
-            />
           </Field>
           <Field label="Monto crédito titular">
             <Input
