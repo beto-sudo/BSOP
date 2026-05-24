@@ -30,10 +30,12 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY ?? '';
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL ?? '';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
-// `onboarding@resend.dev` es el dominio reservado de Resend que funciona con
-// cualquier API key. Para usar un dominio propio (más pro), verifícalo en
-// Resend → Domains y override con el secret SYNC_FROM_EMAIL.
-const FROM_EMAIL = process.env.SYNC_FROM_EMAIL ?? 'BSOP Sync <onboarding@resend.dev>';
+// Para usar un dominio propio (más pro), verifícalo en Resend → Domains y
+// override con el secret SYNC_FROM_EMAIL. **Usamos `||` no `??`**: GH
+// Actions setea SYNC_FROM_EMAIL como env var vacía cuando el secret no
+// existe, lo cual `??` no detecta — y mandar `from: ""` a Resend retorna
+// 422 "domain is invalid" (causa raíz de todos los fails de email).
+const FROM_EMAIL = process.env.SYNC_FROM_EMAIL || 'BSOP Sync <noreply@bsop.io>';
 
 if (!RESEND_API_KEY) throw new Error('Falta RESEND_API_KEY');
 if (!NOTIFY_EMAIL) throw new Error('Falta NOTIFY_EMAIL');
