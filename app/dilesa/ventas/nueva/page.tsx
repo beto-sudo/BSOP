@@ -1,7 +1,5 @@
 'use client';
 
- 
-
 /**
  * Captura Fase 1: Solicitud de Asignación.
  *
