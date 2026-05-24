@@ -15,7 +15,7 @@
  */
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Loader2, Save } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
@@ -105,6 +105,7 @@ export default function NuevaSolicitudPage() {
 
 function NuevaSolicitudForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const toast = useToast();
   const sb = useMemo(() => createSupabaseBrowserClient(), []);
 
@@ -237,6 +238,18 @@ function NuevaSolicitudForm() {
   useEffect(() => {
     void loadMeta();
   }, [loadMeta]);
+
+  // Pre-selección desde `?unidad=<id>` (deep link desde /dilesa/inventario).
+  // Espera a que las unidades estén cargadas para resolver el proyecto.
+  useEffect(() => {
+    const preselectId = searchParams.get('unidad');
+    if (!preselectId || unidades.length === 0 || unidadId) return;
+    const u = unidades.find((x) => x.id === preselectId);
+    if (u) {
+      setProyectoId(u.proyecto_id);
+      setUnidadId(u.id);
+    }
+  }, [searchParams, unidades, unidadId]);
 
   // ── Recalcular precio cuando cambian inputs ─────────────────────────────────
   useEffect(() => {
