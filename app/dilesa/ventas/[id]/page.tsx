@@ -24,7 +24,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Check, Circle, Download, ExternalLink, FileText } from 'lucide-react';
+import { ArrowLeft, Check, Circle, Download, ExternalLink, FileText, Pencil } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Badge } from '@/components/ui/badge';
@@ -170,6 +170,17 @@ const FASE_ROLES: Record<string, string[]> = {
   Entregada: ['checklist_entrega'],
   'Comisión Pagada': [],
   'Operación Terminada': [],
+};
+
+/**
+ * Slugs de captura disponibles — mapea posición de fase → slug de la
+ * page de captura. Se va llenando conforme se implementan las pages
+ * del Sprint 7c. Si la fase no está aquí, el botón "Capturar" no
+ * aparece (la fase no es capturable aún desde BSOP).
+ */
+const CAPTURAR_SLUG_BY_POSICION: Record<number, string> = {
+  3: '3-formalizada',
+  // 2, 4–17 → próximos PRs del Sprint 7c
 };
 
 /** Las 17 fases canónicas en orden — para mostrar incluso las no alcanzadas. */
@@ -390,6 +401,7 @@ function DetailInner() {
   // subiendo el soporte" — la vista que se va a evolucionar.
   const pipelineRows = useMemo(() => {
     const fasesByName = new Map(fases.map((f) => [f.fase, f]));
+    const posicionesAlcanzadas = new Set(fases.map((f) => f.posicion));
     return FASES_ORDEN.map(({ pos, nombre }) => {
       const f = fasesByName.get(nombre);
       const roles = FASE_ROLES[nombre] ?? [];
@@ -398,13 +410,20 @@ function DetailInner() {
       );
       const rolesCargados = new Set(cargados.map((a) => a.rol));
       const faltantes = roles.filter((r) => !rolesCargados.has(r));
+      const slugCaptura = CAPTURAR_SLUG_BY_POSICION[pos];
+      const previaCerrada = pos === 1 || posicionesAlcanzadas.has(pos - 1);
+      const alcanzada = !!f?.fecha;
+      const puedeCapturar = !!slugCaptura && !alcanzada && previaCerrada;
       return {
         pos,
         nombre,
         fecha: f?.fecha ?? null,
-        alcanzada: !!f?.fecha,
+        alcanzada,
         cargados,
         faltantes,
+        slugCaptura,
+        puedeCapturar,
+        previaCerrada,
       };
     });
   }, [fases, adjuntosPorRolMap]);
@@ -645,6 +664,29 @@ function DetailInner() {
                   <span className="text-[10px] text-[var(--text)]/30">—</span>
                 ) : null}
               </div>
+
+              {/* Capturar fase — solo si la página está implementada y aplica */}
+              {r.slugCaptura ? (
+                <div className="shrink-0">
+                  {r.puedeCapturar ? (
+                    <Link
+                      href={`/dilesa/ventas/${id}/capturar/${r.slugCaptura}`}
+                      className="inline-flex items-center gap-1 rounded-md border border-[var(--accent)] bg-[var(--accent)]/10 px-2 py-0.5 text-[10px] font-medium text-[var(--accent)] hover:bg-[var(--accent)]/20"
+                    >
+                      <Pencil className="h-2.5 w-2.5" />
+                      Capturar fase
+                    </Link>
+                  ) : r.alcanzada ? null : (
+                    <span
+                      className="inline-flex cursor-not-allowed items-center gap-1 rounded-md border border-[var(--border)] px-2 py-0.5 text-[10px] text-[var(--text)]/30"
+                      title={`Falta cerrar la fase ${r.pos - 1} primero.`}
+                    >
+                      <Pencil className="h-2.5 w-2.5" />
+                      Capturar
+                    </span>
+                  )}
+                </div>
+              ) : null}
             </li>
           ))}
         </ol>
