@@ -1,7 +1,11 @@
 /**
  * Estilos compartidos para los PDFs DILESA (Sprint 7b).
  * Replicamos el look del export de Coda — colores corporativos olivo +
- * gris, tipografía sans-serif uniforme, márgenes legibles.
+ * gris, tipografía sans-serif uniforme.
+ *
+ * Diseñado para que Solicitud de Asignación quepa en 1 página letter
+ * (la cantidad de filas exige compresión vertical). Aviso de
+ * Privacidad sobra con esto.
  */
 import { StyleSheet, Font } from '@react-pdf/renderer';
 
@@ -23,9 +27,9 @@ export const colors = {
 
 export const styles = StyleSheet.create({
   page: {
-    paddingTop: 30,
-    paddingBottom: 90, // espacio para el footer band
-    paddingHorizontal: 40,
+    paddingTop: 22,
+    paddingBottom: 60, // espacio para el footer band (45) + margen
+    paddingHorizontal: 36,
     fontSize: 10,
     color: colors.text,
     fontFamily: 'Helvetica',
@@ -33,50 +37,50 @@ export const styles = StyleSheet.create({
   bandTopWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 6,
   },
   isotipoWrap: {
-    width: 70,
-    height: 70,
+    width: 52,
+    height: 52,
     backgroundColor: '#fff',
     borderRadius: 4,
-    marginRight: 12,
-    padding: 6,
+    marginRight: 10,
+    padding: 4,
     borderWidth: 1,
     borderColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  isotipo: { width: 50, height: 50 },
+  isotipo: { width: 42, height: 42 },
   bandTitleBar: {
     flex: 1,
     backgroundColor: colors.primary,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
+    paddingVertical: 11,
+    paddingHorizontal: 16,
     borderRadius: 2,
   },
   bandTitle: {
     color: '#fff',
-    fontSize: 22,
+    fontSize: 18,
     fontFamily: 'Helvetica-Bold',
     letterSpacing: 1,
   },
   fechaTopRight: {
-    fontSize: 9,
+    fontSize: 8,
     color: colors.textMuted,
     textAlign: 'right',
-    marginBottom: 8,
+    marginBottom: 2,
   },
   sectionTitle: {
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: 'Helvetica-Bold',
-    marginTop: 14,
-    marginBottom: 6,
-    letterSpacing: 0.5,
+    marginTop: 8,
+    marginBottom: 3,
+    letterSpacing: 0.4,
   },
   row: {
     flexDirection: 'row',
-    marginBottom: 3,
+    marginBottom: 1.5,
   },
   label: {
     fontSize: 9,
@@ -97,49 +101,49 @@ export const styles = StyleSheet.create({
   divider: {
     borderBottomWidth: 0.5,
     borderBottomColor: colors.borderSoft,
-    marginVertical: 10,
+    marginVertical: 5,
   },
   rowSplit: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 3,
+    marginBottom: 1.5,
   },
   rightCol: {
     alignItems: 'flex-end',
-    marginVertical: 6,
+    marginVertical: 2,
   },
   precioVenta: {
     color: colors.primary,
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: 'Helvetica-Bold',
     letterSpacing: 0.5,
   },
   precioBreakdownLabel: {
-    fontSize: 9,
+    fontSize: 8,
     color: colors.textMuted,
   },
   precioBreakdownValue: {
-    fontSize: 9,
+    fontSize: 8,
     fontFamily: 'Helvetica-Bold',
   },
   legalText: {
-    fontSize: 7,
+    fontSize: 6.5,
     color: colors.textMuted,
-    marginTop: 8,
-    lineHeight: 1.4,
+    marginTop: 4,
+    lineHeight: 1.25,
   },
   legalTextBold: {
-    fontSize: 7,
+    fontSize: 6.5,
     fontFamily: 'Helvetica-Bold',
   },
   firmaWrap: {
-    marginTop: 28,
+    marginTop: 14,
     alignItems: 'center',
   },
   firmaCliente: {
     fontSize: 9,
     fontFamily: 'Helvetica-Bold',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   firmaNombre: {
     fontSize: 9,
@@ -147,7 +151,7 @@ export const styles = StyleSheet.create({
   firmaRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginTop: 22,
+    marginTop: 10,
   },
   firmaLabel: {
     fontSize: 9,
@@ -156,9 +160,9 @@ export const styles = StyleSheet.create({
   },
   folio: {
     position: 'absolute',
-    bottom: 76,
-    right: 40,
-    fontSize: 7,
+    bottom: 50,
+    right: 36,
+    fontSize: 6.5,
     color: colors.textMuted,
   },
   footerBand: {
@@ -166,42 +170,42 @@ export const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: 60,
+    height: 45,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    paddingRight: 30,
+    paddingRight: 28,
   },
   footerBandBg: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    height: 60,
+    height: 45,
     backgroundColor: colors.bandBottomDark,
   },
   footerBandText: {
     color: '#fff',
-    fontSize: 10,
+    fontSize: 9,
     fontFamily: 'Helvetica-Bold',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
     textAlign: 'right',
     marginRight: 10,
     zIndex: 2,
   },
   footerBandUrl: {
     color: '#fff',
-    fontSize: 8,
+    fontSize: 7,
     textAlign: 'right',
     marginRight: 10,
     zIndex: 2,
   },
   footerBandLogo: {
-    width: 38,
-    height: 38,
+    width: 32,
+    height: 32,
     backgroundColor: '#fff',
     borderRadius: 4,
-    padding: 4,
+    padding: 3,
     zIndex: 2,
   },
 });
