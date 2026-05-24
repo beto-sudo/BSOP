@@ -1403,6 +1403,48 @@ export type Database = {
           },
         ]
       }
+      promociones: {
+        Row: {
+          activa: boolean
+          created_at: string
+          deleted_at: string | null
+          descripcion: string | null
+          empresa_id: string
+          id: string
+          nombre: string
+          productos_aplicables: string[]
+          updated_at: string
+          vigencia_fin: string | null
+          vigencia_inicio: string | null
+        }
+        Insert: {
+          activa?: boolean
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id: string
+          id?: string
+          nombre: string
+          productos_aplicables?: string[]
+          updated_at?: string
+          vigencia_fin?: string | null
+          vigencia_inicio?: string | null
+        }
+        Update: {
+          activa?: boolean
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string
+          id?: string
+          nombre?: string
+          productos_aplicables?: string[]
+          updated_at?: string
+          vigencia_fin?: string | null
+          vigencia_inicio?: string | null
+        }
+        Relationships: []
+      }
       proyecto_activos: {
         Row: {
           activo_id: string
@@ -1701,6 +1743,7 @@ export type Database = {
           area_m2: number | null
           area_vendible_m2: number | null
           areas_verdes_m2: number | null
+          clasificacion_inmobiliaria: string | null
           clave_interna: string | null
           costo_comercializacion: number | null
           costo_construccion: number | null
@@ -1719,10 +1762,12 @@ export type Database = {
           nombre: string
           notas: string | null
           plantilla_id: string | null
+          precio_m2_excedente: number | null
           presupuesto_estimado: number | null
           proyecto_padre_id: string | null
           proyecto_predecesor_id: string | null
           regla_prorrateo: string
+          tamano_lote_promedio: number | null
           tipo: string
           updated_at: string
         }
@@ -1730,6 +1775,7 @@ export type Database = {
           area_m2?: number | null
           area_vendible_m2?: number | null
           areas_verdes_m2?: number | null
+          clasificacion_inmobiliaria?: string | null
           clave_interna?: string | null
           costo_comercializacion?: number | null
           costo_construccion?: number | null
@@ -1748,10 +1794,12 @@ export type Database = {
           nombre: string
           notas?: string | null
           plantilla_id?: string | null
+          precio_m2_excedente?: number | null
           presupuesto_estimado?: number | null
           proyecto_padre_id?: string | null
           proyecto_predecesor_id?: string | null
           regla_prorrateo?: string
+          tamano_lote_promedio?: number | null
           tipo: string
           updated_at?: string
         }
@@ -1759,6 +1807,7 @@ export type Database = {
           area_m2?: number | null
           area_vendible_m2?: number | null
           areas_verdes_m2?: number | null
+          clasificacion_inmobiliaria?: string | null
           clave_interna?: string | null
           costo_comercializacion?: number | null
           costo_construccion?: number | null
@@ -1777,10 +1826,12 @@ export type Database = {
           nombre?: string
           notas?: string | null
           plantilla_id?: string | null
+          precio_m2_excedente?: number | null
           presupuesto_estimado?: number | null
           proyecto_padre_id?: string | null
           proyecto_predecesor_id?: string | null
           regla_prorrateo?: string
+          tamano_lote_promedio?: number | null
           tipo?: string
           updated_at?: string
         }
@@ -1847,6 +1898,42 @@ export type Database = {
         }
         Relationships: []
       }
+      tipos_credito: {
+        Row: {
+          activo: boolean
+          apoyo_infonavit_monto: number
+          costo_venta_adicional_pct: number
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          id: string
+          nombre: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          apoyo_infonavit_monto?: number
+          costo_venta_adicional_pct?: number
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          id?: string
+          nombre: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          apoyo_infonavit_monto?: number
+          costo_venta_adicional_pct?: number
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          id?: string
+          nombre?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       unidades: {
         Row: {
           activo_id: string | null
@@ -1870,6 +1957,7 @@ export type Database = {
           tiene_frente_verde: boolean | null
           tipo_lote: string | null
           updated_at: string
+          valor_venta_futuro_snapshot: number | null
         }
         Insert: {
           activo_id?: string | null
@@ -1893,6 +1981,7 @@ export type Database = {
           tiene_frente_verde?: boolean | null
           tipo_lote?: string | null
           updated_at?: string
+          valor_venta_futuro_snapshot?: number | null
         }
         Update: {
           activo_id?: string | null
@@ -1916,6 +2005,7 @@ export type Database = {
           tiene_frente_verde?: boolean | null
           tipo_lote?: string | null
           updated_at?: string
+          valor_venta_futuro_snapshot?: number | null
         }
         Relationships: [
           {
@@ -2118,6 +2208,7 @@ export type Database = {
           valor_comercial: number | null
           valor_escrituracion: number | null
           vendedor: string | null
+          vendedor_usuario_id: string | null
         }
         Insert: {
           anticipo_comision?: number | null
@@ -2159,6 +2250,7 @@ export type Database = {
           valor_comercial?: number | null
           valor_escrituracion?: number | null
           vendedor?: string | null
+          vendedor_usuario_id?: string | null
         }
         Update: {
           anticipo_comision?: number | null
@@ -2200,6 +2292,7 @@ export type Database = {
           valor_comercial?: number | null
           valor_escrituracion?: number | null
           vendedor?: string | null
+          vendedor_usuario_id?: string | null
         }
         Relationships: [
           {
@@ -2216,7 +2309,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      fn_calcular_precio_venta: {
+        Args: {
+          p_monto_credito_cotitular?: number
+          p_monto_credito_titular?: number
+          p_tipo_credito_id?: string
+          p_unidad_id: string
+        }
+        Returns: Json
+      }
+      fn_es_vendedor_restringido: { Args: never; Returns: boolean }
     }
     Enums: {
       [_ in never]: never

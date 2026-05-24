@@ -17,7 +17,9 @@ import { DataTable, type Column } from '@/components/module-page';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Receipt, RefreshCw, Search } from 'lucide-react';
+import { Plus, Receipt, RefreshCw, Search } from 'lucide-react';
+import Link from 'next/link';
+import { usePermissions } from '@/components/providers';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 
 type VentaRow = {
@@ -53,6 +55,10 @@ const ESTADO_LABEL: Record<string, string> = {
 
 export function VentasModule({ empresaId }: { empresaId: string }) {
   const router = useRouter();
+  const { permissions } = usePermissions();
+  const puedeCrearSolicitud =
+    permissions.isAdmin ||
+    permissions.modulos.get('dilesa.ventas.fase01_solicitud')?.write === true;
   const [ventas, setVentas] = useState<VentaListaRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -324,6 +330,15 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
           <RefreshCw className="h-3.5 w-3.5" />
           Refrescar
         </button>
+        {puedeCrearSolicitud ? (
+          <Link
+            href="/dilesa/ventas/nueva"
+            className="ml-auto flex h-9 items-center gap-1.5 rounded-md bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Nueva solicitud
+          </Link>
+        ) : null}
       </div>
 
       <DataTable
