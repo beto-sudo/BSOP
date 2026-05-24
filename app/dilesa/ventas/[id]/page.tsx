@@ -547,6 +547,11 @@ function DetailInner() {
         />
         <PdfDownloadLink ventaId={venta.id} tipo="aviso-privacidad" label="Aviso de Privacidad" />
         <PdfDownloadLink ventaId={venta.id} tipo="ficu" label="FICU" />
+        <PdfDownloadLink
+          ventaId={venta.id}
+          tipo="promesa-compraventa"
+          label="Promesa de Compraventa"
+        />
       </div>
 
       <Section title="Datos del cliente">
@@ -778,7 +783,7 @@ function PdfDownloadLink({
   label,
 }: {
   ventaId: string;
-  tipo: 'solicitud-asignacion' | 'aviso-privacidad' | 'ficu';
+  tipo: 'solicitud-asignacion' | 'aviso-privacidad' | 'ficu' | 'promesa-compraventa';
   label: string;
 }) {
   return (

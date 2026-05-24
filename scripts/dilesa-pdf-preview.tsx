@@ -12,6 +12,7 @@ import { SolicitudAsignacionPDF } from '../lib/dilesa/pdf/solicitud-asignacion';
 import { AvisoPrivacidadPDF } from '../lib/dilesa/pdf/aviso-privacidad';
 import { FicuPDF } from '../lib/dilesa/pdf/ficu';
 import { evaluarRiesgo } from '../lib/dilesa/ficu/riesgo';
+import { PromesaCompraventaPDF } from '../lib/dilesa/pdf/promesa-compraventa';
 
 const solicitudData = {
   fechaTexto: '24 de Mayo del 2026',
@@ -91,6 +92,39 @@ const ficuData = {
   identificacionInventario: 'M3-L9-LDLE-ISC',
 };
 
+const promesaData = {
+  fechaTexto: '24 de Mayo del 2026',
+  horaTexto: '9:35',
+  diaTexto: '24',
+  mesTexto: 'Mayo',
+  anioTexto: '2026',
+  comprador: {
+    nombre: 'CHRISTOPHER ALFONSO LIMAS MARTINEZ',
+    curp: 'LIMC010418HCLMRHA6',
+    rfc: 'LIMC010418GU4',
+    estadoCivil: 'casado',
+    profesion: 'profesionista',
+    domicilio: 'OBREROS #712 B, COL. VILLA DE FUENTE, PIEDRAS NEGRAS, COAHUILA, CP 26094',
+    ineNumero: '1890265649',
+  },
+  coTitular: null,
+  inmueble: {
+    fraccionamiento: 'Lomas de los Encinos',
+    lote: '16',
+    manzana: '3',
+    superficieM2: 105,
+    modeloVivienda: 'ISC',
+    identificacionInventario: 'M3-L16-LDLE-ISC',
+  },
+  operacion: {
+    precio: 1_021_000,
+    enganche1pct: 10_210,
+    arras10pct: 102_100,
+    tipoCredito: 'Infonavit Tradicional',
+  },
+  folio: 'CLM-M3-L16-LDLE-ISC-5/24/2026 9:35:36 AM',
+};
+
 async function main() {
   await renderToFile(<SolicitudAsignacionPDF data={solicitudData} />, '/tmp/solicitud-preview.pdf');
   console.log('✔ /tmp/solicitud-preview.pdf');
@@ -100,6 +134,9 @@ async function main() {
 
   await renderToFile(<FicuPDF data={ficuData} />, '/tmp/ficu-preview.pdf');
   console.log('✔ /tmp/ficu-preview.pdf');
+
+  await renderToFile(<PromesaCompraventaPDF data={promesaData} />, '/tmp/promesa-preview.pdf');
+  console.log('✔ /tmp/promesa-preview.pdf');
 }
 
 main().catch((e) => {
