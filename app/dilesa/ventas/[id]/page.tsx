@@ -24,7 +24,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Check, Circle, ExternalLink, FileText } from 'lucide-react';
+import { ArrowLeft, Check, Circle, Download, ExternalLink, FileText } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Badge } from '@/components/ui/badge';
@@ -539,6 +539,15 @@ function DetailInner() {
         </div>
       </header>
 
+      <div className="flex flex-wrap gap-2">
+        <PdfDownloadLink
+          ventaId={venta.id}
+          tipo="solicitud-asignacion"
+          label="Solicitud de Asignación"
+        />
+        <PdfDownloadLink ventaId={venta.id} tipo="aviso-privacidad" label="Aviso de Privacidad" />
+      </div>
+
       <Section title="Datos del cliente">
         {fichaPersona.length === 0 ? (
           <p className="text-sm text-[var(--text)]/60">Sin datos del cliente.</p>
@@ -759,6 +768,26 @@ function FichaGrid({ rows, cols = 2 }: { rows: { label: string; value: string }[
         </div>
       ))}
     </dl>
+  );
+}
+
+function PdfDownloadLink({
+  ventaId,
+  tipo,
+  label,
+}: {
+  ventaId: string;
+  tipo: 'solicitud-asignacion' | 'aviso-privacidad';
+  label: string;
+}) {
+  return (
+    <a
+      href={`/api/dilesa/ventas/${ventaId}/pdf/${tipo}`}
+      className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40 hover:text-[var(--text)]"
+    >
+      <Download className="h-3.5 w-3.5" />
+      {label}
+    </a>
   );
 }
 
