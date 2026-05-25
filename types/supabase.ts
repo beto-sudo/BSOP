@@ -1353,6 +1353,441 @@ export type Database = {
           },
         ]
       }
+      construccion: {
+        Row: {
+          avance_pct: number
+          coda_row_id: string | null
+          codigo: string
+          contratista_id: string
+          created_at: string
+          cuv: string | null
+          deleted_at: string | null
+          empresa_id: string
+          estado: string
+          fecha_arranque: string | null
+          fecha_compromiso_terminar: string | null
+          fecha_dtu: string | null
+          fecha_extraccion: string | null
+          fecha_paquete_ruv: string | null
+          fecha_seguro_calidad: string | null
+          fecha_terminada: string | null
+          frente_ruv: string | null
+          id: string
+          m2_construccion: number | null
+          mo_ejecutado: number
+          notas: string | null
+          precio_mo_x_m2: number | null
+          producto_id: string
+          supervisor_persona_id: string | null
+          unidad_id: string
+          updated_at: string
+          valor_contrato_mo: number | null
+        }
+        Insert: {
+          avance_pct?: number
+          coda_row_id?: string | null
+          codigo: string
+          contratista_id: string
+          created_at?: string
+          cuv?: string | null
+          deleted_at?: string | null
+          empresa_id: string
+          estado?: string
+          fecha_arranque?: string | null
+          fecha_compromiso_terminar?: string | null
+          fecha_dtu?: string | null
+          fecha_extraccion?: string | null
+          fecha_paquete_ruv?: string | null
+          fecha_seguro_calidad?: string | null
+          fecha_terminada?: string | null
+          frente_ruv?: string | null
+          id?: string
+          m2_construccion?: number | null
+          mo_ejecutado?: number
+          notas?: string | null
+          precio_mo_x_m2?: number | null
+          producto_id: string
+          supervisor_persona_id?: string | null
+          unidad_id: string
+          updated_at?: string
+          valor_contrato_mo?: number | null
+        }
+        Update: {
+          avance_pct?: number
+          coda_row_id?: string | null
+          codigo?: string
+          contratista_id?: string
+          created_at?: string
+          cuv?: string | null
+          deleted_at?: string | null
+          empresa_id?: string
+          estado?: string
+          fecha_arranque?: string | null
+          fecha_compromiso_terminar?: string | null
+          fecha_dtu?: string | null
+          fecha_extraccion?: string | null
+          fecha_paquete_ruv?: string | null
+          fecha_seguro_calidad?: string | null
+          fecha_terminada?: string | null
+          frente_ruv?: string | null
+          id?: string
+          m2_construccion?: number | null
+          mo_ejecutado?: number
+          notas?: string | null
+          precio_mo_x_m2?: number | null
+          producto_id?: string
+          supervisor_persona_id?: string | null
+          unidad_id?: string
+          updated_at?: string
+          valor_contrato_mo?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construccion_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construccion_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: true
+            referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      construccion_tareas_terminadas: {
+        Row: {
+          coda_row_id: string | null
+          construccion_id: string
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          fecha_pagada: string | null
+          fecha_terminada: string
+          id: string
+          mano_obra_pagada: number | null
+          notas: string | null
+          plantilla_tarea_id: string
+          revisado_por_persona_id: string | null
+          tiempo_real_dias: number | null
+          updated_at: string
+        }
+        Insert: {
+          coda_row_id?: string | null
+          construccion_id: string
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          fecha_pagada?: string | null
+          fecha_terminada?: string
+          id?: string
+          mano_obra_pagada?: number | null
+          notas?: string | null
+          plantilla_tarea_id: string
+          revisado_por_persona_id?: string | null
+          tiempo_real_dias?: number | null
+          updated_at?: string
+        }
+        Update: {
+          coda_row_id?: string | null
+          construccion_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          fecha_pagada?: string | null
+          fecha_terminada?: string
+          id?: string
+          mano_obra_pagada?: number | null
+          notas?: string | null
+          plantilla_tarea_id?: string
+          revisado_por_persona_id?: string | null
+          tiempo_real_dias?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construccion_tareas_terminadas_construccion_id_fkey"
+            columns: ["construccion_id"]
+            isOneToOne: false
+            referencedRelation: "construccion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construccion_tareas_terminadas_plantilla_tarea_id_fkey"
+            columns: ["plantilla_tarea_id"]
+            isOneToOne: false
+            referencedRelation: "plantilla_tareas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contratistas_datos: {
+        Row: {
+          abreviacion: string | null
+          activo: boolean
+          coda_row_id: string | null
+          created_at: string
+          deleted_at: string | null
+          domicilio: string | null
+          empresa_id: string
+          notas: string | null
+          persona_fisica_o_moral: string | null
+          persona_id: string
+          registro_patronal: string | null
+          representante_legal: string | null
+          repse: string | null
+          retencion_pct: number | null
+          updated_at: string
+        }
+        Insert: {
+          abreviacion?: string | null
+          activo?: boolean
+          coda_row_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          domicilio?: string | null
+          empresa_id: string
+          notas?: string | null
+          persona_fisica_o_moral?: string | null
+          persona_id: string
+          registro_patronal?: string | null
+          representante_legal?: string | null
+          repse?: string | null
+          retencion_pct?: number | null
+          updated_at?: string
+        }
+        Update: {
+          abreviacion?: string | null
+          activo?: boolean
+          coda_row_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          domicilio?: string | null
+          empresa_id?: string
+          notas?: string | null
+          persona_fisica_o_moral?: string | null
+          persona_id?: string
+          registro_patronal?: string | null
+          representante_legal?: string | null
+          repse?: string | null
+          retencion_pct?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      contrato_lotes: {
+        Row: {
+          coda_row_id: string | null
+          construccion_id: string
+          contrato_id: string
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          id: string
+          monto_lote: number | null
+          updated_at: string
+        }
+        Insert: {
+          coda_row_id?: string | null
+          construccion_id: string
+          contrato_id: string
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          id?: string
+          monto_lote?: number | null
+          updated_at?: string
+        }
+        Update: {
+          coda_row_id?: string | null
+          construccion_id?: string
+          contrato_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          id?: string
+          monto_lote?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contrato_lotes_construccion_id_fkey"
+            columns: ["construccion_id"]
+            isOneToOne: false
+            referencedRelation: "construccion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contrato_lotes_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos_construccion"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contratos_construccion: {
+        Row: {
+          coda_row_id: string | null
+          codigo: string
+          contratista_id: string
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          fecha_contrato: string
+          fianzas_url: string | null
+          id: string
+          notas: string | null
+          proyecto_id: string | null
+          updated_at: string
+          valor_total: number
+        }
+        Insert: {
+          coda_row_id?: string | null
+          codigo: string
+          contratista_id: string
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          fecha_contrato: string
+          fianzas_url?: string | null
+          id?: string
+          notas?: string | null
+          proyecto_id?: string | null
+          updated_at?: string
+          valor_total?: number
+        }
+        Update: {
+          coda_row_id?: string | null
+          codigo?: string
+          contratista_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          fecha_contrato?: string
+          fianzas_url?: string | null
+          id?: string
+          notas?: string | null
+          proyecto_id?: string | null
+          updated_at?: string
+          valor_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contratos_construccion_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      etapas_construccion: {
+        Row: {
+          coda_row_id: string | null
+          created_at: string
+          deleted_at: string | null
+          dias_estimados: number | null
+          empresa_id: string
+          id: string
+          nombre: string
+          orden: number
+          updated_at: string
+        }
+        Insert: {
+          coda_row_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          dias_estimados?: number | null
+          empresa_id: string
+          id?: string
+          nombre: string
+          orden: number
+          updated_at?: string
+        }
+        Update: {
+          coda_row_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          dias_estimados?: number | null
+          empresa_id?: string
+          id?: string
+          nombre?: string
+          orden?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      plantilla_tareas: {
+        Row: {
+          coda_row_id: string | null
+          costo_mo_plantilla: number
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          etapa_id: string
+          id: string
+          porcentaje_costo: number
+          producto_id: string
+          tarea_id: string
+          tiempo_dias: number
+          updated_at: string
+        }
+        Insert: {
+          coda_row_id?: string | null
+          costo_mo_plantilla?: number
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          etapa_id: string
+          id?: string
+          porcentaje_costo?: number
+          producto_id: string
+          tarea_id: string
+          tiempo_dias?: number
+          updated_at?: string
+        }
+        Update: {
+          coda_row_id?: string | null
+          costo_mo_plantilla?: number
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          etapa_id?: string
+          id?: string
+          porcentaje_costo?: number
+          producto_id?: string
+          tarea_id?: string
+          tiempo_dias?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plantilla_tareas_etapa_id_fkey"
+            columns: ["etapa_id"]
+            isOneToOne: false
+            referencedRelation: "etapas_construccion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plantilla_tareas_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plantilla_tareas_tarea_id_fkey"
+            columns: ["tarea_id"]
+            isOneToOne: false
+            referencedRelation: "tareas_construccion"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       productos: {
         Row: {
           atributos: Json
@@ -1363,6 +1798,7 @@ export type Database = {
           empresa_id: string
           id: string
           nombre: string
+          planos: Json
           proyecto_id: string
           updated_at: string
           valor_comercial_referencia: number | null
@@ -1376,6 +1812,7 @@ export type Database = {
           empresa_id: string
           id?: string
           nombre: string
+          planos?: Json
           proyecto_id: string
           updated_at?: string
           valor_comercial_referencia?: number | null
@@ -1389,6 +1826,7 @@ export type Database = {
           empresa_id?: string
           id?: string
           nombre?: string
+          planos?: Json
           proyecto_id?: string
           updated_at?: string
           valor_comercial_referencia?: number | null
@@ -1898,6 +2336,36 @@ export type Database = {
         }
         Relationships: []
       }
+      tareas_construccion: {
+        Row: {
+          coda_row_id: string | null
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          id: string
+          nombre: string
+          updated_at: string
+        }
+        Insert: {
+          coda_row_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          id?: string
+          nombre: string
+          updated_at?: string
+        }
+        Update: {
+          coda_row_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          id?: string
+          nombre?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tipos_credito: {
         Row: {
           activo: boolean
@@ -2309,6 +2777,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      fn_calcular_avance_construccion: {
+        Args: { p_construccion_id: string }
+        Returns: number
+      }
       fn_calcular_precio_venta: {
         Args: {
           p_monto_credito_cotitular?: number
