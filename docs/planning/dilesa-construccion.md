@@ -7,11 +7,12 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-24
-**Última actualización:** 2026-05-25 (Sprint 4 — UI captura: 3 sub-slugs
-RBAC `dilesa.construccion.arrancar/.tareas/.contratos` + migración con
-backfill defensivo + 3 forms de captura (arrancar / registrar tareas
-bulk / crear contrato N:M) + botones de entrada gated por permiso en
-las páginas existentes. Sprint 5 — integración con ventas + cierre —
+**Última actualización:** 2026-05-25 (Sprint 4 refactor post-Coda-review:
+colapsado a 2 forms reales. El standalone "Arrancar construcción"
+quedó borrado; el form combinado `/contratos/nuevo` ahora crea
+contrato + arranca N lotes en una sola operación. MO por tarea pasa
+a ser derivado vía vista SQL `v_construccion_tareas_terminadas_con_mo`
+(no se captura en UI). Sprint 5 — integración con ventas + cierre —
 pendiente.)
 
 ## Problema
@@ -489,3 +490,126 @@ END $$ LANGUAGE plpgsql;
   en_construccion → form de venta nueva mostrar el prototipo.
 - Spot-check: crear un contrato con 2-3 lotes desde el detalle de un
   contratista existente.
+
+### 2026-05-25 — Sprint 4 refactor (post-Coda-review)
+
+**PR:** mismo branch / mismo PR (#515 sigue abierto) — commit nuevo
+encima del original de Sprint 4.
+
+**Contexto del refactor:** Beto vio el screenshot del flujo cotidiano
+en Coda. La operación real es "contratista llega con precio MO/m² →
+arrancamos N lotes de un proyecto en un solo paso". El precio vive a
+nivel contrato (no por lote) y el MO por tarea NO se captura — se
+deriva. El Sprint 4 original había dividido eso en 2 forms separados
+(Arrancar standalone + Crear contrato) más un campo MO opcional en
+Registrar tarea, lo cual no refleja cómo Beto/José Pablo realmente
+operan. El refactor colapsa los flujos en 2 acciones reales.
+
+**Cambios:**
+
+- `app/dilesa/construccion/contratos/nuevo/page.tsx` reescrito
+  completo. Ahora es un form combinado:
+  - **Cabecera única**: contratista + proyecto (filtra lotes elegibles)
+    - precio MO × m² + fecha + fianzas + código auto-sugerido tipo Coda
+      (`<año>/<seq>-DIE-<abrev>-CONTRATO#<seq>`).
+  - **Multi-row de lotes** (mínimo 1, sin máximo): cada fila es lote +
+    prototipo + fecha de arranque. Auto-calcula m² desde
+    `productos.atributos.m2_construccion` y valor MO del lote
+    (`precio_mo × m²`). "+ Agregar lote" / botón X por fila. Subtotal
+    m² y subtotal valor MO al pie. Mix de prototipos permitido (igual
+    que Coda — RMA+RMC+RMD juntos).
+  - **Submit secuencial best-effort**: 1 INSERT contrato (con
+    valor_total = SUM(precio_mo × m²)) → loop N veces (INSERT
+    construccion con precio_mo_x_m2 + m2_construccion + valor_contrato_mo
+    derivados + INSERT contrato_lote con monto_lote + UPDATE
+    unidades.estado='planeada' si era 'lote_urbanizado'). Reporta éxitos
+    - fallas en toast diferenciado por severidad.
+- `app/dilesa/construccion/[id]/registrar-tarea/page.tsx`:
+  - Quitado el campo "MO pagada (opcional)" del form (el state
+    `manoObraPagada` y el grid de 3 cols → 2 cols).
+  - El header de la página muestra `valor_contrato_mo` de la obra +
+    una línea read-only "El MO por tarea se deriva = valor_contrato_mo
+    × % costo plantilla".
+  - Cada row de tarea muestra `MO {monto}` calculado read-only al lado
+    del %. Si la obra no tiene valor_contrato_mo todavía, solo el %.
+  - El INSERT en `construccion_tareas_terminadas` NO setea
+    `mano_obra_pagada` (queda NULL — la vista SQL lo deriva).
+- `app/dilesa/construccion/arrancar/page.tsx` + carpeta borrados —
+  el flujo standalone "arrancar sin contrato" ya no existe.
+- `lib/permissions.ts`: quitada la entry
+  `'/dilesa/construccion/arrancar'` de `ROUTE_TO_MODULE`. Comentario
+  explica por qué el sub-slug `dilesa.construccion.arrancar` se
+  deprecó.
+- `lib/permissions.test.ts`: quitado `dilesa.construccion.arrancar`
+  de `EXPECTED_DB_MODULE_SLUGS`. El slug en DB queda vivo como
+  vestigio inofensivo (no se referencia desde código, sin cleanup
+  formal porque el agente no tiene `db push` libre).
+- `components/dilesa/construccion-module.tsx`: botón "+ Arrancar
+  construcción" → "+ Nuevo contrato + arranques" con href a
+  `/dilesa/construccion/contratos/nuevo`. El gate cambia de
+  `dilesa.construccion.arrancar` a `dilesa.construccion.contratos`.
+- Migración nueva
+  `20260525143208_dilesa_construccion_v_tareas_con_mo.sql` —
+  CREATE OR REPLACE VIEW `dilesa.v_construccion_tareas_terminadas_con_mo`
+  con `mo_calculado = COALESCE(mano_obra_pagada, valor_contrato_mo ×
+porcentaje_costo / 100)`. SECURITY INVOKER para respetar RLS. Vista
+  (no columna stored) porque el cálculo cambia si valor_contrato_mo
+  o % se editan después; los rows históricos de Coda con
+  mano_obra_pagada poblada se respetan vía COALESCE.
+
+**Decisiones tácticas adicionales:**
+
+- **MO derivado, no almacenado.** ADR-032 D3 ya lo declaraba como
+  intención; el refactor lo materializa. La vista SQL es la fuente
+  canónica para KPIs (MO total ejecutado por contratista, MO por
+  obra). Si en algún momento Beto pide overrides puntuales por tarea,
+  agregamos input opcional al form de tareas y el COALESCE ya está
+  preparado.
+- **División entre 100 en la vista** porque el seed actual de
+  `plantilla_tareas.porcentaje_costo` viene en %-puntos (2.5, no
+  0.025). Si el seed cambia a fracción, ajustar la vista.
+- **Multi-row con dedup local.** Cada fila excluye las unidades ya
+  elegidas en otras filas del mismo submit — evita duplicar lote
+  dentro de un solo contrato (la UNIQUE en DB lo bloquearía igual,
+  pero el filtro UI da feedback instantáneo).
+- **Best-effort secuencial vs all-or-nothing.** Supabase REST no
+  expone transacciones limpias desde browser. Opté por secuencial:
+  cabecera primero (si falla, abortamos) y luego loop por lote
+  reportando éxitos/fallas. Idempotencia depende de
+  UNIQUE(construccion.unidad_id) — si el operador refresca y reintenta,
+  los exitosos no se duplican. Alternativa "RPC con plpgsql" es
+  más limpia pero requiere migración extra; lo dejé para Sprint 5
+  si emerge necesidad.
+- **Reset de lotes al cambiar proyecto.** Cuando el operador cambia
+  el proyecto en la cabecera, las unidades/prototipos de las filas
+  ya no aplican. Limpio ambos campos pero preservo la fila + fecha
+  (UX: no se siente como reset hard).
+- **El sub-slug deprecado queda en DB.** Idealmente borraría
+  `dilesa.construccion.arrancar` de `core.modulos` + sus permisos
+  asociados con una migración DELETE, pero `supabase db push` está
+  bloqueado por classifier y agregar otra migración solo para limpieza
+  es overkill. El código ya no lo referencia. Cleanup formal queda
+  como nota — si Beto quiere correrlo después en sesión interactiva,
+  basta con `DELETE FROM core.modulos WHERE slug =
+'dilesa.construccion.arrancar'` (el `ON DELETE CASCADE` en
+  permisos_rol/permisos_usuario_excepcion lo limpia transitivamente).
+
+**Pendiente verificar Beto:**
+
+- Aplicar la migración nueva `20260525143208_...v_tareas_con_mo.sql`
+  a prod (`supabase db push`).
+- Validar visualmente en preview el flujo:
+  1. `/dilesa/construccion` → botón "Nuevo contrato + arranques"
+     visible para roles con write sobre `dilesa.construccion.contratos`.
+  2. Form combinado: contratista RMA + proyecto Maya + precio 3500 +
+     elegir 2-3 lotes con distintos prototipos → ver subtotales →
+     submit → verificar que contrato + N construcciones + N
+     contrato_lotes existen + unidades pasaron a 'planeada'.
+  3. Detalle de obra recién creada → "Registrar tareas" → ver header
+     con MO contrato + tareas con MO derivado read-only → marcar 1
+     tarea → verificar que `construccion_tareas_terminadas` quedó con
+     `mano_obra_pagada = NULL` y la vista
+     `v_construccion_tareas_terminadas_con_mo.mo_calculado` da el
+     número esperado.
+- Cleanup opcional: borrar slug deprecado `dilesa.construccion.arrancar`
+  de `core.modulos` si quiere mantener DB limpia.

@@ -16,10 +16,16 @@
  * UX multi-tarea: en lugar de un form por tarea (que forzaría re-navegación
  * y N round-trips), mostramos TODAS las tareas pendientes del prototipo
  * agrupadas por etapa, con checkbox + campos condicionales (fecha terminada,
- * MO pagada, revisor). El operador marca varias y guarda en bulk. Después
- * del save el trigger `tg_construccion_avance` recalcula `avance_pct` y
- * dispara los cambios de estado si aplica (20% → en_construccion, 100% →
+ * revisor). El operador marca varias y guarda en bulk. Después del save
+ * el trigger `tg_construccion_avance` recalcula `avance_pct` y dispara
+ * los cambios de estado si aplica (20% → en_construccion, 100% →
  * terminada).
+ *
+ * MO por tarea = derivado, no se captura. El header muestra el cálculo
+ * `valor_contrato_mo × plantilla.porcentaje_costo` por tarea como
+ * referencia read-only. El INSERT NO setea `mano_obra_pagada` (queda
+ * NULL — la vista SQL `v_construccion_tareas_terminadas_con_mo` lo
+ * deriva). ADR-032 D3.
  *
  * Idempotencia: el form filtra las tareas ya cerradas (no las muestra). Si
  * hay carrera (otro usuario cerró la misma tarea entre load y submit), el
@@ -52,6 +58,9 @@ type ObraCtx = {
   avance_pct: number;
   fecha_arranque: string | null;
   estado: string;
+  /** Valor MO del contrato para esta obra (= precio_mo_x_m2 × m²). Se usa
+   *  para derivar el MO read-only de cada tarea: valor_contrato_mo × pct. */
+  valor_contrato_mo: number | null;
 };
 
 type EtapaCat = { id: string; nombre: string; orden: number };
@@ -70,7 +79,6 @@ type TareaForm = {
   plantillaId: string;
   marcada: boolean;
   fechaTerminada: string; // YYYY-MM-DD
-  manoObraPagada: string; // string para no perder vacío vs 0
   revisorId: string;
 };
 
@@ -122,7 +130,7 @@ function RegistrarTareaForm() {
       .schema('dilesa')
       .from('construccion')
       .select(
-        'id, codigo, producto_id, contratista_id, unidad_id, avance_pct, fecha_arranque, estado'
+        'id, codigo, producto_id, contratista_id, unidad_id, avance_pct, fecha_arranque, estado, valor_contrato_mo'
       )
       .eq('id', obraId)
       .is('deleted_at', null)
@@ -279,7 +287,6 @@ function RegistrarTareaForm() {
         plantillaId,
         marcada: false,
         fechaTerminada: defaultFecha,
-        manoObraPagada: '',
         revisorId: defaultRevisorId,
       }
     );
@@ -353,12 +360,14 @@ function RegistrarTareaForm() {
 
     // Bulk insert — el trigger recalcula avance UNA vez por insert. Si hay
     // muchas, son N triggers pero todos sobre la misma construccion (rápido).
+    // MO por tarea NO se captura — `mano_obra_pagada` queda NULL en cada
+    // row y la vista `v_construccion_tareas_terminadas_con_mo` deriva el
+    // monto desde valor_contrato_mo × plantilla.porcentaje_costo (ADR-032 D3).
     const rows = marcadas.map((m) => ({
       empresa_id: DILESA_EMPRESA_ID,
       construccion_id: obra.id,
       plantilla_tarea_id: m.plantillaId,
       fecha_terminada: m.fechaTerminada || new Date().toISOString().slice(0, 10),
-      mano_obra_pagada: m.manoObraPagada ? Number(m.manoObraPagada) : null,
       revisado_por_persona_id: m.revisorId || null,
     }));
 
@@ -454,7 +463,17 @@ function RegistrarTareaForm() {
           {prototipoNombre ? <span>· {prototipoNombre}</span> : null}
           {contratistaNombre ? <span>· {contratistaNombre}</span> : null}
           <span>· Avance actual {obra.avance_pct.toFixed(0)}%</span>
+          {obra.valor_contrato_mo != null && obra.valor_contrato_mo > 0 ? (
+            <span>· MO contrato {formatoMoney(Number(obra.valor_contrato_mo))}</span>
+          ) : null}
         </div>
+        {obra.valor_contrato_mo != null && obra.valor_contrato_mo > 0 ? (
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            El MO por tarea se deriva ={' '}
+            <span className="font-mono">valor_contrato_mo × % costo plantilla</span>. No se captura
+            aquí.
+          </p>
+        ) : null}
       </header>
 
       <Section title="Defaults para esta sesión">
@@ -512,6 +531,9 @@ function RegistrarTareaForm() {
                 onMarcarTodas={() => marcarTodasDeEtapa(et.id)}
                 defaultFecha={defaultFecha}
                 defaultRevisorId={defaultRevisorId}
+                valorContratoMo={
+                  obra.valor_contrato_mo != null ? Number(obra.valor_contrato_mo) : null
+                }
               />
             ))}
           </div>
@@ -550,6 +572,7 @@ function EtapaBlock({
   onMarcarTodas,
   defaultFecha,
   defaultRevisorId,
+  valorContratoMo,
 }: {
   etapa: {
     id: string;
@@ -573,6 +596,9 @@ function EtapaBlock({
   onMarcarTodas: () => void;
   defaultFecha: string;
   defaultRevisorId: string;
+  /** Para mostrar el MO derivado por tarea (read-only). NULL si la obra
+   *  no tiene contrato MO definido todavía — entonces solo mostramos %. */
+  valorContratoMo: number | null;
 }) {
   return (
     <div className="rounded-md border border-[var(--border)] bg-[var(--card)]">
@@ -598,9 +624,16 @@ function EtapaBlock({
             plantillaId: it.plantillaId,
             marcada: false,
             fechaTerminada: defaultFecha,
-            manoObraPagada: '',
             revisorId: defaultRevisorId,
           };
+          // MO derivado: si la obra tiene valor_contrato_mo, se calcula
+          // con el % de la plantilla. Si no, solo se muestra el %. Es
+          // read-only — sirve para que el supervisor vea cuánto vale la
+          // tarea al cerrarla (no se almacena, lo deriva la vista SQL).
+          const moDerivado =
+            valorContratoMo != null && valorContratoMo > 0
+              ? valorContratoMo * (it.porcentajeCosto / 100)
+              : null;
           return (
             <li key={it.plantillaId} className="px-3 py-2">
               <label className="flex cursor-pointer items-start gap-3">
@@ -615,13 +648,11 @@ function EtapaBlock({
                     <span className="text-sm">{it.nombre}</span>
                     <span className="text-[11px] tabular-nums text-muted-foreground">
                       {it.porcentajeCosto.toFixed(2)}%
-                      {it.costoMoPlantilla > 0
-                        ? ` · MO plantilla ${formatoMoney(it.costoMoPlantilla)}`
-                        : ''}
+                      {moDerivado != null ? ` · MO ${formatoMoney(moDerivado)}` : ''}
                     </span>
                   </div>
                   {row.marcada ? (
-                    <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                       <div>
                         <div className="mb-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
                           Fecha terminada
@@ -631,22 +662,6 @@ function EtapaBlock({
                           value={row.fechaTerminada}
                           onChange={(e) =>
                             onUpdate(it.plantillaId, 'fechaTerminada', e.target.value)
-                          }
-                          className="h-8 text-xs"
-                        />
-                      </div>
-                      <div>
-                        <div className="mb-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                          MO pagada (opcional)
-                        </div>
-                        <Input
-                          type="number"
-                          step="1"
-                          min="0"
-                          placeholder={it.costoMoPlantilla > 0 ? String(it.costoMoPlantilla) : '0'}
-                          value={row.manoObraPagada}
-                          onChange={(e) =>
-                            onUpdate(it.plantillaId, 'manoObraPagada', e.target.value)
                           }
                           className="h-8 text-xs"
                         />

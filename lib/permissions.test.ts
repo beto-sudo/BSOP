@@ -189,8 +189,10 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   'dilesa.contratistas',
   // Sub-slugs de captura del módulo construcción (Sprint 4 dilesa-construccion).
   // El padre `dilesa.construccion` es umbrella (sidebar + lectura); estos
-  // hijos gobiernan acceso a los 3 forms de captura. Ver ADR-030.
-  'dilesa.construccion.arrancar',
+  // hijos gobiernan acceso a los forms de captura. Ver ADR-030.
+  // Nota: `dilesa.construccion.arrancar` se deprecó post-refactor (un
+  // arranque siempre va dentro del contrato — el form combinado vive
+  // bajo `.contratos`). El slug puede quedar en DB como vestigio.
   'dilesa.construccion.tareas',
   'dilesa.construccion.contratos',
   // Sub-slugs por fase del pipeline (Sprint 7a captura por fase)

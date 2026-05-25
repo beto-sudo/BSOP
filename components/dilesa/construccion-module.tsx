@@ -107,8 +107,12 @@ function AvanceBar({ pct }: { pct: number }) {
 export function ConstruccionModule({ empresaId }: { empresaId: string }) {
   const router = useRouter();
   const { permissions } = usePermissions();
+  // Post-refactor: arrancar una construcción siempre va dentro de un
+  // contrato (form combinado en /contratos/nuevo). El permiso que gatea
+  // ese botón es por tanto `dilesa.construccion.contratos`, no `.arrancar`
+  // (ese sub-slug quedó deprecado — ver lib/permissions.ts).
   const puedeArrancar =
-    permissions.isAdmin || permissions.modulos.get('dilesa.construccion.arrancar')?.write === true;
+    permissions.isAdmin || permissions.modulos.get('dilesa.construccion.contratos')?.write === true;
   const [obras, setObras] = useState<ConstruccionListaRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -430,11 +434,11 @@ export function ConstruccionModule({ empresaId }: { empresaId: string }) {
         </span>
         {puedeArrancar ? (
           <Link
-            href="/dilesa/construccion/arrancar"
+            href="/dilesa/construccion/contratos/nuevo"
             className="flex h-9 items-center gap-1.5 rounded-md bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90"
           >
             <Plus className="h-3.5 w-3.5" />
-            Arrancar construcción
+            Nuevo contrato + arranques
           </Link>
         ) : null}
       </div>
