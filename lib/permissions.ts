@@ -60,7 +60,9 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   // El sub-slug `dilesa.construccion.arrancar` quedó deprecado post-refactor
   // (un arranque siempre va dentro del contrato — el form combinado vive en
   // /contratos/nuevo). El slug en DB queda como vestigio inofensivo.
-  '/dilesa/construccion/[id]/registrar-tarea': 'dilesa.construccion.tareas',
+  // El sub-slug `dilesa.construccion.tareas` sigue vigente: gobierna write
+  // access para palomear tareas inline en /construccion/[id] (post-2026-05-25
+  // la página /registrar-tarea fue removida en favor del click directo).
   '/dilesa/construccion/contratos/nuevo': 'dilesa.construccion.contratos',
 
   // RDB — home + operaciones
