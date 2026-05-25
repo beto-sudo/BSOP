@@ -6,7 +6,12 @@
  * Iniciativa dilesa-portafolio-activos. Distinta de Portafolio (que muestra
  * todos los activos patrimoniales). Aquí solo aparecen unidades que se
  * pueden ofrecer a un cliente hoy:
- *   estado IN ('disponible', 'planeada')
+ *   estado IN ('en_construccion', 'terminada')
+ *
+ * Regla operativa DILESA: una unidad NO es vendible hasta que su obra
+ * cruzó el 20% de avance (trigger `tg_construccion_avance` marca la unidad
+ * como `en_construccion` automáticamente). Las `planeada` / `lote_urbanizado`
+ * son lotes sin obra arrancada y no aparecen aquí.
  *
  * Cada fila muestra el precio calculado (vía RPC fn_calcular_precio_venta)
  * para que el vendedor pueda cotizar sin tener que abrir el form. Click en
@@ -47,13 +52,13 @@ type UnidadListaRow = UnidadRow & {
 };
 
 const ESTADO_TONE: Record<string, BadgeTone> = {
-  disponible: 'success',
-  planeada: 'info',
+  en_construccion: 'info',
+  terminada: 'success',
 };
 
 const ESTADO_LABEL: Record<string, string> = {
-  disponible: 'Disponible',
-  planeada: 'Planeada',
+  en_construccion: 'En construcción',
+  terminada: 'Terminada',
 };
 
 export function InventarioModule({ empresaId }: { empresaId: string }) {
@@ -73,8 +78,12 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
   }> => {
     const sb = createSupabaseBrowserClient();
 
-    // Unidades disponibles. `.eq(empresa_id)` para evitar `.in(ids[])` que
-    // rebasaría URL si hubiera muchas; filtro de estado en query (no JS).
+    // Unidades disponibles para asignar = obra arrancada con avance >= 20%
+    // (`en_construccion`, set automático por trigger `tg_construccion_avance`)
+    // o ya terminada físicamente (`terminada`). Las `planeada`/`lote_urbanizado`
+    // NO aparecen aquí — son lotes sin obra arrancada y no son vendibles aún
+    // bajo la regla operativa DILESA. `.eq(empresa_id)` para evitar `.in(ids[])`
+    // que rebasaría URL si hubiera muchas; filtro de estado en query (no JS).
     const { data: uns, error: uErr } = await sb
       .schema('dilesa')
       .from('unidades')
@@ -83,7 +92,7 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
       )
       .eq('empresa_id', empresaId)
       .is('deleted_at', null)
-      .in('estado', ['disponible', 'planeada']);
+      .in('estado', ['en_construccion', 'terminada']);
     if (uErr) return { error: getSupabaseErrorMessage(uErr, 'No se pudo cargar el inventario.') };
     const unidadesArr = (uns ?? []) as UnidadRow[];
 

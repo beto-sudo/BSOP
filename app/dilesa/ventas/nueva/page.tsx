@@ -153,7 +153,11 @@ function NuevaSolicitudForm() {
     setLoadingMeta(true);
     setLoadError(null);
 
-    // Unidades disponibles = activas en proyecto, sin venta vigente ligada.
+    // Unidades disponibles para asignar = obra arrancada con avance >= 20%
+    // (`en_construccion`, set automático por trigger `tg_construccion_avance`)
+    // o ya terminada físicamente (`terminada`). Las `planeada`/`lote_urbanizado`
+    // NO aparecen aquí — son lotes sin obra arrancada y no son vendibles aún
+    // bajo la regla operativa DILESA (regla 20%).
     const [uRes, prjRes, prodRes, tcRes, prRes, persRes] = await Promise.all([
       sb
         .schema('dilesa')
@@ -163,7 +167,7 @@ function NuevaSolicitudForm() {
         )
         .eq('empresa_id', DILESA_EMPRESA_ID)
         .is('deleted_at', null)
-        .in('estado', ['disponible', 'planeada']),
+        .in('estado', ['en_construccion', 'terminada']),
       sb
         .schema('dilesa')
         .from('proyectos')
