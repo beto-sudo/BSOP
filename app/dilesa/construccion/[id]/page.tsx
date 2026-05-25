@@ -1215,146 +1215,122 @@ function CronogramaSection({
           ? 'warning'
           : 'success';
 
+  const efectividadPct =
+    efectividad != null && !obraTerminada ? Math.round(efectividad * 100) : null;
+  const proyectadaSubtitleColor =
+    proyectadaTone === 'success'
+      ? 'text-emerald-600 dark:text-emerald-400'
+      : proyectadaTone === 'warning'
+        ? 'text-amber-600 dark:text-amber-400'
+        : proyectadaTone === 'destructive'
+          ? 'text-rose-600 dark:text-rose-400'
+          : 'text-[var(--text)]/55';
+
   return (
     <Section title="Cronograma">
-      {/* Fila de 3 cards: Arranque · Compromiso · Proyectada */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <CronoCard
-          label="Fecha de arranque"
-          value={fmtFecha(fechaArranque) ?? '—'}
-          subtitle={subtitleArranque}
-        />
-        <CronoCard
-          label="Compromiso de terminar"
-          value={fmtFecha(fechaCompromiso) ?? '—'}
+      {/* Fila compacta: 3 fechas inline con separadores. */}
+      <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm">
+        <InlineDate label="Arranque" value={fmtFecha(fechaArranque)} subtitle={subtitleArranque} />
+        <InlineDate
+          label="Compromiso"
+          value={fmtFecha(fechaCompromiso)}
           subtitle={subtitleCompromiso}
         />
-        <CronoCard
-          label={obraTerminada ? 'Fecha terminada' : 'Proyectada terminar'}
-          value={fmtFecha(obraTerminada ? fechaTerminada : fechaProyectada) ?? '—'}
+        <InlineDate
+          label={obraTerminada ? 'Terminada' : 'Proyectada'}
+          value={fmtFecha(obraTerminada ? fechaTerminada : fechaProyectada)}
           subtitle={subtitleProyectada}
-          tone={obraTerminada ? 'success' : proyectadaTone}
+          subtitleColor={
+            obraTerminada ? 'text-emerald-600 dark:text-emerald-400' : proyectadaSubtitleColor
+          }
         />
       </div>
 
-      {/* Stats de progreso temporal */}
-      <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-2 border-t border-[var(--border)] pt-4 text-xs sm:grid-cols-4">
-        <Stat
-          label="Días estimados (plan)"
-          value={totalDiasEstimado > 0 ? `${totalDiasEstimado.toFixed(1)}` : '—'}
+      {/* Stats inline en una fila, separadores `·`. */}
+      <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-[var(--border)] pt-3 text-[11px] text-[var(--text)]/60">
+        <InlineStat
+          label="Plan"
+          value={totalDiasEstimado > 0 ? `${totalDiasEstimado.toFixed(1)}d` : '—'}
         />
-        <Stat
-          label="Días transcurridos"
-          value={diasTranscurridos != null ? `${diasTranscurridos}` : '—'}
+        <InlineStat
+          label="Transcurridos"
+          value={diasTranscurridos != null ? `${diasTranscurridos}d` : '—'}
         />
-        <Stat
-          label="Días pendientes"
-          value={diasPendientes > 0 ? `${diasPendientes.toFixed(1)}` : '—'}
+        <InlineStat
+          label="Pendientes"
+          value={diasPendientes > 0 ? `${diasPendientes.toFixed(1)}d` : '—'}
         />
-        <Stat
-          label="% tiempo transcurrido"
-          value={pctTiempoTranscurrido != null ? `${pctTiempoTranscurrido.toFixed(1)}%` : '—'}
+        <InlineStat
+          label="Tiempo"
+          value={pctTiempoTranscurrido != null ? `${pctTiempoTranscurrido.toFixed(0)}%` : '—'}
         />
         {diasRealesAcumulados > 0 ? (
-          <Stat label="Días reales (capturados)" value={`${diasRealesAcumulados.toFixed(1)}`} />
+          <InlineStat label="Reales" value={`${diasRealesAcumulados.toFixed(1)}d`} />
         ) : null}
       </div>
 
-      {/* KPI Efectividad — el bloque visual principal */}
-      <div className="mt-5 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--card)]">
-        <div className="border-b border-[var(--border)] bg-[var(--bg)]/30 px-4 py-2">
-          <div className="text-[10px] font-medium uppercase tracking-wider text-[var(--text)]/60">
-            Efectividad de construcción
+      {/* KPI Efectividad — compacto. */}
+      <div className="mt-3 flex flex-wrap items-center gap-4 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-2.5">
+        <div
+          className={`flex shrink-0 flex-col items-center justify-center rounded-md bg-gradient-to-br ${efectividadInfo.gradient} px-3 py-1.5 text-white shadow-sm ring-1 ${efectividadInfo.ringColor}`}
+        >
+          <div className="text-xl font-semibold tabular-nums leading-none">
+            {efectividadPct != null ? `${efectividadPct}%` : '—'}
+          </div>
+          <div className="mt-0.5 text-[9px] font-medium uppercase tracking-wide">
+            {efectividadInfo.label}
           </div>
         </div>
-        <div className="grid grid-cols-1 items-center gap-4 px-5 py-5 sm:grid-cols-[auto_1fr]">
-          {/* Valor + label colorizada */}
-          <div
-            className={`flex flex-col items-center justify-center rounded-md bg-gradient-to-br ${efectividadInfo.gradient} px-6 py-4 text-white shadow-sm ring-1 ${efectividadInfo.ringColor}`}
-          >
-            <div className="text-3xl font-semibold tabular-nums">
-              {efectividad != null && !obraTerminada ? efectividad.toFixed(2) : '—'}
-            </div>
-            <div className="mt-0.5 text-xs font-medium uppercase tracking-wide">
-              {efectividadInfo.label}
-            </div>
-          </div>
-          {/* Detalle del cálculo */}
-          <div className="space-y-3">
-            <div className="text-xs text-[var(--text)]/70">
-              <span className="font-medium text-[var(--text)]">
-                % avance ÷ % tiempo transcurrido
-              </span>
-              {efectividad != null && pctTiempoTranscurrido != null ? (
-                <span className="ml-2 text-[var(--text)]/60">
-                  {avancePct.toFixed(1)}% ÷ {pctTiempoTranscurrido.toFixed(1)}% ={' '}
-                  {efectividad.toFixed(2)}
-                </span>
-              ) : null}
-            </div>
-            {/* Barras paralelas comparando avance vs tiempo */}
-            <div className="space-y-2">
-              <ProgressBar
-                label="% Avance de obra"
-                pct={Math.min(100, avancePct)}
-                color={efectividadInfo.gradient}
-              />
-              <ProgressBar
-                label="% Tiempo transcurrido"
-                pct={Math.min(100, pctTiempoTranscurrido ?? 0)}
-                color="from-slate-400 to-slate-500"
-              />
-            </div>
-            <p className="text-[11px] text-[var(--text)]/50">
-              1.00 = exactamente en plan · &gt;1.10 adelantado · 0.90-1.10 en tiempo · &lt;0.90
-              atrasado · &lt;0.70 crítico
-            </p>
-          </div>
+        <div className="min-w-0 flex-1 space-y-1">
+          <ProgressBar
+            label="Avance"
+            pct={Math.min(100, avancePct)}
+            color={efectividadInfo.gradient}
+          />
+          <ProgressBar
+            label="Tiempo"
+            pct={Math.min(100, pctTiempoTranscurrido ?? 0)}
+            color="from-slate-400 to-slate-500"
+          />
+        </div>
+        <div className="basis-full text-[10px] text-[var(--text)]/45">
+          Efectividad = Avance ÷ Tiempo. ≥110% adelantado · 90-110% en tiempo · 70-90% atrasado ·
+          &lt;70% crítico.
         </div>
       </div>
     </Section>
   );
 }
 
-/** Card individual de fecha. Tone opcional colorea el subtítulo según
- *  estado (a tiempo / tarde / crítico). */
-function CronoCard({
+function InlineDate({
   label,
   value,
   subtitle,
-  tone = 'neutral',
+  subtitleColor,
 }: {
   label: string;
-  value: string;
+  value: string | null;
   subtitle: string | null;
-  tone?: 'neutral' | 'success' | 'warning' | 'destructive' | 'info';
+  subtitleColor?: string;
 }) {
-  const subtitleColor =
-    tone === 'success'
-      ? 'text-emerald-600 dark:text-emerald-400'
-      : tone === 'warning'
-        ? 'text-amber-600 dark:text-amber-400'
-        : tone === 'destructive'
-          ? 'text-rose-600 dark:text-rose-400'
-          : tone === 'info'
-            ? 'text-sky-600 dark:text-sky-400'
-            : 'text-[var(--text)]/55';
   return (
-    <div className="rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-2.5">
-      <div className="text-[10px] font-medium uppercase tracking-wide text-[var(--text)]/50">
-        {label}
-      </div>
-      <div className="mt-1 text-sm font-semibold tabular-nums text-[var(--text)]">{value}</div>
-      {subtitle ? <div className={`mt-0.5 text-[11px] ${subtitleColor}`}>{subtitle}</div> : null}
+    <div>
+      <span className="text-[10px] uppercase tracking-wide text-[var(--text)]/50">{label}</span>{' '}
+      <span className="text-sm font-semibold tabular-nums text-[var(--text)]">{value ?? '—'}</span>
+      {subtitle ? (
+        <span className={`ml-1 text-[11px] ${subtitleColor ?? 'text-[var(--text)]/55'}`}>
+          ({subtitle})
+        </span>
+      ) : null}
     </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function InlineStat({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <div className="text-[10px] uppercase tracking-wide text-[var(--text)]/50">{label}</div>
-      <div className="mt-0.5 text-sm font-medium tabular-nums text-[var(--text)]">{value}</div>
+    <div className="whitespace-nowrap">
+      <span className="text-[var(--text)]/50">{label}</span>{' '}
+      <span className="font-medium tabular-nums text-[var(--text)]">{value}</span>
     </div>
   );
 }
