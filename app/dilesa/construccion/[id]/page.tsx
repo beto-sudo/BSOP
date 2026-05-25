@@ -619,21 +619,72 @@ function DetailInner() {
     [plantilla]
   );
 
+  /** Días pendientes = suma del `tiempo_dias` de las tareas que aún NO se
+   *  han palomeado. Lo usamos para proyectar la fecha de terminación
+   *  desde HOY (no desde fecha_arranque), reflejando avance real. */
+  const diasPendientes = useMemo(() => {
+    const terminadasIds = new Set(terminadas.map((t) => t.plantilla_tarea_id));
+    return plantilla
+      .filter((p) => !terminadasIds.has(p.id))
+      .reduce((s, p) => s + Number(p.tiempo_dias ?? 0), 0);
+  }, [plantilla, terminadas]);
+
   /** Suma de días reales reportados en las tareas ya terminadas. */
   const diasRealesAcumulados = useMemo(
     () => terminadas.reduce((s, t) => s + Number(t.tiempo_real_dias ?? 0), 0),
     [terminadas]
   );
 
-  /** Fecha estimada de terminación = fecha_arranque + ceil(totalDiasEstimado).
-   *  Usamos días corridos (Coda no separa hábiles/feriados). */
+  /** Días corridos transcurridos desde fecha_arranque hasta hoy. Si no
+   *  arrancó (fecha_arranque null) o la fecha es futura, devuelve null. */
   const fechaArranque = obra?.fecha_arranque ?? null;
-  const fechaEstimadaTerminacion = useMemo(() => {
-    if (!fechaArranque || totalDiasEstimado <= 0) return null;
-    const base = new Date(`${fechaArranque}T12:00:00`);
-    base.setDate(base.getDate() + Math.ceil(totalDiasEstimado));
+  const diasTranscurridos = useMemo(() => {
+    if (!fechaArranque) return null;
+    const start = new Date(`${fechaArranque}T00:00:00`).getTime();
+    const today = new Date().setHours(0, 0, 0, 0);
+    const diff = Math.max(0, Math.floor((today - start) / (1000 * 60 * 60 * 24)));
+    return diff;
+  }, [fechaArranque]);
+
+  /** Fecha proyectada de terminación = HOY + ceil(diasPendientes).
+   *  Dinámica: refleja el avance real, no el plan original. Si la obra
+   *  está sin arrancar o sin plantilla, devuelve null. */
+  const fechaProyectadaTerminar = useMemo(() => {
+    if (!fechaArranque || diasPendientes <= 0) return null;
+    const base = new Date();
+    base.setHours(12, 0, 0, 0);
+    base.setDate(base.getDate() + Math.ceil(diasPendientes));
     return base.toISOString().slice(0, 10);
-  }, [fechaArranque, totalDiasEstimado]);
+  }, [fechaArranque, diasPendientes]);
+
+  /** % tiempo transcurrido = días_transcurridos / días_estimados × 100.
+   *  Null si no arrancó o si la plantilla no tiene días estimados. */
+  const pctTiempoTranscurrido = useMemo(() => {
+    if (diasTranscurridos == null || totalDiasEstimado <= 0) return null;
+    return (diasTranscurridos / totalDiasEstimado) * 100;
+  }, [diasTranscurridos, totalDiasEstimado]);
+
+  /** KPI Efectividad de construcción = % avance / % tiempo transcurrido.
+   *   - >= 1.10 → adelantado (verde)
+   *   - 0.90 - 1.10 → en tiempo (ámbar suave)
+   *   - < 0.90 → atrasado (rojo)
+   *  Edge case: si % tiempo es 0 (mismo día del arranque) o si la obra
+   *  ya está al 100%, no se calcula numéricamente. */
+  const efectividad = useMemo(() => {
+    if (pctTiempoTranscurrido == null || pctTiempoTranscurrido <= 0) return null;
+    if (!obra) return null;
+    return obra.avance_pct / pctTiempoTranscurrido;
+  }, [obra, pctTiempoTranscurrido]);
+
+  /** Diferencia entre fecha proyectada y compromiso (en días). Negativo =
+   *  antes del compromiso (a tiempo), positivo = después (tarde). */
+  const fechaCompromiso = obra?.fecha_compromiso_terminar ?? null;
+  const diasVsCompromiso = useMemo(() => {
+    if (!fechaProyectadaTerminar || !fechaCompromiso) return null;
+    const proyectada = new Date(`${fechaProyectadaTerminar}T00:00:00`).getTime();
+    const compromiso = new Date(`${fechaCompromiso}T00:00:00`).getTime();
+    return Math.round((proyectada - compromiso) / (1000 * 60 * 60 * 24));
+  }, [fechaProyectadaTerminar, fechaCompromiso]);
 
   if (loading) {
     return (
@@ -664,6 +715,8 @@ function DetailInner() {
       : unidad.identificador
     : obra.codigo;
 
+  // Fechas/días de progreso viven en la sección "Cronograma" (más abajo).
+  // Aquí solo datos identificadores + hitos post-cierre (DTU/SC/RUV).
   const fichaGeneral: { label: string; value: string }[] = (
     [
       ['Proyecto', proyectoNombre],
@@ -677,18 +730,7 @@ function DetailInner() {
           : (contratistaNombre ?? null),
       ],
       ['Supervisor', supervisorNombre],
-      ['Fecha de arranque', fmtFecha(obra.fecha_arranque)],
-      [
-        'Días estimados (plantilla)',
-        totalDiasEstimado > 0 ? `${totalDiasEstimado.toFixed(1)} días` : null,
-      ],
-      ['Fecha estimada terminación', fmtFecha(fechaEstimadaTerminacion)],
-      ['Compromiso de terminar', fmtFecha(obra.fecha_compromiso_terminar)],
       ['Fecha terminada', fmtFecha(obra.fecha_terminada)],
-      [
-        'Días reales (acumulados)',
-        diasRealesAcumulados > 0 ? `${diasRealesAcumulados.toFixed(1)} días` : null,
-      ],
       ['Fecha DTU', fmtFecha(obra.fecha_dtu)],
       ['Fecha seguro calidad', fmtFecha(obra.fecha_seguro_calidad)],
       ['Fecha extracción', fmtFecha(obra.fecha_extraccion)],
@@ -761,6 +803,21 @@ function DetailInner() {
           </div>
         ) : null}
       </Section>
+
+      <CronogramaSection
+        fechaArranque={obra.fecha_arranque}
+        fechaCompromiso={obra.fecha_compromiso_terminar}
+        fechaProyectada={fechaProyectadaTerminar}
+        fechaTerminada={obra.fecha_terminada}
+        totalDiasEstimado={totalDiasEstimado}
+        diasTranscurridos={diasTranscurridos}
+        diasPendientes={diasPendientes}
+        diasRealesAcumulados={diasRealesAcumulados}
+        pctTiempoTranscurrido={pctTiempoTranscurrido}
+        avancePct={obra.avance_pct}
+        efectividad={efectividad}
+        diasVsCompromiso={diasVsCompromiso}
+      />
 
       <Section title="Mano de obra">
         {fichaMO.length === 0 ? (
@@ -1035,6 +1092,287 @@ function Section({
       </div>
       {children}
     </section>
+  );
+}
+
+/** Sección Cronograma — fechas clave + KPI de Efectividad de Construcción.
+ *  Centraliza toda la info de plazo: cuándo arrancó, cuándo se comprometió
+ *  a terminar, cuándo se proyecta terminar según avance real, y qué tan
+ *  bien va vs el plan. La efectividad es el KPI operativo principal de
+ *  DILESA para construcción. */
+function CronogramaSection({
+  fechaArranque,
+  fechaCompromiso,
+  fechaProyectada,
+  fechaTerminada,
+  totalDiasEstimado,
+  diasTranscurridos,
+  diasPendientes,
+  diasRealesAcumulados,
+  pctTiempoTranscurrido,
+  avancePct,
+  efectividad,
+  diasVsCompromiso,
+}: {
+  fechaArranque: string | null;
+  fechaCompromiso: string | null;
+  fechaProyectada: string | null;
+  fechaTerminada: string | null;
+  totalDiasEstimado: number;
+  diasTranscurridos: number | null;
+  diasPendientes: number;
+  diasRealesAcumulados: number;
+  pctTiempoTranscurrido: number | null;
+  avancePct: number;
+  efectividad: number | null;
+  diasVsCompromiso: number | null;
+}) {
+  // Si la obra no arrancó y no hay datos de plantilla, ni mostramos la sección.
+  if (!fechaArranque && totalDiasEstimado <= 0) return null;
+
+  const obraTerminada = !!fechaTerminada || avancePct >= 100;
+
+  // Clasificación de efectividad — bandas operativas DILESA.
+  const efectividadInfo = (() => {
+    if (obraTerminada) {
+      return {
+        label: 'Completada',
+        tone: 'success' as const,
+        gradient: 'from-emerald-500 to-emerald-600',
+        textColor: 'text-emerald-700 dark:text-emerald-300',
+        ringColor: 'ring-emerald-500/30',
+      };
+    }
+    if (efectividad == null) {
+      return {
+        label: 'Sin datos suficientes',
+        tone: 'neutral' as const,
+        gradient: 'from-slate-400 to-slate-500',
+        textColor: 'text-[var(--text)]/60',
+        ringColor: 'ring-[var(--border)]',
+      };
+    }
+    if (efectividad >= 1.1) {
+      return {
+        label: 'Adelantado',
+        tone: 'success' as const,
+        gradient: 'from-emerald-500 to-emerald-600',
+        textColor: 'text-emerald-700 dark:text-emerald-300',
+        ringColor: 'ring-emerald-500/30',
+      };
+    }
+    if (efectividad >= 0.9) {
+      return {
+        label: 'En tiempo',
+        tone: 'info' as const,
+        gradient: 'from-sky-500 to-sky-600',
+        textColor: 'text-sky-700 dark:text-sky-300',
+        ringColor: 'ring-sky-500/30',
+      };
+    }
+    if (efectividad >= 0.7) {
+      return {
+        label: 'Atrasado',
+        tone: 'warning' as const,
+        gradient: 'from-amber-500 to-amber-600',
+        textColor: 'text-amber-700 dark:text-amber-300',
+        ringColor: 'ring-amber-500/30',
+      };
+    }
+    return {
+      label: 'Crítico',
+      tone: 'destructive' as const,
+      gradient: 'from-rose-500 to-rose-600',
+      textColor: 'text-rose-700 dark:text-rose-300',
+      ringColor: 'ring-rose-500/30',
+    };
+  })();
+
+  // Pill helper para mostrar deltas relativos en cards.
+  const subtitleArranque = diasTranscurridos != null ? `hace ${diasTranscurridos} días` : null;
+  const subtitleCompromiso = (() => {
+    if (!fechaCompromiso) return null;
+    const today = new Date().setHours(0, 0, 0, 0);
+    const target = new Date(`${fechaCompromiso}T00:00:00`).getTime();
+    const diff = Math.round((target - today) / (1000 * 60 * 60 * 24));
+    if (diff > 0) return `en ${diff} días`;
+    if (diff === 0) return 'hoy';
+    return `hace ${Math.abs(diff)} días`;
+  })();
+  const subtitleProyectada = (() => {
+    if (obraTerminada) return null;
+    if (diasVsCompromiso == null) return null;
+    if (diasVsCompromiso === 0) return 'igual al compromiso';
+    if (diasVsCompromiso < 0) return `${Math.abs(diasVsCompromiso)} días antes`;
+    return `${diasVsCompromiso} días tarde`;
+  })();
+  const proyectadaTone =
+    diasVsCompromiso == null
+      ? 'neutral'
+      : diasVsCompromiso > 7
+        ? 'destructive'
+        : diasVsCompromiso > 0
+          ? 'warning'
+          : 'success';
+
+  return (
+    <Section title="Cronograma">
+      {/* Fila de 3 cards: Arranque · Compromiso · Proyectada */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <CronoCard
+          label="Fecha de arranque"
+          value={fmtFecha(fechaArranque) ?? '—'}
+          subtitle={subtitleArranque}
+        />
+        <CronoCard
+          label="Compromiso de terminar"
+          value={fmtFecha(fechaCompromiso) ?? '—'}
+          subtitle={subtitleCompromiso}
+        />
+        <CronoCard
+          label={obraTerminada ? 'Fecha terminada' : 'Proyectada terminar'}
+          value={fmtFecha(obraTerminada ? fechaTerminada : fechaProyectada) ?? '—'}
+          subtitle={subtitleProyectada}
+          tone={obraTerminada ? 'success' : proyectadaTone}
+        />
+      </div>
+
+      {/* Stats de progreso temporal */}
+      <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-2 border-t border-[var(--border)] pt-4 text-xs sm:grid-cols-4">
+        <Stat
+          label="Días estimados (plan)"
+          value={totalDiasEstimado > 0 ? `${totalDiasEstimado.toFixed(1)}` : '—'}
+        />
+        <Stat
+          label="Días transcurridos"
+          value={diasTranscurridos != null ? `${diasTranscurridos}` : '—'}
+        />
+        <Stat
+          label="Días pendientes"
+          value={diasPendientes > 0 ? `${diasPendientes.toFixed(1)}` : '—'}
+        />
+        <Stat
+          label="% tiempo transcurrido"
+          value={pctTiempoTranscurrido != null ? `${pctTiempoTranscurrido.toFixed(1)}%` : '—'}
+        />
+        {diasRealesAcumulados > 0 ? (
+          <Stat label="Días reales (capturados)" value={`${diasRealesAcumulados.toFixed(1)}`} />
+        ) : null}
+      </div>
+
+      {/* KPI Efectividad — el bloque visual principal */}
+      <div className="mt-5 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--card)]">
+        <div className="border-b border-[var(--border)] bg-[var(--bg)]/30 px-4 py-2">
+          <div className="text-[10px] font-medium uppercase tracking-wider text-[var(--text)]/60">
+            Efectividad de construcción
+          </div>
+        </div>
+        <div className="grid grid-cols-1 items-center gap-4 px-5 py-5 sm:grid-cols-[auto_1fr]">
+          {/* Valor + label colorizada */}
+          <div
+            className={`flex flex-col items-center justify-center rounded-md bg-gradient-to-br ${efectividadInfo.gradient} px-6 py-4 text-white shadow-sm ring-1 ${efectividadInfo.ringColor}`}
+          >
+            <div className="text-3xl font-semibold tabular-nums">
+              {efectividad != null && !obraTerminada ? efectividad.toFixed(2) : '—'}
+            </div>
+            <div className="mt-0.5 text-xs font-medium uppercase tracking-wide">
+              {efectividadInfo.label}
+            </div>
+          </div>
+          {/* Detalle del cálculo */}
+          <div className="space-y-3">
+            <div className="text-xs text-[var(--text)]/70">
+              <span className="font-medium text-[var(--text)]">
+                % avance ÷ % tiempo transcurrido
+              </span>
+              {efectividad != null && pctTiempoTranscurrido != null ? (
+                <span className="ml-2 text-[var(--text)]/60">
+                  {avancePct.toFixed(1)}% ÷ {pctTiempoTranscurrido.toFixed(1)}% ={' '}
+                  {efectividad.toFixed(2)}
+                </span>
+              ) : null}
+            </div>
+            {/* Barras paralelas comparando avance vs tiempo */}
+            <div className="space-y-2">
+              <ProgressBar
+                label="% Avance de obra"
+                pct={Math.min(100, avancePct)}
+                color={efectividadInfo.gradient}
+              />
+              <ProgressBar
+                label="% Tiempo transcurrido"
+                pct={Math.min(100, pctTiempoTranscurrido ?? 0)}
+                color="from-slate-400 to-slate-500"
+              />
+            </div>
+            <p className="text-[11px] text-[var(--text)]/50">
+              1.00 = exactamente en plan · &gt;1.10 adelantado · 0.90-1.10 en tiempo · &lt;0.90
+              atrasado · &lt;0.70 crítico
+            </p>
+          </div>
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+/** Card individual de fecha. Tone opcional colorea el subtítulo según
+ *  estado (a tiempo / tarde / crítico). */
+function CronoCard({
+  label,
+  value,
+  subtitle,
+  tone = 'neutral',
+}: {
+  label: string;
+  value: string;
+  subtitle: string | null;
+  tone?: 'neutral' | 'success' | 'warning' | 'destructive' | 'info';
+}) {
+  const subtitleColor =
+    tone === 'success'
+      ? 'text-emerald-600 dark:text-emerald-400'
+      : tone === 'warning'
+        ? 'text-amber-600 dark:text-amber-400'
+        : tone === 'destructive'
+          ? 'text-rose-600 dark:text-rose-400'
+          : tone === 'info'
+            ? 'text-sky-600 dark:text-sky-400'
+            : 'text-[var(--text)]/55';
+  return (
+    <div className="rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-2.5">
+      <div className="text-[10px] font-medium uppercase tracking-wide text-[var(--text)]/50">
+        {label}
+      </div>
+      <div className="mt-1 text-sm font-semibold tabular-nums text-[var(--text)]">{value}</div>
+      {subtitle ? <div className={`mt-0.5 text-[11px] ${subtitleColor}`}>{subtitle}</div> : null}
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wide text-[var(--text)]/50">{label}</div>
+      <div className="mt-0.5 text-sm font-medium tabular-nums text-[var(--text)]">{value}</div>
+    </div>
+  );
+}
+
+function ProgressBar({ label, pct, color }: { label: string; pct: number; color: string }) {
+  return (
+    <div>
+      <div className="mb-0.5 flex items-center justify-between text-[10px] text-[var(--text)]/60">
+        <span>{label}</span>
+        <span className="tabular-nums">{pct.toFixed(1)}%</span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-[var(--border)]/40">
+        <div
+          className={`h-full rounded-full bg-gradient-to-r ${color}`}
+          style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
+        />
+      </div>
+    </div>
   );
 }
 
