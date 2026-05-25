@@ -239,7 +239,7 @@ function NuevaSolicitudForm() {
     void loadMeta();
   }, [loadMeta]);
 
-  // Pre-selección desde `?unidad=<id>` (deep link desde /dilesa/inventario).
+  // Pre-selección desde `?unidad=<id>` (deep link desde /dilesa/ventas/inventario).
   // Espera a que las unidades estén cargadas para resolver el proyecto.
   useEffect(() => {
     const preselectId = searchParams.get('unidad');

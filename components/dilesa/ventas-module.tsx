@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { DataTable, type Column } from '@/components/module-page';
 import { Badge } from '@/components/ui/badge';
@@ -55,6 +55,7 @@ const ESTADO_LABEL: Record<string, string> = {
 
 export function VentasModule({ empresaId }: { empresaId: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { permissions } = usePermissions();
   const puedeCrearSolicitud =
     permissions.isAdmin ||
@@ -64,8 +65,22 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [proyectoFiltro, setProyectoFiltro] = useState('');
-  const [faseFiltro, setFaseFiltro] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState('');
+
+  // `faseFiltro` se deriva del query param (single source of truth: el URL).
+  // Deep-link desde tab Fases (`/dilesa/ventas?fase=<nombre>`) pre-selecciona
+  // sin state intermedio. El dropdown actualiza el URL via `setFaseEnUrl`.
+  const faseFiltro = searchParams.get('fase') ?? '';
+  const setFaseEnUrl = useCallback(
+    (value: string) => {
+      const next = new URLSearchParams(searchParams.toString());
+      if (value) next.set('fase', value);
+      else next.delete('fase');
+      const qs = next.toString();
+      router.replace(qs ? `/dilesa/ventas?${qs}` : '/dilesa/ventas');
+    },
+    [router, searchParams]
+  );
 
   // Fetch puro: regresa data o mensaje de error, NO toca state.
   const fetchVentas = useCallback(async (): Promise<{
@@ -303,7 +318,7 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
         </select>
         <select
           value={faseFiltro}
-          onChange={(e) => setFaseFiltro(e.target.value)}
+          onChange={(e) => setFaseEnUrl(e.target.value)}
           className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
         >
           <option value="">Todas las fases</option>

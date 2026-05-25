@@ -73,7 +73,10 @@ export const NAV_ITEMS: NavItem[] = [
         children: [
           { label: 'Portafolio', href: '/dilesa/portafolio' },
           { label: 'Proyectos', href: '/dilesa/proyectos' },
-          { label: 'Inventario', href: '/dilesa/inventario' },
+          // Ventas ahora es un hub con 5 tabs (Ventas / Inventario / Fases /
+          // Clientes / Vendedores) — el sidebar muestra solo la entry del
+          // padre; las tabs viven en el layout (sprint tabs-hub).
+          // Inventario quedó dentro de Ventas como tab — antes era top-level.
           { label: 'Ventas', href: '/dilesa/ventas' },
           // Construcción ahora es un hub con 4 tabs (Obras / Contratos /
           // Contratistas / Prototipos) — el sidebar muestra solo la entry

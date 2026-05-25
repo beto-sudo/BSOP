@@ -218,10 +218,14 @@ function fmtFecha(s: string | null): string | null {
 /**
  * @module Venta detail (DILESA)
  * @responsive desktop-only
+ *
+ * Gate: sub-slug `dilesa.ventas.lista` post-refactor a hub (sprint
+ * tabs-hub). El detalle es parte del dominio de la tab "Ventas" — quien
+ * puede ver la lista puede entrar al detalle.
  */
 export default function VentaDetailPage() {
   return (
-    <RequireAccess empresa="dilesa" modulo="dilesa.ventas">
+    <RequireAccess empresa="dilesa" modulo="dilesa.ventas.lista">
       <DetailInner />
     </RequireAccess>
   );
