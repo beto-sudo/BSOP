@@ -26,14 +26,16 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Circle, HardHat, Plus } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ChevronRight, Circle, HardHat } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { usePermissions } from '@/components/providers';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 
 type Construccion = {
   id: string;
@@ -79,9 +81,11 @@ type Terminada = {
   plantilla_tarea_id: string;
   fecha_terminada: string | null;
   revisado_por_persona_id: string | null;
+  revisado_por_user_id: string | null;
   mano_obra_pagada: number | null;
   fecha_pagada: string | null;
   tiempo_real_dias: number | null;
+  notas: string | null;
 };
 type ContratoLote = {
   id: string;
@@ -161,7 +165,8 @@ function DetailInner() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const { permissions } = usePermissions();
-  const puedeRegistrarTareas =
+  const toast = useToast();
+  const puedePalomearTareas =
     permissions.isAdmin || permissions.modulos.get('dilesa.construccion.tareas')?.write === true;
 
   const [obra, setObra] = useState<Construccion | null>(null);
@@ -175,7 +180,15 @@ function DetailInner() {
   const [tareasCat, setTareasCat] = useState<Map<string, Tarea>>(new Map());
   const [plantilla, setPlantilla] = useState<Plantilla[]>([]);
   const [terminadas, setTerminadas] = useState<Terminada[]>([]);
+  /** Diccionario para mostrar quién palomeó. Prioridad: usuario del sistema
+   *  (core.usuarios.first_name) sobre persona ERP (revisado_por_persona_id),
+   *  que queda como fallback para registros importados de Coda. */
+  const [userNombres, setUserNombres] = useState<Map<string, string>>(new Map());
   const [revisorNombres, setRevisorNombres] = useState<Map<string, string>>(new Map());
+  const [currentUser, setCurrentUser] = useState<{ id: string; nombre: string } | null>(null);
+  /** plantilla_tarea_id que se está procesando (palomeando o des-palomeando)
+   *  — se usa para deshabilitar el click duplicado mientras inserta/borra. */
+  const [palomeoInFlight, setPalomeoInFlight] = useState<string | null>(null);
   const [contratos, setContratos] = useState<Array<Contrato & { lote: ContratoLote }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -305,7 +318,7 @@ function DetailInner() {
           .schema('dilesa')
           .from('construccion_tareas_terminadas')
           .select(
-            'id, plantilla_tarea_id, fecha_terminada, revisado_por_persona_id, mano_obra_pagada, fecha_pagada, tiempo_real_dias'
+            'id, plantilla_tarea_id, fecha_terminada, revisado_por_persona_id, revisado_por_user_id, mano_obra_pagada, fecha_pagada, tiempo_real_dias, notas'
           )
           .eq('construccion_id', obraRow.id)
           .is('deleted_at', null)
@@ -327,28 +340,56 @@ function DetailInner() {
       const terminadasArr = (ttRes.data ?? []) as Terminada[];
       setTerminadas(terminadasArr);
 
-      // Revisores de las terminadas — una query consolidada.
-      const revisorIds = [
+      // Supervisores de las terminadas. Dos diccionarios paralelos:
+      //   - userNombres: por revisado_por_user_id → core.usuarios.first_name
+      //     (fuente real desde la captura inline post-2026-05-25).
+      //   - revisorNombres: por revisado_por_persona_id → erp.personas.nombre
+      //     (legacy, para data importada de Coda donde el revisor era persona).
+      const userIds = [
+        ...new Set(
+          terminadasArr.map((t) => t.revisado_por_user_id).filter((v): v is string => !!v)
+        ),
+      ];
+      const personaIds = [
         ...new Set(
           terminadasArr.map((t) => t.revisado_por_persona_id).filter((v): v is string => !!v)
         ),
       ];
-      if (revisorIds.length > 0) {
-        const { data: revs } = await sb
-          .schema('erp')
-          .from('personas')
-          .select('id, nombre, apellido_paterno, apellido_materno')
-          .in('id', revisorIds);
-        if (!activo) return;
-        const rmap = new Map<string, string>();
-        for (const r of revs ?? []) {
-          const n = [r.nombre, r.apellido_paterno, r.apellido_materno].filter(Boolean).join(' ');
-          rmap.set(r.id as string, n || '(sin nombre)');
-        }
-        setRevisorNombres(rmap);
-      } else {
-        setRevisorNombres(new Map());
+      const [usersQ, personasQ] = await Promise.all([
+        userIds.length > 0
+          ? sb.schema('core').from('usuarios').select('id, first_name, email').in('id', userIds)
+          : Promise.resolve({
+              data: [] as Array<{ id: string; first_name: string | null; email: string | null }>,
+              error: null,
+            }),
+        personaIds.length > 0
+          ? sb
+              .schema('erp')
+              .from('personas')
+              .select('id, nombre, apellido_paterno, apellido_materno')
+              .in('id', personaIds)
+          : Promise.resolve({
+              data: [] as Array<{
+                id: string;
+                nombre: string;
+                apellido_paterno: string | null;
+                apellido_materno: string | null;
+              }>,
+              error: null,
+            }),
+      ]);
+      if (!activo) return;
+      const umap = new Map<string, string>();
+      for (const u of usersQ.data ?? []) {
+        umap.set(u.id as string, (u.first_name || u.email || '(sin nombre)') as string);
       }
+      setUserNombres(umap);
+      const rmap = new Map<string, string>();
+      for (const r of personasQ.data ?? []) {
+        const n = [r.nombre, r.apellido_paterno, r.apellido_materno].filter(Boolean).join(' ');
+        rmap.set(r.id as string, n || '(sin nombre)');
+      }
+      setRevisorNombres(rmap);
 
       // Contratos asignados: contrato_lotes (N:M) → contratos_construccion.
       const { data: lotes, error: lErr } = await sb
@@ -395,7 +436,134 @@ function DetailInner() {
     };
   }, [id]);
 
-  // Agrupación tareas por etapa, con flag terminada/pendiente y % de costo.
+  // Carga del usuario logueado (para palomear automático + pre-popular el
+  // diccionario de supervisores con su nombre). Se hace en effect aparte
+  // porque no depende del id de la obra.
+  useEffect(() => {
+    let activo = true;
+    const sb = createSupabaseBrowserClient();
+    (async () => {
+      const { data: auth } = await sb.auth.getUser();
+      const authUser = auth?.user;
+      if (!activo || !authUser) return;
+      const { data: u } = await sb
+        .schema('core')
+        .from('usuarios')
+        .select('first_name, email')
+        .eq('id', authUser.id)
+        .maybeSingle();
+      if (!activo) return;
+      const nombre =
+        (u?.first_name as string | null) ||
+        (u?.email as string | null) ||
+        authUser.email ||
+        '(sin nombre)';
+      setCurrentUser({ id: authUser.id, nombre });
+      setUserNombres((prev) => {
+        if (prev.get(authUser.id) === nombre) return prev;
+        const next = new Map(prev);
+        next.set(authUser.id, nombre);
+        return next;
+      });
+    })();
+    return () => {
+      activo = false;
+    };
+  }, []);
+
+  /** Palomea una tarea: INSERT en construccion_tareas_terminadas con defaults.
+   *  fecha_terminada=hoy, revisado_por_user_id=current user. El trigger
+   *  `tg_construccion_avance` recalcula avance + estado de unidad automático. */
+  async function palomearTarea(plantillaId: string) {
+    if (!obra || !currentUser || palomeoInFlight) return;
+    setPalomeoInFlight(plantillaId);
+    const sb = createSupabaseBrowserClient();
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: insRow, error } = await sb
+      .schema('dilesa')
+      .from('construccion_tareas_terminadas')
+      .insert({
+        empresa_id: DILESA_EMPRESA_ID,
+        construccion_id: obra.id,
+        plantilla_tarea_id: plantillaId,
+        fecha_terminada: today,
+        revisado_por_user_id: currentUser.id,
+      })
+      .select(
+        'id, plantilla_tarea_id, fecha_terminada, revisado_por_persona_id, revisado_por_user_id, mano_obra_pagada, fecha_pagada, tiempo_real_dias, notas'
+      )
+      .single();
+    setPalomeoInFlight(null);
+    if (error || !insRow) {
+      toast.add({
+        title: 'No se pudo palomear la tarea',
+        description: getSupabaseErrorMessage(error, 'Error al insertar.'),
+        type: 'error',
+      });
+      return;
+    }
+    setTerminadas((prev) => [...prev, insRow as Terminada]);
+    // Re-fetch sólo de la obra para reflejar nuevo avance_pct y estado.
+    void refetchObra();
+  }
+
+  /** Des-palomea: DELETE de la terminada. Confirm previo porque dispara
+   *  recálculo de avance y potencialmente revierte la unidad a 'planeada'. */
+  async function desPalomearTarea(plantillaId: string, terminadaId: string) {
+    if (!obra || palomeoInFlight) return;
+    const ok = window.confirm(
+      '¿Quitar este registro? El avance de la obra se recalculará. Si baja del 20%, la unidad regresa a "planeada".'
+    );
+    if (!ok) return;
+    setPalomeoInFlight(plantillaId);
+    const sb = createSupabaseBrowserClient();
+    const { error } = await sb
+      .schema('dilesa')
+      .from('construccion_tareas_terminadas')
+      .delete()
+      .eq('id', terminadaId);
+    setPalomeoInFlight(null);
+    if (error) {
+      toast.add({
+        title: 'No se pudo quitar el registro',
+        description: getSupabaseErrorMessage(error, 'Error al borrar.'),
+        type: 'error',
+      });
+      return;
+    }
+    setTerminadas((prev) => prev.filter((t) => t.id !== terminadaId));
+    void refetchObra();
+  }
+
+  async function refetchObra() {
+    if (!obra) return;
+    const sb = createSupabaseBrowserClient();
+    const { data } = await sb
+      .schema('dilesa')
+      .from('construccion')
+      .select('avance_pct, estado, mo_ejecutado, fecha_terminada')
+      .eq('id', obra.id)
+      .maybeSingle();
+    if (data) {
+      setObra((prev) =>
+        prev
+          ? {
+              ...prev,
+              avance_pct: data.avance_pct as number,
+              estado: data.estado as string,
+              mo_ejecutado: data.mo_ejecutado as number,
+              fecha_terminada: (data.fecha_terminada as string | null) ?? null,
+            }
+          : prev
+      );
+    }
+  }
+
+  // Agrupación tareas por etapa, con flag terminada/pendiente, % de costo y
+  // MO calculada (porcentaje × valor_contrato_mo). El cálculo es derivado
+  // — mismo principio que la vista `dilesa.v_construccion_tareas_terminadas_con_mo`
+  // que es la fuente para estimaciones semanales a contratistas.
+  const valorContratoMo = obra?.valor_contrato_mo ?? null;
   const etapasConTareas = useMemo(() => {
     const terminadasByPlantilla = new Map<string, Terminada>();
     for (const t of terminadas) terminadasByPlantilla.set(t.plantilla_tarea_id, t);
@@ -406,10 +574,14 @@ function DetailInner() {
         .map((p) => {
           const tareaInfo = tareasCat.get(p.tarea_id);
           const terminada = terminadasByPlantilla.get(p.id) ?? null;
+          const porcentajeCosto = Number(p.porcentaje_costo ?? 0);
+          const manoObraCalculada =
+            valorContratoMo != null ? porcentajeCosto * valorContratoMo : null;
           return {
             plantillaId: p.id,
             nombre: tareaInfo?.nombre ?? '(tarea desconocida)',
-            porcentajeCosto: Number(p.porcentaje_costo ?? 0),
+            porcentajeCosto,
+            manoObraCalculada,
             terminada,
           };
         })
@@ -431,7 +603,7 @@ function DetailInner() {
     });
     // Solo mostrar etapas con tareas en la plantilla del prototipo
     return rows.filter((r) => r.total > 0);
-  }, [etapas, plantilla, tareasCat, terminadas]);
+  }, [etapas, plantilla, tareasCat, terminadas, valorContratoMo]);
 
   const moPorEjecutar = useMemo(() => {
     if (!obra) return null;
@@ -605,28 +777,35 @@ function DetailInner() {
             ? 'sin plantilla'
             : `${etapasConTareas.length} ${etapasConTareas.length === 1 ? 'etapa' : 'etapas'} · ${terminadas.length} ${terminadas.length === 1 ? 'tarea' : 'tareas'} terminadas`
         }
-        action={
-          puedeRegistrarTareas && etapasConTareas.length > 0 ? (
-            <Link
-              href={`/dilesa/construccion/${obra.id}/registrar-tarea`}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[var(--accent)] px-3 text-xs font-medium text-white hover:opacity-90"
-            >
-              <Plus className="h-3 w-3" />
-              Registrar tareas
-            </Link>
-          ) : null
-        }
       >
         {etapasConTareas.length === 0 ? (
           <p className="text-sm text-[var(--text)]/60">
             La plantilla del prototipo no tiene tareas registradas para este producto.
           </p>
         ) : (
-          <div className="space-y-2">
-            {etapasConTareas.map((et) => (
-              <EtapaBlock key={et.id} etapa={et} revisorNombres={revisorNombres} />
-            ))}
-          </div>
+          <>
+            {puedePalomearTareas ? (
+              <p className="mb-3 text-xs text-[var(--text)]/60">
+                Click en el círculo de una tarea para palomearla como terminada. Tu nombre queda
+                automático como supervisor. Click en una terminada para quitar el registro (con
+                confirmación).
+              </p>
+            ) : null}
+            <div className="space-y-2">
+              {etapasConTareas.map((et) => (
+                <EtapaBlock
+                  key={et.id}
+                  etapa={et}
+                  userNombres={userNombres}
+                  revisorNombres={revisorNombres}
+                  puedePalomear={puedePalomearTareas}
+                  palomeoInFlight={palomeoInFlight}
+                  onPalomear={palomearTarea}
+                  onDesPalomear={desPalomearTarea}
+                />
+              ))}
+            </div>
+          </>
         )}
       </Section>
 
@@ -688,7 +867,12 @@ function BackLink() {
 
 function EtapaBlock({
   etapa,
+  userNombres,
   revisorNombres,
+  puedePalomear,
+  palomeoInFlight,
+  onPalomear,
+  onDesPalomear,
 }: {
   etapa: {
     id: string;
@@ -698,6 +882,7 @@ function EtapaBlock({
       plantillaId: string;
       nombre: string;
       porcentajeCosto: number;
+      manoObraCalculada: number | null;
       terminada: Terminada | null;
     }>;
     total: number;
@@ -705,7 +890,12 @@ function EtapaBlock({
     pctEtapa: number;
     pctCosto: number;
   };
+  userNombres: Map<string, string>;
   revisorNombres: Map<string, string>;
+  puedePalomear: boolean;
+  palomeoInFlight: string | null;
+  onPalomear: (plantillaId: string) => void;
+  onDesPalomear: (plantillaId: string, terminadaId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const Icon = open ? ChevronDown : ChevronRight;
@@ -742,21 +932,49 @@ function EtapaBlock({
         <ul className="border-t border-[var(--border)]/60 px-3 py-2">
           {etapa.items.map((it) => {
             const t = it.terminada;
-            const revisor = t?.revisado_por_persona_id
-              ? revisorNombres.get(t.revisado_por_persona_id)
-              : null;
+            // Display de supervisor: prioridad core.usuarios.first_name (capturado
+            // por la UI nueva post-2026-05-25), fallback erp.personas (data Coda).
+            const supervisor = t?.revisado_por_user_id
+              ? (userNombres.get(t.revisado_por_user_id) ?? null)
+              : t?.revisado_por_persona_id
+                ? (revisorNombres.get(t.revisado_por_persona_id) ?? null)
+                : null;
+            const inFlight = palomeoInFlight === it.plantillaId;
+            const onClick = () => {
+              if (!puedePalomear || inFlight) return;
+              if (t) onDesPalomear(it.plantillaId, t.id);
+              else onPalomear(it.plantillaId);
+            };
+            const clickable = puedePalomear && !inFlight;
             return (
               <li
                 key={it.plantillaId}
                 className="flex flex-wrap items-start gap-3 border-b border-[var(--border)]/40 py-1.5 last:border-0"
               >
-                <div className="mt-0.5 w-4 shrink-0">
+                <button
+                  type="button"
+                  onClick={onClick}
+                  disabled={!clickable}
+                  className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+                    clickable
+                      ? 'cursor-pointer hover:bg-[var(--accent)]/10'
+                      : 'cursor-not-allowed opacity-60'
+                  }`}
+                  title={
+                    !puedePalomear
+                      ? 'Sin permiso para palomear tareas'
+                      : t
+                        ? 'Click para quitar el registro'
+                        : 'Click para marcar como terminada'
+                  }
+                  aria-label={t ? `Quitar palomeo de ${it.nombre}` : `Palomear ${it.nombre}`}
+                >
                   {t ? (
                     <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                   ) : (
                     <Circle className="h-3.5 w-3.5 text-[var(--text)]/30" />
                   )}
-                </div>
+                </button>
                 <div className="flex-1">
                   <div className="text-sm text-[var(--text)]">{it.nombre}</div>
                   {t ? (
@@ -764,11 +982,18 @@ function EtapaBlock({
                       {t.fecha_terminada ? (
                         <span>Terminada {fmtFecha(t.fecha_terminada)}</span>
                       ) : null}
-                      {revisor ? <span>Revisó {revisor}</span> : null}
-                      {t.mano_obra_pagada != null ? (
+                      {supervisor ? <span>Supervisor {supervisor}</span> : null}
+                      {it.manoObraCalculada != null ? (
+                        <span>MO {moneyFmt.format(it.manoObraCalculada)}</span>
+                      ) : t.mano_obra_pagada != null ? (
                         <span>MO {moneyFmt.format(t.mano_obra_pagada)}</span>
                       ) : null}
                       {t.fecha_pagada ? <span>Pagada {fmtFecha(t.fecha_pagada)}</span> : null}
+                      {t.notas ? <span className="italic">«{t.notas}»</span> : null}
+                    </div>
+                  ) : it.manoObraCalculada != null ? (
+                    <div className="mt-0.5 text-[11px] text-[var(--text)]/40">
+                      MO al palomear: {moneyFmt.format(it.manoObraCalculada)}
                     </div>
                   ) : null}
                 </div>

@@ -1483,6 +1483,7 @@ export type Database = {
           notas: string | null
           plantilla_tarea_id: string
           revisado_por_persona_id: string | null
+          revisado_por_user_id: string | null
           tiempo_real_dias: number | null
           updated_at: string
         }
@@ -1499,6 +1500,7 @@ export type Database = {
           notas?: string | null
           plantilla_tarea_id: string
           revisado_por_persona_id?: string | null
+          revisado_por_user_id?: string | null
           tiempo_real_dias?: number | null
           updated_at?: string
         }
@@ -1515,6 +1517,7 @@ export type Database = {
           notas?: string | null
           plantilla_tarea_id?: string
           revisado_por_persona_id?: string | null
+          revisado_por_user_id?: string | null
           tiempo_real_dias?: number | null
           updated_at?: string
         }
