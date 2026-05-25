@@ -1,14 +1,3 @@
-// ==============================================================================
-// Auto-generated Supabase database types.
-// Last regenerated: 2026-05-25T11:04:51Z
-// Project ref: ybklderteyhuugzfmxbi
-// Schemas: public, core, erp, rdb, health, playtomic, dilesa, maquinaria
-//
-// DO NOT EDIT BY HAND. Regenerate via:
-//   - GitHub Actions: trigger 'DB Types' workflow manually
-//   - Local: npm run db:types (requiere supabase CLI + SUPABASE_ACCESS_TOKEN)
-// ==============================================================================
-
 export type Json =
   | string
   | number
@@ -1530,6 +1519,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "construccion_tareas_terminadas_construccion_id_fkey"
+            columns: ["construccion_id"]
+            isOneToOne: false
+            referencedRelation: "v_tareas_pendientes_de_pago"
+            referencedColumns: ["construccion_id"]
+          },
+          {
             foreignKeyName: "construccion_tareas_terminadas_plantilla_tarea_id_fkey"
             columns: ["plantilla_tarea_id"]
             isOneToOne: false
@@ -1635,6 +1631,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "contrato_lotes_construccion_id_fkey"
+            columns: ["construccion_id"]
+            isOneToOne: false
+            referencedRelation: "v_tareas_pendientes_de_pago"
+            referencedColumns: ["construccion_id"]
+          },
+          {
             foreignKeyName: "contrato_lotes_contrato_id_fkey"
             columns: ["contrato_id"]
             isOneToOne: false
@@ -1698,6 +1701,157 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      estimacion_tareas: {
+        Row: {
+          construccion_id: string
+          created_at: string
+          empresa_id: string
+          estimacion_id: string
+          id: string
+          monto_calculado: number
+          tarea_terminada_id: string
+        }
+        Insert: {
+          construccion_id: string
+          created_at?: string
+          empresa_id: string
+          estimacion_id: string
+          id?: string
+          monto_calculado: number
+          tarea_terminada_id: string
+        }
+        Update: {
+          construccion_id?: string
+          created_at?: string
+          empresa_id?: string
+          estimacion_id?: string
+          id?: string
+          monto_calculado?: number
+          tarea_terminada_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estimacion_tareas_construccion_id_fkey"
+            columns: ["construccion_id"]
+            isOneToOne: false
+            referencedRelation: "construccion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimacion_tareas_construccion_id_fkey"
+            columns: ["construccion_id"]
+            isOneToOne: false
+            referencedRelation: "v_tareas_pendientes_de_pago"
+            referencedColumns: ["construccion_id"]
+          },
+          {
+            foreignKeyName: "estimacion_tareas_estimacion_id_fkey"
+            columns: ["estimacion_id"]
+            isOneToOne: false
+            referencedRelation: "estimaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimacion_tareas_tarea_terminada_id_fkey"
+            columns: ["tarea_terminada_id"]
+            isOneToOne: true
+            referencedRelation: "construccion_tareas_terminadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimacion_tareas_tarea_terminada_id_fkey"
+            columns: ["tarea_terminada_id"]
+            isOneToOne: true
+            referencedRelation: "v_construccion_tareas_terminadas_con_mo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimacion_tareas_tarea_terminada_id_fkey"
+            columns: ["tarea_terminada_id"]
+            isOneToOne: true
+            referencedRelation: "v_tareas_pendientes_de_pago"
+            referencedColumns: ["tarea_terminada_id"]
+          },
+        ]
+      }
+      estimaciones: {
+        Row: {
+          aprobada_at: string | null
+          aprobada_por_user_id: string | null
+          codigo: string
+          contratista_id: string
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          estado: string
+          factura_fecha: string | null
+          factura_folio: string | null
+          factura_url: string | null
+          fecha_cierre: string
+          fecha_pago_programado: string
+          id: string
+          monto_bruto: number
+          monto_neto: number
+          notas: string | null
+          pagada_at: string | null
+          pagada_por_user_id: string | null
+          referencia_pago: string | null
+          retencion_monto: number
+          retencion_pct: number
+          updated_at: string
+        }
+        Insert: {
+          aprobada_at?: string | null
+          aprobada_por_user_id?: string | null
+          codigo: string
+          contratista_id: string
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          estado?: string
+          factura_fecha?: string | null
+          factura_folio?: string | null
+          factura_url?: string | null
+          fecha_cierre: string
+          fecha_pago_programado: string
+          id?: string
+          monto_bruto?: number
+          monto_neto?: number
+          notas?: string | null
+          pagada_at?: string | null
+          pagada_por_user_id?: string | null
+          referencia_pago?: string | null
+          retencion_monto?: number
+          retencion_pct?: number
+          updated_at?: string
+        }
+        Update: {
+          aprobada_at?: string | null
+          aprobada_por_user_id?: string | null
+          codigo?: string
+          contratista_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          estado?: string
+          factura_fecha?: string | null
+          factura_folio?: string | null
+          factura_url?: string | null
+          fecha_cierre?: string
+          fecha_pago_programado?: string
+          id?: string
+          monto_bruto?: number
+          monto_neto?: number
+          notas?: string | null
+          pagada_at?: string | null
+          pagada_por_user_id?: string | null
+          referencia_pago?: string | null
+          retencion_monto?: number
+          retencion_pct?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       etapas_construccion: {
         Row: {
@@ -2813,10 +2967,62 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "construccion_tareas_terminadas_construccion_id_fkey"
+            columns: ["construccion_id"]
+            isOneToOne: false
+            referencedRelation: "v_tareas_pendientes_de_pago"
+            referencedColumns: ["construccion_id"]
+          },
+          {
             foreignKeyName: "construccion_tareas_terminadas_plantilla_tarea_id_fkey"
             columns: ["plantilla_tarea_id"]
             isOneToOne: false
             referencedRelation: "plantilla_tareas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_estimaciones_resumen: {
+        Row: {
+          anio_iso: number | null
+          contratista_id: string | null
+          empresa_id: string | null
+          estado: string | null
+          estimaciones_count: number | null
+          monto_bruto_total: number | null
+          monto_neto_total: number | null
+          retencion_total: number | null
+          semana_iso: number | null
+        }
+        Relationships: []
+      }
+      v_tareas_pendientes_de_pago: {
+        Row: {
+          construccion_codigo: string | null
+          construccion_id: string | null
+          contratista_id: string | null
+          empresa_id: string | null
+          fecha_terminada: string | null
+          monto_calculado: number | null
+          plantilla_tarea_id: string | null
+          revisado_por_persona_id: string | null
+          revisado_por_user_id: string | null
+          tarea_terminada_id: string | null
+          unidad_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construccion_tareas_terminadas_plantilla_tarea_id_fkey"
+            columns: ["plantilla_tarea_id"]
+            isOneToOne: false
+            referencedRelation: "plantilla_tareas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construccion_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: true
+            referencedRelation: "unidades"
             referencedColumns: ["id"]
           },
         ]
@@ -2837,6 +3043,18 @@ export type Database = {
         Returns: Json
       }
       fn_es_vendedor_restringido: { Args: never; Returns: boolean }
+      fn_generar_estimacion_borrador: {
+        Args: {
+          p_contratista_id: string
+          p_fecha_cierre?: string
+          p_retencion_pct?: number
+        }
+        Returns: string
+      }
+      fn_tarea_terminada_esta_pagada: {
+        Args: { p_tarea_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
