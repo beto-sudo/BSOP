@@ -2774,7 +2774,39 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_construccion_tareas_terminadas_con_mo: {
+        Row: {
+          construccion_id: string | null
+          created_at: string | null
+          deleted_at: string | null
+          empresa_id: string | null
+          fecha_pagada: string | null
+          fecha_terminada: string | null
+          id: string | null
+          mo_calculado: number | null
+          notas: string | null
+          plantilla_tarea_id: string | null
+          revisado_por_persona_id: string | null
+          tiempo_real_dias: number | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construccion_tareas_terminadas_construccion_id_fkey"
+            columns: ["construccion_id"]
+            isOneToOne: false
+            referencedRelation: "construccion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construccion_tareas_terminadas_plantilla_tarea_id_fkey"
+            columns: ["plantilla_tarea_id"]
+            isOneToOne: false
+            referencedRelation: "plantilla_tareas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       fn_calcular_avance_construccion: {
