@@ -23,12 +23,25 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Banknote, ChevronDown, ChevronRight } from 'lucide-react';
+import {
+  ArrowLeft,
+  Banknote,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  Loader2,
+  X,
+} from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { usePermissions } from '@/components/providers';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 
 type Estimacion = {
@@ -133,9 +146,19 @@ export default function EstimacionDetailPage() {
   );
 }
 
+type ModalKind = 'aprobar' | 'facturar' | 'pagar' | 'cancelar' | null;
+
 function DetailInner() {
   const params = useParams<{ id: string }>();
   const id = params.id;
+  const { permissions } = usePermissions();
+  const toast = useToast();
+  const puedeEscribir =
+    permissions.isAdmin ||
+    permissions.modulos.get('dilesa.construccion.estimaciones')?.write === true;
+
+  const [modal, setModal] = useState<ModalKind>(null);
+  const [savingTransition, setSavingTransition] = useState(false);
 
   const [estim, setEstim] = useState<Estimacion | null>(null);
   const [contratistaNombre, setContratistaNombre] = useState<string | null>(null);
@@ -150,6 +173,163 @@ function DetailInner() {
   const [tareasCat, setTareasCat] = useState<Map<string, Tarea>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Refresca el estado de la estimación tras una transición (sin recargar
+  // toda la página). Hace una query liviana al row de estimaciones.
+  async function refetchEstim() {
+    if (!id) return;
+    const sb = createSupabaseBrowserClient();
+    const { data } = await sb
+      .schema('dilesa')
+      .from('estimaciones')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (data) setEstim(data as unknown as Estimacion);
+  }
+
+  /** Transición borrador → aprobada. En Sprint 5 esto disparará el email. */
+  async function aprobar() {
+    if (!estim || savingTransition) return;
+    setSavingTransition(true);
+    const sb = createSupabaseBrowserClient();
+    const { data: auth } = await sb.auth.getUser();
+    const { error: e } = await sb
+      .schema('dilesa')
+      .from('estimaciones')
+      .update({
+        estado: 'aprobada',
+        aprobada_por_user_id: auth?.user?.id ?? null,
+        aprobada_at: new Date().toISOString(),
+      })
+      .eq('id', estim.id);
+    setSavingTransition(false);
+    if (e) {
+      toast.add({
+        title: 'No se pudo aprobar',
+        description: getSupabaseErrorMessage(e, 'Error al transicionar.'),
+        type: 'error',
+      });
+      return;
+    }
+    toast.add({ title: 'Estimación aprobada', type: 'success' });
+    setModal(null);
+    await refetchEstim();
+  }
+
+  /** Transición aprobada → facturada. Captura folio + URL + fecha. */
+  async function marcarFacturada(input: { folio: string; url: string; fecha: string }) {
+    if (!estim || savingTransition) return;
+    setSavingTransition(true);
+    const sb = createSupabaseBrowserClient();
+    const { error: e } = await sb
+      .schema('dilesa')
+      .from('estimaciones')
+      .update({
+        estado: 'facturada',
+        factura_folio: input.folio || null,
+        factura_url: input.url || null,
+        factura_fecha: input.fecha || null,
+      })
+      .eq('id', estim.id);
+    setSavingTransition(false);
+    if (e) {
+      toast.add({
+        title: 'No se pudo registrar la factura',
+        description: getSupabaseErrorMessage(e, 'Error al transicionar.'),
+        type: 'error',
+      });
+      return;
+    }
+    toast.add({ title: 'Factura registrada', type: 'success' });
+    setModal(null);
+    await refetchEstim();
+  }
+
+  /** Transición facturada → pagada. Captura referencia + fecha de pago.
+   *  Tras esto, las tareas vinculadas quedan locked (trigger SQL). */
+  async function marcarPagada(input: { referencia: string; fechaPago: string }) {
+    if (!estim || savingTransition) return;
+    setSavingTransition(true);
+    const sb = createSupabaseBrowserClient();
+    const { data: auth } = await sb.auth.getUser();
+    const pagadaAt = input.fechaPago
+      ? new Date(`${input.fechaPago}T12:00:00`).toISOString()
+      : new Date().toISOString();
+    const { error: e } = await sb
+      .schema('dilesa')
+      .from('estimaciones')
+      .update({
+        estado: 'pagada',
+        pagada_por_user_id: auth?.user?.id ?? null,
+        pagada_at: pagadaAt,
+        referencia_pago: input.referencia || null,
+      })
+      .eq('id', estim.id);
+    setSavingTransition(false);
+    if (e) {
+      toast.add({
+        title: 'No se pudo registrar el pago',
+        description: getSupabaseErrorMessage(e, 'Error al transicionar.'),
+        type: 'error',
+      });
+      return;
+    }
+    toast.add({ title: 'Estimación pagada · tareas locked', type: 'success' });
+    setModal(null);
+    await refetchEstim();
+  }
+
+  /** Transición borrador|aprobada → cancelada. Libera las tareas
+   *  borrando las filas de estimacion_tareas (CASCADE no aplica porque
+   *  estimaciones queda como cancelada, no eliminada). */
+  async function cancelar() {
+    if (!estim || savingTransition) return;
+    setSavingTransition(true);
+    const sb = createSupabaseBrowserClient();
+    // 1. Borrar las vinculaciones para liberar las tareas.
+    const { error: dErr } = await sb
+      .schema('dilesa')
+      .from('estimacion_tareas')
+      .delete()
+      .eq('estimacion_id', estim.id);
+    if (dErr) {
+      setSavingTransition(false);
+      toast.add({
+        title: 'No se pudieron liberar las tareas',
+        description: getSupabaseErrorMessage(dErr, 'Error al borrar vinculaciones.'),
+        type: 'error',
+      });
+      return;
+    }
+    // 2. Marcar estimación como cancelada + zero montos.
+    const { error: uErr } = await sb
+      .schema('dilesa')
+      .from('estimaciones')
+      .update({
+        estado: 'cancelada',
+        monto_bruto: 0,
+        retencion_monto: 0,
+        monto_neto: 0,
+      })
+      .eq('id', estim.id);
+    setSavingTransition(false);
+    if (uErr) {
+      toast.add({
+        title: 'No se pudo cancelar',
+        description: getSupabaseErrorMessage(uErr, 'Error al transicionar.'),
+        type: 'error',
+      });
+      return;
+    }
+    toast.add({
+      title: 'Estimación cancelada · tareas liberadas',
+      type: 'success',
+    });
+    setModal(null);
+    setEstTareas([]);
+    await refetchEstim();
+  }
 
   useEffect(() => {
     if (!id) return;
@@ -415,6 +595,16 @@ function DetailInner() {
         </div>
       </header>
 
+      {puedeEscribir ? (
+        <ActionBar
+          estado={estim.estado}
+          onAprobar={() => setModal('aprobar')}
+          onFacturar={() => setModal('facturar')}
+          onPagar={() => setModal('pagar')}
+          onCancelar={() => setModal('cancelar')}
+        />
+      ) : null}
+
       <Section title="Datos generales">
         <FichaGrid
           rows={[
@@ -504,6 +694,239 @@ function DetailInner() {
           </div>
         )}
       </Section>
+
+      {/* Modal de transiciones de estado. Solo se renderiza si hay modal activo. */}
+      {modal ? (
+        <TransitionModal
+          kind={modal}
+          codigo={estim.codigo}
+          montoBruto={estim.monto_bruto}
+          fechaPagoProgramado={estim.fecha_pago_programado}
+          saving={savingTransition}
+          onClose={() => (savingTransition ? null : setModal(null))}
+          onAprobar={aprobar}
+          onFacturar={marcarFacturada}
+          onPagar={marcarPagada}
+          onCancelar={cancelar}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ActionBar({
+  estado,
+  onAprobar,
+  onFacturar,
+  onPagar,
+  onCancelar,
+}: {
+  estado: string;
+  onAprobar: () => void;
+  onFacturar: () => void;
+  onPagar: () => void;
+  onCancelar: () => void;
+}) {
+  // Botones contextuales según estado actual. Estados terminales
+  // (pagada/cancelada) no tienen acciones.
+  const acciones: React.ReactNode[] = [];
+  if (estado === 'borrador') {
+    acciones.push(
+      <Button key="aprobar" onClick={onAprobar}>
+        <Check className="size-4" /> Aprobar
+      </Button>,
+      <Button key="cancelar" variant="outline" onClick={onCancelar}>
+        <X className="size-4" /> Cancelar
+      </Button>
+    );
+  } else if (estado === 'aprobada') {
+    acciones.push(
+      <Button key="facturar" onClick={onFacturar}>
+        <FileText className="size-4" /> Marcar factura recibida
+      </Button>,
+      <Button key="cancelar" variant="outline" onClick={onCancelar}>
+        <X className="size-4" /> Cancelar
+      </Button>
+    );
+  } else if (estado === 'facturada') {
+    acciones.push(
+      <Button key="pagar" onClick={onPagar}>
+        <Banknote className="size-4" /> Marcar pagada
+      </Button>
+    );
+  }
+
+  if (acciones.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] p-3">
+      <span className="text-xs uppercase tracking-wide text-[var(--text)]/50">Acciones:</span>
+      {acciones}
+    </div>
+  );
+}
+
+function TransitionModal({
+  kind,
+  codigo,
+  montoBruto,
+  fechaPagoProgramado,
+  saving,
+  onClose,
+  onAprobar,
+  onFacturar,
+  onPagar,
+  onCancelar,
+}: {
+  kind: NonNullable<ModalKind>;
+  codigo: string;
+  montoBruto: number;
+  fechaPagoProgramado: string;
+  saving: boolean;
+  onClose: () => void;
+  onAprobar: () => void | Promise<void>;
+  onFacturar: (input: { folio: string; url: string; fecha: string }) => void | Promise<void>;
+  onPagar: (input: { referencia: string; fechaPago: string }) => void | Promise<void>;
+  onCancelar: () => void | Promise<void>;
+}) {
+  // State local del modal según kind (formularios distintos).
+  const [folio, setFolio] = useState('');
+  const [url, setUrl] = useState('');
+  const [fechaFactura, setFechaFactura] = useState(new Date().toISOString().slice(0, 10));
+  const [referencia, setReferencia] = useState('');
+  const [fechaPago, setFechaPago] = useState(fechaPagoProgramado);
+
+  const titulo = (
+    {
+      aprobar: 'Aprobar estimación',
+      facturar: 'Registrar factura recibida',
+      pagar: 'Marcar como pagada',
+      cancelar: 'Cancelar estimación',
+    } as Record<NonNullable<ModalKind>, string>
+  )[kind];
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-lg border border-[var(--border)] bg-[var(--card)] p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-base font-semibold text-[var(--text)]">{titulo}</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="rounded-md p-1 text-[var(--text)]/50 hover:bg-[var(--bg)]/30 disabled:opacity-30"
+            aria-label="Cerrar"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <p className="mb-4 text-xs text-[var(--text)]/60">
+          {codigo} · {moneyFmt.format(montoBruto)} bruto
+        </p>
+
+        {kind === 'aprobar' ? (
+          <p className="mb-4 text-sm text-[var(--text)]/80">
+            Una vez aprobada, la estimación queda lista para que se reciba la factura del
+            contratista. (Sprint 5 enviará automáticamente PDF + email al aprobar.)
+          </p>
+        ) : null}
+
+        {kind === 'cancelar' ? (
+          <div className="mb-4 rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-300">
+            Al cancelar, las tareas vinculadas se liberan y vuelven a aparecer como pendientes de
+            pago. Esta acción no se puede deshacer.
+          </div>
+        ) : null}
+
+        {kind === 'facturar' ? (
+          <div className="mb-4 space-y-3">
+            <ModalField label="Folio de factura *">
+              <Input value={folio} onChange={(e) => setFolio(e.target.value)} required />
+            </ModalField>
+            <ModalField label="URL de la factura (opcional)">
+              <Input
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://…"
+              />
+            </ModalField>
+            <ModalField label="Fecha de la factura *">
+              <Input
+                type="date"
+                value={fechaFactura}
+                onChange={(e) => setFechaFactura(e.target.value)}
+                required
+              />
+            </ModalField>
+          </div>
+        ) : null}
+
+        {kind === 'pagar' ? (
+          <div className="mb-4 space-y-3">
+            <ModalField label="Referencia de pago *">
+              <Input
+                value={referencia}
+                onChange={(e) => setReferencia(e.target.value)}
+                placeholder="SPEI, transferencia, cheque…"
+                required
+              />
+            </ModalField>
+            <ModalField label="Fecha de pago *">
+              <Input
+                type="date"
+                value={fechaPago}
+                onChange={(e) => setFechaPago(e.target.value)}
+                required
+              />
+            </ModalField>
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-[11px] text-amber-700 dark:text-amber-300">
+              Una vez pagada, las tareas vinculadas quedan locked: nadie las puede des-palomear
+              excepto Dirección o admin.
+            </div>
+          </div>
+        ) : null}
+
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Cerrar
+          </Button>
+          <Button
+            onClick={() => {
+              if (kind === 'aprobar') void onAprobar();
+              else if (kind === 'facturar') void onFacturar({ folio, url, fecha: fechaFactura });
+              else if (kind === 'pagar') void onPagar({ referencia, fechaPago });
+              else if (kind === 'cancelar') void onCancelar();
+            }}
+            disabled={
+              saving ||
+              (kind === 'facturar' && (!folio.trim() || !fechaFactura)) ||
+              (kind === 'pagar' && (!referencia.trim() || !fechaPago))
+            }
+          >
+            {saving ? <Loader2 className="size-4 animate-spin" /> : null}
+            Confirmar
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModalField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--text)]/60">
+        {label}
+      </div>
+      {children}
     </div>
   );
 }

@@ -19,9 +19,11 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import { Banknote, RefreshCw, Search } from 'lucide-react';
+import { usePermissions } from '@/components/providers';
+import { Banknote, Plus, RefreshCw, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { DataTable, type Column } from '@/components/module-page';
@@ -65,6 +67,10 @@ const ESTADO_OPTIONS = ['borrador', 'aprobada', 'facturada', 'pagada', 'cancelad
 
 export function EstimacionesModule({ empresaId }: { empresaId: string }) {
   const router = useRouter();
+  const { permissions } = usePermissions();
+  const puedeCrear =
+    permissions.isAdmin ||
+    permissions.modulos.get('dilesa.construccion.estimaciones')?.write === true;
 
   const [estimaciones, setEstimaciones] = useState<EstimacionRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -329,6 +335,15 @@ export function EstimacionesModule({ empresaId }: { empresaId: string }) {
             </>
           ) : null}
         </span>
+        {puedeCrear ? (
+          <Link
+            href="/dilesa/construccion/estimaciones/nueva"
+            className="flex h-9 items-center gap-1.5 rounded-md bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Nueva estimación
+          </Link>
+        ) : null}
       </div>
 
       <DataTable
