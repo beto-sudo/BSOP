@@ -216,6 +216,11 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   // arranque siempre va dentro del contrato — el form combinado vive
   // bajo `.contratos`). El slug puede quedar en DB como vestigio.
   'dilesa.construccion.tareas',
+  // Sub-slug del módulo Estimaciones (iniciativa dilesa-estimaciones · Sprint 2).
+  // Gobierna acceso al 5° tab del hub Construcción (UI llega en Sprint 3).
+  // Control granular (quién aprueba/paga + override de lock para tareas
+  // pagadas) vive en código UI + trigger SQL `tg_ctt_lock_pagadas`.
+  'dilesa.construccion.estimaciones',
   // Sub-slugs por fase del pipeline (Sprint 7a captura por fase)
   'dilesa.ventas.fase01_solicitud',
   'dilesa.ventas.fase02_asignada',
