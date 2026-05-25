@@ -23,10 +23,11 @@
 --      a cada uno de los 3 sub-slugs nuevos. Patrón ADR-030 SS3 — sin esto,
 --      agregar los sub-slugs ESCONDE las tabs a no-admin users (canAccessModulo
 --      retorna false para slug ausente en permissions.modulos).
---   3. DELETE el slug top-level `dilesa.contratistas`. ON DELETE CASCADE en
---      core.permisos_rol y core.permisos_usuario_excepcion limpia las
---      referencias transitivamente. El submódulo nuevo
---      `dilesa.construccion.contratistas` toma su lugar.
+--   3. DELETE el slug top-level `dilesa.contratistas`. Como las FKs en
+--      core.permisos_rol y core.permisos_usuario_excepcion **NO tienen**
+--      ON DELETE CASCADE (ver pre_migration_bootstrap.sql), borramos las
+--      filas dependientes explícitamente antes de borrar el módulo. El
+--      submódulo nuevo `dilesa.construccion.contratistas` toma su lugar.
 --
 -- Idempotente: ON CONFLICT DO NOTHING en INSERTs; el DELETE es no-op si ya
 -- corrió (slug ausente). NOTIFY pgrst al final para refrescar la caché.
@@ -80,11 +81,28 @@ ON CONFLICT (rol_id, modulo_id) DO NOTHING;
 
 -- ── Deprecar slug top-level `dilesa.contratistas` ──────────────────────────
 -- Ahora vive como sub-slug `dilesa.construccion.contratistas` (clonado
--- arriba). ON DELETE CASCADE en las FKs hijas limpia las referencias en
--- core.permisos_rol y core.permisos_usuario_excepcion transitivamente.
+-- arriba). Las FKs en core.permisos_rol y core.permisos_usuario_excepcion
+-- NO tienen ON DELETE CASCADE, así que limpiamos las filas dependientes
+-- antes del DELETE del módulo. Idempotente: el WHERE no encuentra nada
+-- si la migración corrió antes (o si el slug nunca existió, como en una
+-- preview branch fresca).
+DELETE FROM core.permisos_rol
+WHERE modulo_id IN (
+  SELECT m.id FROM core.modulos m
+  JOIN core.empresas e ON e.id = m.empresa_id
+  WHERE m.slug = 'dilesa.contratistas' AND e.slug = 'dilesa'
+);
+
+DELETE FROM core.permisos_usuario_excepcion
+WHERE modulo_id IN (
+  SELECT m.id FROM core.modulos m
+  JOIN core.empresas e ON e.id = m.empresa_id
+  WHERE m.slug = 'dilesa.contratistas' AND e.slug = 'dilesa'
+);
+
 DELETE FROM core.modulos
 WHERE slug = 'dilesa.contratistas'
-  AND empresa_id = (SELECT id FROM core.empresas WHERE slug = 'dilesa');
+  AND empresa_id IN (SELECT id FROM core.empresas WHERE slug = 'dilesa');
 
 NOTIFY pgrst, 'reload schema';
 
