@@ -50,6 +50,11 @@ const TABS = [
     href: '/dilesa/construccion/prototipos',
     module: 'dilesa.construccion.prototipos',
   },
+  {
+    label: 'Estimaciones',
+    href: '/dilesa/construccion/estimaciones',
+    module: 'dilesa.construccion.estimaciones',
+  },
 ] as const;
 
 export default function ConstruccionLayout({ children }: { children: ReactNode }) {
