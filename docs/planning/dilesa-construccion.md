@@ -7,11 +7,12 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-24
-**Última actualización:** 2026-05-25 (Sprint 3 — UI lectura: 4 páginas
-nuevas /dilesa/construccion (lista + detalle) y /dilesa/contratistas
-(lista con KPIs + detalle con obras asignadas y contratos) + migración
-de RBAC + sync de 4 lugares (NAV_ITEMS, ROUTE_TO_MODULE,
-EXPECTED_DB_MODULE_SLUGS, core.modulos). Sprint 4 — captura — pendiente.)
+**Última actualización:** 2026-05-25 (Sprint 4 — UI captura: 3 sub-slugs
+RBAC `dilesa.construccion.arrancar/.tareas/.contratos` + migración con
+backfill defensivo + 3 forms de captura (arrancar / registrar tareas
+bulk / crear contrato N:M) + botones de entrada gated por permiso en
+las páginas existentes. Sprint 5 — integración con ventas + cierre —
+pendiente.)
 
 ## Problema
 
@@ -375,3 +376,116 @@ END $$ LANGUAGE plpgsql;
 **Sprint 4 — captura (pendiente):** forms "Arrancar construcción",
 "Registrar tarea terminada", "Crear contrato" + sub-slugs
 `dilesa.construccion.arrancar`, `.tareas`, `.contratos`.
+
+### 2026-05-25 — Sprint 4 (UI captura)
+
+**PR:** feat(dilesa): construcción Sprint 4 — UI captura
+(branch `feat/dilesa-construccion-sprint-4`)
+
+**Cambios:**
+
+- Migración `20260525024233_dilesa_construccion_subslugs_captura.sql` —
+  inserta los 3 sub-slugs de captura (`dilesa.construccion.arrancar`,
+  `.tareas`, `.contratos`) en `core.modulos` (seccion='operaciones')
+  con backfill defensivo de permisos: clona acceso del padre
+  `dilesa.construccion` a cada hijo, así cualquier rol que tenía write
+  sobre el módulo lectura conserva capacidad de captura sin
+  intervención manual. Idempotente vía ON CONFLICT DO NOTHING.
+  Sigue ADR-030 SS3 al pie de la letra.
+- RBAC sync 3-places (sin tocar sidebar — los forms se acceden desde
+  páginas padre, no aparecen como entries propias):
+  - `lib/permissions.ts` — 3 entries nuevas en `ROUTE_TO_MODULE`
+    mapeando cada URL de form a su sub-slug.
+  - `lib/permissions.test.ts` — los 3 sub-slugs nuevos en
+    `EXPECTED_DB_MODULE_SLUGS` (el test de drift bloquea CI si falta).
+- 3 forms de captura:
+  - `app/dilesa/construccion/arrancar/page.tsx` — selecciona proyecto
+    → unidad elegible (estado planeada/lote_urbanizado, sin obra
+    vigente) + prototipo + contratista + contrato opcional + supervisor
+    opcional + fechas. Auto-genera código tipo Coda
+    `<unidad>-<sufijo-prototipo>-<abrev-contratista>` con override
+    manual. Insert único: si hay carrera por el UNIQUE en
+    construccion.unidad_id, mensaje específico. Si se eligió contrato,
+    crea la ligadura en `contrato_lotes` (best-effort — no rompe la
+    obra si falla).
+  - `app/dilesa/construccion/[id]/registrar-tarea/page.tsx` — captura
+    MULTI-tarea (más frecuente del módulo). Muestra tareas pendientes
+    agrupadas por etapa con checkbox + fields condicionales (fecha,
+    MO pagada, revisor). "Marcar toda la etapa" para flujo masivo.
+    Defaults de sesión (fecha + revisor) propagados a todas las filas.
+    Bulk insert en `construccion_tareas_terminadas` — el trigger
+    recalcula avance UNA vez por insert pero todos sobre la misma
+    construccion (rápido). Releemos avance post-save para reportar en
+    el toast si cruzó 20% (unidad disponible) o 100% (terminada).
+  - `app/dilesa/construccion/contratos/nuevo/page.tsx` — selecciona
+    contratista → obras suyas SIN contrato vigente (excluyendo
+    canceladas), multi-select con marcar/limpiar todos. Filtro
+    opcional por proyecto. Auto-código tipo Coda
+    `<año>/N-DIE-<abrev>-CONTRATO#<seq>` con seq derivado del conteo
+    actual + override manual. Insert contrato + bulk insert
+    `contrato_lotes`. Soporta `?contratista=<id>` deep-link desde el
+    detalle del contratista.
+- Botones de entrada en páginas existentes (gated client-side por
+  `permissions.modulos.get(...).write`):
+  - `components/dilesa/construccion-module.tsx` (lista) — botón
+    "Arrancar construcción" en el header de filtros.
+  - `app/dilesa/construccion/[id]/page.tsx` (detalle obra) — botón
+    "Registrar tareas" en el header de la sección Avance por etapa
+    (solo si hay tareas en la plantilla).
+  - `app/dilesa/contratistas/[id]/page.tsx` (detalle contratista) —
+    botón "Crear contrato" en el header de la sección Contratos, con
+    deep-link al form pre-seleccionando contratista.
+
+**Decisiones tácticas:**
+
+- **UX multi-tarea (no form-por-tarea).** Construcción es captura de
+  alta frecuencia — un supervisor cierra 5-15 tareas por visita.
+  Forzar form-por-tarea con submit + redirect entre cada una se vuelve
+  doloroso rápido. Implementado como lista filtrada de pendientes con
+  checkbox + fields inline solo en las marcadas. Trade-off: el state
+  es un `Map<plantillaId, TareaForm>` que requiere effect para
+  re-aplicar defaults a filas existentes cuando cambia el default
+  global, pero el patrón mantiene la latencia de captura baja.
+- **Sin sidebar entry para sub-slugs.** Los 3 forms son acción
+  iniciada desde la página padre, no destino que el usuario busca por
+  el sidebar. NAV_ITEMS sólo declara `dilesa.construccion` y
+  `dilesa.contratistas` (umbrellas de lectura). Esto es lo que ADR-030
+  SS2 espera para sub-slugs que son "captura desde padre".
+- **Botones gated client-side via `usePermissions()`.** Mismo patrón
+  que `ventas-module.tsx` — el botón se oculta si el usuario no tiene
+  write sobre el sub-slug. RequireAccess en cada page proporciona el
+  segundo gate por si entran vía URL directa.
+- **UNIQUE strict en construccion.unidad_id.** El schema base puso
+  UNIQUE sin filtrar deleted_at, así que una unidad no puede tener
+  ni siquiera obra histórica soft-deleted más una nueva. El form
+  filtra elegibles excluyendo TODAS las obras (incluso deleted),
+  consistente con el constraint. Si emerge necesidad de "rearrancar"
+  obra cancelada, requiere migración (relajar constraint o hard-delete
+  la cancelada antes).
+- **Best-effort en operaciones secundarias.** Si el INSERT de
+  contrato_lotes falla después del INSERT de construccion (caso edge:
+  RLS bug, FK race), no revertimos — la obra ya existe, el toast
+  reporta el problema parcial y el operador puede asignar contrato
+  desde el detalle después. Mismo patrón que `marcar-fase.ts` con
+  los adjuntos.
+- **Auto-código con override.** Replica el naming de Coda
+  (`M13-L1-LDS-RMA-MAYA`) para mantener continuidad operativa pero
+  permite override por si el operador quiere otra convención. El
+  helper que arma el sugerido depende de los 3 inputs
+  (unidad/prototipo/contratista) — se vuelve a calcular en cada
+  cambio sin extra round-trip.
+- **Pre-selección por `?contratista=` con suspense correcto.** El
+  form de contratos usa useSearchParams (deep-link desde detalle de
+  contratista), así que el body va dentro de RequireAccess — durante
+  prerender estático RequireAccess está en loading state y los
+  hooks dinámicos no corren (regla SS6 de ADR-030).
+
+**Pendiente verificar Beto:**
+
+- Aplicar la migración a prod (`supabase db push` bloqueado por
+  classifier en sesiones autónomas — Beto la corre).
+- Verificación visual en preview de los 3 forms + flujo completo:
+  arrancar → registrar tareas hasta cruzar 20% → ver unidad pasar a
+  en_construccion → form de venta nueva mostrar el prototipo.
+- Spot-check: crear un contrato con 2-3 lotes desde el detalle de un
+  contratista existente.

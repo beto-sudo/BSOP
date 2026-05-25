@@ -26,9 +26,10 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Circle, HardHat } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ChevronRight, Circle, HardHat, Plus } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { usePermissions } from '@/components/providers';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -157,6 +158,9 @@ export default function ConstruccionDetailPage() {
 function DetailInner() {
   const params = useParams<{ id: string }>();
   const id = params.id;
+  const { permissions } = usePermissions();
+  const puedeRegistrarTareas =
+    permissions.isAdmin || permissions.modulos.get('dilesa.construccion.tareas')?.write === true;
 
   const [obra, setObra] = useState<Construccion | null>(null);
   const [unidad, setUnidad] = useState<UnidadInfo | null>(null);
@@ -566,6 +570,17 @@ function DetailInner() {
             ? 'sin plantilla'
             : `${etapasConTareas.length} ${etapasConTareas.length === 1 ? 'etapa' : 'etapas'} · ${terminadas.length} ${terminadas.length === 1 ? 'tarea' : 'tareas'} terminadas`
         }
+        action={
+          puedeRegistrarTareas && etapasConTareas.length > 0 ? (
+            <Link
+              href={`/dilesa/construccion/${obra.id}/registrar-tarea`}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[var(--accent)] px-3 text-xs font-medium text-white hover:opacity-90"
+            >
+              <Plus className="h-3 w-3" />
+              Registrar tareas
+            </Link>
+          ) : null
+        }
       >
         {etapasConTareas.length === 0 ? (
           <p className="text-sm text-[var(--text)]/60">
@@ -737,19 +752,26 @@ function EtapaBlock({
 function Section({
   title,
   description,
+  action,
   children,
 }: {
   title: string;
   description?: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <section className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-5">
       <div className="mb-4 flex items-baseline justify-between gap-3">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
-          {title}
-        </h2>
-        {description ? <span className="text-xs text-[var(--text)]/50">{description}</span> : null}
+        <div className="flex items-baseline gap-3">
+          <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
+            {title}
+          </h2>
+          {description ? (
+            <span className="text-xs text-[var(--text)]/50">{description}</span>
+          ) : null}
+        </div>
+        {action ? <div className="shrink-0">{action}</div> : null}
       </div>
       {children}
     </section>
