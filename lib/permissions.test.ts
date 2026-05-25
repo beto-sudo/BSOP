@@ -186,15 +186,25 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   'dilesa.inventario',
   'dilesa.ventas',
   'dilesa.construccion',
-  'dilesa.contratistas',
+  // Sub-slugs del hub Construcción (sprint tabs+protos, ADR-030). El padre
+  // `dilesa.construccion` queda como umbrella en sidebar; cada tab
+  // (Obras/Contratos/Contratistas/Prototipos) tiene su sub-slug que
+  // gobierna acceso real al contenido. Ver migración
+  // 20260525152711_dilesa_construccion_tabs_hub.sql.
+  // El slug top-level `dilesa.contratistas` fue deprecado y eliminado por
+  // la misma migración — vive ahora como sub-slug del hub.
+  'dilesa.construccion.obras',
+  'dilesa.construccion.contratos',
+  'dilesa.construccion.contratistas',
+  'dilesa.construccion.prototipos',
   // Sub-slugs de captura del módulo construcción (Sprint 4 dilesa-construccion).
-  // El padre `dilesa.construccion` es umbrella (sidebar + lectura); estos
-  // hijos gobiernan acceso a los forms de captura. Ver ADR-030.
+  // `.tareas` gobierna el form de "Registrar tareas terminadas". `.contratos`
+  // sirve doble propósito: form de captura (Sprint 4) + lista/detalle del
+  // tab Contratos (sprint tabs+protos).
   // Nota: `dilesa.construccion.arrancar` se deprecó post-refactor (un
   // arranque siempre va dentro del contrato — el form combinado vive
   // bajo `.contratos`). El slug puede quedar en DB como vestigio.
   'dilesa.construccion.tareas',
-  'dilesa.construccion.contratos',
   // Sub-slugs por fase del pipeline (Sprint 7a captura por fase)
   'dilesa.ventas.fase01_solicitud',
   'dilesa.ventas.fase02_asignada',

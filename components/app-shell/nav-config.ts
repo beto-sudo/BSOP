@@ -75,8 +75,10 @@ export const NAV_ITEMS: NavItem[] = [
           { label: 'Proyectos', href: '/dilesa/proyectos' },
           { label: 'Inventario', href: '/dilesa/inventario' },
           { label: 'Ventas', href: '/dilesa/ventas' },
+          // Construcción ahora es un hub con 4 tabs (Obras / Contratos /
+          // Contratistas / Prototipos) — el sidebar muestra solo la entry
+          // del padre; las tabs viven en el layout (sprint tabs+protos).
           { label: 'Construcción', href: '/dilesa/construccion' },
-          { label: 'Contratistas', href: '/dilesa/contratistas' },
         ],
       },
     ],

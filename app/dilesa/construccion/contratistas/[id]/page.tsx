@@ -115,12 +115,12 @@ const ESTADO_LABEL: Record<string, string> = {
 };
 
 /**
- * @module Contratista detail (DILESA)
+ * @module Construcción · Contratista detail (DILESA)
  * @responsive desktop-only
  */
 export default function ContratistaDetailPage() {
   return (
-    <RequireAccess empresa="dilesa" modulo="dilesa.contratistas">
+    <RequireAccess empresa="dilesa" modulo="dilesa.construccion.contratistas">
       <DetailInner />
     </RequireAccess>
   );
@@ -514,7 +514,7 @@ function DetailInner() {
 function BackLink() {
   return (
     <Link
-      href="/dilesa/contratistas"
+      href="/dilesa/construccion/contratistas"
       className="inline-flex items-center gap-1.5 text-sm text-[var(--text)]/60 hover:text-[var(--text)]"
     >
       <ArrowLeft className="size-4" /> Volver a contratistas

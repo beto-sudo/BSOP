@@ -149,7 +149,7 @@ function avanceColorClass(pct: number): string {
  */
 export default function ConstruccionDetailPage() {
   return (
-    <RequireAccess empresa="dilesa" modulo="dilesa.construccion">
+    <RequireAccess empresa="dilesa" modulo="dilesa.construccion.obras">
       <DetailInner />
     </RequireAccess>
   );

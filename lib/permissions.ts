@@ -37,8 +37,13 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   '/dilesa/proyectos': 'dilesa.proyectos',
   '/dilesa/inventario': 'dilesa.inventario',
   '/dilesa/ventas': 'dilesa.ventas',
-  '/dilesa/construccion': 'dilesa.construccion',
-  '/dilesa/contratistas': 'dilesa.contratistas',
+  // Construcción es un hub con 4 tabs (sprint tabs+protos). El padre
+  // `dilesa.construccion` queda como umbrella; cada tab tiene su sub-slug
+  // (ADR-030 SS2). La URL default mapea al sub-slug del primer tab.
+  '/dilesa/construccion': 'dilesa.construccion.obras',
+  '/dilesa/construccion/contratos': 'dilesa.construccion.contratos',
+  '/dilesa/construccion/contratistas': 'dilesa.construccion.contratistas',
+  '/dilesa/construccion/prototipos': 'dilesa.construccion.prototipos',
   // Captura por fase — sub-slugs ADR-030. Cada URL apunta al sub-slug que
   // gobierna acceso a esa fase. Ver docs/planning/dilesa-ventas-captura.md.
   '/dilesa/ventas/nueva': 'dilesa.ventas.fase01_solicitud',

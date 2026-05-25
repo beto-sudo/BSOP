@@ -554,7 +554,7 @@ function NuevoContratoForm() {
         });
       }
 
-      router.push(`/dilesa/contratistas/${contratistaId}`);
+      router.push(`/dilesa/construccion/contratistas/${contratistaId}`);
     } catch (e) {
       toast.add({
         title: 'Error al crear contrato',
@@ -813,7 +813,11 @@ function NuevoContratoForm() {
         </p>
         <div className="flex items-center gap-3">
           <Link
-            href={contratistaId ? `/dilesa/contratistas/${contratistaId}` : '/dilesa/contratistas'}
+            href={
+              contratistaId
+                ? `/dilesa/construccion/contratistas/${contratistaId}`
+                : '/dilesa/construccion/contratistas'
+            }
           >
             <Button variant="outline" disabled={submitting}>
               Cancelar
