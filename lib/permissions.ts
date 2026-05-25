@@ -43,6 +43,13 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   // gobierna acceso a esa fase. Ver docs/planning/dilesa-ventas-captura.md.
   '/dilesa/ventas/nueva': 'dilesa.ventas.fase01_solicitud',
   '/dilesa/ventas/[id]/capturar/3-formalizada': 'dilesa.ventas.fase03_formalizada',
+  // Construcción — captura (sub-slugs ADR-030 — Sprint 4).
+  // Ver docs/planning/dilesa-construccion.md "Sprint 4 — UI captura".
+  // El sub-slug `dilesa.construccion.arrancar` quedó deprecado post-refactor
+  // (un arranque siempre va dentro del contrato — el form combinado vive en
+  // /contratos/nuevo). El slug en DB queda como vestigio inofensivo.
+  '/dilesa/construccion/[id]/registrar-tarea': 'dilesa.construccion.tareas',
+  '/dilesa/construccion/contratos/nuevo': 'dilesa.construccion.contratos',
 
   // RDB — home + operaciones
   '/rdb/home': 'rdb.home',

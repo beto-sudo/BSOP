@@ -23,13 +23,15 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { usePermissions } from '@/components/providers';
 import { DataTable, type Column } from '@/components/module-page';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { HardHat, RefreshCw, Search } from 'lucide-react';
+import { HardHat, Plus, RefreshCw, Search } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 
 type ConstruccionRow = {
@@ -104,6 +106,13 @@ function AvanceBar({ pct }: { pct: number }) {
 
 export function ConstruccionModule({ empresaId }: { empresaId: string }) {
   const router = useRouter();
+  const { permissions } = usePermissions();
+  // Post-refactor: arrancar una construcción siempre va dentro de un
+  // contrato (form combinado en /contratos/nuevo). El permiso que gatea
+  // ese botón es por tanto `dilesa.construccion.contratos`, no `.arrancar`
+  // (ese sub-slug quedó deprecado — ver lib/permissions.ts).
+  const puedeArrancar =
+    permissions.isAdmin || permissions.modulos.get('dilesa.construccion.contratos')?.write === true;
   const [obras, setObras] = useState<ConstruccionListaRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -423,6 +432,15 @@ export function ConstruccionModule({ empresaId }: { empresaId: string }) {
         <span className="ml-auto text-sm text-[var(--text)]/60">
           {filtrados.length} de {obras.length} obras
         </span>
+        {puedeArrancar ? (
+          <Link
+            href="/dilesa/construccion/contratos/nuevo"
+            className="flex h-9 items-center gap-1.5 rounded-md bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Nuevo contrato + arranques
+          </Link>
+        ) : null}
       </div>
 
       <DataTable
