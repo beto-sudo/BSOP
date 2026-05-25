@@ -282,7 +282,8 @@ function DetailInner() {
         .sort((a, b) => a.nombre.localeCompare(b.nombre));
       const pctEtapa = items.reduce((s, it) => s + it.pctDisplay, 0);
       const costoEtapa = items.reduce((s, it) => s + (it.costoMoTarea ?? 0), 0);
-      return { ...et, items, pctEtapa, costoEtapa };
+      const tiempoEtapa = items.reduce((s, it) => s + it.tiempoDias, 0);
+      return { ...et, items, pctEtapa, costoEtapa, tiempoEtapa };
     });
     return rows.filter((r) => r.items.length > 0);
   }, [etapas, plantilla, tareasCat, totalMo]);
@@ -295,6 +296,13 @@ function DetailInner() {
   );
   const totalCostoSum = useMemo(
     () => etapasConTareas.reduce((s, et) => s + et.costoEtapa, 0),
+    [etapasConTareas]
+  );
+  // Días totales = suma de los días de cada tarea de la plantilla.
+  // Asunción: tareas secuenciales (como en Coda). Si en el futuro hay
+  // paralelismo, esto deja de ser el plazo real y pasa a ser el esfuerzo.
+  const totalTiempoDias = useMemo(
+    () => etapasConTareas.reduce((s, et) => s + et.tiempoEtapa, 0),
     [etapasConTareas]
   );
 
@@ -346,7 +354,14 @@ function DetailInner() {
       ['Prototipo', producto.nombre],
       ['Proyecto', proyectoNombre],
       ['m² de construcción', m2 != null ? `${m2.toFixed(2)} m²` : null],
-      ['Días de construcción', tiempo != null ? `${tiempo} días` : null],
+      [
+        'Días totales (plantilla)',
+        totalTiempoDias > 0
+          ? `${totalTiempoDias.toFixed(1)} días${tiempo != null && Math.abs(tiempo - totalTiempoDias) > 0.5 ? ` · referencia Coda: ${tiempo}` : ''}`
+          : tiempo != null
+            ? `${tiempo} días (referencia)`
+            : null,
+      ],
       ['Costo de materiales', fmtMoney(costoMateriales)],
       [
         'Costo materiales por m²',
@@ -491,7 +506,9 @@ function DetailInner() {
                     <td className="px-2 py-2 text-right tabular-nums">
                       {totalMo != null ? moneyFmt.format(totalCostoSum) : '—'}
                     </td>
-                    <td className="px-2 py-2 text-right" />
+                    <td className="px-2 py-2 text-right tabular-nums">
+                      {totalTiempoDias > 0 ? totalTiempoDias.toFixed(1) : '—'}
+                    </td>
                   </tr>
                 </tfoot>
               </table>

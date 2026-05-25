@@ -72,6 +72,7 @@ type Plantilla = {
   tarea_id: string;
   etapa_id: string;
   porcentaje_costo: number;
+  tiempo_dias: number | null;
 };
 type Terminada = {
   id: string;
@@ -80,6 +81,7 @@ type Terminada = {
   revisado_por_persona_id: string | null;
   mano_obra_pagada: number | null;
   fecha_pagada: string | null;
+  tiempo_real_dias: number | null;
 };
 type ContratoLote = {
   id: string;
@@ -289,7 +291,7 @@ function DetailInner() {
         sb
           .schema('dilesa')
           .from('plantilla_tareas')
-          .select('id, tarea_id, etapa_id, porcentaje_costo')
+          .select('id, tarea_id, etapa_id, porcentaje_costo, tiempo_dias')
           .eq('producto_id', obraRow.producto_id)
           .is('deleted_at', null),
         sb
@@ -303,7 +305,7 @@ function DetailInner() {
           .schema('dilesa')
           .from('construccion_tareas_terminadas')
           .select(
-            'id, plantilla_tarea_id, fecha_terminada, revisado_por_persona_id, mano_obra_pagada, fecha_pagada'
+            'id, plantilla_tarea_id, fecha_terminada, revisado_por_persona_id, mano_obra_pagada, fecha_pagada, tiempo_real_dias'
           )
           .eq('construccion_id', obraRow.id)
           .is('deleted_at', null)
@@ -437,6 +439,30 @@ function DetailInner() {
     return obra.valor_contrato_mo - obra.mo_ejecutado;
   }, [obra]);
 
+  /** Días estimados = suma del `tiempo_dias` de toda la plantilla del prototipo.
+   *  Asunción: tareas secuenciales (como en Coda). Si en el futuro hay
+   *  paralelismo, esto se convierte en esfuerzo total, no en plazo. */
+  const totalDiasEstimado = useMemo(
+    () => plantilla.reduce((s, p) => s + Number(p.tiempo_dias ?? 0), 0),
+    [plantilla]
+  );
+
+  /** Suma de días reales reportados en las tareas ya terminadas. */
+  const diasRealesAcumulados = useMemo(
+    () => terminadas.reduce((s, t) => s + Number(t.tiempo_real_dias ?? 0), 0),
+    [terminadas]
+  );
+
+  /** Fecha estimada de terminación = fecha_arranque + ceil(totalDiasEstimado).
+   *  Usamos días corridos (Coda no separa hábiles/feriados). */
+  const fechaArranque = obra?.fecha_arranque ?? null;
+  const fechaEstimadaTerminacion = useMemo(() => {
+    if (!fechaArranque || totalDiasEstimado <= 0) return null;
+    const base = new Date(`${fechaArranque}T12:00:00`);
+    base.setDate(base.getDate() + Math.ceil(totalDiasEstimado));
+    return base.toISOString().slice(0, 10);
+  }, [fechaArranque, totalDiasEstimado]);
+
   if (loading) {
     return (
       <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
@@ -480,8 +506,17 @@ function DetailInner() {
       ],
       ['Supervisor', supervisorNombre],
       ['Fecha de arranque', fmtFecha(obra.fecha_arranque)],
+      [
+        'Días estimados (plantilla)',
+        totalDiasEstimado > 0 ? `${totalDiasEstimado.toFixed(1)} días` : null,
+      ],
+      ['Fecha estimada terminación', fmtFecha(fechaEstimadaTerminacion)],
       ['Compromiso de terminar', fmtFecha(obra.fecha_compromiso_terminar)],
       ['Fecha terminada', fmtFecha(obra.fecha_terminada)],
+      [
+        'Días reales (acumulados)',
+        diasRealesAcumulados > 0 ? `${diasRealesAcumulados.toFixed(1)} días` : null,
+      ],
       ['Fecha DTU', fmtFecha(obra.fecha_dtu)],
       ['Fecha seguro calidad', fmtFecha(obra.fecha_seguro_calidad)],
       ['Fecha extracción', fmtFecha(obra.fecha_extraccion)],

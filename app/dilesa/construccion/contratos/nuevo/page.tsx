@@ -338,14 +338,22 @@ function NuevoContratoForm() {
 
   const precioMoNum = Number(precioMoM2) || 0;
 
-  /** Detalle por fila: m² del prototipo + valor MO del lote = precio × m². */
+  /** Detalle por fila: m² del prototipo + valor MO del lote = precio × m².
+   *  `error` se popula cuando hay un problema bloqueante de la fila (ej. el
+   *  prototipo elegido no tiene `m2_construccion` capturado). Sin esto, el
+   *  submit producía silent-skip y el toast quedaba con "ningún lote pudo
+   *  arrancarse" sin descripción — debug brutal. */
   const lotesConDetalle = useMemo(() => {
     return lotes.map((l) => {
       const unidad = unidades.find((u) => u.id === l.unidadId) ?? null;
       const producto = productos.find((p) => p.id === l.productoId) ?? null;
       const m2 = producto?.m2_construccion ?? null;
       const valorMo = m2 != null && precioMoNum > 0 ? precioMoNum * m2 : null;
-      return { row: l, unidad, producto, m2, valorMo };
+      let error: string | null = null;
+      if (producto && m2 == null) {
+        error = `${producto.nombre} no tiene m² capturado — abre el prototipo y captúralo antes de arrancar.`;
+      }
+      return { row: l, unidad, producto, m2, valorMo, error };
     });
   }, [lotes, unidades, productos, precioMoNum]);
 
@@ -368,9 +376,14 @@ function NuevoContratoForm() {
 
   const codigoFinal = codigoOverride.trim() || codigoSugerido;
 
+  /** Una fila es válida cuando tiene todos los campos requeridos Y no tiene
+   *  errores derivados (ej. m² del prototipo). */
   const lotesValidos = useMemo(
-    () => lotes.filter((l) => l.unidadId && l.productoId && l.fechaArranque),
-    [lotes]
+    () =>
+      lotesConDetalle.filter(
+        (d) => d.row.unidadId && d.row.productoId && d.row.fechaArranque && d.error === null
+      ),
+    [lotesConDetalle]
   );
 
   const canSubmit = useMemo(
@@ -460,8 +473,19 @@ function NuevoContratoForm() {
       const fallas: Array<{ identificador: string; mensaje: string }> = [];
 
       for (const detalle of lotesConDetalle) {
-        const { row, unidad, producto, m2, valorMo } = detalle;
-        if (!unidad || !producto || m2 == null || valorMo == null) continue;
+        const { row, unidad, producto, m2, valorMo, error } = detalle;
+        // Defensa: canSubmit ya bloquea filas con error/missing, pero por si
+        // alguna se cuela (race condition al editar mientras submit), la
+        // marcamos como falla en lugar de silent skip.
+        if (!unidad || !producto || m2 == null || valorMo == null) {
+          if (unidad) {
+            fallas.push({
+              identificador: unidad.identificador,
+              mensaje: error ?? 'Faltan datos del prototipo (m² o precio).',
+            });
+          }
+          continue;
+        }
 
         // Código de obra estilo Coda: <identificador>-<sufijo prototipo>-<abrev contratista>
         const protoSufijo = producto.nombre.split('-').pop() ?? producto.nombre;
@@ -711,12 +735,14 @@ function NuevoContratoForm() {
               <div className="col-span-1" />
             </div>
             {lotesConDetalle.map((detalle, idx) => {
-              const { row, m2, valorMo } = detalle;
+              const { row, m2, valorMo, error } = detalle;
               const elegibles = unidadesElegiblesParaRow(row.key);
               return (
                 <div
                   key={row.key}
-                  className="grid grid-cols-1 items-start gap-2 rounded-md border border-[var(--border)]/60 bg-[var(--card)] p-2 sm:grid-cols-12"
+                  className={`grid grid-cols-1 items-start gap-2 rounded-md border bg-[var(--card)] p-2 sm:grid-cols-12 ${
+                    error ? 'border-destructive/60' : 'border-[var(--border)]/60'
+                  }`}
                 >
                   <div className="sm:col-span-4">
                     <select
@@ -744,7 +770,7 @@ function NuevoContratoForm() {
                       {productosDelProyecto.map((p) => (
                         <option key={p.id} value={p.id}>
                           {p.nombre}
-                          {p.m2_construccion ? ` · ${p.m2_construccion}m²` : ''}
+                          {p.m2_construccion ? ` · ${p.m2_construccion}m²` : ' · ⚠ falta m²'}
                         </option>
                       ))}
                     </select>
@@ -778,6 +804,9 @@ function NuevoContratoForm() {
                       <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
+                  {error ? (
+                    <div className="text-xs text-destructive sm:col-span-12">{error}</div>
+                  ) : null}
                 </div>
               );
             })}
