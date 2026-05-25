@@ -37,6 +37,8 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   '/dilesa/proyectos': 'dilesa.proyectos',
   '/dilesa/inventario': 'dilesa.inventario',
   '/dilesa/ventas': 'dilesa.ventas',
+  '/dilesa/construccion': 'dilesa.construccion',
+  '/dilesa/contratistas': 'dilesa.contratistas',
   // Captura por fase — sub-slugs ADR-030. Cada URL apunta al sub-slug que
   // gobierna acceso a esa fase. Ver docs/planning/dilesa-ventas-captura.md.
   '/dilesa/ventas/nueva': 'dilesa.ventas.fase01_solicitud',

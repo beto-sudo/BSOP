@@ -185,6 +185,8 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   'dilesa.proyectos',
   'dilesa.inventario',
   'dilesa.ventas',
+  'dilesa.construccion',
+  'dilesa.contratistas',
   // Sub-slugs por fase del pipeline (Sprint 7a captura por fase)
   'dilesa.ventas.fase01_solicitud',
   'dilesa.ventas.fase02_asignada',

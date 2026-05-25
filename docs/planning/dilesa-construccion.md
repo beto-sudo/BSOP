@@ -7,15 +7,11 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-24
-**Última actualización:** 2026-05-24 (promovida tras explorar las 8
-tablas de Construcción en Coda DILESA: Prototipos, Contratistas,
-Etapas, Tareas, Plantilla Tareas por Prototipo, Contrato de
-Construcción, Construcción por Lote, Tareas Terminadas. Decisiones
-cerradas con Beto: contratistas en `erp.personas` + satélite ·
-avance% derivado de `SUM(plantilla_tareas.porcentaje_costo)` ·
-umbral 20% → trigger SQL que setea `unidades.estado='en_construccion'` +
-`producto_id` · importar TODO el histórico de Coda · planos en JSONB
-en `productos.planos`).
+**Última actualización:** 2026-05-25 (Sprint 3 — UI lectura: 4 páginas
+nuevas /dilesa/construccion (lista + detalle) y /dilesa/contratistas
+(lista con KPIs + detalle con obras asignadas y contratos) + migración
+de RBAC + sync de 4 lugares (NAV_ITEMS, ROUTE_TO_MODULE,
+EXPECTED_DB_MODULE_SLUGS, core.modulos). Sprint 4 — captura — pendiente.)
 
 ## Problema
 
@@ -308,3 +304,74 @@ END $$ LANGUAGE plpgsql;
 ## Bitácora
 
 (append-only, escrito por Claude Code al ejecutar)
+
+### 2026-05-25 — Sprint 3 (UI lectura)
+
+**PR:** feat(dilesa): construcción Sprint 3 — UI lectura
+(branch `feat/dilesa-construccion-sprint-3`)
+
+**Cambios:**
+
+- Migración `20260525020000_dilesa_construccion_modulos.sql` —
+  registra `dilesa.construccion` y `dilesa.contratistas` en
+  `core.modulos` (seccion='operaciones') + backfill defensivo de
+  permisos read+write para cada rol existente en DILESA. Idempotente.
+- RBAC 4-places sync:
+  - `components/app-shell/nav-config.ts` — entries Construcción +
+    Contratistas en grupo Inmobiliario de DILESA.
+  - `lib/permissions.ts` — entries `'/dilesa/construccion'` y
+    `'/dilesa/contratistas'` en `ROUTE_TO_MODULE`.
+  - `lib/permissions.test.ts` — slugs nuevos en
+    `EXPECTED_DB_MODULE_SLUGS`.
+- 4 páginas nuevas:
+  - `app/dilesa/construccion/page.tsx` + `components/dilesa/construccion-module.tsx`
+    — lista filtrable (proyecto, contratista, estado, rango de avance,
+    búsqueda) con barra de avance visual coloreada (rojo <20, ámbar
+    20-66, verde ≥66) y orden default por identificador.
+  - `app/dilesa/construccion/[id]/page.tsx` — detalle con 4 secciones
+    (Datos generales, MO, Avance por etapa colapsable, Contratos).
+    Etapa colapsable agrupa las tareas de la plantilla del prototipo
+    con flag terminada/pendiente, fecha terminada, revisor, MO pagada.
+  - `app/dilesa/contratistas/page.tsx` + `components/dilesa/contratistas-module.tsx`
+    — lista con KPIs derivados client-side (obras en curso/terminadas,
+    MO ejecutado total) y filtros PF/PM, REPSE, activo/inactivo.
+  - `app/dilesa/contratistas/[id]/page.tsx` — detalle con 4 secciones
+    (Datos generales, KPIs strip, Obras asignadas con barras de avance
+    - link, Contratos con # lotes cubiertos).
+
+**Decisiones tácticas:**
+
+- **Barra de avance inline (no componente Progress canónico)** — no
+  hay `components/ui/progress.tsx` en el repo todavía. Implementado
+  como `div` con width % escalado y color según umbral (consistente
+  con el umbral 20% del trigger). Cuando aparezca un Progress base
+  podemos refactorizar todas las barras (lista, detalle, drawer) a
+  uno solo.
+- **KPIs de contratistas calculados client-side** — Sprint 3 no
+  introduce vistas SQL para KPIs porque las cardinalidades son chicas
+  (~23 contratistas × ~1,372 obras). Si en Sprint 4 los filtros se
+  vuelven más complejos o aparece "MO pendiente este mes" lo movemos
+  a `v_contratista_kpis`.
+- **Lookups en memoria + `.eq(empresa_id)`** — mismo patrón que
+  `ventas-module.tsx`. Evita `.in(uuids[])` con > 200 IDs (que
+  rebasaría 8KB URL en Cloudflare) y embeds de PostgREST que rompen
+  cuando la tabla embebida existe en > 1 schema (caso `proyectos`
+  en `dilesa` y `erp`).
+- **Etapas filtradas a las que tienen tareas en la plantilla** del
+  prototipo asignado a la obra (no mostrar etapas vacías para evitar
+  ruido).
+- **Cancelada NO suma como obra ni en KPIs de MO** — KPI "obras
+  terminadas" cuenta solo `terminada/dtu/seguro_calidad/extraida`.
+  Las canceladas se muestran aparte en el strip del contratista
+  como referencia histórica con apariencia muted.
+
+**Pendiente verificar Beto:**
+
+- Aplicar la migración a prod (`supabase db push` está bloqueado por
+  el classifier en sesiones autónomas — Beto la corre manualmente).
+- Verificación visual en preview (las 4 páginas + barras de avance +
+  flujo de click row → detail).
+
+**Sprint 4 — captura (pendiente):** forms "Arrancar construcción",
+"Registrar tarea terminada", "Crear contrato" + sub-slugs
+`dilesa.construccion.arrancar`, `.tareas`, `.contratos`.
