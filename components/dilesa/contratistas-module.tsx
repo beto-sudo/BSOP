@@ -6,7 +6,7 @@
  * Iniciativa dilesa-construccion · Sprint 3 (UI lectura). Lista de los
  * contratistas registrados (~23 en Sprint 2) con KPIs calculados en
  * memoria a partir de `dilesa.construccion`: obras en curso, obras
- * terminadas, MO ejecutado total. Click → /dilesa/contratistas/[id].
+ * terminadas, MO ejecutado total. Click → /dilesa/construccion/contratistas/[id].
  *
  * Modelo (ADR-032 D2): los contratistas viven en `erp.personas` con
  * `tipo='contratista'`. Datos específicos de DILESA (REPSE, retención,
@@ -284,7 +284,7 @@ export function ContratistasModule({ empresaId }: { empresaId: string }) {
   ];
 
   const onRowClick = (c: ContratistaRow) => {
-    router.push(`/dilesa/contratistas/${c.persona_id}`);
+    router.push(`/dilesa/construccion/contratistas/${c.persona_id}`);
   };
 
   return (

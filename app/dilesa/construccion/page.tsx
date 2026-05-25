@@ -6,21 +6,22 @@ import { ConstruccionModule } from '@/components/dilesa/construccion-module';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 
 /**
- * @module Construcción (DILESA)
+ * @module Construcción · Obras (DILESA)
  * @responsive desktop-only
  *
- * Iniciativa dilesa-construccion · Sprint 3 (UI lectura). Lista de
+ * Default landing del hub Construcción (sprint tabs+protos). Lista de
  * construcciones por obra (~1,372 obras importadas en Sprint 2):
  * unidad, prototipo, contratista, avance%, estado, fechas críticas.
  * Click navega a /dilesa/construccion/[id] con la ficha completa,
  * timeline de etapas y tareas terminadas/pendientes.
  *
- * Lectura pura — captura (arrancar obra, registrar tarea) entra en
- * Sprint 4. Sub-slugs de escritura se introducirán en esa fase.
+ * Gate: sub-slug `dilesa.construccion.obras` (ADR-030 SS5). El padre
+ * `dilesa.construccion` queda como umbrella en sidebar; el sub-slug
+ * gobierna el contenido real de esta tab.
  */
 export default function Page() {
   return (
-    <RequireAccess empresa="dilesa" modulo="dilesa.construccion">
+    <RequireAccess empresa="dilesa" modulo="dilesa.construccion.obras">
       <DesktopOnlyNotice module="Construcción" />
       <div className="hidden sm:block">
         <ConstruccionModule empresaId={DILESA_EMPRESA_ID} />
