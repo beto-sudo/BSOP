@@ -183,8 +183,19 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   'dilesa.proveedores',
   'dilesa.portafolio',
   'dilesa.proyectos',
-  'dilesa.inventario',
   'dilesa.ventas',
+  // Sub-slugs del hub Ventas (sprint tabs-hub, ADR-030). El padre
+  // `dilesa.ventas` queda como umbrella en sidebar; cada tab (Ventas /
+  // Inventario / Fases / Clientes / Vendedores) tiene su sub-slug que
+  // gobierna acceso real al contenido. Ver migración
+  // 20260525112633_dilesa_ventas_tabs_hub.sql.
+  // El slug top-level `dilesa.inventario` fue deprecado y eliminado por
+  // la misma migración — vive ahora como sub-slug del hub.
+  'dilesa.ventas.lista',
+  'dilesa.ventas.inventario',
+  'dilesa.ventas.fases',
+  'dilesa.ventas.clientes',
+  'dilesa.ventas.vendedores',
   'dilesa.construccion',
   // Sub-slugs del hub Construcción (sprint tabs+protos, ADR-030). El padre
   // `dilesa.construccion` queda como umbrella en sidebar; cada tab
