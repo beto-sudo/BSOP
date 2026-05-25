@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { RequireAccess } from '@/components/require-access';
 import { DesktopOnlyNotice } from '@/components/responsive';
 import { VentasModule } from '@/components/dilesa/ventas-module';
@@ -24,7 +25,11 @@ export default function Page() {
     <RequireAccess empresa="dilesa" modulo="dilesa.ventas.lista">
       <DesktopOnlyNotice module="Ventas" />
       <div className="hidden sm:block">
-        <VentasModule empresaId={DILESA_EMPRESA_ID} />
+        {/* Suspense requerido por `useSearchParams()` dentro de VentasModule
+            (deep-link `?fase=` desde el tab Fases). Next.js 16 + Turbopack. */}
+        <Suspense fallback={null}>
+          <VentasModule empresaId={DILESA_EMPRESA_ID} />
+        </Suspense>
       </div>
     </RequireAccess>
   );
