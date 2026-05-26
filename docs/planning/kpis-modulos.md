@@ -363,6 +363,16 @@ IS NOT NULL` es la señal canónica de venta completada. Wording
   etc.), este KPI se puede actualizar para reflejar esa definición.
   (Why: KPI accionable HOY beats KPI conceptualmente correcto pero
   no derivable.)
+- **2026-05-26** (D13): Proyectos Sprint 2 — "% completado promedio"
+  no aplica (no hay campo de avance en `dilesa.proyectos`) y "Próximo
+  hito por proyecto" es por-proyecto no agregado. Reemplazados por
+  KPIs sobre agregados del portafolio que sí mueven decisión: Total,
+  En ejecución (`count(estado='ejecutando')`), Presupuesto total
+  (`SUM(presupuesto_estimado)`), Lotes proyectados (`SUM(lotes_proyectados)`),
+  Área vendible (`SUM(area_vendible_m2)`, auto-switch m²→ha si >10K).
+  (Why: agregados de portafolio sobre el dataset filtrado son la
+  "primera mirada" útil para una página flat — más informativos que
+  promedios sin base.)
 
 ## Bitácora
 
@@ -416,9 +426,19 @@ IS NOT NULL` es la señal canónica de venta completada. Wording
   `VendedorRow` y el filtro de mes se aplica antes del agrupamiento.
   KPIs: Vendedores activos, Ventas en periodo, $ vendido,
   Promedio/vendedor, Top vendedor (formato "Nombre ($X.YM)"). Helper
-  en `lib/dilesa/kpis/vendedores.ts`. 10 unit tests. Tabla ya muestra
-  9 columnas con info completa — auditoría no agrega más. **Sprint 1
-  CERRADO**. Próximo: Sprint 2 (Proyectos, 1 PR).
+  en `lib/dilesa/kpis/vendedores.ts`. 10 unit tests. **Sprint 1
+  CERRADO**: 5 tabs × 5 KPIs = 25 KPIs reactivos en hub Ventas
+  DILESA. PR #535 mergeado.
+- **2026-05-26** — Sprint 2 (Proyectos): strip de 5 KPIs sobre página
+  flat (1 superficie). Pivote D13: "% completado promedio" y "Próximo
+  hito por proyecto" de la curaduría no aplican — no hay campo de
+  avance y "próximo hito" es por-proyecto no agregado. Reemplazados
+  por KPIs sobre agregados del portafolio: Total proyectos, En
+  ejecución, Presupuesto total, Lotes proyectados, Área vendible
+  (auto-switch m²→ha si >10K m²). Auditoría agrega 2 columnas:
+  "Fin estimado" (`fecha_fin_estimada`) y "Lotes". `deriveKpis`
+  exportada desde el module. 10 unit tests. **Próximo: Sprint 3
+  (Construcción parcial — diferir tabs sin datos)**.
 
 ## Riesgos / open topics
 
