@@ -52,23 +52,29 @@ export async function writeNotificationLog(
   sb: SupabaseClient,
   input: WriteLogInput
 ): Promise<void> {
-  const { error } = await sb
-    .schema('core')
-    .from('notification_log')
-    .insert({
-      definition_id: input.definitionId,
-      empresa_id: input.empresaId ?? null,
-      status: input.status,
-      recipients: input.recipients,
-      subject: input.subject ?? null,
-      resend_id: input.resendId ?? null,
-      error_message: input.errorMessage ?? null,
-      triggered_by_user_id: input.triggeredByUserId ?? null,
-      context: input.context ?? {},
-    });
+  // Wrap en try/catch — fail-open absoluto: ningún error de DB/cliente
+  // mock/network debe bubble up. El email ya se mandó (o ya falló); perder
+  // la traza es siempre menos malo que romper el handler.
+  try {
+    const { error } = await sb
+      .schema('core')
+      .from('notification_log')
+      .insert({
+        definition_id: input.definitionId,
+        empresa_id: input.empresaId ?? null,
+        status: input.status,
+        recipients: input.recipients,
+        subject: input.subject ?? null,
+        resend_id: input.resendId ?? null,
+        error_message: input.errorMessage ?? null,
+        triggered_by_user_id: input.triggeredByUserId ?? null,
+        context: input.context ?? {},
+      });
 
-  if (error) {
-    // Log to stderr — el email ya se mandó, esto es solo trazabilidad.
-    console.error('[notifications] writeNotificationLog falló:', error.message);
+    if (error) {
+      console.error('[notifications] writeNotificationLog falló:', error.message);
+    }
+  } catch (e) {
+    console.error('[notifications] writeNotificationLog excepción:', (e as Error).message);
   }
 }
