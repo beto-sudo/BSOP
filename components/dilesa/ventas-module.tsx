@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import { DataTable, type Column } from '@/components/module-page';
+import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,7 @@ import { Plus, Receipt, RefreshCw, Search } from 'lucide-react';
 import Link from 'next/link';
 import { usePermissions } from '@/components/providers';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { formatCurrency, formatPercent } from '@/lib/format';
 
 type VentaRow = {
   id: string;
@@ -33,9 +34,11 @@ type VentaRow = {
   valor_comercial: number | null;
   tipo_credito: string | null;
   vendedor: string | null;
+  numero_escritura: string | null;
+  fecha_escritura: string | null;
 };
 
-type VentaListaRow = VentaRow & {
+export type VentaListaRow = VentaRow & {
   cliente: string;
   unidadIdentificador: string | null;
   proyectoNombre: string;
@@ -52,6 +55,69 @@ const ESTADO_LABEL: Record<string, string> = {
   activa: 'Activa',
   desasignada: 'Desasignada',
 };
+
+/**
+ * KPIs reactivos a filtros — ADR-034 (Module-level KPI strips).
+ * Deriva 100% client-side desde el array que alimenta la tabla (KPI2);
+ * cuando los filtros cambian, los KPIs y la tabla recalculan en el mismo
+ * render (KPI3). Cap 5 (KPI1).
+ *
+ * Ajustes vs curaduría Sprint 0 (planning doc § "KPIs aprobados — Ventas"):
+ * - KPI3 "% cerradas" → "% Escrituradas": el modelo solo tiene estado
+ *   `activa | desasignada`; "cerrada" en el negocio inmobiliario significa
+ *   escriturada → `numero_escritura IS NOT NULL` es la señal canónica.
+ * - KPI4 "Días promedio en fase" → "Avance promedio": `fase_posicion` no
+ *   trae fecha de entrada a la fase, pero el promedio de la posición en el
+ *   pipeline de 17 fases es proxy directo del avance global.
+ * - KPI5 "Top vendedor" por `$ pipeline` (no por count) — la decisión de
+ *   reconocer/replicar al top opera sobre $ cerrado, no sobre conteo.
+ */
+export function deriveKpis(rows: readonly VentaListaRow[]): readonly ModuleKpi[] {
+  const total = rows.length;
+  const pipeline = rows.reduce((acc, r) => acc + (r.precio ?? 0), 0);
+  const escrituradas = rows.filter((r) => r.numero_escritura != null).length;
+  const pctEscrituradas = total === 0 ? null : escrituradas / total;
+
+  // Avance promedio = mean(fase_posicion) / max(fase_posicion en el dataset).
+  // Si el dataset filtrado no trae fase_posicion (caso borde), KPI = "—".
+  const posiciones = rows
+    .map((r) => r.fase_posicion)
+    .filter((p): p is number => typeof p === 'number');
+  const maxFase = posiciones.length === 0 ? 0 : Math.max(...posiciones);
+  const avgFase =
+    posiciones.length === 0 ? null : posiciones.reduce((a, b) => a + b, 0) / posiciones.length;
+  const avancePct = avgFase == null || maxFase === 0 ? null : avgFase / maxFase;
+
+  // Top vendedor por $ pipeline. Tie-break por nombre alfabético (estable).
+  const vendedorMap = new Map<string, number>();
+  for (const r of rows) {
+    if (r.vendedor && r.precio != null) {
+      vendedorMap.set(r.vendedor, (vendedorMap.get(r.vendedor) ?? 0) + r.precio);
+    }
+  }
+  let topVendedor: string | null = null;
+  let topMonto = -1;
+  for (const [vendedor, monto] of [...vendedorMap.entries()].sort(([a], [b]) =>
+    a.localeCompare(b, 'es')
+  )) {
+    if (monto > topMonto) {
+      topMonto = monto;
+      topVendedor = vendedor;
+    }
+  }
+
+  return [
+    { key: 'count', label: 'Ventas', value: total },
+    {
+      key: 'pipeline',
+      label: 'Pipeline',
+      value: total === 0 ? '—' : formatCurrency(pipeline, { compact: true }),
+    },
+    { key: 'escrituradas', label: '% Escrituradas', value: formatPercent(pctEscrituradas) },
+    { key: 'avance', label: 'Avance promedio', value: formatPercent(avancePct) },
+    { key: 'top_vendedor', label: 'Top vendedor', value: topVendedor ?? '—' },
+  ];
+}
 
 export function VentasModule({ empresaId }: { empresaId: string }) {
   const router = useRouter();
@@ -95,7 +161,7 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
       .schema('dilesa')
       .from('ventas')
       .select(
-        'id, persona_id, unidad_id, estado, fase_actual, fase_posicion, valor_escrituracion, valor_comercial, tipo_credito, vendedor'
+        'id, persona_id, unidad_id, estado, fase_actual, fase_posicion, valor_escrituracion, valor_comercial, tipo_credito, vendedor, numero_escritura, fecha_escritura'
       )
       .eq('empresa_id', empresaId)
       .is('deleted_at', null);
@@ -239,6 +305,8 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
     });
   }, [ventas, search, proyectoFiltro, faseFiltro, estadoFiltro]);
 
+  const kpis = useMemo(() => deriveKpis(filtrados), [filtrados]);
+
   const columns: Column<VentaListaRow>[] = [
     { key: 'cliente', label: 'Comprador', type: 'text', sticky: true, width: 'min-w-[260px]' },
     { key: 'proyectoNombre', label: 'Proyecto', type: 'text' },
@@ -263,6 +331,7 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
         v.fase_actual ? <Badge tone="neutral">{v.fase_actual}</Badge> : <span>—</span>,
     },
     { key: 'precio', label: 'Precio', type: 'currency' },
+    { key: 'fecha_escritura', label: 'Escritura', type: 'date' },
     {
       key: 'estado',
       label: 'Estado',
@@ -293,6 +362,8 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
           </p>
         </div>
       </header>
+
+      <ModuleKpiStrip stats={kpis} cols={5} />
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">
