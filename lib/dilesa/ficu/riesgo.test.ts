@@ -104,6 +104,19 @@ describe('nivelUsoEfectivo', () => {
   it('monto ≥ umbral identificación = Alto', () => {
     expect(nivelUsoEfectivo(null, UMBRAL_IDENTIFICACION_MXN)).toBe('Alto');
   });
+
+  // Strings del catálogo nuevo USO_EFECTIVO_OPTIONS (Sprint 7c-2).
+  it('string "Uso de efectivo mayor a 3,210 UMAs" = Alto', () => {
+    expect(
+      nivelUsoEfectivo('Uso de efectivo mayor a 3,210 UMAs (~$363,179) — Requiere identificación')
+    ).toBe('Alto');
+  });
+  it('string "Uso de efectivo menor a 1,605 UMAs" = Medio', () => {
+    expect(nivelUsoEfectivo('Uso de efectivo menor a 1,605 UMAs (~$181,590)')).toBe('Medio');
+  });
+  it('string "Sin uso de efectivo" del catálogo = Bajo', () => {
+    expect(nivelUsoEfectivo('Sin uso de efectivo')).toBe('Bajo');
+  });
 });
 
 describe('evaluarRiesgo', () => {

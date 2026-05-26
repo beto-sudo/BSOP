@@ -6184,6 +6184,7 @@ export type Database = {
           activo: boolean
           apellido_materno: string | null
           apellido_paterno: string | null
+          conocimiento_dueno_beneficiario: string | null
           contacto_emergencia_nombre: string | null
           contacto_emergencia_parentesco: string | null
           contacto_emergencia_telefono: string | null
@@ -6191,15 +6192,26 @@ export type Database = {
           curp: string | null
           deleted_at: string | null
           domicilio: string | null
+          domicilio_calle: string | null
+          domicilio_ciudad: string | null
+          domicilio_codigo_postal: string | null
+          domicilio_colonia: string | null
+          domicilio_estado: string | null
+          domicilio_numero_exterior: string | null
+          domicilio_numero_interior: string | null
           email: string | null
           empresa_id: string
+          es_pep: boolean | null
           estado_civil: string | null
           fecha_nacimiento: string | null
+          forma_pago_kyc: string | null
           id: string
           lugar_nacimiento: string | null
           nacionalidad: string | null
           nombre: string
           nss: string | null
+          numero_credencial_ine: string | null
+          ocupacion: string | null
           rfc: string | null
           sexo: string | null
           telefono: string | null
@@ -6207,11 +6219,13 @@ export type Database = {
           tipo: string
           tipo_persona: string
           updated_at: string | null
+          uso_efectivo_kyc: string | null
         }
         Insert: {
           activo?: boolean
           apellido_materno?: string | null
           apellido_paterno?: string | null
+          conocimiento_dueno_beneficiario?: string | null
           contacto_emergencia_nombre?: string | null
           contacto_emergencia_parentesco?: string | null
           contacto_emergencia_telefono?: string | null
@@ -6219,15 +6233,26 @@ export type Database = {
           curp?: string | null
           deleted_at?: string | null
           domicilio?: string | null
+          domicilio_calle?: string | null
+          domicilio_ciudad?: string | null
+          domicilio_codigo_postal?: string | null
+          domicilio_colonia?: string | null
+          domicilio_estado?: string | null
+          domicilio_numero_exterior?: string | null
+          domicilio_numero_interior?: string | null
           email?: string | null
           empresa_id: string
+          es_pep?: boolean | null
           estado_civil?: string | null
           fecha_nacimiento?: string | null
+          forma_pago_kyc?: string | null
           id?: string
           lugar_nacimiento?: string | null
           nacionalidad?: string | null
           nombre: string
           nss?: string | null
+          numero_credencial_ine?: string | null
+          ocupacion?: string | null
           rfc?: string | null
           sexo?: string | null
           telefono?: string | null
@@ -6235,11 +6260,13 @@ export type Database = {
           tipo?: string
           tipo_persona?: string
           updated_at?: string | null
+          uso_efectivo_kyc?: string | null
         }
         Update: {
           activo?: boolean
           apellido_materno?: string | null
           apellido_paterno?: string | null
+          conocimiento_dueno_beneficiario?: string | null
           contacto_emergencia_nombre?: string | null
           contacto_emergencia_parentesco?: string | null
           contacto_emergencia_telefono?: string | null
@@ -6247,15 +6274,26 @@ export type Database = {
           curp?: string | null
           deleted_at?: string | null
           domicilio?: string | null
+          domicilio_calle?: string | null
+          domicilio_ciudad?: string | null
+          domicilio_codigo_postal?: string | null
+          domicilio_colonia?: string | null
+          domicilio_estado?: string | null
+          domicilio_numero_exterior?: string | null
+          domicilio_numero_interior?: string | null
           email?: string | null
           empresa_id?: string
+          es_pep?: boolean | null
           estado_civil?: string | null
           fecha_nacimiento?: string | null
+          forma_pago_kyc?: string | null
           id?: string
           lugar_nacimiento?: string | null
           nacionalidad?: string | null
           nombre?: string
           nss?: string | null
+          numero_credencial_ine?: string | null
+          ocupacion?: string | null
           rfc?: string | null
           sexo?: string | null
           telefono?: string | null
@@ -6263,6 +6301,7 @@ export type Database = {
           tipo?: string
           tipo_persona?: string
           updated_at?: string | null
+          uso_efectivo_kyc?: string | null
         }
         Relationships: []
       }
