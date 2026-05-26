@@ -44,15 +44,35 @@ if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('Faltan credenciales de Supa
 const DILESA_EMPRESA_ID = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479';
 
 /**
- * Por default el cron diario corre solo los 2 scripts que cambian a diario:
- * **ventas** (avance de fases, clientes nuevos, datos editados) y
- * **expediente** (PDFs nuevos cargados a Coda). Con FULL=1 corre los 5,
- * incluyendo terrenos/proyectos/inventario — esos cambian rara vez (meses
- * entre cambios) y sus scripts usan DELETE+CASCADE que truena con FK de
- * ventas (pendiente refactorearlos a UPSERT).
+ * Sync orquestador — 3 modos según volumen y costo:
+ *
+ * DAILY (default, todos los días):
+ *   - Ventas, Expediente, y los 5 scripts de Construcción + Estimaciones
+ *     incrementales. Todos usan UPSERT por coda_row_id (idempotentes).
+ *   - Sprint 6 (cutover): se promovieron a daily porque del 2026-05-26
+ *     al sábado 2026-05-31 el equipo sigue capturando en Coda — sin esto,
+ *     las nuevas tareas/contratos/contratistas no llegarían a BSOP.
+ *   - Orden importa por FK: contratistas → catálogos → contratos →
+ *     construcción → tareas_terminadas → estimaciones (backfill incr).
+ *
+ * FULL (FULL=1, manual):
+ *   - DAILY + terrenos + proyectos + inventario. Los 3 últimos cambian
+ *     mensual y sus scripts antes truenaban (resuelto en F2 con UPSERT
+ *     puro, ver iniciativa dilesa-portafolio).
  */
 const FULL = process.env.FULL === '1';
+
+const CONSTRUCCION_SCRIPTS: Array<{ name: string; path: string }> = [
+  { name: 'Contratistas', path: 'scripts/import_dilesa_contratistas.ts' },
+  { name: 'Construcción catálogos', path: 'scripts/import_dilesa_construccion_catalogos.ts' },
+  { name: 'Contratos construcción', path: 'scripts/import_dilesa_contratos_construccion.ts' },
+  { name: 'Construcción (obras)', path: 'scripts/import_dilesa_construccion.ts' },
+  { name: 'Tareas terminadas', path: 'scripts/import_dilesa_tareas_terminadas.ts' },
+  { name: 'Estimaciones (incr)', path: 'scripts/import_dilesa_estimaciones_incremental.ts' },
+];
+
 const DAILY_SCRIPTS: Array<{ name: string; path: string }> = [
+  ...CONSTRUCCION_SCRIPTS,
   { name: 'Ventas', path: 'scripts/import_dilesa_ventas.ts' },
   { name: 'Expediente', path: 'scripts/import_dilesa_expediente.ts' },
 ];
@@ -83,6 +103,13 @@ type Counts = {
   adjuntos_venta: number;
   adjuntos_pago: number;
   personas_cliente: number;
+  // Sprint 6 cutover — tablas de construcción + estimaciones.
+  personas_contratista: number;
+  contratos_construccion: number;
+  construcciones: number;
+  tareas_terminadas: number;
+  estimaciones: number;
+  estimacion_tareas: number;
 };
 
 async function takeSnapshot(): Promise<Counts> {
@@ -116,6 +143,12 @@ async function takeSnapshot(): Promise<Counts> {
     adjuntos_venta: await cAdj('venta'),
     adjuntos_pago: await cAdj('venta_pago'),
     personas_cliente: await c('erp', 'personas', { tipo: 'cliente' }),
+    personas_contratista: await c('erp', 'personas', { tipo: 'contratista' }),
+    contratos_construccion: await c('dilesa', 'contratos_construccion'),
+    construcciones: await c('dilesa', 'construccion'),
+    tareas_terminadas: await c('dilesa', 'construccion_tareas_terminadas'),
+    estimaciones: await c('dilesa', 'estimaciones'),
+    estimacion_tareas: await c('dilesa', 'estimacion_tareas'),
   };
 }
 
@@ -197,6 +230,12 @@ function buildHtml(opts: {
       ['Fases del pipeline', pre.fases, post.fases],
       ['Adjuntos venta', pre.adjuntos_venta, post.adjuntos_venta],
       ['Adjuntos venta_pago', pre.adjuntos_pago, post.adjuntos_pago],
+      ['Contratistas', pre.personas_contratista, post.personas_contratista],
+      ['Contratos construcción', pre.contratos_construccion, post.contratos_construccion],
+      ['Construcciones (obras)', pre.construcciones, post.construcciones],
+      ['Tareas terminadas', pre.tareas_terminadas, post.tareas_terminadas],
+      ['Estimaciones', pre.estimaciones, post.estimaciones],
+      ['Estimación-tareas (vínculos)', pre.estimacion_tareas, post.estimacion_tareas],
     ] as [string, number, number][]
   )
     .map(
