@@ -381,13 +381,9 @@ function NuevaSolicitudForm() {
       // 1) Resolver persona_id (existente o crear nueva)
       let personaId = personaIdSeleccionada;
       if (clienteModo === 'nuevo') {
-        // Cast del insert con columnas KYC nuevas (Sprint 7c-2). Los types
-        // generados de Supabase se regenerarán post-`db push` de la migración
-        // `20260527000000_erp_personas_kyc_ficu.sql`. Hasta entonces el insert
-        // necesita escape — comportamiento runtime es el correcto.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const personasTable = sb.schema('erp').from('personas') as any;
-        const { data: ins, error: pErr } = await personasTable
+        const { data: ins, error: pErr } = await sb
+          .schema('erp')
+          .from('personas')
           .insert({
             empresa_id: DILESA_EMPRESA_ID,
             tipo: 'cliente',
