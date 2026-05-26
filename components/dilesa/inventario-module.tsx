@@ -21,17 +21,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import { DataTable, type Column } from '@/components/module-page';
+import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Boxes, RefreshCw, Search, ArrowRight } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { formatCurrency } from '@/lib/format';
 
 type UnidadRow = {
   id: string;
   identificador: string;
   area_m2: number | null;
+  m2_construccion: number | null;
   es_esquina: boolean | null;
   tiene_frente_verde: boolean | null;
   estado: string;
@@ -40,7 +42,7 @@ type UnidadRow = {
   created_at: string;
 };
 
-type UnidadListaRow = UnidadRow & {
+export type UnidadListaRow = UnidadRow & {
   proyectoNombre: string;
   prototipo: string | null;
   /** Identificador "Coda-style": M3-L9-LDLE-ISC (con sufijo prototipo). */
@@ -60,6 +62,55 @@ const ESTADO_LABEL: Record<string, string> = {
   en_construccion: 'En construcción',
   terminada: 'Terminada',
 };
+
+/**
+ * KPIs reactivos a filtros — ADR-034 (Module-level KPI strips).
+ *
+ * Pivote vs curaduría Sprint 0 (D9, ver planning doc):
+ * La curaduría original proponía "Disponibles · Apartadas · Vendidas ·
+ * % ocupación · $ inventario disponible". Auditando el schema:
+ *
+ * 1. No existe estado "apartada" en `dilesa.unidades` — son `planeada`,
+ *    `lote_urbanizado`, `en_construccion`, `terminada`, `vendida`.
+ * 2. El módulo Inventario es vista comercial: solo trae las unidades
+ *    vendibles (`en_construccion` + `terminada`), no el universo. Por
+ *    ende KPIs sobre vendidas/no-vendibles violarían KPI2 (derivación
+ *    desde el dataset de la tabla) — requerirían query extra.
+ *
+ * KPIs ajustados que sí respetan KPI2 al 100% y dan panorama útil sobre
+ * "qué está disponible para vender ahora":
+ * 1. Disponibles — total vendibles ahora.
+ * 2. En construcción — cuántas todavía no físicamente listas.
+ * 3. Terminadas — listas para entrega inmediata.
+ * 4. Valor disponible — $ total del inventario vendible ahora.
+ * 5. Días promedio en inventario — mean(diasInventario) → señal de
+ *    estancamiento. Si sube, algo no se mueve.
+ */
+export function deriveKpis(rows: readonly UnidadListaRow[]): readonly ModuleKpi[] {
+  const total = rows.length;
+  const enConstruccion = rows.filter((u) => u.estado === 'en_construccion').length;
+  const terminadas = rows.filter((u) => u.estado === 'terminada').length;
+  const valorDisponible = rows.reduce((acc, u) => acc + (u.precio ?? 0), 0);
+
+  const dias = rows.map((u) => u.diasInventario);
+  const diasPromedio = dias.length === 0 ? null : dias.reduce((a, b) => a + b, 0) / dias.length;
+
+  return [
+    { key: 'disponibles', label: 'Disponibles', value: total },
+    { key: 'en_construccion', label: 'En construcción', value: enConstruccion },
+    { key: 'terminadas', label: 'Terminadas', value: terminadas },
+    {
+      key: 'valor',
+      label: 'Valor disponible',
+      value: total === 0 ? '—' : formatCurrency(valorDisponible, { compact: true }),
+    },
+    {
+      key: 'dias_inventario',
+      label: 'Días en inventario',
+      value: diasPromedio == null ? '—' : `${Math.round(diasPromedio)} días`,
+    },
+  ];
+}
 
 export function InventarioModule({ empresaId }: { empresaId: string }) {
   const [unidades, setUnidades] = useState<UnidadListaRow[]>([]);
@@ -88,7 +139,7 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
       .schema('dilesa')
       .from('unidades')
       .select(
-        'id, identificador, area_m2, es_esquina, tiene_frente_verde, estado, proyecto_id, producto_id, created_at'
+        'id, identificador, area_m2, m2_construccion, es_esquina, tiene_frente_verde, estado, proyecto_id, producto_id, created_at'
       )
       .eq('empresa_id', empresaId)
       .is('deleted_at', null)
@@ -211,6 +262,8 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
     });
   }, [unidades, search, proyectoFiltro, prototipoFiltro, caracteristicaFiltro]);
 
+  const kpis = useMemo(() => deriveKpis(filtrados), [filtrados]);
+
   const columns: Column<UnidadListaRow>[] = [
     {
       key: 'identificadorCompleto',
@@ -226,6 +279,12 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
       label: 'Área m²',
       type: 'number',
       render: (u) => (u.area_m2 != null ? u.area_m2.toFixed(2) : '—'),
+    },
+    {
+      key: 'm2_construccion',
+      label: 'm² constr.',
+      type: 'number',
+      render: (u) => (u.m2_construccion != null ? u.m2_construccion.toFixed(2) : '—'),
     },
     {
       key: 'caracteristicas',
@@ -292,6 +351,8 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
           </p>
         </div>
       </header>
+
+      <ModuleKpiStrip stats={kpis} cols={5} />
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">

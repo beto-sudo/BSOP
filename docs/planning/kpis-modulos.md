@@ -318,6 +318,20 @@ IS NOT NULL` es la señal canónica de venta completada. Wording
   en el pipeline de 17 fases. (Why: si una venta avanza, su
   `fase_posicion` sube. El promedio del dataset filtrado es exactamente
   "qué tan avanzadas están las ventas que estoy viendo".)
+- **2026-05-26** (D9): Inventario tab 2 — la curaduría original
+  ("Disponibles · Apartadas · Vendidas · % ocupación · $ inventario
+  disponible") asumía un universo completo. Auditoría reveló: (1) no
+  existe estado "apartada" en `dilesa.unidades` (estados reales:
+  `planeada`, `lote_urbanizado`, `en_construccion`, `terminada`,
+  `vendida`), (2) el módulo Inventario es vista comercial — solo trae
+  `en_construccion` + `terminada` (vendibles ahora), no el universo.
+  KPIs sobre vendidas/no-vendibles requerirían query extra que rompería
+  KPI2. KPIs ajustados a panorama de "qué está disponible para vender
+  ahora": Disponibles, En construcción, Terminadas, Valor disponible,
+  Días promedio en inventario. Este último es un KPI excelente que
+  emergió: `mean(diasInventario)` dispara decisión ("¿se están
+  estancando?"). (Why: respetar KPI2 al 100% y mostrar lo que importa
+  del universo de la tabla, no forzar KPIs sobre datos ausentes.)
 
 ## Bitácora
 
@@ -341,8 +355,16 @@ IS NOT NULL` es la señal canónica de venta completada. Wording
   Test file con 12 unit tests (`components/dilesa/ventas-module.test.ts`)
   cubre derivación, formato, edge cases (sin rows, vendedor null,
   precio null) y reactividad a filtros. Pivote crítico vs curaduría
-  original — ver decisión D7 y D8. **Próximo: Sprint 1 tab 2
-  ("Inventario")**.
+  original — ver decisión D7 y D8. PR #531 mergeado.
+- **2026-05-26** — Sprint 1 tab 2 ("Inventario"): strip de 5 KPIs +
+  auditoría agrega columna `m2_construccion` (estaba en DB no en
+  lista). Pivote D9 vs curaduría: no existe estado "apartada" en el
+  schema, y el módulo solo trae unidades vendibles (`en_construccion` +
+  `terminada`, no el universo). KPIs ajustados a "qué está disponible
+  para vender ahora": Disponibles, En construcción, Terminadas, Valor
+  disponible ($), Días promedio en inventario. Respeta KPI2 al 100%
+  sin queries extras. Test file con 8 unit tests.
+  **Próximo: Sprint 1 tab 3 ("Fases")**.
 
 ## Riesgos / open topics
 
