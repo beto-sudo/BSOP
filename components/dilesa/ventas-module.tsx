@@ -339,6 +339,12 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
         v.fase_actual ? <Badge tone="neutral">{v.fase_actual}</Badge> : <span>—</span>,
     },
     { key: 'precio', label: 'Precio', type: 'currency' },
+    {
+      key: 'tipo_credito',
+      label: 'Crédito',
+      type: 'text',
+      render: (v) => v.tipo_credito ?? <span className="text-[var(--text)]/30">—</span>,
+    },
     { key: 'fecha_escritura', label: 'Escritura', type: 'date' },
     {
       key: 'estado',

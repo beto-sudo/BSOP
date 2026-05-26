@@ -51,6 +51,9 @@ type ConstruccionRow = {
   fecha_arranque: string | null;
   fecha_compromiso_terminar: string | null;
   fecha_terminada: string | null;
+  fecha_seguro_calidad: string | null;
+  fecha_paquete_ruv: string | null;
+  fecha_dtu: string | null;
   avance_pct: number;
   estado: string;
 };
@@ -62,6 +65,8 @@ export type ConstruccionListaRow = ConstruccionRow & {
   prototipo: string | null;
   contratistaNombre: string;
   contratistaAbreviacion: string | null;
+  /** Nombre del supervisor — lookup a erp.personas por supervisor_persona_id. */
+  supervisorNombre: string | null;
 };
 
 /** Estados que cuentan como "en progreso" (consumen recursos hoy). */
@@ -181,7 +186,7 @@ export function ConstruccionModule({ empresaId }: { empresaId: string }) {
       .schema('dilesa')
       .from('construccion')
       .select(
-        'id, codigo, unidad_id, producto_id, contratista_id, supervisor_persona_id, fecha_arranque, fecha_compromiso_terminar, fecha_terminada, avance_pct, estado'
+        'id, codigo, unidad_id, producto_id, contratista_id, supervisor_persona_id, fecha_arranque, fecha_compromiso_terminar, fecha_terminada, fecha_seguro_calidad, fecha_paquete_ruv, fecha_dtu, avance_pct, estado'
       )
       .eq('empresa_id', empresaId)
       .is('deleted_at', null);
@@ -211,12 +216,14 @@ export function ConstruccionModule({ empresaId }: { empresaId: string }) {
         .select('id, nombre')
         .eq('empresa_id', empresaId)
         .is('deleted_at', null),
+      // Sin filtro por tipo: contratistas y supervisores (empleados) viven
+      // ambos en erp.personas. DILESA tiene ~1400 personas — el costo es
+      // marginal y evita un 2do round-trip para resolver supervisores.
       sb
         .schema('erp')
         .from('personas')
         .select('id, nombre, apellido_paterno, apellido_materno')
-        .eq('empresa_id', empresaId)
-        .eq('tipo', 'contratista'),
+        .eq('empresa_id', empresaId),
       sb
         .schema('dilesa')
         .from('contratistas_datos')
@@ -273,6 +280,9 @@ export function ConstruccionModule({ empresaId }: { empresaId: string }) {
           prototipo: proto,
           contratistaNombre: personaMap.get(o.contratista_id) ?? '(sin contratista)',
           contratistaAbreviacion: abrevMap.get(o.contratista_id) ?? null,
+          supervisorNombre: o.supervisor_persona_id
+            ? (personaMap.get(o.supervisor_persona_id) ?? null)
+            : null,
         };
       }),
     };
@@ -389,6 +399,77 @@ export function ConstruccionModule({ empresaId }: { empresaId: string }) {
     },
     { key: 'fecha_arranque', label: 'Arranque', type: 'date' },
     { key: 'fecha_compromiso_terminar', label: 'Compromiso', type: 'date' },
+    {
+      key: 'fecha_terminada',
+      label: 'Terminada',
+      type: 'custom',
+      accessor: (o) => o.fecha_terminada ?? '',
+      render: (o) =>
+        o.fecha_terminada ? (
+          new Date(o.fecha_terminada).toLocaleDateString('es-MX', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          })
+        ) : (
+          <span className="text-[var(--text)]/30">—</span>
+        ),
+    },
+    {
+      key: 'supervisorNombre',
+      label: 'Supervisor',
+      type: 'custom',
+      accessor: (o) => o.supervisorNombre ?? '',
+      render: (o) => o.supervisorNombre ?? <span className="text-[var(--text)]/30">—</span>,
+    },
+    {
+      key: 'fecha_seguro_calidad',
+      label: 'Seguro calidad',
+      type: 'custom',
+      accessor: (o) => o.fecha_seguro_calidad ?? '',
+      render: (o) =>
+        o.fecha_seguro_calidad ? (
+          new Date(o.fecha_seguro_calidad).toLocaleDateString('es-MX', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          })
+        ) : (
+          <span className="text-[var(--text)]/30">—</span>
+        ),
+    },
+    {
+      key: 'fecha_paquete_ruv',
+      label: 'Paquete RUV',
+      type: 'custom',
+      accessor: (o) => o.fecha_paquete_ruv ?? '',
+      render: (o) =>
+        o.fecha_paquete_ruv ? (
+          new Date(o.fecha_paquete_ruv).toLocaleDateString('es-MX', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          })
+        ) : (
+          <span className="text-[var(--text)]/30">—</span>
+        ),
+    },
+    {
+      key: 'fecha_dtu',
+      label: 'DTU',
+      type: 'custom',
+      accessor: (o) => o.fecha_dtu ?? '',
+      render: (o) =>
+        o.fecha_dtu ? (
+          new Date(o.fecha_dtu).toLocaleDateString('es-MX', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          })
+        ) : (
+          <span className="text-[var(--text)]/30">—</span>
+        ),
+    },
   ];
 
   const onRowClick = (o: ConstruccionListaRow) => {

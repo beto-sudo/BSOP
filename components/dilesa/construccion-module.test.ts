@@ -12,6 +12,9 @@ function o(overrides: Partial<ConstruccionListaRow>): ConstruccionListaRow {
     fecha_arranque: null,
     fecha_compromiso_terminar: null,
     fecha_terminada: null,
+    fecha_seguro_calidad: null,
+    fecha_paquete_ruv: null,
+    fecha_dtu: null,
     avance_pct: 0,
     estado: 'arrancada',
     identificadorCompleto: 'M1-L1',
@@ -19,6 +22,7 @@ function o(overrides: Partial<ConstruccionListaRow>): ConstruccionListaRow {
     prototipo: null,
     contratistaNombre: 'Contratista',
     contratistaAbreviacion: null,
+    supervisorNombre: null,
     ...overrides,
   };
 }
