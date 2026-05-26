@@ -11,11 +11,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import { DataTable, type Column } from '@/components/module-page';
+import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Landmark, RefreshCw, Search } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { formatCurrency, formatNumber } from '@/lib/format';
 import {
   ProyectoDetailDrawer,
   type ProyectoDetalle,
@@ -23,6 +24,59 @@ import {
   ESTADO_TONE,
   ESTADO_LABEL,
 } from './proyecto-detail-drawer';
+
+/**
+ * KPIs reactivos a filtros — ADR-034.
+ *
+ * Pivote D13 vs curaduría Sprint 0: "% completado promedio" no aplica
+ * porque `dilesa.proyectos` no tiene campo de avance. "Próximo hito por
+ * proyecto" es por-proyecto, no agregado. Reemplazados por KPIs sobre
+ * agregados del portafolio que sí mueven decisión.
+ *
+ * Estados de proyecto (CHECK constraint): propuesta | analisis |
+ * aprobado | ejecutando | completado | archivado.
+ *
+ * KPIs:
+ * 1. Total proyectos — `rows.length`.
+ * 2. En ejecución — `count(estado='ejecutando')` (los que consumen
+ *    recursos hoy).
+ * 3. Presupuesto total — `SUM(presupuesto_estimado)` (capital
+ *    comprometido en el portafolio filtrado).
+ * 4. Lotes proyectados — `SUM(lotes_proyectados)` (inventario futuro).
+ * 5. Área vendible — `SUM(area_vendible_m2)` en m² o ha.
+ */
+export function deriveKpis(rows: readonly ProyectoDetalle[]): readonly ModuleKpi[] {
+  const total = rows.length;
+  const enEjecucion = rows.filter((p) => p.estado === 'ejecutando').length;
+  const presupuesto = rows.reduce((acc, p) => acc + (p.presupuesto_estimado ?? 0), 0);
+  const lotes = rows.reduce((acc, p) => acc + (p.lotes_proyectados ?? 0), 0);
+  const areaM2 = rows.reduce((acc, p) => acc + (p.area_vendible_m2 ?? 0), 0);
+
+  return [
+    { key: 'total', label: 'Proyectos', value: total },
+    { key: 'ejecutando', label: 'En ejecución', value: enEjecucion },
+    {
+      key: 'presupuesto',
+      label: 'Presupuesto total',
+      value: total === 0 ? '—' : formatCurrency(presupuesto, { compact: true }),
+    },
+    {
+      key: 'lotes',
+      label: 'Lotes proyectados',
+      value: total === 0 ? '—' : formatNumber(lotes, { decimals: 0 }),
+    },
+    {
+      key: 'area',
+      label: 'Área vendible',
+      value:
+        total === 0
+          ? '—'
+          : areaM2 >= 10_000
+            ? `${formatNumber(areaM2 / 10_000, { decimals: 1 })} ha`
+            : `${formatNumber(areaM2, { decimals: 0 })} m²`,
+    },
+  ];
+}
 
 export function ProyectosModule({ empresaId }: { empresaId: string }) {
   const [proyectos, setProyectos] = useState<ProyectoDetalle[]>([]);
@@ -88,6 +142,8 @@ export function ProyectosModule({ empresaId }: { empresaId: string }) {
     });
   }, [proyectos, search, tipoFiltro]);
 
+  const kpis = useMemo(() => deriveKpis(filtrados), [filtrados]);
+
   const columns: Column<ProyectoDetalle>[] = [
     { key: 'nombre', label: 'Nombre', type: 'text', sticky: true, width: 'min-w-[220px]' },
     {
@@ -107,6 +163,13 @@ export function ProyectosModule({ empresaId }: { empresaId: string }) {
       ),
     },
     { key: 'fecha_inicio', label: 'Inicio', type: 'date' },
+    { key: 'fecha_fin_estimada', label: 'Fin estimado', type: 'date' },
+    {
+      key: 'lotes_proyectados',
+      label: 'Lotes',
+      type: 'number',
+      render: (p) => (p.lotes_proyectados != null ? String(p.lotes_proyectados) : '—'),
+    },
     { key: 'presupuesto_estimado', label: 'Presupuesto', type: 'currency' },
   ];
 
@@ -128,6 +191,8 @@ export function ProyectosModule({ empresaId }: { empresaId: string }) {
           </p>
         </div>
       </header>
+
+      <ModuleKpiStrip stats={kpis} cols={5} />
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">
