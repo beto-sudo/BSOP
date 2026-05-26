@@ -409,9 +409,16 @@ IS NOT NULL` es la señal canónica de venta completada. Wording
   `count(email != null OR telefono != null) / total`. Resto 4 KPIs
   siguen curaduría: Total clientes, # con venta activa, # repetidores
   (numVentas > 1), Compra promedio. Helper en `lib/dilesa/kpis/clientes.ts`.
-  8 unit tests. Auditoría no agrega columnas — la tabla ya muestra
-  contacto embebido bajo el nombre. **Próximo: Sprint 1 tab 5
-  ("Vendedores")**.
+  9 unit tests. PR #534 mergeado.
+- **2026-05-26** — Sprint 1 tab 5 ("Vendedores"): strip de 5 KPIs
+  alineados a la curaduría sin pivotes — los datos derivados por
+  vendedor (`numVentas`, `montoTotal`, etc.) ya están listos en
+  `VendedorRow` y el filtro de mes se aplica antes del agrupamiento.
+  KPIs: Vendedores activos, Ventas en periodo, $ vendido,
+  Promedio/vendedor, Top vendedor (formato "Nombre ($X.YM)"). Helper
+  en `lib/dilesa/kpis/vendedores.ts`. 10 unit tests. Tabla ya muestra
+  9 columnas con info completa — auditoría no agrega más. **Sprint 1
+  CERRADO**. Próximo: Sprint 2 (Proyectos, 1 PR).
 
 ## Riesgos / open topics
 
