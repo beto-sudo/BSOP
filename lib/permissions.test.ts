@@ -183,6 +183,14 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   'dilesa.proveedores',
   'dilesa.portafolio',
   'dilesa.proyectos',
+  // Sub-slugs del hub Proyectos (iniciativa
+  // `dilesa-proyectos-anteproyectos` Sprint 1, ADR-030). El padre
+  // `dilesa.proyectos` queda como umbrella en sidebar; cada tab
+  // (Activos / Anteproyectos) tiene su sub-slug que gobierna acceso
+  // real al contenido. Ver migración
+  // 20260526210000_dilesa_proyectos_subscope_permissions.sql.
+  'dilesa.proyectos.activos',
+  'dilesa.proyectos.anteproyectos',
   'dilesa.ventas',
   // Sub-slugs del hub Ventas (sprint tabs-hub, ADR-030). El padre
   // `dilesa.ventas` queda como umbrella en sidebar; cada tab (Ventas /
