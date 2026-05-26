@@ -20,7 +20,7 @@ export default function Page() {
     <RequireAccess empresa="dilesa" modulo="dilesa.proyectos.activos">
       <DesktopOnlyNotice module="Proyectos" />
       <div className="hidden sm:block">
-        <ProyectosModule empresaId={DILESA_EMPRESA_ID} />
+        <ProyectosModule empresaId={DILESA_EMPRESA_ID} excluirTipos={['anteproyecto']} />
       </div>
     </RequireAccess>
   );
