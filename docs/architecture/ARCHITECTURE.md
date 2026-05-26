@@ -325,6 +325,7 @@ Ver [reglas SS1-SS7 en ADR-030](../adr/030_submodule_permissions.md).
 | Detail page anatomy                 | [ADR-009](../adr/009_detail_page.md)                                                    | `<DetailPage>` + `<DetailHeader>` + `<DetailContent>` (D1-D5)   |
 | Detail drawer                       | [ADR-018](../adr/018_drawer_anatomy.md), [ADR-026](../adr/026_drawer_anatomy_polish.md) | `<DetailDrawer size="sm/md/lg/xl">` (DD1-DD11)                  |
 | Data tables                         | [ADR-010](../adr/010_data_table.md)                                                     | `<DataTable>` sobre @tanstack/react-table (DT1-DT8)             |
+| Module-level KPI strips             | [ADR-034](../adr/034_module_kpi_strips.md)                                              | `<ModuleKpiStrip>` deriva client-side del dataset (KPI1-KPI7)   |
 
 ### Forms y captura
 
