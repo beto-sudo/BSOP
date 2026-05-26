@@ -3,10 +3,10 @@
 **Slug:** `dilesa-tablas-filtros-columnas`
 **Empresas:** DILESA
 **Schemas afectados:** ninguno (solo cambios de UI sobre los módulos existentes)
-**Estado:** planned
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-05-26
-**Última actualización:** 2026-05-26 (promovida)
+**Última actualización:** 2026-05-26 (cerrada — Sprint 1 + Sprint 2 mergeados)
 
 ## Problema
 
@@ -123,7 +123,18 @@ los módulos ya cargan.
 ## Bitácora
 
 - **2026-05-26** — Promovida tras audit + Q&A con Beto. Planning doc
-  - fila en INITIATIVES.md. Próximo: Sprint 1.
+  - fila en INITIATIVES.md.
+- **2026-05-26** — Sprint 1 mergeado (PR #540): primitive
+  `<DateRangeFilter>` + helper `isInDateRange()` + 7 tests +
+  aplicación a los 6 módulos (estimaciones lleva 2 filtros). Cero
+  queries nuevas a DB.
+- **2026-05-26** — Sprint 2 mergeado (PR #541): columnas adicionales
+  en 4 módulos. Estimaciones 7→9, Obras 8→13, Proyectos 7→14,
+  Ventas 9→10. SELECT de obras extendido con 3 hitos RUV/DTU/calidad;
+  lookup de personas en obras ya no filtra por tipo para resolver
+  supervisores en el mismo round-trip.
+- **2026-05-26** — Iniciativa cerrada. Sprint 2.5 (columnas
+  colapsables) queda como salida si la densidad molesta en uso.
 
 ## Riesgos / open topics
 
