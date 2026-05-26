@@ -299,7 +299,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'DILESA Facturas <facturas@dilesa.mx>',
+      // El plan free de Resend solo permite 1 dominio verificado y en este
+      // workspace ya está usado por `bsop.io` (mismo patrón que lib/juntas/email.ts).
+      // El display "DILESA Facturas" preserva el branding al contratista;
+      // `reply_to` redirige las respuestas al buzón real de DILESA.
+      from: 'DILESA Facturas <facturas@bsop.io>',
+      reply_to: 'facturas@dilesa.mx',
       to: [to],
       subject,
       html,
