@@ -4,10 +4,12 @@
 **Empresas:** DILESA (v1) — patrón abierto a RDB/ANSA/COAGAN post-validación
 **Schemas afectados:** ninguno (derivación client-side desde el mismo
 dataset que la tabla; cero DDL nuevo)
-**Estado:** planned
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-05-25
-**Última actualización:** 2026-05-25 (planning doc + promovida)
+**Última actualización:** 2026-05-26 (Sprint 4 closeout — iniciativa cerrada; 7 PRs mergeados en 1 día; 55 KPIs reactivos en DILESA Operativo)
+**Cerrada:** 2026-05-26  
+**PRs:** [#529](https://github.com/beto-sudo/BSOP/pull/529) · [#531](https://github.com/beto-sudo/BSOP/pull/531) · [#532](https://github.com/beto-sudo/BSOP/pull/532) · [#533](https://github.com/beto-sudo/BSOP/pull/533) · [#534](https://github.com/beto-sudo/BSOP/pull/534) · [#535](https://github.com/beto-sudo/BSOP/pull/535) · [#537](https://github.com/beto-sudo/BSOP/pull/537) · [#538](https://github.com/beto-sudo/BSOP/pull/538) · [#539](https://github.com/beto-sudo/BSOP/pull/539)
 
 ## Problema
 
@@ -456,7 +458,15 @@ IS NOT NULL` es la señal canónica de venta completada. Wording
     facturada), Pagadas, Neto total, Pendiente pago $.
     Pivotes documentados en headers de cada `deriveKpis` (mismo principio
     que tabs 1-5 de Ventas — usar agregados client-side, no agregar
-    queries extra). **Sprint 3 cierra**. Próximo: Sprint 4 (closeout).
+    queries extra). PR #538 mergeado.
+- **2026-05-26** — Sprint 4 (closeout): refresh
+  `docs/architecture/ARCHITECTURE.md` §5 con 1 línea para ADR-034
+  (regla blanda de mantenimiento). Decisión sobre Playtomic: queda
+  como excepción documentada — su `<KpiCard>` propio con 6 KPIs
+  preexiste y no se refactoriza en v1 (es RDB, fuera de alcance
+  DILESA). Iniciativa hermana RDB/ANSA en backlog: primitiva
+  `<ModuleKpiStrip>` + ADR-034 listos para piggyback sin reinventar.
+  Fila movida a `## Done` en INITIATIVES.md. **Iniciativa CERRADA**.
 
 ## Riesgos / open topics
 
