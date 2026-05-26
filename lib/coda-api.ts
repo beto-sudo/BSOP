@@ -62,6 +62,16 @@ export class CodaClient {
     return res.json() as Promise<T>;
   }
 
+  /**
+   * Devuelve el `rowCount` reportado por Coda para una tabla, en 1 request.
+   * Muchísimo más rápido que `listRowsAll` cuando solo necesitas el total
+   * (no las filas) — útil para reconciliación post-sync.
+   */
+  async getTableRowCount(docId: string, tableId: string): Promise<number> {
+    const data = await this.get<{ rowCount?: number }>(`/docs/${docId}/tables/${tableId}`);
+    return data.rowCount ?? 0;
+  }
+
   async listColumns(docId: string, tableId: string): Promise<CodaColumn[]> {
     const data = await this.get<{ items: CodaColumn[]; nextPageToken?: string }>(
       `/docs/${docId}/tables/${tableId}/columns`

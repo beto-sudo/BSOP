@@ -19,17 +19,23 @@
  *   CODA_API_KEY, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
  *   RESEND_API_KEY, NOTIFY_EMAIL
  *
+ * CODA_API_KEY también se usa al final para snapshot de paridad (rowCount
+ * por tabla con mapping 1:1) — se muestra como columna "Coda" en el email
+ * con flag de drift. Si falla, se omite la columna sin romper el sync.
+ *
  * Exit code: 0 si todos los pasos OK, 1 si algún paso falló (CI marca
  * el job como rojo y aparte ya mandó email).
  */
 
 import { spawn } from 'node:child_process';
 import { createClient } from '@supabase/supabase-js';
+import { CodaClient } from '../lib/coda-api';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY ?? '';
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL ?? '';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
+const CODA_API_KEY = process.env.CODA_API_KEY ?? '';
 // Para usar un dominio propio (más pro), verifícalo en Resend → Domains y
 // override con el secret SYNC_FROM_EMAIL. **Usamos `||` no `??`**: GH
 // Actions setea SYNC_FROM_EMAIL como env var vacía cuando el secret no
@@ -42,6 +48,24 @@ if (!NOTIFY_EMAIL) throw new Error('Falta NOTIFY_EMAIL');
 if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('Faltan credenciales de Supabase');
 
 const DILESA_EMPRESA_ID = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479';
+
+/**
+ * IDs de Coda para reconciliación post-sync. Doc DILESA `ZNxWl_DI2D`.
+ * Solo tablas con mapping 1:1 limpio — derivadas (estimaciones) y agregados
+ * (catálogos N:1) NO se incluyen porque su comparación requiere lógica que
+ * no aporta tanto en el email.
+ */
+const CODA_DOC = 'ZNxWl_DI2D';
+const CODA_TABLES = {
+  contratistas: 'grid-b-HTXuSZp4',
+  contratos_construccion: 'grid-OWReJ19erT',
+  construcciones: 'grid-CkajhVirlg',
+  tareas_terminadas: 'grid-fJSixLw1DF',
+  ventas: 'grid-mMIXWCSfyr', // tabla "Clientes" en Coda — 1 cliente = 1 venta
+  pagos: 'grid-Foeo80pE3s', // tabla "Depósitos" en Coda
+} as const;
+
+type CodaCounts = Partial<Record<keyof typeof CODA_TABLES, number>>;
 
 /**
  * Sync orquestador — 3 modos según volumen y costo:
@@ -111,6 +135,29 @@ type Counts = {
   estimaciones: number;
   estimacion_tareas: number;
 };
+
+/**
+ * Cuenta rows reportadas por Coda para las tablas con mapping 1:1.
+ * 1 HTTP request por tabla (endpoint `/tables/{id}` devuelve `rowCount`).
+ * Si CODA_API_KEY no está set o algo falla, devuelve null y el email
+ * omite la columna — no bloquea el sync.
+ */
+async function takeCodaSnapshot(): Promise<CodaCounts | null> {
+  if (!CODA_API_KEY) return null;
+  try {
+    const coda = new CodaClient(CODA_API_KEY);
+    const out: CodaCounts = {};
+    for (const [key, tableId] of Object.entries(CODA_TABLES) as Array<
+      [keyof typeof CODA_TABLES, string]
+    >) {
+      out[key] = await coda.getTableRowCount(CODA_DOC, tableId);
+    }
+    return out;
+  } catch (e) {
+    console.error(`✗ Coda snapshot falló (no fatal): ${(e as Error).message}`);
+    return null;
+  }
+}
 
 async function takeSnapshot(): Promise<Counts> {
   const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -216,14 +263,38 @@ function fmtRowCells(pre: number, post: number): { antes: string; despues: strin
   };
 }
 
+/**
+ * Celda "Coda" del email — paridad vs BSOP post-sync.
+ *  - undefined (sin pareo en Coda) → dash gris claro.
+ *  - Coda === post                 → verde (paridad).
+ *  - Coda  >  post                 → rojo bold (faltan rows en BSOP, drift real).
+ *  - Coda  <  post                 → naranja (BSOP > Coda, normalmente nativos BSOP).
+ */
+function fmtCodaCell(post: number, coda?: number): string {
+  if (coda === undefined) return `<span style="color:#ccc">—</span>`;
+  const fmt = (n: number) => n.toLocaleString('es-MX');
+  const c = fmt(coda);
+  if (coda === post) {
+    return `<span style="color:#0a8a3a">${c}</span>`;
+  }
+  if (coda > post) {
+    const missing = fmt(coda - post);
+    return `<span style="color:#c0392b;font-weight:600" title="Coda tiene ${missing} rows que no están en BSOP">${c} <small>(faltan ${missing})</small></span>`;
+  }
+  const extra = fmt(post - coda);
+  return `<span style="color:#e67e22" title="BSOP tiene ${extra} rows que no vienen de Coda (nativos)">${c} <small>(+${extra} nat.)</small></span>`;
+}
+
 function buildHtml(opts: {
   status: 'ok' | 'fail';
   pre: Counts;
   post: Counts;
+  coda: CodaCounts | null;
   steps: StepResult[];
   totalMs: number;
 }): { subject: string; html: string } {
-  const { status, pre, post, steps, totalMs } = opts;
+  const { status, pre, post, coda, steps, totalMs } = opts;
+  const includeCoda = coda !== null;
   const today = new Date().toLocaleDateString('es-MX', {
     weekday: 'long',
     day: '2-digit',
@@ -237,40 +308,51 @@ function buildHtml(opts: {
 
   const rows = (
     [
-      ['Terrenos', pre.terrenos, post.terrenos],
-      ['Proyectos', pre.proyectos, post.proyectos],
-      ['Unidades', pre.unidades, post.unidades],
-      ['Ventas', pre.ventas, post.ventas],
-      ['Personas (clientes)', pre.personas_cliente, post.personas_cliente],
-      ['Pagos', pre.pagos, post.pagos],
-      ['Fases del pipeline', pre.fases, post.fases],
-      ['Adjuntos venta', pre.adjuntos_venta, post.adjuntos_venta],
-      ['Adjuntos venta_pago', pre.adjuntos_pago, post.adjuntos_pago],
-      ['Contratistas', pre.personas_contratista, post.personas_contratista],
-      ['Contratos construcción', pre.contratos_construccion, post.contratos_construccion],
-      ['Construcciones (obras)', pre.construcciones, post.construcciones],
-      ['Tareas terminadas', pre.tareas_terminadas, post.tareas_terminadas],
-      ['Estimaciones', pre.estimaciones, post.estimaciones],
-      ['Estimación-tareas (vínculos)', pre.estimacion_tareas, post.estimacion_tareas],
-    ] as [string, number, number][]
+      ['Terrenos', pre.terrenos, post.terrenos, undefined],
+      ['Proyectos', pre.proyectos, post.proyectos, undefined],
+      ['Unidades', pre.unidades, post.unidades, undefined],
+      ['Ventas', pre.ventas, post.ventas, coda?.ventas],
+      ['Personas (clientes)', pre.personas_cliente, post.personas_cliente, undefined],
+      ['Pagos', pre.pagos, post.pagos, coda?.pagos],
+      ['Fases del pipeline', pre.fases, post.fases, undefined],
+      ['Adjuntos venta', pre.adjuntos_venta, post.adjuntos_venta, undefined],
+      ['Adjuntos venta_pago', pre.adjuntos_pago, post.adjuntos_pago, undefined],
+      ['Contratistas', pre.personas_contratista, post.personas_contratista, coda?.contratistas],
+      [
+        'Contratos construcción',
+        pre.contratos_construccion,
+        post.contratos_construccion,
+        coda?.contratos_construccion,
+      ],
+      ['Construcciones (obras)', pre.construcciones, post.construcciones, coda?.construcciones],
+      ['Tareas terminadas', pre.tareas_terminadas, post.tareas_terminadas, coda?.tareas_terminadas],
+      ['Estimaciones', pre.estimaciones, post.estimaciones, undefined],
+      ['Estimación-tareas (vínculos)', pre.estimacion_tareas, post.estimacion_tareas, undefined],
+    ] as [string, number, number, number | undefined][]
   )
-    .map(([label, p, q]) => {
+    .map(([label, p, q, codaCount]) => {
       const cells = fmtRowCells(p, q);
+      const codaTd = includeCoda
+        ? `<td style="padding:4px 0 4px 12px;font-family:monospace;text-align:right">${fmtCodaCell(q, codaCount)}</td>`
+        : '';
       return `<tr>
   <td style="padding:4px 12px 4px 0">${label}</td>
   <td style="padding:4px 12px 4px 0;font-family:monospace;text-align:right;color:#888">${cells.antes}</td>
   <td style="padding:4px 12px 4px 0;font-family:monospace;text-align:right">${cells.despues}</td>
-  <td style="padding:4px 0;font-family:monospace;text-align:right">${cells.delta}</td>
+  <td style="padding:4px 12px 4px 0;font-family:monospace;text-align:right">${cells.delta}</td>${codaTd}
 </tr>`;
     })
     .join('');
 
+  const codaTh = includeCoda
+    ? `<th style="padding:4px 0 6px 12px;text-align:right;font-size:11px;color:#666;font-weight:600;text-transform:uppercase">Coda</th>`
+    : '';
   const tableHeader = `<thead>
   <tr style="border-bottom:1px solid #ddd">
     <th style="padding:4px 12px 6px 0;text-align:left;font-size:11px;color:#666;font-weight:600;text-transform:uppercase">Tabla</th>
     <th style="padding:4px 12px 6px 0;text-align:right;font-size:11px;color:#666;font-weight:600;text-transform:uppercase">Antes</th>
     <th style="padding:4px 12px 6px 0;text-align:right;font-size:11px;color:#666;font-weight:600;text-transform:uppercase">Después</th>
-    <th style="padding:4px 0 6px 0;text-align:right;font-size:11px;color:#666;font-weight:600;text-transform:uppercase">Δ</th>
+    <th style="padding:4px 12px 6px 0;text-align:right;font-size:11px;color:#666;font-weight:600;text-transform:uppercase">Δ</th>${codaTh}
   </tr>
 </thead>`;
 
@@ -300,8 +382,13 @@ function buildHtml(opts: {
     ${steps.length === SCRIPTS.length ? `· ${steps.filter((s) => s.ok).length}/${steps.length} pasos OK` : ''}
   </p>
 
-  <h3 style="margin:16px 0 4px">Conteos (antes → después)</h3>
+  <h3 style="margin:16px 0 4px">Conteos (antes → después${includeCoda ? ' · paridad con Coda' : ''})</h3>
   <table style="border-collapse:collapse">${tableHeader}<tbody>${rows}</tbody></table>
+  ${
+    includeCoda
+      ? `<p style="color:#888;font-size:11px;margin:6px 0 0">Coda en <span style="color:#0a8a3a">verde</span> = paridad. <span style="color:#c0392b">Rojo</span> = Coda tiene más rows que BSOP (algo no se importó). <span style="color:#e67e22">Naranja</span> = BSOP &gt; Coda (rows nativos BSOP, normal en ventas/pagos).</p>`
+      : ''
+  }
 
   <h3 style="margin:24px 0 4px">Pasos</h3>
   <table style="border-collapse:collapse">${stepRows}</table>
@@ -374,6 +461,14 @@ async function main(): Promise<void> {
   const post = await takeSnapshot();
   console.log(`  ventas: ${post.ventas}, adjuntos: ${post.adjuntos_venta + post.adjuntos_pago}`);
 
+  console.log('\nSnapshot Coda (paridad)...');
+  const coda = await takeCodaSnapshot();
+  if (coda) {
+    console.log(`  contratistas: ${coda.contratistas}, tareas: ${coda.tareas_terminadas}`);
+  } else {
+    console.log('  (omitido — sin CODA_API_KEY o error de red)');
+  }
+
   const totalMs = Date.now() - t0;
   console.log(`\n=== Total: ${fmtDuration(totalMs)} ===`);
 
@@ -381,6 +476,7 @@ async function main(): Promise<void> {
     status: anyFail ? 'fail' : 'ok',
     pre,
     post,
+    coda,
     steps,
     totalMs,
   });
