@@ -193,11 +193,27 @@ function fmtDuration(ms: number): string {
   return `${m}m ${rs}s`;
 }
 
-function fmtDiff(pre: number, post: number): string {
+/** Devuelve los 3 strings que van a las 3 columnas del email: Antes, Después,
+ *  Δ con color (verde si suma, rojo si resta, gris si igual). */
+function fmtRowCells(pre: number, post: number): { antes: string; despues: string; delta: string } {
   const d = post - pre;
-  if (d === 0) return `${post.toLocaleString('es-MX')}`;
-  const sign = d > 0 ? '+' : '';
-  return `${post.toLocaleString('es-MX')} (${sign}${d.toLocaleString('es-MX')})`;
+  const fmt = (n: number) => n.toLocaleString('es-MX');
+  const antes = fmt(pre);
+  const despues = fmt(post);
+  if (d === 0) {
+    return {
+      antes,
+      despues,
+      delta: `<span style="color:#999">—</span>`,
+    };
+  }
+  const color = d > 0 ? '#0a8a3a' : '#c0392b';
+  const sign = d > 0 ? '+' : '−';
+  return {
+    antes,
+    despues,
+    delta: `<span style="color:${color};font-weight:600">${sign}${fmt(Math.abs(d))}</span>`,
+  };
 }
 
 function buildHtml(opts: {
@@ -238,11 +254,25 @@ function buildHtml(opts: {
       ['Estimación-tareas (vínculos)', pre.estimacion_tareas, post.estimacion_tareas],
     ] as [string, number, number][]
   )
-    .map(
-      ([label, p, q]) =>
-        `<tr><td style="padding:4px 12px 4px 0">${label}</td><td style="padding:4px 0;font-family:monospace;text-align:right">${fmtDiff(p, q)}</td></tr>`
-    )
+    .map(([label, p, q]) => {
+      const cells = fmtRowCells(p, q);
+      return `<tr>
+  <td style="padding:4px 12px 4px 0">${label}</td>
+  <td style="padding:4px 12px 4px 0;font-family:monospace;text-align:right;color:#888">${cells.antes}</td>
+  <td style="padding:4px 12px 4px 0;font-family:monospace;text-align:right">${cells.despues}</td>
+  <td style="padding:4px 0;font-family:monospace;text-align:right">${cells.delta}</td>
+</tr>`;
+    })
     .join('');
+
+  const tableHeader = `<thead>
+  <tr style="border-bottom:1px solid #ddd">
+    <th style="padding:4px 12px 6px 0;text-align:left;font-size:11px;color:#666;font-weight:600;text-transform:uppercase">Tabla</th>
+    <th style="padding:4px 12px 6px 0;text-align:right;font-size:11px;color:#666;font-weight:600;text-transform:uppercase">Antes</th>
+    <th style="padding:4px 12px 6px 0;text-align:right;font-size:11px;color:#666;font-weight:600;text-transform:uppercase">Después</th>
+    <th style="padding:4px 0 6px 0;text-align:right;font-size:11px;color:#666;font-weight:600;text-transform:uppercase">Δ</th>
+  </tr>
+</thead>`;
 
   const stepRows = steps
     .map(
@@ -271,7 +301,7 @@ function buildHtml(opts: {
   </p>
 
   <h3 style="margin:16px 0 4px">Conteos (antes → después)</h3>
-  <table style="border-collapse:collapse">${rows}</table>
+  <table style="border-collapse:collapse">${tableHeader}<tbody>${rows}</tbody></table>
 
   <h3 style="margin:24px 0 4px">Pasos</h3>
   <table style="border-collapse:collapse">${stepRows}</table>
