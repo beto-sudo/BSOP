@@ -27,12 +27,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { usePermissions } from '@/components/providers';
-import { DataTable, type Column } from '@/components/module-page';
+import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { HardHat, Plus, RefreshCw, Search } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { formatPercent } from '@/lib/format';
 
 type ConstruccionRow = {
   id: string;
@@ -48,7 +49,7 @@ type ConstruccionRow = {
   estado: string;
 };
 
-type ConstruccionListaRow = ConstruccionRow & {
+export type ConstruccionListaRow = ConstruccionRow & {
   /** Identificador "Coda-style": M3-L9-LDLE-ISC (con sufijo prototipo). */
   identificadorCompleto: string;
   proyectoNombre: string;
@@ -56,6 +57,43 @@ type ConstruccionListaRow = ConstruccionRow & {
   contratistaNombre: string;
   contratistaAbreviacion: string | null;
 };
+
+/** Estados que cuentan como "en progreso" (consumen recursos hoy). */
+const ESTADOS_EN_PROGRESO = new Set(['arrancada', 'en_progreso']);
+/** Estados que cuentan como "terminada" en el ciclo de obra. */
+const ESTADOS_TERMINADAS = new Set(['terminada', 'dtu', 'seguro_calidad', 'extraida']);
+
+/**
+ * KPIs reactivos a filtros — ADR-034.
+ * 1,372 obras importadas históricas + nuevas. `avance_pct` se mantiene
+ * actualizado por trigger `tg_construccion_avance` (ADR-032).
+ *
+ * KPIs:
+ * 1. Obras totales — `rows.length`.
+ * 2. En progreso — `count(estado IN arrancada|en_progreso)`.
+ * 3. Avance promedio — `mean(avance_pct) / 100` con formatPercent.
+ * 4. Terminadas — `count(estado IN terminada|dtu|seguro_calidad|extraida)`.
+ * 5. Próximas a terminar — `count(avance_pct >= 80 AND no terminada)` —
+ *    señal directa de "qué entrego pronto".
+ */
+export function deriveKpis(rows: readonly ConstruccionListaRow[]): readonly ModuleKpi[] {
+  const total = rows.length;
+  const enProgreso = rows.filter((o) => ESTADOS_EN_PROGRESO.has(o.estado)).length;
+  const terminadas = rows.filter((o) => ESTADOS_TERMINADAS.has(o.estado)).length;
+  const proximasATerminar = rows.filter(
+    (o) => (o.avance_pct ?? 0) >= 80 && !ESTADOS_TERMINADAS.has(o.estado)
+  ).length;
+  const avancePromedio =
+    total === 0 ? null : rows.reduce((a, o) => a + (o.avance_pct ?? 0), 0) / total / 100;
+
+  return [
+    { key: 'total', label: 'Obras', value: total },
+    { key: 'en_progreso', label: 'En progreso', value: enProgreso },
+    { key: 'avance', label: 'Avance promedio', value: formatPercent(avancePromedio) },
+    { key: 'terminadas', label: 'Terminadas', value: terminadas },
+    { key: 'proximas', label: 'Próximas a entregar', value: proximasATerminar },
+  ];
+}
 
 const ESTADO_TONE: Record<string, BadgeTone> = {
   arrancada: 'info',
@@ -291,6 +329,8 @@ export function ConstruccionModule({ empresaId }: { empresaId: string }) {
     });
   }, [obras, search, proyectoFiltro, contratistaFiltro, estadoFiltro, avanceFiltro]);
 
+  const kpis = useMemo(() => deriveKpis(filtrados), [filtrados]);
+
   const columns: Column<ConstruccionListaRow>[] = [
     {
       key: 'identificadorCompleto',
@@ -361,6 +401,8 @@ export function ConstruccionModule({ empresaId }: { empresaId: string }) {
           </p>
         </div>
       </header>
+
+      <ModuleKpiStrip stats={kpis} cols={5} />
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">

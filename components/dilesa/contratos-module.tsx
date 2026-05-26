@@ -26,12 +26,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { usePermissions } from '@/components/providers';
-import { DataTable, type Column } from '@/components/module-page';
+import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
 import { Input } from '@/components/ui/input';
 import { FileText, Plus, RefreshCw, Search } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { formatCurrency } from '@/lib/format';
 
-type ContratoRow = {
+export type ContratoRow = {
   id: string;
   codigo: string;
   fecha_contrato: string;
@@ -46,6 +47,53 @@ type ContratoRow = {
   /** Computed: count de contrato_lotes (no soft-deleted). */
   lotesCount: number;
 };
+
+/**
+ * KPIs reactivos a filtros — ADR-034. Pivote vs curaduría: "% consumido
+ * promedio" y "próximo vencimiento" no son derivables del row plano.
+ * Reemplazados por agregados del portafolio de contratos.
+ */
+export function deriveKpis(rows: readonly ContratoRow[]): readonly ModuleKpi[] {
+  const total = rows.length;
+  const valorTotal = rows.reduce((acc, r) => acc + (r.valor_total ?? 0), 0);
+  const lotesAsignados = rows.reduce((acc, r) => acc + r.lotesCount, 0);
+  const promedio = total === 0 ? null : valorTotal / total;
+
+  const porContratista = new Map<string, number>();
+  for (const r of rows) {
+    porContratista.set(r.contratistaNombre, (porContratista.get(r.contratistaNombre) ?? 0) + 1);
+  }
+  let topContratista: string | null = null;
+  let topCount = 0;
+  for (const [nombre, count] of [...porContratista.entries()].sort(([a], [b]) =>
+    a.localeCompare(b, 'es')
+  )) {
+    if (count > topCount) {
+      topCount = count;
+      topContratista = nombre;
+    }
+  }
+
+  return [
+    { key: 'total', label: 'Contratos', value: total },
+    {
+      key: 'valor',
+      label: 'Valor total',
+      value: total === 0 ? '—' : formatCurrency(valorTotal, { compact: true }),
+    },
+    { key: 'lotes', label: 'Lotes asignados', value: lotesAsignados },
+    {
+      key: 'promedio',
+      label: 'Promedio/contrato',
+      value: promedio == null ? '—' : formatCurrency(promedio, { compact: true }),
+    },
+    {
+      key: 'top',
+      label: 'Top contratista',
+      value: topContratista ? `${topContratista} (${topCount})` : '—',
+    },
+  ];
+}
 
 export function ContratosModule({ empresaId }: { empresaId: string }) {
   const router = useRouter();
@@ -201,6 +249,8 @@ export function ContratosModule({ empresaId }: { empresaId: string }) {
     });
   }, [contratos, search, contratistaFiltro, proyectoFiltro]);
 
+  const kpis = useMemo(() => deriveKpis(filtrados), [filtrados]);
+
   const columns: Column<ContratoRow>[] = [
     {
       key: 'codigo',
@@ -254,6 +304,8 @@ export function ContratosModule({ empresaId }: { empresaId: string }) {
           </p>
         </div>
       </header>
+
+      <ModuleKpiStrip stats={kpis} cols={5} />
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">
