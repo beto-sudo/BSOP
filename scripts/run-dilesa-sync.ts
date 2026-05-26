@@ -30,6 +30,12 @@
 import { spawn } from 'node:child_process';
 import { createClient } from '@supabase/supabase-js';
 import { CodaClient } from '../lib/coda-api';
+import {
+  getDefinitionBySlug,
+  renderSubject,
+  splitRecipientsExtra,
+  writeNotificationLog,
+} from '../lib/notifications';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY ?? '';
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL ?? '';
@@ -412,26 +418,91 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
-async function sendEmail(subject: string, html: string): Promise<void> {
+/**
+ * Envía el reporte de sync vía Resend, leyendo overrides runtime del catálogo
+ * `core.notification_definitions` (slug `dilesa_sync_report`) y escribiendo
+ * fila en `core.notification_log`. Iniciativa notificaciones-catalogo · S2.
+ *
+ * Fail-open: si la definición no se puede leer o `activo=false`, NO bloquea
+ * el envío con la config hardcoded — el sync nocturno debe seguir llegando
+ * incluso si la DB tiene problemas. El kill switch real es desactivar el
+ * GitHub Actions workflow.
+ */
+async function sendEmail(subject: string, html: string, fecha: string): Promise<void> {
+  const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+  const def = await getDefinitionBySlug(sb, 'dilesa_sync_report');
+
+  // Defaults hardcoded (estado pre-iniciativa) — usados si def es null.
+  let fromAddress = FROM_EMAIL;
+  let replyTo: string | null = null;
+  let finalSubject = subject;
+  let toList = [NOTIFY_EMAIL];
+  let ccList: string[] = [];
+  let bccList: string[] = [];
+
+  if (def) {
+    if (!def.activo) {
+      console.log('⚠ dilesa_sync_report.activo=false — skip envío');
+      await writeNotificationLog(sb, {
+        definitionId: def.id,
+        status: 'skipped',
+        recipients: { to: toList },
+        subject: finalSubject,
+      });
+      return;
+    }
+    const fromName = def.from_name ? `${def.from_name} <${def.from_email}>` : def.from_email;
+    fromAddress = fromName;
+    replyTo = def.reply_to;
+    finalSubject = renderSubject(def.subject_template, { fecha });
+    // Manda con el subject del helper si trae '✓ ' / '✗ ' del status, sino
+    // usa el template editable de la definition.
+    if (subject.startsWith('✗')) finalSubject = subject; // preserva el fail marker
+    const extras = splitRecipientsExtra(def.recipients_extra);
+    toList = [NOTIFY_EMAIL, ...extras.to];
+    ccList = extras.cc;
+    bccList = extras.bcc;
+  }
+
+  const body: Record<string, unknown> = {
+    from: fromAddress,
+    to: toList,
+    subject: finalSubject,
+    html,
+  };
+  if (replyTo) body.reply_to = replyTo;
+  if (ccList.length) body.cc = ccList;
+  if (bccList.length) body.bcc = bccList;
+
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${RESEND_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      from: FROM_EMAIL,
-      to: [NOTIFY_EMAIL],
-      subject,
-      html,
-    }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const text = await res.text();
     console.error(`✗ Resend error ${res.status}: ${text}`);
+    await writeNotificationLog(sb, {
+      definitionId: def?.id ?? null,
+      status: 'failed',
+      recipients: { to: toList, cc: ccList, bcc: bccList },
+      subject: finalSubject,
+      errorMessage: `Resend ${res.status}: ${text}`.slice(0, 1000),
+    });
     return;
   }
+  const json = (await res.json().catch(() => null)) as { id?: string } | null;
   console.log(`✔ Email enviado a ${NOTIFY_EMAIL}`);
+  await writeNotificationLog(sb, {
+    definitionId: def?.id ?? null,
+    status: 'sent',
+    recipients: { to: toList, cc: ccList, bcc: bccList },
+    subject: finalSubject,
+    resendId: json?.id ?? null,
+  });
 }
 
 async function main(): Promise<void> {
@@ -472,6 +543,12 @@ async function main(): Promise<void> {
   const totalMs = Date.now() - t0;
   console.log(`\n=== Total: ${fmtDuration(totalMs)} ===`);
 
+  const today = new Date().toLocaleDateString('es-MX', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  });
   const { subject, html } = buildHtml({
     status: anyFail ? 'fail' : 'ok',
     pre,
@@ -480,7 +557,7 @@ async function main(): Promise<void> {
     steps,
     totalMs,
   });
-  await sendEmail(subject, html);
+  await sendEmail(subject, html, today);
 
   if (anyFail) process.exit(1);
 }
@@ -488,8 +565,15 @@ async function main(): Promise<void> {
 void main().catch((e) => {
   console.error('Error fatal:', e);
   // Best-effort email del fatal antes de salir
+  const today = new Date().toLocaleDateString('es-MX', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  });
   void sendEmail(
     `✗✗ Sync DILESA Coda→BSOP — error FATAL`,
-    `<pre>${escapeHtml((e as Error).stack ?? String(e))}</pre>`
+    `<pre>${escapeHtml((e as Error).stack ?? String(e))}</pre>`,
+    today
   ).finally(() => process.exit(1));
 });

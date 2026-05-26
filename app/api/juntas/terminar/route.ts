@@ -122,7 +122,12 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const result = await sendMinutaEmail(resendKey, payload);
+  const result = await sendMinutaEmail(resendKey, payload, {
+    sb: supabase,
+    slug: 'junta_minuta',
+    empresaId: payload.empresaId,
+    juntaId,
+  });
   if (!result.ok) {
     return NextResponse.json({ success: true, emailsSent: 0, emailError: result.emailError });
   }

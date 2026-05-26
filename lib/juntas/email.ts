@@ -6,6 +6,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { rewriteHtmlImagesWithSignedUrls } from '@/lib/adjuntos';
 import { fetchJuntaUpdates } from '@/lib/juntas/fetch-updates';
+import {
+  getDefinitionBySlug,
+  splitRecipientsExtra,
+  writeNotificationLog,
+} from '@/lib/notifications';
 
 // 1 año — los correos pueden abrirse meses después (archivo, reenvíos).
 // La firma es server-side con service role, sin costo por TTLs largos.
@@ -280,6 +285,9 @@ export async function buildMinutaEmailPayload(
       from: string;
       recipients: string[];
       asistentesCount: number;
+      /** Empresa context para el catálogo de notificaciones (S2 iniciativa
+       *  notificaciones-catalogo). NULL si la junta no tiene empresa. */
+      empresaId: string | null;
     }
   | { ok: false; status: number; error: string }
 > {
@@ -458,27 +466,118 @@ export async function buildMinutaEmailPayload(
     from: fromAddress,
     recipients,
     asistentesCount: asistentes.length,
+    empresaId,
   };
 }
 
+/**
+ * Envía la minuta vía Resend con overrides runtime del catálogo
+ * `core.notification_definitions` (slug `junta_minuta` o `junta_reenviar`)
+ * + log post-envío. Iniciativa notificaciones-catalogo · S2.
+ *
+ * Fail-open: si la definition no se puede leer, usa el `payload` original
+ * (config hardcoded de hoy). El kill switch (activo=false) SÍ se respeta y
+ * skipea el envío, escribiendo log con status=skipped.
+ *
+ * Lookup empresa-aware: primero busca override per-empresa con el `slug`
+ * dado; si no existe, cae a la definition global (mismo slug, empresa NULL).
+ */
 export async function sendMinutaEmail(
   resendKey: string,
-  payload: { html: string; subject: string; from: string; recipients: string[] }
+  payload: { html: string; subject: string; from: string; recipients: string[] },
+  opts: {
+    sb: SupabaseClient;
+    slug: 'junta_minuta' | 'junta_reenviar';
+    empresaId: string | null;
+    juntaId: string;
+    triggeredByUserId?: string | null;
+  }
 ): Promise<{ ok: true; emailId: string } | { ok: false; emailError: unknown }> {
+  const { sb, slug, empresaId, juntaId, triggeredByUserId } = opts;
+  const def = await getDefinitionBySlug(sb, slug, empresaId);
+
+  // Defaults vienen del payload (config legacy de hoy).
+  let fromAddress = payload.from;
+  let replyTo: string | null = null;
+  let toList = payload.recipients;
+  let ccList: string[] = [];
+  let bccList: string[] = [];
+
+  if (def) {
+    if (!def.activo) {
+      console.log(`[juntas/email] ${slug}.activo=false — skip`);
+      await writeNotificationLog(sb, {
+        definitionId: def.id,
+        empresaId,
+        status: 'skipped',
+        recipients: { to: toList },
+        subject: payload.subject,
+        triggeredByUserId,
+        context: { juntaId },
+      });
+      return { ok: false, emailError: { skipped: true, reason: 'kill_switch' } };
+    }
+    // Override del FROM solo si la definition tiene from_email distinto del
+    // default global — para minutas, lo común es que la def per-empresa
+    // sobrescriba (cuando exista). Por ahora si la def NO tiene override
+    // específico, respetamos el `payload.from` que ya viene branded.
+    if (def.from_email && def.from_email !== 'noreply@bsop.io') {
+      fromAddress = def.from_name ? `${def.from_name} <${def.from_email}>` : def.from_email;
+    } else if (def.from_name) {
+      // Caso global: from_name del catálogo aplica si se quiere overridear.
+      fromAddress = `${def.from_name} <noreply@bsop.io>`;
+    }
+    replyTo = def.reply_to;
+    const extras = splitRecipientsExtra(def.recipients_extra);
+    toList = Array.from(new Set([...payload.recipients, ...extras.to]));
+    ccList = extras.cc;
+    bccList = extras.bcc;
+  }
+
+  const resendBody: Record<string, unknown> = {
+    from: fromAddress,
+    to: toList,
+    subject: payload.subject,
+    html: payload.html,
+  };
+  if (replyTo) resendBody.reply_to = replyTo;
+  if (ccList.length) resendBody.cc = ccList;
+  if (bccList.length) resendBody.bcc = bccList;
+
   const emailRes = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${resendKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      from: payload.from,
-      to: payload.recipients,
-      subject: payload.subject,
-      html: payload.html,
-    }),
+    body: JSON.stringify(resendBody),
   });
   const result = await emailRes.json();
-  if (!emailRes.ok) return { ok: false, emailError: result };
+
+  if (!emailRes.ok) {
+    await writeNotificationLog(sb, {
+      definitionId: def?.id ?? null,
+      empresaId,
+      status: 'failed',
+      recipients: { to: toList, cc: ccList, bcc: bccList },
+      subject: payload.subject,
+      errorMessage: `Resend ${emailRes.status}: ${JSON.stringify(result).slice(0, 800)}`,
+      triggeredByUserId,
+      context: { juntaId },
+    });
+    return { ok: false, emailError: result };
+  }
+
+  await writeNotificationLog(sb, {
+    definitionId: def?.id ?? null,
+    empresaId,
+    status: 'sent',
+    recipients: { to: toList, cc: ccList, bcc: bccList },
+    subject: payload.subject,
+    resendId: (result as { id?: string }).id ?? null,
+    triggeredByUserId,
+    context: { juntaId },
+  });
+
   return { ok: true, emailId: result.id };
 }

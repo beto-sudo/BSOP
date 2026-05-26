@@ -6,6 +6,12 @@ import { welcomeEmailRateLimiter, extractIdentifier } from '@/lib/ratelimit';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/empresas/admin-guard';
+import {
+  getDefinitionBySlug,
+  renderSubject,
+  splitRecipientsExtra,
+  writeNotificationLog,
+} from '@/lib/notifications';
 
 const LOGO_MAP: Record<string, string> = {
   rdb: 'https://bsop.io/logo-rdb.png',
@@ -102,26 +108,84 @@ export async function POST(req: NextRequest) {
 
   console.log('[welcome-email-api] Sending welcome email');
 
+  // Iniciativa notificaciones-catalogo · S2: lee overrides runtime + log post-envío.
+  const def = await getDefinitionBySlug(adminClient, 'welcome');
+
+  // Defaults hardcoded como fallback fail-open (estado pre-iniciativa).
+  let fromAddress = 'BSOP <noreply@bsop.io>';
+  let replyTo: string | null = null;
+  let finalSubject = '¡Bienvenido a BSOP! Tu cuenta está lista';
+  let toList = [email];
+  let ccList: string[] = [];
+  let bccList: string[] = [];
+
+  if (def) {
+    if (!def.activo) {
+      console.log('[welcome-email-api] def.activo=false — skip');
+      await writeNotificationLog(adminClient, {
+        definitionId: def.id,
+        status: 'skipped',
+        recipients: { to: toList },
+        subject: finalSubject,
+        context: { usuarioId, email },
+      });
+      return NextResponse.json({ success: true, skipped: true });
+    }
+    fromAddress = def.from_name ? `${def.from_name} <${def.from_email}>` : def.from_email;
+    replyTo = def.reply_to;
+    finalSubject = renderSubject(def.subject_template, {
+      firstName: firstName || email,
+    });
+    const extras = splitRecipientsExtra(def.recipients_extra);
+    toList = [email, ...extras.to];
+    ccList = extras.cc;
+    bccList = extras.bcc;
+  }
+
+  const body: Record<string, unknown> = {
+    from: fromAddress,
+    to: toList,
+    subject: finalSubject,
+    html,
+  };
+  if (replyTo) body.reply_to = replyTo;
+  if (ccList.length) body.cc = ccList;
+  if (bccList.length) body.bcc = bccList;
+
   const emailRes = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${resendKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      from: 'BSOP <noreply@bsop.io>',
-      to: [email],
-      subject: '¡Bienvenido a BSOP! Tu cuenta está lista',
-      html,
-    }),
+    body: JSON.stringify(body),
   });
 
   const emailResult = await emailRes.json();
   console.log('[welcome-email-api] Resend response status:', emailRes.status);
 
   if (!emailRes.ok) {
+    await writeNotificationLog(adminClient, {
+      definitionId: def?.id ?? null,
+      status: 'failed',
+      recipients: { to: toList, cc: ccList, bcc: bccList },
+      subject: finalSubject,
+      errorMessage: `Resend ${emailRes.status}: ${JSON.stringify(emailResult).slice(0, 800)}`,
+      triggeredByUserId: guard.usuario.id,
+      context: { usuarioId, email },
+    });
     return NextResponse.json({ error: 'Resend failed', detail: emailResult }, { status: 500 });
   }
+
+  await writeNotificationLog(adminClient, {
+    definitionId: def?.id ?? null,
+    status: 'sent',
+    recipients: { to: toList, cc: ccList, bcc: bccList },
+    subject: finalSubject,
+    resendId: (emailResult as { id?: string }).id ?? null,
+    triggeredByUserId: guard.usuario.id,
+    context: { usuarioId, email },
+  });
 
   return NextResponse.json({ success: true, emailId: emailResult.id });
 }

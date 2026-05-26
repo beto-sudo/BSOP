@@ -61,38 +61,46 @@ export async function getDefinitionBySlug(
   slug: string,
   empresaId: string | null = null
 ): Promise<NotificationDefinition | null> {
-  // Si nos pasan empresa, intentamos exacta primero. Si no, vamos directo a global.
-  if (empresaId) {
+  // Wrap todo en try/catch — el helper está documentado FAIL-OPEN: si la query
+  // falla por cualquier motivo (DB caída, RLS mal config, cliente mock sin
+  // .schema() en tests), el handler debe usar config hardcoded como fallback.
+  try {
+    // Si nos pasan empresa, intentamos exacta primero. Si no, vamos directo a global.
+    if (empresaId) {
+      const { data, error } = await sb
+        .schema('core')
+        .from('notification_definitions')
+        .select('*')
+        .eq('slug', slug)
+        .eq('empresa_id', empresaId)
+        .maybeSingle();
+
+      if (error) {
+        console.error(`[notifications] error leyendo def per-empresa ${slug}:`, error.message);
+        // Caer a global como fallback en lugar de retornar null acá.
+      } else if (data) {
+        return data as NotificationDefinition;
+      }
+    }
+
+    // Global fallback (empresa_id IS NULL).
     const { data, error } = await sb
       .schema('core')
       .from('notification_definitions')
       .select('*')
       .eq('slug', slug)
-      .eq('empresa_id', empresaId)
+      .is('empresa_id', null)
       .maybeSingle();
 
     if (error) {
-      console.error(`[notifications] error leyendo def per-empresa ${slug}:`, error.message);
-      // Caer a global como fallback en lugar de retornar null acá.
-    } else if (data) {
-      return data as NotificationDefinition;
+      console.error(`[notifications] error leyendo def global ${slug}:`, error.message);
+      return null;
     }
-  }
-
-  // Global fallback (empresa_id IS NULL).
-  const { data, error } = await sb
-    .schema('core')
-    .from('notification_definitions')
-    .select('*')
-    .eq('slug', slug)
-    .is('empresa_id', null)
-    .maybeSingle();
-
-  if (error) {
-    console.error(`[notifications] error leyendo def global ${slug}:`, error.message);
+    return (data as NotificationDefinition | null) ?? null;
+  } catch (e) {
+    console.error(`[notifications] excepción leyendo def ${slug}:`, (e as Error).message);
     return null;
   }
-  return (data as NotificationDefinition | null) ?? null;
 }
 
 /**

@@ -28,6 +28,12 @@ import {
   type EmpresaBranding,
   type TaskSummaryItem,
 } from '@/lib/task-summary-email';
+import {
+  getDefinitionBySlug,
+  renderSubject,
+  splitRecipientsExtra,
+  writeNotificationLog,
+} from '@/lib/notifications';
 
 // 300s cap for cron — tolera crecimiento hasta ~1000 buckets con sleep(220ms)
 // entre envíos y fetch a Resend. Si llegamos cerca del cap, migrar a Workflow
@@ -143,6 +149,26 @@ export async function GET(req: NextRequest) {
   const supabase = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  // Iniciativa notificaciones-catalogo · S2: lee config runtime del catálogo
+  // (slug global `task_summary_daily`). Si activo=false → skip todo el cron y
+  // log 1 row con status=skipped (no logs per-bucket porque no se envió nada).
+  // Fail-open: si def es null usa los defaults hardcoded de hoy.
+  const def = await getDefinitionBySlug(supabase, 'task_summary_daily');
+  if (def && !def.activo) {
+    console.log('[daily-task-summary] def.activo=false — skip ciclo completo');
+    await writeNotificationLog(supabase, {
+      definitionId: def.id,
+      status: 'skipped',
+      recipients: { to: [] },
+      subject: `task_summary_daily — skipped por kill switch`,
+    });
+    return NextResponse.json({ ok: true, skipped: true, reason: 'kill_switch' });
+  }
+  const subjectTemplate = def?.subject_template ?? null;
+  const defExtras = def ? splitRecipientsExtra(def.recipients_extra) : { to: [], cc: [], bcc: [] };
+  const defFromName = def?.from_name ?? null;
+  const defReplyTo = def?.reply_to ?? null;
 
   // Whitelist de estados activos (ver fix #119). Fetch en paralelo de tasks y
   // empresas (cross-schema: empresa_id → core.empresas; PostgREST no hace joins
@@ -261,16 +287,36 @@ export async function GET(req: NextRequest) {
     const groups = groupTasksByUrgency(bucket.tasks, todayCst);
     const html = generateTaskSummaryHtml(bucket.firstName, groups, todayCst, branding);
 
-    const fromName = empresaRow.nombre;
+    // Nombre del from: usa override de la definition si tiene, si no usa el
+    // nombre de la empresa (comportamiento legacy: branding per-empresa).
+    const fromName = defFromName ?? empresaRow.nombre;
     const destination = testTo ?? bucket.email;
-    const subject = testTo
-      ? `[TEST → ${bucket.firstName}] Tareas de hoy en ${empresaRow.nombre} — ${subjectDate}`
+    // Subject: usa template editable de la definition (con vars empresa/fecha/firstName)
+    // o fallback al subject hardcoded de hoy.
+    const baseSubject = subjectTemplate
+      ? renderSubject(subjectTemplate, {
+          empresa: empresaRow.nombre,
+          fecha: subjectDate,
+          firstName: bucket.firstName,
+        })
       : `Tareas de hoy en ${empresaRow.nombre} — ${subjectDate}`;
+    const subject = testTo ? `[TEST → ${bucket.firstName}] ${baseSubject}` : baseSubject;
+    const toList = [destination, ...defExtras.to];
 
     if (!firstSend) {
       await sleep(220);
     }
     firstSend = false;
+
+    const resendBody: Record<string, unknown> = {
+      from: `${fromName} <noreply@bsop.io>`,
+      to: toList,
+      subject,
+      html,
+    };
+    if (defReplyTo) resendBody.reply_to = defReplyTo;
+    if (defExtras.cc.length) resendBody.cc = defExtras.cc;
+    if (defExtras.bcc.length) resendBody.bcc = defExtras.bcc;
 
     const resendRes = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -278,12 +324,7 @@ export async function GET(req: NextRequest) {
         Authorization: `Bearer ${resendKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        from: `${fromName} <noreply@bsop.io>`,
-        to: [destination],
-        subject,
-        html,
-      }),
+      body: JSON.stringify(resendBody),
     });
 
     if (!resendRes.ok) {
@@ -296,9 +337,19 @@ export async function GET(req: NextRequest) {
         email: bucket.email,
         error: err,
       });
+      await writeNotificationLog(supabase, {
+        definitionId: def?.id ?? null,
+        empresaId: bucket.empresaId,
+        status: 'failed',
+        recipients: { to: toList, cc: defExtras.cc, bcc: defExtras.bcc },
+        subject,
+        errorMessage: `Resend ${resendRes.status}: ${err.slice(0, 800)}`,
+        context: { empleadoId: bucket.empleadoId, totalTasks: bucket.tasks.length },
+      });
       continue;
     }
 
+    const sendJson = (await resendRes.json().catch(() => null)) as { id?: string } | null;
     sent++;
     previews.push({
       empleadoId: bucket.empleadoId,
@@ -307,6 +358,15 @@ export async function GET(req: NextRequest) {
       total: bucket.tasks.length,
       subject,
       fromName,
+    });
+    await writeNotificationLog(supabase, {
+      definitionId: def?.id ?? null,
+      empresaId: bucket.empresaId,
+      status: 'sent',
+      recipients: { to: toList, cc: defExtras.cc, bcc: defExtras.bcc },
+      subject,
+      resendId: sendJson?.id ?? null,
+      context: { empleadoId: bucket.empleadoId, totalTasks: bucket.tasks.length },
     });
   }
 

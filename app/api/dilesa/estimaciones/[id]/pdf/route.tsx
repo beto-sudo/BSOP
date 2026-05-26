@@ -17,6 +17,12 @@ import { NextResponse } from 'next/server';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { EstimacionPDF, type EstimacionPdfData } from '@/lib/dilesa/pdf/estimacion';
+import {
+  getDefinitionBySlug,
+  renderSubject,
+  splitRecipientsExtra,
+  writeNotificationLog,
+} from '@/lib/notifications';
 
 const MESES_ES = [
   'Enero',
@@ -249,12 +255,44 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: 'RESEND_API_KEY no configurada' }, { status: 500 });
   }
 
+  // Iniciativa notificaciones-catalogo · S2: lee config runtime + log post-envío.
+  const def = await getDefinitionBySlug(sb, 'dilesa_estimacion');
+
+  // Defaults hardcoded como fallback fail-open.
+  let fromAddress = 'DILESA Facturas <facturas@bsop.io>';
+  let replyTo: string | null = 'facturas@dilesa.mx';
+  let toList = [to];
+  let ccList: string[] = [];
+  let bccList: string[] = [];
+
+  if (def) {
+    if (!def.activo) {
+      console.log('[estimaciones/pdf POST] def.activo=false — skip');
+      await writeNotificationLog(sb, {
+        definitionId: def.id,
+        status: 'skipped',
+        recipients: { to: toList },
+        subject: `dilesa_estimacion ${data.codigo} — kill switch`,
+        context: { estimacionId: id },
+      });
+      return NextResponse.json({ ok: true, skipped: true, reason: 'kill_switch' });
+    }
+    fromAddress = def.from_name ? `${def.from_name} <${def.from_email}>` : def.from_email;
+    replyTo = def.reply_to;
+    const extras = splitRecipientsExtra(def.recipients_extra);
+    toList = [to, ...extras.to];
+    ccList = extras.cc;
+    bccList = extras.bcc;
+  }
+
   const buf = await renderToBuffer(<EstimacionPDF data={data} />);
   const base64 = buf.toString('base64');
 
   const subject =
     body.subject?.trim() ||
-    `Estimación ${data.codigo} · favor de emitir factura por $${data.montoNeto.toFixed(2)}`;
+    (def?.subject_template
+      ? renderSubject(def.subject_template, { codigo: data.codigo })
+      : `Estimación ${data.codigo} · favor de emitir factura por $${data.montoNeto.toFixed(2)}`);
 
   const moneyFmt = new Intl.NumberFormat('es-MX', {
     style: 'currency',
@@ -292,29 +330,32 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   </p>
 </div>`.trim();
 
+  // El plan free de Resend solo permite 1 dominio verificado (`bsop.io`); el
+  // display name "DILESA Facturas" preserva el branding al contratista y
+  // `reply_to` redirige las respuestas al buzón real de DILESA.
+  const resendBody: Record<string, unknown> = {
+    from: fromAddress,
+    to: toList,
+    subject,
+    html,
+    attachments: [
+      {
+        filename: `estimacion-${data.codigo}.pdf`,
+        content: base64,
+      },
+    ],
+  };
+  if (replyTo) resendBody.reply_to = replyTo;
+  if (ccList.length) resendBody.cc = ccList;
+  if (bccList.length) resendBody.bcc = bccList;
+
   const emailRes = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${resendKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      // El plan free de Resend solo permite 1 dominio verificado y en este
-      // workspace ya está usado por `bsop.io` (mismo patrón que lib/juntas/email.ts).
-      // El display "DILESA Facturas" preserva el branding al contratista;
-      // `reply_to` redirige las respuestas al buzón real de DILESA.
-      from: 'DILESA Facturas <facturas@bsop.io>',
-      reply_to: 'facturas@dilesa.mx',
-      to: [to],
-      subject,
-      html,
-      attachments: [
-        {
-          filename: `estimacion-${data.codigo}.pdf`,
-          content: base64,
-        },
-      ],
-    }),
+    body: JSON.stringify(resendBody),
   });
   const resJson = (await emailRes.json()) as { id?: string; message?: string; name?: string };
 
@@ -326,11 +367,28 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       status: emailRes.status,
       resendError: resJson,
     });
+    await writeNotificationLog(sb, {
+      definitionId: def?.id ?? null,
+      status: 'failed',
+      recipients: { to: toList, cc: ccList, bcc: bccList },
+      subject,
+      errorMessage: `Resend ${emailRes.status}: ${JSON.stringify(resJson).slice(0, 800)}`,
+      context: { estimacionId: id, codigo: data.codigo },
+    });
     return NextResponse.json(
       { error: resJson.message ?? 'Error al enviar email', detail: resJson },
       { status: 500 }
     );
   }
+
+  await writeNotificationLog(sb, {
+    definitionId: def?.id ?? null,
+    status: 'sent',
+    recipients: { to: toList, cc: ccList, bcc: bccList },
+    subject,
+    resendId: resJson.id ?? null,
+    context: { estimacionId: id, codigo: data.codigo },
+  });
 
   return NextResponse.json({ ok: true, emailId: resJson.id, sentTo: to });
 }
