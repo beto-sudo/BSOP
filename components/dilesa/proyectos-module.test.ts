@@ -10,6 +10,7 @@ function p(overrides: Partial<ProyectoDetalle>): ProyectoDetalle {
     estado: 'propuesta',
     clave_interna: null,
     proyecto_padre_id: null,
+    proyecto_predecesor_id: null,
     fecha_inicio: null,
     fecha_fin_estimada: null,
     fecha_licencia: null,

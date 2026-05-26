@@ -200,3 +200,54 @@ export async function populatePlantilla(
   revalidatePath('/dilesa/proyectos/anteproyectos');
   return { ok: true, tareasCreadas: insertados.length };
 }
+
+/**
+ * Promueve un anteproyecto a desarrollo via RPC
+ * `dilesa.fn_proyecto_promote_anteproyecto`.
+ *
+ * Sprint 4 de la iniciativa. La RPC valida:
+ * - El anteproyecto existe y `tipo='anteproyecto'`.
+ * - No existe ya un desarrollo apuntándolo via `proyecto_predecesor_id`.
+ * - Tarea "Aprobación de Comité de Inversión" en `estado='completada'`.
+ *
+ * En éxito: crea row nuevo en `dilesa.proyectos` con `tipo='desarrollo'`,
+ * copia tareas rehogables + partidas autorizadas, marca el anteproyecto
+ * como `estado='completado'`. Retorna `proyectoId` del nuevo desarrollo.
+ */
+export async function promoteAnteproyecto(
+  anteproyectoId: string
+): Promise<{ ok: true; proyectoId: string } | { ok: false; error: string }> {
+  if (!anteproyectoId) return { ok: false, error: 'anteproyectoId requerido' };
+
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll() {
+          // no-op
+        },
+      },
+    }
+  );
+
+  const { data, error } = await supabase
+    .schema('dilesa')
+    .rpc('fn_proyecto_promote_anteproyecto', { p_anteproyecto_id: anteproyectoId });
+
+  if (error) {
+    return {
+      ok: false,
+      error: error.message || 'No se pudo promover el anteproyecto.',
+    };
+  }
+
+  revalidatePath('/dilesa/proyectos');
+  revalidatePath('/dilesa/proyectos/anteproyectos');
+
+  return { ok: true, proyectoId: data as string };
+}

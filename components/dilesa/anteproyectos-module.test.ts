@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { deriveKpis } from './anteproyectos-module';
-import { deriveAnalisis } from './anteproyecto-detail-drawer';
+import { deriveAnalisis, gateComitePromocion } from './anteproyecto-detail-drawer';
 import type { ProyectoDetalle } from './proyecto-detail-drawer';
 
 function ap(overrides: Partial<ProyectoDetalle>): ProyectoDetalle {
@@ -11,6 +11,7 @@ function ap(overrides: Partial<ProyectoDetalle>): ProyectoDetalle {
     estado: 'analisis',
     clave_interna: null,
     proyecto_padre_id: null,
+    proyecto_predecesor_id: null,
     fecha_inicio: null,
     fecha_fin_estimada: null,
     fecha_licencia: null,
@@ -197,5 +198,43 @@ describe('deriveAnalisis (financiero derivado client-side)', () => {
     expect(a.costoPorLote).toBeNull();
     expect(a.costoPorM2Vendible).toBeNull();
     expect(a.deltaPresupuesto).toBeNull();
+  });
+});
+
+describe('gateComitePromocion (Sprint 4 — gate de conversión)', () => {
+  it('detecta gate completado por título canónico', () => {
+    const r = gateComitePromocion([
+      { titulo: 'Otra tarea', estado: 'pendiente' },
+      { titulo: 'Aprobación de Comité de Inversión', estado: 'completada' },
+    ]);
+    expect(r.existe).toBe(true);
+    expect(r.completado).toBe(true);
+  });
+
+  it('gate pendiente si la tarea existe pero no está completada', () => {
+    const r = gateComitePromocion([
+      { titulo: 'Aprobación de Comité de Inversión', estado: 'en_curso' },
+    ]);
+    expect(r.existe).toBe(true);
+    expect(r.completado).toBe(false);
+  });
+
+  it('gate inexistente si no se ha poblado la plantilla', () => {
+    const r = gateComitePromocion([{ titulo: 'Levantamiento Topográfico', estado: 'completada' }]);
+    expect(r.existe).toBe(false);
+    expect(r.completado).toBe(false);
+  });
+
+  it('case-insensitive — match aunque cambien las mayúsculas/tildes', () => {
+    const r = gateComitePromocion([
+      { titulo: 'aprobación de comité de inversión', estado: 'completada' },
+    ]);
+    expect(r.completado).toBe(true);
+  });
+
+  it('lista vacía → gate inexistente', () => {
+    const r = gateComitePromocion([]);
+    expect(r.existe).toBe(false);
+    expect(r.completado).toBe(false);
   });
 });

@@ -21,7 +21,10 @@ import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
-import { populatePlantilla } from '@/app/dilesa/proyectos/anteproyectos/actions';
+import {
+  populatePlantilla,
+  promoteAnteproyecto,
+} from '@/app/dilesa/proyectos/anteproyectos/actions';
 import { type ProyectoDetalle, ESTADO_TONE, ESTADO_LABEL } from './proyecto-detail-drawer';
 
 const numberFmt = new Intl.NumberFormat('es-MX');
@@ -103,6 +106,29 @@ const PARTIDA_ESTADO_TONE: Record<string, BadgeTone> = {
 };
 
 /**
+ * Detecta el gate de promoción: la tarea "Aprobación de Comité de
+ * Inversión" debe existir Y estar en `estado='completada'`. La RPC
+ * server-side valida lo mismo — esto es solo UX preventiva para no
+ * mostrar un botón que va a fallar.
+ *
+ * Exportado para tests + reuso.
+ */
+export function gateComitePromocion(tareas: readonly { titulo: string; estado: string }[]): {
+  existe: boolean;
+  completado: boolean;
+} {
+  const gate = tareas.find(
+    (t) =>
+      t.titulo.toLowerCase().includes('comité de inversión') &&
+      t.titulo.toLowerCase().includes('aprobación')
+  );
+  return {
+    existe: gate !== undefined,
+    completado: gate?.estado === 'completada',
+  };
+}
+
+/**
  * Indicadores derivados client-side desde las columnas de
  * `dilesa.proyectos`. Se exportan para reuso en tests + KPIs agregados.
  */
@@ -157,6 +183,10 @@ export function AnteproyectoDetailDrawer({
   const [extrasError, setExtrasError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [populateError, setPopulateError] = useState<string | null>(null);
+  const [promotePending, startPromoteTransition] = useTransition();
+  const [promoteError, setPromoteError] = useState<string | null>(null);
+  const [promoteSuccess, setPromoteSuccess] = useState<string | null>(null);
+  const [confirmingPromote, setConfirmingPromote] = useState(false);
   // Derivamos loading desde `loadedId` para evitar setState síncrono en el
   // effect (ver eslint react-hooks): si el drawer está abierto y el id del
   // proyecto cargado no coincide con el actual, estamos cargando.
@@ -243,6 +273,25 @@ export function AnteproyectoDetailDrawer({
   if (!anteproyecto) return null;
 
   const analisis = deriveAnalisis(anteproyecto);
+  const gate = gateComitePromocion(tareas);
+  const yaConvertido = anteproyecto.estado === 'completado';
+  const puedePromover = gate.completado && !yaConvertido && !loadingExtras;
+
+  const handlePromote = () => {
+    setPromoteError(null);
+    setPromoteSuccess(null);
+    startPromoteTransition(async () => {
+      const r = await promoteAnteproyecto(anteproyecto.id);
+      if (!r.ok) {
+        setPromoteError(r.error);
+        setConfirmingPromote(false);
+      } else {
+        setPromoteSuccess(r.proyectoId);
+        setConfirmingPromote(false);
+      }
+    });
+  };
+
   const handlePopulate = () => {
     setPopulateError(null);
     const fecha = anteproyecto.fecha_inicio ?? new Date().toISOString().slice(0, 10);
@@ -506,6 +555,67 @@ export function AnteproyectoDetailDrawer({
             </div>
           )}
           {extrasError && <p className="mt-2 text-sm text-red-600/80">{extrasError}</p>}
+        </DetailDrawerSection>
+
+        <DetailDrawerSection
+          title="Promoción a desarrollo"
+          description={
+            yaConvertido
+              ? 'Este anteproyecto ya fue convertido.'
+              : gate.completado
+                ? 'Listo para promover.'
+                : gate.existe
+                  ? 'Pendiente: la tarea "Aprobación de Comité de Inversión" no está completada.'
+                  : 'Pendiente: pobla la plantilla canónica para tener el gate.'
+          }
+        >
+          {promoteSuccess ? (
+            <div className="rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800">
+              <div className="font-medium">Anteproyecto promovido.</div>
+              <div className="mt-1 text-xs">
+                Nuevo desarrollo creado con ID <code>{promoteSuccess}</code>. El anteproyecto queda
+                como histórico (estado completado). Cambia a la tab Activos para verlo.
+              </div>
+            </div>
+          ) : confirmingPromote ? (
+            <div className="space-y-3 rounded-md border border-[var(--border)] bg-[var(--card)] p-3">
+              <div className="text-sm text-[var(--text)]">
+                Al promover se creará un nuevo proyecto con <strong>tipo desarrollo</strong>{' '}
+                apuntando a este anteproyecto como predecesor. Se llevarán las tareas trabajadas
+                (estado en curso o completada con aplicación desarrollo/ambas) y las partidas
+                presupuestales autorizadas (con monto aprobado snapshot). Este anteproyecto queda
+                como histórico inmutable.
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handlePromote}
+                  disabled={promotePending}
+                  className="h-9 rounded-md bg-[var(--accent)] px-4 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+                >
+                  {promotePending ? 'Promoviendo…' : 'Confirmar promoción'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingPromote(false)}
+                  disabled={promotePending}
+                  className="h-9 rounded-md border border-[var(--border)] px-4 text-sm font-medium text-[var(--text)] hover:bg-[var(--card)] disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmingPromote(true)}
+              disabled={!puedePromover}
+              className="h-9 rounded-md bg-[var(--accent)] px-4 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Promover a desarrollo
+            </button>
+          )}
+          {promoteError && <p className="mt-2 text-sm text-red-600/80">{promoteError}</p>}
         </DetailDrawerSection>
       </DetailDrawerContent>
     </DetailDrawer>
