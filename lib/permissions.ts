@@ -34,7 +34,12 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   '/dilesa/rh/departamentos': 'dilesa.rh.departamentos',
   '/dilesa/proveedores': 'dilesa.proveedores',
   '/dilesa/portafolio': 'dilesa.portafolio',
-  '/dilesa/proyectos': 'dilesa.proyectos',
+  // Proyectos es un hub con 2 tabs (Activos / Anteproyectos) — iniciativa
+  // `dilesa-proyectos-anteproyectos` Sprint 1. El padre `dilesa.proyectos`
+  // queda como umbrella; cada tab tiene su sub-slug (ADR-030 SS2). La URL
+  // default mapea al sub-slug del primer tab (`.activos`).
+  '/dilesa/proyectos': 'dilesa.proyectos.activos',
+  '/dilesa/proyectos/anteproyectos': 'dilesa.proyectos.anteproyectos',
   // Ventas es un hub con 5 tabs (sprint tabs-hub). El padre
   // `dilesa.ventas` queda como umbrella; cada tab tiene su sub-slug
   // (ADR-030 SS2). La URL default mapea al sub-slug del primer tab
