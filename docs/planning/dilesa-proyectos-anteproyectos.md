@@ -1,12 +1,12 @@
-# Iniciativa — Proyectos DILESA: Anteproyectos como sub-tab + presupuestos preliminares
+# Iniciativa — Proyectos DILESA: Anteproyectos como sub-tab + plantilla de trabajo + conversión
 
 **Slug:** `dilesa-proyectos-anteproyectos`
 **Empresas:** DILESA
-**Schemas afectados:** `dilesa` (extender — completar UI sobre `anteproyectos` + `v_anteproyectos_analisis` existentes; tabla nueva para presupuestos preliminares; sub-slugs en `core.modulos`)
-**Estado:** proposed
+**Schemas afectados:** `dilesa` (4 tablas nuevas: `plantilla_anteproyecto_tareas`, `anteproyecto_tareas`, `anteproyecto_presupuestos_preliminares`, `proyectos_presupuestos`; usa `anteproyectos` + `v_anteproyectos_analisis` existentes; sub-slugs en `core.modulos`)
+**Estado:** planned
 **Dueño:** Beto
 **Creada:** 2026-05-26
-**Última actualización:** 2026-05-26 (promovida)
+**Última actualización:** 2026-05-26 (alcance v1 cerrado tras D1+D2; Beto pidió agregar **plantilla preestablecida** de tareas/trámites/cotizaciones por anteproyecto que al promover queda **ligada al proyecto**; sigue 4 sprints + closeout)
 
 ## Problema
 
@@ -17,13 +17,12 @@ visualmente las fases del ciclo de vida:
 
 1. **Anteproyectos** son evaluaciones de viabilidad: ¿cuántos lotes
    salen del terreno?, ¿qué prototipos meto?, ¿qué utilidad proyectada
-   tengo?, ¿qué presupuestos preliminares de costos tengo (cotizaciones
-   tempranas de urbanización, materiales, etc.)? — el resultado es una
-   decisión de **arrancar o descartar**.
+   tengo?, ¿qué trámites debo arrancar?, ¿qué cotizaciones tempranas
+   tengo? — el resultado es una decisión de **arrancar o descartar**.
 2. **Proyectos activos** son los que ya pasaron la decisión y están
    en ejecución o terminados. Aquí lo que importa es el control de
-   ejecución contra el presupuesto (que viene heredado del anteproyecto)
-   y el avance físico/comercial.
+   ejecución contra el presupuesto (heredado del anteproyecto) y el
+   avance físico/comercial.
 
 Mezclarlos en la misma tabla:
 
@@ -33,6 +32,14 @@ Mezclarlos en la misma tabla:
   proyectada en evaluación" que "utilidad realizada en ejecución").
 - Esconde el flujo natural anteproyecto → proyecto que el operador
   vive a diario.
+
+Además, el **trabajo del anteproyecto hoy vive en la cabeza del
+operador**. No hay checklist canónica de "qué tienes que llenar antes
+de declarar un anteproyecto como viable" — los trámites (licencias,
+factibilidades), cotizaciones (urbanización, materiales) y
+determinaciones de costo (terreno, infraestructura) se hacen sin un
+patrón replicable. Cuando se promueve a proyecto, ese trabajo se
+pierde o se duplica.
 
 Estado de la implementación hoy:
 
@@ -44,10 +51,11 @@ Estado de la implementación hoy:
   `convertido_a_proyecto_por` ya están en el schema — el modelo de
   conversión **ya está cableado en DB**.
 - **NO hay UI de Anteproyectos** — la tabla puede estar vacía o casi.
+- **NO hay catálogo de tareas preestablecidas** por anteproyecto.
 - **NO hay modelo de presupuestos preliminares** — Beto los obtiene
   hoy pero no tienen home en BSOP.
-- **NO hay mecanismo de promoción** que arrastre el presupuesto del
-  anteproyecto al control de ejecución del proyecto.
+- **NO hay mecanismo de promoción** que arrastre el trabajo del
+  anteproyecto al proyecto.
 
 ## Outcome esperado
 
@@ -57,13 +65,22 @@ Estado de la implementación hoy:
 2. **UI completa de Anteproyectos** — listado + drawer/page de detalle
    con análisis financiero conectado a `v_anteproyectos_analisis`,
    formulario de captura, filtros (estado, etapa, decisión, prioridad).
-3. **Presupuestos preliminares con home** — modelo nuevo que permite
-   capturar cotizaciones tempranas (partidas + monto + fuente:
-   cotización/referencia/proveedor) dentro del anteproyecto.
-4. **Conversión anteproyecto → proyecto** — acción "promover" que crea
-   el proyecto, arrastra los presupuestos preliminares como línea base
-   del control de ejecución, setea los campos de trazabilidad
-   (`convertido_a_proyecto_en/_por`).
+3. **Plantilla de trabajo preestablecida** — catálogo global por
+   empresa con las tareas canónicas que un anteproyecto debe completar
+   (trámites, cotizaciones, determinaciones de costo). Al crear un
+   anteproyecto, las tareas se instancian automáticamente. Cada tarea
+   tiene estado, responsable, fecha objetivo, monto resultado y
+   documento/comprobante adjunto.
+4. **Presupuestos preliminares con home** — modelo nuevo (partidas +
+   monto + fuente + flag `autorizado`) que puede ligarse a la tarea
+   originadora (la cotización del proveedor X produjo el monto de la
+   partida Y).
+5. **Conversión anteproyecto → proyecto que preserva el trabajo** —
+   acción "promover" que crea el proyecto, **rehoga** las tareas
+   ejecutadas (mantienen FK al anteproyecto + ganan FK al proyecto)
+   y snapshot-copia los presupuestos preliminares autorizados al
+   modelo de control de ejecución. Trazabilidad completa hacia atrás
+   (postmortem) y continuidad operativa hacia adelante (seguimiento).
 
 ## Modelo conceptual
 
@@ -88,80 +105,159 @@ Sub-slugs RBAC nuevos (ADR-030 SS1-SS7):
 
 Padre `dilesa.proyectos` se mantiene como umbrella (visibilidad sidebar).
 
+### Plantilla de trabajo + tareas instanciadas (Sprint 3)
+
+Patrón canónico catálogo + instancia (mismo shape conceptual que
+`dilesa.plantilla_tareas` en construcción):
+
+```sql
+-- CATÁLOGO (global por empresa, opcionalmente filtrado por tipo_proyecto)
+dilesa.plantilla_anteproyecto_tareas
+  id, empresa_id (FK), nombre, descripcion,
+  categoria (enum: 'tramite' | 'cotizacion' | 'determinacion_costo'
+                 | 'analisis' | 'otro'),
+  tipo_proyecto_id (FK opcional — null = aplica a todos los tipos),
+  orden_default (int), activa (bool DEFAULT true),
+  created_at, updated_at, deleted_at
+
+-- INSTANCIAS (1:N por anteproyecto, snapshot del nombre al crear)
+dilesa.anteproyecto_tareas
+  id, anteproyecto_id (FK), plantilla_tarea_id (FK opcional — null = ad-hoc),
+  nombre_snapshot (text), categoria (enum), descripcion (text),
+  estado (enum: 'pendiente' | 'en_progreso' | 'completada'
+              | 'no_aplica' | 'autorizada'),
+  fecha_objetivo, fecha_completada,
+  responsable_persona_id (FK opcional a erp.personas),
+  resultado_monto (numeric — para cotizaciones/determinaciones),
+  resultado_documento_url (text — comprobante/adjunto),
+  notas (text),
+  -- AL PROMOVER: las tareas que se hayan trabajado mantienen FK al
+  -- anteproyecto Y ganan FK al proyecto. Las pendientes/no_aplica
+  -- se quedan solo en el anteproyecto.
+  proyecto_id (FK opcional — null hasta promover),
+  created_at, updated_at, deleted_at
+```
+
+Al **crear un anteproyecto**, un trigger o server action instancia
+las tareas de la plantilla activa filtrada por `tipo_proyecto_id =
+<tipo del anteproyecto>` o `IS NULL`. El operador puede añadir
+tareas ad-hoc (`plantilla_tarea_id IS NULL`) y modificar el estado
+de las pre-instanciadas.
+
 ### Presupuestos preliminares (Sprint 3)
 
-Tabla nueva en `dilesa` con relación 1:N anteproyecto → partidas
-preliminares. Naming tentativo (a definir al cerrar D1):
-
-```
-dilesa.anteproyectos_presupuestos_preliminares
-  id, anteproyecto_id (FK), partida (text), descripcion (text),
+```sql
+dilesa.anteproyecto_presupuestos_preliminares
+  id, anteproyecto_id (FK),
+  tarea_origen_id (FK opcional a anteproyecto_tareas
+                   — para ligar la partida con la cotización
+                   que produjo el monto),
+  partida (text), descripcion (text),
   monto_estimado (numeric), unidad (text), cantidad (numeric),
   fuente (enum: 'cotizacion' | 'referencia' | 'proveedor' | 'estimado_interno'),
   proveedor_persona_id (FK opcional a erp.personas),
+  -- workflow de autorización antes de la promoción
+  autorizado (bool DEFAULT false),
+  autorizado_at, autorizado_por (FK opcional a auth.users),
   notas (text), created_at, updated_at, deleted_at
 ```
 
 RLS canónica `core.fn_has_empresa(empresa_id) OR core.fn_is_admin()`.
-`empresa_id` heredado vía JOIN al anteproyecto.
+`empresa_id` heredado vía JOIN al anteproyecto en política RLS.
+
+### Modelo de control de ejecución del proyecto (Sprint 4)
+
+Decisión D1 = **Opción B (separación con snapshot)**. Tabla nueva
+para el control real del proyecto:
+
+```sql
+dilesa.proyectos_presupuestos
+  id, proyecto_id (FK),
+  -- TRAZABILIDAD: si el monto viene de un preliminar autorizado,
+  -- preserva el ID original para postmortem
+  preliminar_origen_id (FK opcional a anteproyecto_presupuestos_preliminares),
+  partida (text), descripcion (text),
+  monto_aprobado (numeric — snapshot del monto_estimado autorizado
+                           al momento de promover),
+  monto_ejercido (numeric DEFAULT 0 — se va llenando con la ejecución
+                                     real, vía estimaciones/contratos),
+  unidad (text), cantidad (numeric),
+  estado (enum: 'planeada' | 'en_ejercicio' | 'cerrada'),
+  proveedor_persona_id (FK opcional),
+  notas (text), created_at, updated_at, deleted_at
+```
 
 ### Conversión anteproyecto → proyecto (Sprint 4)
 
-Server action / RPC que en una transacción:
+RPC `dilesa.fn_anteproyecto_promote(anteproyecto_id uuid)` en una
+transacción:
 
-1. INSERT en `dilesa.proyectos` con datos heredados del anteproyecto
-   (clave_interna, terreno_id, tipo_proyecto_id, etc.).
-2. Copia los presupuestos preliminares al modelo de control de
-   ejecución del proyecto (forma exacta depende de D1 — ver
-   "Decisiones abiertas").
-3. UPDATE en `dilesa.anteproyectos` setea `proyecto_id`,
-   `convertido_a_proyecto_en`, `convertido_a_proyecto_por`.
-4. Bitácora del evento (si se integra con `activity-log-pattern`).
+1. **INSERT en `dilesa.proyectos`** con datos heredados del anteproyecto
+   (clave_interna, terreno_id, tipo_proyecto_id, responsable_id, etc.).
+2. **UPDATE en `dilesa.anteproyecto_tareas`** SET `proyecto_id = <nuevo>`
+   WHERE `anteproyecto_id = <ante>` AND `estado IN ('en_progreso',
+'completada', 'autorizada')`. Las tareas pendientes / no_aplica se
+   quedan solo en el anteproyecto (histórico).
+3. **INSERT en `dilesa.proyectos_presupuestos`** por cada
+   `anteproyecto_presupuestos_preliminares` con `autorizado = true`:
+   `monto_aprobado = monto_estimado`, `monto_ejercido = 0`,
+   `estado = 'planeada'`, `preliminar_origen_id = <id del preliminar>`.
+   Los no-autorizados quedan vivos en el anteproyecto (no se llevan).
+4. **UPDATE en `dilesa.anteproyectos`** SET `proyecto_id`,
+   `convertido_a_proyecto_en = NOW()`, `convertido_a_proyecto_por =
+auth.uid()`.
+5. **Bitácora** del evento si se integra con `activity-log-pattern`
+   (ADR-023).
 
 Idempotente: si el anteproyecto ya tiene `proyecto_id`, la acción
-falla con mensaje claro ("ya convertido").
+falla con mensaje claro ("ya convertido al proyecto X el 2026-Y-Z").
 
-## Decisiones abiertas (D1-D2)
+Después de promover, **las tareas autorizadas/completadas viven con
+doble FK** — el proyecto puede listarlas y actualizarlas (cambiar
+estado, agregar comprobante, etc.) y el anteproyecto las sigue
+mostrando como contexto histórico.
 
-### D1 — Modelado del presupuesto que se arrastra
+## Decisiones cerradas (D1-D2)
 
-¿Cómo modelamos la relación entre presupuesto preliminar y presupuesto
-de control de ejecución del proyecto?
+### D1 — Modelado del presupuesto que se arrastra ✅ Opción B + plantilla
 
-**Opción A — Continuidad (misma tabla, flag de fase).** Una sola
-tabla `dilesa.proyectos_presupuestos` con columna `fase` ∈
-{`preliminar`, `ejecucion`}. Al promover, las filas mueven de fase
-y se enlazan al proyecto. Pro: simpler model, una sola query.
-Contra: pierde la trazabilidad histórica "qué pensábamos al inicio
-vs qué pasó realmente".
+**Decisión** (2026-05-26): Opción B (separación con snapshot), **más**
+el concepto de plantilla preestablecida de tareas que Beto pidió. El
+flujo combinado:
 
-**Opción B — Separación (entidades distintas).** Preliminares viven
-en `dilesa.anteproyectos_presupuestos_preliminares` y se preservan
-inmutables como histórico. Al promover, se hace SNAPSHOT-INSERT en
-`dilesa.proyectos_presupuestos` (tabla nueva, modelo de control real
-con `monto_estimado` + `monto_ejercido` + estado de partida). Pro:
-trazabilidad full anteproyecto vs realidad. Contra: 2 tablas similares
-en estructura.
+- Los presupuestos preliminares viven en
+  `anteproyecto_presupuestos_preliminares` (inmutable como histórico
+  del análisis de viabilidad).
+- Tienen flag `autorizado` con su workflow (capturado en el
+  anteproyecto, autorizado por Beto/director antes de promover).
+- Al promover, se hace SNAPSHOT-INSERT en `proyectos_presupuestos`
+  (modelo de control con `monto_aprobado` + `monto_ejercido` +
+  estado) preservando `preliminar_origen_id` para trazabilidad.
+- Las **tareas del anteproyecto** (cotizaciones, trámites,
+  determinaciones de costo) que se hayan trabajado se rehogan al
+  proyecto vía doble FK — quedan ligadas para seguimiento.
 
-**Sesgo de Claude:** opción B. La trazabilidad histórica del análisis
-de viabilidad es exactamente el caso de uso del anteproyecto — sin
-ella el módulo pierde valor para postmortems.
+**Razón:** la trazabilidad histórica del análisis de viabilidad es
+exactamente el caso de uso del anteproyecto — sin ella el módulo
+pierde valor para postmortems. Y al ligar el **trabajo operativo**
+(no solo los montos), el proyecto preserva todo el contexto del
+anteproyecto sin duplicar nada.
 
-### D2 — KPIs del anteproyecto
+### D2 — KPIs del anteproyecto ✅ Confirmados
 
-Curaduría de los KPIs reactivos a filtros (cap 5 por ADR-034) en la
-tab Anteproyectos. Propuesta default:
+**Decisión** (2026-05-26): los 5 KPIs propuestos.
 
 1. **# anteproyectos activos** (estado ≠ `descartado` ni `convertido`)
 2. **Monto inversión proyectada total** (suma de
-   `costo_total_proyecto` de la vista)
+   `costo_total_proyecto` de `v_anteproyectos_analisis`)
 3. **Utilidad proyectada total** (suma de `utilidad_proyecto`)
 4. **Margen promedio %**
 5. **# en decisión pendiente** (filtro por `decision_actual`)
 
-Beto confirma o ajusta esta lista al cerrar v1.
+Todos reactivos a los filtros de la tab (cap 5 ADR-034, derivación
+client-side).
 
-## Sprints (4)
+## Sprints (4 + closeout)
 
 ### Sprint 1 — Refactor a sub-tabs
 
@@ -177,68 +273,127 @@ Beto confirma o ajusta esta lista al cerrar v1.
 - Regenerar `SCHEMA_REF.md` + `types/supabase.ts`.
 - 1 PR.
 
-### Sprint 2 — UI de Anteproyectos
+### Sprint 2 — UI base de Anteproyectos
 
 - `<AnteproyectosModule>` componente nuevo en
   `components/dilesa/anteproyectos-module.tsx`.
 - Listado con filtros (estado, etapa, decisión actual, prioridad),
   date range filter (`fecha_inicio` o `fecha_ultima_revision`),
-  pattern canónico `<DataTable>` + `<ModuleKpiStrip>`.
+  patrón canónico `<DataTable>` + `<ModuleKpiStrip>`.
 - Detail drawer/page con análisis financiero conectado a
   `v_anteproyectos_analisis` — tarjeta con aprovechamiento, costos,
   utilidad, margen.
-- Formulario de captura (`<Form>` + zod + RHF, patrón ADR-016).
+- Formulario de captura básico (`<Form>` + zod + RHF, patrón ADR-016)
+  para los campos directos de `dilesa.anteproyectos`.
 - KPIs reactivos según D2.
 - Tests unitarios siguiendo patrón `kpis-modulos`.
 - 1 PR.
 
-### Sprint 3 — Presupuestos preliminares
+### Sprint 3 — Plantilla de tareas + presupuestos preliminares
 
-- Migración SQL: tabla `dilesa.anteproyectos_presupuestos_preliminares`
-  - RLS + índices + comentarios. `NOTIFY pgrst, 'reload schema'`.
-- UI dentro del drawer/page del anteproyecto: sección "Presupuestos
-  preliminares" con tabla editable inline o sub-drawer de captura.
-- Cálculo automático de "total preliminar estimado" + comparación
-  con `costo_total_proyecto` de la vista de análisis.
+- **Migración SQL**: 3 tablas nuevas (`plantilla_anteproyecto_tareas`,
+  `anteproyecto_tareas`, `anteproyecto_presupuestos_preliminares`)
+  - RLS + índices + comentarios + `NOTIFY pgrst, 'reload schema'`.
+- **Seed inicial** de `plantilla_anteproyecto_tareas` con las tareas
+  canónicas de DILESA (a coordinar con Beto: lista de trámites,
+  cotizaciones y determinaciones que se hacen siempre — probable
+  ~15-25 tareas iniciales).
+- **Trigger** o server action que instancia tareas automáticamente
+  al crear un anteproyecto.
+- **UI** en el drawer/page del anteproyecto:
+  - Sección "Checklist" con las tareas instanciadas (tabla editable
+    inline con estado, responsable, fecha objetivo, monto resultado,
+    documento adjunto). Permite agregar tareas ad-hoc.
+  - Sección "Presupuestos preliminares" con tabla editable inline.
+    Permite ligar partida a tarea originadora (dropdown). Campo
+    `autorizado` con workflow (botón "Autorizar" → set `autorizado =
+true`, `autorizado_at`, `autorizado_por`).
+- Cálculo automático de "total preliminar autorizado" + comparación
+  con `costo_total_proyecto` de `v_anteproyectos_analisis`.
 - Regenerar `SCHEMA_REF.md` + `types/supabase.ts`.
 - 1 PR.
 
 ### Sprint 4 — Conversión anteproyecto → proyecto
 
-- RPC/server action `dilesa.fn_anteproyecto_promote(anteproyecto_id)`
-  con la lógica transaccional descrita arriba.
-- UI: botón "Promover a proyecto" en el detalle del anteproyecto
-  (gated por `decision_actual = 'viable'` o equivalente — a definir).
-- ConfirmDialog con preview del proyecto que se va a crear.
-- Test E2E o unitario de la promoción (anteproyecto antes/después +
-  proyecto creado + presupuestos copiados).
-- Closeout: actualizar planning doc + INITIATIVES.md + barrido de
+- **Migración SQL**: tabla `dilesa.proyectos_presupuestos` (modelo de
+  control de ejecución) + RLS + índices + comentarios.
+- **RPC** `dilesa.fn_anteproyecto_promote(anteproyecto_id uuid)` con
+  la lógica transaccional descrita arriba (4 pasos).
+- **UI**: botón "Promover a proyecto" en el detalle del anteproyecto
+  (gated por `decision_actual = 'viable'` o equivalente — a definir
+  con Beto al arrancar). ConfirmDialog con preview del proyecto que
+  se va a crear + lista de tareas que se rehogan + monto del
+  presupuesto que se snapshot-copia.
+- **UI lado proyecto**: el detalle del proyecto debe mostrar las
+  tareas heredadas del anteproyecto (sección read-mostly + actualizar
+  estado/comprobante) y los presupuestos como línea base (con
+  `monto_ejercido` editable o derivado de estimaciones/contratos).
+- **Test** unitario o E2E de la promoción (anteproyecto antes/después
+  - proyecto creado + tareas con doble FK + presupuestos copiados).
+- Regenerar `SCHEMA_REF.md` + `types/supabase.ts`.
+- **Closeout**: actualizar planning doc + INITIATIVES.md + barrido de
   Reminders.
 - 1 PR.
 
 ## Riesgos
 
-1. **D1 sin cerrar puede bloquear Sprint 3.** El diseño de la tabla
-   de presupuestos preliminares depende de si se va con A o B. Cerrar
-   D1 con Beto antes de arrancar Sprint 3.
-2. **Drift histórico en `dilesa.anteproyectos`.** Si la tabla tiene
+1. **Drift histórico en `dilesa.anteproyectos`.** Si la tabla tiene
    filas legacy de Coda o de pruebas, validar la calidad antes de
    exponerlas en UI. Si está vacía (probable), no hay riesgo.
-3. **Performance del análisis financiero.** La vista
+2. **Performance del análisis financiero.** La vista
    `v_anteproyectos_analisis` hace JOIN a `terrenos` + LEFT JOIN a
    un CTE de prototipos por anteproyecto. Si la tabla crece (>200
    anteproyectos), monitorear `EXPLAIN`.
-4. **Conflicts en `INITIATIVES.md`.** Sprint 1 toca sidebar y RBAC
+3. **Conflicts en `INITIATIVES.md`.** Sprint 1 toca sidebar y RBAC
    (hotspots cruzados con otras iniciativas en curso). Rebase
    preventivo antes de cada push.
+4. **Seed de plantilla en Sprint 3 requiere input de Beto.** La lista
+   de tareas canónicas vive en su cabeza/Coda; antes de Sprint 3
+   arrancar pausa para coordinar la lista (puede ser un sub-sprint
+   de exploración tipo "deep-dive" pequeño).
+5. **Modelo de control `proyectos_presupuestos` puede chocar con
+   estimaciones/contratos existentes.** El módulo Construcción ya
+   tiene `dilesa.estimaciones` y `dilesa.contratos_construccion` que
+   también son "ejecución del proyecto". Sprint 4 debe verificar
+   que `proyectos_presupuestos.monto_ejercido` no duplique ni
+   contradiga los montos de estimaciones (probablemente
+   `monto_ejercido` = SUM de estimaciones aplicadas a esa partida —
+   a definir).
 
 ## Bitácora
 
-- **2026-05-26** — Promovida a `proposed` tras conversación con Beto.
-  Estado actual del módulo, gaps y propuesta de alcance documentados.
-  Pendiente: cerrar D1 (modelado del presupuesto) + D2 (KPIs) para
-  pasar a `planned`.
+- **2026-05-26 (promoción)** — Promovida a `proposed` tras
+  conversación con Beto. Estado actual del módulo, gaps y propuesta
+  de alcance documentados. Pendiente: cerrar D1 (modelado del
+  presupuesto) + D2 (KPIs) para pasar a `planned`. PR
+  [#544](https://github.com/beto-sudo/BSOP/pull/544) mergeado.
+- **2026-05-26 (planned)** — D1 + D2 cerradas en chat. Beto agregó
+  el concepto de **plantilla preestablecida de tareas** por
+  anteproyecto (trámites, cotizaciones, determinaciones de costo)
+  que al promover queda **ligada al proyecto** (no se duplica). Doc
+  actualizado: schema extendido a 4 tablas nuevas, Sprint 3 ampliado
+  a incluir la plantilla, Sprint 4 incluye el modelo de control de
+  ejecución del proyecto. Estado pasa a `planned`. Próximo hito:
+  Sprint 1 (refactor a sub-tabs).
 
 ## Decisiones registradas
 
-_Pendientes — se llenan al cerrar D1 y D2._
+- **2026-05-26 — D1: Opción B (separación con snapshot) + plantilla
+  de tareas ligada al proyecto post-promoción.** Los presupuestos
+  preliminares viven en `anteproyecto_presupuestos_preliminares`
+  (inmutable). Las tareas de la plantilla viven en
+  `anteproyecto_tareas` y al promover ganan `proyecto_id` (FK doble:
+  anteproyecto + proyecto) — el trabajo queda ligado para
+  seguimiento sin duplicar. Los presupuestos autorizados se
+  snapshot-copian a `proyectos_presupuestos` (modelo de control con
+  `monto_ejercido`). Razón: trazabilidad histórica del análisis +
+  continuidad operativa del trabajo.
+- **2026-05-26 — D2: 5 KPIs del anteproyecto confirmados.**
+  Activos · Inversión proyectada · Utilidad proyectada · Margen
+  promedio · # en decisión pendiente. Reactivos a filtros, derivados
+  client-side (ADR-034).
+- **2026-05-26 — Workflow de autorización en presupuestos
+  preliminares.** El operador captura → autorizador (Beto/director)
+  marca `autorizado = true`. Solo los autorizados se snapshot-copian
+  al proyecto al promover. Los no-autorizados quedan vivos en el
+  anteproyecto como histórico de "se cotizó pero no se aprobó".
