@@ -4,10 +4,10 @@
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa` (2 tablas nuevas + RPC de generación),
 `core` (3 roles nuevos si aún no existen)
-**Estado:** planned
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-05-25
-**Última actualización:** 2026-05-25 (planning doc + promovida)
+**Última actualización:** 2026-05-25 (Sprint 6 cutover mergeado — PR #530)
 
 ## Problema
 
@@ -201,12 +201,22 @@ Sub-slugs:
 - Botón "Marcar como pagada" en estado=facturada → captura referencia
   bancaria + fecha + transiciona a `pagada` → dispara el lock en cascada.
 
-### Sprint 6 (opcional) — Migración histórica de Coda
+### Sprint 6 — Sync cutover + paridad Coda en email
 
-- Si Beto lo pide, importar estimaciones pagadas históricas de Coda
-  para tener KPIs históricos de pagos por contratista.
-- Mapeo Coda → BSOP de la tabla "Estimaciones" / "Pagos".
-- Marca todas con `estado='pagada'` + `coda_row_id` para idempotencia.
+- Promovidos a cron daily los 5 scripts de construcción (contratistas,
+  catálogos, contratos, construcción, tareas terminadas) — antes solo
+  estaban en FULL manual y no se sincronizaban noche a noche.
+- Nuevo script `import_dilesa_estimaciones_incremental.ts` + RPC
+  `dilesa.fn_estimaciones_backfill_incremental()` que cada noche crea
+  estimaciones nuevas idempotente desde tareas pagadas recientes.
+- Email del cron rediseñado:
+  - 3 columnas de conteos: Antes / Después / Δ con color (verde sumas,
+    rojo restas).
+  - Columna "Coda" con `rowCount` reportado por Coda para las 6 tablas
+    1:1 (Contratistas, Contratos, Construcciones, Tareas terminadas,
+    Ventas, Pagos) — paridad verde, drift rojo, nativos BSOP naranja.
+- Backfill histórico 188 estimaciones de Coda hecho en Sprint 1
+  separado (no duplicado aquí).
 
 ## Decisiones registradas
 
@@ -239,6 +249,27 @@ Sub-slugs:
 
 - **2026-05-25** — Promovida a iniciativa formal tras Q&A con Beto.
   Planning doc creado + fila en INITIATIVES.md. Próximo: Sprint 1.
+- **2026-05-25** — Sprint 1 mergeado (PR #524): schema base
+  (`dilesa.estimaciones` + `estimacion_tareas`), RPC
+  `fn_generar_estimacion_borrador` y trigger de lock financiero
+  `BEFORE UPDATE/DELETE` en `construccion_tareas_terminadas`.
+- **2026-05-25** — Backfill histórico: 188 estimaciones de Coda
+  reconstruidas agrupando tareas pagadas por (contratista, fecha_pagada).
+- **2026-05-25** — Sprint 2 mergeado (PR #525): 3 roles nuevos
+  (`dilesa_construccion_gerente`, `dilesa_dir_construccion`,
+  `dilesa_dir_finanzas`), RLS por rol, override de lock para dirección.
+- **2026-05-25** — Sprint 3 mergeado (PR #526): UI lista + detalle
+  (solo lectura) con drawer canónico y desglose por obra.
+- **2026-05-25** — Sprint 4 mergeado (PR #527): UI de generación
+  borrador + transiciones aprobada → facturada → pagada.
+- **2026-05-25** — Sprint 5 mergeado (PR #528): PDF con
+  `@react-pdf/renderer` + email al contratista via Resend desde
+  `facturas@bsop.io` (dominio verificado), `reply_to:facturas@dilesa.mx`.
+- **2026-05-25** — Sprint 6 mergeado (PR #530): cutover del sync —
+  5 scripts construcción + estimaciones incrementales al cron daily,
+  email con columnas Antes/Después/Δ y columna Coda con flag de paridad.
+- **2026-05-25** — Iniciativa cerrada. Próximo: cutover operativo
+  (sábado 31-may pausar Coda, lunes 2-jun staff usa BSOP).
 
 ## Riesgos / open topics
 
