@@ -61,6 +61,7 @@ describe('flattenNavChildren', () => {
     const flat = flattenNavChildren(settings);
     expect(flat.map((c) => c.href)).toEqual([
       '/settings/acceso',
+      '/settings/notificaciones',
       '/settings/empresas',
       '/settings/integraciones',
       '/settings/preferencias',

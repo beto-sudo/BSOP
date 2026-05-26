@@ -97,6 +97,7 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
 
   // Settings
   '/settings/acceso': 'settings.acceso',
+  '/settings/notificaciones': 'settings.notificaciones',
 };
 
 /** Maps a nav section href to its empresa slug */

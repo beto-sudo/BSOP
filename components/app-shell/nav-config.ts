@@ -158,6 +158,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: 'settings',
     children: [
       { label: 'Acceso', href: '/settings/acceso' },
+      { label: 'Notificaciones', href: '/settings/notificaciones' },
       { label: 'Empresas', href: '/settings/empresas' },
       { label: 'Integraciones', href: '/settings/integraciones' },
       { label: 'Preferencias', href: '/settings/preferencias' },

@@ -271,6 +271,7 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
 
   // Settings
   'settings.acceso',
+  'settings.notificaciones',
 ]);
 
 describe('ROUTE_TO_MODULE ↔ core.modulos sync', () => {
