@@ -56,20 +56,26 @@ avance va el proyecto?" sin abrir Coda.
    operador lo actualice manualmente. v1 no fuerza el UPDATE — eso
    queda para un sprint B opcional con trigger/cron.
 
-## Decisión registrada — regla de transición a `completado`
+## Decisión registrada — regla de transición a `completado` (estricta)
 
-Un proyecto pasa a `estado='completado'` cuando:
+Un proyecto pasa a `estado='completado'` solo cuando **TODAS** sus
+unidades cumplen:
 
-- `avance_construccion = 100%` (todas las unidades en estado
-  `terminada` o posterior: `asignada`/`vendida`/`escriturada`/
-  `entregada`), Y
-- `avance_ventas >= 95%` (al menos 95% de las unidades en
-  `vendida`/`escriturada`/`entregada` — permite holgura de 1
-  unidad sobrante).
+- `construidas = total` (todas en `terminada`/`asignada`/`vendida`/
+  `escriturada`/`entregada`), Y
+- `vendidas = total` (todas en `vendida`/`escriturada`/`entregada`/
+  `asignada`).
 
-Aplica a los 3 desarrollos identificados: LV (100/100), LV2
-(100/100), LDV (100/99.12). Los demás 5 desarrollos siguen
-`ejecutando`.
+**Regla original (descartada)**: `≥ 95%` ambos. Beto pidió "aunque
+quede una vivienda por vender hay que marcarlo como ejecutando" —
+regla relajada permitía marcar terminado con 1-10 unidades sin
+vender, no refleja la realidad operativa.
+
+Estado de los 8 desarrollos hoy (post-revert): los 3 que habían
+pasado a `completado` (LV/LV2/LDV) vuelven a `ejecutando` porque en
+BSOP les quedan 3/6/10 unidades respectivamente. Cuando todas se
+vendan, el `estado_sugerido` será `completado` y el operador lo
+aplicará manualmente.
 
 ## Modelo conceptual
 
@@ -191,6 +197,14 @@ WHERE p.deleted_at IS NULL;
 
 ## Bitácora
 
+- **2026-05-26 (revert + regla estricta)** — Beto pidió cambiar la
+  regla: "aunque quede una vivienda por vender hay que marcarlo como
+  ejecutando". Migración `20260527000200_dilesa_v_proyecto_avances_estricto`
+  aplicada: revierte UPDATE de LV/LV2/LDV (vuelven a `ejecutando`) y
+  reemplaza la regla `≥ 95%` por estricta `= 100%`. Los 8 desarrollos
+  ahora todos `ejecutando` y `estado_sugerido='ejecutando'`. Cuando
+  todas las unidades de un proyecto pasen a `vendida`/`escriturada`/
+  `entregada`, el `estado_sugerido` será `completado`.
 - **2026-05-26 (promoción + Sprint A DONE)** — Iniciativa creada
   tras comparar `*Proyectos` de Coda (`grid-SlvkPAfZNE`, 8 rows × 60
   cols) con `dilesa.proyectos`. Migración `20260527000100`
@@ -212,9 +226,10 @@ WHERE p.deleted_at IS NULL;
 
 ## Decisiones registradas
 
-- **2026-05-26 — Regla de transición `ejecutando → completado`**:
-  avance construcción = 100% AND avance ventas ≥ 95%. La holgura de
-  5% permite tener 1 unidad sobrante sin bloquear el cierre.
+- **2026-05-26 — Regla de transición `ejecutando → completado`
+  ESTRICTA**: `construidas = total AND vendidas = total`. Sin
+  holgura. Aunque quede 1 unidad por vender, sigue `ejecutando`.
+  Razón explícita de Beto.
 - **2026-05-26 — Estado sugerido vs estado en DB**. La vista expone
   el sugerido; el operador aplica manualmente en v1. Sprint B
   opcional automatiza vía trigger o cron si Beto quiere.
