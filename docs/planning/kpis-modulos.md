@@ -8,7 +8,8 @@ dataset que la tabla; cero DDL nuevo)
 **Dueño:** Beto
 **Creada:** 2026-05-25
 **Última actualización:** 2026-05-26 (Sprint 4 closeout — iniciativa cerrada; 7 PRs mergeados en 1 día; 55 KPIs reactivos en DILESA Operativo)
-**Cerrada:** 2026-05-26
+**Cerrada:** 2026-05-26  
+**PRs:** [#529](https://github.com/beto-sudo/BSOP/pull/529) · [#531](https://github.com/beto-sudo/BSOP/pull/531) · [#532](https://github.com/beto-sudo/BSOP/pull/532) · [#533](https://github.com/beto-sudo/BSOP/pull/533) · [#534](https://github.com/beto-sudo/BSOP/pull/534) · [#535](https://github.com/beto-sudo/BSOP/pull/535) · [#537](https://github.com/beto-sudo/BSOP/pull/537) · [#538](https://github.com/beto-sudo/BSOP/pull/538) · [#539](https://github.com/beto-sudo/BSOP/pull/539)
 
 ## Problema
 
