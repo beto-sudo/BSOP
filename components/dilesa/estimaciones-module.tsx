@@ -27,6 +27,12 @@ import { Banknote, Plus, RefreshCw, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
+import {
+  DateRangeFilter,
+  EMPTY_DATE_RANGE,
+  isInDateRange,
+  type DateRange,
+} from '@/components/filters/date-range-filter';
 import { Input } from '@/components/ui/input';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency } from '@/lib/format';
@@ -108,6 +114,8 @@ export function EstimacionesModule({ empresaId }: { empresaId: string }) {
   const [search, setSearch] = useState('');
   const [contratistaFiltro, setContratistaFiltro] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState<string>('');
+  const [rangoCierre, setRangoCierre] = useState<DateRange>(EMPTY_DATE_RANGE);
+  const [rangoPago, setRangoPago] = useState<DateRange>(EMPTY_DATE_RANGE);
 
   const fetchEstimaciones = useCallback(async (): Promise<{
     data?: EstimacionRow[];
@@ -225,6 +233,8 @@ export function EstimacionesModule({ empresaId }: { empresaId: string }) {
     return estimaciones.filter((e) => {
       if (contratistaFiltro && e.contratistaNombre !== contratistaFiltro) return false;
       if (estadoFiltro && e.estado !== estadoFiltro) return false;
+      if (!isInDateRange(e.fecha_cierre, rangoCierre)) return false;
+      if (!isInDateRange(e.pagada_at, rangoPago)) return false;
       if (q) {
         const hay =
           e.codigo.toLowerCase().includes(q) || e.contratistaNombre.toLowerCase().includes(q);
@@ -232,7 +242,7 @@ export function EstimacionesModule({ empresaId }: { empresaId: string }) {
       }
       return true;
     });
-  }, [estimaciones, search, contratistaFiltro, estadoFiltro]);
+  }, [estimaciones, search, contratistaFiltro, estadoFiltro, rangoCierre, rangoPago]);
 
   const kpis = useMemo(() => deriveKpis(filtradas), [filtradas]);
 
@@ -350,6 +360,18 @@ export function EstimacionesModule({ empresaId }: { empresaId: string }) {
             </option>
           ))}
         </select>
+        <DateRangeFilter
+          label="Cierre"
+          ariaPrefix="Fecha cierre"
+          value={rangoCierre}
+          onChange={setRangoCierre}
+        />
+        <DateRangeFilter
+          label="Pago"
+          ariaPrefix="Fecha pagada"
+          value={rangoPago}
+          onChange={setRangoPago}
+        />
         <button
           type="button"
           onClick={() => void cargar()}

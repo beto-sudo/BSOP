@@ -25,6 +25,12 @@ import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/compon
 import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import {
+  DateRangeFilter,
+  EMPTY_DATE_RANGE,
+  isInDateRange,
+  type DateRange,
+} from '@/components/filters/date-range-filter';
 import { Boxes, RefreshCw, Search, ArrowRight } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency } from '@/lib/format';
@@ -122,6 +128,7 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
   const [caracteristicaFiltro, setCaracteristicaFiltro] = useState<'' | 'esquina' | 'frente_verde'>(
     ''
   );
+  const [rangoIngreso, setRangoIngreso] = useState<DateRange>(EMPTY_DATE_RANGE);
 
   const fetchUnidades = useCallback(async (): Promise<{
     data?: UnidadListaRow[];
@@ -257,10 +264,11 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
       if (prototipoFiltro && u.prototipo !== prototipoFiltro) return false;
       if (caracteristicaFiltro === 'esquina' && !u.es_esquina) return false;
       if (caracteristicaFiltro === 'frente_verde' && !u.tiene_frente_verde) return false;
+      if (!isInDateRange(u.created_at, rangoIngreso)) return false;
       if (q && !u.identificadorCompleto.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [unidades, search, proyectoFiltro, prototipoFiltro, caracteristicaFiltro]);
+  }, [unidades, search, proyectoFiltro, prototipoFiltro, caracteristicaFiltro, rangoIngreso]);
 
   const kpis = useMemo(() => deriveKpis(filtrados), [filtrados]);
 
@@ -399,6 +407,12 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
           <option value="esquina">Solo esquinas</option>
           <option value="frente_verde">Solo frente verde</option>
         </select>
+        <DateRangeFilter
+          label="Ingreso"
+          ariaPrefix="Fecha de ingreso a inventario"
+          value={rangoIngreso}
+          onChange={setRangoIngreso}
+        />
         <button
           type="button"
           onClick={() => void cargar()}
