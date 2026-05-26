@@ -7,7 +7,7 @@
 **Estado:** proposed
 **Dueño:** Beto
 **Creada:** 2026-05-26
-**Última actualización:** 2026-05-26 (promovida)
+**Última actualización:** 2026-05-26 (D2 scope RBAC cerrado: operadora actual + gerente de proyectos + dirección + Beto admin; D1 sigue bloqueante con Sprint 0 deep-dive de Coda; estado se mantiene `proposed`)
 
 ## Problema
 
@@ -137,13 +137,13 @@ por `unidad.proyecto_id = <proyecto>`. Requiere:
   el sub-slug; si no, tab no aparece (filter automático
   `<RoutedModuleTabs>`).
 
-## Decisiones abiertas (D1-D2)
+## Decisiones (D1 abierta · D2 cerrada)
 
-### D1 — Schema preciso (resuelve Sprint 0 deep-dive de Coda)
+### D1 — Schema preciso (resuelve Sprint 0 deep-dive de Coda) 🔒 Abierta
 
 Antes del Sprint 1, hacer el deep-dive de las 3 tablas en Coda:
 
-- Exportar las 1,557 registros + columnas reales (no solo el
+- Exportar los 1,557 registros + columnas reales (no solo el
   inventario top-level).
 - Identificar columnas calculadas / relaciones / fórmulas que el
   módulo de Coda haga implícitamente.
@@ -157,20 +157,28 @@ Antes del Sprint 1, hacer el deep-dive de las 3 tablas en Coda:
 Output esperado: shape definitivo del schema + lista de
 columnas/enum-values + plan de adjuntos.
 
-### D2 — Scope RBAC
+Beto ofreció apuntar a las tablas específicas en Coda cuando el deep-dive
+arranque — se aprovecha al inicio del Sprint 0 para no perder tiempo
+buscando.
 
-¿Quién tiene acceso al módulo en producción?
+### D2 — Scope RBAC ✅ Cerrada
 
-- **Operadora única + Beto** (mínimo).
-- **+ Alejandra Chavarría / Michelle Santos** — Beto confirma si
-  ellas también ven RUV o no (probablemente sí, son admins).
-- **+ cualquier rol comercial** — improbable (RUV es post-venta /
-  trámite).
+**Decisión** (2026-05-26): el módulo `dilesa.ruv` se libera a 4 roles:
 
-El backfill defensivo de permisos depende de esta decisión —
-clonar permisos de qué módulo (`dilesa.construccion` para
-operativos vs `dilesa.proyectos` para admin) decide el comportamiento
-de roles existentes.
+1. **Operadora actual** del módulo (responsable directo, escritura).
+2. **Gerente de Proyectos** (lectura + escritura — supervisa el flujo).
+3. **Dirección** (lectura + escritura — visibilidad operativa).
+4. **Admin (Beto)** — bypass por `core.fn_is_admin()`.
+
+Roles **excluidos por defecto**: comercial, ventas, contraloría, RH.
+El backfill defensivo de permisos clona desde un módulo con perfil
+operativo similar (probablemente `dilesa.construccion`) y luego ajusta
+fino para excluir los roles no deseados.
+
+Implicación para Sprint 1: la migración INSERT-permissions debe ser
+explícita por rol — no clonar a ciegas todos los roles existentes.
+Patrón canónico de "Liberación de módulo nuevo" se sigue, pero con
+filtro adicional al backfill.
 
 ## Sprints (4 + Sprint 0)
 
@@ -236,11 +244,18 @@ NULL` + flag de revisión manual, **no** bloquear el import.
 
 ## Bitácora
 
-- **2026-05-26** — Promovida a `proposed`. RUV se mantiene como
-  módulo independiente (no sub-tab de Proyectos) por instrucción de
-  Beto: lo opera una sola persona dedicada, módulo propio refleja
+- **2026-05-26 (promoción)** — Promovida a `proposed`. RUV se mantiene
+  como módulo independiente (no sub-tab de Proyectos) por instrucción
+  de Beto: lo opera una sola persona dedicada, módulo propio refleja
   mejor el flujo. Sprint 0 (deep-dive de Coda) queda como bloqueante
-  para pasar a `planned`.
+  para pasar a `planned`. PR
+  [#544](https://github.com/beto-sudo/BSOP/pull/544) mergeado.
+- **2026-05-26 (D2 cerrada)** — Scope RBAC definido por Beto:
+  operadora actual + gerente de proyectos + dirección + admin (Beto).
+  Comercial, ventas, contraloría, RH excluidos. Beto ofreció apuntar
+  a las tablas específicas en Coda cuando el deep-dive arranque — se
+  aprovecha al inicio del Sprint 0. D1 sigue bloqueante (deep-dive
+  pendiente).
 
 ## Decisiones registradas
 
@@ -249,3 +264,8 @@ NULL` + flag de revisión manual, **no** bloquear el import.
   al módulo a hacer trámites, no a navegar proyectos. Drill-down
   desde proyecto se considera para v1.1 como afordancia de
   navegación, no como home del módulo.
+- **2026-05-26 — D2: scope RBAC = 4 roles + admin.** Operadora del
+  módulo + Gerente de Proyectos + Dirección + Beto. Roles excluidos
+  por defecto: comercial, ventas, contraloría, RH. El backfill
+  defensivo del Sprint 1 debe ser explícito por rol, no clonar
+  a ciegas.
