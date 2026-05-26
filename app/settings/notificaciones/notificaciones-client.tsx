@@ -113,12 +113,12 @@ export function NotificacionesClient({
       subject_template: selected.subject_template,
       activo: selected.activo,
     });
-     
+
     setSaveMsg(null);
-     
+
     setTestStatus({ state: 'idle' });
     let active = true;
-     
+
     setLoadingLogs(true);
     const sb = createSupabaseBrowserClient();
     void sb
