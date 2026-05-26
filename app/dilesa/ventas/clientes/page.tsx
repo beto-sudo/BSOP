@@ -32,10 +32,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshCw, Search, Users } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import { DataTable, type Column } from '@/components/module-page';
+import { DataTable, ModuleKpiStrip, type Column } from '@/components/module-page';
 import { Input } from '@/components/ui/input';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { deriveClientesKpis } from '@/lib/dilesa/kpis/clientes';
 
 type Venta = {
   id: string;
@@ -213,6 +214,9 @@ function VentasClientesBody() {
     });
   }, [clientes, search, proyectoFiltro]);
 
+  // KPIs derivados del dataset filtrado — ADR-034 (KPI2+KPI3).
+  const kpis = useMemo(() => deriveClientesKpis(filtrados), [filtrados]);
+
   const columns: Column<ClienteRow>[] = [
     {
       key: 'nombre',
@@ -282,6 +286,8 @@ function VentasClientesBody() {
           </p>
         </div>
       </header>
+
+      <ModuleKpiStrip stats={kpis} cols={5} />
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">

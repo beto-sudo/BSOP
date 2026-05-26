@@ -353,6 +353,16 @@ IS NOT NULL` es la señal canónica de venta completada. Wording
   derivación queda dentro del module file mismo. (Why: minimizar
   fricción de imports, mantener la derivación cerca del consumer real
   excepto cuando se necesita para testing.)
+- **2026-05-26** (D12): Clientes tab 4 — el KPI "% con expediente
+  completo" estaba marcado ⚠ en curaduría sin definición clara de
+  qué docs componen el expediente. Reinterpretado como "% contactables"
+  (`email != null OR telefono != null`) que es la única señal de
+  "completitud" derivable hoy y dispara una decisión clara ("¿a quién
+  no puedo contactar?"). Si en el futuro DILESA define un set de
+  documentos requeridos (RFC, CURP, INE, comprobante de domicilio,
+  etc.), este KPI se puede actualizar para reflejar esa definición.
+  (Why: KPI accionable HOY beats KPI conceptualmente correcto pero
+  no derivable.)
 
 ## Bitácora
 
@@ -391,7 +401,17 @@ IS NOT NULL` es la señal canónica de venta completada. Wording
   `created_at`. Helper movido a `lib/dilesa/kpis/fases.ts` (D11,
   patrón para pages directos). 9 unit tests con `now` inyectable para
   estabilidad. Fases no tiene tabla — la auditoría no aplica.
-  **Próximo: Sprint 1 tab 4 ("Clientes")**.
+  PR #533 mergeado.
+- **2026-05-26** — Sprint 1 tab 4 ("Clientes"): strip de 5 KPIs sobre
+  la agregación de ventas por persona. Pivote D12 reinterpreta el KPI
+  "% con expediente completo" (marcado ⚠ en curaduría sin definición
+  clara) como "% contactables" — único proxy derivable client-side:
+  `count(email != null OR telefono != null) / total`. Resto 4 KPIs
+  siguen curaduría: Total clientes, # con venta activa, # repetidores
+  (numVentas > 1), Compra promedio. Helper en `lib/dilesa/kpis/clientes.ts`.
+  8 unit tests. Auditoría no agrega columnas — la tabla ya muestra
+  contacto embebido bajo el nombre. **Próximo: Sprint 1 tab 5
+  ("Vendedores")**.
 
 ## Riesgos / open topics
 
