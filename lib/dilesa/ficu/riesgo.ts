@@ -166,6 +166,9 @@ export function nivelUsoEfectivo(
   }
   const ue = (usoEfectivo ?? '').toUpperCase();
   if (!ue || ue.includes('SIN') || ue === 'NO') return 'Bajo';
+  // Reconoce los strings del catálogo `USO_EFECTIVO_OPTIONS`:
+  // "mayor a 3,210 UMAs" → Alto (cruzó el umbral de identificación LFPIORPI).
+  if (ue.includes('3,210') || ue.includes('3210') || ue.includes('IDENTIFICACIÓN')) return 'Alto';
   return 'Medio';
 }
 

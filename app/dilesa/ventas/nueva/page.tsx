@@ -26,6 +26,17 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
+import {
+  TIPO_PERSONA_OPTIONS,
+  NACIONALIDAD_OPTIONS,
+  FORMA_PAGO_OPTIONS,
+  USO_EFECTIVO_OPTIONS,
+  ESTADO_CIVIL_OPTIONS,
+  OCUPACION_OPTIONS,
+  CONOCIMIENTO_DUENO_BENEFICIARIO_OPTIONS,
+} from '@/lib/dilesa/ficu/catalogos';
+import { evaluarRiesgo } from '@/lib/dilesa/ficu/riesgo';
+import { buildAdjuntoPath } from '@/lib/storage/path';
 
 type UnidadDisponible = {
   id: string;
@@ -133,7 +144,10 @@ function NuevaSolicitudForm() {
   const [personaIdSeleccionada, setPersonaIdSeleccionada] = useState<string>('');
   const [busquedaPersona, setBusquedaPersona] = useState('');
 
-  // Nuevo cliente (campos básicos — KYC completo va en Fase 2)
+  // Cliente nuevo — KYC completo (Sprint 7c-2: todo en Fase 1, no se difiere).
+  // El form de Coda captura estos 14 campos extra que alimentan los 3 PDFs
+  // (Solicitud, Aviso Privacidad, FICU) + el EBR automático. Ver
+  // docs/planning/dilesa-portafolio-activos.md "Sprint 7c-2".
   const [nombre, setNombre] = useState('');
   const [apellidoPaterno, setApellidoPaterno] = useState('');
   const [apellidoMaterno, setApellidoMaterno] = useState('');
@@ -141,6 +155,30 @@ function NuevaSolicitudForm() {
   const [rfc, setRfc] = useState('');
   const [telefono, setTelefono] = useState('');
   const [email, setEmail] = useState('');
+  // Datos personales / identificación
+  const [fechaNacimiento, setFechaNacimiento] = useState('');
+  const [nss, setNss] = useState('');
+  const [numeroCredencialIne, setNumeroCredencialIne] = useState('');
+  // Domicilio estructurado
+  const [domCalle, setDomCalle] = useState('');
+  const [domNumExt, setDomNumExt] = useState('');
+  const [domNumInt, setDomNumInt] = useState('');
+  const [domColonia, setDomColonia] = useState('');
+  const [domCp, setDomCp] = useState('');
+  const [domCiudad, setDomCiudad] = useState('');
+  const [domEstado, setDomEstado] = useState('');
+  // KYC / FICU
+  const [tipoPersona, setTipoPersona] = useState<'fisica' | 'moral'>('fisica');
+  const [nacionalidad, setNacionalidad] = useState<string>('Mexicana');
+  const [estadoCivil, setEstadoCivil] = useState<string>('');
+  const [ocupacion, setOcupacion] = useState<string>('');
+  const [esPep, setEsPep] = useState(false);
+  const [formaPagoKyc, setFormaPagoKyc] = useState<string>('');
+  const [usoEfectivoKyc, setUsoEfectivoKyc] = useState<string>('');
+  const [conocimientoDuenoBeneficiario, setConocimientoDuenoBeneficiario] = useState<string>('No');
+  // Expediente digital (1 PDF aglutinado con IFE + Acta Nac + RFC + CURP +
+  // Sol Crédito + Acta Matrimonio — mismo patrón que Coda).
+  const [expedienteFile, setExpedienteFile] = useState<File | null>(null);
 
   // Cálculo
   const [calculo, setCalculo] = useState<CalculoPrecio | null>(null);
@@ -343,9 +381,13 @@ function NuevaSolicitudForm() {
       // 1) Resolver persona_id (existente o crear nueva)
       let personaId = personaIdSeleccionada;
       if (clienteModo === 'nuevo') {
-        const { data: ins, error: pErr } = await sb
-          .schema('erp')
-          .from('personas')
+        // Cast del insert con columnas KYC nuevas (Sprint 7c-2). Los types
+        // generados de Supabase se regenerarán post-`db push` de la migración
+        // `20260527000000_erp_personas_kyc_ficu.sql`. Hasta entonces el insert
+        // necesita escape — comportamiento runtime es el correcto.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const personasTable = sb.schema('erp').from('personas') as any;
+        const { data: ins, error: pErr } = await personasTable
           .insert({
             empresa_id: DILESA_EMPRESA_ID,
             tipo: 'cliente',
@@ -356,6 +398,25 @@ function NuevaSolicitudForm() {
             rfc: rfc.trim().toUpperCase() || null,
             telefono: telefono.trim() || null,
             email: email.trim() || null,
+            // Sprint 7c-2 — 14 campos KYC para FICU + EBR automático.
+            fecha_nacimiento: fechaNacimiento || null,
+            nss: nss.trim() || null,
+            numero_credencial_ine: numeroCredencialIne.trim() || null,
+            domicilio_calle: domCalle.trim() || null,
+            domicilio_numero_exterior: domNumExt.trim() || null,
+            domicilio_numero_interior: domNumInt.trim() || null,
+            domicilio_colonia: domColonia.trim() || null,
+            domicilio_codigo_postal: domCp.trim() || null,
+            domicilio_ciudad: domCiudad.trim() || null,
+            domicilio_estado: domEstado.trim() || null,
+            tipo_persona: tipoPersona,
+            nacionalidad: nacionalidad || null,
+            estado_civil: estadoCivil || null,
+            ocupacion: ocupacion || null,
+            es_pep: esPep,
+            forma_pago_kyc: formaPagoKyc || null,
+            uso_efectivo_kyc: usoEfectivoKyc || null,
+            conocimiento_dueno_beneficiario: conocimientoDuenoBeneficiario || 'No',
           })
           .select('id')
           .single();
@@ -420,7 +481,48 @@ function NuevaSolicitudForm() {
         console.warn('No se pudo registrar venta_fase inicial:', fErr.message);
       }
 
-      // 5) Marcar unidad como asignada
+      // 5) Upload del expediente digital (PDF aglutinado con IFE + Acta
+      //    Nac + RFC + CURP + Sol Crédito + Acta Matrimonio — patrón Coda).
+      //    Sprint 7c-2. Mismo layout que el script de migración histórico:
+      //    `dilesa/ventas/<id>/<role>__<filename>`. Falla no bloquea — la
+      //    venta ya está creada y el operador puede re-subir desde el detalle.
+      if (expedienteFile) {
+        try {
+          const path = buildAdjuntoPath({
+            empresa: 'dilesa',
+            entidad: 'ventas',
+            entidadId: ventaId,
+            filename: expedienteFile.name,
+          });
+          const { error: upErr } = await sb.storage.from('adjuntos').upload(path, expedienteFile, {
+            contentType: expedienteFile.type || 'application/pdf',
+            upsert: false,
+          });
+          if (upErr) {
+            console.warn('No se pudo subir expediente:', upErr.message);
+          } else {
+            const { error: adjErr } = await sb
+              .schema('erp')
+              .from('adjuntos')
+              .insert({
+                empresa_id: DILESA_EMPRESA_ID,
+                entidad_tipo: 'ventas',
+                entidad_id: ventaId,
+                rol: 'expediente_digital',
+                nombre: expedienteFile.name,
+                url: path,
+                tamano_bytes: expedienteFile.size,
+                tipo_mime: expedienteFile.type || 'application/pdf',
+                uploaded_by: user?.id ?? null,
+              });
+            if (adjErr) console.warn('No se pudo registrar adjunto:', adjErr.message);
+          }
+        } catch (e) {
+          console.warn('Excepción subiendo expediente:', (e as Error).message);
+        }
+      }
+
+      // 6) Marcar unidad como asignada
       const { error: uErr } = await sb
         .schema('dilesa')
         .from('unidades')
@@ -552,45 +654,61 @@ function NuevaSolicitudForm() {
             </div>
           </div>
         ) : (
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field label="Nombre(s) *">
-              <Input value={nombre} onChange={(e) => setNombre(e.target.value)} required />
-            </Field>
-            <div />
-            <Field label="Apellido paterno *">
-              <Input
-                value={apellidoPaterno}
-                onChange={(e) => setApellidoPaterno(e.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Apellido materno">
-              <Input value={apellidoMaterno} onChange={(e) => setApellidoMaterno(e.target.value)} />
-            </Field>
-            <Field label="CURP">
-              <Input
-                value={curp}
-                onChange={(e) => setCurp(e.target.value.toUpperCase())}
-                maxLength={18}
-              />
-            </Field>
-            <Field label="RFC">
-              <Input
-                value={rfc}
-                onChange={(e) => setRfc(e.target.value.toUpperCase())}
-                maxLength={13}
-              />
-            </Field>
-            <Field label="Teléfono">
-              <Input value={telefono} onChange={(e) => setTelefono(e.target.value)} />
-            </Field>
-            <Field label="Email">
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-            </Field>
-            <p className="col-span-full text-xs text-muted-foreground">
-              KYC completo (PEP, ocupación, domicilio, etc.) se captura en Fase 2 (Asignada).
-            </p>
-          </div>
+          <ClienteNuevoForm
+            // Personales
+            nombre={nombre}
+            setNombre={setNombre}
+            apellidoPaterno={apellidoPaterno}
+            setApellidoPaterno={setApellidoPaterno}
+            apellidoMaterno={apellidoMaterno}
+            setApellidoMaterno={setApellidoMaterno}
+            fechaNacimiento={fechaNacimiento}
+            setFechaNacimiento={setFechaNacimiento}
+            curp={curp}
+            setCurp={setCurp}
+            rfc={rfc}
+            setRfc={setRfc}
+            nss={nss}
+            setNss={setNss}
+            numeroCredencialIne={numeroCredencialIne}
+            setNumeroCredencialIne={setNumeroCredencialIne}
+            telefono={telefono}
+            setTelefono={setTelefono}
+            email={email}
+            setEmail={setEmail}
+            // Domicilio
+            domCalle={domCalle}
+            setDomCalle={setDomCalle}
+            domNumExt={domNumExt}
+            setDomNumExt={setDomNumExt}
+            domNumInt={domNumInt}
+            setDomNumInt={setDomNumInt}
+            domColonia={domColonia}
+            setDomColonia={setDomColonia}
+            domCp={domCp}
+            setDomCp={setDomCp}
+            domCiudad={domCiudad}
+            setDomCiudad={setDomCiudad}
+            domEstado={domEstado}
+            setDomEstado={setDomEstado}
+            // KYC
+            tipoPersona={tipoPersona}
+            setTipoPersona={setTipoPersona}
+            nacionalidad={nacionalidad}
+            setNacionalidad={setNacionalidad}
+            estadoCivil={estadoCivil}
+            setEstadoCivil={setEstadoCivil}
+            ocupacion={ocupacion}
+            setOcupacion={setOcupacion}
+            esPep={esPep}
+            setEsPep={setEsPep}
+            formaPagoKyc={formaPagoKyc}
+            setFormaPagoKyc={setFormaPagoKyc}
+            usoEfectivoKyc={usoEfectivoKyc}
+            setUsoEfectivoKyc={setUsoEfectivoKyc}
+            conocimientoDuenoBeneficiario={conocimientoDuenoBeneficiario}
+            setConocimientoDuenoBeneficiario={setConocimientoDuenoBeneficiario}
+          />
         )}
       </Section>
 
@@ -721,6 +839,41 @@ function NuevaSolicitudForm() {
         </Section>
       ) : null}
 
+      {/* ── EBR preview (solo cliente nuevo, ayuda al vendedor a ver el
+           score que tendrá el FICU antes de cerrar) ── */}
+      {clienteModo === 'nuevo' ? (
+        <EbrPreview
+          tipoPersona={tipoPersona}
+          nacionalidad={nacionalidad}
+          esPep={esPep}
+          formaPago={formaPagoKyc}
+          usoEfectivo={usoEfectivoKyc}
+        />
+      ) : null}
+
+      {/* ── Expediente digital — 1 PDF aglutinado patrón Coda ── */}
+      {clienteModo === 'nuevo' ? (
+        <Section title="Expediente digital del cliente">
+          <p className="mb-3 text-xs text-muted-foreground">
+            Sube un PDF con: IFE/INE, Acta de Nacimiento, RFC, CURP, Solicitud de Crédito y, si
+            aplica, Acta de Matrimonio. Se guarda en el bucket privado y queda asociado a la venta
+            para el flujo de Fase 2 (Asignada).
+          </p>
+          <input
+            type="file"
+            accept="application/pdf,image/*"
+            onChange={(e) => setExpedienteFile(e.target.files?.[0] ?? null)}
+            className="block w-full text-sm file:mr-3 file:rounded-md file:border file:border-[var(--border)] file:bg-[var(--card)] file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground hover:file:bg-[var(--accent)]/5"
+          />
+          {expedienteFile ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Seleccionado: <span className="font-mono">{expedienteFile.name}</span> ·{' '}
+              {(expedienteFile.size / 1024 / 1024).toFixed(2)} MB
+            </p>
+          ) : null}
+        </Section>
+      ) : null}
+
       {/* ── Submit ── */}
       <div className="flex items-center justify-end gap-3">
         <Link href="/dilesa/ventas">
@@ -786,5 +939,352 @@ function Row({
       <dt className="text-muted-foreground">{label}</dt>
       <dd className="tabular-nums">{value}</dd>
     </div>
+  );
+}
+
+// ── Sub-componentes Sprint 7c-2 ──────────────────────────────────────────
+
+/**
+ * Form expandido del cliente nuevo. 4 sub-secciones:
+ *   1. Datos personales (nombre + identificadores)
+ *   2. Domicilio estructurado (7 campos)
+ *   3. Contacto
+ *   4. KYC / FICU (8 campos para EBR + reportes LFPIORPI)
+ */
+type ClienteNuevoFormProps = {
+  // Personales
+  nombre: string;
+  setNombre: (v: string) => void;
+  apellidoPaterno: string;
+  setApellidoPaterno: (v: string) => void;
+  apellidoMaterno: string;
+  setApellidoMaterno: (v: string) => void;
+  fechaNacimiento: string;
+  setFechaNacimiento: (v: string) => void;
+  curp: string;
+  setCurp: (v: string) => void;
+  rfc: string;
+  setRfc: (v: string) => void;
+  nss: string;
+  setNss: (v: string) => void;
+  numeroCredencialIne: string;
+  setNumeroCredencialIne: (v: string) => void;
+  telefono: string;
+  setTelefono: (v: string) => void;
+  email: string;
+  setEmail: (v: string) => void;
+  // Domicilio
+  domCalle: string;
+  setDomCalle: (v: string) => void;
+  domNumExt: string;
+  setDomNumExt: (v: string) => void;
+  domNumInt: string;
+  setDomNumInt: (v: string) => void;
+  domColonia: string;
+  setDomColonia: (v: string) => void;
+  domCp: string;
+  setDomCp: (v: string) => void;
+  domCiudad: string;
+  setDomCiudad: (v: string) => void;
+  domEstado: string;
+  setDomEstado: (v: string) => void;
+  // KYC
+  tipoPersona: 'fisica' | 'moral';
+  setTipoPersona: (v: 'fisica' | 'moral') => void;
+  nacionalidad: string;
+  setNacionalidad: (v: string) => void;
+  estadoCivil: string;
+  setEstadoCivil: (v: string) => void;
+  ocupacion: string;
+  setOcupacion: (v: string) => void;
+  esPep: boolean;
+  setEsPep: (v: boolean) => void;
+  formaPagoKyc: string;
+  setFormaPagoKyc: (v: string) => void;
+  usoEfectivoKyc: string;
+  setUsoEfectivoKyc: (v: string) => void;
+  conocimientoDuenoBeneficiario: string;
+  setConocimientoDuenoBeneficiario: (v: string) => void;
+};
+
+function ClienteNuevoForm(props: ClienteNuevoFormProps) {
+  return (
+    <div className="mt-4 space-y-6">
+      {/* — Datos personales — */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Field label="Nombre(s) *">
+          <Input value={props.nombre} onChange={(e) => props.setNombre(e.target.value)} required />
+        </Field>
+        <Field label="Apellido paterno *">
+          <Input
+            value={props.apellidoPaterno}
+            onChange={(e) => props.setApellidoPaterno(e.target.value)}
+            required
+          />
+        </Field>
+        <Field label="Apellido materno">
+          <Input
+            value={props.apellidoMaterno}
+            onChange={(e) => props.setApellidoMaterno(e.target.value)}
+          />
+        </Field>
+        <Field label="Fecha de nacimiento *">
+          <Input
+            type="date"
+            value={props.fechaNacimiento}
+            onChange={(e) => props.setFechaNacimiento(e.target.value)}
+          />
+        </Field>
+        <Field label="CURP *">
+          <Input
+            value={props.curp}
+            onChange={(e) => props.setCurp(e.target.value.toUpperCase())}
+            maxLength={18}
+          />
+        </Field>
+        <Field label="RFC *">
+          <Input
+            value={props.rfc}
+            onChange={(e) => props.setRfc(e.target.value.toUpperCase())}
+            maxLength={13}
+          />
+        </Field>
+        <Field label="NSS (Seguro Social)">
+          <Input value={props.nss} onChange={(e) => props.setNss(e.target.value)} maxLength={11} />
+        </Field>
+        <Field label="Número Credencial INE *">
+          <Input
+            value={props.numeroCredencialIne}
+            onChange={(e) => props.setNumeroCredencialIne(e.target.value.toUpperCase())}
+          />
+        </Field>
+        <div />
+        <Field label="Teléfono *">
+          <Input value={props.telefono} onChange={(e) => props.setTelefono(e.target.value)} />
+        </Field>
+        <Field label="Email *">
+          <Input
+            type="email"
+            value={props.email}
+            onChange={(e) => props.setEmail(e.target.value)}
+          />
+        </Field>
+      </div>
+
+      {/* — Domicilio — */}
+      <div>
+        <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Domicilio
+        </h3>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+          <div className="sm:col-span-2">
+            <Field label="Calle *">
+              <Input value={props.domCalle} onChange={(e) => props.setDomCalle(e.target.value)} />
+            </Field>
+          </div>
+          <Field label="Núm. exterior *">
+            <Input value={props.domNumExt} onChange={(e) => props.setDomNumExt(e.target.value)} />
+          </Field>
+          <Field label="Núm. interior">
+            <Input value={props.domNumInt} onChange={(e) => props.setDomNumInt(e.target.value)} />
+          </Field>
+          <Field label="Colonia *">
+            <Input value={props.domColonia} onChange={(e) => props.setDomColonia(e.target.value)} />
+          </Field>
+          <Field label="Código postal *">
+            <Input
+              value={props.domCp}
+              onChange={(e) => props.setDomCp(e.target.value)}
+              maxLength={5}
+            />
+          </Field>
+          <Field label="Ciudad *">
+            <Input value={props.domCiudad} onChange={(e) => props.setDomCiudad(e.target.value)} />
+          </Field>
+          <Field label="Estado *">
+            <Input value={props.domEstado} onChange={(e) => props.setDomEstado(e.target.value)} />
+          </Field>
+        </div>
+      </div>
+
+      {/* — KYC / FICU — */}
+      <div>
+        <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          KYC / FICU (alimenta el cálculo automático del EBR)
+        </h3>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Personalidad *">
+            <select
+              value={props.tipoPersona}
+              onChange={(e) => props.setTipoPersona(e.target.value as 'fisica' | 'moral')}
+              className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm"
+            >
+              {TIPO_PERSONA_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Nacionalidad *">
+            <select
+              value={props.nacionalidad}
+              onChange={(e) => props.setNacionalidad(e.target.value)}
+              className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm"
+            >
+              {NACIONALIDAD_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Estado civil *">
+            <select
+              value={props.estadoCivil}
+              onChange={(e) => props.setEstadoCivil(e.target.value)}
+              className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm"
+            >
+              <option value="">— selecciona —</option>
+              {ESTADO_CIVIL_OPTIONS.map((e) => (
+                <option key={e} value={e}>
+                  {e}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Ocupación *">
+            <select
+              value={props.ocupacion}
+              onChange={(e) => props.setOcupacion(e.target.value)}
+              className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm"
+            >
+              <option value="">— selecciona —</option>
+              {OCUPACION_OPTIONS.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Persona Políticamente Expuesta (PEP)">
+            <label className="flex h-9 items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={props.esPep}
+                onChange={(e) => props.setEsPep(e.target.checked)}
+                className="size-4"
+              />
+              <span className="text-muted-foreground">
+                Marcar si el cliente declara ser PEP o familiar directo
+              </span>
+            </label>
+          </Field>
+          <Field label="Conoce al dueño beneficiario">
+            <select
+              value={props.conocimientoDuenoBeneficiario}
+              onChange={(e) => props.setConocimientoDuenoBeneficiario(e.target.value)}
+              className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm"
+            >
+              {CONOCIMIENTO_DUENO_BENEFICIARIO_OPTIONS.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Forma de pago *">
+            <select
+              value={props.formaPagoKyc}
+              onChange={(e) => props.setFormaPagoKyc(e.target.value)}
+              className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm"
+            >
+              <option value="">— selecciona —</option>
+              {FORMA_PAGO_OPTIONS.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Uso de efectivo *">
+            <select
+              value={props.usoEfectivoKyc}
+              onChange={(e) => props.setUsoEfectivoKyc(e.target.value)}
+              className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm"
+            >
+              <option value="">— selecciona —</option>
+              {USO_EFECTIVO_OPTIONS.map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Preview del EBR (Evaluación Basada en Riesgo) calculado live conforme
+ * el vendedor llena el form. Da feedback inmediato si el cliente quedará
+ * en Bajo / Medio / Alto para que el vendedor sepa si requiere docs
+ * extra (LFPIORPI Art. 18).
+ */
+function EbrPreview({
+  tipoPersona,
+  nacionalidad,
+  esPep,
+  formaPago,
+  usoEfectivo,
+}: {
+  tipoPersona: string;
+  nacionalidad: string;
+  esPep: boolean;
+  formaPago: string;
+  usoEfectivo: string;
+}) {
+  // No mostrar si aún no hay info mínima — evita banner desinformado.
+  if (!formaPago || !usoEfectivo) return null;
+  const r = evaluarRiesgo({
+    tipoPersona,
+    nacionalidad,
+    esPep,
+    formaPago,
+    usoEfectivo,
+  });
+  const tone =
+    r.clasificacion === 'Bajo'
+      ? 'border-green-500/40 bg-green-500/10 text-green-700'
+      : r.clasificacion === 'Medio'
+        ? 'border-amber-500/40 bg-amber-500/10 text-amber-700'
+        : 'border-red-500/40 bg-red-500/10 text-red-700';
+  return (
+    <Section title="Vista previa del EBR (Enfoque Basado en Riesgo)">
+      <div className={`rounded-md border p-3 ${tone}`}>
+        <div className="flex items-baseline justify-between">
+          <span className="text-sm font-medium">
+            Clasificación: <strong>{r.clasificacion}</strong>
+          </span>
+          <span className="font-mono text-sm tabular-nums">{r.scoreTotal.toFixed(2)}%</span>
+        </div>
+        <ul className="mt-2 grid grid-cols-1 gap-1 text-xs sm:grid-cols-5">
+          {r.criterios.map((c) => (
+            <li key={c.nombre} className="flex flex-col">
+              <span className="text-muted-foreground">{c.nombre}</span>
+              <span>
+                <strong>{c.nivel}</strong>{' '}
+                <span className="text-muted-foreground">({c.porcentaje}%)</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Cálculo automático per LFPIORPI Art. 18. Cambia en vivo según las selecciones del KYC.
+      </p>
+    </Section>
   );
 }
