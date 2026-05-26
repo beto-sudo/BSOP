@@ -26,11 +26,12 @@ import { usePermissions } from '@/components/providers';
 import { Banknote, Plus, RefreshCw, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
-import { DataTable, type Column } from '@/components/module-page';
+import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
 import { Input } from '@/components/ui/input';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { formatCurrency } from '@/lib/format';
 
-type EstimacionRow = {
+export type EstimacionRow = {
   id: string;
   codigo: string;
   fecha_cierre: string;
@@ -46,6 +47,35 @@ type EstimacionRow = {
   /** Computed: # de tareas vinculadas. */
   tareasCount: number;
 };
+
+const ESTADOS_PENDIENTES = new Set(['borrador', 'aprobada', 'facturada']);
+
+/** KPIs reactivos a filtros — ADR-034. */
+export function deriveKpis(rows: readonly EstimacionRow[]): readonly ModuleKpi[] {
+  const total = rows.length;
+  const pendientes = rows.filter((r) => ESTADOS_PENDIENTES.has(r.estado)).length;
+  const pagadas = rows.filter((r) => r.estado === 'pagada').length;
+  const netoTotal = rows.reduce((acc, r) => acc + (r.monto_neto ?? 0), 0);
+  const netoPendiente = rows
+    .filter((r) => ESTADOS_PENDIENTES.has(r.estado))
+    .reduce((acc, r) => acc + (r.monto_neto ?? 0), 0);
+
+  return [
+    { key: 'total', label: 'Estimaciones', value: total },
+    { key: 'pendientes', label: 'Pendientes pago', value: pendientes },
+    { key: 'pagadas', label: 'Pagadas', value: pagadas },
+    {
+      key: 'neto_total',
+      label: 'Neto total',
+      value: total === 0 ? '—' : formatCurrency(netoTotal, { compact: true }),
+    },
+    {
+      key: 'pendiente_monto',
+      label: 'Pendiente pago $',
+      value: total === 0 ? '—' : formatCurrency(netoPendiente, { compact: true }),
+    },
+  ];
+}
 
 const ESTADO_TONE: Record<string, BadgeTone> = {
   borrador: 'neutral',
@@ -204,6 +234,8 @@ export function EstimacionesModule({ empresaId }: { empresaId: string }) {
     });
   }, [estimaciones, search, contratistaFiltro, estadoFiltro]);
 
+  const kpis = useMemo(() => deriveKpis(filtradas), [filtradas]);
+
   /** Suma de montos visibles según filtros — útil para el operador que
    *  filtra por contratista/semana y quiere ver el total acumulado. */
   const totalesFiltrados = useMemo(() => {
@@ -281,6 +313,8 @@ export function EstimacionesModule({ empresaId }: { empresaId: string }) {
           </p>
         </div>
       </header>
+
+      <ModuleKpiStrip stats={kpis} cols={5} />
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">

@@ -20,13 +20,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import { DataTable, type Column } from '@/components/module-page';
+import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { HardHat, RefreshCw, Search, Users } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { formatCurrency } from '@/lib/format';
 
-type ContratistaRow = {
+export type ContratistaRow = {
   persona_id: string;
   nombre: string;
   rfc: string | null;
@@ -39,6 +40,30 @@ type ContratistaRow = {
   obrasTerminadas: number;
   moEjecutadoTotal: number;
 };
+
+/**
+ * KPIs reactivos a filtros — ADR-034. Usa los agregados pre-calculados
+ * por contratista (`obrasEnCurso`, `obrasTerminadas`, `moEjecutadoTotal`).
+ */
+export function deriveKpis(rows: readonly ContratistaRow[]): readonly ModuleKpi[] {
+  const total = rows.length;
+  const activos = rows.filter((c) => c.activo).length;
+  const obrasEnCurso = rows.reduce((acc, c) => acc + c.obrasEnCurso, 0);
+  const obrasTerminadas = rows.reduce((acc, c) => acc + c.obrasTerminadas, 0);
+  const moEjecutado = rows.reduce((acc, c) => acc + (c.moEjecutadoTotal ?? 0), 0);
+
+  return [
+    { key: 'total', label: 'Contratistas', value: total },
+    { key: 'activos', label: 'Activos', value: activos },
+    { key: 'obras_curso', label: 'Obras en curso', value: obrasEnCurso },
+    { key: 'obras_term', label: 'Obras terminadas', value: obrasTerminadas },
+    {
+      key: 'mo',
+      label: 'MO ejecutado',
+      value: total === 0 ? '—' : formatCurrency(moEjecutado, { compact: true }),
+    },
+  ];
+}
 
 export function ContratistasModule({ empresaId }: { empresaId: string }) {
   const router = useRouter();
@@ -199,6 +224,8 @@ export function ContratistasModule({ empresaId }: { empresaId: string }) {
     });
   }, [contratistas, search, tipoFiltro, estadoFiltro, repseFiltro]);
 
+  const kpis = useMemo(() => deriveKpis(filtrados), [filtrados]);
+
   const columns: Column<ContratistaRow>[] = [
     {
       key: 'nombre',
@@ -300,6 +327,8 @@ export function ContratistasModule({ empresaId }: { empresaId: string }) {
           </p>
         </div>
       </header>
+
+      <ModuleKpiStrip stats={kpis} cols={5} />
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">

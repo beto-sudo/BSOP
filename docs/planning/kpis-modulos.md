@@ -437,8 +437,26 @@ IS NOT NULL` es la señal canónica de venta completada. Wording
   ejecución, Presupuesto total, Lotes proyectados, Área vendible
   (auto-switch m²→ha si >10K m²). Auditoría agrega 2 columnas:
   "Fin estimado" (`fecha_fin_estimada`) y "Lotes". `deriveKpis`
-  exportada desde el module. 10 unit tests. **Próximo: Sprint 3
-  (Construcción parcial — diferir tabs sin datos)**.
+  exportada desde el module. 10 unit tests. PR #537 mergeado.
+- **2026-05-26** — Sprint 3 (Construcción) — TODAS las 5 tabs en un
+  solo PR porque todas tienen datos productivos (no hubo necesidad
+  de diferir): Obras (1,372 importadas), Contratos, Contratistas,
+  Prototipos, Estimaciones. 25 KPIs en 5 strips + 34 unit tests:
+  - **Obras**: Total, En progreso (arrancada+en_progreso), Avance
+    promedio (mean(avance_pct)/100), Terminadas (terminada+dtu+
+    seguro_calidad+extraida), Próximas a entregar (avance≥80% y no
+    terminada).
+  - **Contratos**: Total, Valor total, Lotes asignados, Promedio por
+    contrato, Top contratista (`argmax(count)` con tie-break alfa).
+  - **Contratistas**: Total, Activos, Obras en curso (suma),
+    Terminadas (suma), MO ejecutado total.
+  - **Prototipos**: Total, Obras activas (suma), Terminadas (suma),
+    MO promedio (mean del calculado), m² promedio (con sufijo "m²").
+  - **Estimaciones**: Total, Pendientes pago (borrador+aprobada+
+    facturada), Pagadas, Neto total, Pendiente pago $.
+    Pivotes documentados en headers de cada `deriveKpis` (mismo principio
+    que tabs 1-5 de Ventas — usar agregados client-side, no agregar
+    queries extra). **Sprint 3 cierra**. Próximo: Sprint 4 (closeout).
 
 ## Riesgos / open topics
 

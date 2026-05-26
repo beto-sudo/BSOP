@@ -25,12 +25,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import { DataTable, type Column } from '@/components/module-page';
+import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
 import { Input } from '@/components/ui/input';
 import { Home, RefreshCw, Search } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { formatCurrency, formatNumber } from '@/lib/format';
 
-type PrototipoRow = {
+export type PrototipoRow = {
   id: string;
   nombre: string;
   proyectoNombre: string;
@@ -45,6 +46,35 @@ type PrototipoRow = {
 
 const EN_CURSO = new Set(['arrancada', 'en_progreso']);
 const TERMINADA = new Set(['terminada', 'dtu', 'seguro_calidad', 'extraida']);
+
+/** KPIs reactivos a filtros — ADR-034. */
+export function deriveKpis(rows: readonly PrototipoRow[]): readonly ModuleKpi[] {
+  const total = rows.length;
+  const obrasEnCurso = rows.reduce((acc, p) => acc + p.obrasEnConstruccion, 0);
+  const obrasTerminadas = rows.reduce((acc, p) => acc + p.obrasTerminadas, 0);
+
+  const mos = rows.map((p) => p.totalMoCalculado).filter((v): v is number => typeof v === 'number');
+  const moPromedio = mos.length === 0 ? null : mos.reduce((a, b) => a + b, 0) / mos.length;
+
+  const m2s = rows.map((p) => p.m2_construccion).filter((v): v is number => typeof v === 'number');
+  const m2Promedio = m2s.length === 0 ? null : m2s.reduce((a, b) => a + b, 0) / m2s.length;
+
+  return [
+    { key: 'total', label: 'Prototipos', value: total },
+    { key: 'obras_curso', label: 'Obras activas', value: obrasEnCurso },
+    { key: 'obras_term', label: 'Obras terminadas', value: obrasTerminadas },
+    {
+      key: 'mo_promedio',
+      label: 'MO promedio',
+      value: moPromedio == null ? '—' : formatCurrency(moPromedio, { compact: true }),
+    },
+    {
+      key: 'm2',
+      label: 'm² promedio',
+      value: m2Promedio == null ? '—' : `${formatNumber(m2Promedio, { decimals: 0 })} m²`,
+    },
+  ];
+}
 
 /**
  * Lee la m² del JSONB atributos (coerciona string a number cuando viene
@@ -210,6 +240,8 @@ export function PrototiposModule({ empresaId }: { empresaId: string }) {
     });
   }, [prototipos, search, proyectoFiltro]);
 
+  const kpis = useMemo(() => deriveKpis(filtrados), [filtrados]);
+
   const columns: Column<PrototipoRow>[] = [
     {
       key: 'nombre',
@@ -289,6 +321,8 @@ export function PrototiposModule({ empresaId }: { empresaId: string }) {
           </p>
         </div>
       </header>
+
+      <ModuleKpiStrip stats={kpis} cols={5} />
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">
