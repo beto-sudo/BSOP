@@ -267,6 +267,23 @@ export function EstimacionesModule({ empresaId }: { empresaId: string }) {
       width: 'min-w-[260px]',
     },
     { key: 'fecha_cierre', label: 'Fecha cierre', type: 'date' },
+    { key: 'fecha_pago_programado', label: 'Pago programado', type: 'date' },
+    {
+      key: 'pagada_at',
+      label: 'Pagada',
+      type: 'custom',
+      accessor: (e) => e.pagada_at ?? '',
+      render: (e) =>
+        e.pagada_at ? (
+          new Date(e.pagada_at).toLocaleDateString('es-MX', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          })
+        ) : (
+          <span className="text-[var(--text)]/30">—</span>
+        ),
+    },
     {
       key: 'contratistaNombre',
       label: 'Contratista',

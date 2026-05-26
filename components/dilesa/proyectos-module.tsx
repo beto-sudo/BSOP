@@ -155,6 +155,12 @@ export function ProyectosModule({ empresaId }: { empresaId: string }) {
   const columns: Column<ProyectoDetalle>[] = [
     { key: 'nombre', label: 'Nombre', type: 'text', sticky: true, width: 'min-w-[220px]' },
     {
+      key: 'clave_interna',
+      label: 'Clave',
+      type: 'text',
+      render: (p) => p.clave_interna ?? <span className="text-[var(--text)]/30">—</span>,
+    },
+    {
       key: 'tipo',
       label: 'Tipo',
       type: 'custom',
@@ -173,12 +179,43 @@ export function ProyectosModule({ empresaId }: { empresaId: string }) {
     { key: 'fecha_inicio', label: 'Inicio', type: 'date' },
     { key: 'fecha_fin_estimada', label: 'Fin estimado', type: 'date' },
     {
+      key: 'fecha_licencia',
+      label: 'Licencia',
+      type: 'custom',
+      accessor: (p) => p.fecha_licencia ?? '',
+      render: (p) =>
+        p.fecha_licencia ? (
+          new Date(p.fecha_licencia).toLocaleDateString('es-MX', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          })
+        ) : (
+          <span className="text-[var(--text)]/30">—</span>
+        ),
+    },
+    {
       key: 'lotes_proyectados',
       label: 'Lotes',
       type: 'number',
       render: (p) => (p.lotes_proyectados != null ? String(p.lotes_proyectados) : '—'),
     },
+    {
+      key: 'area_vendible_m2',
+      label: 'Área vendible m²',
+      type: 'number',
+      render: (p) =>
+        p.area_vendible_m2 != null ? (
+          formatNumber(p.area_vendible_m2)
+        ) : (
+          <span className="text-[var(--text)]/30">—</span>
+        ),
+    },
     { key: 'presupuesto_estimado', label: 'Presupuesto', type: 'currency' },
+    { key: 'costo_terreno', label: 'Costo terreno', type: 'currency' },
+    { key: 'costo_urbanizacion', label: 'Costo urb.', type: 'currency' },
+    { key: 'costo_construccion', label: 'Costo const.', type: 'currency' },
+    { key: 'costo_comercializacion', label: 'Costo com.', type: 'currency' },
   ];
 
   const tiposPresentes = useMemo(
