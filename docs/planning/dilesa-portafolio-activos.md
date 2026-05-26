@@ -7,13 +7,15 @@ las tablas viejas), `core.empresas` (lectura)
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-08
-**Última actualización:** 2026-05-23 (PR #495 mergeado — módulo Ventas
-en prod: lista filtrable + página de detalle con cliente, ficha,
-pipeline compacto de 17 fases con docs por fase, pagos, expediente.
-Re-import con `coda_row_id` para dedup correcto de personas (bug
-"Ana Mena = 183 ventas" resuelto): 1,425 ventas, 1,300 personas-cliente,
-11,878 adjuntos. Próximo: UI de captura por fase — botón "subir doc
-faltante" que al guardar marca fecha de la fase + crea adjunto.)
+**Última actualización:** 2026-05-26 (PR #554 mergeado — Sprint 7c-2:
+Fase 1 KYC expandido. Form `/dilesa/ventas/nueva` ahora captura los 14
+campos KYC del FICU (INE, domicilio estructurado, PEP, forma de pago,
+uso de efectivo, dueño beneficiario, ocupación) con catálogos cerrados
+matchando los branches del EBR, `<EbrPreview>` recalcula el score en
+vivo (verde/ámbar/rojo) y uploader de expediente PDF. Migración
+`20260527000000_erp_personas_kyc_ficu.sql` aplicada en prod con 13
+columnas nuevas en `erp.personas`. Próximo: seguir fase por fase
+(Fase 2 → Fase 17) con la venta de prueba.)
 
 ## Problema
 
@@ -678,3 +680,39 @@ lotificación (agosto 2023, vigente).
   - **Próximo**: UI de captura por fase (botón "subir doc faltante" que
     marca la fecha + crea el adjunto). El pipeline compacto ya tiene la
     estructura para alojarlo.
+- **2026-05-26 — Sprint 7c-2 (Fase 1 KYC expandido + EBR live) mergeado.**
+  PR #554. Cierra el gap entre el form de Coda (14 campos KYC) y la
+  captura previa de BSOP (3 campos). Habilita generar los 3 PDFs de
+  Fase 1 (Solicitud, Aviso Privacidad, FICU) con datos completos.
+  - **DB**: migración `20260527000000_erp_personas_kyc_ficu.sql` agrega
+    13 columnas a `erp.personas` (INE, 7 campos de domicilio
+    estructurado, `es_pep`, `forma_pago_kyc`, `uso_efectivo_kyc`,
+    `conocimiento_dueno_beneficiario` con default 'No', `ocupacion`).
+    Aditiva pura, todas NULLABLE para no romper las 1,767 filas
+    existentes. Aplicada en prod + SCHEMA_REF/types regenerados.
+  - **Catálogos** (`lib/dilesa/ficu/catalogos.ts`): 7 listas cerradas
+    para los selects (TipoPersona, Nacionalidad, FormaPago, UsoEfectivo,
+    EstadoCivil, TipoIdentificacion, Ocupación). Strings matchean
+    exacto los branches del EBR — cambiar una etiqueta tira el cálculo
+    a "Medio" defensivo.
+  - **EBR live** (`lib/dilesa/ficu/riesgo.ts` + form): el form expande
+    el INSERT de persona con los 14 campos nuevos + monta `<EbrPreview>`
+    que recalcula el score 5×20% en cada cambio y muestra badge
+    verde/ámbar/rojo. Branch nuevo en `nivelUsoEfectivo` para detectar
+    los strings del catálogo (`3,210 UMAs` → Alto).
+  - **Expediente**: uploader de PDF post-creación de venta, vía
+    `buildAdjuntoPath({ empresa:'dilesa', entidad:'ventas', ... })`
+    - insert a `erp.adjuntos` con `entidad_tipo: 'ventas'`.
+  - **Coordinación con sesión paralela**: la otra sesión
+    (`dilesa-anteproyectos-s4`) aplicó `20260526230000` antes de
+    pushear su rama. Mi `db push` inicial falló por drift; esperé al
+    merge de su PR #555, hice `git rebase origin/main`, y reapliqué
+    limpio. Nota para futuras sesiones paralelas: aplicar migración →
+    push del archivo a una rama → mergear ANTES de aplicar otra
+    migración con timestamp posterior, o coordinar timestamps.
+  - **924 tests verdes**. Pendiente fuera de PR: smoke manual de una
+    venta de prueba completa cuando Beto esté listo, validar render
+    de los 3 PDFs con los datos nuevos.
+  - **Próximo**: seguir fase por fase (Fase 2 → Fase 17) con la venta
+    de prueba. Fase 3 (Formalizada / Promesa de Compraventa) ya está
+    cubierta por Sprint 7c-1.
