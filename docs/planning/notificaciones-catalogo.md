@@ -3,10 +3,10 @@
 **Slug:** `notificaciones-catalogo`
 **Empresas:** todas (modelo empresa-aware con NULL = global)
 **Schemas afectados:** `core` (2 tablas nuevas: `notification_definitions`, `notification_log`)
-**Estado:** planned
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-05-26
-**Última actualización:** 2026-05-26 (promovida)
+**Última actualización:** 2026-05-26 (4 sprints mergeados, iniciativa cerrada)
 
 ## Problema
 
@@ -226,7 +226,32 @@ Orden de risk-progression:
 ## Bitácora
 
 - **2026-05-26** — Promovida tras audit de los 6 emails reales + Q&A
-  con Beto. Planning doc + fila INITIATIVES.md. Próximo: Sprint 1.
+  con Beto. Planning doc + fila INITIATIVES.md.
+- **2026-05-26** — Sprint 1 mergeado (PR #543): migración
+  `20260526155000` con 2 tablas en `core` + RLS admin-only + 6 rows
+  backfill. Helper `lib/notifications/` con `getDefinitionBySlug`
+  FAIL-OPEN, `writeNotificationLog`, `renderSubject`,
+  `splitRecipientsExtra` + 9 unit tests. Aplicada a prod tras
+  aprobación verbal de Beto.
+- **2026-05-26** — Sprint 2 mergeado (PR #545): refactor de los 6
+  handlers (sync, welcome, task-summary cron, dilesa-estimacion,
+  juntas terminar + reenviar) para leer config del catálogo +
+  escribir log. FAIL-OPEN si DB no responde. Helpers reforzados con
+  try/catch para sobrevivir a clientes mock en tests.
+- **2026-05-26** — Sprint 3 mergeado (PR #547): UI catálogo
+  read-only en `/settings/notificaciones`. Migración
+  `20260526200000` agregó sub-slug RBAC `settings.notificaciones` +
+  4 lugares de sync (nav-config, ROUTE_TO_MODULE, permissions.test,
+  nav test). Page admin-gated con lista agrupada por trigger_type +
+  filtro por empresa + DetailDrawer con config + últimos 20 logs.
+- **2026-05-26** — Sprint 4 mergeado (PR #548): server action
+  `updateDefinitionAction` editando from/reply_to/recipients_extra/
+  subject/activo. API `POST /api/notifications/test-send` que manda
+  correo dummy SOLO al admin clicker. UI con form editable + editor
+  de recipientes (add/remove/cambiar tipo) + botones Guardar / Test
+  send con feedback de status.
+- **2026-05-26** — Iniciativa cerrada. Pendiente: Beto valida cada
+  correo end-to-end via la nueva UI (test send + envío real).
 
 ## Riesgos / open topics
 
