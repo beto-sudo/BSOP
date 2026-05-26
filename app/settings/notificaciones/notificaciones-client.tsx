@@ -18,8 +18,9 @@ import {
   DetailDrawerSection,
 } from '@/components/detail-page/detail-drawer';
 import { Badge } from '@/components/ui/badge';
-import { Bell, Clock, Hand, Mail, Plug, Power, PowerOff } from 'lucide-react';
-import type { NotificationDefinition } from '@/lib/notifications';
+import { Bell, Clock, Hand, Mail, Plug, Power, PowerOff, Send, Trash2, Plus } from 'lucide-react';
+import type { NotificationDefinition, RecipientExtra } from '@/lib/notifications';
+import { updateDefinitionAction, type UpdateDefinitionPatch } from './actions';
 
 type LogStats = { total: number; sent: number; failed: number; skipped: number; lastAt?: string };
 
@@ -73,6 +74,15 @@ export function NotificacionesClient({
   const [empresaFiltro, setEmpresaFiltro] = useState<string>('');
   const [recentLogs, setRecentLogs] = useState<LogRow[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
+  // Draft del form de edición — espejo de los campos editables. Inicializa
+  // desde `selected` cada vez que abre el drawer.
+  const [draft, setDraft] = useState<UpdateDefinitionPatch>({});
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [testStatus, setTestStatus] = useState<{
+    state: 'idle' | 'sending' | 'sent' | 'error';
+    msg?: string;
+  }>({ state: 'idle' });
 
   const empresaMap = useMemo(() => new Map(empresas.map((e) => [e.id, e])), [empresas]);
 
@@ -94,8 +104,21 @@ export function NotificacionesClient({
 
   useEffect(() => {
     if (!selected) return;
-    let active = true;
     // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDraft({
+      from_email: selected.from_email,
+      from_name: selected.from_name,
+      reply_to: selected.reply_to,
+      recipients_extra: selected.recipients_extra,
+      subject_template: selected.subject_template,
+      activo: selected.activo,
+    });
+     
+    setSaveMsg(null);
+     
+    setTestStatus({ state: 'idle' });
+    let active = true;
+     
     setLoadingLogs(true);
     const sb = createSupabaseBrowserClient();
     void sb
@@ -119,6 +142,54 @@ export function NotificacionesClient({
       active = false;
     };
   }, [selected]);
+
+  async function handleSave(id: string) {
+    setSaving(true);
+    setSaveMsg(null);
+    const res = await updateDefinitionAction(id, {
+      from_email: draft.from_email,
+      from_name: draft.from_name,
+      reply_to: draft.reply_to,
+      recipients_extra: draft.recipients_extra,
+      subject_template: draft.subject_template,
+      activo: draft.activo,
+    });
+    setSaving(false);
+    if (res.ok) {
+      setSaveMsg('✓ Cambios guardados. Recarga la página para ver el conteo actualizado.');
+    } else {
+      setSaveMsg(`✗ Error: ${res.error}`);
+    }
+  }
+
+  async function handleTestSend(slug: string, empresaId: string | null) {
+    setTestStatus({ state: 'sending', msg: 'Enviando correo de prueba…' });
+    try {
+      const res = await fetch('/api/notifications/test-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, empresaId }),
+      });
+      const json = (await res.json().catch(() => null)) as {
+        ok?: boolean;
+        sentTo?: string;
+        error?: string;
+      } | null;
+      if (!res.ok || !json?.ok) {
+        setTestStatus({
+          state: 'error',
+          msg: `✗ ${json?.error ?? `HTTP ${res.status}`}`,
+        });
+        return;
+      }
+      setTestStatus({
+        state: 'sent',
+        msg: `✓ Correo enviado a ${json.sentTo}`,
+      });
+    } catch (e) {
+      setTestStatus({ state: 'error', msg: `✗ ${(e as Error).message}` });
+    }
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -250,27 +321,54 @@ export function NotificacionesClient({
           size="xl"
         >
           <DetailDrawerContent>
-            <DetailDrawerSection title="Configuración runtime">
+            <DetailDrawerSection title="Configuración runtime (editable)">
               <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
-                <Field
-                  label="Estado"
-                  value={
-                    selected.activo ? (
-                      <Badge tone="success">Activo</Badge>
-                    ) : (
-                      <Badge tone="danger">Apagado (kill switch)</Badge>
-                    )
-                  }
-                />
+                <FormField label="From email" htmlFor="fld-from-email">
+                  <input
+                    id="fld-from-email"
+                    type="email"
+                    value={draft.from_email ?? ''}
+                    onChange={(e) => setDraft({ ...draft, from_email: e.target.value })}
+                    className={inputCls}
+                  />
+                </FormField>
+                <FormField label="From name (display)" htmlFor="fld-from-name">
+                  <input
+                    id="fld-from-name"
+                    type="text"
+                    value={draft.from_name ?? ''}
+                    onChange={(e) => setDraft({ ...draft, from_name: e.target.value || null })}
+                    className={inputCls}
+                  />
+                </FormField>
+                <FormField label="Reply-to" htmlFor="fld-reply-to">
+                  <input
+                    id="fld-reply-to"
+                    type="email"
+                    value={draft.reply_to ?? ''}
+                    onChange={(e) => setDraft({ ...draft, reply_to: e.target.value || null })}
+                    className={inputCls}
+                    placeholder="(opcional)"
+                  />
+                </FormField>
+                <FormField label="Kill switch" htmlFor="fld-activo">
+                  <label className="flex h-9 items-center gap-2">
+                    <input
+                      id="fld-activo"
+                      type="checkbox"
+                      checked={draft.activo ?? true}
+                      onChange={(e) => setDraft({ ...draft, activo: e.target.checked })}
+                      className="h-4 w-4 accent-[var(--accent)]"
+                    />
+                    <span className="text-sm text-[var(--text)]">
+                      {draft.activo ? 'Activo' : 'Apagado'}
+                    </span>
+                  </label>
+                </FormField>
                 <Field
                   label="Trigger"
                   value={TRIGGER_LABEL[selected.trigger_type] ?? selected.trigger_type}
                 />
-                <Field
-                  label="From"
-                  value={`${selected.from_name ?? '—'} <${selected.from_email}>`}
-                />
-                <Field label="Reply-to" value={selected.reply_to ?? '—'} />
                 <Field
                   label="Empresa"
                   value={
@@ -279,18 +377,18 @@ export function NotificacionesClient({
                       : 'Global (sin empresa)'
                   }
                 />
-                <Field
-                  label="Última actualización"
-                  value={new Date(selected.updated_at).toLocaleString('es-MX')}
-                />
               </div>
               <div className="mt-4 space-y-1">
                 <div className="text-xs uppercase tracking-wide text-[var(--text)]/60">
-                  Subject template
+                  Subject template (vars `{'{firstName}'}`, `{'{fecha}'}`, `{'{empresa}'}`, `
+                  {'{codigo}'}`, `{'{junta_titulo}'}`)
                 </div>
-                <code className="block rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm">
-                  {selected.subject_template}
-                </code>
+                <input
+                  type="text"
+                  value={draft.subject_template ?? ''}
+                  onChange={(e) => setDraft({ ...draft, subject_template: e.target.value })}
+                  className={inputCls + ' w-full font-mono'}
+                />
               </div>
               <div className="mt-4 space-y-1">
                 <div className="text-xs uppercase tracking-wide text-[var(--text)]/60">
@@ -298,6 +396,9 @@ export function NotificacionesClient({
                 </div>
                 <p className="text-sm text-[var(--text)]/80">{selected.descripcion ?? '—'}</p>
               </div>
+              <p className="mt-3 text-xs text-[var(--text)]/50">
+                Última actualización: {new Date(selected.updated_at).toLocaleString('es-MX')}
+              </p>
             </DetailDrawerSection>
 
             <DetailDrawerSection title="Trigger config (read-only)">
@@ -317,20 +418,65 @@ export function NotificacionesClient({
             </DetailDrawerSection>
 
             <DetailDrawerSection title="Recipientes extra (fijos, suma del TO derivado)">
-              {selected.recipients_extra.length === 0 ? (
-                <p className="text-sm text-[var(--text)]/60">
-                  Sin recipientes extra. El TO se deriva 100% de la lógica del handler.
+              <p className="mb-3 text-xs text-[var(--text)]/60">
+                Estos destinatarios se suman al TO/CC/BCC en cada envío. El TO principal sigue
+                viniendo de la lógica del handler. Usa <code>always</code> para sumar al TO,{' '}
+                <code>cc</code>/<code>bcc</code> para tipo distinto.
+              </p>
+              <RecipientsEditor
+                value={draft.recipients_extra ?? []}
+                onChange={(next) => setDraft({ ...draft, recipients_extra: next })}
+              />
+            </DetailDrawerSection>
+
+            <DetailDrawerSection title="Acciones">
+              {saveMsg ? (
+                <p
+                  className={
+                    saveMsg.startsWith('✓')
+                      ? 'mb-2 text-sm text-green-600'
+                      : 'mb-2 text-sm text-red-500'
+                  }
+                >
+                  {saveMsg}
                 </p>
-              ) : (
-                <ul className="space-y-1 text-sm">
-                  {selected.recipients_extra.map((r, i) => (
-                    <li key={i} className="flex items-center gap-2">
-                      <Badge tone="neutral">{r.type.toUpperCase()}</Badge>
-                      <code className="text-xs">{r.email}</code>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              ) : null}
+              {testStatus.state !== 'idle' ? (
+                <p
+                  className={
+                    testStatus.state === 'sent'
+                      ? 'mb-2 text-sm text-green-600'
+                      : testStatus.state === 'error'
+                        ? 'mb-2 text-sm text-red-500'
+                        : 'mb-2 text-sm text-[var(--text)]/60'
+                  }
+                >
+                  {testStatus.msg}
+                </p>
+              ) : null}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void handleSave(selected.id)}
+                  className="flex h-9 items-center gap-1.5 rounded-md bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+                >
+                  {saving ? 'Guardando…' : 'Guardar cambios'}
+                </button>
+                <button
+                  type="button"
+                  disabled={testStatus.state === 'sending'}
+                  onClick={() => void handleTestSend(selected.slug, selected.empresa_id)}
+                  className="flex h-9 items-center gap-1.5 rounded-md border border-[var(--border)] px-3 text-sm text-[var(--text)] hover:bg-[var(--accent)]/5 disabled:opacity-50"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  {testStatus.state === 'sending' ? 'Enviando…' : 'Enviar prueba (datos dummy)'}
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-[var(--text)]/50">
+                &ldquo;Enviar prueba&rdquo; usa datos dummy hardcodeados y manda solo a tu correo de
+                admin — nunca a recipientes reales.
+              </p>
             </DetailDrawerSection>
 
             <DetailDrawerSection title="Últimos 20 envíos">
@@ -410,6 +556,88 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
     <div className="space-y-0.5">
       <div className="text-xs uppercase tracking-wide text-[var(--text)]/60">{label}</div>
       <div className="text-sm text-[var(--text)]">{value}</div>
+    </div>
+  );
+}
+
+const inputCls =
+  'h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-2 text-sm text-[var(--text)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/50';
+
+function FormField({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-0.5">
+      <label htmlFor={htmlFor} className="text-xs uppercase tracking-wide text-[var(--text)]/60">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function RecipientsEditor({
+  value,
+  onChange,
+}: {
+  value: RecipientExtra[];
+  onChange: (next: RecipientExtra[]) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      {value.length === 0 ? (
+        <p className="text-sm text-[var(--text)]/50">Sin recipientes extra.</p>
+      ) : (
+        value.map((r, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <select
+              value={r.type}
+              onChange={(e) => {
+                const next = [...value];
+                next[i] = { ...r, type: e.target.value as RecipientExtra['type'] };
+                onChange(next);
+              }}
+              className={inputCls + ' w-24'}
+            >
+              <option value="always">always</option>
+              <option value="cc">cc</option>
+              <option value="bcc">bcc</option>
+            </select>
+            <input
+              type="email"
+              value={r.email}
+              onChange={(e) => {
+                const next = [...value];
+                next[i] = { ...r, email: e.target.value };
+                onChange(next);
+              }}
+              className={inputCls + ' flex-1'}
+              placeholder="alguien@dominio.com"
+            />
+            <button
+              type="button"
+              onClick={() => onChange(value.filter((_, idx) => idx !== i))}
+              className="flex h-9 w-9 items-center justify-center rounded-md text-[var(--text)]/40 hover:bg-red-50 hover:text-red-500"
+              aria-label="Eliminar recipiente"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+        ))
+      )}
+      <button
+        type="button"
+        onClick={() => onChange([...value, { type: 'bcc', email: '' }])}
+        className="flex h-9 items-center gap-1.5 rounded-md border border-dashed border-[var(--border)] px-3 text-sm text-[var(--text)]/70 hover:text-[var(--text)]"
+      >
+        <Plus className="h-3.5 w-3.5" /> Agregar recipiente
+      </button>
     </div>
   );
 }
