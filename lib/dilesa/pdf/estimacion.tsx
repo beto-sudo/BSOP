@@ -118,7 +118,7 @@ export function EstimacionPDF({ data }: { data: EstimacionPdfData }) {
           <Text style={solicitudReceptor}>DESARROLLO INMOBILIARIO LOS ENCINOS, S.A. DE C.V.</Text>
           <Text style={solicitudTexto}>
             Por concepto de mano de obra de las tareas relacionadas en esta estimación. Una vez
-            recibida la factura por correo a pagos@dilesa.mx, se programará el pago para la fecha
+            recibida la factura por correo a facturas@dilesa.mx, se programará el pago para la fecha
             indicada arriba.
           </Text>
         </View>

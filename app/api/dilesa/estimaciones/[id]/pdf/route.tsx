@@ -276,7 +276,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   <p>
     Favor de emitir la factura por el monto neto a nombre de
     <strong>DESARROLLO INMOBILIARIO LOS ENCINOS, S.A. DE C.V.</strong>
-    y enviarla a <a href="mailto:pagos@dilesa.mx">pagos@dilesa.mx</a>.
+    y enviarla a <a href="mailto:facturas@dilesa.mx">facturas@dilesa.mx</a>.
   </p>
   <p>
     El pago está programado para el <strong>${data.fechaPagoTexto}</strong>.
@@ -288,7 +288,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
   <p style="color: #888; font-size: 11px;">
     DILESA · Desarrollo Inmobiliario Los Encinos<br/>
-    pagos@dilesa.mx · (878) 791-1818
+    facturas@dilesa.mx · (878) 791-1818
   </p>
 </div>`.trim();
 
@@ -299,7 +299,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'DILESA Pagos <pagos@dilesa.mx>',
+      from: 'DILESA Facturas <facturas@dilesa.mx>',
       to: [to],
       subject,
       html,
@@ -311,9 +311,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       ],
     }),
   });
-  const resJson = (await emailRes.json()) as { id?: string; message?: string };
+  const resJson = (await emailRes.json()) as { id?: string; message?: string; name?: string };
 
   if (!emailRes.ok) {
+    // Log para Vercel runtime logs — sin esto, los 500 quedan opacos.
+    console.error('[estimaciones/pdf POST] Resend rechazó el envío', {
+      estimacionId: id,
+      to,
+      status: emailRes.status,
+      resendError: resJson,
+    });
     return NextResponse.json(
       { error: resJson.message ?? 'Error al enviar email', detail: resJson },
       { status: 500 }
