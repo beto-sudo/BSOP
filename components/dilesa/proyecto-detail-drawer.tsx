@@ -29,6 +29,7 @@ export type ProyectoDetalle = {
   estado: string;
   clave_interna: string | null;
   proyecto_padre_id: string | null;
+  proyecto_predecesor_id: string | null;
   fecha_inicio: string | null;
   fecha_fin_estimada: string | null;
   fecha_licencia: string | null;
@@ -192,13 +193,15 @@ export function ProyectoDetailDrawer({
   const [search, setSearch] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState('');
+  const [predecesorNombre, setPredecesorNombre] = useState<string | null>(null);
 
   // Carga las unidades del proyecto al abrir el drawer. Los setState van solo
   // dentro del `.then` (no síncronos dentro del effect).
   useEffect(() => {
     if (!open || !proyecto) return;
     let activo = true;
-    void createSupabaseBrowserClient()
+    const supabase = createSupabaseBrowserClient();
+    void supabase
       .schema('dilesa')
       .from('unidades')
       .select(
@@ -218,6 +221,26 @@ export function ProyectoDetailDrawer({
         }
         setLoadedId(proyecto.id);
       });
+    // Si tiene predecesor, fetch su nombre (no bloqueante).
+    if (proyecto.proyecto_predecesor_id) {
+      void supabase
+        .schema('dilesa')
+        .from('proyectos')
+        .select('nombre')
+        .eq('id', proyecto.proyecto_predecesor_id)
+        .single()
+        .then(({ data }) => {
+          if (!activo) return;
+          setPredecesorNombre((data?.nombre as string | undefined) ?? null);
+        });
+    } else {
+      // setState fuera del flujo síncrono del effect (microtask) — el repo
+      // prohíbe setState síncrono dentro de useEffect (cascada de renders).
+      void Promise.resolve().then(() => {
+        if (!activo) return;
+        setPredecesorNombre(null);
+      });
+    }
     return () => {
       activo = false;
     };
@@ -285,7 +308,20 @@ export function ProyectoDetailDrawer({
       }
     >
       <DetailDrawerContent>
-        <DetailDrawerSection title="Datos del proyecto" divider={false}>
+        {proyecto.proyecto_predecesor_id && (
+          <DetailDrawerSection title="Origen" divider={false}>
+            <p className="text-sm text-[var(--text)]">
+              Este desarrollo vino del anteproyecto{' '}
+              <strong>{predecesorNombre ?? 'cargando…'}</strong>. El anteproyecto se preserva como
+              histórico de viabilidad.
+            </p>
+          </DetailDrawerSection>
+        )}
+
+        <DetailDrawerSection
+          title="Datos del proyecto"
+          divider={proyecto.proyecto_predecesor_id != null}
+        >
           {ficha.length > 0 ? (
             <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
               {ficha.map((r) => (

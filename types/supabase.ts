@@ -3466,6 +3466,10 @@ export type Database = {
         }
         Returns: string
       }
+      fn_proyecto_promote_anteproyecto: {
+        Args: { p_anteproyecto_id: string }
+        Returns: string
+      }
       fn_tarea_terminada_esta_pagada: {
         Args: { p_tarea_id: string }
         Returns: boolean

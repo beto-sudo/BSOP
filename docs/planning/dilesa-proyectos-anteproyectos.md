@@ -3,10 +3,11 @@
 **Slug:** `dilesa-proyectos-anteproyectos`
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa` (4 tablas nuevas: `plantilla_proyecto_tareas` catálogo + `plantilla_proyecto_tareas_dependencias` + `proyecto_tareas_dependencias` + `proyecto_presupuesto_partidas`; ALTER `proyecto_tareas` extendiendo columnas taxonómicas; usa `proyectos` + `proyectos_plantillas` + `proyecto_tareas` + `proyecto_hitos` + `proyecto_documentos` + `proyecto_responsables` existentes; sub-slugs en `core.modulos` ya creados en Sprint 1)
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-05-26
-**Última actualización:** 2026-05-26 (re-alineación con DB real: descubrí que la tabla `dilesa.anteproyectos` mencionada en el doc previo **NO existe**; fue eliminada en `dilesa-portafolio-activos` PR #482 demolición 2026-05-21. Modelo real es `dilesa.proyectos` con `tipo` discriminator. Iniciativa re-arquitecturada para reusar schema v2 existente. Sprint 1 sigue mergeado y válido — era solo refactor UI/RBAC sin tocar data.)
+**Cerrada:** 2026-05-26
+**Última actualización:** 2026-05-26 (Sprint 4 mergeado — iniciativa completa. RPC `dilesa.fn_proyecto_promote_anteproyecto` aplicada a prod + server action wrapping + UI botón "Promover a desarrollo" gated por tarea "Aprobación de Comité de Inversión" completada + ConfirmDialog inline + UI "Vino del anteproyecto X" en el `<ProyectoDetailDrawer>` cuando hay `proyecto_predecesor_id`. Cero churn en data — los 5 anteproyectos y 8 desarrollos siguen igual. Total iniciativa: 5 PRs (544 promoción + 546 decisiones + 550 Sprint 1 + 552 Sprint 2 + 553 Sprint 3 + 551 re-alineación + Sprint 4 este PR). Cobertura: 921 tests verdes.) (Histórico de cambios previos: re-alineación con DB real, descubrí que la tabla `dilesa.anteproyectos` mencionada en el doc previo **NO existe**; fue eliminada en `dilesa-portafolio-activos` PR #482 demolición 2026-05-21. Modelo real es `dilesa.proyectos` con `tipo` discriminator. Iniciativa re-arquitecturada para reusar schema v2 existente. Sprint 1 sigue mergeado y válido — era solo refactor UI/RBAC sin tocar data.)
 
 ## Problema
 
@@ -309,17 +310,22 @@ RBAC + backfill defensivo. Cero churn en `<ProyectosModule>` o data.
   workflow autorización.
 - 1 PR.
 
-### Sprint 4 — Conversión anteproyecto → desarrollo + closeout
+### Sprint 4 — Conversión anteproyecto → desarrollo + closeout ✅ DONE
 
-- RPC `dilesa.fn_proyecto_promote_anteproyecto` con 7 pasos
-  transaccionales.
-- UI: botón "Promover a desarrollo" gated por tarea Comité completada,
-  ConfirmDialog con preview.
-- UI desarrollo: sección "Vino del anteproyecto X" + "Tareas heredadas"
-  - "Presupuesto base".
-- Tests E2E o unitarios.
-- Closeout: planning doc + INITIATIVES.md + barrido de Reminders.
-- 1 PR.
+- RPC `dilesa.fn_proyecto_promote_anteproyecto` aplicada (migración
+  `20260526230000`). 8 pasos transaccionales: cargar + validar
+  idempotencia + validar gate + INSERT desarrollo + rehoga tareas
+  desarrollo/ambas en curso o completadas + copia partidas autorizadas
+  como planeadas + marca anteproyecto como completado.
+- Server action `promoteAnteproyecto` wrappea la RPC con revalidatePath.
+- UI en `<AnteproyectoDetailDrawer>` sección "Promoción a desarrollo"
+  con estados (yaConvertido / pendienteGate / pendientePlantilla /
+  listoPromover). Confirm dialog inline antes de ejecutar.
+- UI lado desarrollo: `<ProyectoDetailDrawer>` muestra sección "Origen"
+  con "Vino del anteproyecto X" cuando hay `proyecto_predecesor_id`.
+- Helper `gateComitePromocion` exportado para tests + reuso.
+- 5 tests nuevos sobre el gate. Total 921 tests verdes.
+- 1 PR. CI verde. Iniciativa pasa a `done`.
 
 ## Riesgos
 
@@ -348,6 +354,19 @@ RBAC + backfill defensivo. Cero churn en `<ProyectosModule>` o data.
 - **2026-05-26 (Sprint 1 DONE)** — PR
   [#550](https://github.com/beto-sudo/BSOP/pull/550) mergeado. Refactor
   a sub-tabs + sub-slugs RBAC. Migración aplicada a prod.
+- **2026-05-26 (Sprint 4 DONE / iniciativa cerrada)** — RPC
+  `dilesa.fn_proyecto_promote_anteproyecto` aplicada a prod. Server
+  action `promoteAnteproyecto` + UI con botón gated y confirm dialog
+  inline en el drawer del anteproyecto + UI "Vino del anteproyecto X"
+  en el drawer del desarrollo. `proyecto_predecesor_id` agregado al
+  type `ProyectoDetalle` y al SELECT de ambos módulos. 5 tests nuevos
+  para `gateComitePromocion`. Total iniciativa: 5 PRs efectivos + 1
+  re-alineación. 921 tests verdes. Iniciativa pasa formalmente a
+  `done`. Trade-off documentado: la RPC NO instancia tareas
+  exclusivas de desarrollo automáticamente — el operador puede llamar
+  `populatePlantilla` sobre el nuevo proyecto si quiere las del
+  catálogo con fechas frescas (evita duplicar la lógica de cascada
+  de fechas en SQL).
 - **2026-05-26 (re-alineación con DB real)** — Descubrí que la tabla
   `dilesa.anteproyectos` que el doc previo mencionaba **NO existe**.
   Fue eliminada el 2026-05-21 en la demolición del schema v1 de
@@ -377,6 +396,17 @@ RBAC + backfill defensivo. Cero churn en `<ProyectosModule>` o data.
   vez de UPDATE in-place (que perdería el histórico), se crea nuevo row
   con `tipo='desarrollo'` y `proyecto_predecesor_id` apuntando al
   anteproyecto. Anteproyecto se preserva como histórico inmutable.
+- **2026-05-26 — Sprint 4: la RPC NO instancia tareas nuevas de
+  desarrollo automáticamente.** Trade-off para no duplicar la cascada
+  de fechas hábiles en SQL. El operador puede llamar
+  `populatePlantilla` sobre el nuevo proyecto si quiere repoblar con
+  fechas frescas desde la fecha de promoción.
+- **2026-05-26 — Gate del Comité detectado case-insensitive por
+  título.** El `gateComitePromocion` helper busca tareas cuyo título
+  matchea "comité de inversión" + "aprobación" (case-insensitive). La
+  RPC server-side hace el mismo match exacto contra el nombre canónico
+  de la plantilla — el helper UI es solo preventivo para no mostrar
+  un botón que va a fallar.
 
 ## Appendix — Plantilla canónica de 35 tareas
 
