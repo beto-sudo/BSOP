@@ -29,8 +29,10 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Download,
   FileText,
   Loader2,
+  Mail,
   X,
 } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
@@ -159,6 +161,11 @@ function DetailInner() {
 
   const [modal, setModal] = useState<ModalKind>(null);
   const [savingTransition, setSavingTransition] = useState(false);
+
+  // Email modal state — pre-fillea con email del contratista si existe.
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [contratistaEmail, setContratistaEmail] = useState<string | null>(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   const [estim, setEstim] = useState<Estimacion | null>(null);
   const [contratistaNombre, setContratistaNombre] = useState<string | null>(null);
@@ -365,7 +372,7 @@ function DetailInner() {
         sb
           .schema('erp')
           .from('personas')
-          .select('nombre, apellido_paterno, apellido_materno')
+          .select('nombre, apellido_paterno, apellido_materno, email')
           .eq('id', estimRow.contratista_id)
           .maybeSingle(),
         sb
@@ -401,6 +408,7 @@ function DetailInner() {
           .filter(Boolean)
           .join(' ');
         setContratistaNombre(n || '(sin nombre)');
+        setContratistaEmail((persRes.data.email as string | null) ?? null);
         // Buscar abrev en satélite
         const { data: cd } = await sb
           .schema('dilesa')
@@ -605,6 +613,34 @@ function DetailInner() {
         />
       ) : null}
 
+      {/* Acciones de PDF/email — siempre disponibles excepto en borrador.
+          Sin RBAC porque cualquiera con read puede descargar el PDF. */}
+      {estim.estado !== 'borrador' && estim.estado !== 'cancelada' ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] p-3">
+          <span className="text-xs uppercase tracking-wide text-[var(--text)]/50">Documento:</span>
+          <a
+            href={`/api/dilesa/estimaciones/${estim.id}/pdf`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[var(--border)] px-3 text-sm font-medium text-[var(--text)] hover:bg-[var(--bg)]/30"
+          >
+            <Download className="size-4" />
+            Descargar PDF
+          </a>
+          {puedeEscribir ? (
+            <Button onClick={() => setEmailModalOpen(true)}>
+              <Mail className="size-4" />
+              Enviar al contratista
+            </Button>
+          ) : null}
+          {!contratistaEmail ? (
+            <span className="text-[11px] text-amber-700 dark:text-amber-400">
+              El contratista no tiene email registrado — captúralo manual al enviar.
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
       <Section title="Datos generales">
         <FichaGrid
           rows={[
@@ -710,6 +746,122 @@ function DetailInner() {
           onCancelar={cancelar}
         />
       ) : null}
+
+      {/* Modal para enviar el PDF al contratista vía email Resend. */}
+      {emailModalOpen ? (
+        <EmailModal
+          codigo={estim.codigo}
+          montoNeto={estim.monto_neto}
+          defaultEmail={contratistaEmail}
+          sending={sendingEmail}
+          onClose={() => (sendingEmail ? null : setEmailModalOpen(false))}
+          onSend={async (to) => {
+            setSendingEmail(true);
+            const res = await fetch(`/api/dilesa/estimaciones/${estim.id}/pdf`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ to }),
+            });
+            const json = (await res.json().catch(() => ({}))) as {
+              error?: string;
+              sentTo?: string;
+            };
+            setSendingEmail(false);
+            if (!res.ok) {
+              toast.add({
+                title: 'No se pudo enviar el email',
+                description: json.error ?? 'Error desconocido',
+                type: 'error',
+              });
+              return;
+            }
+            toast.add({
+              title: 'Email enviado',
+              description: `PDF enviado a ${json.sentTo ?? to}`,
+              type: 'success',
+            });
+            setEmailModalOpen(false);
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function EmailModal({
+  codigo,
+  montoNeto,
+  defaultEmail,
+  sending,
+  onClose,
+  onSend,
+}: {
+  codigo: string;
+  montoNeto: number;
+  defaultEmail: string | null;
+  sending: boolean;
+  onClose: () => void;
+  onSend: (to: string) => void | Promise<void>;
+}) {
+  const [to, setTo] = useState(defaultEmail ?? '');
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-lg border border-[var(--border)] bg-[var(--card)] p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-base font-semibold text-[var(--text)]">
+            Enviar estimación al contratista
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={sending}
+            className="rounded-md p-1 text-[var(--text)]/50 hover:bg-[var(--bg)]/30 disabled:opacity-30"
+            aria-label="Cerrar"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <p className="mb-4 text-xs text-[var(--text)]/60">
+          {codigo} · solicita factura por {money(montoNeto)}
+        </p>
+
+        <div className="mb-4 space-y-3">
+          <ModalField label="Email del contratista *">
+            <Input
+              type="email"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              placeholder="contratista@ejemplo.com"
+              required
+            />
+          </ModalField>
+          <p className="text-[11px] text-[var(--text)]/55">
+            Se envía con el PDF de la estimación adjunto + texto pidiendo que emita la factura por
+            el monto neto y la envíe a pagos@dilesa.mx. Puedes re-enviar las veces que necesites.
+          </p>
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose} disabled={sending}>
+            Cerrar
+          </Button>
+          <Button
+            onClick={() => void onSend(to)}
+            disabled={sending || !to.trim() || !/^.+@.+\..+$/.test(to)}
+          >
+            {sending ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />}
+            Enviar PDF por email
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
