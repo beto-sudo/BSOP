@@ -129,8 +129,11 @@ otro.
 
 ### KPI6 — Formato de display alineado con `lib/format/`
 
-- **Monedas**: `formatMoney(value)` → `$1,234.56`.
-- **Porcentajes**: 1 decimal, sufijo `%`. `(value * 100).toFixed(1) + '%'`.
+- **Monedas**: `formatCurrency(value)` → `$1,234.56`. Para strips con
+  espacio horizontal limitado, `formatCurrency(value, { compact: true })`
+  → `$1.5M`.
+- **Porcentajes**: `formatPercent(0–1)` → `27.5%` (1 decimal por
+  default). El valor de entrada es proporción 0–1, no 0–100.
 - **Conteos**: entero sin separadores hasta 4 dígitos; con
   `toLocaleString('es-MX')` desde 5 dígitos.
 - **Fechas** (cuando un KPI es una fecha, ej. "próximo vencimiento"):
@@ -192,17 +195,23 @@ Forma típica del caller:
 'use client';
 
 import { ModuleKpiStrip, type ModuleKpi } from '@/components/module-page';
-import { formatMoney } from '@/lib/format';
+import { formatCurrency, formatPercent } from '@/lib/format';
 
-function deriveKpis(rows: VentaRow[]): readonly ModuleKpi[] {
-  const cerradas = rows.filter((r) => r.estado === 'cerrada');
+function deriveKpis(rows: readonly VentaRow[]): readonly ModuleKpi[] {
+  const total = rows.length;
+  const cerradas = rows.filter((r) => r.estado === 'cerrada').length;
+  const pipeline = rows.reduce((acc, r) => acc + (r.precio ?? 0), 0);
   return [
-    { key: 'count', label: 'Ventas', value: rows.length },
-    { key: 'pipeline', label: 'Pipeline', value: formatMoney(sum(rows, 'precio')) },
+    { key: 'count', label: 'Ventas', value: total },
+    {
+      key: 'pipeline',
+      label: 'Pipeline',
+      value: total === 0 ? '—' : formatCurrency(pipeline, { compact: true }),
+    },
     {
       key: 'cerradas_pct',
       label: '% cerradas',
-      value: rows.length === 0 ? '—' : `${((cerradas.length / rows.length) * 100).toFixed(1)}%`,
+      value: formatPercent(total === 0 ? null : cerradas / total),
     },
     // ...hasta 5
   ];

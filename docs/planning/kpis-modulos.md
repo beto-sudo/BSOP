@@ -62,7 +62,7 @@ PRIMITIVAS (existentes)
   KpiSection de Playtomic                    ← precedente vivo,
                                                 misma idea ad-hoc
 
-PATRÓN (nuevo, codificado en ADR-031)
+PATRÓN (nuevo, codificado en ADR-034)
   Hub o página
     ├── <ModuleKpiStrip stats={kpis}/>      ← derivado client-side
     ├── filtros (URL-synced)
@@ -88,8 +88,8 @@ PATRÓN (nuevo, codificado en ADR-031)
 - **KPI5** — `value` siempre `tabular-nums`. Sin datos: `—`. Con datos
   de espera (loading): skeleton. Cero "0" cuando es "sin datos
   todavía".
-- **KPI6** — Formato canónico: monedas con `formatMoney`, porcentajes
-  con 1 decimal, conteos enteros, fechas con `formatDateShort`.
+- **KPI6** — Formato canónico: monedas con `formatCurrency`, porcentajes
+  con `formatPercent`, conteos enteros, fechas con `formatDateShort`.
   Coherente con lo que ya hace `lib/format/`.
 - **KPI7** — Strip va arriba de los filtros (no entre filtros y tabla).
   Orden vertical canónico: KPIs → filtros → tabla. Consistente con
@@ -301,6 +301,23 @@ implementar.
   de 5 es disciplina sana — fuerza priorizar. Si una superficie
   necesita 6+, es señal de que hay un módulo escondido que merece ser
   superficie separada.)
+- **2026-05-25** (D7): KPI3 "% cerradas" → "% Escrituradas" en Ventas
+  tab 1. Implementando Sprint 1 descubrí que `dilesa.ventas.estado`
+  solo tiene `activa | desasignada`; no existe estado "cerrada".
+  "Cerrada" en bienes raíces significa "escriturada" → `numero_escritura
+IS NOT NULL` es la señal canónica de venta completada. Wording
+  "% Escrituradas" es más preciso para el negocio que "% cerradas".
+  (Why: la auditoría empírica del schema reveló que mi curaduría
+  asumía un estado que no existe.)
+- **2026-05-25** (D8): KPI4 "Días promedio en fase actual" → "Avance
+  promedio" en Ventas tab 1. No existe `fecha_entrada_fase_actual`
+  en el modelo; cargarlo requeriría query extra al `dilesa.venta_fases`
+  que rompería KPI2 (derivación 100% client-side desde el dataset
+  de la tabla). Reemplazado por `mean(fase_posicion) / max(fase_posicion)`
+  expresado como `formatPercent` — proxy directo del avance global
+  en el pipeline de 17 fases. (Why: si una venta avanza, su
+  `fase_posicion` sube. El promedio del dataset filtrado es exactamente
+  "qué tan avanzadas están las ventas que estoy viendo".)
 
 ## Bitácora
 
@@ -316,8 +333,16 @@ implementar.
   después pulimos"). 3 KPIs marcados ⚠ para ajustar en Sprint 1 si
   emerge fricción al implementar (Apartadas, % expediente completo,
   Tasa de avance). Tabla completa en sección "KPIs aprobados —
-  Ventas" arriba. Sprint 0 cerrado. **Próximo: Sprint 1 — Ventas
-  tab 1 ("Ventas") como golden migration**, después las otras 4 tabs.
+  Ventas" arriba. Sprint 0 cerrado y mergeado en PR #529.
+- **2026-05-25** — Sprint 1 tab 1 ("Ventas"): strip de 5 KPIs reactivo
+  a los filtros (proyecto, fase, estado, búsqueda) + auditoría de
+  columnas reveló que `fecha_escritura` y `numero_escritura` eran info
+  importante oculta — se agrega columna "Escritura" a la tabla.
+  Test file con 12 unit tests (`components/dilesa/ventas-module.test.ts`)
+  cubre derivación, formato, edge cases (sin rows, vendedor null,
+  precio null) y reactividad a filtros. Pivote crítico vs curaduría
+  original — ver decisión D7 y D8. **Próximo: Sprint 1 tab 2
+  ("Inventario")**.
 
 ## Riesgos / open topics
 
