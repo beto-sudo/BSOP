@@ -12,7 +12,8 @@
  * Lectura pura — la captura/edición es entregable posterior.
  */
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useTransition } from 'react';
+import { updateProyectoFields } from '@/app/dilesa/proyectos/actions';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { DataTable, type Column } from '@/components/module-page';
 import { DetailDrawer, DetailDrawerContent, DetailDrawerSection } from '@/components/detail-page';
@@ -43,6 +44,32 @@ export type ProyectoDetalle = {
   costo_construccion: number | null;
   costo_comercializacion: number | null;
   notas: string | null;
+  plano_oficial_url: string | null;
+  image_url: string | null;
+  acreditacion_escritura: string | null;
+  objetivo_trimestral: number | null;
+};
+
+/**
+ * Datos derivados de `dilesa.v_proyecto_avances` — Sprint A de
+ * `dilesa-proyectos-paridad-coda`. Reemplaza las 46 fórmulas de la
+ * tabla Proyectos en Coda.
+ */
+export type ProyectoAvances = {
+  lotes_total: number;
+  lotes_construidos: number;
+  lotes_vendidos: number;
+  lotes_urbanizados: number;
+  casas_terminadas: number;
+  casas_en_construccion: number;
+  casas_escrituradas: number;
+  avance_urb_pct: number | null;
+  avance_const_pct: number | null;
+  avance_vts_pct: number | null;
+  parque_disponible: number;
+  ticket_promedio: number | null;
+  ventas_totales: number;
+  estado_sugerido: string;
 };
 
 export const TIPO_LABEL: Record<string, string> = {
@@ -194,6 +221,15 @@ export function ProyectoDetailDrawer({
   const [estadoFiltro, setEstadoFiltro] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState('');
   const [predecesorNombre, setPredecesorNombre] = useState<string | null>(null);
+  const [avances, setAvances] = useState<ProyectoAvances | null>(null);
+  // Campos editables (Sprint A paridad-coda)
+  const [planoUrl, setPlanoUrl] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [acreditacion, setAcreditacion] = useState('');
+  const [objetivo, setObjetivo] = useState('');
+  const [editPending, startEditTransition] = useTransition();
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSaved, setEditSaved] = useState(false);
 
   // Carga las unidades del proyecto al abrir el drawer. Los setState van solo
   // dentro del `.then` (no síncronos dentro del effect).
@@ -241,10 +277,54 @@ export function ProyectoDetailDrawer({
         setPredecesorNombre(null);
       });
     }
+    // Carga avances derivados desde v_proyecto_avances (Sprint A paridad-coda).
+    void supabase
+      .schema('dilesa')
+      .from('v_proyecto_avances')
+      .select(
+        'lotes_total, lotes_construidos, lotes_vendidos, lotes_urbanizados, casas_terminadas, casas_en_construccion, casas_escrituradas, avance_urb_pct, avance_const_pct, avance_vts_pct, parque_disponible, ticket_promedio, ventas_totales, estado_sugerido'
+      )
+      .eq('proyecto_id', proyecto.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!activo) return;
+        setAvances((data as unknown as ProyectoAvances | null) ?? null);
+      });
+    // Sincroniza state local de campos editables con el proyecto actual.
+    void Promise.resolve().then(() => {
+      if (!activo) return;
+      setPlanoUrl(proyecto.plano_oficial_url ?? '');
+      setImageUrl(proyecto.image_url ?? '');
+      setAcreditacion(proyecto.acreditacion_escritura ?? '');
+      setObjetivo(proyecto.objetivo_trimestral != null ? String(proyecto.objetivo_trimestral) : '');
+      setEditError(null);
+      setEditSaved(false);
+    });
     return () => {
       activo = false;
     };
   }, [open, proyecto]);
+
+  const handleSaveFields = () => {
+    if (!proyecto) return;
+    setEditError(null);
+    setEditSaved(false);
+    const objN = objetivo.trim() === '' ? null : Number(objetivo);
+    if (objN != null && (!Number.isInteger(objN) || objN < 0)) {
+      setEditError('Objetivo trimestral debe ser entero ≥ 0');
+      return;
+    }
+    startEditTransition(async () => {
+      const r = await updateProyectoFields(proyecto.id, {
+        plano_oficial_url: planoUrl.trim() === '' ? null : planoUrl.trim(),
+        image_url: imageUrl.trim() === '' ? null : imageUrl.trim(),
+        acreditacion_escritura: acreditacion.trim() === '' ? null : acreditacion.trim(),
+        objetivo_trimestral: objN,
+      });
+      if (!r.ok) setEditError(r.error);
+      else setEditSaved(true);
+    });
+  };
 
   const loading = open && proyecto != null && loadedId !== proyecto.id;
 
@@ -411,7 +491,131 @@ export function ProyectoDetailDrawer({
             emptyIcon={<Boxes className="h-6 w-6" />}
           />
         </DetailDrawerSection>
+
+        {avances && avances.lotes_total > 0 && (
+          <DetailDrawerSection
+            title="Avances"
+            description={
+              avances.estado_sugerido !== proyecto.estado
+                ? `Estado sugerido: ${ESTADO_LABEL[avances.estado_sugerido] ?? avances.estado_sugerido}`
+                : undefined
+            }
+          >
+            <div className="space-y-3">
+              <ProgressBar label="Urbanización" pct={avances.avance_urb_pct} />
+              <ProgressBar label="Construcción" pct={avances.avance_const_pct} />
+              <ProgressBar label="Ventas" pct={avances.avance_vts_pct} />
+            </div>
+            <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+              <Stat label="Lotes totales" value={fmtInt(avances.lotes_total)} />
+              <Stat label="Parque disponible" value={fmtInt(avances.parque_disponible)} />
+              <Stat label="Terminadas" value={fmtInt(avances.casas_terminadas)} />
+              <Stat label="En construcción" value={fmtInt(avances.casas_en_construccion)} />
+              <Stat label="Escrituradas" value={fmtInt(avances.casas_escrituradas)} />
+              <Stat label="Ticket promedio" value={fmtMoney(avances.ticket_promedio)} />
+              <Stat label="Ventas totales" value={fmtMoney(avances.ventas_totales)} />
+            </dl>
+          </DetailDrawerSection>
+        )}
+
+        <DetailDrawerSection title="Documentos y configuración">
+          <div className="space-y-3">
+            <FieldRow
+              label="Plano oficial (URL)"
+              value={planoUrl}
+              onChange={setPlanoUrl}
+              placeholder="https://…"
+            />
+            <FieldRow
+              label="Imagen / portada (URL)"
+              value={imageUrl}
+              onChange={setImageUrl}
+              placeholder="https://…"
+            />
+            <FieldRow
+              label="Acreditación de escritura"
+              value={acreditacion}
+              onChange={setAcreditacion}
+              placeholder="Notas o referencia"
+            />
+            <FieldRow
+              label="Objetivo trimestral (unidades)"
+              value={objetivo}
+              onChange={setObjetivo}
+              placeholder="0"
+              type="number"
+            />
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={handleSaveFields}
+                disabled={editPending}
+                className="h-9 rounded-md bg-[var(--accent)] px-4 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+              >
+                {editPending ? 'Guardando…' : 'Guardar cambios'}
+              </button>
+              {editSaved && <span className="text-sm text-emerald-600">Cambios guardados.</span>}
+              {editError && <span className="text-sm text-red-600/80">{editError}</span>}
+            </div>
+          </div>
+        </DetailDrawerSection>
       </DetailDrawerContent>
     </DetailDrawer>
+  );
+}
+
+function ProgressBar({ label, pct }: { label: string; pct: number | null }) {
+  const value = pct ?? 0;
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between text-xs text-[var(--text)]/60">
+        <span>{label}</span>
+        <span className="tabular-nums">{pct != null ? `${pct.toFixed(1)}%` : '—'}</span>
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--border)]">
+        <div
+          className="h-full bg-[var(--accent)] transition-all"
+          style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div>
+      <dt className="text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">{label}</dt>
+      <dd className="mt-0.5 text-sm text-[var(--text)] tabular-nums">{value ?? '—'}</dd>
+    </div>
+  );
+}
+
+function FieldRow({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = 'text',
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  type?: 'text' | 'number';
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
+        {label}
+      </span>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)] focus:border-[var(--accent)] focus:outline-none"
+      />
+    </label>
   );
 }
