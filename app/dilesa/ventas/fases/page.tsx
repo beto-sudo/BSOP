@@ -32,11 +32,13 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronRight, GitBranch, RefreshCw } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { ModuleKpiStrip } from '@/components/module-page';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { useUrlFilters } from '@/hooks/use-url-filters';
+import { deriveFasesKpis } from '@/lib/dilesa/kpis/fases';
 
 type Fase = {
   posicion: number;
@@ -193,6 +195,11 @@ function VentasFasesBody() {
     [conteoPorFase]
   );
 
+  // KPIs sobre el dataset filtrado — ADR-034. Deriva del mismo array
+  // que alimenta las cards (cero queries extras, recalcula en mismo
+  // render que las cards cuando cambian los filtros).
+  const kpis = useMemo(() => deriveFasesKpis(ventasFiltradas), [ventasFiltradas]);
+
   // Meses únicos (YYYY-MM) presentes en las ventas — para el filtro
   const mesesPresentes = useMemo(() => {
     const s = new Set<string>();
@@ -233,6 +240,8 @@ function VentasFasesBody() {
           </p>
         </div>
       </header>
+
+      <ModuleKpiStrip stats={kpis} cols={5} />
 
       <div className="flex flex-wrap items-center gap-3">
         <select

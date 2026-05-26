@@ -332,6 +332,27 @@ IS NOT NULL` es la señal canónica de venta completada. Wording
   emergió: `mean(diasInventario)` dispara decisión ("¿se están
   estancando?"). (Why: respetar KPI2 al 100% y mostrar lo que importa
   del universo de la tabla, no forzar KPIs sobre datos ausentes.)
+- **2026-05-26** (D10): Fases tab 3 — la curaduría original tenía 3 de
+  5 KPIs dependientes de campos inexistentes en `dilesa.ventas`: "Fase
+  más demorada" + "# estancadas (>30 días en fase)" + "Tiempo promedio
+  pipeline" + "Tasa de avance" (marcada ⚠) — todos requieren
+  `fecha_entrada_fase_actual` o `fecha_cierre`, ninguno existe (solo
+  hay `created_at` de la venta). Pivote: usar `days_since(created_at)`
+  como proxy del tiempo en pipeline (no es "en fase" pero sí "viva en
+  el sistema"). KPIs ajustados: Activas, Fase más poblada
+  (`argmax(fase, count)` formato "Nombre (N)"), Días promedio en
+  pipeline, Estancadas >180d, Avance promedio (mismo cálculo que tab
+  Ventas). Helper movido a `lib/dilesa/kpis/fases.ts` porque Fases es
+  page directo (no module exportable). (Why: respetar KPI2 al 100%,
+  usar el campo disponible más informativo. 180d es threshold de
+  estancamiento razonable para inmobiliario donde el ciclo típico es
+  6-12 meses.)
+- **2026-05-26** (D11): Helpers de KPI viven en
+  `lib/<empresa>/kpis/<tab>.ts` cuando el módulo es page directo
+  (no module exportable). Cuando es un `<Module>` exportable, la
+  derivación queda dentro del module file mismo. (Why: minimizar
+  fricción de imports, mantener la derivación cerca del consumer real
+  excepto cuando se necesita para testing.)
 
 ## Bitácora
 
@@ -363,8 +384,14 @@ IS NOT NULL` es la señal canónica de venta completada. Wording
   `terminada`, no el universo). KPIs ajustados a "qué está disponible
   para vender ahora": Disponibles, En construcción, Terminadas, Valor
   disponible ($), Días promedio en inventario. Respeta KPI2 al 100%
-  sin queries extras. Test file con 8 unit tests.
-  **Próximo: Sprint 1 tab 3 ("Fases")**.
+  sin queries extras. Test file con 8 unit tests. PR #532 mergeado.
+- **2026-05-26** — Sprint 1 tab 3 ("Fases"): strip de 5 KPIs sobre el
+  pipeline global. Pivote D10 mayor — 3 KPIs de la curaduría dependían
+  de campos inexistentes; reemplazados por proxies derivables del
+  `created_at`. Helper movido a `lib/dilesa/kpis/fases.ts` (D11,
+  patrón para pages directos). 9 unit tests con `now` inyectable para
+  estabilidad. Fases no tiene tabla — la auditoría no aplica.
+  **Próximo: Sprint 1 tab 4 ("Clientes")**.
 
 ## Riesgos / open topics
 
