@@ -63,14 +63,14 @@ Estado de la implementación hoy:
 2. **UI completa de Anteproyectos** — listado + drawer/page de detalle
    con análisis financiero conectado a `v_anteproyectos_analisis`,
    formulario de captura, filtros (estado, etapa, decisión, prioridad).
-3. **Plantilla canónica de trabajo** — catálogo de **35 tareas**
-   (31 importadas de Coda + 1 gate de decisión "Comité de Inversión"
-   + 3 cotizaciones de obra) con taxonomía rica (tipo/subtipo/entidad/
-   obligatoriedad/duración/dependencias). Al crear un anteproyecto, las
-   tareas se instancian automáticamente respetando `aplicacion =
-   'anteproyecto'`. Las fechas objetivo se calculan auto-mágicamente
-   desde la fecha de arranque + grafo de dependencias + duración en
-   días hábiles.
+3. **Plantilla canónica de trabajo** — catálogo de **35 tareas** (31
+   importadas de Coda, más 1 gate de decisión "Comité de Inversión" y 3
+   cotizaciones de obra) con taxonomía rica
+   (tipo/subtipo/entidad/obligatoriedad/duración/dependencias). Al crear
+   un anteproyecto las tareas se instancian automáticamente respetando
+   el campo aplicacion. Las fechas objetivo se calculan
+   auto-mágicamente desde la fecha de arranque, el grafo de
+   dependencias y la duración en días hábiles.
 4. **Presupuestos preliminares con home** — modelo nuevo (partidas +
    monto + fuente + flag `autorizado`) que puede ligarse a la tarea
    originadora.
@@ -213,7 +213,7 @@ dilesa.anteproyecto_tareas_dependencias
 Al **crear un anteproyecto**:
 
 1. Se instancian las tareas del catálogo donde `aplicacion IN
-   ('anteproyecto', 'ambas')` y `(tipo_proyecto_id = <tipo> OR IS NULL)`.
+('anteproyecto', 'ambas')` y `(tipo_proyecto_id = <tipo> OR IS NULL)`.
 2. Se clonan las dependencias del catálogo al modelo de instancias.
 3. Se calculan `fecha_objetivo_inicio` + `fecha_objetivo_fin` para
    cada tarea respetando el grafo de dependencias y usando calendario
@@ -277,8 +277,8 @@ transacción:
    terreno_id, tipo_proyecto_id, responsable_id, etc.).
 3. **UPDATE en `dilesa.anteproyecto_tareas`** SET `proyecto_id = <nuevo>`
    WHERE `anteproyecto_id = <ante>` AND `aplicacion_snapshot IN
-   ('proyecto', 'ambas')` AND `estado IN ('en_progreso', 'completada',
-   'no_aplica')`. Las pendientes/bloqueadas se quedan solo en el
+('proyecto', 'ambas')` AND `estado IN ('en_progreso', 'completada',
+'no_aplica')`. Las pendientes/bloqueadas se quedan solo en el
    anteproyecto. Las de `aplicacion = 'anteproyecto'` no se llevan
    (terminan su ciclo).
 4. **INSERT en `dilesa.anteproyecto_tareas`** las tareas faltantes
@@ -293,7 +293,7 @@ transacción:
    `estado = 'planeada'`, `preliminar_origen_id = <id>`.
 7. **UPDATE en `dilesa.anteproyectos`** SET `proyecto_id`,
    `convertido_a_proyecto_en = NOW()`, `convertido_a_proyecto_por =
-   auth.uid()`.
+auth.uid()`.
 8. **Bitácora** del evento (si se integra con `activity-log-pattern`).
 
 Idempotente: si el anteproyecto ya tiene `proyecto_id`, la acción
@@ -306,8 +306,8 @@ falla con mensaje claro ("ya convertido al proyecto X el Y-Z").
 - **Catálogo** define `duracion_dias_habiles` por tarea. Coda promedia
   ~12 días por trámite; rango observado: 5–30 días.
 - **Instancia** calcula `fecha_objetivo_inicio` y `fecha_objetivo_fin`
-  desde la fecha de creación del anteproyecto + grafo de dependencias
-  + calendario MX hábil.
+  desde la fecha de creación del anteproyecto, respetando grafo de
+  dependencias y calendario MX hábil.
 - **Recálculo en cascada**: cuando una tarea pasa a `completada` antes
   o después de su `fecha_objetivo_fin`, se actualizan las dependientes
   (ripple). Política tentativa: `fecha_objetivo_inicio` de la dependiente
@@ -386,11 +386,11 @@ La RPC `fn_anteproyecto_promote` valida que esta tarea esté
 3 tareas nuevas, paralelas (no dependientes entre sí), con
 `Aplicación: Anteproyecto` y `Tipo: Cotización`:
 
-| Tarea                              | Subtipo      | Entidad                   | Días | Obligatoriedad |
-| ---------------------------------- | ------------ | ------------------------- | ---: | -------------- |
-| Cotización de Urbanización         | Urbanismo    | Contratistas Urbanización |   15 | obligatoria    |
-| Cotización de Construcción         | Construcción | Contratistas Vivienda     |   15 | obligatoria    |
-| Cotización de Comercialización     | Comercial    | Marketing / Ventas        |   10 | opcional       |
+| Tarea                          | Subtipo      | Entidad                   | Días | Obligatoriedad |
+| ------------------------------ | ------------ | ------------------------- | ---: | -------------- |
+| Cotización de Urbanización     | Urbanismo    | Contratistas Urbanización |   15 | obligatoria    |
+| Cotización de Construcción     | Construcción | Contratistas Vivienda     |   15 | obligatoria    |
+| Cotización de Comercialización | Comercial    | Marketing / Ventas        |   10 | opcional       |
 
 Las 3 dependen de "Elaboración de Anteproyecto" (orden 3 en Coda) y
 alimentan el "Estudio de Factibilidad Económica" (orden 4) — Sprint 3
@@ -430,11 +430,10 @@ completada).
 
 ### Sprint 3 — Plantilla + tareas + presupuestos preliminares
 
-- **Migración SQL** con las 5 tablas:
-  `plantilla_anteproyecto_tareas` + `plantilla_anteproyecto_tareas_dependencias`
-  + `anteproyecto_tareas` + `anteproyecto_tareas_dependencias`
-  + `anteproyecto_presupuestos_preliminares`
-  + RLS + índices + comentarios + `NOTIFY pgrst, 'reload schema'`.
+- **Migración SQL** con las 5 tablas (`plantilla_anteproyecto_tareas`,
+  `plantilla_anteproyecto_tareas_dependencias`, `anteproyecto_tareas`,
+  `anteproyecto_tareas_dependencias`, `anteproyecto_presupuestos_preliminares`).
+  Incluye RLS, índices, comentarios y `NOTIFY pgrst, 'reload schema'`.
 - **Seed canónico** de 35 tareas en `plantilla_anteproyecto_tareas`
   (31 importadas de Coda + 1 gate Comité + 3 cotizaciones de obra) +
   dependencias (27 + ajustes para las 4 nuevas). Ver appendix.
@@ -442,9 +441,9 @@ completada).
 - **Trigger / server action** que instancia tareas + dependencias +
   fechas objetivo al crear un anteproyecto.
 - **UI** en el drawer/page del anteproyecto:
-  - Sección "Checklist" con timeline simple (tareas en orden + estado
-    + fecha objetivo/real + responsable + adjunto). Permite agregar
-    tareas ad-hoc, marcar `no_aplica`.
+  - Sección "Checklist" con timeline simple (tareas en orden con
+    estado, fecha objetivo/real, responsable y adjunto). Permite
+    agregar tareas ad-hoc, marcar `no_aplica`.
   - Sección "Presupuestos preliminares" con tabla editable inline.
     Permite ligar partida a tarea originadora (dropdown). Workflow
     `autorizado` (botón "Autorizar").
@@ -516,12 +515,12 @@ completada).
   Coda `table-7XBvWbyLzx` (`Plantilla Trámites Estudios y Documentos`,
   31 rows, 12 cols, 27 deps). Modelo de plantilla ajustado a 5 tablas
   con taxonomía rica (`aplicacion`/`tipo`/`subtipo`/`duracion_dias_habiles`/
-  `entidad_responsable`/`obligatoriedad`/`se_entrega_a`/`requiere_archivo`+`formato_archivo`)
-  + tabla de dependencias N:M + estado `bloqueada`. Beto OK las 3
+  `entidad_responsable`/`obligatoriedad`/`se_entrega_a`/`requiere_archivo`+`formato_archivo`),
+  tabla de dependencias N:M, y estado `bloqueada`. Beto OK las 3
   preguntas: agregar gate "Comité de Inversión" (D3), agregar 3
   cotizaciones de obra (D4), guardar el refinamiento ahora. Sprint 3
   expandido para incluir la plantilla canónica seed de 35 tareas
-  + helper de calendario hábil MX. PR #546 amplía contenido.
+  más helper de calendario hábil MX. PR #546 amplía contenido.
 
 ## Decisiones registradas
 
@@ -558,26 +557,27 @@ Sprint 3.
 
 ### Anteproyecto (15 tareas: 12 Coda + 1 gate + 3 cotizaciones)
 
-| # | Tarea | Tipo | Subtipo | Entidad | Días | Obl |
-| -: | --- | --- | --- | --- | -: | :-: |
-| 1 | Escritura/Contrato Compraventa del Terreno | Legal | Propiedad | Notaría / Registro Público | 15 | ✓ |
-| 2 | Levantamiento Topográfico y Curvas de Nivel | Estudio | Técnico | Topógrafo | 5 | ✓ |
-| 3 | Elaboración de Anteproyecto | Plano | Urbanismo | Interno | 10 | ✓ |
-| 4 | Estudio de Factibilidad Económica / Corrida Financiera | Estudio | Financiero | Finanzas / Dirección / Consultor | 7 | ✓ |
-| 5 | Mecánica de Suelos | Estudio | Técnico | Laboratorio | 10 | ✓ |
-| 6 | Estudio Hidrológico | Estudio | Técnico | UANL / Consultor | 10 | — |
-| 7 | Factibilidad de Uso de Suelo | Factibilidad | Urbanismo | Municipio | 15 | ✓ |
-| 8 | Factibilidad de Agua Potable y Drenaje | Factibilidad | Servicios | SIMAS | 15 | ✓ |
-| 9 | Factibilidad de Energía Eléctrica | Factibilidad | Servicios | CFE | 15 | ✓ |
-| 10 | Factibilidad de Servicios Complementarios | Factibilidad | Servicios | Proveedores | 10 | — |
-| 11 | Cambio de Uso de Suelo | Trámite | Urbanismo | Municipio | 20 | opc |
-| 12 | Aprobación Consejo de Desarrollo Urbano | Trámite | Urbanismo | Municipio | 20 | ✓ |
-| ⭐12.1 | Cotización de Urbanización | Cotización | Urbanismo | Contratistas Urbanización | 15 | ✓ |
-| ⭐12.2 | Cotización de Construcción de Vivienda | Cotización | Construcción | Contratistas Vivienda | 15 | ✓ |
-| ⭐12.3 | Cotización de Comercialización | Cotización | Comercial | Marketing / Ventas | 10 | — |
-| ⭐13 | **Aprobación de Comité de Inversión** (gate) | Decisión | Financiero | Comité de Inversión / Dirección | 7 | ✓ |
+|      # | Tarea                                                  | Tipo         | Subtipo      | Entidad                          | Días | Obl |
+| -----: | ------------------------------------------------------ | ------------ | ------------ | -------------------------------- | ---: | :-: |
+|      1 | Escritura/Contrato Compraventa del Terreno             | Legal        | Propiedad    | Notaría / Registro Público       |   15 |  ✓  |
+|      2 | Levantamiento Topográfico y Curvas de Nivel            | Estudio      | Técnico      | Topógrafo                        |    5 |  ✓  |
+|      3 | Elaboración de Anteproyecto                            | Plano        | Urbanismo    | Interno                          |   10 |  ✓  |
+|      4 | Estudio de Factibilidad Económica / Corrida Financiera | Estudio      | Financiero   | Finanzas / Dirección / Consultor |    7 |  ✓  |
+|      5 | Mecánica de Suelos                                     | Estudio      | Técnico      | Laboratorio                      |   10 |  ✓  |
+|      6 | Estudio Hidrológico                                    | Estudio      | Técnico      | UANL / Consultor                 |   10 |  —  |
+|      7 | Factibilidad de Uso de Suelo                           | Factibilidad | Urbanismo    | Municipio                        |   15 |  ✓  |
+|      8 | Factibilidad de Agua Potable y Drenaje                 | Factibilidad | Servicios    | SIMAS                            |   15 |  ✓  |
+|      9 | Factibilidad de Energía Eléctrica                      | Factibilidad | Servicios    | CFE                              |   15 |  ✓  |
+|     10 | Factibilidad de Servicios Complementarios              | Factibilidad | Servicios    | Proveedores                      |   10 |  —  |
+|     11 | Cambio de Uso de Suelo                                 | Trámite      | Urbanismo    | Municipio                        |   20 | opc |
+|     12 | Aprobación Consejo de Desarrollo Urbano                | Trámite      | Urbanismo    | Municipio                        |   20 |  ✓  |
+| ⭐12.1 | Cotización de Urbanización                             | Cotización   | Urbanismo    | Contratistas Urbanización        |   15 |  ✓  |
+| ⭐12.2 | Cotización de Construcción de Vivienda                 | Cotización   | Construcción | Contratistas Vivienda            |   15 |  ✓  |
+| ⭐12.3 | Cotización de Comercialización                         | Cotización   | Comercial    | Marketing / Ventas               |   10 |  —  |
+|   ⭐13 | **Aprobación de Comité de Inversión** (gate)           | Decisión     | Financiero   | Comité de Inversión / Dirección  |    7 |  ✓  |
 
 Dependencias clave del anteproyecto:
+
 - #2 (Topo) depende de #1 (Escritura).
 - #3 (Anteproyecto) depende de #2.
 - #5 (Suelos) depende de #2.
@@ -591,37 +591,37 @@ Dependencias clave del anteproyecto:
 
 ### Proyecto (19 tareas, todas de Coda)
 
-| # | Tarea | Tipo | Subtipo | Entidad | Días | Obl |
-| -: | --- | --- | --- | --- | -: | :-: |
-| 14 | Estudio de Impacto Ambiental | Estudio | Ambiental | Tramitador / Consultor | 20 | ✓ |
-| 15 | Manifestación de Impacto Ambiental (MIA) | Trámite | Ambiental | Autoridad Ambiental | 30 | ✓ |
-| 16 | Licencia de Fraccionamiento | Licencia | Urbanismo | Municipio | 20 | ✓ |
-| 17 | Plano Oficial Aprobado | Plano | Urbanismo | Municipio | 10 | ✓ |
-| 18 | Proyecto de Rasantes y Plataformas | Proyecto | Topografía | Topógrafo / Proyectos | 15 | ✓ |
-| 19 | Proyecto Hidrosanitario Aprobado | Proyecto | Servicios | SIMAS | 15 | ✓ |
-| 20 | Proyecto Eléctrico Aprobado | Proyecto | Servicios | CFE | 15 | ✓ |
-| 21 | Certificación de Números Oficiales | Certificación | Urbanismo | Municipio | 10 | ✓ |
-| 22 | Certificación de Alineamiento Residencial | Certificación | Urbanismo | Municipio | 10 | ✓ |
-| 23 | Declaración Unilateral de Voluntades / Escrituración | Legal | Urbanismo | Notaría | 20 | ✓ |
-| 24 | Registro ante Catastro | Registro | Legal | Notaría / Municipio | 10 | ✓ |
-| 25 | Registro Público de la Propiedad (RPP) | Registro | Legal | Notaría | 15 | ✓ |
-| 26 | Permiso de Movimiento de Tierras | Permiso | Construcción | Municipio | 10 | — |
-| 27 | Permiso de Trazo y Nivelación | Permiso | Construcción | Municipio | 10 | — |
-| 28 | Constancia de No Adeudo SIMAS | Constancia | Servicios | SIMAS | 5 | — |
-| 29 | Constancia de No Adeudo CFE | Constancia | Servicios | CFE | 5 | — |
-| 30 | Constancia de Protección Civil | Certificación | Legal | Protección Civil | 10 | — |
-| 31 | Acta de Terminación de Obra de Urbanización | Acta | Construcción | Municipio | 15 | ✓ |
-| 32 | Entrega-Recepción de Fraccionamiento | Acta | Urbanismo | Municipio | 10 | ✓ |
+|   # | Tarea                                                | Tipo          | Subtipo      | Entidad                | Días | Obl |
+| --: | ---------------------------------------------------- | ------------- | ------------ | ---------------------- | ---: | :-: |
+|  14 | Estudio de Impacto Ambiental                         | Estudio       | Ambiental    | Tramitador / Consultor |   20 |  ✓  |
+|  15 | Manifestación de Impacto Ambiental (MIA)             | Trámite       | Ambiental    | Autoridad Ambiental    |   30 |  ✓  |
+|  16 | Licencia de Fraccionamiento                          | Licencia      | Urbanismo    | Municipio              |   20 |  ✓  |
+|  17 | Plano Oficial Aprobado                               | Plano         | Urbanismo    | Municipio              |   10 |  ✓  |
+|  18 | Proyecto de Rasantes y Plataformas                   | Proyecto      | Topografía   | Topógrafo / Proyectos  |   15 |  ✓  |
+|  19 | Proyecto Hidrosanitario Aprobado                     | Proyecto      | Servicios    | SIMAS                  |   15 |  ✓  |
+|  20 | Proyecto Eléctrico Aprobado                          | Proyecto      | Servicios    | CFE                    |   15 |  ✓  |
+|  21 | Certificación de Números Oficiales                   | Certificación | Urbanismo    | Municipio              |   10 |  ✓  |
+|  22 | Certificación de Alineamiento Residencial            | Certificación | Urbanismo    | Municipio              |   10 |  ✓  |
+|  23 | Declaración Unilateral de Voluntades / Escrituración | Legal         | Urbanismo    | Notaría                |   20 |  ✓  |
+|  24 | Registro ante Catastro                               | Registro      | Legal        | Notaría / Municipio    |   10 |  ✓  |
+|  25 | Registro Público de la Propiedad (RPP)               | Registro      | Legal        | Notaría                |   15 |  ✓  |
+|  26 | Permiso de Movimiento de Tierras                     | Permiso       | Construcción | Municipio              |   10 |  —  |
+|  27 | Permiso de Trazo y Nivelación                        | Permiso       | Construcción | Municipio              |   10 |  —  |
+|  28 | Constancia de No Adeudo SIMAS                        | Constancia    | Servicios    | SIMAS                  |    5 |  —  |
+|  29 | Constancia de No Adeudo CFE                          | Constancia    | Servicios    | CFE                    |    5 |  —  |
+|  30 | Constancia de Protección Civil                       | Certificación | Legal        | Protección Civil       |   10 |  —  |
+|  31 | Acta de Terminación de Obra de Urbanización          | Acta          | Construcción | Municipio              |   15 |  ✓  |
+|  32 | Entrega-Recepción de Fraccionamiento                 | Acta          | Urbanismo    | Municipio              |   10 |  ✓  |
 
 Dependencias del proyecto: se importan tal cual de Coda (27 de las
 31 originales). Lista completa en el script de seed del Sprint 3.
 
 ### Resumen agregado
 
-| Métrica | Anteproyecto | Proyecto | Total |
-| --- | -: | -: | -: |
-| Tareas | 15 | 19 | 34 (+ 1 gate) |
-| Obligatorias | 11 | 13 | 24 |
-| Opcionales/condicionales | 3 | 6 | 9 |
-| Duración acumulada (sin paralelización) | ~190d | ~245d | — |
-| Entidades externas distintas | 9 | 9 | 13 (algunas se comparten) |
+| Métrica                                 | Anteproyecto | Proyecto |                     Total |
+| --------------------------------------- | -----------: | -------: | ------------------------: |
+| Tareas                                  |           15 |       19 |             34 (+ 1 gate) |
+| Obligatorias                            |           11 |       13 |                        24 |
+| Opcionales/condicionales                |            3 |        6 |                         9 |
+| Duración acumulada (sin paralelización) |        ~190d |    ~245d |                         — |
+| Entidades externas distintas            |            9 |        9 | 13 (algunas se comparten) |
