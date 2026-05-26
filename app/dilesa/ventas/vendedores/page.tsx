@@ -33,10 +33,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BadgeDollarSign, RefreshCw, Search } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import { DataTable, type Column } from '@/components/module-page';
+import { DataTable, ModuleKpiStrip, type Column } from '@/components/module-page';
 import { Input } from '@/components/ui/input';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { deriveVendedoresKpis } from '@/lib/dilesa/kpis/vendedores';
 
 const CIERRE_POSICION_MIN = 15;
 
@@ -172,6 +173,9 @@ function VentasVendedoresBody() {
     return vendedores.filter((v) => v.nombre.toLowerCase().includes(q));
   }, [vendedores, search]);
 
+  // KPIs sobre dataset filtrado — ADR-034 KPI2+KPI3.
+  const kpis = useMemo(() => deriveVendedoresKpis(filtrados), [filtrados]);
+
   const columns: Column<VendedorRow>[] = [
     { key: 'nombre', label: 'Vendedor', type: 'text', sticky: true, width: 'min-w-[220px]' },
     { key: 'numVentas', label: '# ventas', type: 'number' },
@@ -204,6 +208,8 @@ function VentasVendedoresBody() {
           </p>
         </div>
       </header>
+
+      <ModuleKpiStrip stats={kpis} cols={5} />
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">
