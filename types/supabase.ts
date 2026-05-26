@@ -358,6 +358,142 @@ export type Database = {
           },
         ]
       }
+      notification_definitions: {
+        Row: {
+          activo: boolean
+          created_at: string
+          descripcion: string | null
+          empresa_id: string | null
+          from_email: string
+          from_name: string | null
+          id: string
+          nombre: string
+          recipients_extra: Json
+          reply_to: string | null
+          slug: string
+          subject_template: string
+          trigger_config: Json
+          trigger_type: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          descripcion?: string | null
+          empresa_id?: string | null
+          from_email: string
+          from_name?: string | null
+          id?: string
+          nombre: string
+          recipients_extra?: Json
+          reply_to?: string | null
+          slug: string
+          subject_template: string
+          trigger_config?: Json
+          trigger_type: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          descripcion?: string | null
+          empresa_id?: string | null
+          from_email?: string
+          from_name?: string | null
+          id?: string
+          nombre?: string
+          recipients_extra?: Json
+          reply_to?: string | null
+          slug?: string
+          subject_template?: string
+          trigger_config?: Json
+          trigger_type?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_definitions_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_definitions_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_log: {
+        Row: {
+          context: Json
+          definition_id: string | null
+          empresa_id: string | null
+          error_message: string | null
+          id: string
+          recipients: Json
+          resend_id: string | null
+          sent_at: string
+          status: string
+          subject: string | null
+          triggered_by_user_id: string | null
+        }
+        Insert: {
+          context?: Json
+          definition_id?: string | null
+          empresa_id?: string | null
+          error_message?: string | null
+          id?: string
+          recipients: Json
+          resend_id?: string | null
+          sent_at?: string
+          status: string
+          subject?: string | null
+          triggered_by_user_id?: string | null
+        }
+        Update: {
+          context?: Json
+          definition_id?: string | null
+          empresa_id?: string | null
+          error_message?: string | null
+          id?: string
+          recipients?: Json
+          resend_id?: string | null
+          sent_at?: string
+          status?: string
+          subject?: string | null
+          triggered_by_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_log_definition_id_fkey"
+            columns: ["definition_id"]
+            isOneToOne: false
+            referencedRelation: "notification_definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_log_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_log_triggered_by_user_id_fkey"
+            columns: ["triggered_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       permisos_rol: {
         Row: {
           acceso_escritura: boolean | null
@@ -623,6 +759,10 @@ export type Database = {
       fn_has_empresa: { Args: { p_empresa_id: string }; Returns: boolean }
       fn_is_admin: { Args: never; Returns: boolean }
       fn_persona_visible: { Args: { p_persona_id: string }; Returns: boolean }
+      fn_user_has_role: {
+        Args: { p_empresa_id: string; p_role_name: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
@@ -3043,6 +3183,13 @@ export type Database = {
         Returns: Json
       }
       fn_es_vendedor_restringido: { Args: never; Returns: boolean }
+      fn_estimaciones_backfill_incremental: {
+        Args: never
+        Returns: {
+          estimaciones_creadas: number
+          tareas_vinculadas: number
+        }[]
+      }
       fn_generar_estimacion_borrador: {
         Args: {
           p_contratista_id: string
