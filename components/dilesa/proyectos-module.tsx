@@ -84,7 +84,25 @@ export function deriveKpis(rows: readonly ProyectoDetalle[]): readonly ModuleKpi
   ];
 }
 
-export function ProyectosModule({ empresaId }: { empresaId: string }) {
+const EMPTY_TIPOS: readonly string[] = [];
+
+/**
+ * Props del módulo.
+ *
+ * - `excluirTipos` permite filtrar tipos específicos en el query base.
+ *   Caso de uso: la tab "Activos" del hub Proyectos
+ *   (`/dilesa/proyectos`) pasa `['anteproyecto']` para que los
+ *   anteproyectos vivan solo en su tab hermana (iniciativa
+ *   `dilesa-proyectos-anteproyectos` Sprint 2). Default vacío preserva
+ *   el comportamiento histórico (todos los tipos).
+ */
+export function ProyectosModule({
+  empresaId,
+  excluirTipos = EMPTY_TIPOS,
+}: {
+  empresaId: string;
+  excluirTipos?: readonly string[];
+}) {
   const [proyectos, setProyectos] = useState<ProyectoDetalle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -94,19 +112,22 @@ export function ProyectosModule({ empresaId }: { empresaId: string }) {
   const [selected, setSelected] = useState<ProyectoDetalle | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const fetchProyectos = useCallback(
-    () =>
-      createSupabaseBrowserClient()
-        .schema('dilesa')
-        .from('proyectos')
-        .select(
-          'id, tipo, nombre, estado, clave_interna, proyecto_padre_id, fecha_inicio, fecha_fin_estimada, fecha_licencia, area_m2, area_vendible_m2, areas_verdes_m2, lotes_proyectados, presupuesto_estimado, costo_terreno, costo_urbanizacion, costo_construccion, costo_comercializacion, notas'
-        )
-        .eq('empresa_id', empresaId)
-        .is('deleted_at', null)
-        .order('nombre'),
-    [empresaId]
-  );
+  const fetchProyectos = useCallback(() => {
+    let q = createSupabaseBrowserClient()
+      .schema('dilesa')
+      .from('proyectos')
+      .select(
+        'id, tipo, nombre, estado, clave_interna, proyecto_padre_id, fecha_inicio, fecha_fin_estimada, fecha_licencia, area_m2, area_vendible_m2, areas_verdes_m2, lotes_proyectados, presupuesto_estimado, costo_terreno, costo_urbanizacion, costo_construccion, costo_comercializacion, notas'
+      )
+      .eq('empresa_id', empresaId)
+      .is('deleted_at', null);
+    if (excluirTipos.length > 0) {
+      // PostgREST: usar `not.in` con lista entre paréntesis. Valores
+      // sin comillas porque `tipo` es text sin caracteres especiales.
+      q = q.not('tipo', 'in', `(${excluirTipos.join(',')})`);
+    }
+    return q.order('nombre');
+  }, [empresaId, excluirTipos]);
 
   const cargar = useCallback(async () => {
     setLoading(true);
