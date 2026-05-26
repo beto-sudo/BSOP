@@ -2029,6 +2029,105 @@ export type Database = {
         }
         Relationships: []
       }
+      plantilla_proyecto_tareas: {
+        Row: {
+          activa: boolean
+          aplicacion: string
+          created_at: string
+          deleted_at: string | null
+          descripcion: string | null
+          duracion_dias_habiles: number
+          empresa_id: string | null
+          entidad_responsable: string
+          formato_archivo: string | null
+          id: string
+          nombre: string
+          obligatoriedad: string
+          orden_default: number
+          requiere_archivo: boolean
+          se_entrega_a: string | null
+          subtipo: string | null
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          aplicacion: string
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          duracion_dias_habiles: number
+          empresa_id?: string | null
+          entidad_responsable: string
+          formato_archivo?: string | null
+          id?: string
+          nombre: string
+          obligatoriedad: string
+          orden_default?: number
+          requiere_archivo?: boolean
+          se_entrega_a?: string | null
+          subtipo?: string | null
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          aplicacion?: string
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          duracion_dias_habiles?: number
+          empresa_id?: string | null
+          entidad_responsable?: string
+          formato_archivo?: string | null
+          id?: string
+          nombre?: string
+          obligatoriedad?: string
+          orden_default?: number
+          requiere_archivo?: boolean
+          se_entrega_a?: string | null
+          subtipo?: string | null
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      plantilla_proyecto_tareas_dependencias: {
+        Row: {
+          created_at: string
+          depende_de_plantilla_tarea_id: string
+          id: string
+          plantilla_tarea_id: string
+        }
+        Insert: {
+          created_at?: string
+          depende_de_plantilla_tarea_id: string
+          id?: string
+          plantilla_tarea_id: string
+        }
+        Update: {
+          created_at?: string
+          depende_de_plantilla_tarea_id?: string
+          id?: string
+          plantilla_tarea_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plantilla_proyecto_tareas_dep_depende_de_plantilla_tarea_i_fkey"
+            columns: ["depende_de_plantilla_tarea_id"]
+            isOneToOne: false
+            referencedRelation: "plantilla_proyecto_tareas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plantilla_proyecto_tareas_dependencias_plantilla_tarea_id_fkey"
+            columns: ["plantilla_tarea_id"]
+            isOneToOne: false
+            referencedRelation: "plantilla_proyecto_tareas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plantilla_tareas: {
         Row: {
           coda_row_id: string | null
@@ -2336,6 +2435,90 @@ export type Database = {
           },
         ]
       }
+      proyecto_presupuesto_partidas: {
+        Row: {
+          autorizado_at: string | null
+          autorizado_por: string | null
+          cantidad: number | null
+          created_at: string
+          deleted_at: string | null
+          descripcion: string | null
+          empresa_id: string
+          estado: string
+          fuente: string | null
+          id: string
+          monto_aprobado: number | null
+          monto_ejercido: number
+          monto_estimado: number | null
+          notas: string | null
+          partida: string
+          proveedor_persona_id: string | null
+          proyecto_id: string
+          tarea_origen_id: string | null
+          unidad: string | null
+          updated_at: string
+        }
+        Insert: {
+          autorizado_at?: string | null
+          autorizado_por?: string | null
+          cantidad?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id: string
+          estado?: string
+          fuente?: string | null
+          id?: string
+          monto_aprobado?: number | null
+          monto_ejercido?: number
+          monto_estimado?: number | null
+          notas?: string | null
+          partida: string
+          proveedor_persona_id?: string | null
+          proyecto_id: string
+          tarea_origen_id?: string | null
+          unidad?: string | null
+          updated_at?: string
+        }
+        Update: {
+          autorizado_at?: string | null
+          autorizado_por?: string | null
+          cantidad?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string
+          estado?: string
+          fuente?: string | null
+          id?: string
+          monto_aprobado?: number | null
+          monto_ejercido?: number
+          monto_estimado?: number | null
+          notas?: string | null
+          partida?: string
+          proveedor_persona_id?: string | null
+          proyecto_id?: string
+          tarea_origen_id?: string | null
+          unidad?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proyecto_presupuesto_partidas_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proyecto_presupuesto_partidas_tarea_origen_id_fkey"
+            columns: ["tarea_origen_id"]
+            isOneToOne: false
+            referencedRelation: "proyecto_tareas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proyecto_prorrateo: {
         Row: {
           created_at: string
@@ -2427,59 +2610,144 @@ export type Database = {
       }
       proyecto_tareas: {
         Row: {
+          aplicacion_snapshot: string | null
           created_at: string
           deleted_at: string | null
           descripcion: string | null
+          duracion_dias_habiles_snapshot: number | null
           empresa_id: string
+          entidad_responsable_snapshot: string | null
           estado: string
           fecha_completada: string | null
           fecha_limite: string | null
+          fecha_objetivo_fin: string | null
+          fecha_objetivo_inicio: string | null
+          formato_archivo_snapshot: string | null
           id: string
+          obligatoriedad_snapshot: string | null
           orden: number
+          plantilla_tarea_id: string | null
           prioridad: string
           proyecto_id: string
+          requiere_archivo_snapshot: boolean | null
           responsable_id: string | null
+          resultado_documento_url: string | null
+          resultado_monto: number | null
+          se_entrega_a_snapshot: string | null
+          subtipo_snapshot: string | null
+          tipo_snapshot: string | null
           titulo: string
           updated_at: string
         }
         Insert: {
+          aplicacion_snapshot?: string | null
           created_at?: string
           deleted_at?: string | null
           descripcion?: string | null
+          duracion_dias_habiles_snapshot?: number | null
           empresa_id: string
+          entidad_responsable_snapshot?: string | null
           estado?: string
           fecha_completada?: string | null
           fecha_limite?: string | null
+          fecha_objetivo_fin?: string | null
+          fecha_objetivo_inicio?: string | null
+          formato_archivo_snapshot?: string | null
           id?: string
+          obligatoriedad_snapshot?: string | null
           orden?: number
+          plantilla_tarea_id?: string | null
           prioridad?: string
           proyecto_id: string
+          requiere_archivo_snapshot?: boolean | null
           responsable_id?: string | null
+          resultado_documento_url?: string | null
+          resultado_monto?: number | null
+          se_entrega_a_snapshot?: string | null
+          subtipo_snapshot?: string | null
+          tipo_snapshot?: string | null
           titulo: string
           updated_at?: string
         }
         Update: {
+          aplicacion_snapshot?: string | null
           created_at?: string
           deleted_at?: string | null
           descripcion?: string | null
+          duracion_dias_habiles_snapshot?: number | null
           empresa_id?: string
+          entidad_responsable_snapshot?: string | null
           estado?: string
           fecha_completada?: string | null
           fecha_limite?: string | null
+          fecha_objetivo_fin?: string | null
+          fecha_objetivo_inicio?: string | null
+          formato_archivo_snapshot?: string | null
           id?: string
+          obligatoriedad_snapshot?: string | null
           orden?: number
+          plantilla_tarea_id?: string | null
           prioridad?: string
           proyecto_id?: string
+          requiere_archivo_snapshot?: boolean | null
           responsable_id?: string | null
+          resultado_documento_url?: string | null
+          resultado_monto?: number | null
+          se_entrega_a_snapshot?: string | null
+          subtipo_snapshot?: string | null
+          tipo_snapshot?: string | null
           titulo?: string
           updated_at?: string
         }
         Relationships: [
           {
+            foreignKeyName: "proyecto_tareas_plantilla_tarea_id_fkey"
+            columns: ["plantilla_tarea_id"]
+            isOneToOne: false
+            referencedRelation: "plantilla_proyecto_tareas"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "proyecto_tareas_proyecto_id_fkey"
             columns: ["proyecto_id"]
             isOneToOne: false
             referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proyecto_tareas_dependencias: {
+        Row: {
+          created_at: string
+          depende_de_tarea_id: string
+          id: string
+          tarea_id: string
+        }
+        Insert: {
+          created_at?: string
+          depende_de_tarea_id: string
+          id?: string
+          tarea_id: string
+        }
+        Update: {
+          created_at?: string
+          depende_de_tarea_id?: string
+          id?: string
+          tarea_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proyecto_tareas_dependencias_depende_de_tarea_id_fkey"
+            columns: ["depende_de_tarea_id"]
+            isOneToOne: false
+            referencedRelation: "proyecto_tareas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proyecto_tareas_dependencias_tarea_id_fkey"
+            columns: ["tarea_id"]
+            isOneToOne: false
+            referencedRelation: "proyecto_tareas"
             referencedColumns: ["id"]
           },
         ]
