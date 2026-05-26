@@ -28,6 +28,12 @@ import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { usePermissions } from '@/components/providers';
 import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
 import { Input } from '@/components/ui/input';
+import {
+  DateRangeFilter,
+  EMPTY_DATE_RANGE,
+  isInDateRange,
+  type DateRange,
+} from '@/components/filters/date-range-filter';
 import { FileText, Plus, RefreshCw, Search } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency } from '@/lib/format';
@@ -107,6 +113,7 @@ export function ContratosModule({ empresaId }: { empresaId: string }) {
   const [search, setSearch] = useState('');
   const [contratistaFiltro, setContratistaFiltro] = useState('');
   const [proyectoFiltro, setProyectoFiltro] = useState('');
+  const [rangoFecha, setRangoFecha] = useState<DateRange>(EMPTY_DATE_RANGE);
 
   const fetchContratos = useCallback(async (): Promise<{
     data?: ContratoRow[];
@@ -238,6 +245,7 @@ export function ContratosModule({ empresaId }: { empresaId: string }) {
     return contratos.filter((c) => {
       if (contratistaFiltro && c.contratistaNombre !== contratistaFiltro) return false;
       if (proyectoFiltro && c.proyectoNombre !== proyectoFiltro) return false;
+      if (!isInDateRange(c.fecha_contrato, rangoFecha)) return false;
       if (q) {
         const hay =
           c.codigo.toLowerCase().includes(q) ||
@@ -247,7 +255,7 @@ export function ContratosModule({ empresaId }: { empresaId: string }) {
       }
       return true;
     });
-  }, [contratos, search, contratistaFiltro, proyectoFiltro]);
+  }, [contratos, search, contratistaFiltro, proyectoFiltro, rangoFecha]);
 
   const kpis = useMemo(() => deriveKpis(filtrados), [filtrados]);
 
@@ -341,6 +349,12 @@ export function ContratosModule({ empresaId }: { empresaId: string }) {
             </option>
           ))}
         </select>
+        <DateRangeFilter
+          label="Fecha"
+          ariaPrefix="Fecha contrato"
+          value={rangoFecha}
+          onChange={setRangoFecha}
+        />
         <button
           type="button"
           onClick={() => void cargar()}

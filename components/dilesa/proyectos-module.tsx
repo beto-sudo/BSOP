@@ -14,6 +14,12 @@ import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import {
+  DateRangeFilter,
+  EMPTY_DATE_RANGE,
+  isInDateRange,
+  type DateRange,
+} from '@/components/filters/date-range-filter';
 import { Landmark, RefreshCw, Search } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency, formatNumber } from '@/lib/format';
@@ -84,6 +90,7 @@ export function ProyectosModule({ empresaId }: { empresaId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState<string>('');
+  const [rangoInicio, setRangoInicio] = useState<DateRange>(EMPTY_DATE_RANGE);
   const [selected, setSelected] = useState<ProyectoDetalle | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -137,10 +144,11 @@ export function ProyectosModule({ empresaId }: { empresaId: string }) {
     const q = search.trim().toLowerCase();
     return proyectos.filter((p) => {
       if (tipoFiltro && p.tipo !== tipoFiltro) return false;
+      if (!isInDateRange(p.fecha_inicio, rangoInicio)) return false;
       if (q && !p.nombre.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [proyectos, search, tipoFiltro]);
+  }, [proyectos, search, tipoFiltro, rangoInicio]);
 
   const kpis = useMemo(() => deriveKpis(filtrados), [filtrados]);
 
@@ -216,6 +224,12 @@ export function ProyectosModule({ empresaId }: { empresaId: string }) {
             </option>
           ))}
         </select>
+        <DateRangeFilter
+          label="Inicio"
+          ariaPrefix="Fecha inicio"
+          value={rangoInicio}
+          onChange={setRangoInicio}
+        />
         <button
           type="button"
           onClick={() => void cargar()}

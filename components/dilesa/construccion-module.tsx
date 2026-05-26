@@ -31,6 +31,12 @@ import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/compon
 import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import {
+  DateRangeFilter,
+  EMPTY_DATE_RANGE,
+  isInDateRange,
+  type DateRange,
+} from '@/components/filters/date-range-filter';
 import { HardHat, Plus, RefreshCw, Search } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatPercent } from '@/lib/format';
@@ -161,6 +167,7 @@ export function ConstruccionModule({ empresaId }: { empresaId: string }) {
   const [avanceFiltro, setAvanceFiltro] = useState<'' | 'lt20' | '20a66' | 'gte66' | 'completa'>(
     ''
   );
+  const [rangoArranque, setRangoArranque] = useState<DateRange>(EMPTY_DATE_RANGE);
 
   const fetchObras = useCallback(async (): Promise<{
     data?: ConstruccionListaRow[];
@@ -318,6 +325,7 @@ export function ConstruccionModule({ empresaId }: { empresaId: string }) {
       if (avanceFiltro === '20a66' && (o.avance_pct < 20 || o.avance_pct >= 66)) return false;
       if (avanceFiltro === 'gte66' && o.avance_pct < 66) return false;
       if (avanceFiltro === 'completa' && o.avance_pct < 100) return false;
+      if (!isInDateRange(o.fecha_arranque, rangoArranque)) return false;
       if (q) {
         const hay =
           o.identificadorCompleto.toLowerCase().includes(q) ||
@@ -327,7 +335,7 @@ export function ConstruccionModule({ empresaId }: { empresaId: string }) {
       }
       return true;
     });
-  }, [obras, search, proyectoFiltro, contratistaFiltro, estadoFiltro, avanceFiltro]);
+  }, [obras, search, proyectoFiltro, contratistaFiltro, estadoFiltro, avanceFiltro, rangoArranque]);
 
   const kpis = useMemo(() => deriveKpis(filtrados), [filtrados]);
 
@@ -463,6 +471,12 @@ export function ConstruccionModule({ empresaId }: { empresaId: string }) {
           <option value="gte66">≥ 66%</option>
           <option value="completa">100% completada</option>
         </select>
+        <DateRangeFilter
+          label="Arranque"
+          ariaPrefix="Fecha arranque"
+          value={rangoArranque}
+          onChange={setRangoArranque}
+        />
         <button
           type="button"
           onClick={() => void cargar()}

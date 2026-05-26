@@ -17,6 +17,12 @@ import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/compon
 import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import {
+  DateRangeFilter,
+  EMPTY_DATE_RANGE,
+  isInDateRange,
+  type DateRange,
+} from '@/components/filters/date-range-filter';
 import { Plus, Receipt, RefreshCw, Search } from 'lucide-react';
 import Link from 'next/link';
 import { usePermissions } from '@/components/providers';
@@ -132,6 +138,7 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
   const [search, setSearch] = useState('');
   const [proyectoFiltro, setProyectoFiltro] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState('');
+  const [rangoEscritura, setRangoEscritura] = useState<DateRange>(EMPTY_DATE_RANGE);
 
   // `faseFiltro` se deriva del query param (single source of truth: el URL).
   // Deep-link desde tab Fases (`/dilesa/ventas?fase=<nombre>`) pre-selecciona
@@ -300,10 +307,11 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
       if (proyectoFiltro && v.proyectoNombre !== proyectoFiltro) return false;
       if (faseFiltro && v.fase_actual !== faseFiltro) return false;
       if (estadoFiltro && v.estado !== estadoFiltro) return false;
+      if (!isInDateRange(v.fecha_escritura, rangoEscritura)) return false;
       if (q && !v.cliente.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [ventas, search, proyectoFiltro, faseFiltro, estadoFiltro]);
+  }, [ventas, search, proyectoFiltro, faseFiltro, estadoFiltro, rangoEscritura]);
 
   const kpis = useMemo(() => deriveKpis(filtrados), [filtrados]);
 
@@ -408,6 +416,12 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
           <option value="activa">Activa</option>
           <option value="desasignada">Desasignada</option>
         </select>
+        <DateRangeFilter
+          label="Escritura"
+          ariaPrefix="Fecha escritura"
+          value={rangoEscritura}
+          onChange={setRangoEscritura}
+        />
         <button
           type="button"
           onClick={() => void cargar()}
