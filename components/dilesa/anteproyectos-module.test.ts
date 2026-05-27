@@ -25,6 +25,10 @@ function ap(overrides: Partial<ProyectoDetalle>): ProyectoDetalle {
     costo_construccion: null,
     costo_comercializacion: null,
     notas: null,
+    plano_oficial_url: null,
+    image_url: null,
+    acreditacion_escritura: null,
+    objetivo_trimestral: null,
     ...overrides,
   };
 }
