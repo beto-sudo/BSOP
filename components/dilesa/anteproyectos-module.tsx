@@ -26,8 +26,9 @@ import {
 import { ClipboardList, RefreshCw, Search } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency, formatNumber } from '@/lib/format';
-import { AnteproyectoDetailDrawer, deriveAnalisis } from './anteproyecto-detail-drawer';
-import { type ProyectoDetalle, ESTADO_TONE, ESTADO_LABEL } from './proyecto-detail-drawer';
+import { useRouter } from 'next/navigation';
+import { deriveAnalisis } from './anteproyecto-detalle';
+import { type ProyectoDetalle, ESTADO_TONE, ESTADO_LABEL } from './proyecto-detalle';
 
 /** Estados que cuentan como "activos" (en pipeline de evaluación). */
 const ESTADOS_ACTIVOS = new Set(['propuesta', 'analisis', 'aprobado']);
@@ -83,8 +84,7 @@ export function AnteproyectosModule({ empresaId }: { empresaId: string }) {
   const [search, setSearch] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState<string>('');
   const [rangoInicio, setRangoInicio] = useState<DateRange>(EMPTY_DATE_RANGE);
-  const [selected, setSelected] = useState<ProyectoDetalle | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const router = useRouter();
 
   const fetchAnteproyectos = useCallback(
     () =>
@@ -274,20 +274,11 @@ export function AnteproyectosModule({ empresaId }: { empresaId: string }) {
         loading={loading}
         error={error}
         onRetry={() => void cargar()}
-        onRowClick={(p) => {
-          setSelected(p);
-          setDrawerOpen(true);
-        }}
+        onRowClick={(p) => router.push(`/dilesa/proyectos/anteproyectos/${p.id}`)}
         initialSort={{ key: 'nombre', dir: 'asc' }}
         emptyTitle="Sin anteproyectos"
         emptyDescription="Aún no hay anteproyectos en evaluación. Cuando se promuevan a desarrollos cambiarán de tab."
         emptyIcon={<ClipboardList className="h-6 w-6" />}
-      />
-
-      <AnteproyectoDetailDrawer
-        anteproyecto={selected}
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
       />
     </div>
   );

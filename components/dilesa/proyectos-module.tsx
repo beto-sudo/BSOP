@@ -23,13 +23,8 @@ import {
 import { Landmark, RefreshCw, Search } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency, formatNumber } from '@/lib/format';
-import {
-  ProyectoDetailDrawer,
-  type ProyectoDetalle,
-  TIPO_LABEL,
-  ESTADO_TONE,
-  ESTADO_LABEL,
-} from './proyecto-detail-drawer';
+import { useRouter } from 'next/navigation';
+import { type ProyectoDetalle, TIPO_LABEL, ESTADO_TONE, ESTADO_LABEL } from './proyecto-detalle';
 
 /**
  * KPIs reactivos a filtros — ADR-034.
@@ -109,8 +104,7 @@ export function ProyectosModule({
   const [search, setSearch] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState<string>('');
   const [rangoInicio, setRangoInicio] = useState<DateRange>(EMPTY_DATE_RANGE);
-  const [selected, setSelected] = useState<ProyectoDetalle | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const router = useRouter();
 
   const fetchProyectos = useCallback(() => {
     let q = createSupabaseBrowserClient()
@@ -305,17 +299,12 @@ export function ProyectosModule({
         loading={loading}
         error={error}
         onRetry={() => void cargar()}
-        onRowClick={(p) => {
-          setSelected(p);
-          setDrawerOpen(true);
-        }}
+        onRowClick={(p) => router.push(`/dilesa/proyectos/${p.id}`)}
         initialSort={{ key: 'nombre', dir: 'asc' }}
         emptyTitle="Sin proyectos"
         emptyDescription="Aún no hay proyectos. Se llenará al importar los datos de Coda."
         emptyIcon={<Landmark className="h-6 w-6" />}
       />
-
-      <ProyectoDetailDrawer proyecto={selected} open={drawerOpen} onOpenChange={setDrawerOpen} />
     </div>
   );
 }
