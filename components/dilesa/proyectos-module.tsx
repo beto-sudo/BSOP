@@ -24,7 +24,27 @@ import { Landmark, RefreshCw, Search } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency, formatNumber } from '@/lib/format';
 import { useRouter } from 'next/navigation';
-import { type ProyectoDetalle, TIPO_LABEL, ESTADO_TONE, ESTADO_LABEL } from './proyecto-detalle';
+import {
+  type ProyectoDetalle,
+  type ProyectoAvances,
+  TIPO_LABEL,
+  ESTADO_TONE,
+  ESTADO_LABEL,
+} from './proyecto-detalle';
+
+/**
+ * Subset de `dilesa.v_proyecto_avances` que pinta la tabla principal.
+ * El detalle consume el set completo (`ProyectoAvances`); aquí solo los
+ * campos que se muestran como columna o entran en KPIs.
+ */
+type ProyectoAvancesRow = Pick<
+  ProyectoAvances,
+  'avance_urb_pct' | 'avance_const_pct' | 'avance_vts_pct' | 'ventas_totales' | 'parque_disponible'
+>;
+
+export type ProyectoListRow = ProyectoDetalle & {
+  avances: ProyectoAvancesRow | null;
+};
 
 /**
  * KPIs reactivos a filtros — ADR-034.
@@ -46,7 +66,7 @@ import { type ProyectoDetalle, TIPO_LABEL, ESTADO_TONE, ESTADO_LABEL } from './p
  * 4. Lotes proyectados — `SUM(lotes_proyectados)` (inventario futuro).
  * 5. Área vendible — `SUM(area_vendible_m2)` en m² o ha.
  */
-export function deriveKpis(rows: readonly ProyectoDetalle[]): readonly ModuleKpi[] {
+export function deriveKpis(rows: readonly ProyectoListRow[]): readonly ModuleKpi[] {
   const total = rows.length;
   const enEjecucion = rows.filter((p) => p.estado === 'ejecutando').length;
   const presupuesto = rows.reduce((acc, p) => acc + (p.presupuesto_estimado ?? 0), 0);
@@ -81,6 +101,11 @@ export function deriveKpis(rows: readonly ProyectoDetalle[]): readonly ModuleKpi
 
 const EMPTY_TIPOS: readonly string[] = [];
 
+function renderPct(pct: number | null | undefined) {
+  if (pct == null) return <span className="text-[var(--text)]/30">—</span>;
+  return <span className="tabular-nums">{pct.toFixed(0)}%</span>;
+}
+
 /**
  * Props del módulo.
  *
@@ -98,7 +123,7 @@ export function ProyectosModule({
   empresaId: string;
   excluirTipos?: readonly string[];
 }) {
-  const [proyectos, setProyectos] = useState<ProyectoDetalle[]>([]);
+  const [proyectos, setProyectos] = useState<ProyectoListRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -106,8 +131,20 @@ export function ProyectosModule({
   const [rangoInicio, setRangoInicio] = useState<DateRange>(EMPTY_DATE_RANGE);
   const router = useRouter();
 
-  const fetchProyectos = useCallback(() => {
-    let q = createSupabaseBrowserClient()
+  /**
+   * Carga `dilesa.proyectos` + `dilesa.v_proyecto_avances` en paralelo
+   * y mergea por `proyecto_id`. La vista expone los avances derivados
+   * (urb/const/vts %, ventas totales, parque disponible) que reemplazan
+   * las 46 fórmulas de la tabla Coda `*Proyectos`. Si la vista falla,
+   * los avances quedan en `null` por fila — la tabla degrada bien con
+   * `—`.
+   */
+  const fetchProyectos = useCallback(async (): Promise<{
+    data: ProyectoListRow[];
+    error: unknown;
+  }> => {
+    const sb = createSupabaseBrowserClient();
+    let q = sb
       .schema('dilesa')
       .from('proyectos')
       .select(
@@ -120,7 +157,32 @@ export function ProyectosModule({
       // sin comillas porque `tipo` es text sin caracteres especiales.
       q = q.not('tipo', 'in', `(${excluirTipos.join(',')})`);
     }
-    return q.order('nombre');
+    const [{ data: pData, error: pErr }, { data: aData }] = await Promise.all([
+      q.order('nombre'),
+      sb
+        .schema('dilesa')
+        .from('v_proyecto_avances')
+        .select(
+          'proyecto_id, avance_urb_pct, avance_const_pct, avance_vts_pct, ventas_totales, parque_disponible'
+        )
+        .eq('empresa_id', empresaId),
+    ]);
+    if (pErr) return { data: [], error: pErr };
+    const avancesById = new Map<string, ProyectoAvancesRow>();
+    for (const a of (aData ?? []) as Array<{ proyecto_id: string } & ProyectoAvancesRow>) {
+      avancesById.set(a.proyecto_id, {
+        avance_urb_pct: a.avance_urb_pct,
+        avance_const_pct: a.avance_const_pct,
+        avance_vts_pct: a.avance_vts_pct,
+        ventas_totales: a.ventas_totales,
+        parque_disponible: a.parque_disponible,
+      });
+    }
+    const merged: ProyectoListRow[] = ((pData ?? []) as ProyectoDetalle[]).map((p) => ({
+      ...p,
+      avances: avancesById.get(p.id) ?? null,
+    }));
+    return { data: merged, error: null };
   }, [empresaId, excluirTipos]);
 
   const cargar = useCallback(async () => {
@@ -131,7 +193,7 @@ export function ProyectosModule({
       setError(getSupabaseErrorMessage(err, 'No se pudieron cargar los proyectos.'));
       setProyectos([]);
     } else {
-      setProyectos((data ?? []) as ProyectoDetalle[]);
+      setProyectos(data);
     }
     setLoading(false);
   }, [fetchProyectos]);
@@ -146,7 +208,7 @@ export function ProyectosModule({
         setError(getSupabaseErrorMessage(err, 'No se pudieron cargar los proyectos.'));
         setProyectos([]);
       } else {
-        setProyectos((data ?? []) as ProyectoDetalle[]);
+        setProyectos(data);
       }
       setLoading(false);
     });
@@ -167,7 +229,7 @@ export function ProyectosModule({
 
   const kpis = useMemo(() => deriveKpis(filtrados), [filtrados]);
 
-  const columns: Column<ProyectoDetalle>[] = [
+  const columns: Column<ProyectoListRow>[] = [
     { key: 'nombre', label: 'Nombre', type: 'text', sticky: true, width: 'min-w-[220px]' },
     {
       key: 'clave_interna',
@@ -214,6 +276,62 @@ export function ProyectosModule({
       label: 'Lotes',
       type: 'number',
       render: (p) => (p.lotes_proyectados != null ? String(p.lotes_proyectados) : '—'),
+    },
+    {
+      key: 'avance_urb_pct',
+      label: 'Urb. %',
+      type: 'custom',
+      accessor: (p) => p.avances?.avance_urb_pct ?? null,
+      render: (p) => renderPct(p.avances?.avance_urb_pct),
+    },
+    {
+      key: 'avance_const_pct',
+      label: 'Const. %',
+      type: 'custom',
+      accessor: (p) => p.avances?.avance_const_pct ?? null,
+      render: (p) => renderPct(p.avances?.avance_const_pct),
+    },
+    {
+      key: 'avance_vts_pct',
+      label: 'Vts. %',
+      type: 'custom',
+      accessor: (p) => p.avances?.avance_vts_pct ?? null,
+      render: (p) => renderPct(p.avances?.avance_vts_pct),
+    },
+    {
+      key: 'parque_disponible',
+      label: 'Parque',
+      type: 'custom',
+      accessor: (p) => p.avances?.parque_disponible ?? null,
+      render: (p) =>
+        p.avances?.parque_disponible != null ? (
+          String(p.avances.parque_disponible)
+        ) : (
+          <span className="text-[var(--text)]/30">—</span>
+        ),
+    },
+    {
+      key: 'ventas_totales',
+      label: 'Ventas',
+      type: 'custom',
+      accessor: (p) => p.avances?.ventas_totales ?? null,
+      render: (p) =>
+        p.avances?.ventas_totales != null && p.avances.ventas_totales > 0 ? (
+          formatCurrency(p.avances.ventas_totales, { compact: true })
+        ) : (
+          <span className="text-[var(--text)]/30">—</span>
+        ),
+    },
+    {
+      key: 'objetivo_trimestral',
+      label: 'Obj. trim.',
+      type: 'number',
+      render: (p) =>
+        p.objetivo_trimestral != null ? (
+          String(p.objetivo_trimestral)
+        ) : (
+          <span className="text-[var(--text)]/30">—</span>
+        ),
     },
     {
       key: 'area_vendible_m2',

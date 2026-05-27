@@ -2,12 +2,11 @@
 
 **Slug:** `dilesa-proyectos-paridad-coda`
 **Empresas:** DILESA
-**Schemas afectados:** `dilesa.proyectos` (4 columnas nuevas + UPDATE de 3 estados), `dilesa.v_proyecto_avances` (vista nueva derivando avances de `unidades` + `construccion` + `ventas`)
-**Estado:** done
+**Schemas afectados:** `dilesa.proyectos` (4 columnas en Sprint A + ~6 más pendientes en Sprint C), `dilesa.v_proyecto_avances` (vista derivando avances de `unidades`; Sprint C amplía agregados)
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-26
-**Cerrada:** 2026-05-26
-**Última actualización:** 2026-05-26 (Sprint A mergeado. Migración + UPDATE estados + vista de avances + UI con 2 secciones nuevas + server action. Sprint B opcional se difiere a iniciativa nueva si Beto la pide.)
+**Última actualización:** 2026-05-27 (Sprint B mergeado/PR abierto — tabla principal pinta los avances + objetivo trimestral del detalle. Spike Sprint C abre catálogo de ~15 columnas Coda faltantes por categoría para que Beto decida alcance v2.)
 
 ## Problema
 
@@ -169,16 +168,101 @@ WHERE p.deleted_at IS NULL;
 5. Tests unitarios para la lógica de "estado sugerido vs actual".
 6. 1 PR.
 
-### Sprint B (opcional) — Automatización
+### Sprint B — Exponer Avances en tabla principal (2026-05-27, este PR)
 
-- Trigger SQL `AFTER UPDATE` en `dilesa.unidades` que, cuando el
-  cambio de estado mueve el agregado del proyecto al rango
-  "completado" según la vista, dispare un update a
-  `dilesa.proyectos.estado='completado'`. Variante: cron diario
-  que reconcilia vs `v_proyecto_avances`.
-- Decisión al cierre del Sprint A: si Beto quiere el sync automático
-  o prefiere control manual (botón "Aplicar estado sugerido" en el
-  drawer).
+`<ProyectosModule>` (tabla `/dilesa/proyectos`) heredaba el set viejo
+de 14 columnas (`nombre/clave/tipo/estado/fechas/lotes/área/4 costos`).
+Beto observó que los bloques nuevos del Sprint A (avances %, ventas
+totales, objetivo trimestral) viven solo en el detalle — al recorrer
+el portafolio no se ven.
+
+Cambios:
+
+- `ProyectosModule` fetchea `dilesa.proyectos` + `v_proyecto_avances`
+  en paralelo (`Promise.all` con dos queries del mismo client) y
+  mergea por `proyecto_id` in-memory. Si la vista falla (RLS,
+  PostgREST), los avances quedan `null` y la tabla degrada con `—`.
+- Tipo nuevo `ProyectoListRow = ProyectoDetalle & { avances: Pick<…> | null }`
+  exportado para el test.
+- 5 columnas nuevas: **Urb. %**, **Const. %**, **Vts. %**,
+  **Parque** (disponible), **Ventas** (totales, compact MXN),
+  **Obj. trim.** Total tabla: 14 → 19 columnas (página
+  desktop-only ya, scroll horizontal aceptable per ADR-019/ADR-010).
+- KPIs intactos (cap 5 ADR-034 — sin sustituciones); este PR no
+  reordena la curaduría D13.
+- Sort robust con `null` (TanStack lo manda al fondo natural). No
+  introducimos sentinel `-1` para no confundir con avance real 0%.
+
+Sin DDL. Cero migración. Tests `deriveKpis` actualizados al nuevo
+tipo `ProyectoListRow` (helper `p()` suma `avances: null`); los 10
+tests pasan sin cambio funcional.
+
+### Sprint C (spike abierto) — Paridad real con Coda · ~15 columnas faltantes
+
+Comparativa fresca 2026-05-27 vs `grid-SlvkPAfZNE` (60 columnas Coda
+× 8 proyectos): de las 60, 16 hoy están en `dilesa.proyectos` o en
+`v_proyecto_avances`. Quedan ~30 derivadas que no migramos
+(intencional Sprint A) y ~15 capturables/derivables que sí podrían
+agregar valor en BSOP. Catalogación a continuación; **Beto decide qué
+entra y qué se difiere** antes de tocar schema.
+
+#### (a) Derivables expandiendo `v_proyecto_avances` — cero ALTER
+
+Cómputos sobre `dilesa.unidades` y/o `dilesa.ventas`:
+
+| Coda                              | Cómputo propuesto                                                                | Notas                                                                                         |
+| --------------------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Casas Vendidas                    | `COUNT(*) FILTER (estado='vendida')`                                             | Distinto de `escriturada`/`entregada`.                                                        |
+| Casas Muestra/Demo                | `COUNT(*) FILTER (tipo_lote='muestra')` ó flag dedicado                          | Verificar si hoy hay convención. Si no, agregar enum o flag.                                  |
+| Inventario Disponible Terminado   | `COUNT(*) FILTER (estado='terminada')` sin asignar                               | Hoy `casas_terminadas` ya está; falta el filtro "sin asignar".                                |
+| Inventario Formalizado            | `COUNT(*) FILTER (estado IN ('vendida','escriturada','entregada'))`              | Definir si "formalizado" = vendida en adelante o solo escriturada+entregada.                  |
+| Inventario Disponible para Venta  | `COUNT(*) FILTER (estado='terminada' AND no_asignada)`                           | Subconjunto del anterior.                                                                     |
+| En Proceso de Escrituración       | Ya en vista (`casas_escrituradas`) ó estado intermedio "vendida sin escriturar". | Reconciliar definición operativa.                                                             |
+| Lotes Comerciales / Residenciales | `COUNT(*) FILTER (tipo_lote='comercial')` / `'residencial'`                      | `unidades.tipo_lote` ya existe.                                                               |
+| Tamaño Lote Promedio              | `AVG(area_m2)` en `unidades`                                                     | Trivial.                                                                                      |
+| Densidad de Vivienda              | `lotes_residenciales / (area_residencial_m2 / 10000)`                            | Requiere `area_residencial_m2` capturado (ver categoría b).                                   |
+| Parque Disponible Inicial/Final   | `parque_disponible` con corte temporal                                           | Necesita parámetro fecha o usar trimestre actual. Replantear como vista parametrizable o RPC. |
+| Escrituración del periodo         | `COUNT(*) FILTER (escriturado_at BETWEEN inicio_trim AND fin_trim)`              | Requiere `unidades.escriturado_at` (campo a verificar; si no existe va a (b)).                |
+| Cumplimiento %                    | `escrituracion_periodo / objetivo_trimestral`                                    | Calculable una vez tengamos "escrituración del periodo".                                      |
+| En Proceso Por Detonar ($)        | Pendiente investigación                                                          | "Detonar" suena a comisión/incentivo o a próximo desembolso. Beto define.                     |
+
+#### (b) ALTER simple en `dilesa.proyectos` — captura nueva
+
+Campos que no se derivan; el operador los registra como parte del
+proyecto. Todos columna escalar; idempotente con
+`ADD COLUMN IF NOT EXISTS`.
+
+| Coda                                       | Columna propuesta            | Tipo                                                                 |
+| ------------------------------------------ | ---------------------------- | -------------------------------------------------------------------- |
+| Clasificación Inmobiliaria                 | `clasificacion_inmobiliaria` | `text` (enum suave) — "Interés Social", "Medio", "Residencial", etc. |
+| Área Comercial m²                          | `area_comercial_m2`          | `numeric`                                                            |
+| Área Residencial m²                        | `area_residencial_m2`        | `numeric`                                                            |
+| Área Vialidades · Banquetas · Equipamiento | `area_vialidades_m2`         | `numeric`                                                            |
+| Precio M² Excedente                        | `precio_m2_excedente`        | `numeric` (MXN)                                                      |
+| Costo de MO                                | `costo_mo`                   | `numeric` (MXN)                                                      |
+
+#### (c) Requieren tabla relacionada o aclaración con Beto
+
+| Coda                                  | Pregunta abierta                                                                                                                                                                                                                   |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bitácora de Obra                      | En Coda es lookup → tabla aparte. ¿Qué guarda? ¿Es la misma que el módulo Construcción de BSOP, o algo distinto?                                                                                                                   |
+| Archivos ZCU                          | "ZCU" = ¿Zonificación / Certificación de Uso? Acrónimo no estándar. ¿Mapeo a `proyecto_documentos` con `tipo='zcu'`?                                                                                                               |
+| Control de Documentos                 | Lista de checklist (Coda guarda texto con múltiples docs separados por coma). Probable mover a `proyecto_documentos` ya existente, marcando el checklist canónico por proyecto. Pregunta: ¿hay una lista maestra o varía por tipo? |
+| Pendiente Pago Seguro                 | Coda lo marca como number. ¿Es contador de unidades sin pago de seguro entregado, o monto $?                                                                                                                                       |
+| Terminadas sin DTU / Con DTU sin Ext. | "DTU" = ¿Documento de Terminación de Urbanización? Confirmar significado y dónde se captura.                                                                                                                                       |
+
+#### Recomendación de Sprint C v1 (propuesta)
+
+- **Incluir**: las 6 columnas de la categoría (b) — ALTER puro, bajo
+  riesgo, queman cero comprensión nueva — y las 7 derivaciones más
+  obvias de la categoría (a) que NO requieren columnas nuevas
+  (vendidas/muestra/formalizado/disponible-venta/lotes-com-res/lote-promedio).
+- **Diferir** a un Sprint D si Beto lo pide: parque inicial/final +
+  escrituración del periodo + cumplimiento (requieren modelo
+  temporal o RPC); categoría (c) entera (acrónimos + bitácora).
+- **Backfill** desde Coda usando el importer existente
+  (`scripts/import_dilesa_proyectos.ts`) — extender mapeo, correr
+  con `DRY_RUN=1` antes de live.
 
 ## Riesgos
 
@@ -196,6 +280,23 @@ WHERE p.deleted_at IS NULL;
    unidad, no de proyecto.
 
 ## Bitácora
+
+- **2026-05-27 (Sprint B + spike C)** — Beto observó al revisar el
+  portafolio que los avances + objetivo trimestral del Sprint A solo
+  vivían en el detalle del proyecto, no en la tabla principal.
+  Sprint B (este PR) extiende `<ProyectosModule>` con fetch en
+  paralelo a `v_proyecto_avances` + 5 columnas (Urb./Const./Vts. %,
+  Parque disponible, Ventas totales, Objetivo trim.). 14 → 19
+  columnas. Tipo `ProyectoListRow` exportado. Cero DDL. 10 tests
+  `deriveKpis` updateados al nuevo tipo. Estado iniciativa
+  re-abierto a `in_progress` por extensión natural del alcance: el
+  closeout de Sprint A había declarado "Sprint B opcional difiere"
+  pero ese B era de automatización (trigger); este B es de UI tabla
+  y prepara terreno para Sprint C de paridad real con Coda. Spike C
+  cataloga ~15 columnas no-migradas en 3 categorías (derivable
+  expandiendo view / ALTER simple / requiere aclaración con Beto)
+  con recomendación de incluir 6 ALTER + 7 derivaciones triviales en
+  v1 y diferir el resto.
 
 - **2026-05-26 (revert + regla estricta)** — Beto pidió cambiar la
   regla: "aunque quede una vivienda por vender hay que marcarlo como
@@ -225,6 +326,15 @@ WHERE p.deleted_at IS NULL;
   la pide se abre iniciativa nueva. Iniciativa cierra en `done`.
 
 ## Decisiones registradas
+
+- **2026-05-27 — Reapertura de la iniciativa**. El cierre 2026-05-26
+  enmarcó al Sprint A como entrega final del alcance v1 y dejó
+  "Sprint B automatización" como opcional. Beto pidió 2 trabajos
+  nuevos: (1) exponer en la tabla principal los avances que ya
+  expone el detalle (Sprint B nuevo, este PR); (2) paridad real con
+  Coda (~15 columnas faltantes — Sprint C, spike). El alcance Sprint
+  A original se mantiene en producción; los nuevos sprints
+  extienden, no reabren decisiones tomadas.
 
 - **2026-05-26 — Regla de transición `ejecutando → completado`
   ESTRICTA**: `construidas = total AND vendidas = total`. Sin
