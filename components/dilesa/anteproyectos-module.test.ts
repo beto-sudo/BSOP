@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { deriveKpis } from './anteproyectos-module';
-import { deriveAnalisis, gateComitePromocion } from './anteproyecto-detail-drawer';
-import type { ProyectoDetalle } from './proyecto-detail-drawer';
+import { deriveAnalisis, gateComitePromocion } from './anteproyecto-detalle';
+import type { ProyectoDetalle } from './proyecto-detalle';
 
 function ap(overrides: Partial<ProyectoDetalle>): ProyectoDetalle {
   return {

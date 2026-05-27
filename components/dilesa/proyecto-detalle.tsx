@@ -1,22 +1,27 @@
 'use client';
 
 /**
- * ProyectoDetailDrawer — detalle de un proyecto DILESA con su tabla de
- * unidades.
+ * ProyectoDetalle — detalle de un proyecto DILESA con su tabla de
+ * unidades, montado como **página completa** (no drawer).
  *
- * Iniciativa dilesa-portafolio-activos · Sprint 4 (detalle de lectura).
- * Se abre al hacer click en una fila de `ProyectosModule`. Muestra la ficha
- * del proyecto (alcance + costos) y la lista de sus `dilesa.unidades`
- * (lotes/casas importados de Coda), filtrable por estado y tipo de lote.
+ * Iniciativa `dilesa-drawers-a-paginas` Sprint 1: convertimos los
+ * side drawers DILESA en páginas. Este archivo era originalmente
+ * `proyecto-detail-drawer.tsx` con `<ProyectoDetailDrawer>` wrappeado
+ * en `<DetailDrawer size="xl">`. Ahora exporta `<ProyectoDetalle>`
+ * que se monta directo en `app/dilesa/proyectos/[id]/page.tsx` con
+ * layout scroll-largo (decisión 3 de Beto).
  *
- * Lectura pura — la captura/edición es entregable posterior.
+ * Conserva: types `ProyectoDetalle` y `ProyectoAvances`, labels
+ * `TIPO_LABEL`/`ESTADO_TONE`/`ESTADO_LABEL`, helpers de fetch +
+ * estado + edición inline + sección Avances + sección Documentos y
+ * configuración (Sprint A de `dilesa-proyectos-paridad-coda`).
  */
 
 import { useMemo, useState, useEffect, useTransition } from 'react';
 import { updateProyectoFields } from '@/app/dilesa/proyectos/actions';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { DataTable, type Column } from '@/components/module-page';
-import { DetailDrawer, DetailDrawerContent, DetailDrawerSection } from '@/components/detail-page';
+import { DetailDrawerSection } from '@/components/detail-page';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -205,15 +210,7 @@ const unidadColumns: Column<Unidad>[] = [
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 
-export function ProyectoDetailDrawer({
-  proyecto,
-  open,
-  onOpenChange,
-}: {
-  proyecto: ProyectoDetalle | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
+export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null }) {
   const [unidades, setUnidades] = useState<Unidad[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loadedId, setLoadedId] = useState<string | null>(null);
@@ -231,10 +228,10 @@ export function ProyectoDetailDrawer({
   const [editError, setEditError] = useState<string | null>(null);
   const [editSaved, setEditSaved] = useState(false);
 
-  // Carga las unidades del proyecto al abrir el drawer. Los setState van solo
-  // dentro del `.then` (no síncronos dentro del effect).
+  // Carga las unidades del proyecto al montar / cambiar de proyecto.
+  // Los setState van solo dentro del `.then` (no síncronos dentro del effect).
   useEffect(() => {
-    if (!open || !proyecto) return;
+    if (!proyecto) return;
     let activo = true;
     const supabase = createSupabaseBrowserClient();
     void supabase
@@ -303,7 +300,7 @@ export function ProyectoDetailDrawer({
     return () => {
       activo = false;
     };
-  }, [open, proyecto]);
+  }, [proyecto]);
 
   const handleSaveFields = () => {
     if (!proyecto) return;
@@ -326,7 +323,7 @@ export function ProyectoDetailDrawer({
     });
   };
 
-  const loading = open && proyecto != null && loadedId !== proyecto.id;
+  const loading = proyecto != null && loadedId !== proyecto.id;
 
   const tiposPresentes = useMemo(
     () => Array.from(new Set(unidades.map((u) => u.tipo_lote).filter(Boolean))).sort() as string[],
@@ -373,194 +370,190 @@ export function ProyectoDetailDrawer({
     .map(([label, value]) => ({ label, value }));
 
   return (
-    <DetailDrawer
-      open={open}
-      onOpenChange={onOpenChange}
-      size="xl"
-      title={proyecto.nombre}
-      meta={
-        <>
+    <div className="space-y-6 p-4 sm:p-6">
+      <header className="space-y-2">
+        <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)]">
+          {proyecto.nombre}
+        </h1>
+        <div className="flex flex-wrap items-center gap-2">
           <Badge tone="neutral">{TIPO_LABEL[proyecto.tipo] ?? proyecto.tipo}</Badge>
           <Badge tone={ESTADO_TONE[proyecto.estado] ?? 'neutral'}>
             {ESTADO_LABEL[proyecto.estado] ?? proyecto.estado}
           </Badge>
-        </>
-      }
-    >
-      <DetailDrawerContent>
-        {proyecto.proyecto_predecesor_id && (
-          <DetailDrawerSection title="Origen" divider={false}>
-            <p className="text-sm text-[var(--text)]">
-              Este desarrollo vino del anteproyecto{' '}
-              <strong>{predecesorNombre ?? 'cargando…'}</strong>. El anteproyecto se preserva como
-              histórico de viabilidad.
-            </p>
-          </DetailDrawerSection>
-        )}
+        </div>
+      </header>
 
-        <DetailDrawerSection
-          title="Datos del proyecto"
-          divider={proyecto.proyecto_predecesor_id != null}
-        >
-          {ficha.length > 0 ? (
-            <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-              {ficha.map((r) => (
-                <div key={r.label}>
-                  <dt className="text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
-                    {r.label}
-                  </dt>
-                  <dd className="mt-0.5 text-sm text-[var(--text)]">{r.value}</dd>
-                </div>
-              ))}
-            </dl>
-          ) : (
-            <p className="text-sm text-[var(--text)]/60">
-              Sin datos de alcance ni costos capturados.
-            </p>
-          )}
-          {proyecto.notas ? (
-            <div className="mt-4">
-              <div className="text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
-                Notas
-              </div>
-              <p className="mt-0.5 whitespace-pre-line text-sm text-[var(--text)]/80">
-                {proyecto.notas}
-              </p>
-            </div>
-          ) : null}
+      {proyecto.proyecto_predecesor_id && (
+        <DetailDrawerSection title="Origen" divider={false}>
+          <p className="text-sm text-[var(--text)]">
+            Este desarrollo vino del anteproyecto <strong>{predecesorNombre ?? 'cargando…'}</strong>
+            . El anteproyecto se preserva como histórico de viabilidad.
+          </p>
         </DetailDrawerSection>
+      )}
 
+      <DetailDrawerSection
+        title="Datos del proyecto"
+        divider={proyecto.proyecto_predecesor_id != null}
+      >
+        {ficha.length > 0 ? (
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+            {ficha.map((r) => (
+              <div key={r.label}>
+                <dt className="text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
+                  {r.label}
+                </dt>
+                <dd className="mt-0.5 text-sm text-[var(--text)]">{r.value}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <p className="text-sm text-[var(--text)]/60">
+            Sin datos de alcance ni costos capturados.
+          </p>
+        )}
+        {proyecto.notas ? (
+          <div className="mt-4">
+            <div className="text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
+              Notas
+            </div>
+            <p className="mt-0.5 whitespace-pre-line text-sm text-[var(--text)]/80">
+              {proyecto.notas}
+            </p>
+          </div>
+        ) : null}
+      </DetailDrawerSection>
+
+      <DetailDrawerSection
+        title="Unidades"
+        description={
+          loading
+            ? 'Cargando…'
+            : `${filtradas.length}${
+                filtradas.length !== unidades.length ? ` de ${unidades.length}` : ''
+              } ${unidades.length === 1 ? 'unidad' : 'unidades'}`
+        }
+      >
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text)]/40" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar lote…"
+              className="w-44 pl-9"
+            />
+          </div>
+          <select
+            value={estadoFiltro}
+            onChange={(e) => setEstadoFiltro(e.target.value)}
+            className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
+          >
+            <option value="">Todos los estados</option>
+            {estadosPresentes.map((e) => (
+              <option key={e} value={e}>
+                {UNIDAD_ESTADO_LABEL[e] ?? e}
+              </option>
+            ))}
+          </select>
+          <select
+            value={tipoFiltro}
+            onChange={(e) => setTipoFiltro(e.target.value)}
+            className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
+          >
+            <option value="">Todos los tipos</option>
+            {tiposPresentes.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <DataTable
+          data={filtradas}
+          columns={unidadColumns}
+          rowKey="id"
+          loading={loading}
+          error={error}
+          sticky={{ header: false }}
+          showDensityToggle={false}
+          density="compact"
+          initialSort={{ key: 'identificador', dir: 'asc' }}
+          emptyTitle="Sin unidades"
+          emptyDescription="Este proyecto no tiene unidades registradas."
+          emptyIcon={<Boxes className="h-6 w-6" />}
+        />
+      </DetailDrawerSection>
+
+      {avances && avances.lotes_total > 0 && (
         <DetailDrawerSection
-          title="Unidades"
+          title="Avances"
           description={
-            loading
-              ? 'Cargando…'
-              : `${filtradas.length}${
-                  filtradas.length !== unidades.length ? ` de ${unidades.length}` : ''
-                } ${unidades.length === 1 ? 'unidad' : 'unidades'}`
+            avances.estado_sugerido !== proyecto.estado
+              ? `Estado sugerido: ${ESTADO_LABEL[avances.estado_sugerido] ?? avances.estado_sugerido}`
+              : undefined
           }
         >
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text)]/40" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar lote…"
-                className="w-44 pl-9"
-              />
-            </div>
-            <select
-              value={estadoFiltro}
-              onChange={(e) => setEstadoFiltro(e.target.value)}
-              className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
-            >
-              <option value="">Todos los estados</option>
-              {estadosPresentes.map((e) => (
-                <option key={e} value={e}>
-                  {UNIDAD_ESTADO_LABEL[e] ?? e}
-                </option>
-              ))}
-            </select>
-            <select
-              value={tipoFiltro}
-              onChange={(e) => setTipoFiltro(e.target.value)}
-              className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
-            >
-              <option value="">Todos los tipos</option>
-              {tiposPresentes.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <DataTable
-            data={filtradas}
-            columns={unidadColumns}
-            rowKey="id"
-            loading={loading}
-            error={error}
-            sticky={{ header: false }}
-            showDensityToggle={false}
-            density="compact"
-            initialSort={{ key: 'identificador', dir: 'asc' }}
-            emptyTitle="Sin unidades"
-            emptyDescription="Este proyecto no tiene unidades registradas."
-            emptyIcon={<Boxes className="h-6 w-6" />}
-          />
-        </DetailDrawerSection>
-
-        {avances && avances.lotes_total > 0 && (
-          <DetailDrawerSection
-            title="Avances"
-            description={
-              avances.estado_sugerido !== proyecto.estado
-                ? `Estado sugerido: ${ESTADO_LABEL[avances.estado_sugerido] ?? avances.estado_sugerido}`
-                : undefined
-            }
-          >
-            <div className="space-y-3">
-              <ProgressBar label="Urbanización" pct={avances.avance_urb_pct} />
-              <ProgressBar label="Construcción" pct={avances.avance_const_pct} />
-              <ProgressBar label="Ventas" pct={avances.avance_vts_pct} />
-            </div>
-            <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
-              <Stat label="Lotes totales" value={fmtInt(avances.lotes_total)} />
-              <Stat label="Parque disponible" value={fmtInt(avances.parque_disponible)} />
-              <Stat label="Terminadas" value={fmtInt(avances.casas_terminadas)} />
-              <Stat label="En construcción" value={fmtInt(avances.casas_en_construccion)} />
-              <Stat label="Escrituradas" value={fmtInt(avances.casas_escrituradas)} />
-              <Stat label="Ticket promedio" value={fmtMoney(avances.ticket_promedio)} />
-              <Stat label="Ventas totales" value={fmtMoney(avances.ventas_totales)} />
-            </dl>
-          </DetailDrawerSection>
-        )}
-
-        <DetailDrawerSection title="Documentos y configuración">
           <div className="space-y-3">
-            <FieldRow
-              label="Plano oficial (URL)"
-              value={planoUrl}
-              onChange={setPlanoUrl}
-              placeholder="https://…"
-            />
-            <FieldRow
-              label="Imagen / portada (URL)"
-              value={imageUrl}
-              onChange={setImageUrl}
-              placeholder="https://…"
-            />
-            <FieldRow
-              label="Acreditación de escritura"
-              value={acreditacion}
-              onChange={setAcreditacion}
-              placeholder="Notas o referencia"
-            />
-            <FieldRow
-              label="Objetivo trimestral (unidades)"
-              value={objetivo}
-              onChange={setObjetivo}
-              placeholder="0"
-              type="number"
-            />
-            <div className="flex items-center gap-3 pt-2">
-              <button
-                type="button"
-                onClick={handleSaveFields}
-                disabled={editPending}
-                className="h-9 rounded-md bg-[var(--accent)] px-4 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
-              >
-                {editPending ? 'Guardando…' : 'Guardar cambios'}
-              </button>
-              {editSaved && <span className="text-sm text-emerald-600">Cambios guardados.</span>}
-              {editError && <span className="text-sm text-red-600/80">{editError}</span>}
-            </div>
+            <ProgressBar label="Urbanización" pct={avances.avance_urb_pct} />
+            <ProgressBar label="Construcción" pct={avances.avance_const_pct} />
+            <ProgressBar label="Ventas" pct={avances.avance_vts_pct} />
           </div>
+          <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+            <Stat label="Lotes totales" value={fmtInt(avances.lotes_total)} />
+            <Stat label="Parque disponible" value={fmtInt(avances.parque_disponible)} />
+            <Stat label="Terminadas" value={fmtInt(avances.casas_terminadas)} />
+            <Stat label="En construcción" value={fmtInt(avances.casas_en_construccion)} />
+            <Stat label="Escrituradas" value={fmtInt(avances.casas_escrituradas)} />
+            <Stat label="Ticket promedio" value={fmtMoney(avances.ticket_promedio)} />
+            <Stat label="Ventas totales" value={fmtMoney(avances.ventas_totales)} />
+          </dl>
         </DetailDrawerSection>
-      </DetailDrawerContent>
-    </DetailDrawer>
+      )}
+
+      <DetailDrawerSection title="Documentos y configuración">
+        <div className="space-y-3">
+          <FieldRow
+            label="Plano oficial (URL)"
+            value={planoUrl}
+            onChange={setPlanoUrl}
+            placeholder="https://…"
+          />
+          <FieldRow
+            label="Imagen / portada (URL)"
+            value={imageUrl}
+            onChange={setImageUrl}
+            placeholder="https://…"
+          />
+          <FieldRow
+            label="Acreditación de escritura"
+            value={acreditacion}
+            onChange={setAcreditacion}
+            placeholder="Notas o referencia"
+          />
+          <FieldRow
+            label="Objetivo trimestral (unidades)"
+            value={objetivo}
+            onChange={setObjetivo}
+            placeholder="0"
+            type="number"
+          />
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={handleSaveFields}
+              disabled={editPending}
+              className="h-9 rounded-md bg-[var(--accent)] px-4 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+            >
+              {editPending ? 'Guardando…' : 'Guardar cambios'}
+            </button>
+            {editSaved && <span className="text-sm text-emerald-600">Cambios guardados.</span>}
+            {editError && <span className="text-sm text-red-600/80">{editError}</span>}
+          </div>
+        </div>
+      </DetailDrawerSection>
+    </div>
   );
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { deriveKpis } from './proyectos-module';
-import type { ProyectoDetalle } from './proyecto-detail-drawer';
+import type { ProyectoDetalle } from './proyecto-detalle';
 
 function p(overrides: Partial<ProyectoDetalle>): ProyectoDetalle {
   return {
