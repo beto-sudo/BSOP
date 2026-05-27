@@ -424,68 +424,6 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
         ) : null}
       </DetailDrawerSection>
 
-      <DetailDrawerSection
-        title="Unidades"
-        description={
-          loading
-            ? 'Cargando…'
-            : `${filtradas.length}${
-                filtradas.length !== unidades.length ? ` de ${unidades.length}` : ''
-              } ${unidades.length === 1 ? 'unidad' : 'unidades'}`
-        }
-      >
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text)]/40" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar lote…"
-              className="w-44 pl-9"
-            />
-          </div>
-          <select
-            value={estadoFiltro}
-            onChange={(e) => setEstadoFiltro(e.target.value)}
-            className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
-          >
-            <option value="">Todos los estados</option>
-            {estadosPresentes.map((e) => (
-              <option key={e} value={e}>
-                {UNIDAD_ESTADO_LABEL[e] ?? e}
-              </option>
-            ))}
-          </select>
-          <select
-            value={tipoFiltro}
-            onChange={(e) => setTipoFiltro(e.target.value)}
-            className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
-          >
-            <option value="">Todos los tipos</option>
-            {tiposPresentes.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <DataTable
-          data={filtradas}
-          columns={unidadColumns}
-          rowKey="id"
-          loading={loading}
-          error={error}
-          sticky={{ header: false }}
-          showDensityToggle={false}
-          density="compact"
-          initialSort={{ key: 'identificador', dir: 'asc' }}
-          emptyTitle="Sin unidades"
-          emptyDescription="Este proyecto no tiene unidades registradas."
-          emptyIcon={<Boxes className="h-6 w-6" />}
-        />
-      </DetailDrawerSection>
-
       {avances && avances.lotes_total > 0 && (
         <DetailDrawerSection
           title="Avances"
@@ -552,6 +490,68 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
             {editError && <span className="text-sm text-red-600/80">{editError}</span>}
           </div>
         </div>
+      </DetailDrawerSection>
+
+      <DetailDrawerSection
+        title="Unidades"
+        description={
+          loading
+            ? 'Cargando…'
+            : `${filtradas.length}${
+                filtradas.length !== unidades.length ? ` de ${unidades.length}` : ''
+              } ${unidades.length === 1 ? 'unidad' : 'unidades'}`
+        }
+      >
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text)]/40" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar lote…"
+              className="w-44 pl-9"
+            />
+          </div>
+          <select
+            value={estadoFiltro}
+            onChange={(e) => setEstadoFiltro(e.target.value)}
+            className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
+          >
+            <option value="">Todos los estados</option>
+            {estadosPresentes.map((e) => (
+              <option key={e} value={e}>
+                {UNIDAD_ESTADO_LABEL[e] ?? e}
+              </option>
+            ))}
+          </select>
+          <select
+            value={tipoFiltro}
+            onChange={(e) => setTipoFiltro(e.target.value)}
+            className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
+          >
+            <option value="">Todos los tipos</option>
+            {tiposPresentes.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <DataTable
+          data={filtradas}
+          columns={unidadColumns}
+          rowKey="id"
+          loading={loading}
+          error={error}
+          sticky={{ header: false }}
+          showDensityToggle={false}
+          density="compact"
+          initialSort={{ key: 'identificador', dir: 'asc' }}
+          emptyTitle="Sin unidades"
+          emptyDescription="Este proyecto no tiene unidades registradas."
+          emptyIcon={<Boxes className="h-6 w-6" />}
+        />
       </DetailDrawerSection>
     </div>
   );
