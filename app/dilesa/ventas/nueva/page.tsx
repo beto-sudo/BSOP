@@ -239,7 +239,10 @@ function NuevaSolicitudForm() {
         .select('id, nombre, apellido_paterno, apellido_materno, curp')
         .eq('empresa_id', DILESA_EMPRESA_ID)
         .eq('tipo', 'cliente')
-        .is('deleted_at', null),
+        .is('deleted_at', null)
+        .order('apellido_paterno', { ascending: true, nullsFirst: false })
+        .order('nombre', { ascending: true })
+        .range(0, 4999),
     ]);
 
     const firstErr =
@@ -352,18 +355,20 @@ function NuevaSolicitudForm() {
   }, [promociones, unidadId, unidades]);
 
   // ── Personas filtradas por búsqueda ─────────────────────────────────────────
+  // Sin búsqueda mostramos el catálogo completo (sort por apellido en la query).
+  // Con búsqueda filtramos client-side por nombre completo o CURP — sin cap, los
+  // matches reales son siempre pocos. El render de la lista vive en un
+  // `max-h-64 overflow-auto` que ya pagina visualmente con scroll.
   const personasFiltradas = useMemo(() => {
     const q = busquedaPersona.trim().toLowerCase();
-    if (!q) return personasExistentes.slice(0, 50);
-    return personasExistentes
-      .filter((p) => {
-        const full = [p.nombre, p.apellido_paterno, p.apellido_materno]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase();
-        return full.includes(q) || (p.curp ?? '').toLowerCase().includes(q);
-      })
-      .slice(0, 50);
+    if (!q) return personasExistentes;
+    return personasExistentes.filter((p) => {
+      const full = [p.nombre, p.apellido_paterno, p.apellido_materno]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return full.includes(q) || (p.curp ?? '').toLowerCase().includes(q);
+    });
   }, [busquedaPersona, personasExistentes]);
 
   // ── Submit ──────────────────────────────────────────────────────────────────
@@ -607,10 +612,15 @@ function NuevaSolicitudForm() {
         {clienteModo === 'existente' ? (
           <div className="mt-4 space-y-3">
             <Input
-              placeholder="Buscar por nombre o CURP…"
+              placeholder="Buscar por nombre, apellido o CURP…"
               value={busquedaPersona}
               onChange={(e) => setBusquedaPersona(e.target.value)}
             />
+            <p className="text-xs text-muted-foreground">
+              {busquedaPersona.trim()
+                ? `${personasFiltradas.length} coincidencia${personasFiltradas.length === 1 ? '' : 's'} de ${personasExistentes.length}`
+                : `${personasExistentes.length} clientes en total — escribe para filtrar`}
+            </p>
             <div className="max-h-64 overflow-auto rounded-md border border-[var(--border)]">
               {personasFiltradas.length === 0 ? (
                 <div className="p-3 text-sm text-muted-foreground">
