@@ -10,10 +10,22 @@
  * del trigger tg_construccion_avance:
  *
  *   1. ALTER TABLE ... DISABLE TRIGGER tg_construccion_avance.
- *   2. Bulk UPSERT por batches de 500.
- *   3. ALTER TABLE ... ENABLE TRIGGER tg_construccion_avance.
- *   4. UPDATE dilesa.construccion SET avance_pct =
+ *   2. Cargar set de coda_row_id ya existentes en BSOP.
+ *   3. Filtrar a "solo nuevas" + bulk INSERT por batches de 500.
+ *   4. ALTER TABLE ... ENABLE TRIGGER tg_construccion_avance.
+ *   5. UPDATE dilesa.construccion SET avance_pct =
  *        dilesa.fn_calcular_avance_construccion(id) (un UPDATE por obra).
+ *
+ * Por qué INSERT solo (vs UPSERT): el trigger tg_ctt_lock_pagadas (ADR-033 D8,
+ * migración 20260525221141) bloquea UPDATE/DELETE de tareas vinculadas a una
+ * estimación pagada. Como UPSERT con ON CONFLICT DO UPDATE intenta UPDATE
+ * cuando ya existe el row, todo el chunk falla aunque el INSERT puro pasaría.
+ * Solo INSERT de las nuevas respeta el lock por construcción: las pagadas
+ * "no se tocan" (regla del negocio) y las nuevas entran sin choque.
+ *
+ * Edits de Coda en tareas ya importadas se ignoran. Si requieres refrescar
+ * una tarea específica (corrección de fecha, mano de obra, etc.), pídelo a
+ * Dirección — mismo flujo que el lock_pagadas exige.
  *
  * Lookup plantilla_tarea_id:
  *   - "Tarea Terminada" en Coda viene como "ETAPA-Nombre de tarea".
@@ -22,7 +34,7 @@
  *     AND etapa.nombre = X AND tarea.nombre = Y.
  *   - Si no resuelve, skip + reporta.
  *
- * Idempotente: UPSERT por (empresa_id, coda_row_id).
+ * Idempotente: INSERT solo de coda_row_id no vistos. Re-runs son no-op.
  *
  * Prerequisites:
  *   - Construcción ya importada (Script D).
@@ -288,31 +300,53 @@ async function main() {
     );
     console.log('  ✔ Trigger tg_construccion_avance DESHABILITADO.');
 
-    // ── Bulk UPSERT ────────────────────────────────────────────────────────
+    // ── Cargar coda_row_id ya en BSOP (para hacer INSERT-only) ─────────────
+    console.log('  Cargando coda_row_id ya existentes en BSOP...');
+    const existentesRes = await pg.query<{ coda_row_id: string }>(
+      `SELECT coda_row_id
+         FROM dilesa.construccion_tareas_terminadas
+         WHERE empresa_id = $1 AND coda_row_id IS NOT NULL`,
+      [empresaId]
+    );
+    const existentes = new Set(existentesRes.rows.map((r) => r.coda_row_id));
+    const nuevas = insertsDedup.filter((i) => !existentes.has(i.coda_row_id));
+    const yaExisten = insertsDedup.length - nuevas.length;
+    console.log(
+      `  ${existentes.size} ya en BSOP · ${nuevas.length} nuevas a insertar · ${yaExisten} skip (ya existen)`
+    );
+
+    // ── Bulk INSERT de nuevas ──────────────────────────────────────────────
     let ok = 0;
     let err = 0;
+    const erroresMuestra: string[] = [];
     const CHUNK = 500;
     const startTs = Date.now();
-    for (let i = 0; i < insertsDedup.length; i += CHUNK) {
-      const chunk = insertsDedup.slice(i, i + CHUNK);
+    for (let i = 0; i < nuevas.length; i += CHUNK) {
+      const chunk = nuevas.slice(i, i + CHUNK);
       const { error } = await sb
         .schema('dilesa')
         .from('construccion_tareas_terminadas')
-        .upsert(chunk, { onConflict: 'empresa_id,coda_row_id' });
+        .insert(chunk);
       if (error) {
-        console.error(`  ✗ chunk [${i}..${i + chunk.length}): ${error.message}`);
+        if (erroresMuestra.length < 3) {
+          erroresMuestra.push(`chunk [${i}..${i + chunk.length}): ${error.message}`);
+        }
         err += chunk.length;
         continue;
       }
       ok += chunk.length;
-      if (i % 5000 === 0) {
+      if (i % 5000 === 0 && i > 0) {
         const elapsed = ((Date.now() - startTs) / 1000).toFixed(1);
         console.log(
-          `    [${ok}/${insertsDedup.length}] (${elapsed}s, ${(ok / Math.max(1, (Date.now() - startTs) / 1000)).toFixed(0)} rows/s)`
+          `    [${ok}/${nuevas.length}] (${elapsed}s, ${(ok / Math.max(1, (Date.now() - startTs) / 1000)).toFixed(0)} rows/s)`
         );
       }
     }
-    console.log(`  ✔ ${ok} UPSERT (${err} errores).`);
+    console.log(`  ✔ ${ok} INSERT (${err} errores).`);
+    if (erroresMuestra.length > 0) {
+      console.error('  Muestra de errores:');
+      for (const m of erroresMuestra) console.error(`    · ${m}`);
+    }
 
     // ── ENABLE trigger ────────────────────────────────────────────────────
     await pg.query(
@@ -330,6 +364,12 @@ async function main() {
       [empresaId]
     );
     console.log(`  ✔ ${avanceRes.length} construcciones con avance_pct recalculado.`);
+
+    if (err > 0) {
+      throw new Error(
+        `${err} tareas terminadas fallaron al insertar (de ${nuevas.length} candidatas nuevas).`
+      );
+    }
   } finally {
     await pg.end();
   }
