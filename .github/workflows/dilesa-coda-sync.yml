@@ -46,6 +46,7 @@ jobs:
       CODA_API_KEY: ${{ secrets.CODA_API_KEY }}
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       NOTIFY_EMAIL: ${{ secrets.NOTIFY_EMAIL }}
       SYNC_FROM_EMAIL: ${{ secrets.SYNC_FROM_EMAIL }}
