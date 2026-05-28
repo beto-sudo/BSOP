@@ -279,6 +279,23 @@ rdb.waitry_pedidos`. (`security_invoker=on` per
   Migración `20260528221756`; **aplicada a prod 2026-05-28** vía
   `supabase db push`, verificada (rdb eliminada, erp sin typo + con
   `paid IS TRUE`, trigger activo).
+- **2026-05-28 — Saneo de Corte-SC vacíos + decisión sobre `process_waitry_inbound`**
+  (cierra los dos sub-pendientes del follow-up anterior). **(1) Saneo cosmético**:
+  migración `20260528225939` borra los 9 Corte-SC sin ninguna venta real
+  (`paid=true`); por la FK `waitry_pedidos.corte_id` SET NULL, los 18 pedidos
+  `paid=false` asociados vuelven a huérfanos (correcto bajo F3 — se preservan en la
+  tabla base, WAITRY-PAID-2). Verificado en prod: Corte-SC 93→84, 0 vacíos
+  restantes, 0 `corte_id` huérfanos. **(2) `process_waitry_inbound` se deja
+  intacto** (decisión): asigna `corte_id` por rango de tiempo sin filtrar
+  `paid`/`status`, pero el `corte_id` es metadata, no afirmación de venta;
+  `v_cortes_totales` ya filtra `paid IS TRUE` + `order_canceled`. Filtrarlo ahí
+  contradiría la decisión de ADR-035 de mantener el webhook como recorder pasivo y
+  arriesgaría el caso de re-pago (`paid false→true`). **(3) Incidencia operativa**:
+  al aplicar se detectó un drift de historial dejado por el PR #570 (security):
+  archivo `20260528220000` vs registro en DB `20260528223149` (mismo SQL, distinto
+  timestamp) que bloqueaba `supabase db push` para todas las sesiones. Se realineó
+  con `supabase migration repair` (`220000`→applied, `223149`→reverted) tras OK de
+  Beto; no tocó el schema, solo la tabla de tracking.
 
 ## Riesgos y mitigaciones
 

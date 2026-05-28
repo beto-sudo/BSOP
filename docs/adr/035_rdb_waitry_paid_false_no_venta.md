@@ -188,7 +188,12 @@ no recalculan cierres) sigue vigente.
   `v_cortes_totales` ya filtraba correcto, por eso no afectó totales. Sin
   backfill, consistente con F3 (la vista ya excluye). Huella histórica
   cosmética: 35 pedidos no-pagados/cancelados quedaron en algún Corte-SC, 9/93
-  Corte-SC sin venta real — su saneamiento, si se desea, es paso aparte.
+  Corte-SC sin venta real — **saneados 2026-05-28** (migración
+  `20260528225939`): DELETE de los 9 Corte-SC sin ninguna venta real; los 18
+  pedidos `paid=false` asociados vuelven a `corte_id NULL` (FK SET NULL, se
+  preservan en la tabla base). `process_waitry_inbound` se deja intacto a
+  propósito (asigna `corte_id` sin filtrar `paid`, pero es metadata
+  no-financiera y la vista ya filtra — detalle en el planning doc).
 
 ## Referencias
 
