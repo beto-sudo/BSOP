@@ -17,7 +17,7 @@
  * del desarrollo filtrando por `aplicacion_snapshot`.
  */
 
-import { useCallback, useMemo, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import { FileText } from 'lucide-react';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { FileAttachments } from '@/components/file-attachments/file-attachments';
@@ -120,18 +120,24 @@ export function TareasChecklist({
   empresaSlug: EmpresaSlug;
   onChange?: () => void;
 }) {
+  // Guard defensivo: si el padre pasa algo que no es array (race condition
+  // o data corrupta), tratamos como vacío para no romper el render.
+  const tareasSource: readonly TareaChecklistRow[] = Array.isArray(tareasInicial)
+    ? tareasInicial
+    : [];
   // Estado local — optimistic. Rollback si la server action falla.
-  const [tareas, setTareas] = useState<TareaChecklistRow[]>([...tareasInicial]);
+  const [tareas, setTareas] = useState<TareaChecklistRow[]>([...tareasSource]);
   const [error, setError] = useState<string | null>(null);
 
   // Sincroniza state local cuando el padre nos pasa nuevas tareas (refresh).
   // Comparación shallow por id+estado para evitar re-sincronizar la lista local
-  // entera cuando llega el mismo dataset.
-  const idsEstados = tareasInicial.map((t) => `${t.id}:${t.estado}`).join('|');
-  useMemo(() => {
-    setTareas([...tareasInicial]);
+  // entera cuando llega el mismo dataset. setState va dentro de useEffect (no
+  // de useMemo) para respetar la semántica de React 19.
+  const idsEstados = tareasSource.map((t) => `${t.id}:${t.estado}`).join('|');
+  useEffect(() => {
+    setTareas([...tareasSource]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idsEstados, tareasInicial.length]);
+  }, [idsEstados, tareasSource.length]);
 
   const bloqueadasMap = useMemo(
     () => computeBloqueadasMap(tareas, dependencias),

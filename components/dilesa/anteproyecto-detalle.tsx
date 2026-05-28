@@ -176,9 +176,11 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
   // proyecto cargado no coincide con el actual, estamos cargando.
   const loadingExtras = anteproyecto != null && loadedId !== anteproyecto.id;
 
-  const fetchExtras = useCallback((proyectoId: string) => {
+  const fetchExtras = useCallback(async (proyectoId: string) => {
     const supabase = createSupabaseBrowserClient();
-    return Promise.all([
+    // Tareas + partidas en paralelo. Las dependencias requieren los IDs de
+    // tareas como input, por lo que viven en una segunda fase.
+    const [tareasRes, partidasRes] = await Promise.all([
       supabase
         .schema('dilesa')
         .from('proyecto_tareas')
@@ -195,12 +197,25 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
         .eq('proyecto_id', proyectoId)
         .is('deleted_at', null)
         .order('partida'),
-      supabase
-        .schema('dilesa')
-        .from('proyecto_tareas_dependencias')
-        .select('tarea_id, depende_de_tarea_id, tarea:proyecto_tareas!tarea_id(proyecto_id)')
-        .eq('tarea.proyecto_id', proyectoId),
     ]);
+
+    // Dependencias por IN sobre los IDs de las tareas del proyecto. Patrón
+    // sin embed PostgREST: si la query falla (RLS, parsing del embed), el
+    // shape de `.data` queda consistentemente array vacío en vez de null
+    // wrapped en algo raro. Aceptamos el round-trip extra.
+    const tareaIds =
+      Array.isArray(tareasRes.data) && tareasRes.data.length > 0
+        ? tareasRes.data.map((t) => t.id as string)
+        : [];
+    const depsRes =
+      tareaIds.length === 0
+        ? { data: [] as Array<{ tarea_id: string; depende_de_tarea_id: string }>, error: null }
+        : await supabase
+            .schema('dilesa')
+            .from('proyecto_tareas_dependencias')
+            .select('tarea_id, depende_de_tarea_id')
+            .in('tarea_id', tareaIds);
+    return [tareasRes, partidasRes, depsRes] as const;
   }, []);
 
   const cargarExtras = useCallback(
@@ -213,7 +228,7 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
         setTareas([]);
       } else {
         setExtrasError(null);
-        setTareas((tareasRes.data ?? []) as ProyectoTarea[]);
+        setTareas(Array.isArray(tareasRes.data) ? (tareasRes.data as ProyectoTarea[]) : []);
       }
       if (partidasRes.error) {
         setExtrasError(
@@ -221,15 +236,12 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
         );
         setPartidas([]);
       } else {
-        setPartidas((partidasRes.data ?? []) as Partida[]);
+        setPartidas(Array.isArray(partidasRes.data) ? (partidasRes.data as Partida[]) : []);
       }
-      if (!depsRes.error) {
-        setDependencias(
-          ((depsRes.data ?? []) as Array<TareaDep & { tarea?: unknown }>).map((d) => ({
-            tarea_id: d.tarea_id,
-            depende_de_tarea_id: d.depende_de_tarea_id,
-          }))
-        );
+      if (!depsRes.error && Array.isArray(depsRes.data)) {
+        setDependencias(depsRes.data as TareaDep[]);
+      } else {
+        setDependencias([]);
       }
       setLoadedId(proyectoId);
     },
@@ -250,7 +262,7 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
         setTareas([]);
       } else {
         setExtrasError(null);
-        setTareas((tareasRes.data ?? []) as ProyectoTarea[]);
+        setTareas(Array.isArray(tareasRes.data) ? (tareasRes.data as ProyectoTarea[]) : []);
       }
       if (partidasRes.error) {
         setExtrasError(
@@ -258,15 +270,12 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
         );
         setPartidas([]);
       } else {
-        setPartidas((partidasRes.data ?? []) as Partida[]);
+        setPartidas(Array.isArray(partidasRes.data) ? (partidasRes.data as Partida[]) : []);
       }
-      if (!depsRes.error) {
-        setDependencias(
-          ((depsRes.data ?? []) as Array<TareaDep & { tarea?: unknown }>).map((d) => ({
-            tarea_id: d.tarea_id,
-            depende_de_tarea_id: d.depende_de_tarea_id,
-          }))
-        );
+      if (!depsRes.error && Array.isArray(depsRes.data)) {
+        setDependencias(depsRes.data as TareaDep[]);
+      } else {
+        setDependencias([]);
       }
       setLoadedId(anteproyecto.id);
     });
