@@ -177,10 +177,18 @@ no recalculan cierres) sigue vigente.
 
 - **F1** — fantasmas que escapan al cap de 15 min de ADR-031.
 - **F2** — explicar a Pablo el multi-pago sobre el mismo folio (cosmético).
-- **`rdb.handle_sc_corte_on_open`** — bug latente independiente: typo
-  `'order_cancelled'` + sin filtro `paid` + referencia `rdb.cortes` (relación
-  inexistente). No participa en el cálculo de totales (eso lo hace la vista);
-  se reporta aparte.
+- ~~**`rdb.handle_sc_corte_on_open`**~~ — **resuelto 2026-05-28** (migración
+  `20260528221756`). El diagnóstico encontró **dos** funciones gemelas: la `rdb`
+  (código muerto — sin trigger, porque `rdb.cortes` nunca existió y el guard de
+  su migración original nunca creó el trigger) se **eliminó**; la `erp`
+  (viva — trigger `trg_sc_corte_on_open_erp` en `erp.cortes_caja`, 93 Corte-SC
+  creados) se **corrigió** (`'order_cancelled'`→`'order_canceled'` y
+  `+ AND paid IS TRUE` en el conteo y la asignación de huérfanos). Confirmado
+  latente: el typo no vive en ninguna vista (solo en estas funciones) y
+  `v_cortes_totales` ya filtraba correcto, por eso no afectó totales. Sin
+  backfill, consistente con F3 (la vista ya excluye). Huella histórica
+  cosmética: 35 pedidos no-pagados/cancelados quedaron en algún Corte-SC, 9/93
+  Corte-SC sin venta real — su saneamiento, si se desea, es paso aparte.
 
 ## Referencias
 
