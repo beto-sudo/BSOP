@@ -58,13 +58,32 @@ const DRY_RUN = process.env.DRY_RUN === '1';
 const CODA_DOC = 'ZNxWl_DI2D';
 const T_TAREAS_TERMINADAS = 'grid-fJSixLw1DF';
 
-if (!CODA_API_KEY) throw new Error('Falta CODA_API_KEY');
-if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('Faltan credenciales de Supabase');
-if (!SUPABASE_DB_URL)
-  throw new Error('Falta SUPABASE_DB_URL (para disable/enable trigger via psql)');
-
-/** Split "ETAPA-tarea" → {etapa, tarea}. Toma el primer guión como separador. */
-function splitTareaTerminada(s: string): { etapa: string; tarea: string } | null {
+/**
+ * Split "ETAPA-tarea" → {etapa, tarea}.
+ *
+ * Usa longest-prefix-match contra `etapasOrdenadas` (lista de etapas conocidas
+ * ordenada por longitud DESC) porque algunas etapas contienen guion en el
+ * nombre — ej. "INSTALACIÓN HIDRO-SANITARIA". Si splitea por primer guión,
+ * la etapa queda mal ("INSTALACIÓN HIDRO") y el lookup en plantilla_tareas
+ * falla siempre — bug histórico que dejó ~1,038 tareas sin importar.
+ *
+ * Fallback al primer guión solo si ninguna etapa conocida matchea (defensivo:
+ * permite que rows con etapas nuevas se reporten en `skipPlantilla` y no se
+ * pierdan silenciosamente con `null`).
+ *
+ * Exportado para tests.
+ */
+export function splitTareaTerminada(
+  s: string,
+  etapasOrdenadas: readonly string[]
+): { etapa: string; tarea: string } | null {
+  const sLower = s.toLowerCase();
+  for (const etapa of etapasOrdenadas) {
+    const prefix = (etapa + '-').toLowerCase();
+    if (sLower.startsWith(prefix)) {
+      return { etapa, tarea: s.slice(etapa.length + 1).trim() };
+    }
+  }
   const dash = s.indexOf('-');
   if (dash < 1) return null;
   return {
@@ -74,6 +93,11 @@ function splitTareaTerminada(s: string): { etapa: string; tarea: string } | null
 }
 
 async function main() {
+  if (!CODA_API_KEY) throw new Error('Falta CODA_API_KEY');
+  if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('Faltan credenciales de Supabase');
+  if (!SUPABASE_DB_URL)
+    throw new Error('Falta SUPABASE_DB_URL (para disable/enable trigger via psql)');
+
   const coda = new CodaClient(CODA_API_KEY);
   const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -153,6 +177,12 @@ async function main() {
   }
   console.log(`  ${plantillaRows.length} plantilla_tareas cargadas.`);
 
+  // Lista única de etapas, ordenada por longitud DESC para longest-prefix-match.
+  // Imprescindible para etapas que contienen guion (ej. "INSTALACIÓN HIDRO-SANITARIA").
+  const etapasOrdenadas = Array.from(new Set(plantillaRows.map((p) => p.etapa_nombre))).sort(
+    (a, b) => b.length - a.length
+  );
+
   // Index: producto_id|etapa|tarea → plantilla_id
   const plantillaPorKey = new Map<string, string>();
   const makeKey = (producto_id: string, etapa: string, tarea: string): string =>
@@ -216,7 +246,7 @@ async function main() {
 
     const tareaStr = str(pick(v, ttCm, 'Tarea Terminada'));
     if (!tareaStr) continue;
-    const split = splitTareaTerminada(tareaStr);
+    const split = splitTareaTerminada(tareaStr, etapasOrdenadas);
     if (!split) {
       skipFormatoTarea++;
       continue;
@@ -377,7 +407,9 @@ async function main() {
   console.log('\n✔ Script E (tareas terminadas) terminado.');
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
