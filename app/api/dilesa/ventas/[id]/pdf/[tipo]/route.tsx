@@ -61,7 +61,7 @@ export async function GET(
     .schema('dilesa')
     .from('ventas')
     .select(
-      'id, persona_id, unidad_id, tipo_credito, vendedor, monto_credito_titular, monto_credito_cotitular, created_at, es_pep, ocupacion, ine_numero, forma_pago, uso_efectivo'
+      'id, persona_id, unidad_id, tipo_credito, vendedor, monto_credito_titular, monto_credito_cotitular, productos_adicionales, created_at, es_pep, ocupacion, ine_numero, forma_pago, uso_efectivo'
     )
     .eq('id', id)
     .is('deleted_at', null)
@@ -296,6 +296,7 @@ export async function GET(
     p_unidad_id: venta.unidad_id ?? '00000000-0000-0000-0000-000000000000',
     p_monto_credito_titular: Number(venta.monto_credito_titular ?? 0),
     p_monto_credito_cotitular: Number(venta.monto_credito_cotitular ?? 0),
+    p_productos_adicionales: Number(venta.productos_adicionales ?? 0),
   });
   const c = calc as Record<string, number> | null;
 
@@ -317,6 +318,7 @@ export async function GET(
     valorEsquina: Number(c?.valor_esquina ?? 0),
     valorVentaFuturo: Number(c?.valor_venta_futuro ?? 0),
     costoCreditoAdicional: Number(c?.costo_credito_adicional ?? 0),
+    productosAdicionales: Number(c?.productos_adicionales ?? venta.productos_adicionales ?? 0),
     precioVenta: Number(c?.precio_venta_total ?? 0),
     enganche1pct: Number(c?.enganche_1pct ?? 0),
     isai2pct: Number(c?.isai_2pct ?? 0),
