@@ -27,24 +27,14 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { instanciarPlantillaParaProyecto } from '@/lib/dilesa/instanciar-plantilla';
+import {
+  TAREA_ESTADOS_VALIDOS,
+  type TareaEstado,
+} from '@/components/dilesa/tareas-checklist-types';
 
 type Result = { ok: true; tareasCreadas: number } | { ok: false; error: string };
 
 type SimpleResult = { ok: true } | { ok: false; error: string };
-
-/**
- * Estados válidos de `dilesa.proyecto_tareas.estado`. Mantener en sync
- * con el CHECK constraint declarado en la migración de Sprint 3.
- * Exportado para reuso en el componente checklist y los tests.
- */
-export const TAREA_ESTADOS_VALIDOS = [
-  'pendiente',
-  'bloqueada',
-  'en_curso',
-  'completada',
-  'cancelada',
-] as const;
-export type TareaEstado = (typeof TAREA_ESTADOS_VALIDOS)[number];
 
 async function makeServerClient() {
   const cookieStore = await cookies();
