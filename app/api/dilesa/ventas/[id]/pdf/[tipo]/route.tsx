@@ -92,20 +92,22 @@ export async function GET(
 
   // Vendedor (asesor de ventas) — el form persiste `vendedor_usuario_id`
   // (FK a core.usuarios); el campo legacy `venta.vendedor` (text) puede
-  // estar vacío en ventas nuevas. Resolvemos el nombre via lookup. Si no hay
-  // usuario o falta `first_name`, caemos al campo text legacy.
+  // estar vacío en ventas nuevas. Resolvemos el nombre completo via lookup.
+  // Concatena `first_name + ' ' + last_name`; si falta last_name, queda
+  // solo el first_name; si falta first_name, fallback a email; si nada,
+  // al campo text legacy de la venta.
   let vendedorNombre = (venta.vendedor ?? '').toString();
   if (venta.vendedor_usuario_id) {
     const { data: u } = await sb
       .schema('core')
       .from('usuarios')
-      .select('first_name, email')
+      .select('first_name, last_name, email')
       .eq('id', venta.vendedor_usuario_id)
       .maybeSingle();
-    if (u?.first_name) {
-      vendedorNombre = u.first_name;
+    const nombreCompleto = [u?.first_name, u?.last_name].filter(Boolean).join(' ').trim();
+    if (nombreCompleto) {
+      vendedorNombre = nombreCompleto;
     } else if (u?.email && !vendedorNombre) {
-      // Sin first_name configurado: usar email como fallback (mejor que vacío).
       vendedorNombre = u.email;
     }
   }
@@ -167,6 +169,7 @@ export async function GET(
 
   const fechaCreado = new Date(venta.created_at);
   const fechaTexto = fechaCreado.toLocaleDateString('es-MX', {
+    timeZone: 'America/Matamoros',
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -230,23 +233,42 @@ export async function GET(
     const modeloSufijo = productoFull?.nombre ? (productoFull.nombre.split('-').pop() ?? '') : '';
 
     // La promesa se firma en el momento de la impresión. Toda la fecha
-    // del contrato refleja "ahora", no `venta.created_at`.
+    // del contrato refleja "ahora" en TZ America/Matamoros (Vercel runtime
+    // es UTC; sin timeZone explícito la hora salía 5–6 horas adelantada).
     const ahora = new Date();
+    const TZ_MX = 'America/Matamoros';
     const fechaTextoPromesa = ahora.toLocaleDateString('es-MX', {
+      timeZone: TZ_MX,
       day: 'numeric',
       month: 'long',
       year: 'numeric',
     });
+    // Componentes individuales del contrato — usamos Intl.DateTimeFormat con
+    // TZ explícito porque `getDate()/getMonth()/getFullYear()` retornan
+    // siempre en TZ local del runtime (UTC en Vercel), no en TZ Matamoros.
+    const partsFmt = new Intl.DateTimeFormat('es-MX', {
+      timeZone: TZ_MX,
+      day: 'numeric',
+      month: 'numeric',
+      year: 'numeric',
+    });
+    const parts = Object.fromEntries(
+      partsFmt.formatToParts(ahora).map((p) => [p.type, p.value])
+    ) as Record<string, string>;
+    const diaTextoMx = parts.day ?? String(ahora.getUTCDate());
+    const mesIdxMx = Math.max(0, Math.min(11, Number(parts.month ?? '1') - 1));
+    const anioTextoMx = parts.year ?? String(ahora.getUTCFullYear());
 
     const data: PromesaData = {
       fechaTexto: fechaTextoPromesa,
       horaTexto: ahora.toLocaleTimeString('es-MX', {
+        timeZone: TZ_MX,
         hour: 'numeric',
         minute: '2-digit',
       }),
-      diaTexto: String(ahora.getDate()),
-      mesTexto: MESES_ES[ahora.getMonth()],
-      anioTexto: String(ahora.getFullYear()),
+      diaTexto: diaTextoMx,
+      mesTexto: MESES_ES[mesIdxMx],
+      anioTexto: anioTextoMx,
       comprador: {
         nombre: clienteNombre.toUpperCase(),
         curp: persona?.curp ?? null,
@@ -277,7 +299,9 @@ export async function GET(
         .map((p) => p[0]?.toUpperCase())
         .filter(Boolean)
         .slice(0, 3)
-        .join('')}-${identificacionInventario}-${ahora.toLocaleString('es-MX')}`,
+        .join(
+          ''
+        )}-${identificacionInventario}-${ahora.toLocaleString('es-MX', { timeZone: TZ_MX })}`,
     };
     const buf = await renderToBuffer(<PromesaCompraventaPDF data={data} />);
     return pdfResponse(buf, `promesa-compraventa-${identificacionInventario || id}.pdf`);
@@ -295,7 +319,8 @@ export async function GET(
       usoEfectivo: persona?.uso_efectivo_kyc,
     });
     const fechaNac = persona?.fecha_nacimiento
-      ? new Date(`${persona.fecha_nacimiento}T00:00:00`).toLocaleDateString('es-MX', {
+      ? new Date(`${persona.fecha_nacimiento}T12:00:00`).toLocaleDateString('es-MX', {
+          timeZone: 'America/Matamoros',
           day: 'numeric',
           month: 'long',
           year: 'numeric',
@@ -352,7 +377,7 @@ export async function GET(
     .filter(Boolean)
     .slice(0, 3)
     .join('');
-  const folio = `${iniciales}-${identificacionInventario}-${fechaCreado.toLocaleString('es-MX')}`;
+  const folio = `${iniciales}-${identificacionInventario}-${fechaCreado.toLocaleString('es-MX', { timeZone: 'America/Matamoros' })}`;
 
   const data: SolicitudData = {
     fechaTexto,
