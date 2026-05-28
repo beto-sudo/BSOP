@@ -86,6 +86,7 @@ const ficuData = {
   formaPago: 'FINANCIAMIENTO HIPOTECARIO',
   usoEfectivo: 'SIN USO DE EFECTIVO',
   ocupacion: 'OTRAS OCUPACIONES - AGENTE ADUANAL',
+  conocimientoDuenoBeneficiario: 'Por cuenta propia',
   criteriosRiesgo: riesgo.criterios,
   scoreTotal: riesgo.scoreTotal,
   clasificacionRiesgo: riesgo.clasificacion,
@@ -119,6 +120,7 @@ const promesaData = {
   },
   operacion: {
     precio: 1_021_000,
+    precioEnLetra: 'Un Millón Veintiún Mil Pesos 00/100 M.N.',
     enganche1pct: 10_210,
     arras10pct: 102_100,
     tipoCredito: 'Infonavit Tradicional',

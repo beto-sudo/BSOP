@@ -37,6 +37,7 @@ type Venta = {
   id: string;
   persona_id: string;
   unidad_id: string | null;
+  vendedor_usuario_id: string | null;
   estado: string;
   fase_actual: string | null;
   fase_posicion: number | null;
@@ -44,6 +45,7 @@ type Venta = {
   valor_comercial: number | null;
   valor_escrituracion: number | null;
   precio_asignacion: number | null;
+  productos_adicionales: number | null;
   monto_credito_titular: number | null;
   monto_credito_cotitular: number | null;
   credito_titular_ref: string | null;
@@ -90,6 +92,23 @@ type UnidadInfo = {
   identificador: string;
   proyecto_id: string | null;
   producto_id: string | null;
+};
+type DesgloseCalculo = {
+  valor_comercial: number;
+  metros_excedentes: number;
+  valor_excedente_terreno: number;
+  valor_frente_verde: number;
+  valor_esquina: number;
+  pct_esquina_aplicado: number;
+  valor_venta_futuro: number;
+  costo_credito_adicional: number;
+  productos_adicionales: number;
+  precio_venta_total: number;
+  apoyo_infonavit: number;
+  pago_directo: number;
+  enganche_1pct: number;
+  isai_2pct: number;
+  gastos_notariales_6pct: number;
 };
 type Fase = { id: string; fase: string; posicion: number | null; fecha: string | null };
 type Pago = { id: string; fecha: string | null; monto: number; tipo: string | null };
@@ -243,6 +262,7 @@ function DetailInner() {
   const [fases, setFases] = useState<Fase[]>([]);
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [adjuntos, setAdjuntos] = useState<Adjunto[]>([]);
+  const [calculo, setCalculo] = useState<DesgloseCalculo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -359,6 +379,23 @@ function DetailInner() {
         return;
       }
       setAdjuntos((adjRows ?? []) as Adjunto[]);
+
+      // Desglose del cálculo — se recalcula con los datos snapshot de la venta
+      // para mostrar TODOS los componentes (excedente, frente verde, esquina,
+      // productos adicionales, ISAI, gastos notariales). No persistimos cada
+      // componente en `dilesa.ventas`; la RPC los recompone en runtime.
+      if (ventaRow.unidad_id) {
+        const { data: calcRow } = await sb.schema('dilesa').rpc('fn_calcular_precio_venta', {
+          p_unidad_id: ventaRow.unidad_id,
+          p_monto_credito_titular: Number(ventaRow.monto_credito_titular ?? 0),
+          p_monto_credito_cotitular: Number(ventaRow.monto_credito_cotitular ?? 0),
+          p_productos_adicionales: Number(ventaRow.productos_adicionales ?? 0),
+        });
+        if (activo && calcRow && typeof calcRow === 'object' && !('error' in calcRow)) {
+          setCalculo(calcRow as unknown as DesgloseCalculo);
+        }
+      }
+
       setLoading(false);
     })();
 
@@ -484,6 +521,7 @@ function DetailInner() {
       ['Valor comercial', fmtMoney(venta.valor_comercial)],
       ['Valor de escrituración', fmtMoney(venta.valor_escrituracion)],
       ['Enganche requerido', fmtMoney(venta.enganche_requerido)],
+      ['Productos adicionales', fmtMoney(venta.productos_adicionales)],
       ['Descuento total', fmtMoney(venta.descuento_total)],
       ['Crédito titular', fmtMoney(venta.monto_credito_titular)],
       ['Crédito co-titular', fmtMoney(venta.monto_credito_cotitular)],
@@ -591,6 +629,49 @@ function DetailInner() {
         ) : (
           <FichaGrid rows={fichaVenta} cols={3} />
         )}
+        {calculo ? (
+          <div className="mt-5 border-t border-[var(--border)] pt-5">
+            <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
+              Desglose del cálculo
+            </h3>
+            <FichaGrid
+              rows={[
+                { label: 'Valor comercial', value: fmtMoney(calculo.valor_comercial) ?? '—' },
+                {
+                  label: `Excedente terreno (${calculo.metros_excedentes.toFixed(1)} m²)`,
+                  value: fmtMoney(calculo.valor_excedente_terreno) ?? '—',
+                },
+                { label: 'Frente verde', value: fmtMoney(calculo.valor_frente_verde) ?? '—' },
+                {
+                  label: `Esquina (${(calculo.pct_esquina_aplicado * 100).toFixed(1)}%)`,
+                  value: fmtMoney(calculo.valor_esquina) ?? '—',
+                },
+                { label: 'Venta futuro', value: fmtMoney(calculo.valor_venta_futuro) ?? '—' },
+                {
+                  label: 'Costo crédito adicional',
+                  value: fmtMoney(calculo.costo_credito_adicional) ?? '—',
+                },
+                {
+                  label: 'Productos adicionales',
+                  value: fmtMoney(calculo.productos_adicionales) ?? '—',
+                },
+                {
+                  label: 'Precio de venta total',
+                  value: fmtMoney(calculo.precio_venta_total) ?? '—',
+                },
+                { label: 'Apoyo Infonavit', value: fmtMoney(calculo.apoyo_infonavit) ?? '—' },
+                { label: 'Pago directo cliente', value: fmtMoney(calculo.pago_directo) ?? '—' },
+                { label: 'Enganche 1%', value: fmtMoney(calculo.enganche_1pct) ?? '—' },
+                { label: 'ISAI 2%', value: fmtMoney(calculo.isai_2pct) ?? '—' },
+                {
+                  label: 'Gastos notariales 6%',
+                  value: fmtMoney(calculo.gastos_notariales_6pct) ?? '—',
+                },
+              ]}
+              cols={3}
+            />
+          </div>
+        ) : null}
         {venta.motivo_desasignacion ? (
           <div className="mt-4 border-t border-[var(--border)] pt-4">
             <div className="text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">

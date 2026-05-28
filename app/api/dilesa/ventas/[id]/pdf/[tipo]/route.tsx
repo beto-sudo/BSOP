@@ -25,6 +25,7 @@ import { AvisoPrivacidadPDF, type AvisoPrivacidadData } from '@/lib/dilesa/pdf/a
 import { FicuPDF, type FicuData } from '@/lib/dilesa/pdf/ficu';
 import { PromesaCompraventaPDF, type PromesaData } from '@/lib/dilesa/pdf/promesa-compraventa';
 import { evaluarRiesgo } from '@/lib/dilesa/ficu/riesgo';
+import { formatMontoEnLetras } from '@/lib/format/numero-a-letras';
 
 const TIPOS = ['solicitud-asignacion', 'aviso-privacidad', 'ficu', 'promesa-compraventa'] as const;
 type TipoPdf = (typeof TIPOS)[number];
@@ -57,11 +58,15 @@ export async function GET(
   const sb = await createSupabaseServerClient();
 
   // Venta + relaciones cross-schema. RLS filtra automáticamente.
+  // `ine_numero` se preserva en venta porque es per-venta (la INE específica
+  // que presentó el comprador en este expediente). Los demás KYC fields
+  // (forma_pago, uso_efectivo, ocupacion, es_pep, conocimiento_dueno_beneficiario)
+  // viven en erp.personas y se leen desde ahí (Sprint 7c-2 los puso ahí).
   const { data: venta, error: vErr } = await sb
     .schema('dilesa')
     .from('ventas')
     .select(
-      'id, persona_id, unidad_id, tipo_credito, vendedor, monto_credito_titular, monto_credito_cotitular, productos_adicionales, created_at, es_pep, ocupacion, ine_numero, forma_pago, uso_efectivo'
+      'id, persona_id, unidad_id, vendedor_usuario_id, tipo_credito, vendedor, monto_credito_titular, monto_credito_cotitular, productos_adicionales, precio_asignacion, created_at, ine_numero'
     )
     .eq('id', id)
     .is('deleted_at', null)
@@ -70,12 +75,13 @@ export async function GET(
     return NextResponse.json({ error: 'Venta no encontrada' }, { status: 404 });
   }
 
-  // Persona (cliente) cross-schema — FICU necesita todos los campos
+  // Persona (cliente) cross-schema — FICU + Promesa necesitan todos los KYC
+  // fields que el form de Sprint 7c-2 persistió aquí (no en `dilesa.ventas`).
   const { data: persona } = await sb
     .schema('erp')
     .from('personas')
     .select(
-      'nombre, apellido_paterno, apellido_materno, fecha_nacimiento, curp, rfc, email, telefono, nacionalidad, tipo_persona, domicilio'
+      'nombre, apellido_paterno, apellido_materno, fecha_nacimiento, curp, rfc, email, telefono, nacionalidad, tipo_persona, domicilio, forma_pago_kyc, uso_efectivo_kyc, ocupacion, conocimiento_dueno_beneficiario, es_pep'
     )
     .eq('id', venta.persona_id)
     .maybeSingle();
@@ -83,6 +89,26 @@ export async function GET(
     [persona?.nombre, persona?.apellido_paterno, persona?.apellido_materno]
       .filter(Boolean)
       .join(' ') || '(sin nombre)';
+
+  // Vendedor (asesor de ventas) — el form persiste `vendedor_usuario_id`
+  // (FK a core.usuarios); el campo legacy `venta.vendedor` (text) puede
+  // estar vacío en ventas nuevas. Resolvemos el nombre via lookup. Si no hay
+  // usuario o falta `first_name`, caemos al campo text legacy.
+  let vendedorNombre = (venta.vendedor ?? '').toString();
+  if (venta.vendedor_usuario_id) {
+    const { data: u } = await sb
+      .schema('core')
+      .from('usuarios')
+      .select('first_name, email')
+      .eq('id', venta.vendedor_usuario_id)
+      .maybeSingle();
+    if (u?.first_name) {
+      vendedorNombre = u.first_name;
+    } else if (u?.email && !vendedorNombre) {
+      // Sin first_name configurado: usar email como fallback (mejor que vacío).
+      vendedorNombre = u.email;
+    }
+  }
 
   // Unidad + proyecto + producto (todos en dilesa)
   let identificacionInventario = '';
@@ -192,27 +218,41 @@ export async function GET(
         : Promise.resolve({ data: null }),
     ]);
 
+    // El precio de la operación es el TOTAL de la venta, no la suma de
+    // créditos (que omite enganche, gastos notariales y pago directo).
+    // Usamos `precio_asignacion` (snapshot persistido del cálculo) y
+    // fallback a la suma de créditos solo si no está disponible.
     const precio =
+      Number(venta.precio_asignacion ?? 0) ||
       Number(venta.monto_credito_titular ?? 0) + Number(venta.monto_credito_cotitular ?? 0);
     const arras1pct = Math.round(precio * 0.01);
     const arras10pct = Math.round(precio * 0.1);
     const modeloSufijo = productoFull?.nombre ? (productoFull.nombre.split('-').pop() ?? '') : '';
 
+    // La promesa se firma en el momento de la impresión. Toda la fecha
+    // del contrato refleja "ahora", no `venta.created_at`.
+    const ahora = new Date();
+    const fechaTextoPromesa = ahora.toLocaleDateString('es-MX', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
     const data: PromesaData = {
-      fechaTexto,
-      horaTexto: fechaCreado.toLocaleTimeString('es-MX', {
+      fechaTexto: fechaTextoPromesa,
+      horaTexto: ahora.toLocaleTimeString('es-MX', {
         hour: 'numeric',
         minute: '2-digit',
       }),
-      diaTexto: String(fechaCreado.getDate()),
-      mesTexto: MESES_ES[fechaCreado.getMonth()],
-      anioTexto: String(fechaCreado.getFullYear()),
+      diaTexto: String(ahora.getDate()),
+      mesTexto: MESES_ES[ahora.getMonth()],
+      anioTexto: String(ahora.getFullYear()),
       comprador: {
         nombre: clienteNombre.toUpperCase(),
         curp: persona?.curp ?? null,
         rfc: persona?.rfc ?? null,
         estadoCivil: null, // TODO sprint-7c: capturar estado civil en form
-        profesion: venta.ocupacion ?? null,
+        profesion: persona?.ocupacion ?? null,
         domicilio: persona?.domicilio ?? null,
         ineNumero: venta.ine_numero ?? null,
       },
@@ -227,6 +267,7 @@ export async function GET(
       },
       operacion: {
         precio,
+        precioEnLetra: formatMontoEnLetras(precio),
         enganche1pct: arras1pct,
         arras10pct,
         tipoCredito: venta.tipo_credito ?? '',
@@ -236,19 +277,22 @@ export async function GET(
         .map((p) => p[0]?.toUpperCase())
         .filter(Boolean)
         .slice(0, 3)
-        .join('')}-${identificacionInventario}-${fechaCreado.toLocaleString('es-MX')}`,
+        .join('')}-${identificacionInventario}-${ahora.toLocaleString('es-MX')}`,
     };
     const buf = await renderToBuffer(<PromesaCompraventaPDF data={data} />);
     return pdfResponse(buf, `promesa-compraventa-${identificacionInventario || id}.pdf`);
   }
 
   if (tipo === 'ficu') {
+    // KYC fields viven en erp.personas (Sprint 7c-2). El form de Solicitud
+    // los persiste ahí, no en dilesa.ventas. Leer desde persona evita el
+    // bug de "FICU vacío" cuando los fields de la venta nunca se poblaron.
     const riesgo = evaluarRiesgo({
       tipoPersona: persona?.tipo_persona,
       nacionalidad: persona?.nacionalidad,
-      esPep: venta.es_pep,
-      formaPago: venta.forma_pago,
-      usoEfectivo: venta.uso_efectivo,
+      esPep: persona?.es_pep,
+      formaPago: persona?.forma_pago_kyc,
+      usoEfectivo: persona?.uso_efectivo_kyc,
     });
     const fechaNac = persona?.fecha_nacimiento
       ? new Date(`${persona.fecha_nacimiento}T00:00:00`).toLocaleDateString('es-MX', {
@@ -276,10 +320,11 @@ export async function GET(
       correo: persona?.email ?? '',
       personalidad: (persona?.tipo_persona ?? 'persona física').toUpperCase(),
       nacionalidad: (persona?.nacionalidad ?? '').toUpperCase(),
-      esPep: !!venta.es_pep,
-      formaPago: (venta.forma_pago ?? '').toUpperCase(),
-      usoEfectivo: (venta.uso_efectivo ?? '').toUpperCase(),
-      ocupacion: (venta.ocupacion ?? '').toUpperCase(),
+      esPep: !!persona?.es_pep,
+      formaPago: (persona?.forma_pago_kyc ?? '').toUpperCase(),
+      usoEfectivo: (persona?.uso_efectivo_kyc ?? '').toUpperCase(),
+      ocupacion: (persona?.ocupacion ?? '').toUpperCase(),
+      conocimientoDuenoBeneficiario: persona?.conocimiento_dueno_beneficiario ?? '—',
       criteriosRiesgo: riesgo.criterios,
       scoreTotal: riesgo.scoreTotal,
       clasificacionRiesgo: riesgo.clasificacion,
@@ -311,7 +356,7 @@ export async function GET(
 
   const data: SolicitudData = {
     fechaTexto,
-    asesorVentas: (venta.vendedor ?? '').toUpperCase(),
+    asesorVentas: vendedorNombre.toUpperCase(),
     valorComercial: Number(c?.valor_comercial ?? 0),
     valorExcedenteTerreno: Number(c?.valor_excedente_terreno ?? 0),
     valorFrenteVerde: Number(c?.valor_frente_verde ?? 0),
