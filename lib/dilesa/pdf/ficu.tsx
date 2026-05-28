@@ -65,6 +65,7 @@ export type FicuData = {
   formaPago: string;
   usoEfectivo: string;
   ocupacion: string;
+  conocimientoDuenoBeneficiario: string;
 
   // Riesgo (EBR)
   criteriosRiesgo: CriterioRiesgo[];
@@ -121,7 +122,10 @@ export function FicuPDF({ data }: { data: FicuData }) {
         <DataRow label="Forma de Pago:" value={data.formaPago} />
         <DataRow label="Uso de Efectivo:" value={data.usoEfectivo} />
         <DataRow label="Actividad, Ocupación o Profesión:" value={data.ocupacion} />
-        <DataRow label="Conocimiento Dueño Beneficiario:" value="Por cuenta propia" />
+        <DataRow
+          label="Conocimiento Dueño Beneficiario:"
+          value={data.conocimientoDuenoBeneficiario || '—'}
+        />
 
         {/* ── Evaluación de Riesgo + Pie Chart ── */}
         <View style={ficuStyles.riesgoSection}>

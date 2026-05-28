@@ -66,6 +66,7 @@ export type PromesaData = {
 
   operacion: {
     precio: number; // 1021000
+    precioEnLetra: string; // "Un Millón Veintiún Mil Pesos 00/100 M.N."
     enganche1pct: number; // 10210
     arras10pct: number; // 102100
     tipoCredito: string; // "Infonavit" / "Bancario" / "Recursos propios"
@@ -209,7 +210,7 @@ export function PromesaCompraventaPDF({ data }: { data: PromesaData }) {
               pactado de la PROMESA DE COMPRAVENTA, para efectos de la operación futura, lo
               constituirá la cantidad de{' '}
               <Text style={contratoStyles.bold}>
-                {money(data.operacion.precio)} Pesos Mexicanos
+                {money(data.operacion.precio)} ({data.operacion.precioEnLetra})
               </Text>
               , precio que acuerdan <Text style={contratoStyles.quoted}>“LAS PARTES”</Text> como
               valor total de la operación de compraventa y que se pagará mediante crédito INFONAVIT,
