@@ -3277,6 +3277,13 @@ export type Database = {
             foreignKeyName: "venta_fases_venta_id_fkey"
             columns: ["venta_id"]
             isOneToOne: false
+            referencedRelation: "v_unidad_hold_queue"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_fases_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
             referencedRelation: "ventas"
             referencedColumns: ["id"]
           },
@@ -3327,6 +3334,13 @@ export type Database = {
             foreignKeyName: "venta_pagos_venta_id_fkey"
             columns: ["venta_id"]
             isOneToOne: false
+            referencedRelation: "v_unidad_hold_queue"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_pagos_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
             referencedRelation: "ventas"
             referencedColumns: ["id"]
           },
@@ -3349,6 +3363,8 @@ export type Database = {
           enganche_requerido: number | null
           es_pep: boolean | null
           estado: string
+          expira_at: string | null
+          expirada_at: string | null
           fase_actual: string | null
           fase_posicion: number | null
           fecha_escritura: string | null
@@ -3362,6 +3378,10 @@ export type Database = {
           motivo_desasignacion: string | null
           notario: string | null
           notas: string | null
+          notif_hold_4h_at: string | null
+          notif_hold_creado_at: string | null
+          notif_hold_expirada_at: string | null
+          notif_hold_promovido_at: string | null
           numero_escritura: string | null
           ocupacion: string | null
           persona_id: string
@@ -3392,6 +3412,8 @@ export type Database = {
           enganche_requerido?: number | null
           es_pep?: boolean | null
           estado?: string
+          expira_at?: string | null
+          expirada_at?: string | null
           fase_actual?: string | null
           fase_posicion?: number | null
           fecha_escritura?: string | null
@@ -3405,6 +3427,10 @@ export type Database = {
           motivo_desasignacion?: string | null
           notario?: string | null
           notas?: string | null
+          notif_hold_4h_at?: string | null
+          notif_hold_creado_at?: string | null
+          notif_hold_expirada_at?: string | null
+          notif_hold_promovido_at?: string | null
           numero_escritura?: string | null
           ocupacion?: string | null
           persona_id: string
@@ -3435,6 +3461,8 @@ export type Database = {
           enganche_requerido?: number | null
           es_pep?: boolean | null
           estado?: string
+          expira_at?: string | null
+          expirada_at?: string | null
           fase_actual?: string | null
           fase_posicion?: number | null
           fecha_escritura?: string | null
@@ -3448,6 +3476,10 @@ export type Database = {
           motivo_desasignacion?: string | null
           notario?: string | null
           notas?: string | null
+          notif_hold_4h_at?: string | null
+          notif_hold_creado_at?: string | null
+          notif_hold_expirada_at?: string | null
+          notif_hold_promovido_at?: string | null
           numero_escritura?: string | null
           ocupacion?: string | null
           persona_id?: string
@@ -3591,6 +3623,30 @@ export type Database = {
           },
         ]
       }
+      v_unidad_hold_queue: {
+        Row: {
+          created_at: string | null
+          empresa_id: string | null
+          expira_at: string | null
+          notif_hold_4h_at: string | null
+          notif_hold_creado_at: string | null
+          notif_hold_promovido_at: string | null
+          persona_id: string | null
+          posicion: number | null
+          unidad_id: string | null
+          vendedor_usuario_id: string | null
+          venta_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ventas_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       fn_calcular_avance_construccion: {
@@ -3613,6 +3669,16 @@ export type Database = {
         Returns: {
           estimaciones_creadas: number
           tareas_vinculadas: number
+        }[]
+      }
+      fn_expirar_ventas_vencidas: {
+        Args: never
+        Returns: {
+          empresa_id: string
+          persona_id: string
+          unidad_id: string
+          vendedor_usuario_id: string
+          venta_id: string
         }[]
       }
       fn_generar_estimacion_borrador: {

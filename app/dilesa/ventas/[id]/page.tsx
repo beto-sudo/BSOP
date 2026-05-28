@@ -32,6 +32,12 @@ import type { BadgeTone } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getAdjuntoProxyUrl } from '@/lib/adjuntos';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import {
+  snapshotHold,
+  formatearVencimiento,
+  type ColaItem,
+  type HoldSnapshot,
+} from '@/lib/dilesa/hold-cola';
 
 type Venta = {
   id: string;
@@ -39,6 +45,7 @@ type Venta = {
   unidad_id: string | null;
   vendedor_usuario_id: string | null;
   estado: string;
+  expira_at: string | null;
   fase_actual: string | null;
   fase_posicion: number | null;
   tipo_credito: string | null;
@@ -169,7 +176,7 @@ const moneyFmt = new Intl.NumberFormat('es-MX', {
  */
 const FASE_ROLES: Record<string, string[]> = {
   'Solicitud de Asignación': ['solicitud_asignacion'],
-  Asignada: ['aviso_pld', 'expediente_digital', 'ficu', 'aviso_privacidad'],
+  Asignada: ['expediente_digital', 'ficu', 'aviso_privacidad'],
   Formalizada: ['contrato_promesa'],
   'Solicitud de Avalúo': [],
   'Avalúo Cerrado': ['avaluo_comercial'],
@@ -198,8 +205,9 @@ const FASE_ROLES: Record<string, string[]> = {
  * aparece (la fase no es capturable aún desde BSOP).
  */
 const CAPTURAR_SLUG_BY_POSICION: Record<number, string> = {
+  2: '2-asignada',
   3: '3-formalizada',
-  // 2, 4–17 → próximos PRs del Sprint 7c
+  // 4–17 → próximos PRs del Sprint 7c
 };
 
 /** Las 17 fases canónicas en orden — para mostrar incluso las no alcanzadas. */
@@ -264,6 +272,7 @@ function DetailInner() {
   const [adjuntos, setAdjuntos] = useState<Adjunto[]>([]);
   const [calculo, setCalculo] = useState<DesgloseCalculo | null>(null);
   const [vendedorNombre, setVendedorNombre] = useState<string | null>(null);
+  const [holdSnapshot, setHoldSnapshot] = useState<HoldSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -397,6 +406,30 @@ function DetailInner() {
         }
       } else if (activo) {
         setVendedorNombre(ventaRow.vendedor || null);
+      }
+
+      // Snapshot del hold/cola para banners de la página. Solo aplica a
+      // ventas creadas en BSOP (no históricas Coda) y Fase 1.
+      if (ventaRow.unidad_id) {
+        const { data: colaRows } = await sb
+          .schema('dilesa')
+          .from('v_unidad_hold_queue')
+          .select('venta_id, posicion, created_at, expira_at')
+          .eq('unidad_id', ventaRow.unidad_id)
+          .order('posicion', { ascending: true });
+        if (activo) {
+          const cola = (colaRows ?? []) as ColaItem[];
+          setHoldSnapshot(
+            snapshotHold({
+              ventaId: ventaRow.id,
+              estado: ventaRow.estado,
+              expiraAt: ventaRow.expira_at ? new Date(ventaRow.expira_at) : null,
+              cola,
+            })
+          );
+        }
+      } else if (activo) {
+        setHoldSnapshot(null);
       }
 
       // Desglose del cálculo — se recalcula con los datos snapshot de la venta
@@ -618,6 +651,10 @@ function DetailInner() {
           {venta.tipo_credito ? <Badge tone="neutral">{venta.tipo_credito}</Badge> : null}
         </div>
       </header>
+
+      {holdSnapshot && holdSnapshot.estado !== 'no_aplica' ? (
+        <HoldBanner snapshot={holdSnapshot} />
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         <PdfDownloadLink
@@ -920,6 +957,70 @@ function FichaGrid({ rows, cols = 2 }: { rows: { label: string; value: string }[
         </div>
       ))}
     </dl>
+  );
+}
+
+function HoldBanner({ snapshot }: { snapshot: HoldSnapshot }) {
+  let tone: 'success' | 'warning' | 'danger' = 'success';
+  let title = '';
+  let body = '';
+  switch (snapshot.estado) {
+    case 'lider_ok': {
+      tone = 'success';
+      title = 'Líder de la fila — hold activo';
+      body = snapshot.expira_at
+        ? `Vence ${formatearVencimiento(snapshot.expira_at)}. Completá el expediente antes para que Dirección autorice la asignación.`
+        : 'Completá el expediente para que Dirección autorice la asignación.';
+      if (snapshot.esperando > 0)
+        body += ` Hay ${snapshot.esperando} en fila esperando esta unidad.`;
+      break;
+    }
+    case 'lider_warning': {
+      tone = 'warning';
+      title = '⚠️ Hold expira pronto';
+      body = snapshot.expira_at
+        ? `${formatearVencimiento(snapshot.expira_at, { mostrarRestante: true })}. Si no completás el expediente, el siguiente en la fila toma el lugar.`
+        : 'El hold expira en menos de 4 horas.';
+      break;
+    }
+    case 'lider_expirado': {
+      tone = 'danger';
+      title = 'Hold expirado';
+      body =
+        'El plazo de 2 días hábiles pasó. El sistema marcará la venta como expirada y promoverá al siguiente en la fila en la próxima vuelta del cron.';
+      break;
+    }
+    case 'en_cola': {
+      tone = 'warning';
+      title = `En fila — posición #${snapshot.posicion}`;
+      body = snapshot.expira_at
+        ? `Esperando que el líder complete o expire ${formatearVencimiento(snapshot.expira_at)}.`
+        : 'Esperando que el líder complete o expire su hold.';
+      break;
+    }
+    case 'expirada': {
+      tone = 'danger';
+      title = 'Hold perdido';
+      body =
+        'Esta solicitud perdió el hold por no completar expediente en 2 días hábiles. Si el cliente sigue interesado, podés recrear la solicitud y entrar al final de la fila.';
+      break;
+    }
+    case 'no_aplica':
+      return null;
+  }
+
+  const cls =
+    tone === 'success'
+      ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-900 dark:text-emerald-100'
+      : tone === 'warning'
+        ? 'border-amber-500/30 bg-amber-500/5 text-amber-900 dark:text-amber-100'
+        : 'border-red-500/30 bg-red-500/5 text-red-900 dark:text-red-100';
+
+  return (
+    <div className={`rounded-lg border px-4 py-3 text-sm ${cls}`}>
+      <p className="font-semibold">{title}</p>
+      <p className="mt-1 text-sm opacity-90">{body}</p>
+    </div>
   );
 }
 
