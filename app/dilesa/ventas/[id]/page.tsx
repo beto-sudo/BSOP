@@ -263,6 +263,7 @@ function DetailInner() {
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [adjuntos, setAdjuntos] = useState<Adjunto[]>([]);
   const [calculo, setCalculo] = useState<DesgloseCalculo | null>(null);
+  const [vendedorNombre, setVendedorNombre] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -379,6 +380,24 @@ function DetailInner() {
         return;
       }
       setAdjuntos((adjRows ?? []) as Adjunto[]);
+
+      // Vendedor (asesor de ventas) — lookup core.usuarios para mostrar
+      // nombre completo, mismo patrón que el endpoint PDF. El campo
+      // legacy `venta.vendedor` (text) puede estar vacío en ventas nuevas.
+      if (ventaRow.vendedor_usuario_id) {
+        const { data: u } = await sb
+          .schema('core')
+          .from('usuarios')
+          .select('first_name, last_name, email')
+          .eq('id', ventaRow.vendedor_usuario_id)
+          .maybeSingle();
+        if (activo) {
+          const completo = [u?.first_name, u?.last_name].filter(Boolean).join(' ').trim();
+          setVendedorNombre(completo || u?.email || ventaRow.vendedor || null);
+        }
+      } else if (activo) {
+        setVendedorNombre(ventaRow.vendedor || null);
+      }
 
       // Desglose del cálculo — se recalcula con los datos snapshot de la venta
       // para mostrar TODOS los componentes (excedente, frente verde, esquina,
@@ -514,7 +533,7 @@ function DetailInner() {
       ['Unidad', unidad?.identificador ?? null],
       ['Prototipo', prototipoNombre],
       ['Tipo de crédito', venta.tipo_credito],
-      ['Vendedor', venta.vendedor],
+      ['Asesor de ventas', vendedorNombre ?? venta.vendedor],
       ['Notario', venta.notario],
       ['Casa valuadora', venta.casa_valuadora],
       ['Precio de asignación', fmtMoney(venta.precio_asignacion)],

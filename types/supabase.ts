@@ -684,6 +684,7 @@ export type Database = {
           first_name: string | null
           id: string
           junta_activa_id: string | null
+          last_name: string | null
           rol: string
           welcome_sent_at: string | null
         }
@@ -694,6 +695,7 @@ export type Database = {
           first_name?: string | null
           id?: string
           junta_activa_id?: string | null
+          last_name?: string | null
           rol?: string
           welcome_sent_at?: string | null
         }
@@ -704,6 +706,7 @@ export type Database = {
           first_name?: string | null
           id?: string
           junta_activa_id?: string | null
+          last_name?: string | null
           rol?: string
           welcome_sent_at?: string | null
         }

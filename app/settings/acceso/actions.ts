@@ -52,6 +52,7 @@ export type UsuarioCore = {
   id: string;
   email: string;
   first_name: string | null;
+  last_name: string | null;
   activo: boolean;
   welcome_sent_at: string | null;
 };
@@ -238,7 +239,11 @@ export async function upsertPermisoRol(
 
 // ── Usuario CRUD (RBAC) ────────────────────────────────────────────────────
 
-export async function createUsuarioCore(email: string, first_name: string): Promise<void> {
+export async function createUsuarioCore(
+  email: string,
+  first_name: string,
+  last_name?: string
+): Promise<void> {
   await requireAdmin();
   const admin = getSupabaseAdminClient()!;
   const cleanEmail = email.toLowerCase().trim();
@@ -279,6 +284,7 @@ export async function createUsuarioCore(email: string, first_name: string): Prom
       id: authUserId,
       email: cleanEmail,
       first_name: first_name.trim() || null,
+      last_name: last_name?.trim() || null,
       rol: 'viewer',
       activo: true,
     });
@@ -288,6 +294,31 @@ export async function createUsuarioCore(email: string, first_name: string): Prom
   }
 
   // 5. NO welcome email here — it's sent when the first empresa is assigned
+  revalidatePath('/settings/acceso');
+}
+
+/**
+ * Actualiza nombre + apellido del usuario. Útil para usuarios existentes
+ * cuyo perfil fue cargado con sólo first_name antes de que existiera
+ * `last_name` (migración 20260528023539). Los documentos legales DILESA
+ * imprimen `${first_name} ${last_name}`.
+ */
+export async function updateUsuarioNombre(
+  id: string,
+  first_name: string | null,
+  last_name: string | null
+): Promise<void> {
+  await requireAdmin();
+  const admin = getSupabaseAdminClient()!;
+  const { error } = await admin
+    .schema('core')
+    .from('usuarios')
+    .update({
+      first_name: first_name?.trim() || null,
+      last_name: last_name?.trim() || null,
+    })
+    .eq('id', id);
+  if (error) throw new Error(error.message);
   revalidatePath('/settings/acceso');
 }
 

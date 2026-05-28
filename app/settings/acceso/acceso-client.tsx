@@ -69,6 +69,7 @@ import {
   deleteRolRecord,
   upsertPermisoRol,
   createUsuarioCore,
+  updateUsuarioNombre,
   setUsuarioEmpresaAcceso,
   updateUsuarioEmpresaRol,
   upsertExcepcionUsuario,
@@ -210,6 +211,7 @@ export function AccesoClient({
   const [usuarioDialogOpen, setUsuarioDialogOpen] = useState(false);
   const [usuarioEmail, setUsuarioEmail] = useState('');
   const [usuarioFirstName, setUsuarioFirstName] = useState('');
+  const [usuarioLastName, setUsuarioLastName] = useState('');
 
   // ── Error state ──
   const [dialogError, setDialogError] = useState<string | null>(null);
@@ -277,6 +279,7 @@ export function AccesoClient({
   function openUsuarioDialog() {
     setUsuarioEmail('');
     setUsuarioFirstName('');
+    setUsuarioLastName('');
     setDialogError(null);
     setUsuarioDialogOpen(true);
   }
@@ -646,7 +649,7 @@ export function AccesoClient({
                           {u.email}
                         </TableCell>
                         <TableCell className="text-sm dark:text-white/60 text-[var(--text)]/60">
-                          {u.first_name ?? '—'}
+                          {[u.first_name, u.last_name].filter(Boolean).join(' ') || '—'}
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
@@ -702,7 +705,12 @@ export function AccesoClient({
         open={sheetOpen}
         onOpenChange={setSheetOpen}
         size="lg"
-        title={selectedUsuario?.first_name ?? selectedUsuario?.email ?? ''}
+        title={
+          selectedUsuario
+            ? [selectedUsuario.first_name, selectedUsuario.last_name].filter(Boolean).join(' ') ||
+              selectedUsuario.email
+            : ''
+        }
         description={
           selectedUsuario ? <span className="font-mono">{selectedUsuario.email}</span> : undefined
         }
@@ -711,6 +719,16 @@ export function AccesoClient({
           <>
             <ScrollArea className="flex-1 min-h-0">
               <div className="space-y-8 px-6 py-5">
+                {/* ── Datos personales (nombre + apellido) ── */}
+                <UsuarioNombreEditor
+                  key={selectedUsuario.id}
+                  usuario={selectedUsuario}
+                  isPending={isPending}
+                  onSave={(firstName, lastName) =>
+                    run(() => updateUsuarioNombre(selectedUsuario.id, firstName, lastName))
+                  }
+                />
+
                 {/* ── Empresas section ── */}
                 <section>
                   <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide dark:text-white/40 text-[var(--text-subtle)]">
@@ -1243,6 +1261,17 @@ export function AccesoClient({
                 placeholder="Ej. Juan"
               />
             </div>
+            <div className="space-y-1.5">
+              <p className="text-sm dark:text-white/60 text-[var(--text)]/60">
+                Apellido(s){' '}
+                <span className="dark:text-white/35 text-[var(--text)]/35">(opcional)</span>
+              </p>
+              <Input
+                value={usuarioLastName}
+                onChange={(e) => setUsuarioLastName(e.target.value)}
+                placeholder="Ej. Pérez García"
+              />
+            </div>
             {dialogError && (
               <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-400">
                 {dialogError}
@@ -1261,7 +1290,7 @@ export function AccesoClient({
               disabled={!usuarioEmail.trim() || isPending}
               onClick={() => {
                 run(
-                  () => createUsuarioCore(usuarioEmail, usuarioFirstName),
+                  () => createUsuarioCore(usuarioEmail, usuarioFirstName, usuarioLastName),
                   () => setUsuarioDialogOpen(false)
                 );
               }}
@@ -1272,5 +1301,71 @@ export function AccesoClient({
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+/**
+ * Editor inline para nombre + apellido del usuario. Vive arriba del bloque
+ * de empresas en el drawer. Mantiene draft local; al hacer blur en un
+ * input dispara onSave si hubo cambio real.
+ *
+ * El `key={usuario.id}` en el caller fuerza remount al cambiar de usuario
+ * — más simple que sincronizar drafts con useEffect.
+ */
+function UsuarioNombreEditor({
+  usuario,
+  isPending,
+  onSave,
+}: {
+  usuario: UsuarioCore;
+  isPending: boolean;
+  onSave: (firstName: string | null, lastName: string | null) => void;
+}) {
+  const [firstName, setFirstName] = useState(usuario.first_name ?? '');
+  const [lastName, setLastName] = useState(usuario.last_name ?? '');
+
+  function commit() {
+    const fn = firstName.trim() || null;
+    const ln = lastName.trim() || null;
+    const changed = fn !== usuario.first_name || ln !== usuario.last_name;
+    if (changed) onSave(fn, ln);
+  }
+
+  return (
+    <section>
+      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide dark:text-white/40 text-[var(--text-subtle)]">
+        Datos personales
+      </h3>
+      <p className="mb-3 text-xs dark:text-white/40 text-[var(--text)]/40">
+        El nombre completo (nombre + apellido) aparece en documentos legales de DILESA — Solicitud
+        de Asignación, Promesa de Compraventa, FICU.
+      </p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-xs dark:text-white/50 text-[var(--text)]/50">
+            Nombre
+          </label>
+          <Input
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            onBlur={commit}
+            disabled={isPending}
+            placeholder="Ej. Adalberto"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs dark:text-white/50 text-[var(--text)]/50">
+            Apellido(s)
+          </label>
+          <Input
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            onBlur={commit}
+            disabled={isPending}
+            placeholder="Ej. Santos de los Santos"
+          />
+        </div>
+      </div>
+    </section>
   );
 }

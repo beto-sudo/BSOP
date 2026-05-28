@@ -102,7 +102,7 @@ export default async function AccesoPage() {
     admin
       .schema('core')
       .from('usuarios')
-      .select('id, email, first_name, activo, welcome_sent_at')
+      .select('id, email, first_name, last_name, activo, welcome_sent_at')
       .order('email'),
     admin.schema('core').from('usuarios_empresas').select('usuario_id, empresa_id, rol_id'),
     admin
