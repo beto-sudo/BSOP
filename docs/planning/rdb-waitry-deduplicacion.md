@@ -3,7 +3,7 @@
 **Estado:** done
 **Empresas:** RDB
 **Schemas:** `rdb` (`waitry_pedidos.superseded_by_order_id`, `waitry_items_signature`, `detect_waitry_fantasma`, `refresh_waitry_superseded`, triggers en `waitry_pedidos`+`waitry_productos`, `v_waitry_pedidos`, `v_waitry_pedidos_con_fantasmas`)
-**Última actualización:** 2026-05-28 (follow-up F3 `paid=false` ≠ venta + ADR-035; iniciativa sigue `done`)
+**Última actualización:** 2026-05-28 (follow-up F3 `paid=false` ≠ venta + ADR-035 + saneamiento `handle_sc_corte_on_open`; iniciativa sigue `done`)
 
 > **Diferencia vs `rdb-waitry-ingesta-dedup`** (cerrada 2026-05-06):
 > esa iniciativa atacaba duplicados por **doble-tap del operador** en
@@ -259,6 +259,26 @@ rdb.waitry_pedidos`. (`security_invoker=on` per
     `paid=false` (un pago fallido nunca fue venta real, a diferencia de un
     fantasma). Pendientes derivados: F1 (fantasmas que escapan al cap de 15
     min) y bug latente de `handle_sc_corte_on_open`. **Aplicado a prod 2026-05-28** vía `supabase db push` (migración `20260528210000`): el backfill revirtió 118 movimientos de inventario (198.16 unidades devueltas al stock); la verificación post-apply confirma 0 pedidos `paid=false` en las vistas canónica/reportería/inventario y 361 preservados en la tabla base (auditoría).
+- **2026-05-28 — Saneamiento `handle_sc_corte_on_open`** (cierra el pendiente
+  derivado de F3). El diagnóstico halló **dos** funciones gemelas, no una:
+  `rdb.handle_sc_corte_on_open` (**código muerto** — sin trigger, porque
+  `rdb.cortes` nunca existió en prod y el guard de su migración nunca lo creó;
+  su body apunta a esa relación inexistente) y `erp.handle_sc_corte_on_open`
+  (**viva** — trigger `trg_sc_corte_on_open_erp` en `erp.cortes_caja`, 93
+  Corte-SC creados, último 2026-05-26). Fix: se **elimina** la `rdb` y se
+  **corrige** la `erp` (`'order_cancelled'`→`'order_canceled'` — el status real
+  del ingest es una L; y `+ AND paid IS TRUE` en el conteo y la asignación de
+  huérfanos, semántica F3). Confirmado **latente**: el typo no vive en ninguna
+  vista (solo en estas 2 funciones) y `v_cortes_totales` ya filtraba
+  `order_canceled` + `paid IS TRUE`, por eso no afectaba totales. **Sin
+  backfill** (consistente con F3; el `corte_id` histórico se preserva y la vista
+  lo excluye). Huella cosmética medida: 35 pedidos no-pagados/cancelados en
+  algún Corte-SC, 9/93 Corte-SC sin venta real. No se tocó
+  `process_waitry_inbound` (asigna `corte_id` sin filtrar `paid`, pero es
+  metadata no-financiera y path crítico de ingestión — fuera de alcance).
+  Migración `20260528221756`; **aplicada a prod 2026-05-28** vía
+  `supabase db push`, verificada (rdb eliminada, erp sin typo + con
+  `paid IS TRUE`, trigger activo).
 
 ## Riesgos y mitigaciones
 
