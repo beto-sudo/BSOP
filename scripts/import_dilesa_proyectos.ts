@@ -107,8 +107,6 @@ async function main() {
 
   const proyectos = pRows.map((row) => {
     const v = row.values;
-    const clasif = str(pick(v, pCm, 'Clasificación Inmobiliaria'));
-    const notasCoda = str(pick(v, pCm, 'Notas'));
     return {
       empresa_id: empresaId,
       tipo: 'desarrollo',
@@ -122,10 +120,22 @@ async function main() {
       fecha_licencia: dateStr(pick(v, pCm, 'Fecha Licencia Fraccionamiento')),
       costo_terreno: num(pick(v, pCm, 'Costo Terreno')),
       costo_urbanizacion: num(pick(v, pCm, 'Costo de Urbanización')),
-      costo_construccion: num(pick(v, pCm, 'Costo de MO')),
-      notas: [clasif ? `Clasificación inmobiliaria: ${clasif}` : null, notasCoda]
-        .filter(Boolean)
-        .join('\n'),
+      // costo_construccion NO se mapea desde Coda — esa columna solo tiene
+      // "Costo de MO" que se mapea aparte. costo_construccion queda capturable
+      // post-import.
+      notas: str(pick(v, pCm, 'Notas')),
+      // Sprint A — 4 campos raw.
+      plano_oficial_url: firstUrl(pick(v, pCm, 'Plano Oficial')),
+      image_url: firstUrl(pick(v, pCm, 'Image')),
+      acreditacion_escritura: str(pick(v, pCm, 'Acreditación Escritura')),
+      objetivo_trimestral: int(pick(v, pCm, 'Objetivo Trimestral')),
+      // Sprint C — paridad v2.
+      clasificacion_inmobiliaria: str(pick(v, pCm, 'Clasificación Inmobiliaria')),
+      area_comercial_m2: num(pick(v, pCm, 'Area Comercial M²')),
+      area_residencial_m2: num(pick(v, pCm, 'Area Residencial M²')),
+      area_vialidades_m2: num(pick(v, pCm, 'Area Vialidades Banquetas y Equipamiento M²')),
+      precio_m2_excedente: num(pick(v, pCm, 'Precio M² Excedente')),
+      costo_mo: num(pick(v, pCm, 'Costo de MO')),
     };
   });
 

@@ -2825,13 +2825,17 @@ export type Database = {
       proyectos: {
         Row: {
           acreditacion_escritura: string | null
+          area_comercial_m2: number | null
           area_m2: number | null
+          area_residencial_m2: number | null
           area_vendible_m2: number | null
+          area_vialidades_m2: number | null
           areas_verdes_m2: number | null
           clasificacion_inmobiliaria: string | null
           clave_interna: string | null
           costo_comercializacion: number | null
           costo_construccion: number | null
+          costo_mo: number | null
           costo_terreno: number | null
           costo_urbanizacion: number | null
           created_at: string
@@ -2861,13 +2865,17 @@ export type Database = {
         }
         Insert: {
           acreditacion_escritura?: string | null
+          area_comercial_m2?: number | null
           area_m2?: number | null
+          area_residencial_m2?: number | null
           area_vendible_m2?: number | null
+          area_vialidades_m2?: number | null
           areas_verdes_m2?: number | null
           clasificacion_inmobiliaria?: string | null
           clave_interna?: string | null
           costo_comercializacion?: number | null
           costo_construccion?: number | null
+          costo_mo?: number | null
           costo_terreno?: number | null
           costo_urbanizacion?: number | null
           created_at?: string
@@ -2897,13 +2905,17 @@ export type Database = {
         }
         Update: {
           acreditacion_escritura?: string | null
+          area_comercial_m2?: number | null
           area_m2?: number | null
+          area_residencial_m2?: number | null
           area_vendible_m2?: number | null
+          area_vialidades_m2?: number | null
           areas_verdes_m2?: number | null
           clasificacion_inmobiliaria?: string | null
           clave_interna?: string | null
           costo_comercializacion?: number | null
           costo_construccion?: number | null
+          costo_mo?: number | null
           costo_terreno?: number | null
           costo_urbanizacion?: number | null
           created_at?: string
@@ -3083,6 +3095,7 @@ export type Database = {
           deleted_at: string | null
           empresa_id: string
           es_esquina: boolean | null
+          es_muestra: boolean
           estado: string
           id: string
           identificador: string
@@ -3107,6 +3120,7 @@ export type Database = {
           deleted_at?: string | null
           empresa_id: string
           es_esquina?: boolean | null
+          es_muestra?: boolean
           estado?: string
           id?: string
           identificador: string
@@ -3131,6 +3145,7 @@ export type Database = {
           deleted_at?: string | null
           empresa_id?: string
           es_esquina?: boolean | null
+          es_muestra?: boolean
           estado?: string
           id?: string
           identificador?: string
@@ -3512,18 +3527,27 @@ export type Database = {
           avance_const_pct: number | null
           avance_urb_pct: number | null
           avance_vts_pct: number | null
+          casas_asignadas: number | null
           casas_en_construccion: number | null
+          casas_entregadas: number | null
           casas_escrituradas: number | null
+          casas_muestra: number | null
           casas_terminadas: number | null
+          densidad_vivienda: number | null
           empresa_id: string | null
           estado_actual: string | null
           estado_sugerido: string | null
+          inventario_disponible_venta: number | null
+          inventario_formalizado: number | null
+          lotes_comerciales: number | null
           lotes_construidos: number | null
+          lotes_residenciales: number | null
           lotes_total: number | null
           lotes_urbanizados: number | null
           lotes_vendidos: number | null
           parque_disponible: number | null
           proyecto_id: string | null
+          tamano_lote_promedio_m2: number | null
           ticket_promedio: number | null
           tipo: string | null
           ventas_totales: number | null

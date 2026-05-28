@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { deriveKpis } from './proyectos-module';
-import type { ProyectoDetalle } from './proyecto-detalle';
+import { deriveKpis, type ProyectoListRow } from './proyectos-module';
 
-function p(overrides: Partial<ProyectoDetalle>): ProyectoDetalle {
+function p(overrides: Partial<ProyectoListRow>): ProyectoListRow {
   return {
     id: 'id',
     tipo: 'desarrollo',
@@ -28,6 +27,13 @@ function p(overrides: Partial<ProyectoDetalle>): ProyectoDetalle {
     image_url: null,
     acreditacion_escritura: null,
     objetivo_trimestral: null,
+    clasificacion_inmobiliaria: null,
+    area_comercial_m2: null,
+    area_residencial_m2: null,
+    area_vialidades_m2: null,
+    precio_m2_excedente: null,
+    costo_mo: null,
+    avances: null,
     ...overrides,
   };
 }

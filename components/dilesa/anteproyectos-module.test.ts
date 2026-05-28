@@ -29,6 +29,12 @@ function ap(overrides: Partial<ProyectoDetalle>): ProyectoDetalle {
     image_url: null,
     acreditacion_escritura: null,
     objetivo_trimestral: null,
+    clasificacion_inmobiliaria: null,
+    area_comercial_m2: null,
+    area_residencial_m2: null,
+    area_vialidades_m2: null,
+    precio_m2_excedente: null,
+    costo_mo: null,
     ...overrides,
   };
 }
