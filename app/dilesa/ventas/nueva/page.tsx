@@ -36,6 +36,7 @@ import {
   CONOCIMIENTO_DUENO_BENEFICIARIO_OPTIONS,
 } from '@/lib/dilesa/ficu/catalogos';
 import { evaluarRiesgo } from '@/lib/dilesa/ficu/riesgo';
+import { calcularExpiraAt } from '@/lib/dilesa/hold-cola';
 import { buildAdjuntoPath } from '@/lib/storage/path';
 
 type UnidadDisponible = {
@@ -521,6 +522,10 @@ function NuevaSolicitudForm() {
           estado: 'activa',
           fase_actual: 'Solicitud de Asignación',
           fase_posicion: 1,
+          // Hold de inventario: 2 días hábiles MX desde ahora. La columna
+          // `expira_at` la consume el cron de expiración + los banners UI.
+          // Ver `lib/dilesa/hold-cola.ts` + iniciativa Fase 2.
+          expira_at: calcularExpiraAt(new Date()).toISOString(),
           tipo_credito: tipoCredito?.nombre ?? null,
           valor_comercial: calculo?.valor_comercial ?? null,
           precio_asignacion: calculo?.precio_venta_total ?? null,
