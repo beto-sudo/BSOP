@@ -3363,6 +3363,7 @@ export type Database = {
           ocupacion: string | null
           persona_id: string
           precio_asignacion: number | null
+          productos_adicionales: number
           tipo_credito: string | null
           unidad_id: string | null
           updated_at: string
@@ -3405,6 +3406,7 @@ export type Database = {
           ocupacion?: string | null
           persona_id: string
           precio_asignacion?: number | null
+          productos_adicionales?: number
           tipo_credito?: string | null
           unidad_id?: string | null
           updated_at?: string
@@ -3447,6 +3449,7 @@ export type Database = {
           ocupacion?: string | null
           persona_id?: string
           precio_asignacion?: number | null
+          productos_adicionales?: number
           tipo_credito?: string | null
           unidad_id?: string | null
           updated_at?: string
@@ -3595,6 +3598,7 @@ export type Database = {
         Args: {
           p_monto_credito_cotitular?: number
           p_monto_credito_titular?: number
+          p_productos_adicionales?: number
           p_tipo_credito_id?: string
           p_unidad_id: string
         }

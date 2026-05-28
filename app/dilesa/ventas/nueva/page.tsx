@@ -80,6 +80,7 @@ type CalculoPrecio = {
   pct_esquina_aplicado: number;
   valor_venta_futuro: number;
   costo_credito_adicional: number;
+  productos_adicionales: number;
   precio_venta_total: number;
   apoyo_infonavit: number;
   monto_credito_titular: number;
@@ -136,6 +137,10 @@ function NuevaSolicitudForm() {
   const [promocionId, setPromocionId] = useState<string>('');
   const [montoCreditoTitular, setMontoCreditoTitular] = useState<string>('');
   const [montoCreditoCotitular, setMontoCreditoCotitular] = useState<string>('');
+  // Productos adicionales (paridad Coda): monto $ de extras del paquete que no
+  // están en `dilesa.productos` (closets, upgrades, mejoras puntuales). Se
+  // suma al precio total en `fn_calcular_precio_venta`. 0 si no hay.
+  const [productosAdicionales, setProductosAdicionales] = useState<string>('');
   // La fecha + hora de la solicitud la setea el servidor al guardar (now()).
   // Importante para orden FIFO en Fase 2 cuando hay inventario limitado.
 
@@ -310,6 +315,7 @@ function NuevaSolicitudForm() {
         p_tipo_credito_id: tipoCreditoId || undefined,
         p_monto_credito_titular: Number(montoCreditoTitular) || 0,
         p_monto_credito_cotitular: Number(montoCreditoCotitular) || 0,
+        p_productos_adicionales: Number(productosAdicionales) || 0,
       });
       if (!active) return;
       if (error) {
@@ -322,7 +328,14 @@ function NuevaSolicitudForm() {
     return () => {
       active = false;
     };
-  }, [sb, unidadId, tipoCreditoId, montoCreditoTitular, montoCreditoCotitular]);
+  }, [
+    sb,
+    unidadId,
+    tipoCreditoId,
+    montoCreditoTitular,
+    montoCreditoCotitular,
+    productosAdicionales,
+  ]);
 
   // ── Proyectos con unidades disponibles + unidades del proyecto elegido ────
   const proyectosConUnidades = useMemo(() => {
@@ -372,11 +385,74 @@ function NuevaSolicitudForm() {
   }, [busquedaPersona, personasExistentes]);
 
   // ── Submit ──────────────────────────────────────────────────────────────────
+  // Paridad Coda: el form de Solicitud captura el expediente completo de Fase 1.
+  // No es captura parcial — el operador NO debe poder guardar borrador sin todos
+  // los campos obligatorios. Los `required` HTML quedan como hint visual + ARIA
+  // pero la validación real vive aquí porque el submit es un `<Button onClick>`,
+  // no un `<form onSubmit>` (no se ejecuta validación nativa del browser).
   const canSubmit = useMemo(() => {
     if (!unidadId || !tipoCreditoId) return false;
+    if (montoCreditoTitular.trim() === '' || montoCreditoCotitular.trim() === '') return false;
+    if (productosAdicionales.trim() === '') return false;
     if (clienteModo === 'existente') return !!personaIdSeleccionada;
-    return !!nombre.trim() && !!apellidoPaterno.trim();
-  }, [unidadId, tipoCreditoId, clienteModo, personaIdSeleccionada, nombre, apellidoPaterno]);
+    // Cliente nuevo: 21 campos obligatorios + expediente PDF.
+    const obligatoriosTexto = [
+      nombre,
+      apellidoPaterno,
+      apellidoMaterno,
+      curp,
+      rfc,
+      telefono,
+      email,
+      fechaNacimiento,
+      nss,
+      numeroCredencialIne,
+      domCalle,
+      domNumExt,
+      domColonia,
+      domCp,
+      domCiudad,
+      domEstado,
+      estadoCivil,
+      ocupacion,
+      formaPagoKyc,
+      usoEfectivoKyc,
+      conocimientoDuenoBeneficiario,
+    ];
+    if (obligatoriosTexto.some((v) => !v.trim())) return false;
+    if (!expedienteFile) return false;
+    return true;
+  }, [
+    unidadId,
+    tipoCreditoId,
+    montoCreditoTitular,
+    montoCreditoCotitular,
+    productosAdicionales,
+    clienteModo,
+    personaIdSeleccionada,
+    nombre,
+    apellidoPaterno,
+    apellidoMaterno,
+    curp,
+    rfc,
+    telefono,
+    email,
+    fechaNacimiento,
+    nss,
+    numeroCredencialIne,
+    domCalle,
+    domNumExt,
+    domColonia,
+    domCp,
+    domCiudad,
+    domEstado,
+    estadoCivil,
+    ocupacion,
+    formaPagoKyc,
+    usoEfectivoKyc,
+    conocimientoDuenoBeneficiario,
+    expedienteFile,
+  ]);
 
   async function onSubmit() {
     if (!canSubmit) return;
@@ -450,6 +526,7 @@ function NuevaSolicitudForm() {
           precio_asignacion: calculo?.precio_venta_total ?? null,
           monto_credito_titular: Number(montoCreditoTitular) || null,
           monto_credito_cotitular: Number(montoCreditoCotitular) || null,
+          productos_adicionales: Number(productosAdicionales) || 0,
           enganche_requerido: calculo?.enganche_1pct ?? null,
           gastos_escrituracion: calculo?.gastos_notariales_6pct ?? null,
           notas: promocionId
@@ -791,20 +868,31 @@ function NuevaSolicitudForm() {
               ))}
             </select>
           </Field>
-          <Field label="Monto crédito titular">
+          <Field label="Monto crédito titular *">
             <Input
               type="number"
               value={montoCreditoTitular}
               onChange={(e) => setMontoCreditoTitular(e.target.value)}
               placeholder="0"
+              required
             />
           </Field>
-          <Field label="Monto crédito co-titular">
+          <Field label="Monto crédito co-titular *">
             <Input
               type="number"
               value={montoCreditoCotitular}
               onChange={(e) => setMontoCreditoCotitular(e.target.value)}
-              placeholder="0"
+              placeholder="0 si no hay co-titular"
+              required
+            />
+          </Field>
+          <Field label="Productos adicionales *">
+            <Input
+              type="number"
+              value={productosAdicionales}
+              onChange={(e) => setProductosAdicionales(e.target.value)}
+              placeholder="0 si no hay productos adicionales"
+              required
             />
           </Field>
         </div>
@@ -831,6 +919,7 @@ function NuevaSolicitudForm() {
             />
             <Row label="Venta futuro" value={money(calculo.valor_venta_futuro)} />
             <Row label="Costo crédito adicional" value={money(calculo.costo_credito_adicional)} />
+            <Row label="Productos adicionales" value={money(calculo.productos_adicionales ?? 0)} />
             <Row label="Precio de venta" value={money(calculo.precio_venta_total)} highlight />
             <Row label="Apoyo Infonavit" value={`− ${money(calculo.apoyo_infonavit)}`} />
             <Row label="Pago directo cliente" value={money(calculo.pago_directo)} highlight />
@@ -859,7 +948,7 @@ function NuevaSolicitudForm() {
 
       {/* ── Expediente digital — 1 PDF aglutinado patrón Coda ── */}
       {clienteModo === 'nuevo' ? (
-        <Section title="Expediente digital del cliente">
+        <Section title="Expediente digital del cliente *">
           <p className="mb-3 text-xs text-muted-foreground">
             Sube un PDF con: IFE/INE, Acta de Nacimiento, RFC, CURP, Solicitud de Crédito y, si
             aplica, Acta de Matrimonio. Se guarda en el bucket privado y queda asociado a la venta
@@ -869,6 +958,7 @@ function NuevaSolicitudForm() {
             type="file"
             accept="application/pdf,image/*"
             onChange={(e) => setExpedienteFile(e.target.files?.[0] ?? null)}
+            required
             className="block w-full text-sm file:mr-3 file:rounded-md file:border file:border-[var(--border)] file:bg-[var(--card)] file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground hover:file:bg-[var(--accent)]/5"
           />
           {expedienteFile ? (
@@ -1028,10 +1118,11 @@ function ClienteNuevoForm(props: ClienteNuevoFormProps) {
             required
           />
         </Field>
-        <Field label="Apellido materno">
+        <Field label="Apellido materno *">
           <Input
             value={props.apellidoMaterno}
             onChange={(e) => props.setApellidoMaterno(e.target.value)}
+            required
           />
         </Field>
         <Field label="Fecha de nacimiento *">
@@ -1055,8 +1146,13 @@ function ClienteNuevoForm(props: ClienteNuevoFormProps) {
             maxLength={13}
           />
         </Field>
-        <Field label="NSS (Seguro Social)">
-          <Input value={props.nss} onChange={(e) => props.setNss(e.target.value)} maxLength={11} />
+        <Field label="NSS (Seguro Social) *">
+          <Input
+            value={props.nss}
+            onChange={(e) => props.setNss(e.target.value)}
+            maxLength={11}
+            required
+          />
         </Field>
         <Field label="Número Credencial INE *">
           <Input
@@ -1173,7 +1269,7 @@ function ClienteNuevoForm(props: ClienteNuevoFormProps) {
               ))}
             </select>
           </Field>
-          <Field label="Persona Políticamente Expuesta (PEP)">
+          <Field label="Persona Políticamente Expuesta (PEP) *">
             <label className="flex h-9 items-center gap-2 text-sm">
               <input
                 type="checkbox"
@@ -1186,11 +1282,12 @@ function ClienteNuevoForm(props: ClienteNuevoFormProps) {
               </span>
             </label>
           </Field>
-          <Field label="Conoce al dueño beneficiario">
+          <Field label="Conoce al dueño beneficiario *">
             <select
               value={props.conocimientoDuenoBeneficiario}
               onChange={(e) => props.setConocimientoDuenoBeneficiario(e.target.value)}
               className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm"
+              required
             >
               {CONOCIMIENTO_DUENO_BENEFICIARIO_OPTIONS.map((c) => (
                 <option key={c} value={c}>

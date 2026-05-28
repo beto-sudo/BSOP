@@ -40,6 +40,7 @@ export type SolicitudData = {
   valorEsquina: number;
   valorVentaFuturo: number;
   costoCreditoAdicional: number; // IMSS/Fovissste etc.
+  productosAdicionales: number; // monto $ extras declarados por vendedor (paridad Coda)
   // precio + cargos
   precioVenta: number;
   enganche1pct: number;
@@ -106,7 +107,7 @@ export function SolicitudAsignacionPDF({ data }: { data: SolicitudData }) {
         <DataRow label="VALOR ESQUINA:" value={money(data.valorEsquina)} />
         <DataRow label="VALOR VENTA FUTURO:" value={money(data.valorVentaFuturo)} />
         <DataRow label="IMSS/FOVISSSTE:" value={money(data.costoCreditoAdicional)} />
-        <DataRow label="PRODUCTOS ADICIONALES:" value="$0" />
+        <DataRow label="PRODUCTOS ADICIONALES:" value={money(data.productosAdicionales)} />
 
         <View style={styles.divider} />
 
