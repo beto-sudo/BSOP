@@ -39,7 +39,13 @@ import {
  */
 type ProyectoAvancesRow = Pick<
   ProyectoAvances,
-  'avance_urb_pct' | 'avance_const_pct' | 'avance_vts_pct' | 'ventas_totales' | 'parque_disponible'
+  | 'avance_urb_pct'
+  | 'avance_const_pct'
+  | 'avance_vts_pct'
+  | 'ventas_totales'
+  | 'parque_disponible'
+  | 'inventario_disponible_venta'
+  | 'casas_muestra'
 >;
 
 export type ProyectoListRow = ProyectoDetalle & {
@@ -148,7 +154,7 @@ export function ProyectosModule({
       .schema('dilesa')
       .from('proyectos')
       .select(
-        'id, tipo, nombre, estado, clave_interna, proyecto_padre_id, proyecto_predecesor_id, fecha_inicio, fecha_fin_estimada, fecha_licencia, area_m2, area_vendible_m2, areas_verdes_m2, lotes_proyectados, presupuesto_estimado, costo_terreno, costo_urbanizacion, costo_construccion, costo_comercializacion, notas, plano_oficial_url, image_url, acreditacion_escritura, objetivo_trimestral'
+        'id, tipo, nombre, estado, clave_interna, proyecto_padre_id, proyecto_predecesor_id, fecha_inicio, fecha_fin_estimada, fecha_licencia, area_m2, area_vendible_m2, areas_verdes_m2, lotes_proyectados, presupuesto_estimado, costo_terreno, costo_urbanizacion, costo_construccion, costo_comercializacion, notas, plano_oficial_url, image_url, acreditacion_escritura, objetivo_trimestral, clasificacion_inmobiliaria, area_comercial_m2, area_residencial_m2, area_vialidades_m2, precio_m2_excedente, costo_mo'
       )
       .eq('empresa_id', empresaId)
       .is('deleted_at', null);
@@ -163,7 +169,7 @@ export function ProyectosModule({
         .schema('dilesa')
         .from('v_proyecto_avances')
         .select(
-          'proyecto_id, avance_urb_pct, avance_const_pct, avance_vts_pct, ventas_totales, parque_disponible'
+          'proyecto_id, avance_urb_pct, avance_const_pct, avance_vts_pct, ventas_totales, parque_disponible, inventario_disponible_venta, casas_muestra'
         )
         .eq('empresa_id', empresaId),
     ]);
@@ -176,6 +182,8 @@ export function ProyectosModule({
         avance_vts_pct: a.avance_vts_pct,
         ventas_totales: a.ventas_totales,
         parque_disponible: a.parque_disponible,
+        inventario_disponible_venta: a.inventario_disponible_venta,
+        casas_muestra: a.casas_muestra,
       });
     }
     const merged: ProyectoListRow[] = ((pData ?? []) as ProyectoDetalle[]).map((p) => ({
@@ -242,6 +250,13 @@ export function ProyectosModule({
       label: 'Tipo',
       type: 'custom',
       render: (p) => <Badge tone="neutral">{TIPO_LABEL[p.tipo] ?? p.tipo}</Badge>,
+    },
+    {
+      key: 'clasificacion_inmobiliaria',
+      label: 'Clasificación',
+      type: 'text',
+      render: (p) =>
+        p.clasificacion_inmobiliaria ?? <span className="text-[var(--text)]/30">—</span>,
     },
     {
       key: 'estado',

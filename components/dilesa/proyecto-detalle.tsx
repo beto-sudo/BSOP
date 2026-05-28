@@ -18,7 +18,7 @@
  */
 
 import { useMemo, useState, useEffect, useTransition } from 'react';
-import { updateProyectoFields } from '@/app/dilesa/proyectos/actions';
+import { updateProyectoFields, setUnidadMuestra } from '@/app/dilesa/proyectos/actions';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { DataTable, type Column } from '@/components/module-page';
 import { DetailDrawerSection } from '@/components/detail-page';
@@ -53,6 +53,13 @@ export type ProyectoDetalle = {
   image_url: string | null;
   acreditacion_escritura: string | null;
   objetivo_trimestral: number | null;
+  // Sprint C — paridad Coda v2
+  clasificacion_inmobiliaria: string | null;
+  area_comercial_m2: number | null;
+  area_residencial_m2: number | null;
+  area_vialidades_m2: number | null;
+  precio_m2_excedente: number | null;
+  costo_mo: number | null;
 };
 
 /**
@@ -75,6 +82,16 @@ export type ProyectoAvances = {
   ticket_promedio: number | null;
   ventas_totales: number;
   estado_sugerido: string;
+  // Sprint C — derivaciones nuevas
+  casas_asignadas: number;
+  casas_entregadas: number;
+  casas_muestra: number;
+  inventario_formalizado: number;
+  inventario_disponible_venta: number;
+  lotes_comerciales: number;
+  lotes_residenciales: number;
+  tamano_lote_promedio_m2: number | null;
+  densidad_vivienda: number | null;
 };
 
 export const TIPO_LABEL: Record<string, string> = {
@@ -115,6 +132,7 @@ type Unidad = {
   area_m2: number | null;
   m2_construccion: number | null;
   precio: number | null;
+  es_muestra: boolean;
   producto: { nombre: string } | null;
 };
 
@@ -173,6 +191,16 @@ function fmtInt(n: number | null): string | null {
   return n == null ? null : numberFmt.format(n);
 }
 
+function numToStr(n: number | null | undefined): string {
+  return n == null ? '' : String(n);
+}
+
+function parseNum(s: string): number | null {
+  if (s.trim() === '') return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
 function fmtFecha(s: string | null): string | null {
   if (!s) return null;
   // Columna DATE ('YYYY-MM-DD'): se parsea como medianoche local para que el
@@ -182,31 +210,52 @@ function fmtFecha(s: string | null): string | null {
   return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-const unidadColumns: Column<Unidad>[] = [
-  { key: 'identificador', label: 'Lote', type: 'text', sticky: true, width: 'min-w-[140px]' },
-  {
-    key: 'estado',
-    label: 'Estado',
-    type: 'custom',
-    accessor: (u) => UNIDAD_ESTADO_ORDEN.indexOf(u.estado),
-    render: (u) => (
-      <Badge tone={UNIDAD_ESTADO_TONE[u.estado] ?? 'neutral'}>
-        {UNIDAD_ESTADO_LABEL[u.estado] ?? u.estado}
-      </Badge>
-    ),
-  },
-  { key: 'tipo_lote', label: 'Tipo de lote', type: 'text', render: (u) => u.tipo_lote ?? '—' },
-  {
-    key: 'producto',
-    label: 'Prototipo',
-    type: 'custom',
-    accessor: (u) => u.producto?.nombre ?? '',
-    render: (u) => u.producto?.nombre ?? '—',
-  },
-  { key: 'area_m2', label: 'Sup. lote', type: 'number' },
-  { key: 'm2_construccion', label: 'M² constr.', type: 'number' },
-  { key: 'precio', label: 'Precio', type: 'currency' },
-];
+function buildUnidadColumns(
+  onToggleMuestra: (id: string, next: boolean) => void,
+  pendingId: string | null
+): Column<Unidad>[] {
+  return [
+    { key: 'identificador', label: 'Lote', type: 'text', sticky: true, width: 'min-w-[140px]' },
+    {
+      key: 'estado',
+      label: 'Estado',
+      type: 'custom',
+      accessor: (u) => UNIDAD_ESTADO_ORDEN.indexOf(u.estado),
+      render: (u) => (
+        <Badge tone={UNIDAD_ESTADO_TONE[u.estado] ?? 'neutral'}>
+          {UNIDAD_ESTADO_LABEL[u.estado] ?? u.estado}
+        </Badge>
+      ),
+    },
+    { key: 'tipo_lote', label: 'Tipo de lote', type: 'text', render: (u) => u.tipo_lote ?? '—' },
+    {
+      key: 'producto',
+      label: 'Prototipo',
+      type: 'custom',
+      accessor: (u) => u.producto?.nombre ?? '',
+      render: (u) => u.producto?.nombre ?? '—',
+    },
+    { key: 'area_m2', label: 'Sup. lote', type: 'number' },
+    { key: 'm2_construccion', label: 'M² constr.', type: 'number' },
+    { key: 'precio', label: 'Precio', type: 'currency' },
+    {
+      key: 'es_muestra',
+      label: 'Muestra',
+      type: 'custom',
+      accessor: (u) => (u.es_muestra ? 1 : 0),
+      render: (u) => (
+        <input
+          type="checkbox"
+          checked={u.es_muestra}
+          disabled={pendingId === u.id}
+          onChange={(e) => onToggleMuestra(u.id, e.currentTarget.checked)}
+          aria-label={`Marcar ${u.identificador} como casa muestra`}
+          className="h-4 w-4 cursor-pointer accent-[var(--accent)]"
+        />
+      ),
+    },
+  ];
+}
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 
@@ -224,9 +273,16 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
   const [imageUrl, setImageUrl] = useState('');
   const [acreditacion, setAcreditacion] = useState('');
   const [objetivo, setObjetivo] = useState('');
+  const [clasificacion, setClasificacion] = useState('');
+  const [areaComercial, setAreaComercial] = useState('');
+  const [areaResidencial, setAreaResidencial] = useState('');
+  const [areaVialidades, setAreaVialidades] = useState('');
+  const [precioExcedente, setPrecioExcedente] = useState('');
+  const [costoMo, setCostoMo] = useState('');
   const [editPending, startEditTransition] = useTransition();
   const [editError, setEditError] = useState<string | null>(null);
   const [editSaved, setEditSaved] = useState(false);
+  const [muestraPendingId, setMuestraPendingId] = useState<string | null>(null);
 
   // Carga las unidades del proyecto al montar / cambiar de proyecto.
   // Los setState van solo dentro del `.then` (no síncronos dentro del effect).
@@ -238,7 +294,7 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
       .schema('dilesa')
       .from('unidades')
       .select(
-        'id, identificador, estado, tipo_lote, area_m2, m2_construccion, precio, producto:productos(nombre)'
+        'id, identificador, estado, tipo_lote, area_m2, m2_construccion, precio, es_muestra, producto:productos(nombre)'
       )
       .eq('proyecto_id', proyecto.id)
       .is('deleted_at', null)
@@ -279,7 +335,7 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
       .schema('dilesa')
       .from('v_proyecto_avances')
       .select(
-        'lotes_total, lotes_construidos, lotes_vendidos, lotes_urbanizados, casas_terminadas, casas_en_construccion, casas_escrituradas, avance_urb_pct, avance_const_pct, avance_vts_pct, parque_disponible, ticket_promedio, ventas_totales, estado_sugerido'
+        'lotes_total, lotes_construidos, lotes_vendidos, lotes_urbanizados, casas_terminadas, casas_en_construccion, casas_escrituradas, avance_urb_pct, avance_const_pct, avance_vts_pct, parque_disponible, ticket_promedio, ventas_totales, estado_sugerido, casas_asignadas, casas_entregadas, casas_muestra, inventario_formalizado, inventario_disponible_venta, lotes_comerciales, lotes_residenciales, tamano_lote_promedio_m2, densidad_vivienda'
       )
       .eq('proyecto_id', proyecto.id)
       .maybeSingle()
@@ -294,6 +350,12 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
       setImageUrl(proyecto.image_url ?? '');
       setAcreditacion(proyecto.acreditacion_escritura ?? '');
       setObjetivo(proyecto.objetivo_trimestral != null ? String(proyecto.objetivo_trimestral) : '');
+      setClasificacion(proyecto.clasificacion_inmobiliaria ?? '');
+      setAreaComercial(numToStr(proyecto.area_comercial_m2));
+      setAreaResidencial(numToStr(proyecto.area_residencial_m2));
+      setAreaVialidades(numToStr(proyecto.area_vialidades_m2));
+      setPrecioExcedente(numToStr(proyecto.precio_m2_excedente));
+      setCostoMo(numToStr(proyecto.costo_mo));
       setEditError(null);
       setEditSaved(false);
     });
@@ -311,15 +373,51 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
       setEditError('Objetivo trimestral debe ser entero ≥ 0');
       return;
     }
+    const numericFields: Array<[string, number | null]> = [
+      ['Área comercial', parseNum(areaComercial)],
+      ['Área residencial', parseNum(areaResidencial)],
+      ['Área vialidades', parseNum(areaVialidades)],
+      ['Precio m² excedente', parseNum(precioExcedente)],
+      ['Costo MO', parseNum(costoMo)],
+    ];
+    for (const [label, val] of numericFields) {
+      if (val != null && val < 0) {
+        setEditError(`${label} debe ser ≥ 0`);
+        return;
+      }
+    }
     startEditTransition(async () => {
       const r = await updateProyectoFields(proyecto.id, {
         plano_oficial_url: planoUrl.trim() === '' ? null : planoUrl.trim(),
         image_url: imageUrl.trim() === '' ? null : imageUrl.trim(),
         acreditacion_escritura: acreditacion.trim() === '' ? null : acreditacion.trim(),
         objetivo_trimestral: objN,
+        clasificacion_inmobiliaria: clasificacion.trim() === '' ? null : clasificacion.trim(),
+        area_comercial_m2: parseNum(areaComercial),
+        area_residencial_m2: parseNum(areaResidencial),
+        area_vialidades_m2: parseNum(areaVialidades),
+        precio_m2_excedente: parseNum(precioExcedente),
+        costo_mo: parseNum(costoMo),
       });
       if (!r.ok) setEditError(r.error);
       else setEditSaved(true);
+    });
+  };
+
+  const handleToggleMuestra = (unidadId: string, next: boolean) => {
+    setMuestraPendingId(unidadId);
+    // Optimistic: actualiza UI antes de la server action; revierte si falla.
+    setUnidades((prev) => prev.map((u) => (u.id === unidadId ? { ...u, es_muestra: next } : u)));
+    void setUnidadMuestra(unidadId, next).then((r) => {
+      setMuestraPendingId(null);
+      if (!r.ok) {
+        setUnidades((prev) =>
+          prev.map((u) => (u.id === unidadId ? { ...u, es_muestra: !next } : u))
+        );
+        setError(r.error);
+      } else {
+        setError(null);
+      }
     });
   };
 
@@ -351,6 +449,7 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
 
   const ficha: { label: string; value: string }[] = (
     [
+      ['Clasificación', proyecto.clasificacion_inmobiliaria],
       ['Clave interna', proyecto.clave_interna],
       ['Inicio', fmtFecha(proyecto.fecha_inicio)],
       ['Fin estimado', fmtFecha(proyecto.fecha_fin_estimada)],
@@ -358,12 +457,17 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
       ['Área total', fmtM2(proyecto.area_m2)],
       ['Área vendible', fmtM2(proyecto.area_vendible_m2)],
       ['Áreas verdes', fmtM2(proyecto.areas_verdes_m2)],
+      ['Área comercial', fmtM2(proyecto.area_comercial_m2)],
+      ['Área residencial', fmtM2(proyecto.area_residencial_m2)],
+      ['Vialidades · banquetas', fmtM2(proyecto.area_vialidades_m2)],
       ['Lotes proyectados', fmtInt(proyecto.lotes_proyectados)],
       ['Presupuesto estimado', fmtMoney(proyecto.presupuesto_estimado)],
       ['Costo de terreno', fmtMoney(proyecto.costo_terreno)],
       ['Costo de urbanización', fmtMoney(proyecto.costo_urbanizacion)],
       ['Costo de construcción', fmtMoney(proyecto.costo_construccion)],
+      ['Costo de MO', fmtMoney(proyecto.costo_mo)],
       ['Costo de comercialización', fmtMoney(proyecto.costo_comercializacion)],
+      ['Precio m² excedente', fmtMoney(proyecto.precio_m2_excedente)],
     ] as [string, string | null][]
   )
     .filter((r): r is [string, string] => r[1] != null)
@@ -440,10 +544,22 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
           </div>
           <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
             <Stat label="Lotes totales" value={fmtInt(avances.lotes_total)} />
+            <Stat label="Comerciales" value={fmtInt(avances.lotes_comerciales)} />
+            <Stat label="Residenciales" value={fmtInt(avances.lotes_residenciales)} />
+            <Stat label="Lote promedio" value={fmtM2(avances.tamano_lote_promedio_m2)} />
+            <Stat label="Densidad (lotes/ha)" value={fmtInt(avances.densidad_vivienda)} />
             <Stat label="Parque disponible" value={fmtInt(avances.parque_disponible)} />
+            <Stat
+              label="Disponible para venta"
+              value={fmtInt(avances.inventario_disponible_venta)}
+            />
+            <Stat label="Casa muestra" value={fmtInt(avances.casas_muestra)} />
             <Stat label="Terminadas" value={fmtInt(avances.casas_terminadas)} />
             <Stat label="En construcción" value={fmtInt(avances.casas_en_construccion)} />
+            <Stat label="Asignadas" value={fmtInt(avances.casas_asignadas)} />
             <Stat label="Escrituradas" value={fmtInt(avances.casas_escrituradas)} />
+            <Stat label="Entregadas" value={fmtInt(avances.casas_entregadas)} />
+            <Stat label="Formalizadas" value={fmtInt(avances.inventario_formalizado)} />
             <Stat label="Ticket promedio" value={fmtMoney(avances.ticket_promedio)} />
             <Stat label="Ventas totales" value={fmtMoney(avances.ventas_totales)} />
           </dl>
@@ -477,6 +593,51 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
             placeholder="0"
             type="number"
           />
+          <FieldRow
+            label="Clasificación inmobiliaria"
+            value={clasificacion}
+            onChange={setClasificacion}
+            placeholder="Interés Social · Medio · Residencial"
+          />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <FieldRow
+              label="Área comercial m²"
+              value={areaComercial}
+              onChange={setAreaComercial}
+              placeholder="0"
+              type="number"
+            />
+            <FieldRow
+              label="Área residencial m²"
+              value={areaResidencial}
+              onChange={setAreaResidencial}
+              placeholder="0"
+              type="number"
+            />
+            <FieldRow
+              label="Vialidades · banquetas m²"
+              value={areaVialidades}
+              onChange={setAreaVialidades}
+              placeholder="0"
+              type="number"
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <FieldRow
+              label="Precio m² excedente (MXN)"
+              value={precioExcedente}
+              onChange={setPrecioExcedente}
+              placeholder="0"
+              type="number"
+            />
+            <FieldRow
+              label="Costo MO (MXN)"
+              value={costoMo}
+              onChange={setCostoMo}
+              placeholder="0"
+              type="number"
+            />
+          </div>
           <div className="flex items-center gap-3 pt-2">
             <button
               type="button"
@@ -540,7 +701,7 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
 
         <DataTable
           data={filtradas}
-          columns={unidadColumns}
+          columns={buildUnidadColumns(handleToggleMuestra, muestraPendingId)}
           rowKey="id"
           loading={loading}
           error={error}

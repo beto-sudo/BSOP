@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-26
-**Última actualización:** 2026-05-27 (Sprint B mergeado/PR abierto — tabla principal pinta los avances + objetivo trimestral del detalle. Spike Sprint C abre catálogo de ~15 columnas Coda faltantes por categoría para que Beto decida alcance v2.)
+**Última actualización:** 2026-05-27 (Sprint B + Sprint C aplicados. Migración `20260527190000` en prod con 6 columnas ALTER + flag `es_muestra` en unidades + 9 derivaciones nuevas en `v_proyecto_avances`. UI: 6 inputs editables en sección "Documentos y configuración" + sección "Avances" ampliada a 16 stats + columna "Muestra" en tabla de unidades con toggle inline. Importer Coda mapea los 6 campos nuevos.)
 
 ## Problema
 
@@ -281,6 +281,36 @@ proyecto. Todos columna escalar; idempotente con
 
 ## Bitácora
 
+- **2026-05-27 (Sprint C aplicado)** — Beto aprobó el alcance del
+  spike + agregó "Casa muestra/demo" como flag boolean en `dilesa.unidades`
+  (no derivable, captura manual). Migración `20260527190000` aplicada
+  vía `supabase db push` (autorización explícita post-classifier block):
+  6 columnas en `dilesa.proyectos` (`clasificacion_inmobiliaria`,
+  `area_comercial_m2`, `area_residencial_m2`, `area_vialidades_m2`,
+  `precio_m2_excedente`, `costo_mo`), `es_muestra boolean DEFAULT false`
+  en `dilesa.unidades` con índice parcial, y reescritura de
+  `v_proyecto_avances` agregando 9 derivaciones nuevas
+  (`casas_asignadas`, `casas_entregadas`, `casas_muestra`,
+  `inventario_formalizado`, `inventario_disponible_venta` excluyendo
+  muestras, `lotes_comerciales`, `lotes_residenciales`,
+  `tamano_lote_promedio_m2`, `densidad_vivienda`). Detour menor: el
+  primer push falló por column-rename error (no había detectado que
+  migración `20260527000200` había sumado `tipo` al final de la vista
+  preservada del Sprint A); corregido respetando ese orden y aplicado
+  limpio. `types/supabase.ts` regenerado (`db:types`); `SCHEMA_REF.md`
+  diferido (`SUPABASE_DB_URL` no expuesto local — pre-commit/CI lo
+  enforza). UI: `<ProyectoDetalle>` gana 6 inputs editables en
+  "Documentos y configuración" + "Avances" pasa de 7 a 16 stats +
+  tabla de unidades agrega columna "Muestra" con `<input type=checkbox>`
+  optimistic, server action `setUnidadMuestra` con rollback. Server
+  action `updateProyectoFields` extendida a los 10 campos. Importer
+  `import_dilesa_proyectos.ts` mapea los 6 nuevos desde Coda
+  (DRY_RUN verificado, no se aplicó re-import — el importer está
+  pensado para carga inicial, no incremental). Tabla principal
+  `<ProyectosModule>` suma 1 columna nueva "Clasificación"
+  (19 → 20 cols totales). Categoría (c) — Bitácora/ZCU/DTU/Pago
+  Seguro/Control Documentos — sigue diferida; Beto define cuándo.
+
 - **2026-05-27 (Sprint B + spike C)** — Beto observó al revisar el
   portafolio que los avances + objetivo trimestral del Sprint A solo
   vivían en el detalle del proyecto, no en la tabla principal.
@@ -326,6 +356,17 @@ proyecto. Todos columna escalar; idempotente con
   la pide se abre iniciativa nueva. Iniciativa cierra en `done`.
 
 ## Decisiones registradas
+
+- **2026-05-27 — Casa muestra como flag boolean**. Beto: "normalmente
+  en los fraccionamientos armamos casas para demostración y cuando
+  están como demo no están disponibles para venta; cuando ya no las
+  necesitamos se les quita el check mark y se les agrega el valor de
+  los accesorios y muebles y se pone a disposición de ventas".
+  Implicancia: `inventario_disponible_venta = terminadas AND NOT
+es_muestra`. La captura del valor de accesorios al liberar
+  (workflow "Liberar de demo a inventario") se difiere — requiere
+  columna `valor_accesorios numeric` + UI con action que pida el
+  monto al desmarcar.
 
 - **2026-05-27 — Reapertura de la iniciativa**. El cierre 2026-05-26
   enmarcó al Sprint A como entrega final del alcance v1 y dejó

@@ -3,13 +3,12 @@
 /**
  * Server actions de Proyectos DILESA.
  *
- * Iniciativa `dilesa-proyectos-paridad-coda` Sprint A.
+ * Iniciativa `dilesa-proyectos-paridad-coda`. Sprint A: 4 campos
+ * (plano/imagen/acreditación/objetivo). Sprint C: + 6 campos de
+ * paridad con Coda (clasificación inmobiliaria + 3 áreas + precio m²
+ * excedente + costo MO). RLS valida acceso a la empresa.
  *
- * `updateProyectoFields(proyectoId, patch)` actualiza los 4 campos
- * raw que se agregaron en la migración 20260527000100 para paridad
- * con la tabla canónica de Coda: `plano_oficial_url`, `image_url`,
- * `acreditacion_escritura`, `objetivo_trimestral`. RLS valida acceso
- * a la empresa.
+ * `setUnidadMuestra` controla el flag de casa demo en `dilesa.unidades`.
  */
 
 import { createServerClient } from '@supabase/ssr';
@@ -21,9 +20,21 @@ type ProyectoFieldsPatch = {
   image_url?: string | null;
   acreditacion_escritura?: string | null;
   objetivo_trimestral?: number | null;
+  clasificacion_inmobiliaria?: string | null;
+  area_comercial_m2?: number | null;
+  area_residencial_m2?: number | null;
+  area_vialidades_m2?: number | null;
+  precio_m2_excedente?: number | null;
+  costo_mo?: number | null;
 };
 
 type Result = { ok: true } | { ok: false; error: string };
+
+function validatePositive(n: number | null | undefined, label: string): string | null {
+  if (n == null) return null;
+  if (!Number.isFinite(n) || n < 0) return `${label} debe ser número ≥ 0`;
+  return null;
+}
 
 export async function updateProyectoFields(
   proyectoId: string,
@@ -43,6 +54,22 @@ export async function updateProyectoFields(
       return { ok: false, error: 'objetivo_trimestral debe ser entero ≥ 0' };
     }
     allowed.objetivo_trimestral = n;
+  }
+  if ('clasificacion_inmobiliaria' in patch)
+    allowed.clasificacion_inmobiliaria = patch.clasificacion_inmobiliaria;
+  for (const [key, label] of [
+    ['area_comercial_m2', 'Área comercial'],
+    ['area_residencial_m2', 'Área residencial'],
+    ['area_vialidades_m2', 'Área vialidades'],
+    ['precio_m2_excedente', 'Precio m² excedente'],
+    ['costo_mo', 'Costo MO'],
+  ] as const) {
+    if (key in patch) {
+      const n = patch[key];
+      const err = validatePositive(n, label);
+      if (err) return { ok: false, error: err };
+      allowed[key] = n;
+    }
   }
   if (Object.keys(allowed).length === 0) {
     return { ok: false, error: 'sin campos a actualizar' };
@@ -70,6 +97,43 @@ export async function updateProyectoFields(
 
   if (error) {
     return { ok: false, error: error.message || 'No se pudo actualizar el proyecto.' };
+  }
+
+  revalidatePath('/dilesa/proyectos');
+  return { ok: true };
+}
+
+/**
+ * Marca o desmarca una unidad como casa muestra/demo. Las muestra no
+ * están disponibles para venta hasta desmarcarlas. La captura del
+ * valor de accesorios al liberar queda pendiente para un Sprint
+ * posterior (workflow UI).
+ */
+export async function setUnidadMuestra(unidadId: string, esMuestra: boolean): Promise<Result> {
+  if (!unidadId) return { ok: false, error: 'unidadId requerido' };
+
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll() {},
+      },
+    }
+  );
+
+  const { error } = await supabase
+    .schema('dilesa')
+    .from('unidades')
+    .update({ es_muestra: esMuestra })
+    .eq('id', unidadId);
+
+  if (error) {
+    return { ok: false, error: error.message || 'No se pudo actualizar la unidad.' };
   }
 
   revalidatePath('/dilesa/proyectos');
