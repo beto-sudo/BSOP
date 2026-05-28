@@ -902,6 +902,10 @@ _(sin columnas)_
 - **image_url** `text`
 - **acreditacion_escritura** `text`
 - **objetivo_trimestral** `integer`
+- **area_comercial_m2** `numeric`
+- **area_residencial_m2** `numeric`
+- **area_vialidades_m2** `numeric`
+- **costo_mo** `numeric`
 
 ### `dilesa.proyectos_plantillas`
 
@@ -970,6 +974,7 @@ _(sin columnas)_
 - **tiene_frente_verde** `boolean`
 - **m2_construccion** `numeric`
 - **valor_venta_futuro_snapshot** `numeric` DEFAULT `0`
+- **es_muestra** `boolean` NOT NULL DEFAULT `false`
 
 ### `dilesa.v_construccion_tareas_terminadas_con_mo` _(view)_
 
@@ -1005,7 +1010,7 @@ _(sin columnas)_
 
 ### `dilesa.v_proyecto_avances` _(view)_
 
-> Indicadores derivados de proyectos DILESA. Regla estricta: estado_sugerido=completado solo cuando todas las unidades están construidas Y vendidas. Sprint A de dilesa-proyectos-paridad-coda (refinado).
+> Agregados derivados de `dilesa.unidades` por proyecto. Sprint A: avance %, conteos básicos, ticket, ventas, estado sugerido. Sprint C: segmentación comercial/residencial, lote promedio, inventario formalizado/disponible (excluye muestra), casas asignadas/entregadas/muestra, densidad de vivienda. Reemplaza las 46 fórmulas de la tabla Coda *Proyectos.
 
 - **proyecto_id** `uuid`
 - **empresa_id** `uuid`
@@ -1025,6 +1030,15 @@ _(sin columnas)_
 - **estado_sugerido** `text`
 - **estado_actual** `text`
 - **tipo** `text`
+- **casas_asignadas** `bigint`
+- **casas_entregadas** `bigint`
+- **casas_muestra** `bigint`
+- **inventario_formalizado** `bigint`
+- **inventario_disponible_venta** `bigint`
+- **lotes_comerciales** `bigint`
+- **lotes_residenciales** `bigint`
+- **tamano_lote_promedio_m2** `numeric`
+- **densidad_vivienda** `numeric`
 
 ### `dilesa.v_tareas_pendientes_de_pago` _(view)_
 
