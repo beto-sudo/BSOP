@@ -22,13 +22,12 @@ import { FileText } from 'lucide-react';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { FileAttachments } from '@/components/file-attachments/file-attachments';
 import {
-  TAREA_ESTADOS_VALIDOS,
   updateTareaDocumento,
   updateTareaEstado,
   updateTareaMonto,
   updateTareaNotas,
-  type TareaEstado,
 } from '@/app/dilesa/proyectos/anteproyectos/actions';
+import { TAREA_ESTADOS_VALIDOS, type TareaEstado } from './tareas-checklist-types';
 import type { EmpresaSlug } from '@/lib/storage';
 
 const moneyFmt = new Intl.NumberFormat('es-MX', {
