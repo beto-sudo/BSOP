@@ -26,6 +26,8 @@ import {
   promoteAnteproyecto,
 } from '@/app/dilesa/proyectos/anteproyectos/actions';
 import { type ProyectoDetalle, ESTADO_TONE, ESTADO_LABEL } from './proyecto-detalle';
+import { TareasChecklist } from './tareas-checklist';
+import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 
 const numberFmt = new Intl.NumberFormat('es-MX');
 const moneyFmt = new Intl.NumberFormat('es-MX', {
@@ -60,6 +62,7 @@ function fmtFecha(s: string | null): string | null {
 type ProyectoTarea = {
   id: string;
   titulo: string;
+  descripcion: string | null;
   estado: string;
   orden: number;
   tipo_snapshot: string | null;
@@ -75,6 +78,8 @@ type ProyectoTarea = {
   plantilla_tarea_id: string | null;
 };
 
+type TareaDep = { tarea_id: string; depende_de_tarea_id: string };
+
 type Partida = {
   id: string;
   partida: string;
@@ -83,20 +88,6 @@ type Partida = {
   estado: string;
 };
 
-const TAREA_ESTADO_TONE: Record<string, BadgeTone> = {
-  pendiente: 'neutral',
-  bloqueada: 'warning',
-  en_curso: 'info',
-  completada: 'success',
-  cancelada: 'neutral',
-};
-const TAREA_ESTADO_LABEL: Record<string, string> = {
-  pendiente: 'Pendiente',
-  bloqueada: 'Bloqueada',
-  en_curso: 'En curso',
-  completada: 'Completada',
-  cancelada: 'Cancelada',
-};
 const PARTIDA_ESTADO_TONE: Record<string, BadgeTone> = {
   preliminar: 'neutral',
   autorizada: 'info',
@@ -170,6 +161,7 @@ export function deriveAnalisis(p: ProyectoDetalle) {
 
 export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDetalle | null }) {
   const [tareas, setTareas] = useState<ProyectoTarea[]>([]);
+  const [dependencias, setDependencias] = useState<TareaDep[]>([]);
   const [partidas, setPartidas] = useState<Partida[]>([]);
   const [loadedId, setLoadedId] = useState<string | null>(null);
   const [extrasError, setExtrasError] = useState<string | null>(null);
@@ -191,7 +183,7 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
         .schema('dilesa')
         .from('proyecto_tareas')
         .select(
-          'id, titulo, estado, orden, tipo_snapshot, subtipo_snapshot, entidad_responsable_snapshot, obligatoriedad_snapshot, requiere_archivo_snapshot, fecha_objetivo_inicio, fecha_objetivo_fin, fecha_completada, resultado_monto, resultado_documento_url, plantilla_tarea_id'
+          'id, titulo, descripcion, estado, orden, tipo_snapshot, subtipo_snapshot, entidad_responsable_snapshot, obligatoriedad_snapshot, requiere_archivo_snapshot, fecha_objetivo_inicio, fecha_objetivo_fin, fecha_completada, resultado_monto, resultado_documento_url, plantilla_tarea_id'
         )
         .eq('proyecto_id', proyectoId)
         .is('deleted_at', null)
@@ -203,12 +195,17 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
         .eq('proyecto_id', proyectoId)
         .is('deleted_at', null)
         .order('partida'),
+      supabase
+        .schema('dilesa')
+        .from('proyecto_tareas_dependencias')
+        .select('tarea_id, depende_de_tarea_id, tarea:proyecto_tareas!tarea_id(proyecto_id)')
+        .eq('tarea.proyecto_id', proyectoId),
     ]);
   }, []);
 
   const cargarExtras = useCallback(
     async (proyectoId: string) => {
-      const [tareasRes, partidasRes] = await fetchExtras(proyectoId);
+      const [tareasRes, partidasRes, depsRes] = await fetchExtras(proyectoId);
       if (tareasRes.error) {
         setExtrasError(
           getSupabaseErrorMessage(tareasRes.error, 'No se pudieron cargar las tareas.')
@@ -226,6 +223,14 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
       } else {
         setPartidas((partidasRes.data ?? []) as Partida[]);
       }
+      if (!depsRes.error) {
+        setDependencias(
+          ((depsRes.data ?? []) as Array<TareaDep & { tarea?: unknown }>).map((d) => ({
+            tarea_id: d.tarea_id,
+            depende_de_tarea_id: d.depende_de_tarea_id,
+          }))
+        );
+      }
       setLoadedId(proyectoId);
     },
     [fetchExtras]
@@ -236,7 +241,7 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
   useEffect(() => {
     if (!anteproyecto) return;
     let activo = true;
-    void fetchExtras(anteproyecto.id).then(([tareasRes, partidasRes]) => {
+    void fetchExtras(anteproyecto.id).then(([tareasRes, partidasRes, depsRes]) => {
       if (!activo) return;
       if (tareasRes.error) {
         setExtrasError(
@@ -254,6 +259,14 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
         setPartidas([]);
       } else {
         setPartidas((partidasRes.data ?? []) as Partida[]);
+      }
+      if (!depsRes.error) {
+        setDependencias(
+          ((depsRes.data ?? []) as Array<TareaDep & { tarea?: unknown }>).map((d) => ({
+            tarea_id: d.tarea_id,
+            depende_de_tarea_id: d.depende_de_tarea_id,
+          }))
+        );
       }
       setLoadedId(anteproyecto.id);
     });
@@ -427,7 +440,9 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
             <p className="text-sm text-[var(--text)]/60">
               Las 16 tareas canónicas del anteproyecto (incluyendo gate &quot;Comité de
               Inversión&quot;) se instancian con fechas objetivo calculadas desde la fecha de
-              arranque + grafo de dependencias + calendario hábil MX.
+              arranque + grafo de dependencias + calendario hábil MX. Sprint 1 de
+              `dilesa-proyectos-checklist-inline` automatiza esto al crear el proyecto desde el
+              formulario; los 13 proyectos vivos se backfillean con un script one-shot.
             </p>
             <button
               type="button"
@@ -440,56 +455,13 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
             {populateError && <p className="text-sm text-red-600/80">{populateError}</p>}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="text-xs uppercase text-[var(--text)]/50">
-                <tr className="border-b border-[var(--border)]">
-                  <th className="py-2 pr-4 text-left">Tarea</th>
-                  <th className="py-2 pr-4 text-left">Estado</th>
-                  <th className="py-2 pr-4 text-left">Tipo</th>
-                  <th className="py-2 pr-4 text-left">Entidad</th>
-                  <th className="py-2 pr-4 text-left">Inicio</th>
-                  <th className="py-2 pr-4 text-left">Fin</th>
-                  <th className="py-2 text-right">Monto</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tareas.map((t) => (
-                  <tr key={t.id} className="border-b border-[var(--border)]/40">
-                    <td className="py-2 pr-4">
-                      <div className="font-medium text-[var(--text)]">{t.titulo}</div>
-                      {t.obligatoriedad_snapshot && t.obligatoriedad_snapshot !== 'obligatoria' && (
-                        <div className="text-xs text-[var(--text)]/50">
-                          {t.obligatoriedad_snapshot}
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-2 pr-4">
-                      <Badge tone={TAREA_ESTADO_TONE[t.estado] ?? 'neutral'}>
-                        {TAREA_ESTADO_LABEL[t.estado] ?? t.estado}
-                      </Badge>
-                    </td>
-                    <td className="py-2 pr-4 text-[var(--text)]/70">
-                      {t.tipo_snapshot}
-                      {t.subtipo_snapshot ? ` · ${t.subtipo_snapshot}` : ''}
-                    </td>
-                    <td className="py-2 pr-4 text-[var(--text)]/70">
-                      {t.entidad_responsable_snapshot ?? '—'}
-                    </td>
-                    <td className="py-2 pr-4 text-[var(--text)]/70">
-                      {t.fecha_objetivo_inicio ?? '—'}
-                    </td>
-                    <td className="py-2 pr-4 text-[var(--text)]/70">
-                      {t.fecha_objetivo_fin ?? '—'}
-                    </td>
-                    <td className="py-2 text-right text-[var(--text)]/70">
-                      {t.resultado_monto != null ? moneyFmt.format(t.resultado_monto) : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <TareasChecklist
+            tareas={tareas}
+            dependencias={dependencias}
+            empresaId={DILESA_EMPRESA_ID}
+            empresaSlug="dilesa"
+            onChange={() => void cargarExtras(anteproyecto.id)}
+          />
         )}
       </DetailDrawerSection>
 
