@@ -841,6 +841,8 @@ _(sin columnas)_
 - **created_at** `timestamp with time zone` NOT NULL DEFAULT `now()`
 - **updated_at** `timestamp with time zone` NOT NULL DEFAULT `now()`
 - **deleted_at** `timestamp with time zone`
+- **autorizado_at** `timestamp with time zone`
+- **autorizado_por** `uuid` — FK → `core.usuarios(id)`
 
 ### `dilesa.proyecto_tareas`
 

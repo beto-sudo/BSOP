@@ -24,7 +24,14 @@ import { ChevronRight, MessageSquare, Paperclip } from 'lucide-react';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { updateTareaEstado, updateTareaNotas } from '@/app/dilesa/proyectos/anteproyectos/actions';
 import { TAREA_ESTADOS_VALIDOS, type TareaEstado } from './tareas-checklist-types';
-import { TareaPasos, type PasoRow, computeAvanceTarea, sumMontosPasos } from './tarea-pasos';
+import {
+  TareaPasos,
+  type PasoRow,
+  type EstadoVisual,
+  computeAvanceTarea,
+  estadoVisualDePaso,
+  sumMontosPasos,
+} from './tarea-pasos';
 import type { EmpresaSlug } from '@/lib/storage';
 
 const moneyFmt = new Intl.NumberFormat('es-MX', {
@@ -125,6 +132,7 @@ export function TareasChecklist({
   pasos,
   empresaId,
   empresaSlug,
+  puedeAutorizar = false,
   onChange,
 }: {
   tareas: readonly TareaChecklistRow[];
@@ -132,6 +140,7 @@ export function TareasChecklist({
   pasos: readonly PasoRow[];
   empresaId: string;
   empresaSlug: EmpresaSlug;
+  puedeAutorizar?: boolean;
   onChange?: () => void;
 }) {
   const tareasSource: readonly TareaChecklistRow[] = Array.isArray(tareasInicial)
@@ -193,8 +202,15 @@ export function TareasChecklist({
             <tr className="border-b border-[var(--border)]">
               <th className="w-8 px-2 py-2 text-center">#</th>
               <th className="px-3 py-2 text-left">Tarea</th>
+              <th className="hidden w-32 px-2 py-2 text-left lg:table-cell">Entidad</th>
               <th className="w-36 px-2 py-2 text-left">Estado</th>
               <th className="w-20 px-2 py-2 text-left">Vence</th>
+              <th className="w-28 px-2 py-2 text-center">
+                <span className="block">C · F · P · R</span>
+                <span className="block text-[9px] normal-case tracking-normal text-[var(--text)]/40">
+                  cotiz · factura · pago · result
+                </span>
+              </th>
               <th className="w-16 px-2 py-2 text-right">Avance</th>
               <th className="w-24 px-2 py-2 text-right">$ acum.</th>
               <th className="w-12 px-2 py-2 text-center" aria-label="Notas">
@@ -223,6 +239,7 @@ export function TareasChecklist({
                     bloqueadaPor={bloqueadasMap.get(t.id) ?? []}
                     empresaId={empresaId}
                     empresaSlug={empresaSlug}
+                    puedeAutorizar={puedeAutorizar}
                     onPatch={patchLocal}
                     onError={setError}
                     onChange={onChange}
@@ -328,6 +345,11 @@ function TareaRowCompact({
           )}
         </button>
       </td>
+      <td className="hidden px-2 py-1.5 text-xs text-[var(--text)]/70 lg:table-cell">
+        <span className="block truncate">
+          {tarea.entidad_responsable_snapshot ?? <span className="text-[var(--text)]/30">—</span>}
+        </span>
+      </td>
       <td className="px-2 py-1.5">
         <select
           value={tarea.estado}
@@ -354,6 +376,9 @@ function TareaRowCompact({
       </td>
       <td className="px-2 py-1.5 text-xs text-[var(--text)]/70 tabular-nums">
         {fmtFechaCorta(tarea.fecha_objetivo_fin)}
+      </td>
+      <td className="px-2 py-1.5 text-center">
+        <PasosMini pasos={pasos} />
       </td>
       <td className="px-2 py-1.5 text-right">
         <AvanceBar pct={avance} />
@@ -391,6 +416,7 @@ function TareaRowExpanded({
   bloqueadaPor,
   empresaId,
   empresaSlug,
+  puedeAutorizar,
   onPatch,
   onError,
   onChange,
@@ -400,6 +426,7 @@ function TareaRowExpanded({
   bloqueadaPor: string[];
   empresaId: string;
   empresaSlug: EmpresaSlug;
+  puedeAutorizar: boolean;
   onPatch: (id: string, patch: Partial<TareaChecklistRow>) => void;
   onError: (msg: string | null) => void;
   onChange?: () => void;
@@ -472,6 +499,7 @@ function TareaRowExpanded({
             pasos={pasos}
             empresaId={empresaId}
             empresaSlug={empresaSlug}
+            puedeAutorizar={puedeAutorizar}
             onChange={onChange}
           />
 
@@ -492,6 +520,60 @@ function TareaRowExpanded({
         </div>
       </td>
     </tr>
+  );
+}
+
+// ─── Mini visualización de pasos (4 cuadrados en la fila compacta) ──────────
+
+const PASO_ORDER: readonly ('cotizacion' | 'factura' | 'pago' | 'resultado')[] = [
+  'cotizacion',
+  'factura',
+  'pago',
+  'resultado',
+];
+
+const ESTADO_VISUAL_TONE: Record<EstadoVisual, string> = {
+  pendiente: 'bg-[var(--border)]/40 border-[var(--border)]',
+  hecho: 'bg-emerald-500 border-emerald-500',
+  esperando_autorizacion: 'bg-amber-400 border-amber-500',
+  autorizado: 'bg-emerald-600 border-emerald-600',
+  no_aplica: 'bg-transparent border-[var(--border)]/40 border-dashed',
+};
+
+const ESTADO_VISUAL_LABEL: Record<EstadoVisual, string> = {
+  pendiente: 'pendiente',
+  hecho: 'hecho',
+  esperando_autorizacion: 'esperando autorización',
+  autorizado: 'autorizado',
+  no_aplica: 'no aplica',
+};
+
+const PASO_SHORT_LABEL: Record<'cotizacion' | 'factura' | 'pago' | 'resultado', string> = {
+  cotizacion: 'C',
+  factura: 'F',
+  pago: 'P',
+  resultado: 'R',
+};
+
+function PasosMini({ pasos }: { pasos: readonly PasoRow[] }) {
+  const byPaso = new Map(pasos.map((p) => [p.paso, p]));
+  return (
+    <div className="inline-flex items-center gap-1">
+      {PASO_ORDER.map((paso) => {
+        const row = byPaso.get(paso);
+        const visual: EstadoVisual = row ? estadoVisualDePaso(row) : 'pendiente';
+        return (
+          <span
+            key={paso}
+            title={`${PASO_SHORT_LABEL[paso]}: ${ESTADO_VISUAL_LABEL[visual]}`}
+            aria-label={`${PASO_SHORT_LABEL[paso]} ${ESTADO_VISUAL_LABEL[visual]}`}
+            className={`inline-flex h-3 w-3 items-center justify-center rounded-sm border text-[8px] font-bold ${ESTADO_VISUAL_TONE[visual]}`}
+          >
+            <span className="sr-only">{PASO_SHORT_LABEL[paso]}</span>
+          </span>
+        );
+      })}
+    </div>
   );
 }
 

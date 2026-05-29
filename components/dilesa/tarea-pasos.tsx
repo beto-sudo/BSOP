@@ -1,21 +1,25 @@
 'use client';
 
 /**
- * `<TareaPasos>` — grid 2×2 con los 4 pasos canónicos de una tarea.
+ * `<TareaPasos>` — grid 1×4 horizontal con los 4 pasos canónicos.
  *
  * Sprint 3 de `dilesa-proyectos-checklist-inline`. Cada celda captura
  * monto + documento + fecha + estado (pendiente/hecho/N/A) + notas
  * para uno de los pasos: cotizacion · factura · pago · resultado.
+ *
+ * Sprint 3.5 (refactor 2026-05-29): el grid pasa de 2×2 a 1×4 para
+ * aprovechar pantallas anchas (en mobile/tablet se apila). Botón
+ * "Autorizar" en el paso cotización gateado por rol director.
  *
  * Se monta dentro del expand de `<TareasChecklist>` (1 fila por tarea
  * cuando está colapsada; este grid aparece debajo al hacer click).
  */
 
 import { useEffect, useState, useTransition } from 'react';
-import { Check, Circle, FileText, Minus } from 'lucide-react';
+import { Check, Circle, FileText, Minus, ShieldCheck } from 'lucide-react';
 import { FileAttachments } from '@/components/file-attachments/file-attachments';
 import { Badge } from '@/components/ui/badge';
-import { upsertPaso } from '@/app/dilesa/proyectos/anteproyectos/actions';
+import { autorizarPaso, upsertPaso } from '@/app/dilesa/proyectos/anteproyectos/actions';
 import {
   type PasoEstado,
   type TareaPaso,
@@ -39,7 +43,41 @@ export type PasoRow = {
   fecha: string | null;
   estado: PasoEstado;
   notas: string | null;
+  autorizado_at: string | null;
+  autorizado_por: string | null;
 };
+
+/**
+ * Pasos que requieren autorización adicional (rol director/admin).
+ * v1: solo `cotizacion`. Extender si Beto pide para factura/pago.
+ */
+const PASOS_REQUIEREN_AUTORIZACION: ReadonlySet<TareaPaso> = new Set(['cotizacion']);
+
+export function pasoRequiereAutorizacion(paso: TareaPaso): boolean {
+  return PASOS_REQUIEREN_AUTORIZACION.has(paso);
+}
+
+/**
+ * "Estado visual" del paso, derivado del estado + autorización.
+ * Útil para la mini visualización en la fila compacta y para el badge
+ * del header de cada celda.
+ */
+export type EstadoVisual =
+  | 'pendiente'
+  | 'hecho'
+  | 'esperando_autorizacion'
+  | 'autorizado'
+  | 'no_aplica';
+
+export function estadoVisualDePaso(p: PasoRow): EstadoVisual {
+  if (p.estado === 'no_aplica') return 'no_aplica';
+  if (p.estado === 'pendiente') return 'pendiente';
+  // estado = 'hecho'
+  if (pasoRequiereAutorizacion(p.paso)) {
+    return p.autorizado_at ? 'autorizado' : 'esperando_autorizacion';
+  }
+  return 'hecho';
+}
 
 const PASO_LABEL: Record<TareaPaso, string> = {
   cotizacion: 'Cotización',
@@ -76,12 +114,16 @@ export function TareaPasos({
   pasos: pasosProp,
   empresaId,
   empresaSlug,
+  puedeAutorizar = false,
   onChange,
 }: {
   tareaId: string;
   pasos: readonly PasoRow[];
   empresaId: string;
   empresaSlug: EmpresaSlug;
+  /** Si true, el botón "Autorizar" se muestra en pasos pendientes de
+   *  autorización. Default false. El padre resuelve el rol del usuario. */
+  puedeAutorizar?: boolean;
   onChange?: () => void;
 }) {
   // Index por paso para acceso O(1). Si falta algún paso lo tratamos
@@ -89,7 +131,7 @@ export function TareaPasos({
   const byPaso = new Map(pasosProp.map((p) => [p.paso, p]));
 
   return (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
       {TAREA_PASOS_VALIDOS.map((paso) => (
         <PasoCard
           key={paso}
@@ -98,6 +140,7 @@ export function TareaPasos({
           row={byPaso.get(paso) ?? null}
           empresaId={empresaId}
           empresaSlug={empresaSlug}
+          puedeAutorizar={puedeAutorizar}
           onChange={onChange}
         />
       ))}
@@ -111,6 +154,7 @@ function PasoCard({
   row,
   empresaId,
   empresaSlug,
+  puedeAutorizar,
   onChange,
 }: {
   tareaId: string;
@@ -118,6 +162,7 @@ function PasoCard({
   row: PasoRow | null;
   empresaId: string;
   empresaSlug: EmpresaSlug;
+  puedeAutorizar: boolean;
   onChange?: () => void;
 }) {
   const [pending, startTransition] = useTransition();
@@ -173,28 +218,48 @@ function PasoCard({
     guardar({ estado: next });
   };
 
+  const handleAutorizar = () => {
+    setError(null);
+    startTransition(async () => {
+      const r = await autorizarPaso(tareaId, paso);
+      if (!r.ok) setError(r.error);
+      else onChange?.();
+    });
+  };
+
   const isNoAplica = estado === 'no_aplica';
   const isHecho = estado === 'hecho';
+  const requiereAut = pasoRequiereAutorizacion(paso);
+  const yaAutorizado = !!row?.autorizado_at;
+  const esperandoAut = requiereAut && isHecho && !yaAutorizado;
+
+  // Tonalidad del card según estado visual.
+  const cardTone = isNoAplica
+    ? 'border-[var(--border)] bg-[var(--card)]/30 opacity-50'
+    : esperandoAut
+      ? 'border-amber-300 bg-amber-50/40'
+      : yaAutorizado
+        ? 'border-emerald-300 bg-emerald-50/50'
+        : isHecho
+          ? 'border-emerald-200 bg-emerald-50/40'
+          : 'border-[var(--border)] bg-[var(--bg)]';
 
   return (
-    <div
-      className={`rounded-md border p-3 transition-colors ${
-        isNoAplica
-          ? 'border-[var(--border)] bg-[var(--card)]/30 opacity-50'
-          : isHecho
-            ? 'border-emerald-200 bg-emerald-50/40'
-            : 'border-[var(--border)] bg-[var(--bg)]'
-      }`}
-    >
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text)]/70">
+    <div className={`rounded-md border p-3 transition-colors ${cardTone}`}>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-xs font-semibold uppercase tracking-wide text-[var(--text)]/70">
             {PASO_LABEL[paso]}
           </span>
           {partidaSugerida && (
             <Badge tone="neutral">
               <span className="text-[10px] normal-case">→ {partidaSugerida}</span>
             </Badge>
+          )}
+          {yaAutorizado && (
+            <span title="Autorizado por dirección">
+              <ShieldCheck className="h-3 w-3 text-emerald-600" aria-label="Autorizado" />
+            </span>
           )}
         </div>
         <div className="flex items-center gap-0.5">
@@ -290,6 +355,31 @@ function PasoCard({
             <p className="text-[10px] tabular-nums text-[var(--text)]/60">
               {moneyFmt.format(row.monto)}
               {row.fecha ? ` · ${row.fecha}` : ''}
+            </p>
+          )}
+
+          {esperandoAut && (
+            <div className="mt-1 rounded-md border border-amber-300 bg-amber-100/60 px-2 py-1.5 text-[11px] text-amber-900">
+              <div className="font-medium">Esperando autorización</div>
+              {puedeAutorizar ? (
+                <button
+                  type="button"
+                  onClick={handleAutorizar}
+                  disabled={pending}
+                  className="mt-1 inline-flex h-6 items-center gap-1 rounded border border-amber-400 bg-amber-200 px-2 text-[11px] font-medium text-amber-900 hover:bg-amber-300 disabled:opacity-50"
+                >
+                  <ShieldCheck className="h-3 w-3" />
+                  {pending ? 'Autorizando…' : 'Autorizar'}
+                </button>
+              ) : (
+                <span className="text-amber-800/70">Requiere rol de dirección.</span>
+              )}
+            </div>
+          )}
+
+          {yaAutorizado && row?.autorizado_at && (
+            <p className="text-[10px] text-emerald-700">
+              Autorizado {row.autorizado_at.slice(0, 10)}
             </p>
           )}
         </div>

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { computeAvanceTarea, sumMontosPasos, type PasoRow } from './tarea-pasos';
+import {
+  computeAvanceTarea,
+  estadoVisualDePaso,
+  pasoRequiereAutorizacion,
+  sumMontosPasos,
+  type PasoRow,
+} from './tarea-pasos';
 
 function p(over: Partial<PasoRow>): PasoRow {
   return {
@@ -11,6 +17,8 @@ function p(over: Partial<PasoRow>): PasoRow {
     fecha: null,
     estado: 'pendiente',
     notas: null,
+    autorizado_at: null,
+    autorizado_por: null,
     ...over,
   };
 }
@@ -108,5 +116,48 @@ describe('sumMontosPasos (Sprint 3)', () => {
 
   it('sin pasos → 0', () => {
     expect(sumMontosPasos([])).toBe(0);
+  });
+});
+
+describe('pasoRequiereAutorizacion (Sprint 3.5)', () => {
+  it('cotizacion requiere autorización', () => {
+    expect(pasoRequiereAutorizacion('cotizacion')).toBe(true);
+  });
+  it('factura/pago/resultado NO requieren autorización en v1', () => {
+    expect(pasoRequiereAutorizacion('factura')).toBe(false);
+    expect(pasoRequiereAutorizacion('pago')).toBe(false);
+    expect(pasoRequiereAutorizacion('resultado')).toBe(false);
+  });
+});
+
+describe('estadoVisualDePaso (Sprint 3.5)', () => {
+  it('pendiente → pendiente', () => {
+    expect(estadoVisualDePaso(p({ paso: 'cotizacion', estado: 'pendiente' }))).toBe('pendiente');
+  });
+
+  it('no_aplica → no_aplica', () => {
+    expect(estadoVisualDePaso(p({ paso: 'cotizacion', estado: 'no_aplica' }))).toBe('no_aplica');
+  });
+
+  it('paso que requiere autorización + hecho + sin autorizado_at → esperando_autorizacion', () => {
+    expect(
+      estadoVisualDePaso(p({ paso: 'cotizacion', estado: 'hecho', autorizado_at: null }))
+    ).toBe('esperando_autorizacion');
+  });
+
+  it('paso que requiere autorización + hecho + autorizado_at set → autorizado', () => {
+    expect(
+      estadoVisualDePaso(
+        p({ paso: 'cotizacion', estado: 'hecho', autorizado_at: '2026-05-29T12:00:00Z' })
+      )
+    ).toBe('autorizado');
+  });
+
+  it('factura hecho → hecho (no requiere autorización en v1)', () => {
+    expect(estadoVisualDePaso(p({ paso: 'factura', estado: 'hecho' }))).toBe('hecho');
+  });
+
+  it('resultado hecho → hecho', () => {
+    expect(estadoVisualDePaso(p({ paso: 'resultado', estado: 'hecho' }))).toBe('hecho');
   });
 });

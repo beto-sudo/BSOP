@@ -485,3 +485,53 @@ export async function marcarPasoEstado(
 ): Promise<SimpleResult> {
   return upsertPaso(tareaId, paso, { estado });
 }
+
+/**
+ * Autoriza un paso (típicamente `cotizacion`) por dirección. Setea
+ * `autorizado_at=NOW()` y `autorizado_por=<user>`. Requiere usuario
+ * admin (Sprint 3.5 v1: solo admin puede autorizar; roles director
+ * específicos vendrán después si Beto los pide).
+ *
+ * Idempotente: si el paso ya está autorizado, no-op silencioso.
+ */
+export async function autorizarPaso(tareaId: string, paso: TareaPaso): Promise<SimpleResult> {
+  if (!tareaId) return { ok: false, error: 'tareaId requerido' };
+  if (!(TAREA_PASOS_VALIDOS as readonly string[]).includes(paso)) {
+    return { ok: false, error: `Paso inválido: ${paso}` };
+  }
+
+  const supabase = await makeServerClient();
+  const { data: userRes, error: userErr } = await supabase.auth.getUser();
+  if (userErr || !userRes?.user) return { ok: false, error: 'No autenticado' };
+  const userId = userRes.user.id;
+  const email = userRes.user.email;
+  if (!email) return { ok: false, error: 'JWT sin email' };
+
+  // Role gate: solo admin por ahora. El check se hace contra
+  // core.usuarios.rol (mismo patrón que `lib/empresas/admin-guard.ts`).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: coreUser, error: roleErr } = await (supabase.schema('core') as any)
+    .from('usuarios')
+    .select('rol')
+    .eq('email', email)
+    .maybeSingle();
+  if (roleErr) return { ok: false, error: roleErr.message };
+  if (!coreUser || coreUser.rol !== 'admin') {
+    return { ok: false, error: 'Requiere rol admin/dirección para autorizar' };
+  }
+
+  const { error } = await supabase
+    .schema('dilesa')
+    .from('proyecto_tarea_pasos')
+    .update({
+      autorizado_at: new Date().toISOString(),
+      autorizado_por: userId,
+    })
+    .eq('tarea_id', tareaId)
+    .eq('paso', paso)
+    .is('autorizado_at', null);
+
+  if (error) return { ok: false, error: error.message || 'No se pudo autorizar el paso.' };
+  revalidateAnteproyectosPaths();
+  return { ok: true };
+}

@@ -2676,6 +2676,8 @@ export type Database = {
       }
       proyecto_tarea_pasos: {
         Row: {
+          autorizado_at: string | null
+          autorizado_por: string | null
           created_at: string
           deleted_at: string | null
           documento_url: string | null
@@ -2690,6 +2692,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          autorizado_at?: string | null
+          autorizado_por?: string | null
           created_at?: string
           deleted_at?: string | null
           documento_url?: string | null
@@ -2704,6 +2708,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          autorizado_at?: string | null
+          autorizado_por?: string | null
           created_at?: string
           deleted_at?: string | null
           documento_url?: string | null

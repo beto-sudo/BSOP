@@ -29,6 +29,7 @@ import { type ProyectoDetalle, ESTADO_TONE, ESTADO_LABEL } from './proyecto-deta
 import { TareasChecklist, type PasoRow } from './tareas-checklist';
 import { PartidasPresupuestales, type PartidaRow } from './partidas-presupuestales';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
+import { useEffectiveUser } from '@/components/providers';
 
 const numberFmt = new Intl.NumberFormat('es-MX');
 const moneyFmt = new Intl.NumberFormat('es-MX', {
@@ -150,6 +151,8 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
   const [tareas, setTareas] = useState<ProyectoTarea[]>([]);
   const [dependencias, setDependencias] = useState<TareaDep[]>([]);
   const [pasos, setPasos] = useState<PasoRow[]>([]);
+  const { data: effectiveUser } = useEffectiveUser();
+  const puedeAutorizar = !!effectiveUser?.isAdmin;
   const [partidas, setPartidas] = useState<Partida[]>([]);
   const [loadedId, setLoadedId] = useState<string | null>(null);
   const [extrasError, setExtrasError] = useState<string | null>(null);
@@ -212,7 +215,9 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
             supabase
               .schema('dilesa')
               .from('proyecto_tarea_pasos')
-              .select('id, tarea_id, paso, monto, documento_url, fecha, estado, notas')
+              .select(
+                'id, tarea_id, paso, monto, documento_url, fecha, estado, notas, autorizado_at, autorizado_por'
+              )
               .in('tarea_id', tareaIds)
               .is('deleted_at', null),
           ]);
@@ -481,6 +486,7 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
             pasos={pasos}
             empresaId={DILESA_EMPRESA_ID}
             empresaSlug="dilesa"
+            puedeAutorizar={puedeAutorizar}
             onChange={() => void cargarExtras(anteproyecto.id)}
           />
         )}
