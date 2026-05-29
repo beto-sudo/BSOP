@@ -17,7 +17,7 @@ import { NextResponse } from 'next/server';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { AnalisisFinancieroPDF, type AnalisisPdfData } from '@/lib/dilesa/pdf/analisis-financiero';
-import { PROYECTO_DETALLE_COLUMNAS } from '@/components/dilesa/proyecto-detalle';
+import { PROYECTO_DETALLE_COLUMNAS } from '@/lib/dilesa/proyecto-detalle-columnas';
 import type { AnalisisFinancieroSnapshot } from '@/components/dilesa/analisis-financiero-types';
 
 const MESES_ES = [
