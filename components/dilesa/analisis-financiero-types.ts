@@ -99,12 +99,14 @@ export type AnalisisFinancieroSnapshot = {
   area_vialidades_m2: number | null;
   lotes_proyectados: number | null;
   tamano_lote_promedio: number | null;
-  clasificacion_inmobiliaria: string | null;
+  clasificacion_inmobiliaria: string | null; // singular legacy
+  clasificaciones_inmobiliarias: string[]; // Sprint 4B refinamiento — multiselect
   // Capital
   costo_terreno: number | null;
   valor_predio: number | null;
   infraestructura_cabecera_necesaria: boolean;
-  prototipos_referencia: string[];
+  prototipos_referencia: string[]; // chips manuales (fallback)
+  prototipo_referencia_id: string | null; // FK a dilesa.productos (Sprint 4B refinamiento)
   presupuesto_estimado: number | null;
   // Comparativo Referencia
   valor_comercial_referencia: number | null;
@@ -152,6 +154,42 @@ const SUM = (...xs: Array<number | null | undefined>) => {
   }
   return any ? acc : null;
 };
+
+// ── Catálogo de clasificaciones inmobiliarias ───────────────────────────────
+// Multiselect: un proyecto puede combinar tipos (ej. Lomas del Bosque =
+// Interés Social + Residencial Medio + Plaza Comercial). Slug en
+// snake_case porque ya existe data legacy con ese formato; preservamos
+// codigo para que `fn_calcular_precio_venta` lea valores conocidos en
+// el `CASE clasificacion_inmobiliaria`.
+
+export const CLASIFICACIONES_INMOBILIARIAS = [
+  { codigo: 'interes_social', label: 'Interés Social' },
+  { codigo: 'residencial_medio', label: 'Residencial Medio' },
+  { codigo: 'residencial_alto', label: 'Residencial Alto' },
+  { codigo: 'plaza_comercial', label: 'Plaza Comercial' },
+  { codigo: 'usos_mixtos', label: 'Usos Mixtos' },
+  { codigo: 'naves_industriales', label: 'Naves Industriales' },
+  { codigo: 'oficinas', label: 'Oficinas / Corporativo' },
+  { codigo: 'departamentos', label: 'Departamentos / Vertical' },
+  { codigo: 'lotificacion', label: 'Lotificación (predial puro)' },
+] as const;
+
+export type ClasificacionCodigo = (typeof CLASIFICACIONES_INMOBILIARIAS)[number]['codigo'];
+
+export const CLASIFICACION_CODIGOS = CLASIFICACIONES_INMOBILIARIAS.map((c) => c.codigo);
+
+export function labelDeClasificacion(codigo: string): string {
+  return CLASIFICACIONES_INMOBILIARIAS.find((c) => c.codigo === codigo)?.label ?? codigo;
+}
+
+/**
+ * Valida que un array de códigos de clasificación sea legal (todos
+ * dentro del catálogo, dedup, conserva orden).
+ */
+export function normalizarClasificaciones(codigos: string[]): string[] {
+  const set = CLASIFICACION_CODIGOS as readonly string[];
+  return Array.from(new Set(codigos.filter((c) => set.includes(c))));
+}
 
 // ── Formatters compartidos ───────────────────────────────────────────────────
 // Vivían en el componente pero los movemos acá para que se puedan

@@ -2894,6 +2894,7 @@ export type Database = {
           area_vialidades_m2: number | null
           areas_verdes_m2: number | null
           clasificacion_inmobiliaria: string | null
+          clasificaciones_inmobiliarias: string[]
           clave_interna: string | null
           costo_comercializacion: number | null
           costo_comercializacion_referencia: number | null
@@ -2924,6 +2925,7 @@ export type Database = {
           plantilla_id: string | null
           precio_m2_excedente: number | null
           presupuesto_estimado: number | null
+          prototipo_referencia_id: string | null
           prototipos_referencia: string[]
           proyecto_padre_id: string | null
           proyecto_predecesor_id: string | null
@@ -2948,6 +2950,7 @@ export type Database = {
           area_vialidades_m2?: number | null
           areas_verdes_m2?: number | null
           clasificacion_inmobiliaria?: string | null
+          clasificaciones_inmobiliarias?: string[]
           clave_interna?: string | null
           costo_comercializacion?: number | null
           costo_comercializacion_referencia?: number | null
@@ -2978,6 +2981,7 @@ export type Database = {
           plantilla_id?: string | null
           precio_m2_excedente?: number | null
           presupuesto_estimado?: number | null
+          prototipo_referencia_id?: string | null
           prototipos_referencia?: string[]
           proyecto_padre_id?: string | null
           proyecto_predecesor_id?: string | null
@@ -3002,6 +3006,7 @@ export type Database = {
           area_vialidades_m2?: number | null
           areas_verdes_m2?: number | null
           clasificacion_inmobiliaria?: string | null
+          clasificaciones_inmobiliarias?: string[]
           clave_interna?: string | null
           costo_comercializacion?: number | null
           costo_comercializacion_referencia?: number | null
@@ -3032,6 +3037,7 @@ export type Database = {
           plantilla_id?: string | null
           precio_m2_excedente?: number | null
           presupuesto_estimado?: number | null
+          prototipo_referencia_id?: string | null
           prototipos_referencia?: string[]
           proyecto_padre_id?: string | null
           proyecto_predecesor_id?: string | null
@@ -3053,6 +3059,13 @@ export type Database = {
             columns: ["plantilla_id"]
             isOneToOne: false
             referencedRelation: "proyectos_plantillas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proyectos_prototipo_referencia_id_fkey"
+            columns: ["prototipo_referencia_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
             referencedColumns: ["id"]
           },
           {

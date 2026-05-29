@@ -76,6 +76,9 @@ export type ProyectoDetalle = {
   infraestructura_cabecera_necesaria: boolean;
   valor_predio: number | null;
   prototipos_referencia: string[];
+  // Sprint 4B refinamiento — multiselect clasificaciones + selector prototipo
+  clasificaciones_inmobiliarias: string[];
+  prototipo_referencia_id: string | null;
 };
 
 /**
@@ -103,6 +106,8 @@ export const PROYECTO_DETALLE_COLUMNAS = [
   'seguro_calidad_referencia, seguro_calidad_proyecto',
   'costo_comercializacion_referencia',
   'infraestructura_cabecera_necesaria, valor_predio, prototipos_referencia',
+  // Sprint 4B refinamiento
+  'clasificaciones_inmobiliarias, prototipo_referencia_id',
 ].join(', ');
 
 /**

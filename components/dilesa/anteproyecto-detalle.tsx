@@ -101,10 +101,12 @@ function toAnalisisSnapshot(p: ProyectoDetalle): AnalisisFinancieroSnapshot {
     lotes_proyectados: p.lotes_proyectados,
     tamano_lote_promedio: p.tamano_lote_promedio,
     clasificacion_inmobiliaria: p.clasificacion_inmobiliaria,
+    clasificaciones_inmobiliarias: p.clasificaciones_inmobiliarias,
     costo_terreno: p.costo_terreno,
     valor_predio: p.valor_predio,
     infraestructura_cabecera_necesaria: p.infraestructura_cabecera_necesaria,
     prototipos_referencia: p.prototipos_referencia,
+    prototipo_referencia_id: p.prototipo_referencia_id,
     presupuesto_estimado: p.presupuesto_estimado,
     valor_comercial_referencia: p.valor_comercial_referencia,
     costo_urbanizacion_referencia: p.costo_urbanizacion_referencia,
@@ -122,6 +124,14 @@ function toAnalisisSnapshot(p: ProyectoDetalle): AnalisisFinancieroSnapshot {
     costo_comercializacion: p.costo_comercializacion,
   };
 }
+
+/** Tipo del catálogo de productos disponibles para el selector. */
+type ProductoCatalogo = {
+  id: string;
+  nombre: string;
+  proyecto_nombre: string | null;
+  valor_comercial_referencia: number | null;
+};
 
 /**
  * Sprint 4A: el gate de promoción ya no se basa en una tarea Comité
@@ -214,6 +224,7 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
     !!effectiveUser?.isAdmin ||
     (effectiveUser?.direccionEmpresaIds ?? []).includes(DILESA_EMPRESA_ID);
   const [partidas, setPartidas] = useState<Partida[]>([]);
+  const [productosCatalogo, setProductosCatalogo] = useState<ProductoCatalogo[]>([]);
   const [loadedId, setLoadedId] = useState<string | null>(null);
   const [extrasError, setExtrasError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -226,6 +237,41 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
   // effect (ver eslint react-hooks): si el drawer está abierto y el id del
   // proyecto cargado no coincide con el actual, estamos cargando.
   const loadingExtras = anteproyecto != null && loadedId !== anteproyecto.id;
+
+  // Catálogo de productos DILESA con valor_comercial_referencia
+  // poblado — pull-eables al seleccionarlos en el selector de
+  // prototipo referencia. Se carga 1 sola vez por mount.
+  useEffect(() => {
+    let activo = true;
+    const supabase = createSupabaseBrowserClient();
+    void supabase
+      .schema('dilesa')
+      .from('productos')
+      .select('id, nombre, valor_comercial_referencia, proyecto:proyectos(nombre)')
+      .eq('empresa_id', DILESA_EMPRESA_ID)
+      .is('deleted_at', null)
+      .order('nombre')
+      .then(({ data, error }) => {
+        if (!activo || error) return;
+        const norm: ProductoCatalogo[] = (
+          (data ?? []) as unknown as Array<{
+            id: string;
+            nombre: string;
+            valor_comercial_referencia: number | null;
+            proyecto: { nombre: string } | null;
+          }>
+        ).map((p) => ({
+          id: p.id,
+          nombre: p.nombre,
+          proyecto_nombre: p.proyecto?.nombre ?? null,
+          valor_comercial_referencia: p.valor_comercial_referencia,
+        }));
+        setProductosCatalogo(norm);
+      });
+    return () => {
+      activo = false;
+    };
+  }, []);
 
   const fetchExtras = useCallback(async (proyectoId: string) => {
     const supabase = createSupabaseBrowserClient();
@@ -362,7 +408,6 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
 
   if (!anteproyecto) return null;
 
-  const analisis = deriveAnalisis(anteproyecto);
   const yaConvertido = anteproyecto.estado === 'completado';
   const gate = gatePromocion(tareas, { puedeAutorizar, yaConvertido });
   const puedePromover = gate.puede && !loadingExtras;
@@ -395,44 +440,10 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
     });
   };
 
-  const fichaFisica: { label: string; value: string }[] = (
-    [
-      ['Clave interna', anteproyecto.clave_interna],
-      ['Inicio', fmtFecha(anteproyecto.fecha_inicio)],
-      ['Fin estimado', fmtFecha(anteproyecto.fecha_fin_estimada)],
-      ['Licencia de fraccionamiento', fmtFecha(anteproyecto.fecha_licencia)],
-      ['Área total', fmtM2(anteproyecto.area_m2)],
-      ['Área vendible', fmtM2(anteproyecto.area_vendible_m2)],
-      ['Áreas verdes', fmtM2(anteproyecto.areas_verdes_m2)],
-      ['Lotes proyectados', fmtInt(anteproyecto.lotes_proyectados)],
-    ] as [string, string | null][]
-  )
-    .filter((r): r is [string, string] => r[1] != null)
-    .map(([label, value]) => ({ label, value }));
-
-  const fichaCostos: { label: string; value: string }[] = (
-    [
-      ['Presupuesto estimado', fmtMoney(anteproyecto.presupuesto_estimado)],
-      ['Costo de terreno', fmtMoney(anteproyecto.costo_terreno)],
-      ['Costo de urbanización', fmtMoney(anteproyecto.costo_urbanizacion)],
-      ['Costo de construcción', fmtMoney(anteproyecto.costo_construccion)],
-      ['Costo de comercialización', fmtMoney(anteproyecto.costo_comercializacion)],
-    ] as [string, string | null][]
-  )
-    .filter((r): r is [string, string] => r[1] != null)
-    .map(([label, value]) => ({ label, value }));
-
-  const fichaAnalisis: { label: string; value: string }[] = (
-    [
-      ['Costo total (suma de partidas)', fmtMoney(analisis.costoTotal)],
-      ['Aprovechamiento (vendible/total)', fmtPct(analisis.aprovechamiento)],
-      ['% Áreas verdes', fmtPct(analisis.pctVerdes)],
-      ['Costo por lote', fmtMoney(analisis.costoPorLote)],
-      ['Costo por m² vendible', fmtMoney(analisis.costoPorM2Vendible)],
-    ] as [string, string | null][]
-  )
-    .filter((r): r is [string, string] => r[1] != null)
-    .map(([label, value]) => ({ label, value }));
+  // Sprint 4B refinamiento: las antes-ficha-física/costos/análisis
+  // se eliminaron — el componente `<AnteproyectoAnalisisFinanciero>`
+  // arriba cubre toda esa información (sin duplicar). `deriveAnalisis`
+  // sigue exportado para tests y consumo externo.
 
   return (
     <div className="space-y-6 p-4 sm:p-6">
@@ -450,62 +461,14 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
 
       <AnteproyectoAnalisisFinanciero
         snapshot={toAnalisisSnapshot(anteproyecto)}
+        productosDisponibles={productosCatalogo}
         onChange={() => void cargarExtras(anteproyecto.id)}
       />
 
-      <DetailDrawerSection title="Ficha física" divider={false}>
-        {fichaFisica.length > 0 ? (
-          <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-            {fichaFisica.map((r) => (
-              <div key={r.label}>
-                <dt className="text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
-                  {r.label}
-                </dt>
-                <dd className="mt-0.5 text-sm text-[var(--text)]">{r.value}</dd>
-              </div>
-            ))}
-          </dl>
-        ) : (
-          <p className="text-sm text-[var(--text)]/60">Sin datos físicos capturados todavía.</p>
-        )}
-      </DetailDrawerSection>
-
-      {fichaCostos.length > 0 && (
-        <DetailDrawerSection title="Costos estimados">
-          <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-            {fichaCostos.map((r) => (
-              <div key={r.label}>
-                <dt className="text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
-                  {r.label}
-                </dt>
-                <dd className="mt-0.5 text-sm text-[var(--text)]">{r.value}</dd>
-              </div>
-            ))}
-          </dl>
-          {analisis.deltaPresupuesto != null && Math.abs(analisis.deltaPresupuesto) > 1 && (
-            <p className="mt-3 text-xs text-[var(--text)]/60">
-              {analisis.deltaPresupuesto > 0
-                ? `El presupuesto excede la suma de partidas en ${fmtMoney(analisis.deltaPresupuesto)} (holgura).`
-                : `La suma de partidas excede el presupuesto en ${fmtMoney(Math.abs(analisis.deltaPresupuesto))} (sobre-asignación).`}
-            </p>
-          )}
-        </DetailDrawerSection>
-      )}
-
-      {fichaAnalisis.length > 0 && (
-        <DetailDrawerSection title="Análisis derivado">
-          <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-            {fichaAnalisis.map((r) => (
-              <div key={r.label}>
-                <dt className="text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
-                  {r.label}
-                </dt>
-                <dd className="mt-0.5 text-sm text-[var(--text)]">{r.value}</dd>
-              </div>
-            ))}
-          </dl>
-        </DetailDrawerSection>
-      )}
+      {/* Ficha física + Costos estimados + Análisis derivado quedaron
+          reemplazadas por la sección Análisis Financiero arriba
+          (Sprint 4B refinamiento — Beto: "la ficha ya puede salir
+          sobrando"). */}
 
       {anteproyecto.notas ? (
         <DetailDrawerSection title="Notas">

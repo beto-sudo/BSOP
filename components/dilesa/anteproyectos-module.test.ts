@@ -50,6 +50,8 @@ function ap(overrides: Partial<ProyectoDetalle>): ProyectoDetalle {
     infraestructura_cabecera_necesaria: false,
     valor_predio: null,
     prototipos_referencia: [],
+    clasificaciones_inmobiliarias: [],
+    prototipo_referencia_id: null,
     ...overrides,
   };
 }

@@ -39,6 +39,7 @@ import {
 } from '@/components/dilesa/tareas-checklist-types';
 import {
   type AnalisisCampo,
+  normalizarClasificaciones,
   normalizarPrototiposReferencia,
   validarCampoAnalisis,
 } from '@/components/dilesa/analisis-financiero-types';
@@ -678,6 +679,80 @@ export async function updateAnteproyectoPrototiposReferencia(
     .from('proyectos')
     .update({ prototipos_referencia: norm })
     .eq('id', proyectoId);
+  if (error) return { ok: false, error: error.message };
+  revalidateAnteproyectosPaths();
+  return { ok: true };
+}
+
+/**
+ * Multiselect de clasificaciones inmobiliarias (Sprint 4B refinamiento).
+ * Acepta el array completo. Whitelist contra el catálogo
+ * `CLASIFICACIONES_INMOBILIARIAS` — valores fuera se descartan
+ * silenciosamente. El trigger DB sincroniza el primer elemento al
+ * campo singular legacy para back-compat con funciones SQL.
+ */
+export async function updateAnteproyectoClasificaciones(
+  proyectoId: string,
+  codigos: string[]
+): Promise<SimpleResult> {
+  if (!proyectoId) return { ok: false, error: 'proyectoId requerido' };
+  if (!Array.isArray(codigos)) return { ok: false, error: 'codigos debe ser array' };
+  const norm = normalizarClasificaciones(codigos);
+  const supabase = await makeServerClient();
+  const { error } = await supabase
+    .schema('dilesa')
+    .from('proyectos')
+    .update({ clasificaciones_inmobiliarias: norm })
+    .eq('id', proyectoId);
+  if (error) return { ok: false, error: error.message };
+  revalidateAnteproyectosPaths();
+  return { ok: true };
+}
+
+/**
+ * Setea (o limpia, con null) el prototipo de referencia. Cuando el
+ * prototipo seleccionado tiene `valor_comercial_referencia` poblado en
+ * `dilesa.productos`, autopopula ese campo en el proyecto — esa es la
+ * razón principal del selector (Beto explícito: "para poder extraer
+ * los datos de referencia de ahí").
+ *
+ * Si productoId=null: limpia el FK y deja el resto intacto (no borra
+ * los valores capturados — el usuario decide si los limpia manual).
+ */
+export async function updateAnteproyectoPrototipoReferencia(
+  proyectoId: string,
+  productoId: string | null
+): Promise<SimpleResult> {
+  if (!proyectoId) return { ok: false, error: 'proyectoId requerido' };
+  const supabase = await makeServerClient();
+
+  const patch: Record<string, unknown> = { prototipo_referencia_id: productoId };
+
+  if (productoId) {
+    // Lookup del prototipo para autopopular valor_comercial_referencia
+    // si está poblado en `dilesa.productos`. RLS valida acceso.
+    const { data: producto, error: prodErr } = await supabase
+      .schema('dilesa')
+      .from('productos')
+      .select('valor_comercial_referencia, costo_referencia')
+      .eq('id', productoId)
+      .maybeSingle();
+    if (prodErr) return { ok: false, error: prodErr.message };
+    if (!producto) return { ok: false, error: 'Prototipo no encontrado' };
+
+    if (producto.valor_comercial_referencia != null) {
+      patch.valor_comercial_referencia = producto.valor_comercial_referencia;
+    }
+    // costo_referencia en dilesa.productos es total — no lo desglosamos
+    // a urbanizacion/materiales/MO/etc. v1 sólo pull-ea valor comercial.
+  }
+
+  const { error } = await supabase
+    .schema('dilesa')
+    .from('proyectos')
+    .update(patch)
+    .eq('id', proyectoId);
+
   if (error) return { ok: false, error: error.message };
   revalidateAnteproyectosPaths();
   return { ok: true };

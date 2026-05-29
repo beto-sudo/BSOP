@@ -34,6 +34,13 @@ let rpcResult: { data: string | null; error: { message: string } | null } = {
   error: null,
 };
 
+// Sprint 4B refinamiento — lookup de producto para autopopulate.
+let productoRow: {
+  valor_comercial_referencia: number | null;
+  costo_referencia: number | null;
+} | null = { valor_comercial_referencia: 900_000, costo_referencia: null };
+let productoError: { message: string } | null = null;
+
 // ── Mocks ──────────────────────────────────────────────────────────────
 
 vi.mock('next/headers', () => ({
@@ -90,6 +97,15 @@ vi.mock('@supabase/ssr', () => ({
             }),
           };
         }
+        if (schemaName === 'dilesa' && table === 'productos') {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({ data: productoRow, error: productoError }),
+              }),
+            }),
+          };
+        }
         if (schemaName === 'dilesa' && table === 'proyectos') {
           // Distinguir entre SELECT (promote: leer empresa) y UPDATE (Sprint 4B análisis).
           const chain = {
@@ -142,6 +158,93 @@ beforeEach(() => {
   rolesData = [];
   asignacionesData = [];
   rpcResult = { data: 'desarrollo-1', error: null };
+  productoRow = { valor_comercial_referencia: 900_000, costo_referencia: null };
+  productoError = null;
+});
+
+describe('updateAnteproyectoClasificaciones (Sprint 4B refinamiento)', () => {
+  it('rechaza proyectoId vacío', async () => {
+    const { updateAnteproyectoClasificaciones } = await import('./actions');
+    const r = await updateAnteproyectoClasificaciones('', ['interes_social']);
+    expect(r.ok).toBe(false);
+    expect(lastTable).toBeNull();
+  });
+
+  it('rechaza no-array', async () => {
+    const { updateAnteproyectoClasificaciones } = await import('./actions');
+    // @ts-expect-error — input inválido
+    const r = await updateAnteproyectoClasificaciones('p1', 'interes_social');
+    expect(r.ok).toBe(false);
+    expect(lastTable).toBeNull();
+  });
+
+  it('persiste array de códigos válidos del catálogo', async () => {
+    const { updateAnteproyectoClasificaciones } = await import('./actions');
+    const r = await updateAnteproyectoClasificaciones('p1', [
+      'interes_social',
+      'residencial_medio',
+    ]);
+    expect(r.ok).toBe(true);
+    expect(lastPatch).toEqual({
+      clasificaciones_inmobiliarias: ['interes_social', 'residencial_medio'],
+    });
+  });
+
+  it('filtra códigos fuera del catálogo (no rompe)', async () => {
+    const { updateAnteproyectoClasificaciones } = await import('./actions');
+    const r = await updateAnteproyectoClasificaciones('p1', ['interes_social', 'no_existe']);
+    expect(r.ok).toBe(true);
+    expect(lastPatch).toEqual({ clasificaciones_inmobiliarias: ['interes_social'] });
+  });
+
+  it('persiste array vacío', async () => {
+    const { updateAnteproyectoClasificaciones } = await import('./actions');
+    const r = await updateAnteproyectoClasificaciones('p1', []);
+    expect(r.ok).toBe(true);
+    expect(lastPatch).toEqual({ clasificaciones_inmobiliarias: [] });
+  });
+});
+
+describe('updateAnteproyectoPrototipoReferencia (Sprint 4B refinamiento)', () => {
+  it('rechaza proyectoId vacío', async () => {
+    const { updateAnteproyectoPrototipoReferencia } = await import('./actions');
+    const r = await updateAnteproyectoPrototipoReferencia('', 'prod-1');
+    expect(r.ok).toBe(false);
+  });
+
+  it('productoId=null limpia el FK sin autopopulate', async () => {
+    const { updateAnteproyectoPrototipoReferencia } = await import('./actions');
+    const r = await updateAnteproyectoPrototipoReferencia('p1', null);
+    expect(r.ok).toBe(true);
+    expect(lastPatch).toEqual({ prototipo_referencia_id: null });
+  });
+
+  it('productoId válido autopopula valor_comercial_referencia', async () => {
+    productoRow = { valor_comercial_referencia: 1_200_000, costo_referencia: null };
+    const { updateAnteproyectoPrototipoReferencia } = await import('./actions');
+    const r = await updateAnteproyectoPrototipoReferencia('p1', 'prod-1');
+    expect(r.ok).toBe(true);
+    expect(lastPatch).toEqual({
+      prototipo_referencia_id: 'prod-1',
+      valor_comercial_referencia: 1_200_000,
+    });
+  });
+
+  it('producto sin valor_comercial_referencia → solo setea el FK', async () => {
+    productoRow = { valor_comercial_referencia: null, costo_referencia: null };
+    const { updateAnteproyectoPrototipoReferencia } = await import('./actions');
+    const r = await updateAnteproyectoPrototipoReferencia('p1', 'prod-1');
+    expect(r.ok).toBe(true);
+    expect(lastPatch).toEqual({ prototipo_referencia_id: 'prod-1' });
+  });
+
+  it('producto no encontrado → error', async () => {
+    productoRow = null;
+    const { updateAnteproyectoPrototipoReferencia } = await import('./actions');
+    const r = await updateAnteproyectoPrototipoReferencia('p1', 'prod-bad');
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/no encontrado/i);
+  });
 });
 
 describe('promoteAnteproyecto (Sprint 4A — rol Dirección por empresa)', () => {

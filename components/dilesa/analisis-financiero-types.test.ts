@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CLASIFICACIONES_INMOBILIARIAS,
   deriveAnalisisFinanciero,
   fmtM2,
   fmtMoney,
   fmtMoneyCents,
   fmtNumber,
   fmtPct,
+  labelDeClasificacion,
+  normalizarClasificaciones,
   normalizarPrototiposReferencia,
   parseMoneyInput,
   validarCampoAnalisis,
@@ -22,10 +25,12 @@ function snap(overrides: Partial<AnalisisFinancieroSnapshot>): AnalisisFinancier
     lotes_proyectados: null,
     tamano_lote_promedio: null,
     clasificacion_inmobiliaria: null,
+    clasificaciones_inmobiliarias: [],
     costo_terreno: null,
     valor_predio: null,
     infraestructura_cabecera_necesaria: false,
     prototipos_referencia: [],
+    prototipo_referencia_id: null,
     presupuesto_estimado: null,
     valor_comercial_referencia: null,
     costo_urbanizacion_referencia: null,
@@ -345,5 +350,53 @@ describe('validarCampoAnalisis — coverage de ramas adicionales', () => {
     expect(validarCampoAnalisis('areas_verdes_m2', 5_000)).toEqual({ ok: true });
     expect(validarCampoAnalisis('area_vialidades_m2', 10_000)).toEqual({ ok: true });
     expect(validarCampoAnalisis('tamano_lote_promedio', 250)).toEqual({ ok: true });
+  });
+});
+
+describe('Clasificaciones inmobiliarias (Sprint 4B refinamiento)', () => {
+  it('catálogo tiene las 9 clasificaciones definidas con Beto', () => {
+    expect(CLASIFICACIONES_INMOBILIARIAS).toHaveLength(9);
+    const codigos = CLASIFICACIONES_INMOBILIARIAS.map((c) => c.codigo);
+    expect(codigos).toContain('interes_social');
+    expect(codigos).toContain('residencial_medio');
+    expect(codigos).toContain('residencial_alto');
+    expect(codigos).toContain('plaza_comercial');
+    expect(codigos).toContain('usos_mixtos');
+    expect(codigos).toContain('naves_industriales');
+    expect(codigos).toContain('oficinas');
+    expect(codigos).toContain('departamentos');
+    expect(codigos).toContain('lotificacion');
+  });
+
+  it('labelDeClasificacion resuelve códigos conocidos', () => {
+    expect(labelDeClasificacion('interes_social')).toBe('Interés Social');
+    expect(labelDeClasificacion('lotificacion')).toBe('Lotificación (predial puro)');
+  });
+
+  it('labelDeClasificacion devuelve el código mismo cuando no está en catálogo', () => {
+    expect(labelDeClasificacion('desconocido_xyz')).toBe('desconocido_xyz');
+  });
+
+  it('normalizarClasificaciones acepta códigos válidos', () => {
+    expect(normalizarClasificaciones(['interes_social', 'residencial_medio'])).toEqual([
+      'interes_social',
+      'residencial_medio',
+    ]);
+  });
+
+  it('normalizarClasificaciones descarta códigos fuera del catálogo', () => {
+    expect(normalizarClasificaciones(['interes_social', 'rol_invalido'])).toEqual([
+      'interes_social',
+    ]);
+  });
+
+  it('normalizarClasificaciones dedup', () => {
+    expect(
+      normalizarClasificaciones(['interes_social', 'interes_social', 'residencial_alto'])
+    ).toEqual(['interes_social', 'residencial_alto']);
+  });
+
+  it('normalizarClasificaciones array vacío → array vacío', () => {
+    expect(normalizarClasificaciones([])).toEqual([]);
   });
 });

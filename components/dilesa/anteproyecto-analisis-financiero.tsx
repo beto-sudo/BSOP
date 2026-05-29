@@ -26,19 +26,23 @@
 import { useCallback, useEffect, useState, useTransition } from 'react';
 import {
   ANALISIS_FILAS_COSTOS,
+  CLASIFICACIONES_INMOBILIARIAS,
   deriveAnalisisFinanciero,
   fmtM2,
   fmtMoney,
   fmtMoneyCents,
   fmtNumber,
   fmtPct,
+  labelDeClasificacion,
   parseMoneyInput,
   type AnalisisCampo,
   type AnalisisFinancieroSnapshot,
 } from './analisis-financiero-types';
 import {
   updateAnteproyectoAnalisisCampo,
+  updateAnteproyectoClasificaciones,
   updateAnteproyectoInfraCabecera,
+  updateAnteproyectoPrototipoReferencia,
   updateAnteproyectoPrototiposReferencia,
 } from '@/app/dilesa/proyectos/anteproyectos/actions';
 
@@ -108,6 +112,119 @@ function MoneyCell({
   );
 }
 
+// ── Clasificaciones multiselect ──────────────────────────────────────────────
+
+function ClasificacionesMultiSelect({
+  value,
+  onChange,
+  pending,
+}: {
+  value: string[];
+  onChange: (next: string[]) => void;
+  pending: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const toggle = (codigo: string) => {
+    const next = value.includes(codigo) ? value.filter((c) => c !== codigo) : [...value, codigo];
+    onChange(next);
+  };
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        disabled={pending}
+        className="flex w-full items-center justify-between gap-2 rounded-sm border border-transparent px-1 py-0.5 text-right text-xs hover:border-[var(--border)] disabled:opacity-50"
+      >
+        {value.length === 0 ? (
+          <span className="text-[var(--muted-text)]">—</span>
+        ) : (
+          <span className="flex flex-wrap justify-end gap-1">
+            {value.map((c) => (
+              <span
+                key={c}
+                className="inline-flex rounded-full border border-[var(--border)] bg-[var(--card)] px-1.5 py-0.5 text-[10px]"
+              >
+                {labelDeClasificacion(c)}
+              </span>
+            ))}
+          </span>
+        )}
+        <span className="text-[var(--muted-text)]">▾</span>
+      </button>
+      {open && (
+        <>
+          <button
+            type="button"
+            aria-label="Cerrar"
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-30 cursor-default"
+            tabIndex={-1}
+          />
+          <div className="absolute right-0 z-40 mt-1 w-56 rounded-md border border-[var(--border)] bg-[var(--bg)] p-1 shadow-lg">
+            {CLASIFICACIONES_INMOBILIARIAS.map((c) => (
+              <label
+                key={c.codigo}
+                className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1 text-xs hover:bg-[var(--card)]"
+              >
+                <input
+                  type="checkbox"
+                  checked={value.includes(c.codigo)}
+                  onChange={() => toggle(c.codigo)}
+                  disabled={pending}
+                  className="h-3.5 w-3.5 accent-[var(--accent)]"
+                />
+                <span>{c.label}</span>
+              </label>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Prototipo referencia (selector único contra dilesa.productos) ────────────
+
+type ProductoOption = {
+  id: string;
+  nombre: string;
+  proyecto_nombre: string | null;
+  valor_comercial_referencia: number | null;
+};
+
+function PrototipoReferenciaSelect({
+  value,
+  options,
+  onChange,
+  pending,
+}: {
+  value: string | null;
+  options: ProductoOption[];
+  onChange: (productoId: string | null) => void;
+  pending: boolean;
+}) {
+  return (
+    <select
+      value={value ?? ''}
+      onChange={(e) => onChange(e.target.value === '' ? null : e.target.value)}
+      disabled={pending}
+      className="h-7 w-full rounded-sm border border-transparent bg-transparent px-1 text-xs hover:border-[var(--border)] focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
+    >
+      <option value="">— Ninguno (entrada manual) —</option>
+      {options.map((o) => (
+        <option key={o.id} value={o.id}>
+          {o.nombre}
+          {o.proyecto_nombre ? ` · ${o.proyecto_nombre}` : ''}
+          {o.valor_comercial_referencia != null
+            ? ` · ${fmtMoney(o.valor_comercial_referencia)}`
+            : ''}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 // ── Prototipos chips (free-text) ──────────────────────────────────────────────
 
 function PrototiposChips({
@@ -172,9 +289,17 @@ function PrototiposChips({
 
 export function AnteproyectoAnalisisFinanciero({
   snapshot,
+  productosDisponibles = [],
   onChange,
 }: {
   snapshot: AnalisisFinancieroSnapshot;
+  /**
+   * Catálogo de `dilesa.productos` para el selector de prototipo
+   * referencia. Lo carga el padre vía Supabase (filtrado por
+   * empresa). Si está vacío, el selector solo muestra "Ninguno" y
+   * cae a captura manual de chips.
+   */
+  productosDisponibles?: ProductoOption[];
   /** Callback opcional para que el padre re-fetcheé tras un commit. */
   onChange?: () => void;
 }) {
@@ -229,6 +354,63 @@ export function AnteproyectoAnalisisFinanciero({
     [local.id, onChange, snapshot.infraestructura_cabecera_necesaria]
   );
 
+  const commitClasificaciones = useCallback(
+    (codigos: string[]) => {
+      setError(null);
+      setLocal((prev) => ({ ...prev, clasificaciones_inmobiliarias: codigos }));
+      startTransition(async () => {
+        const r = await updateAnteproyectoClasificaciones(local.id, codigos);
+        if (!r.ok) {
+          setError(r.error);
+          setLocal((prev) => ({
+            ...prev,
+            clasificaciones_inmobiliarias: snapshot.clasificaciones_inmobiliarias,
+          }));
+        } else {
+          onChange?.();
+        }
+      });
+    },
+    [local.id, onChange, snapshot.clasificaciones_inmobiliarias]
+  );
+
+  const commitPrototipoReferenciaId = useCallback(
+    (productoId: string | null) => {
+      setError(null);
+      // Optimistic — si se selecciona prototipo, también pre-llenamos
+      // valor_comercial_referencia con el del producto (mismo que hace
+      // el server action). Si productoId=null no tocamos otros campos.
+      setLocal((prev) => {
+        const proto = productosDisponibles.find((p) => p.id === productoId);
+        const next = { ...prev, prototipo_referencia_id: productoId };
+        if (proto && proto.valor_comercial_referencia != null) {
+          next.valor_comercial_referencia = proto.valor_comercial_referencia;
+        }
+        return next;
+      });
+      startTransition(async () => {
+        const r = await updateAnteproyectoPrototipoReferencia(local.id, productoId);
+        if (!r.ok) {
+          setError(r.error);
+          setLocal((prev) => ({
+            ...prev,
+            prototipo_referencia_id: snapshot.prototipo_referencia_id,
+            valor_comercial_referencia: snapshot.valor_comercial_referencia,
+          }));
+        } else {
+          onChange?.();
+        }
+      });
+    },
+    [
+      local.id,
+      onChange,
+      productosDisponibles,
+      snapshot.prototipo_referencia_id,
+      snapshot.valor_comercial_referencia,
+    ]
+  );
+
   const commitPrototipos = useCallback(
     (nombres: string[]) => {
       setError(null);
@@ -266,8 +448,15 @@ export function AnteproyectoAnalisisFinanciero({
           <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-[var(--muted-text)]">
             Predio
           </div>
-          <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-            <Row label="Clasificación" value={local.clasificacion_inmobiliaria ?? '—'} />
+          <dl className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 text-xs">
+            <dt className="text-[var(--muted-text)]">Clasificación</dt>
+            <dd className="min-w-[140px] max-w-[260px]">
+              <ClasificacionesMultiSelect
+                value={local.clasificaciones_inmobiliarias}
+                onChange={commitClasificaciones}
+                pending={pending}
+              />
+            </dd>
             <Row label="Lotes" value={fmtNumber(local.lotes_proyectados)} />
             <Row label="Área total" value={fmtM2(local.area_m2)} />
             <Row label="Área vendible" value={fmtM2(local.area_vendible_m2)} />
@@ -323,13 +512,26 @@ export function AnteproyectoAnalisisFinanciero({
                 className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent)]"
               />
             </dd>
-            <dt className="col-span-2 mt-1 text-[var(--muted-text)]">Prototipos referencia</dt>
+            <dt className="col-span-2 mt-1 text-[var(--muted-text)]">Prototipo referencia</dt>
             <dd className="col-span-2">
-              <PrototiposChips
-                value={local.prototipos_referencia}
-                onChange={commitPrototipos}
+              <PrototipoReferenciaSelect
+                value={local.prototipo_referencia_id}
+                options={productosDisponibles}
+                onChange={commitPrototipoReferenciaId}
                 pending={pending}
               />
+              {local.prototipo_referencia_id == null && (
+                <div className="mt-1">
+                  <div className="mb-0.5 text-[10px] uppercase tracking-wide text-[var(--muted-text)]">
+                    Captura manual (sin prototipo)
+                  </div>
+                  <PrototiposChips
+                    value={local.prototipos_referencia}
+                    onChange={commitPrototipos}
+                    pending={pending}
+                  />
+                </div>
+              )}
             </dd>
           </dl>
         </div>
