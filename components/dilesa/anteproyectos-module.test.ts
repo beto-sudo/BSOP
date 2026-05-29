@@ -217,32 +217,32 @@ describe('gatePromocion (Sprint 4A — autorización integrada)', () => {
     obligatoriedad_snapshot,
   });
 
-  it('admin con todas las obligatorias completadas → puede', () => {
+  it('autorizado con todas las obligatorias completadas → puede', () => {
     const r = gatePromocion([T('completada'), T('completada')], {
-      isAdmin: true,
+      puedeAutorizar: true,
       yaConvertido: false,
     });
     expect(r.puede).toBe(true);
     expect(r.razon).toMatch(/listo/i);
   });
 
-  it('admin con obligatoria pendiente → no puede', () => {
+  it('autorizado con obligatoria pendiente → no puede', () => {
     const r = gatePromocion([T('completada'), T('en_curso')], {
-      isAdmin: true,
+      puedeAutorizar: true,
       yaConvertido: false,
     });
     expect(r.puede).toBe(false);
     expect(r.razon).toMatch(/faltan 1/i);
   });
 
-  it('no-admin nunca puede (aunque todo esté completado)', () => {
-    const r = gatePromocion([T('completada')], { isAdmin: false, yaConvertido: false });
+  it('no-autorizado nunca puede (aunque todo esté completado)', () => {
+    const r = gatePromocion([T('completada')], { puedeAutorizar: false, yaConvertido: false });
     expect(r.puede).toBe(false);
     expect(r.razon).toMatch(/dirección/i);
   });
 
-  it('ya convertido → no puede aunque sea admin', () => {
-    const r = gatePromocion([T('completada')], { isAdmin: true, yaConvertido: true });
+  it('ya convertido → no puede aunque esté autorizado', () => {
+    const r = gatePromocion([T('completada')], { puedeAutorizar: true, yaConvertido: true });
     expect(r.puede).toBe(false);
     expect(r.razon).toMatch(/ya fue convertido/i);
   });
@@ -250,13 +250,13 @@ describe('gatePromocion (Sprint 4A — autorización integrada)', () => {
   it('tareas opcionales pendientes no bloquean', () => {
     const r = gatePromocion(
       [T('completada', 'obligatoria'), T('pendiente', 'opcional'), T('pendiente', 'informativa')],
-      { isAdmin: true, yaConvertido: false }
+      { puedeAutorizar: true, yaConvertido: false }
     );
     expect(r.puede).toBe(true);
   });
 
-  it('lista vacía con admin → puede (caso anteproyecto sin plantilla aún)', () => {
-    const r = gatePromocion([], { isAdmin: true, yaConvertido: false });
+  it('lista vacía con autorización → puede (caso anteproyecto sin plantilla aún)', () => {
+    const r = gatePromocion([], { puedeAutorizar: true, yaConvertido: false });
     expect(r.puede).toBe(true);
   });
 });

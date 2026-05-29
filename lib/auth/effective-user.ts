@@ -12,6 +12,14 @@ export type EffectiveUser = {
   isAdmin: boolean;
   /** True only when the caller is admin AND a preview cookie is active. */
   isPreviewing: boolean;
+  /**
+   * IDs de empresas donde el usuario efectivo tiene un rol cuyo nombre matchea
+   * "Dirección" (case-insensitive). Sirve para gates de autorización
+   * operativos como el de promoción a desarrollo (Sprint 4A DILESA).
+   * Los admin globales NO necesitan estar listados aquí — el `isAdmin=true`
+   * los habilita en cualquier empresa.
+   */
+  direccionEmpresaIds: string[];
 };
 
 /**
@@ -53,12 +61,15 @@ export async function getEffectiveUser(
 
   if (!caller) return null;
 
+  const callerDireccion = await loadDireccionEmpresaIds(admin, caller.id);
+
   const callerSelf: EffectiveUser = {
     id: caller.id,
     email: caller.email,
     firstName: caller.first_name ?? null,
     isAdmin: caller.rol === 'admin',
     isPreviewing: false,
+    direccionEmpresaIds: callerDireccion,
   };
 
   if (caller.rol !== 'admin') return callerSelf;
@@ -76,11 +87,61 @@ export async function getEffectiveUser(
 
   if (!target) return callerSelf;
 
+  const targetDireccion = await loadDireccionEmpresaIds(admin, target.id);
+
   return {
     id: target.id,
     email: target.email,
     firstName: target.first_name ?? null,
     isAdmin: target.rol === 'admin',
     isPreviewing: true,
+    direccionEmpresaIds: targetDireccion,
   };
+}
+
+/**
+ * Lee las empresas donde el usuario tiene un rol cuyo nombre matchea
+ * "Dirección" (case-insensitive) en `core.roles`. Usado para gates
+ * operativos por empresa (ej. autorizar promoción a desarrollo DILESA).
+ *
+ * Falla silencioso a `[]` en caso de error — el gate es additive sobre
+ * `isAdmin`, así que un fallo de lectura no rompe a los admin globales.
+ */
+async function loadDireccionEmpresaIds(
+  admin: ReturnType<typeof getSupabaseAdminClient>,
+  usuarioId: string
+): Promise<string[]> {
+  if (!admin) return [];
+  // Dos pasos para no depender de embeds cross-schema:
+  // 1) IDs de roles llamados "Dirección" (cualquier empresa, case-insensitive).
+  // 2) Asignaciones activas del usuario contra esos roles.
+  const { data: roles, error: rolesErr } = await admin
+    .schema('core')
+    .from('roles')
+    .select('id, empresa_id, nombre')
+    .ilike('nombre', 'direcci%n');
+  if (rolesErr || !roles?.length) return [];
+
+  const roleIdToEmpresa = new Map(roles.map((r) => [r.id, r.empresa_id]));
+  const roleIds = roles.map((r) => r.id);
+
+  const { data: asgs, error: asgErr } = await admin
+    .schema('core')
+    .from('usuarios_empresas')
+    .select('rol_id, empresa_id, activo')
+    .eq('usuario_id', usuarioId)
+    .eq('activo', true)
+    .in('rol_id', roleIds);
+  if (asgErr || !asgs?.length) return [];
+
+  const out = new Set<string>();
+  for (const a of asgs) {
+    if (!a.rol_id || !a.empresa_id) continue;
+    // Doble check: el rol asignado matchea y la empresa coincide.
+    const empresaRol = roleIdToEmpresa.get(a.rol_id);
+    if (empresaRol && empresaRol === a.empresa_id) {
+      out.add(a.empresa_id);
+    }
+  }
+  return Array.from(out);
 }

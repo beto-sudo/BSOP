@@ -87,7 +87,8 @@ type Partida = PartidaRow;
 /**
  * Sprint 4A: el gate de promoción ya no se basa en una tarea Comité
  * (eliminada). En su lugar, se requiere que:
- *   1) El usuario sea admin (dirección). El server action revalida.
+ *   1) El usuario sea admin global O tenga rol "Dirección" en la
+ *      empresa del anteproyecto. El server action revalida.
  *   2) Todas las tareas obligatorias del anteproyecto estén
  *      `completada`. Esto evita promover sin haber cerrado los
  *      trámites y factibilidades canónicos.
@@ -98,15 +99,15 @@ type Partida = PartidaRow;
  */
 export function gatePromocion(
   tareas: readonly { estado: string; obligatoriedad_snapshot?: string | null }[],
-  ctx: { isAdmin: boolean; yaConvertido: boolean }
+  ctx: { puedeAutorizar: boolean; yaConvertido: boolean }
 ): { puede: boolean; razon: string } {
   if (ctx.yaConvertido) {
     return { puede: false, razon: 'Este anteproyecto ya fue convertido.' };
   }
-  if (!ctx.isAdmin) {
+  if (!ctx.puedeAutorizar) {
     return {
       puede: false,
-      razon: 'Solo dirección (rol admin) puede autorizar y promover a desarrollo.',
+      razon: 'Solo dirección puede autorizar y promover a desarrollo.',
     };
   }
   const obligatoriasPendientes = tareas.filter(
@@ -166,7 +167,13 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
   const [dependencias, setDependencias] = useState<TareaDep[]>([]);
   const [pasos, setPasos] = useState<PasoRow[]>([]);
   const { data: effectiveUser } = useEffectiveUser();
-  const puedeAutorizar = !!effectiveUser?.isAdmin;
+  // Sprint 4A: puede autorizar si es admin global, O tiene rol
+  // "Dirección" en la empresa DILESA. Este componente solo se usa para
+  // anteproyectos DILESA, por eso comparamos contra DILESA_EMPRESA_ID
+  // directo.
+  const puedeAutorizar =
+    !!effectiveUser?.isAdmin ||
+    (effectiveUser?.direccionEmpresaIds ?? []).includes(DILESA_EMPRESA_ID);
   const [partidas, setPartidas] = useState<Partida[]>([]);
   const [loadedId, setLoadedId] = useState<string | null>(null);
   const [extrasError, setExtrasError] = useState<string | null>(null);
@@ -318,7 +325,7 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
 
   const analisis = deriveAnalisis(anteproyecto);
   const yaConvertido = anteproyecto.estado === 'completado';
-  const gate = gatePromocion(tareas, { isAdmin: puedeAutorizar, yaConvertido });
+  const gate = gatePromocion(tareas, { puedeAutorizar, yaConvertido });
   const puedePromover = gate.puede && !loadingExtras;
 
   const handlePromote = () => {
@@ -580,7 +587,7 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
           </button>
         ) : (
           <div className="text-sm text-[var(--muted-text)]">
-            Solo dirección (rol admin) puede autorizar y promover este anteproyecto.
+            Solo dirección puede autorizar y promover este anteproyecto.
           </div>
         )}
         {promoteError && <p className="mt-2 text-sm text-red-600/80">{promoteError}</p>}

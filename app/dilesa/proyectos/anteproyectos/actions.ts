@@ -103,21 +103,60 @@ export async function promoteAnteproyecto(
 
   const supabase = await makeServerClient();
 
-  // Role gate (Sprint 4A): solo admin/dirección puede autorizar +
-  // promover. Mismo patrón que `autorizarPaso`.
+  // Role gate (Sprint 4A): admin global O rol "Dirección" en la empresa
+  // del anteproyecto. Patrón consistente con `autorizarPaso` /
+  // `autorizarPartida`, pero ampliado al rol por empresa (`core.roles`).
   const { data: userRes, error: userErr } = await supabase.auth.getUser();
   if (userErr || !userRes?.user) return { ok: false, error: 'No autenticado' };
   const email = userRes.user.email;
   if (!email) return { ok: false, error: 'JWT sin email' };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: coreUser, error: roleErr } = await (supabase.schema('core') as any)
+  const coreSb = supabase.schema('core') as any;
+
+  const { data: coreUser, error: userLookupErr } = await coreSb
     .from('usuarios')
-    .select('rol')
+    .select('id, rol')
     .eq('email', email)
     .maybeSingle();
-  if (roleErr) return { ok: false, error: roleErr.message };
-  if (!coreUser || coreUser.rol !== 'admin') {
+  if (userLookupErr) return { ok: false, error: userLookupErr.message };
+  if (!coreUser) return { ok: false, error: 'Usuario no encontrado en core.usuarios' };
+
+  const isAdmin = coreUser.rol === 'admin';
+
+  // Si no es admin global, validar rol "Dirección" en la empresa del
+  // anteproyecto. Necesitamos primero leer la empresa.
+  let autorizado = isAdmin;
+  if (!autorizado) {
+    const { data: ap, error: apErr } = await supabase
+      .schema('dilesa')
+      .from('proyectos')
+      .select('empresa_id')
+      .eq('id', anteproyectoId)
+      .maybeSingle();
+    if (apErr || !ap) {
+      return { ok: false, error: apErr?.message || 'Anteproyecto no encontrado' };
+    }
+
+    const { data: direccionRoles } = await coreSb
+      .from('roles')
+      .select('id')
+      .eq('empresa_id', ap.empresa_id)
+      .ilike('nombre', 'direcci%n');
+    const roleIds = (direccionRoles ?? []).map((r: { id: string }) => r.id);
+    if (roleIds.length > 0) {
+      const { data: asgs } = await coreSb
+        .from('usuarios_empresas')
+        .select('rol_id')
+        .eq('usuario_id', coreUser.id)
+        .eq('empresa_id', ap.empresa_id)
+        .eq('activo', true)
+        .in('rol_id', roleIds);
+      autorizado = (asgs ?? []).length > 0;
+    }
+  }
+
+  if (!autorizado) {
     return {
       ok: false,
       error: 'Solo dirección puede autorizar y promover a desarrollo.',
