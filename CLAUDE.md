@@ -133,25 +133,35 @@ correctamente en su sub-set, el PR pasa porque no corrió
 `prettier --check .` global, y el archivo se mergea malformatado. La
 regla de "todo el repo, no solo lo tocado" detecta eso.
 
-### Después de `git push` (vigilancia obligatoria)
+### Después de `git push` — auto-merge por default (norma 2026-05-29)
 
-**Inmediatamente** después del push del PR, correr:
+**Default para todo PR:** una vez pasados los 5 checks locales y creado el PR,
+habilitar auto-merge para que GitHub lo mergee solo al pasar CI:
 
 ```bash
-gh pr checks <PR-number> --watch --interval 15
+gh pr merge <PR-number> --squash --auto --delete-branch
 ```
 
-Bloquea hasta que termine. Si hay fallo:
+No hace falta `gh pr checks --watch` bloqueante en el caso default. Pero el
+cuidado de CI **sigue vigente**:
 
-1. Leer el log del job que falló: `gh run view --log-failed <run-id>`.
-2. Identificar el step exacto y el error real (no solo el último log).
-3. Arreglar localmente. Si el fix es trivial (formato, lint warning),
-   commit chico en el mismo PR. Si es estructural, considerar si
-   amerita revisar el alcance con el usuario.
-4. Re-push y volver a vigilar.
-5. **NO reportar el PR al usuario hasta que esté verde** — o, si el
-   fallo no es trivial, reportar explícitamente con el error y proponer
-   plan antes de continuar.
+1. Si CI **falla**, el auto-merge NO procede y el PR queda **abierto** (no es
+   "entregado"). Confirmar el desenlace con un `gh pr view <PR> --json
+state,mergedAt` o un `gh pr checks <PR>` puntual (NO `--watch`) un rato
+   después. **NO reportar el PR como cerrado/entregado sin confirmar que mergeó
+   o que va verde en camino.**
+2. Si falló: `gh run view --log-failed <run-id>`, identificar el step y el error
+   real, arreglar (commit chico si es trivial), re-push. El auto-merge queda
+   armado y mergea al verde.
+
+**Excepción — revisar Vercel Preview antes (SIN auto-merge):** para cambios de
+**UI/diseño visibles** donde conviene ver el preview, NO habilitar `--auto`:
+dejar el PR abierto, avisar a Beto con el link del preview para que revise y
+mergee (o dé el OK). CC **infiere** este caso en trabajo de UI/pulido; backend,
+migraciones, datos y docs van **siempre con auto-merge**. Beto puede override
+cualquiera ("este no auto-mergees" / "este sí"). En este modo sin `--auto`
+aplica el flujo previo: `gh pr checks <PR> --watch --interval 15` hasta verde y
+avisar; **no reportar entregado hasta verde**.
 
 ### Excepciones aceptables
 
