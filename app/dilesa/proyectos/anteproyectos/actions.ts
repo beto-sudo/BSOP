@@ -82,10 +82,15 @@ export async function populatePlantilla(
  * Promueve un anteproyecto a desarrollo via RPC
  * `dilesa.fn_proyecto_promote_anteproyecto`.
  *
- * Sprint 4 de la iniciativa. La RPC valida:
+ * Sprint 4A (2026-05-30): la autorización del comité se eliminó como
+ * tarea separada. La RPC ya no valida tarea Comité; el control de quién
+ * puede llamar este action vive aquí — requiere rol admin (dirección).
+ * Patrón consistente con `autorizarPaso` (Sprint 3.5) y
+ * `autorizarPartida` (Sprint 2).
+ *
+ * La RPC sigue validando:
  * - El anteproyecto existe y `tipo='anteproyecto'`.
  * - No existe ya un desarrollo apuntándolo via `proyecto_predecesor_id`.
- * - Tarea "Aprobación de Comité de Inversión" en `estado='completada'`.
  *
  * En éxito: crea row nuevo en `dilesa.proyectos` con `tipo='desarrollo'`,
  * copia tareas rehogables + partidas autorizadas, marca el anteproyecto
@@ -97,6 +102,67 @@ export async function promoteAnteproyecto(
   if (!anteproyectoId) return { ok: false, error: 'anteproyectoId requerido' };
 
   const supabase = await makeServerClient();
+
+  // Role gate (Sprint 4A): admin global O rol "Dirección" en la empresa
+  // del anteproyecto. Patrón consistente con `autorizarPaso` /
+  // `autorizarPartida`, pero ampliado al rol por empresa (`core.roles`).
+  const { data: userRes, error: userErr } = await supabase.auth.getUser();
+  if (userErr || !userRes?.user) return { ok: false, error: 'No autenticado' };
+  const email = userRes.user.email;
+  if (!email) return { ok: false, error: 'JWT sin email' };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const coreSb = supabase.schema('core') as any;
+
+  const { data: coreUser, error: userLookupErr } = await coreSb
+    .from('usuarios')
+    .select('id, rol')
+    .eq('email', email)
+    .maybeSingle();
+  if (userLookupErr) return { ok: false, error: userLookupErr.message };
+  if (!coreUser) return { ok: false, error: 'Usuario no encontrado en core.usuarios' };
+
+  const isAdmin = coreUser.rol === 'admin';
+
+  // Si no es admin global, validar rol "Dirección" en la empresa del
+  // anteproyecto. Necesitamos primero leer la empresa.
+  let autorizado = isAdmin;
+  if (!autorizado) {
+    const { data: ap, error: apErr } = await supabase
+      .schema('dilesa')
+      .from('proyectos')
+      .select('empresa_id')
+      .eq('id', anteproyectoId)
+      .maybeSingle();
+    if (apErr || !ap) {
+      return { ok: false, error: apErr?.message || 'Anteproyecto no encontrado' };
+    }
+
+    const { data: direccionRoles } = await coreSb
+      .from('roles')
+      .select('id')
+      .eq('empresa_id', ap.empresa_id)
+      .ilike('nombre', 'direcci%n');
+    const roleIds = (direccionRoles ?? []).map((r: { id: string }) => r.id);
+    if (roleIds.length > 0) {
+      const { data: asgs } = await coreSb
+        .from('usuarios_empresas')
+        .select('rol_id')
+        .eq('usuario_id', coreUser.id)
+        .eq('empresa_id', ap.empresa_id)
+        .eq('activo', true)
+        .in('rol_id', roleIds);
+      autorizado = (asgs ?? []).length > 0;
+    }
+  }
+
+  if (!autorizado) {
+    return {
+      ok: false,
+      error: 'Solo dirección puede autorizar y promover a desarrollo.',
+    };
+  }
+
   const { data, error } = await supabase
     .schema('dilesa')
     .rpc('fn_proyecto_promote_anteproyecto', { p_anteproyecto_id: anteproyectoId });

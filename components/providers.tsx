@@ -70,6 +70,13 @@ export type EffectiveUserData = {
   firstName: string | null;
   isAdmin: boolean;
   isPreviewing: boolean;
+  /**
+   * IDs de empresas donde el user tiene rol "Dirección". Usado para
+   * gates operativos por empresa (ej. autorizar promoción a desarrollo
+   * en DILESA, Sprint 4A). Default `[]` para back-compat con cache de
+   * `/api/me` previa al cambio.
+   */
+  direccionEmpresaIds: string[];
 };
 
 /**
@@ -99,7 +106,9 @@ export function useEffectiveUser(): { data: EffectiveUserData | null; loading: b
       .then((r) => (r.ok ? r.json() : null))
       .then((json) => {
         if (!cancelled) {
-          setData(json);
+          // Back-compat: cache previa al Sprint 4A no traía
+          // `direccionEmpresaIds`. Lo defaulteamos a [].
+          setData(json ? { ...json, direccionEmpresaIds: json.direccionEmpresaIds ?? [] } : null);
           setLoading(false);
         }
       })

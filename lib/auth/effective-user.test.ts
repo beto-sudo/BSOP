@@ -44,13 +44,26 @@ function installAdmin(script: Script) {
   adminClient = {
     schema() {
       return {
-        from() {
+        from(table: string) {
           const ctx: { filterCols: string[] } = { filterCols: [] };
+          // Stub thenable: las queries del helper `loadDireccionEmpresaIds`
+          // a `roles` y `usuarios_empresas` se resuelven aquí. Por
+          // default retornan arrays vacíos → ningún user de los tests
+          // tiene rol "Dirección", el flag queda en [].
           const chain = {
             select: () => chain,
             eq: (col: string) => {
               ctx.filterCols.push(col);
               return chain;
+            },
+            ilike: () => chain,
+            in: () => chain,
+            then: (resolve: (v: { data: unknown[]; error: null }) => void) => {
+              if (table === 'roles' || table === 'usuarios_empresas') {
+                resolve({ data: [], error: null });
+              } else {
+                resolve({ data: [], error: null });
+              }
             },
             maybeSingle: async () => {
               if (ctx.filterCols.includes('email')) {
@@ -117,6 +130,7 @@ describe('getEffectiveUser', () => {
       firstName: 'Caller',
       isAdmin: false,
       isPreviewing: false,
+      direccionEmpresaIds: [],
     });
   });
 
@@ -146,6 +160,7 @@ describe('getEffectiveUser', () => {
       firstName: 'Admin',
       isAdmin: true,
       isPreviewing: false,
+      direccionEmpresaIds: [],
     });
   });
 
@@ -175,6 +190,7 @@ describe('getEffectiveUser', () => {
       firstName: 'Target',
       isAdmin: false,
       isPreviewing: true,
+      direccionEmpresaIds: [],
     });
   });
 
