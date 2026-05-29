@@ -26,7 +26,7 @@ import {
   promoteAnteproyecto,
 } from '@/app/dilesa/proyectos/anteproyectos/actions';
 import { type ProyectoDetalle, ESTADO_TONE, ESTADO_LABEL } from './proyecto-detalle';
-import { TareasChecklist } from './tareas-checklist';
+import { TareasChecklist, type PasoRow } from './tareas-checklist';
 import { PartidasPresupuestales, type PartidaRow } from './partidas-presupuestales';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 
@@ -149,6 +149,7 @@ export function deriveAnalisis(p: ProyectoDetalle) {
 export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDetalle | null }) {
   const [tareas, setTareas] = useState<ProyectoTarea[]>([]);
   const [dependencias, setDependencias] = useState<TareaDep[]>([]);
+  const [pasos, setPasos] = useState<PasoRow[]>([]);
   const [partidas, setPartidas] = useState<Partida[]>([]);
   const [loadedId, setLoadedId] = useState<string | null>(null);
   const [extrasError, setExtrasError] = useState<string | null>(null);
@@ -188,28 +189,39 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
         .order('partida'),
     ]);
 
-    // Dependencias por IN sobre los IDs de las tareas del proyecto. Patrón
-    // sin embed PostgREST: si la query falla (RLS, parsing del embed), el
-    // shape de `.data` queda consistentemente array vacío en vez de null
+    // Dependencias + pasos por IN sobre los IDs de las tareas del proyecto.
+    // Patrón sin embed PostgREST: si la query falla (RLS, parsing del embed),
+    // el shape de `.data` queda consistentemente array vacío en vez de null
     // wrapped en algo raro. Aceptamos el round-trip extra.
     const tareaIds =
       Array.isArray(tareasRes.data) && tareasRes.data.length > 0
         ? tareasRes.data.map((t) => t.id as string)
         : [];
-    const depsRes =
+    const [depsRes, pasosRes] =
       tareaIds.length === 0
-        ? { data: [] as Array<{ tarea_id: string; depende_de_tarea_id: string }>, error: null }
-        : await supabase
-            .schema('dilesa')
-            .from('proyecto_tareas_dependencias')
-            .select('tarea_id, depende_de_tarea_id')
-            .in('tarea_id', tareaIds);
-    return [tareasRes, partidasRes, depsRes] as const;
+        ? [
+            { data: [] as Array<{ tarea_id: string; depende_de_tarea_id: string }>, error: null },
+            { data: [] as PasoRow[], error: null },
+          ]
+        : await Promise.all([
+            supabase
+              .schema('dilesa')
+              .from('proyecto_tareas_dependencias')
+              .select('tarea_id, depende_de_tarea_id')
+              .in('tarea_id', tareaIds),
+            supabase
+              .schema('dilesa')
+              .from('proyecto_tarea_pasos')
+              .select('id, tarea_id, paso, monto, documento_url, fecha, estado, notas')
+              .in('tarea_id', tareaIds)
+              .is('deleted_at', null),
+          ]);
+    return [tareasRes, partidasRes, depsRes, pasosRes] as const;
   }, []);
 
   const cargarExtras = useCallback(
     async (proyectoId: string) => {
-      const [tareasRes, partidasRes, depsRes] = await fetchExtras(proyectoId);
+      const [tareasRes, partidasRes, depsRes, pasosRes] = await fetchExtras(proyectoId);
       if (tareasRes.error) {
         setExtrasError(
           getSupabaseErrorMessage(tareasRes.error, 'No se pudieron cargar las tareas.')
@@ -232,6 +244,11 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
       } else {
         setDependencias([]);
       }
+      if (!pasosRes.error && Array.isArray(pasosRes.data)) {
+        setPasos(pasosRes.data as PasoRow[]);
+      } else {
+        setPasos([]);
+      }
       setLoadedId(proyectoId);
     },
     [fetchExtras]
@@ -242,7 +259,7 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
   useEffect(() => {
     if (!anteproyecto) return;
     let activo = true;
-    void fetchExtras(anteproyecto.id).then(([tareasRes, partidasRes, depsRes]) => {
+    void fetchExtras(anteproyecto.id).then(([tareasRes, partidasRes, depsRes, pasosRes]) => {
       if (!activo) return;
       if (tareasRes.error) {
         setExtrasError(
@@ -265,6 +282,11 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
         setDependencias(depsRes.data as TareaDep[]);
       } else {
         setDependencias([]);
+      }
+      if (!pasosRes.error && Array.isArray(pasosRes.data)) {
+        setPasos(pasosRes.data as PasoRow[]);
+      } else {
+        setPasos([]);
       }
       setLoadedId(anteproyecto.id);
     });
@@ -456,6 +478,7 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
           <TareasChecklist
             tareas={tareas}
             dependencias={dependencias}
+            pasos={pasos}
             empresaId={DILESA_EMPRESA_ID}
             empresaSlug="dilesa"
             onChange={() => void cargarExtras(anteproyecto.id)}

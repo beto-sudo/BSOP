@@ -2674,6 +2674,59 @@ export type Database = {
           },
         ]
       }
+      proyecto_tarea_pasos: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          documento_url: string | null
+          empresa_id: string
+          estado: string
+          fecha: string | null
+          id: string
+          monto: number | null
+          notas: string | null
+          paso: string
+          tarea_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          documento_url?: string | null
+          empresa_id: string
+          estado?: string
+          fecha?: string | null
+          id?: string
+          monto?: number | null
+          notas?: string | null
+          paso: string
+          tarea_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          documento_url?: string | null
+          empresa_id?: string
+          estado?: string
+          fecha?: string | null
+          id?: string
+          monto?: number | null
+          notas?: string | null
+          paso?: string
+          tarea_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proyecto_tarea_pasos_tarea_id_fkey"
+            columns: ["tarea_id"]
+            isOneToOne: false
+            referencedRelation: "proyecto_tareas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proyecto_tareas: {
         Row: {
           aplicacion_snapshot: string | null
@@ -3559,6 +3612,31 @@ export type Database = {
           semana_iso: number | null
         }
         Relationships: []
+      }
+      v_proyecto_avance: {
+        Row: {
+          avance_pct: number | null
+          empresa_id: string | null
+          proyecto_id: string | null
+          tareas_aplicables: number | null
+          tareas_completadas: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proyecto_tareas_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proyecto_tareas_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_proyecto_avances"
+            referencedColumns: ["proyecto_id"]
+          },
+        ]
       }
       v_proyecto_avances: {
         Row: {

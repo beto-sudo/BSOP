@@ -2,11 +2,11 @@
 
 **Slug:** `dilesa-proyectos-checklist-inline`
 **Empresas:** DILESA
-**Schemas afectados:** ninguno (cero ALTER). Reusa `dilesa.proyecto_tareas` + `proyecto_tareas_dependencias` + `proyecto_presupuesto_partidas` + `proyecto_documentos` + `proyecto_hitos` + `plantilla_proyecto_tareas` ya existentes.
+**Schemas afectados:** `dilesa.proyecto_tarea_pasos` (tabla nueva Sprint 3); reusa `dilesa.proyecto_tareas` + `proyecto_tareas_dependencias` + `proyecto_presupuesto_partidas` + `proyecto_documentos` + `proyecto_hitos` + `plantilla_proyecto_tareas`.
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-28
-**Última actualización:** 2026-05-28 (promoción + arranque Sprint 1)
+**Última actualización:** 2026-05-29 (Sprints 1+1.5+2 mergeados + compactación visual + hotfix detección cotización; Sprint 3 reformulado a "pasos por tarea" tras propuesta de Beto)
 
 ## Problema
 
@@ -158,15 +158,147 @@ dilesa.proyectos
    por estado (preliminar · autorizada · planeada · en ejercicio · cerrada).
 3. Server action `autorizarPartida` con role gate.
 
-### Sprint 3 — Espejar checklist en desarrollo + backfill
+### Sprint 3 — Pasos por tarea (reformulado 2026-05-29)
 
-1. Backfill SQL para los 8 desarrollos vivos.
-2. `<ProyectoDetalle>` agrega secciones `<TareasChecklist>` y
+**Cambio de visión propuesto por Beto:** cada tarea pasa de ser
+"una cosa" (1 doc + 1 monto) a tener **4 pasos canónicos** que
+modelan el ciclo de vida operativo de la tarea:
+
+| Paso         | Captura                                                 | Avance | Efecto en `proyecto_presupuesto_partidas` |
+| ------------ | ------------------------------------------------------- | ------ | ----------------------------------------- |
+| `cotizacion` | monto + cotización.pdf + fecha                          | 25%    | partida `preliminar` (`monto_estimado`)   |
+| `factura`    | monto + factura.pdf + fecha                             | 25%    | partida `autorizada` (`monto_aprobado`)   |
+| `pago`       | monto + comprobante.pdf + fecha                         | 25%    | partida `en_ejercicio` (`monto_ejercido`) |
+| `resultado`  | el entregable (escritura, plano, dictamen, certificado) | 25%    | — (cierra el ciclo)                       |
+
+Pasos opcionales con `estado='no_aplica'` se sacan del denominador
+del cálculo. El avance de la tarea = `pasos_hechos / pasos_aplicables × 100`.
+
+**Decisiones cerradas D1-D6 (2026-05-29):**
+
+- **D1:** Los 4 pasos aparecen siempre; el operador marca "N/A" los
+  que no aplican. Más simple que codificarlos en el catálogo.
+- **D2:** Avance tarea = `hechos / aplicables × 100`. Peso igual.
+- **D3:** Avance proyecto = promedio ponderado por obligatoriedad:
+  obligatoria=1, condicional=0.5, opcional=0. Lo opcional no estorba.
+- **D4:** Auto-flujo con partidas: paso cotizacion → preliminar,
+  factura → autorizada+monto_aprobado, pago → en_ejercicio +
+  monto_ejercido. Cuando los 3 pasos financieros aplicables están
+  hechos, partida pasa a `cerrada`. Sprint 2 ya cubre cotización.
+- **D5:** Backfill cero-pérdida desde Sprint 1+1.5: cada tarea con
+  `resultado_documento_url` poblado → INSERT paso='resultado'
+  estado='hecho'. Cada tarea con `resultado_monto` poblado → INSERT
+  paso='cotizacion' estado='hecho'. Los atajos en `proyecto_tareas`
+  se mantienen como referencia rápida (deprecados para captura nueva).
+- **D6:** Mergear primero PR #581 (compactación visual independiente);
+  el rediseño con pasos viene encima.
+
+**Schema delta:**
+
+```sql
+CREATE TABLE dilesa.proyecto_tarea_pasos (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  empresa_id uuid NOT NULL REFERENCES core.empresas(id),
+  tarea_id uuid NOT NULL REFERENCES dilesa.proyecto_tareas(id) ON DELETE CASCADE,
+  paso text NOT NULL CHECK (paso IN ('cotizacion','factura','pago','resultado')),
+  monto numeric,                    -- NULL si N/A o no capturado
+  documento_url text,               -- URL del proxy (atajo del adjunto principal)
+  fecha date,                       -- fecha del paso (cotizado/facturado/pagado/entregado)
+  estado text NOT NULL DEFAULT 'pendiente'
+    CHECK (estado IN ('pendiente','hecho','no_aplica')),
+  notas text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  deleted_at timestamptz,
+  UNIQUE (tarea_id, paso)
+);
+CREATE INDEX idx_proyecto_tarea_pasos_tarea ON dilesa.proyecto_tarea_pasos(tarea_id)
+  WHERE deleted_at IS NULL;
+
+-- RLS canónica DILESA: SELECT/INSERT/UPDATE para miembros de empresa,
+--                     DELETE solo admin.
+
+-- Vista de avance derivado:
+CREATE VIEW dilesa.v_proyecto_avance AS
+WITH paso_tarea AS (
+  SELECT
+    pt.tarea_id,
+    COUNT(*) FILTER (WHERE pt.estado <> 'no_aplica') AS aplicables,
+    COUNT(*) FILTER (WHERE pt.estado = 'hecho') AS hechos
+  FROM dilesa.proyecto_tarea_pasos pt
+  WHERE pt.deleted_at IS NULL
+  GROUP BY pt.tarea_id
+), avance_tarea AS (
+  SELECT
+    t.id AS tarea_id,
+    t.proyecto_id,
+    t.obligatoriedad_snapshot,
+    CASE
+      WHEN pt.aplicables IS NULL OR pt.aplicables = 0 THEN 0
+      ELSE ROUND(100.0 * pt.hechos / pt.aplicables, 2)
+    END AS avance_pct,
+    CASE t.obligatoriedad_snapshot
+      WHEN 'obligatoria' THEN 1.0
+      WHEN 'condicional' THEN 0.5
+      ELSE 0.0
+    END AS peso
+  FROM dilesa.proyecto_tareas t
+  LEFT JOIN paso_tarea pt ON pt.tarea_id = t.id
+  WHERE t.deleted_at IS NULL
+)
+SELECT
+  proyecto_id,
+  COUNT(*) FILTER (WHERE peso > 0) AS tareas_aplicables,
+  ROUND(
+    SUM(avance_pct * peso) / NULLIF(SUM(peso), 0),
+    2
+  ) AS avance_pct
+FROM avance_tarea
+GROUP BY proyecto_id;
+```
+
+**Backfill:** script idempotente extrae `resultado_documento_url` y
+`resultado_monto` de las 80 tareas backfilleadas en Sprint 1 → crea
+pasos `resultado` y `cotizacion` respectivos con `estado='hecho'`.
+
+**Storage:** `lib/storage/path.ts` agrega `'proyecto_tarea_pasos'`
+al union `AdjuntoEntidad`. Adjuntos individuales por paso vía
+`entidad_tipo='proyecto_tarea_paso'`. El campo `documento_url` del
+paso es atajo al adjunto principal (igual que `resultado_documento_url`
+es atajo al de la tarea hoy).
+
+**Server actions:**
+
+- `upsertPasoMonto(tareaId, paso, monto)`: idempotente, crea row
+  con `estado='pendiente'` si no existe.
+- `upsertPasoDocumento(tareaId, paso, url)`: idem.
+- `marcarPasoEstado(tareaId, paso, estado)`: incluyendo `no_aplica`.
+- Cada uno dispara `syncPartidaDesdeTarea` extendido para mapear
+  estado de paso → estado de partida (D4).
+
+**UI:**
+
+- Tabla compacta mantiene 1 row por tarea con columnas nuevas:
+  **Avance %** + **$ acum.** (suma de los 3 montos financieros
+  capturados).
+- Expand al click muestra **grid 2×2 de pasos**; cada celda tiene
+  input monto + slot `<FileAttachments>` mini + selector estado +
+  fecha.
+- `<PartidasPresupuestales>` queda igual; el auto-flujo lo alimenta
+  desde los pasos en lugar del campo `resultado_monto` antiguo.
+
+### Sprint 4 — Espejar a desarrollo + backfill desarrollos
+
+(Pospuesto desde el plan original Sprint 3 — se ejecuta una vez que
+los pasos por tarea estén estables en anteproyecto.)
+
+1. Backfill SQL para los 8 desarrollos vivos (tareas + pasos).
+2. `<ProyectoDetalle>` agrega `<TareasChecklist>` +
    `<PartidasPresupuestales>` filtradas por
    `aplicacion_snapshot IN ('desarrollo','ambas')`.
 3. Banner sticky "Marcar histórico" para acelerar marcado en bulk.
 
-### Sprint 4 — Documentos + hitos unificados
+### Sprint 5 — Documentos + hitos unificados
 
 1. Sección `<DocumentosProyecto>` que agrega URLs sueltas +
    `resultado_documento_url` de tareas + filas de
@@ -196,6 +328,34 @@ dilesa.proyectos
   patrón existe y funciona (otros módulos ya lo usan).
 
 ## Bitácora
+
+- **2026-05-29 (Sprint 3 reformulado a "pasos por tarea")** — Beto
+  propuso un rediseño del modelo: cada tarea debe tener 4 sub-pasos
+  (cotización · factura · pago · resultado), cada uno con su monto +
+  documento + estado + fecha. La misma tarea sirve de control
+  documental + presupuestal + avance. Cerradas D1-D6 documentadas
+  arriba. PR #581 mergeado (compactación visual independiente).
+  Sprint 3 original "espejar a desarrollo" pospuesto a Sprint 4.
+
+- **2026-05-29 (hotfix detección cotización + compactación UI)** —
+  Bug detectado: helper buscaba "cotizac" en subtipo (Urbanismo/
+  Construcción/Comercial) en lugar de tipo ('Cotización'). PR #580
+  con fix de 1 línea. Beto reportó que la UI se veía "revuelta sin
+  organización"; PR #581 refactor a tabla compacta con expand inline
+  (1 fila por tarea, ~32px alto, click expande captura completa).
+
+- **2026-05-28 (Sprint 2)** — Auto-vinculación tarea → partida +
+  componente `<PartidasPresupuestales>` agrupado por estado +
+  `autorizarPartida` server action. PR #579 mergeado.
+
+- **2026-05-28 (Sprint 1.5)** — Import de 29 PDFs/JPGs desde Coda
+  `grid-XLc0Md6iHp` (3 anteproyectos: LDLE/LDLD/LE). PR #577.
+
+- **2026-05-28 (Sprint 1 + hotfixes)** — PR #572 mergeado con captura
+  inline + 4 server actions + `<TareasChecklist>` + backfill de 80
+  tareas + 105 dependencias en 5 anteproyectos. Hotfixes: PR #573
+  guards defensivos + PR #575 root cause `'use server'` no exporta
+  const/types (movidos a `tareas-checklist-types.ts`).
 
 - **2026-05-28 (promoción)** — Iniciativa promovida tras análisis profundo
   con Beto comparando UI actual contra visión de "plantilla expuesta

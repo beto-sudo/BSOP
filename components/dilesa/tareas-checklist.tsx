@@ -20,20 +20,11 @@
  */
 
 import { Fragment, useCallback, useEffect, useMemo, useState, useTransition } from 'react';
-import { ChevronRight, FileText, MessageSquare, Paperclip } from 'lucide-react';
+import { ChevronRight, MessageSquare, Paperclip } from 'lucide-react';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
-import { FileAttachments } from '@/components/file-attachments/file-attachments';
-import {
-  updateTareaDocumento,
-  updateTareaEstado,
-  updateTareaMonto,
-  updateTareaNotas,
-} from '@/app/dilesa/proyectos/anteproyectos/actions';
-import {
-  TAREA_ESTADOS_VALIDOS,
-  type TareaEstado,
-  esTareaCotizacion,
-} from './tareas-checklist-types';
+import { updateTareaEstado, updateTareaNotas } from '@/app/dilesa/proyectos/anteproyectos/actions';
+import { TAREA_ESTADOS_VALIDOS, type TareaEstado } from './tareas-checklist-types';
+import { TareaPasos, type PasoRow, computeAvanceTarea, sumMontosPasos } from './tarea-pasos';
 import type { EmpresaSlug } from '@/lib/storage';
 
 const moneyFmt = new Intl.NumberFormat('es-MX', {
@@ -66,6 +57,8 @@ export type TareaDependencia = {
   depende_de_tarea_id: string;
 };
 
+export type { PasoRow } from './tarea-pasos';
+
 const ESTADO_TONE: Record<string, BadgeTone> = {
   pendiente: 'neutral',
   bloqueada: 'warning',
@@ -87,9 +80,12 @@ const OBLIG_TONE: Record<string, BadgeTone> = {
   condicional: 'info',
 };
 
-function esCotizacion(t: TareaChecklistRow): boolean {
-  return esTareaCotizacion(t.tipo_snapshot, t.subtipo_snapshot);
-}
+const moneyFmtCompact = new Intl.NumberFormat('es-MX', {
+  style: 'currency',
+  currency: 'MXN',
+  notation: 'compact',
+  maximumFractionDigits: 1,
+});
 
 /**
  * Formatea una fecha ISO (YYYY-MM-DD) en formato compacto "dd/mmm" para
@@ -126,12 +122,14 @@ export function computeBloqueadasMap(
 export function TareasChecklist({
   tareas: tareasInicial,
   dependencias,
+  pasos,
   empresaId,
   empresaSlug,
   onChange,
 }: {
   tareas: readonly TareaChecklistRow[];
   dependencias: readonly TareaDependencia[];
+  pasos: readonly PasoRow[];
   empresaId: string;
   empresaSlug: EmpresaSlug;
   onChange?: () => void;
@@ -160,6 +158,16 @@ export function TareasChecklist({
     [tareas, dependencias]
   );
 
+  const pasosPorTarea = useMemo(() => {
+    const m = new Map<string, PasoRow[]>();
+    for (const p of pasos) {
+      const arr = m.get(p.tarea_id) ?? [];
+      arr.push(p);
+      m.set(p.tarea_id, arr);
+    }
+    return m;
+  }, [pasos]);
+
   const patchLocal = useCallback((id: string, patch: Partial<TareaChecklistRow>) => {
     setTareas((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
   }, []);
@@ -187,10 +195,8 @@ export function TareasChecklist({
               <th className="px-3 py-2 text-left">Tarea</th>
               <th className="w-36 px-2 py-2 text-left">Estado</th>
               <th className="w-20 px-2 py-2 text-left">Vence</th>
-              <th className="w-36 px-2 py-2 text-right">Monto</th>
-              <th className="w-12 px-2 py-2 text-center" aria-label="Documento">
-                <Paperclip className="mx-auto h-3.5 w-3.5" />
-              </th>
+              <th className="w-16 px-2 py-2 text-right">Avance</th>
+              <th className="w-24 px-2 py-2 text-right">$ acum.</th>
               <th className="w-12 px-2 py-2 text-center" aria-label="Notas">
                 <MessageSquare className="mx-auto h-3.5 w-3.5" />
               </th>
@@ -201,6 +207,7 @@ export function TareasChecklist({
               <Fragment key={t.id}>
                 <TareaRowCompact
                   tarea={t}
+                  pasos={pasosPorTarea.get(t.id) ?? []}
                   orden={idx + 1}
                   bloqueadaPor={bloqueadasMap.get(t.id) ?? []}
                   expanded={expandedId === t.id}
@@ -212,6 +219,7 @@ export function TareasChecklist({
                 {expandedId === t.id && (
                   <TareaRowExpanded
                     tarea={t}
+                    pasos={pasosPorTarea.get(t.id) ?? []}
                     bloqueadaPor={bloqueadasMap.get(t.id) ?? []}
                     empresaId={empresaId}
                     empresaSlug={empresaSlug}
@@ -233,6 +241,7 @@ export function TareasChecklist({
 
 function TareaRowCompact({
   tarea,
+  pasos,
   orden,
   bloqueadaPor,
   expanded,
@@ -242,6 +251,7 @@ function TareaRowCompact({
   onChange,
 }: {
   tarea: TareaChecklistRow;
+  pasos: readonly PasoRow[];
   orden: number;
   bloqueadaPor: string[];
   expanded: boolean;
@@ -251,27 +261,12 @@ function TareaRowCompact({
   onChange?: () => void;
 }) {
   const [pending, startTransition] = useTransition();
-  const [montoLocal, setMontoLocal] = useState(
-    tarea.resultado_monto != null ? String(tarea.resultado_monto) : ''
-  );
 
-  // Sincroniza el input si el padre cambia el monto externamente (refresh).
-  // setState va dentro de microtask para no triggerear cascada (regla del repo).
-  useEffect(() => {
-    let activo = true;
-    void Promise.resolve().then(() => {
-      if (!activo) return;
-      setMontoLocal(tarea.resultado_monto != null ? String(tarea.resultado_monto) : '');
-    });
-    return () => {
-      activo = false;
-    };
-  }, [tarea.resultado_monto]);
+  const avance = useMemo(() => computeAvanceTarea(pasos), [pasos]);
+  const montoAcum = useMemo(() => sumMontosPasos(pasos), [pasos]);
 
-  const esCot = esCotizacion(tarea);
-  const tieneDoc = !!tarea.resultado_documento_url;
   const tieneNotas = !!(tarea.descripcion && tarea.descripcion.trim() !== '');
-  const completada = tarea.estado === 'completada';
+  const completada = tarea.estado === 'completada' || avance === 100;
 
   const handleEstadoChange = useCallback(
     (next: TareaEstado) => {
@@ -293,29 +288,6 @@ function TareaRowCompact({
     },
     [tarea.id, tarea.estado, onPatch, onError, onChange]
   );
-
-  const handleMontoBlur = useCallback(() => {
-    const trimmed = montoLocal.trim();
-    const parsed = trimmed === '' ? null : Number(trimmed);
-    if (parsed != null && (!Number.isFinite(parsed) || parsed < 0)) {
-      onError('Monto debe ser número ≥ 0');
-      return;
-    }
-    if (parsed === tarea.resultado_monto) return;
-    const prev = tarea.resultado_monto;
-    onPatch(tarea.id, { resultado_monto: parsed });
-    startTransition(async () => {
-      const r = await updateTareaMonto(tarea.id, parsed);
-      if (!r.ok) {
-        onPatch(tarea.id, { resultado_monto: prev });
-        setMontoLocal(prev != null ? String(prev) : '');
-        onError(r.error);
-      } else {
-        onError(null);
-        onChange?.();
-      }
-    });
-  }, [montoLocal, tarea.id, tarea.resultado_monto, onPatch, onError, onChange]);
 
   return (
     <tr
@@ -384,35 +356,14 @@ function TareaRowCompact({
         {fmtFechaCorta(tarea.fecha_objetivo_fin)}
       </td>
       <td className="px-2 py-1.5 text-right">
-        {esCot ? (
-          <input
-            type="number"
-            inputMode="decimal"
-            step="0.01"
-            value={montoLocal}
-            onChange={(e) => setMontoLocal(e.target.value)}
-            onBlur={handleMontoBlur}
-            onClick={(e) => e.stopPropagation()}
-            disabled={pending}
-            placeholder="$ —"
-            className="h-7 w-full rounded-md border border-[var(--border)] bg-[var(--bg)] px-2 text-right text-xs tabular-nums focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
-            aria-label={`Monto cotizado de ${tarea.titulo}`}
-          />
-        ) : (
-          <span className="text-xs text-[var(--text)]/30">—</span>
-        )}
+        <AvanceBar pct={avance} />
       </td>
-      <td className="px-2 py-1.5 text-center">
-        <button
-          type="button"
-          onClick={() => onToggleExpand(tarea.id)}
-          className="inline-flex h-6 w-6 items-center justify-center rounded hover:bg-[var(--card)]"
-          aria-label={tieneDoc ? 'Ver documento' : 'Subir documento'}
-        >
-          <Paperclip
-            className={`h-3.5 w-3.5 ${tieneDoc ? 'text-[var(--accent)]' : 'text-[var(--text)]/25'}`}
-          />
-        </button>
+      <td className="px-2 py-1.5 text-right text-xs tabular-nums text-[var(--text)]/70">
+        {montoAcum > 0 ? (
+          moneyFmtCompact.format(montoAcum)
+        ) : (
+          <span className="text-[var(--text)]/30">—</span>
+        )}
       </td>
       <td className="px-2 py-1.5 text-center">
         <button
@@ -436,6 +387,7 @@ function TareaRowCompact({
 
 function TareaRowExpanded({
   tarea,
+  pasos,
   bloqueadaPor,
   empresaId,
   empresaSlug,
@@ -444,6 +396,7 @@ function TareaRowExpanded({
   onChange,
 }: {
   tarea: TareaChecklistRow;
+  pasos: readonly PasoRow[];
   bloqueadaPor: string[];
   empresaId: string;
   empresaSlug: EmpresaSlug;
@@ -465,9 +418,6 @@ function TareaRowExpanded({
     };
   }, [tarea.descripcion]);
 
-  const requiereArchivo = !!tarea.requiere_archivo_snapshot;
-  const esCot = esCotizacion(tarea);
-
   const handleNotasBlur = useCallback(() => {
     const next = notasLocal.trim() === '' ? null : notasLocal;
     if (next === tarea.descripcion) return;
@@ -486,26 +436,10 @@ function TareaRowExpanded({
     });
   }, [notasLocal, tarea.id, tarea.descripcion, onPatch, onError, onChange]);
 
-  const handleLimpiarDocumento = useCallback(() => {
-    const prev = tarea.resultado_documento_url;
-    onPatch(tarea.id, { resultado_documento_url: null });
-    startTransition(async () => {
-      const r = await updateTareaDocumento(tarea.id, null);
-      if (!r.ok) {
-        onPatch(tarea.id, { resultado_documento_url: prev });
-        onError(r.error);
-      } else {
-        onError(null);
-        onChange?.();
-      }
-    });
-  }, [tarea.id, tarea.resultado_documento_url, onPatch, onError, onChange]);
-
   return (
     <tr className="border-b border-[var(--border)]/60 bg-[var(--card)]/30">
       <td colSpan={7} className="px-3 py-3">
         <div className="space-y-3">
-          {/* Meta info: tipo · subtipo · entidad responsable · fechas largas */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--text)]/60">
             {tarea.tipo_snapshot && (
               <span>
@@ -533,70 +467,13 @@ function TareaRowExpanded({
             </p>
           )}
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {/* Documento(s) — siempre visible en expand, pero más prominente
-                cuando requiere_archivo. */}
-            <div>
-              <span className="mb-1 block text-[11px] uppercase tracking-wide text-[var(--text)]/50">
-                {requiereArchivo ? 'Documento requerido' : 'Documentos'}
-              </span>
-              <div className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-2">
-                <FileAttachments
-                  empresaId={empresaId}
-                  empresaSlug={empresaSlug}
-                  entidad="proyecto_tareas"
-                  entidadId={tarea.id}
-                  roles={[
-                    {
-                      id: 'resultado',
-                      label: 'Resultado',
-                      icon: <FileText className="h-3 w-3" />,
-                    },
-                    { id: 'anexo', label: 'Anexo' },
-                  ]}
-                  defaultUploadRole="resultado"
-                  variant="flat"
-                  onChange={onChange}
-                />
-              </div>
-              {tarea.resultado_documento_url && (
-                <div className="mt-1 flex items-center gap-2 text-[11px]">
-                  <a
-                    href={tarea.resultado_documento_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[var(--accent)] hover:underline"
-                  >
-                    URL legada
-                  </a>
-                  <button
-                    type="button"
-                    onClick={handleLimpiarDocumento}
-                    disabled={pending}
-                    className="text-[var(--text)]/50 hover:text-[var(--text)]"
-                  >
-                    Limpiar
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Resumen del monto cuando es cotización + número formateado.
-                El input está en la row compacta. */}
-            {esCot && tarea.resultado_monto != null && (
-              <div>
-                <span className="mb-1 block text-[11px] uppercase tracking-wide text-[var(--text)]/50">
-                  Monto capturado
-                </span>
-                <div className="rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm tabular-nums">
-                  {moneyFmt.format(tarea.resultado_monto)}
-                </div>
-                <span className="mt-1 block text-[11px] text-[var(--text)]/60">
-                  Genera una partida preliminar vinculada en el presupuesto.
-                </span>
-              </div>
-            )}
-          </div>
+          <TareaPasos
+            tareaId={tarea.id}
+            pasos={pasos}
+            empresaId={empresaId}
+            empresaSlug={empresaSlug}
+            onChange={onChange}
+          />
 
           <label className="block">
             <span className="mb-1 block text-[11px] uppercase tracking-wide text-[var(--text)]/50">
@@ -615,5 +492,27 @@ function TareaRowExpanded({
         </div>
       </td>
     </tr>
+  );
+}
+
+// ─── Avance bar (mini barra horizontal para columna de avance) ──────────────
+
+function AvanceBar({ pct }: { pct: number }) {
+  const safe = Math.max(0, Math.min(100, pct));
+  const tone =
+    safe === 100
+      ? 'bg-emerald-500'
+      : safe >= 50
+        ? 'bg-sky-500'
+        : safe > 0
+          ? 'bg-amber-500'
+          : 'bg-[var(--border)]';
+  return (
+    <div className="flex items-center justify-end gap-1.5">
+      <div className="h-1.5 w-12 overflow-hidden rounded-full bg-[var(--border)]/40">
+        <div className={`h-full ${tone}`} style={{ width: `${safe}%` }} />
+      </div>
+      <span className="text-xs tabular-nums text-[var(--text)]/70">{safe}%</span>
+    </div>
   );
 }

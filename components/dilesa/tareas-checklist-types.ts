@@ -37,6 +37,39 @@ export const PARTIDA_ESTADOS_VALIDOS = [
 export type PartidaEstado = (typeof PARTIDA_ESTADOS_VALIDOS)[number];
 
 /**
+ * Pasos canónicos del ciclo de vida operativo de una tarea (Sprint 3).
+ * Cada tarea instancia los 4 pasos al crearse; el operador marca
+ * `no_aplica` los que no apliquen para su flujo específico.
+ */
+export const TAREA_PASOS_VALIDOS = ['cotizacion', 'factura', 'pago', 'resultado'] as const;
+export type TareaPaso = (typeof TAREA_PASOS_VALIDOS)[number];
+
+/**
+ * Estados válidos de `dilesa.proyecto_tarea_pasos.estado`. `no_aplica`
+ * saca al paso del denominador del avance.
+ */
+export const PASO_ESTADOS_VALIDOS = ['pendiente', 'hecho', 'no_aplica'] as const;
+export type PasoEstado = (typeof PASO_ESTADOS_VALIDOS)[number];
+
+/**
+ * Mapping del paso canónico al estado de la partida presupuestal
+ * vinculada (auto-flujo D4). Cuando un paso pasa a `hecho`, la partida
+ * se mueve al estado correspondiente:
+ *
+ *   cotizacion → preliminar (monto_estimado = monto del paso)
+ *   factura    → autorizada (monto_aprobado = monto del paso)
+ *   pago       → en_ejercicio (monto_ejercido = monto del paso)
+ *   resultado  → (no toca partida, cierra el ciclo cuando los 3
+ *                financieros aplicables están hechos)
+ */
+export const PASO_TO_PARTIDA_ESTADO: Record<TareaPaso, PartidaEstado | null> = {
+  cotizacion: 'preliminar',
+  factura: 'autorizada',
+  pago: 'en_ejercicio',
+  resultado: null,
+};
+
+/**
  * Detecta si una tarea es de cotización. Las tareas canónicas vienen
  * con `tipo='Cotización'` en el catálogo (las 3 tareas de cotización
  * son: Urbanización / Construcción / Comercialización con

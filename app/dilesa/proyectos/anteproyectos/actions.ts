@@ -31,6 +31,11 @@ import {
   TAREA_ESTADOS_VALIDOS,
   type TareaEstado,
   esTareaCotizacion,
+  TAREA_PASOS_VALIDOS,
+  type TareaPaso,
+  PASO_ESTADOS_VALIDOS,
+  type PasoEstado,
+  PASO_TO_PARTIDA_ESTADO,
 } from '@/components/dilesa/tareas-checklist-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -337,4 +342,146 @@ export async function updateTareaNotas(
   if (error) return { ok: false, error: error.message || 'No se pudieron actualizar las notas.' };
   revalidateAnteproyectosPaths();
   return { ok: true };
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Sprint 3 de `dilesa-proyectos-checklist-inline` — pasos por tarea
+// ──────────────────────────────────────────────────────────────────────────────
+
+export type PasoPatch = {
+  monto?: number | null;
+  documento_url?: string | null;
+  fecha?: string | null;
+  estado?: PasoEstado;
+  notas?: string | null;
+};
+
+/**
+ * Upsert universal de un paso (cotización / factura / pago / resultado)
+ * de una tarea. Si el paso no existe lo crea con `estado='pendiente'`;
+ * después aplica el patch. Whitelist por campo + validación.
+ *
+ * Side effects mantienen compat con los atajos de Sprint 1:
+ * - Cuando el paso `cotizacion` actualiza `monto` → también escribe a
+ *   `proyecto_tareas.resultado_monto` y dispara `syncPartidaDesdeTarea`
+ *   para que la partida preliminar quede en sync (Sprint 2).
+ * - Cuando el paso `resultado` actualiza `documento_url` → también
+ *   escribe a `proyecto_tareas.resultado_documento_url`.
+ *
+ * El flujo extendido para factura/pago (autorizada/en_ejercicio en la
+ * partida) se entrega en un sprint posterior — Sprint 3 entrega
+ * captura + persistencia limpias por paso.
+ */
+export async function upsertPaso(
+  tareaId: string,
+  paso: TareaPaso,
+  patch: PasoPatch
+): Promise<SimpleResult> {
+  if (!tareaId) return { ok: false, error: 'tareaId requerido' };
+  if (!(TAREA_PASOS_VALIDOS as readonly string[]).includes(paso)) {
+    return { ok: false, error: `Paso inválido: ${paso}` };
+  }
+
+  // Validación por campo (todos opcionales — el caller solo manda lo
+  // que cambió).
+  const update: Record<string, unknown> = {};
+  if ('monto' in patch) {
+    if (patch.monto != null) {
+      if (!Number.isFinite(patch.monto) || patch.monto < 0) {
+        return { ok: false, error: 'Monto debe ser número ≥ 0' };
+      }
+    }
+    update.monto = patch.monto ?? null;
+  }
+  if ('documento_url' in patch) {
+    update.documento_url =
+      patch.documento_url != null && patch.documento_url.trim() === ''
+        ? null
+        : (patch.documento_url ?? null);
+  }
+  if ('fecha' in patch) {
+    if (patch.fecha != null && !/^\d{4}-\d{2}-\d{2}$/.test(patch.fecha)) {
+      return { ok: false, error: 'Fecha debe ser YYYY-MM-DD' };
+    }
+    update.fecha = patch.fecha ?? null;
+  }
+  if ('estado' in patch && patch.estado) {
+    if (!(PASO_ESTADOS_VALIDOS as readonly string[]).includes(patch.estado)) {
+      return { ok: false, error: `Estado de paso inválido: ${patch.estado}` };
+    }
+    update.estado = patch.estado;
+  }
+  if ('notas' in patch) {
+    update.notas = patch.notas != null && patch.notas.trim() === '' ? null : (patch.notas ?? null);
+  }
+  if (Object.keys(update).length === 0) return { ok: false, error: 'sin cambios' };
+
+  const supabase = await makeServerClient();
+
+  // 1) Leer tarea para empresa_id (necesario para el upsert por unique
+  //    (tarea_id, paso) y para RLS).
+  const { data: tareaRow, error: tareaErr } = await supabase
+    .schema('dilesa')
+    .from('proyecto_tareas')
+    .select('id, empresa_id')
+    .eq('id', tareaId)
+    .is('deleted_at', null)
+    .single();
+  if (tareaErr || !tareaRow) {
+    return { ok: false, error: tareaErr?.message ?? 'tarea no encontrada' };
+  }
+  const empresaId = (tareaRow as { empresa_id: string }).empresa_id;
+
+  // 2) Upsert por (tarea_id, paso). La unique constraint hace que un
+  //    INSERT del mismo (tarea_id, paso) actualice en lugar de duplicar.
+  const upsertRow = {
+    empresa_id: empresaId,
+    tarea_id: tareaId,
+    paso,
+    estado: 'pendiente' as const,
+    ...update,
+  };
+  const { error: upsertErr } = await supabase
+    .schema('dilesa')
+    .from('proyecto_tarea_pasos')
+    .upsert(upsertRow, { onConflict: 'tarea_id,paso' });
+  if (upsertErr) {
+    return { ok: false, error: upsertErr.message || 'No se pudo guardar el paso.' };
+  }
+
+  // 3) Side effects backwards-compat con atajos en `proyecto_tareas`.
+  if (paso === 'cotizacion' && 'monto' in update) {
+    const newMonto = (update.monto as number | null) ?? null;
+    await supabase
+      .schema('dilesa')
+      .from('proyecto_tareas')
+      .update({ resultado_monto: newMonto })
+      .eq('id', tareaId);
+    // Mantén la sincronización con partida preliminar del Sprint 2.
+    void syncPartidaDesdeTarea(supabase, tareaId, newMonto).catch((e) =>
+      console.warn('[upsertPaso] sync partida falló:', e)
+    );
+  }
+  if (paso === 'resultado' && 'documento_url' in update) {
+    await supabase
+      .schema('dilesa')
+      .from('proyecto_tareas')
+      .update({ resultado_documento_url: update.documento_url ?? null })
+      .eq('id', tareaId);
+  }
+
+  revalidateAnteproyectosPaths();
+  return { ok: true };
+}
+
+/**
+ * Marca un paso como `hecho`, `pendiente` o `no_aplica`. Atajo cuando
+ * el caller solo quiere mover el estado sin tocar monto/doc/fecha.
+ */
+export async function marcarPasoEstado(
+  tareaId: string,
+  paso: TareaPaso,
+  estado: PasoEstado
+): Promise<SimpleResult> {
+  return upsertPaso(tareaId, paso, { estado });
 }
