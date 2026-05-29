@@ -27,6 +27,12 @@ import { useCallback, useEffect, useState, useTransition } from 'react';
 import {
   ANALISIS_FILAS_COSTOS,
   deriveAnalisisFinanciero,
+  fmtM2,
+  fmtMoney,
+  fmtMoneyCents,
+  fmtNumber,
+  fmtPct,
+  parseMoneyInput,
   type AnalisisCampo,
   type AnalisisFinancieroSnapshot,
 } from './analisis-financiero-types';
@@ -35,45 +41,6 @@ import {
   updateAnteproyectoInfraCabecera,
   updateAnteproyectoPrototiposReferencia,
 } from '@/app/dilesa/proyectos/anteproyectos/actions';
-
-const moneyFmt = new Intl.NumberFormat('es-MX', {
-  style: 'currency',
-  currency: 'MXN',
-  maximumFractionDigits: 0,
-});
-const moneyFmtCents = new Intl.NumberFormat('es-MX', {
-  style: 'currency',
-  currency: 'MXN',
-  maximumFractionDigits: 2,
-});
-const pctFmt = new Intl.NumberFormat('es-MX', {
-  style: 'percent',
-  maximumFractionDigits: 1,
-});
-const numberFmt = new Intl.NumberFormat('es-MX');
-
-function fmtMoney(n: number | null | undefined): string {
-  return n == null ? '—' : moneyFmt.format(n);
-}
-function fmtMoneyCents(n: number | null | undefined): string {
-  return n == null ? '—' : moneyFmtCents.format(n);
-}
-function fmtPct(n: number | null | undefined): string {
-  return n == null ? '—' : pctFmt.format(n);
-}
-function fmtNumber(n: number | null | undefined): string {
-  return n == null ? '—' : numberFmt.format(n);
-}
-function fmtM2(n: number | null | undefined): string {
-  return n == null ? '—' : `${numberFmt.format(n)} m²`;
-}
-
-function parseMoneyInput(raw: string): number | null {
-  const cleaned = raw.replace(/[,$\s]/g, '').replace(/[^\d.-]/g, '');
-  if (cleaned === '' || cleaned === '-') return null;
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : null;
-}
 
 // ── Money input inline ────────────────────────────────────────────────────────
 
@@ -217,7 +184,6 @@ export function AnteproyectoAnalisisFinanciero({
   // necesitamos pisarlo desde props.
   const [local, setLocal] = useState(snapshot);
   useEffect(() => {
-     
     setLocal(snapshot);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snapshot.id]);

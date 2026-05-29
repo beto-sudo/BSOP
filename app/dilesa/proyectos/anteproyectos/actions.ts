@@ -38,9 +38,9 @@ import {
   PASO_TO_PARTIDA_ESTADO,
 } from '@/components/dilesa/tareas-checklist-types';
 import {
-  ANALISIS_NUMERIC_FIELDS,
-  ANALISIS_INT_FIELDS,
   type AnalisisCampo,
+  normalizarPrototiposReferencia,
+  validarCampoAnalisis,
 } from '@/components/dilesa/analisis-financiero-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -624,19 +624,8 @@ export async function updateAnteproyectoAnalisisCampo(
   valor: number | null
 ): Promise<SimpleResult> {
   if (!proyectoId) return { ok: false, error: 'proyectoId requerido' };
-  const esNumeric = (ANALISIS_NUMERIC_FIELDS as readonly string[]).includes(campo);
-  const esInt = (ANALISIS_INT_FIELDS as readonly string[]).includes(campo);
-  if (!esNumeric && !esInt) {
-    return { ok: false, error: `Campo inválido: ${campo}` };
-  }
-  if (valor != null) {
-    if (!Number.isFinite(valor) || valor < 0) {
-      return { ok: false, error: 'Valor debe ser número ≥ 0' };
-    }
-    if (esInt && !Number.isInteger(valor)) {
-      return { ok: false, error: 'Valor debe ser entero' };
-    }
-  }
+  const valid = validarCampoAnalisis(campo, valor);
+  if (!valid.ok) return valid;
 
   const supabase = await makeServerClient();
   const { error } = await supabase
@@ -682,9 +671,7 @@ export async function updateAnteproyectoPrototiposReferencia(
 ): Promise<SimpleResult> {
   if (!proyectoId) return { ok: false, error: 'proyectoId requerido' };
   if (!Array.isArray(nombres)) return { ok: false, error: 'nombres debe ser array' };
-  const norm = Array.from(
-    new Set(nombres.map((n) => (n ?? '').trim()).filter((n) => n.length > 0 && n.length <= 80))
-  ).slice(0, 16);
+  const norm = normalizarPrototiposReferencia(nombres);
   const supabase = await makeServerClient();
   const { error } = await supabase
     .schema('dilesa')

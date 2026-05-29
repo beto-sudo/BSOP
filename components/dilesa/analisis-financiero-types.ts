@@ -153,6 +153,96 @@ const SUM = (...xs: Array<number | null | undefined>) => {
   return any ? acc : null;
 };
 
+// ── Formatters compartidos ───────────────────────────────────────────────────
+// Vivían en el componente pero los movemos acá para que se puedan
+// testear sin tocar React. El PDF (Sprint 4C) también los usará.
+
+const _moneyFmt = new Intl.NumberFormat('es-MX', {
+  style: 'currency',
+  currency: 'MXN',
+  maximumFractionDigits: 0,
+});
+const _moneyFmtCents = new Intl.NumberFormat('es-MX', {
+  style: 'currency',
+  currency: 'MXN',
+  maximumFractionDigits: 2,
+});
+const _pctFmt = new Intl.NumberFormat('es-MX', {
+  style: 'percent',
+  maximumFractionDigits: 1,
+});
+const _numberFmt = new Intl.NumberFormat('es-MX');
+
+export function fmtMoney(n: number | null | undefined): string {
+  return n == null ? '—' : _moneyFmt.format(n);
+}
+export function fmtMoneyCents(n: number | null | undefined): string {
+  return n == null ? '—' : _moneyFmtCents.format(n);
+}
+export function fmtPct(n: number | null | undefined): string {
+  return n == null ? '—' : _pctFmt.format(n);
+}
+export function fmtNumber(n: number | null | undefined): string {
+  return n == null ? '—' : _numberFmt.format(n);
+}
+export function fmtM2(n: number | null | undefined): string {
+  return n == null ? '—' : `${_numberFmt.format(n)} m²`;
+}
+
+/**
+ * Parsea el input crudo del campo monetario inline. Strip currency
+ * symbols/separators, retorna `null` si el string queda vacío o no
+ * parseable. Exportado para testear sin renderizar React.
+ */
+export function parseMoneyInput(raw: string): number | null {
+  const cleaned = raw.replace(/[,$\s]/g, '').replace(/[^\d.-]/g, '');
+  if (cleaned === '' || cleaned === '-') return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Valida que un campo+valor del análisis sea legal antes de escribir a
+ * la DB. Centraliza la whitelist + reglas numéricas para que los
+ * server actions queden thin y la lógica sea testeable directo.
+ *
+ * Reglas:
+ *   - `campo` debe estar en `ANALISIS_NUMERIC_FIELDS` o `ANALISIS_INT_FIELDS`.
+ *   - `valor=null` siempre legal (limpia el campo).
+ *   - `valor` debe ser finito y >= 0.
+ *   - Si el campo es integer, debe ser `Number.isInteger`.
+ */
+export function validarCampoAnalisis(
+  campo: string,
+  valor: number | null
+): { ok: true } | { ok: false; error: string } {
+  const esNumeric = (ANALISIS_NUMERIC_FIELDS as readonly string[]).includes(campo);
+  const esInt = (ANALISIS_INT_FIELDS as readonly string[]).includes(campo);
+  if (!esNumeric && !esInt) {
+    return { ok: false, error: `Campo inválido: ${campo}` };
+  }
+  if (valor != null) {
+    if (!Number.isFinite(valor) || valor < 0) {
+      return { ok: false, error: 'Valor debe ser número ≥ 0' };
+    }
+    if (esInt && !Number.isInteger(valor)) {
+      return { ok: false, error: 'Valor debe ser entero' };
+    }
+  }
+  return { ok: true };
+}
+
+/**
+ * Normaliza el array de prototipos referencia antes de persistir:
+ * trim, descarta vacíos, descarta > 80 chars, dedup, máximo 16
+ * elementos.
+ */
+export function normalizarPrototiposReferencia(nombres: string[]): string[] {
+  return Array.from(
+    new Set(nombres.map((n) => (n ?? '').trim()).filter((n) => n.length > 0 && n.length <= 80))
+  ).slice(0, 16);
+}
+
 export function deriveAnalisisFinanciero(s: AnalisisFinancieroSnapshot): AnalisisDerivados {
   const aprovechamiento = s.area_m2 && s.area_vendible_m2 ? s.area_vendible_m2 / s.area_m2 : null;
   const pctVerdes = s.area_m2 && s.areas_verdes_m2 ? s.areas_verdes_m2 / s.area_m2 : null;
