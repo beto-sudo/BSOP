@@ -8,7 +8,10 @@ import { RequireAccess } from '@/components/require-access';
 import { DesktopOnlyNotice } from '@/components/responsive';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { AnteproyectoDetalle } from '@/components/dilesa/anteproyecto-detalle';
-import type { ProyectoDetalle as ProyectoDetalleType } from '@/components/dilesa/proyecto-detalle';
+import {
+  type ProyectoDetalle as ProyectoDetalleType,
+  PROYECTO_DETALLE_COLUMNAS,
+} from '@/components/dilesa/proyecto-detalle';
 
 /**
  * @module Proyectos · Anteproyectos · Detalle (DILESA)
@@ -42,9 +45,7 @@ function Body() {
     void createSupabaseBrowserClient()
       .schema('dilesa')
       .from('proyectos')
-      .select(
-        'id, tipo, nombre, estado, clave_interna, proyecto_padre_id, proyecto_predecesor_id, fecha_inicio, fecha_fin_estimada, fecha_licencia, area_m2, area_vendible_m2, areas_verdes_m2, lotes_proyectados, presupuesto_estimado, costo_terreno, costo_urbanizacion, costo_construccion, costo_comercializacion, notas, plano_oficial_url, image_url, acreditacion_escritura, objetivo_trimestral'
-      )
+      .select(PROYECTO_DETALLE_COLUMNAS)
       .eq('id', id)
       .eq('tipo', 'anteproyecto')
       .is('deleted_at', null)

@@ -37,6 +37,11 @@ import {
   type PasoEstado,
   PASO_TO_PARTIDA_ESTADO,
 } from '@/components/dilesa/tareas-checklist-types';
+import {
+  ANALISIS_NUMERIC_FIELDS,
+  ANALISIS_INT_FIELDS,
+  type AnalisisCampo,
+} from '@/components/dilesa/analisis-financiero-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 type Result = { ok: true; tareasCreadas: number } | { ok: false; error: string };
@@ -598,6 +603,95 @@ export async function autorizarPaso(tareaId: string, paso: TareaPaso): Promise<S
     .is('autorizado_at', null);
 
   if (error) return { ok: false, error: error.message || 'No se pudo autorizar el paso.' };
+  revalidateAnteproyectosPaths();
+  return { ok: true };
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Sprint 4B — captura inline del análisis financiero del anteproyecto
+// ──────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Actualiza un campo numérico del análisis financiero de un
+ * anteproyecto. `valor=null` limpia. Acepta `number | null` y valida
+ * que sea finito y no-negativo. Whitelist contra
+ * `ANALISIS_NUMERIC_FIELDS` para no escribir a columnas no
+ * intencionadas. RLS valida el acceso a la empresa.
+ */
+export async function updateAnteproyectoAnalisisCampo(
+  proyectoId: string,
+  campo: AnalisisCampo,
+  valor: number | null
+): Promise<SimpleResult> {
+  if (!proyectoId) return { ok: false, error: 'proyectoId requerido' };
+  const esNumeric = (ANALISIS_NUMERIC_FIELDS as readonly string[]).includes(campo);
+  const esInt = (ANALISIS_INT_FIELDS as readonly string[]).includes(campo);
+  if (!esNumeric && !esInt) {
+    return { ok: false, error: `Campo inválido: ${campo}` };
+  }
+  if (valor != null) {
+    if (!Number.isFinite(valor) || valor < 0) {
+      return { ok: false, error: 'Valor debe ser número ≥ 0' };
+    }
+    if (esInt && !Number.isInteger(valor)) {
+      return { ok: false, error: 'Valor debe ser entero' };
+    }
+  }
+
+  const supabase = await makeServerClient();
+  const { error } = await supabase
+    .schema('dilesa')
+    .from('proyectos')
+    .update({ [campo]: valor })
+    .eq('id', proyectoId);
+
+  if (error) {
+    return { ok: false, error: error.message || 'No se pudo actualizar el campo.' };
+  }
+  revalidateAnteproyectosPaths();
+  return { ok: true };
+}
+
+/**
+ * Bandera `infraestructura_cabecera_necesaria` — boolean simple.
+ */
+export async function updateAnteproyectoInfraCabecera(
+  proyectoId: string,
+  necesaria: boolean
+): Promise<SimpleResult> {
+  if (!proyectoId) return { ok: false, error: 'proyectoId requerido' };
+  const supabase = await makeServerClient();
+  const { error } = await supabase
+    .schema('dilesa')
+    .from('proyectos')
+    .update({ infraestructura_cabecera_necesaria: necesaria })
+    .eq('id', proyectoId);
+  if (error) return { ok: false, error: error.message };
+  revalidateAnteproyectosPaths();
+  return { ok: true };
+}
+
+/**
+ * `prototipos_referencia` — array de nombres free-text (chips). v1
+ * acepta el array completo (replace), no add/remove granular. Trim +
+ * dedup + limita a 16 elementos máx.
+ */
+export async function updateAnteproyectoPrototiposReferencia(
+  proyectoId: string,
+  nombres: string[]
+): Promise<SimpleResult> {
+  if (!proyectoId) return { ok: false, error: 'proyectoId requerido' };
+  if (!Array.isArray(nombres)) return { ok: false, error: 'nombres debe ser array' };
+  const norm = Array.from(
+    new Set(nombres.map((n) => (n ?? '').trim()).filter((n) => n.length > 0 && n.length <= 80))
+  ).slice(0, 16);
+  const supabase = await makeServerClient();
+  const { error } = await supabase
+    .schema('dilesa')
+    .from('proyectos')
+    .update({ prototipos_referencia: norm })
+    .eq('id', proyectoId);
+  if (error) return { ok: false, error: error.message };
   revalidateAnteproyectosPaths();
   return { ok: true };
 }

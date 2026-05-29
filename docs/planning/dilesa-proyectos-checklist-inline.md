@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-28
-**Última actualización:** 2026-05-29 (Sprints 1+1.5+2 mergeados + compactación visual + hotfix detección cotización; Sprint 3 reformulado a "pasos por tarea" tras propuesta de Beto)
+**Última actualización:** 2026-05-29 (Sprint 4A mergeado — 4 tareas eliminadas + autorización integrada en promoción + rol Dirección por empresa)
 
 ## Problema
 
@@ -329,6 +329,20 @@ los pasos por tarea estén estables en anteproyecto.)
 
 ## Bitácora
 
+- **2026-05-29 (Sprint 4A — consolidar autorización en promoción)** —
+  PR #583 mergeado. 4 tareas redundantes eliminadas del catálogo
+  canónico (Cotización Urbanización/Construcción/Comercialización +
+  Aprobación Comité de Inversión), 20 instancias vivas + 80 pasos
+  soft-deleted, 11 dependencias hard-deleted. RPC
+  `fn_proyecto_promote_anteproyecto` actualizada sin gate de tarea
+  Comité; gate ahora vive en server action +`gatePromocion()` UI.
+  Botón "Promover a desarrollo" → "Autorizar y promover a desarrollo"
+  con copy explícito sobre autorización de ejecución. Acceso al botón
+  ampliado de `rol='admin'` a admin global O rol "Dirección" en la
+  empresa (modelo correcto vía `core.usuarios_empresas` + `core.roles`).
+  `EffectiveUser` expone `direccionEmpresaIds: string[]` para que
+  consumidores futuros reusen el flag por empresa.
+
 - **2026-05-29 (Sprint 3 reformulado a "pasos por tarea")** — Beto
   propuso un rediseño del modelo: cada tarea debe tener 4 sub-pasos
   (cotización · factura · pago · resultado), cada uno con su monto +
@@ -366,6 +380,22 @@ los pasos por tarea estén estables en anteproyecto.)
   esta sesión.
 
 ## Decisiones registradas
+
+- **2026-05-29 (Sprint 4A) — Rol "Dirección" por empresa, no rol
+  global**. El modelo correcto para gates operativos es
+  `core.usuarios_empresas.rol_id → core.roles.nombre` por empresa.
+  `core.usuarios.rol` (admin/viewer) queda reservado para
+  superusuarios cross-empresa. `EffectiveUser.direccionEmpresaIds`
+  expone la lista de empresas donde el caller tiene rol "Dirección"
+  (match case-insensitive 'direcci%n') para que cualquier gate futuro
+  reuse el flag.
+
+- **2026-05-29 (Sprint 4A) — Eliminación de las 3 cotizaciones del
+  catálogo**. Los montos de urbanización/construcción/comercialización
+  se capturarán directamente en el análisis financiero (Sprint 4B)
+  como columnas Referencia vs Proyecto, alineado con la vista Coda.
+  Ya no tiene sentido tenerlos como tareas separadas con su propio
+  ciclo de pasos.
 
 - **2026-05-28 — Cero ALTER en v1**. El schema actual ya cubre el flujo
   completo. Validar antes de proponer columnas nuevas.

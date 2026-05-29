@@ -28,7 +28,12 @@ import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency, formatNumber } from '@/lib/format';
 import { useRouter } from 'next/navigation';
 import { deriveAnalisis } from './anteproyecto-detalle';
-import { type ProyectoDetalle, ESTADO_TONE, ESTADO_LABEL } from './proyecto-detalle';
+import {
+  type ProyectoDetalle,
+  ESTADO_TONE,
+  ESTADO_LABEL,
+  PROYECTO_DETALLE_COLUMNAS,
+} from './proyecto-detalle';
 
 /** Estados que cuentan como "activos" (en pipeline de evaluación). */
 const ESTADOS_ACTIVOS = new Set(['propuesta', 'analisis', 'aprobado']);
@@ -91,9 +96,7 @@ export function AnteproyectosModule({ empresaId }: { empresaId: string }) {
       createSupabaseBrowserClient()
         .schema('dilesa')
         .from('proyectos')
-        .select(
-          'id, tipo, nombre, estado, clave_interna, proyecto_padre_id, proyecto_predecesor_id, fecha_inicio, fecha_fin_estimada, fecha_licencia, area_m2, area_vendible_m2, areas_verdes_m2, lotes_proyectados, presupuesto_estimado, costo_terreno, costo_urbanizacion, costo_construccion, costo_comercializacion, notas, plano_oficial_url, image_url, acreditacion_escritura, objetivo_trimestral'
-        )
+        .select(PROYECTO_DETALLE_COLUMNAS)
         .eq('empresa_id', empresaId)
         .eq('tipo', 'anteproyecto')
         .is('deleted_at', null)
@@ -109,7 +112,7 @@ export function AnteproyectosModule({ empresaId }: { empresaId: string }) {
       setError(getSupabaseErrorMessage(err, 'No se pudieron cargar los anteproyectos.'));
       setAnteproyectos([]);
     } else {
-      setAnteproyectos((data ?? []) as ProyectoDetalle[]);
+      setAnteproyectos((data ?? []) as unknown as ProyectoDetalle[]);
     }
     setLoading(false);
   }, [fetchAnteproyectos]);
@@ -122,7 +125,7 @@ export function AnteproyectosModule({ empresaId }: { empresaId: string }) {
         setError(getSupabaseErrorMessage(err, 'No se pudieron cargar los anteproyectos.'));
         setAnteproyectos([]);
       } else {
-        setAnteproyectos((data ?? []) as ProyectoDetalle[]);
+        setAnteproyectos((data ?? []) as unknown as ProyectoDetalle[]);
       }
       setLoading(false);
     });

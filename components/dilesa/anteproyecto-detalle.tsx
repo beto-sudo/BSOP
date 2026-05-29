@@ -30,6 +30,8 @@ import { TareasChecklist, type PasoRow } from './tareas-checklist';
 import { PartidasPresupuestales, type PartidaRow } from './partidas-presupuestales';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { useEffectiveUser } from '@/components/providers';
+import { AnteproyectoAnalisisFinanciero } from './anteproyecto-analisis-financiero';
+import type { AnalisisFinancieroSnapshot } from './analisis-financiero-types';
 
 const numberFmt = new Intl.NumberFormat('es-MX');
 const moneyFmt = new Intl.NumberFormat('es-MX', {
@@ -83,6 +85,43 @@ type ProyectoTarea = {
 type TareaDep = { tarea_id: string; depende_de_tarea_id: string };
 
 type Partida = PartidaRow;
+
+/**
+ * Mapea el row de `dilesa.proyectos` a la shape esperada por
+ * `<AnteproyectoAnalisisFinanciero>` (Sprint 4B). Solo proyecta los
+ * campos requeridos para mantener el contrato chico.
+ */
+function toAnalisisSnapshot(p: ProyectoDetalle): AnalisisFinancieroSnapshot {
+  return {
+    id: p.id,
+    area_m2: p.area_m2,
+    area_vendible_m2: p.area_vendible_m2,
+    areas_verdes_m2: p.areas_verdes_m2,
+    area_vialidades_m2: p.area_vialidades_m2,
+    lotes_proyectados: p.lotes_proyectados,
+    tamano_lote_promedio: p.tamano_lote_promedio,
+    clasificacion_inmobiliaria: p.clasificacion_inmobiliaria,
+    costo_terreno: p.costo_terreno,
+    valor_predio: p.valor_predio,
+    infraestructura_cabecera_necesaria: p.infraestructura_cabecera_necesaria,
+    prototipos_referencia: p.prototipos_referencia,
+    presupuesto_estimado: p.presupuesto_estimado,
+    valor_comercial_referencia: p.valor_comercial_referencia,
+    costo_urbanizacion_referencia: p.costo_urbanizacion_referencia,
+    costo_materiales_referencia: p.costo_materiales_referencia,
+    costo_mo_referencia: p.costo_mo_referencia,
+    registro_ruv_referencia: p.registro_ruv_referencia,
+    seguro_calidad_referencia: p.seguro_calidad_referencia,
+    costo_comercializacion_referencia: p.costo_comercializacion_referencia,
+    valor_comercial_proyecto: p.valor_comercial_proyecto,
+    costo_urbanizacion: p.costo_urbanizacion,
+    costo_materiales_proyecto: p.costo_materiales_proyecto,
+    costo_mo: p.costo_mo,
+    registro_ruv_proyecto: p.registro_ruv_proyecto,
+    seguro_calidad_proyecto: p.seguro_calidad_proyecto,
+    costo_comercializacion: p.costo_comercializacion,
+  };
+}
 
 /**
  * Sprint 4A: el gate de promoción ya no se basa en una tarea Comité
@@ -408,6 +447,11 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
           </Badge>
         </div>
       </header>
+
+      <AnteproyectoAnalisisFinanciero
+        snapshot={toAnalisisSnapshot(anteproyecto)}
+        onChange={() => void cargarExtras(anteproyecto.id)}
+      />
 
       <DetailDrawerSection title="Ficha física" divider={false}>
         {fichaFisica.length > 0 ? (
