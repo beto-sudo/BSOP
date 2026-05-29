@@ -37,6 +37,12 @@ import {
   type PasoEstado,
   PASO_TO_PARTIDA_ESTADO,
 } from '@/components/dilesa/tareas-checklist-types';
+import {
+  type AnalisisCampo,
+  normalizarClasificaciones,
+  normalizarPrototiposReferencia,
+  validarCampoAnalisis,
+} from '@/components/dilesa/analisis-financiero-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 type Result = { ok: true; tareasCreadas: number } | { ok: false; error: string };
@@ -598,6 +604,156 @@ export async function autorizarPaso(tareaId: string, paso: TareaPaso): Promise<S
     .is('autorizado_at', null);
 
   if (error) return { ok: false, error: error.message || 'No se pudo autorizar el paso.' };
+  revalidateAnteproyectosPaths();
+  return { ok: true };
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Sprint 4B — captura inline del análisis financiero del anteproyecto
+// ──────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Actualiza un campo numérico del análisis financiero de un
+ * anteproyecto. `valor=null` limpia. Acepta `number | null` y valida
+ * que sea finito y no-negativo. Whitelist contra
+ * `ANALISIS_NUMERIC_FIELDS` para no escribir a columnas no
+ * intencionadas. RLS valida el acceso a la empresa.
+ */
+export async function updateAnteproyectoAnalisisCampo(
+  proyectoId: string,
+  campo: AnalisisCampo,
+  valor: number | null
+): Promise<SimpleResult> {
+  if (!proyectoId) return { ok: false, error: 'proyectoId requerido' };
+  const valid = validarCampoAnalisis(campo, valor);
+  if (!valid.ok) return valid;
+
+  const supabase = await makeServerClient();
+  const { error } = await supabase
+    .schema('dilesa')
+    .from('proyectos')
+    .update({ [campo]: valor })
+    .eq('id', proyectoId);
+
+  if (error) {
+    return { ok: false, error: error.message || 'No se pudo actualizar el campo.' };
+  }
+  revalidateAnteproyectosPaths();
+  return { ok: true };
+}
+
+/**
+ * Bandera `infraestructura_cabecera_necesaria` — boolean simple.
+ */
+export async function updateAnteproyectoInfraCabecera(
+  proyectoId: string,
+  necesaria: boolean
+): Promise<SimpleResult> {
+  if (!proyectoId) return { ok: false, error: 'proyectoId requerido' };
+  const supabase = await makeServerClient();
+  const { error } = await supabase
+    .schema('dilesa')
+    .from('proyectos')
+    .update({ infraestructura_cabecera_necesaria: necesaria })
+    .eq('id', proyectoId);
+  if (error) return { ok: false, error: error.message };
+  revalidateAnteproyectosPaths();
+  return { ok: true };
+}
+
+/**
+ * `prototipos_referencia` — array de nombres free-text (chips). v1
+ * acepta el array completo (replace), no add/remove granular. Trim +
+ * dedup + limita a 16 elementos máx.
+ */
+export async function updateAnteproyectoPrototiposReferencia(
+  proyectoId: string,
+  nombres: string[]
+): Promise<SimpleResult> {
+  if (!proyectoId) return { ok: false, error: 'proyectoId requerido' };
+  if (!Array.isArray(nombres)) return { ok: false, error: 'nombres debe ser array' };
+  const norm = normalizarPrototiposReferencia(nombres);
+  const supabase = await makeServerClient();
+  const { error } = await supabase
+    .schema('dilesa')
+    .from('proyectos')
+    .update({ prototipos_referencia: norm })
+    .eq('id', proyectoId);
+  if (error) return { ok: false, error: error.message };
+  revalidateAnteproyectosPaths();
+  return { ok: true };
+}
+
+/**
+ * Multiselect de clasificaciones inmobiliarias (Sprint 4B refinamiento).
+ * Acepta el array completo. Whitelist contra el catálogo
+ * `CLASIFICACIONES_INMOBILIARIAS` — valores fuera se descartan
+ * silenciosamente. El trigger DB sincroniza el primer elemento al
+ * campo singular legacy para back-compat con funciones SQL.
+ */
+export async function updateAnteproyectoClasificaciones(
+  proyectoId: string,
+  codigos: string[]
+): Promise<SimpleResult> {
+  if (!proyectoId) return { ok: false, error: 'proyectoId requerido' };
+  if (!Array.isArray(codigos)) return { ok: false, error: 'codigos debe ser array' };
+  const norm = normalizarClasificaciones(codigos);
+  const supabase = await makeServerClient();
+  const { error } = await supabase
+    .schema('dilesa')
+    .from('proyectos')
+    .update({ clasificaciones_inmobiliarias: norm })
+    .eq('id', proyectoId);
+  if (error) return { ok: false, error: error.message };
+  revalidateAnteproyectosPaths();
+  return { ok: true };
+}
+
+/**
+ * Setea (o limpia, con null) el prototipo de referencia. Cuando el
+ * prototipo seleccionado tiene `valor_comercial_referencia` poblado en
+ * `dilesa.productos`, autopopula ese campo en el proyecto — esa es la
+ * razón principal del selector (Beto explícito: "para poder extraer
+ * los datos de referencia de ahí").
+ *
+ * Si productoId=null: limpia el FK y deja el resto intacto (no borra
+ * los valores capturados — el usuario decide si los limpia manual).
+ */
+export async function updateAnteproyectoPrototipoReferencia(
+  proyectoId: string,
+  productoId: string | null
+): Promise<SimpleResult> {
+  if (!proyectoId) return { ok: false, error: 'proyectoId requerido' };
+  const supabase = await makeServerClient();
+
+  const patch: Record<string, unknown> = { prototipo_referencia_id: productoId };
+
+  if (productoId) {
+    // Lookup del prototipo para autopopular valor_comercial_referencia
+    // si está poblado en `dilesa.productos`. RLS valida acceso.
+    const { data: producto, error: prodErr } = await supabase
+      .schema('dilesa')
+      .from('productos')
+      .select('valor_comercial_referencia, costo_referencia')
+      .eq('id', productoId)
+      .maybeSingle();
+    if (prodErr) return { ok: false, error: prodErr.message };
+    if (!producto) return { ok: false, error: 'Prototipo no encontrado' };
+
+    if (producto.valor_comercial_referencia != null) {
+      patch.valor_comercial_referencia = producto.valor_comercial_referencia;
+    }
+    // costo_referencia en dilesa.productos es total — no lo desglosamos
+    // a urbanizacion/materiales/MO/etc. v1 sólo pull-ea valor comercial.
+  }
+
+  const { error } = await supabase
+    .schema('dilesa')
+    .from('proyectos')
+    .update(patch)
+    .eq('id', proyectoId);
+
+  if (error) return { ok: false, error: error.message };
   revalidateAnteproyectosPaths();
   return { ok: true };
 }
