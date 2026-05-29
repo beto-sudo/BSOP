@@ -42,7 +42,6 @@ const s = StyleSheet.create({
   chipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 4,
     marginTop: 2,
   },
   chip: {
@@ -52,6 +51,8 @@ const s = StyleSheet.create({
     paddingVertical: 1,
     paddingHorizontal: 4,
     fontSize: 7.5,
+    marginRight: 4,
+    marginBottom: 2,
   },
   card: {
     borderWidth: 0.5,
@@ -71,10 +72,17 @@ const s = StyleSheet.create({
   },
   grid2: {
     flexDirection: 'row',
-    gap: 8,
   },
   col: {
     flex: 1,
+  },
+  colLeft: {
+    flex: 1,
+    marginRight: 4,
+  },
+  colRight: {
+    flex: 1,
+    marginLeft: 4,
   },
   rowKV: {
     flexDirection: 'row',
@@ -154,10 +162,17 @@ const s = StyleSheet.create({
   },
   resultGrid: {
     flexDirection: 'row',
-    gap: 8,
     marginTop: 2,
   },
   resultCard: {
+    flex: 1,
+    borderWidth: 0.5,
+    borderColor: colors.border,
+    borderRadius: 3,
+    padding: 5,
+    marginRight: 4,
+  },
+  resultCardLast: {
     flex: 1,
     borderWidth: 0.5,
     borderColor: colors.border,
@@ -230,7 +245,7 @@ export function AnalisisFinancieroPDF({ data }: { data: AnalisisPdfData }) {
 
         {/* ── Predio + Capital ──────────────────────────────────────────── */}
         <View style={s.grid2}>
-          <View style={[s.card, s.col]}>
+          <View style={[s.card, s.colLeft]}>
             <Text style={s.cardLabel}>Predio</Text>
             <KV
               k="Clasificación"
@@ -250,7 +265,7 @@ export function AnalisisFinancieroPDF({ data }: { data: AnalisisPdfData }) {
             <KV k="Aprovechamiento" v={n(d.aprovechamiento, fmtPct)} accent />
           </View>
 
-          <View style={[s.card, s.col]}>
+          <View style={[s.card, s.colRight]}>
             <Text style={s.cardLabel}>Capital inicial</Text>
             <KV k="Costo terreno" v={n(snapshot.costo_terreno, fmtMoney)} />
             <KV k="Valor predio" v={n(snapshot.valor_predio, fmtMoney)} />
@@ -334,7 +349,7 @@ export function AnalisisFinancieroPDF({ data }: { data: AnalisisPdfData }) {
               <Text style={s.resultLabel}>Inversión total</Text>
               <Text style={s.resultValue}>{n(inversion, fmtMoney)}</Text>
             </View>
-            <View style={s.resultCard}>
+            <View style={s.resultCardLast}>
               <Text style={s.resultLabel}>Valor comercial proyecto</Text>
               <Text style={s.resultValue}>{n(snapshot.valor_comercial_proyecto, fmtMoney)}</Text>
             </View>

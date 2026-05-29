@@ -154,7 +154,19 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     snapshot,
   };
 
-  const buf = await renderToBuffer(<AnalisisFinancieroPDF data={data} />);
+  let buf: Buffer;
+  try {
+    buf = await renderToBuffer(<AnalisisFinancieroPDF data={data} />);
+  } catch (e) {
+    const msg = e instanceof Error ? `${e.name}: ${e.message}\n${e.stack}` : String(e);
+    // Log explícito al runtime de Vercel para debugging futuro (Beto vio
+    // un HTTP 500 truncado en preview, los logs llegan mejor con stack).
+    console.error('[analisis-pdf] renderToBuffer failed', { id, msg });
+    return NextResponse.json(
+      { error: 'No se pudo generar el PDF.', detail: msg.slice(0, 500) },
+      { status: 500 }
+    );
+  }
   const slug = p.nombre
     .toLowerCase()
     .normalize('NFD')
