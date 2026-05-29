@@ -205,7 +205,7 @@ export function TareasChecklist({
               <th className="hidden w-32 px-2 py-2 text-left lg:table-cell">Entidad</th>
               <th className="w-36 px-2 py-2 text-left">Estado</th>
               <th className="w-20 px-2 py-2 text-left">Vence</th>
-              <th className="w-28 px-2 py-2 text-center">
+              <th className="w-40 px-2 py-2 text-center">
                 <span className="block">C · F · P · R</span>
                 <span className="block text-[9px] normal-case tracking-normal text-[var(--text)]/40">
                   cotiz · factura · pago · result
@@ -558,17 +558,32 @@ const PASO_SHORT_LABEL: Record<'cotizacion' | 'factura' | 'pago' | 'resultado', 
 function PasosMini({ pasos }: { pasos: readonly PasoRow[] }) {
   const byPaso = new Map(pasos.map((p) => [p.paso, p]));
   return (
-    <div className="inline-flex items-center gap-1">
+    <div className="inline-flex items-center gap-1.5">
       {PASO_ORDER.map((paso) => {
         const row = byPaso.get(paso);
         const visual: EstadoVisual = row ? estadoVisualDePaso(row) : 'pendiente';
+        const doc = row?.documento_url ?? null;
+        const label = `${PASO_SHORT_LABEL[paso]}: ${ESTADO_VISUAL_LABEL[visual]}`;
+        const baseCls = `inline-flex h-4 w-4 items-center justify-center rounded-sm border text-[9px] font-bold ${ESTADO_VISUAL_TONE[visual]}`;
+
+        if (doc) {
+          return (
+            <a
+              key={paso}
+              href={doc}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              title={`${label} — click para abrir documento`}
+              aria-label={`Abrir documento de ${PASO_SHORT_LABEL[paso]}`}
+              className={`${baseCls} cursor-pointer ring-offset-1 transition-shadow hover:ring-2 hover:ring-[var(--accent)]/60`}
+            >
+              <span className="sr-only">{PASO_SHORT_LABEL[paso]} con documento adjunto</span>
+            </a>
+          );
+        }
         return (
-          <span
-            key={paso}
-            title={`${PASO_SHORT_LABEL[paso]}: ${ESTADO_VISUAL_LABEL[visual]}`}
-            aria-label={`${PASO_SHORT_LABEL[paso]} ${ESTADO_VISUAL_LABEL[visual]}`}
-            className={`inline-flex h-3 w-3 items-center justify-center rounded-sm border text-[8px] font-bold ${ESTADO_VISUAL_TONE[visual]}`}
-          >
+          <span key={paso} title={label} aria-label={label} className={baseCls}>
             <span className="sr-only">{PASO_SHORT_LABEL[paso]}</span>
           </span>
         );
