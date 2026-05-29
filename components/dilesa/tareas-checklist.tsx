@@ -86,7 +86,7 @@ const OBLIG_TONE: Record<string, BadgeTone> = {
 };
 
 function esCotizacion(t: TareaChecklistRow): boolean {
-  return esTareaCotizacion(t.subtipo_snapshot);
+  return esTareaCotizacion(t.tipo_snapshot, t.subtipo_snapshot);
 }
 
 /**
