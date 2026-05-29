@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-28
-**Última actualización:** 2026-05-29 (Sprint 4A mergeado — 4 tareas eliminadas + autorización integrada en promoción + rol Dirección por empresa)
+**Última actualización:** 2026-05-29 (Sprint 4A+4B+4C mergeados — autorización integrada en promoción, análisis financiero compacto con multiselect + selector prototipo, PDF imprimible del análisis)
 
 ## Problema
 
@@ -328,6 +328,32 @@ los pasos por tarea estén estables en anteproyecto.)
   patrón existe y funciona (otros módulos ya lo usan).
 
 ## Bitácora
+
+- **2026-05-29 (Sprint 4C — PDF del análisis financiero)** — PR #585
+  mergeado. Nuevo endpoint `GET /api/dilesa/anteproyectos/[id]/analisis-pdf`
+  con `@react-pdf/renderer` + componente PDF en
+  `lib/dilesa/pdf/analisis-financiero.tsx` reusa formatters y
+  derivados del archivo de types (Sprint 4B precisamente los expuso
+  para esto). Botón "Imprimir PDF" en el header del componente.
+  2 fixes durante la integración: (a) `gap` en StyleSheet falla
+  bundled por Next aunque tsx puro lo acepta; (b)
+  PROYECTO_DETALLE_COLUMNAS vivía en client component, importarla
+  desde route handler arrastraba el árbol cliente y rompía el
+  bundle — movida a `lib/dilesa/proyecto-detalle-columnas.ts`.
+
+- **2026-05-29 (Sprint 4B refinamiento)** — PR #584 mergeado tras
+  revisión de Beto: quitadas 3 secciones legacy redundantes (Ficha
+  física, Costos estimados, Análisis derivado), clasificación
+  inmobiliaria pasó a multiselect 9 opciones, prototipo referencia
+  pasó a selector único contra `dilesa.productos` con autopopulate de
+  `valor_comercial_referencia`.
+
+- **2026-05-29 (Sprint 4B — análisis financiero compacto)** — PR #584
+  fase 1: componente `<AnteproyectoAnalisisFinanciero>` con 4
+  sub-cards (Predio, Capital, Costos Referencia vs Proyecto, Resultado),
+  captura inline optimistic con rollback. Migración aditiva con 14
+  columnas en `dilesa.proyectos` (pares referencia/proyecto + valor
+  predio + infraestructura cabecera + prototipos referencia).
 
 - **2026-05-29 (Sprint 4A — consolidar autorización en promoción)** —
   PR #583 mergeado. 4 tareas redundantes eliminadas del catálogo
