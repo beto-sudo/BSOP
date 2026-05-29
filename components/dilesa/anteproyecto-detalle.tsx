@@ -85,26 +85,40 @@ type TareaDep = { tarea_id: string; depende_de_tarea_id: string };
 type Partida = PartidaRow;
 
 /**
- * Detecta el gate de promoción: la tarea "Aprobación de Comité de
- * Inversión" debe existir Y estar en `estado='completada'`. La RPC
- * server-side valida lo mismo — esto es solo UX preventiva para no
- * mostrar un botón que va a fallar.
+ * Sprint 4A: el gate de promoción ya no se basa en una tarea Comité
+ * (eliminada). En su lugar, se requiere que:
+ *   1) El usuario sea admin (dirección). El server action revalida.
+ *   2) Todas las tareas obligatorias del anteproyecto estén
+ *      `completada`. Esto evita promover sin haber cerrado los
+ *      trámites y factibilidades canónicos.
+ *   3) El anteproyecto no esté ya convertido.
  *
- * Exportado para tests + reuso.
+ * Retorna `puede` (booleano) y `razon` (string para mostrar al usuario
+ * cuando no puede). Exportado para tests + reuso.
  */
-export function gateComitePromocion(tareas: readonly { titulo: string; estado: string }[]): {
-  existe: boolean;
-  completado: boolean;
-} {
-  const gate = tareas.find(
-    (t) =>
-      t.titulo.toLowerCase().includes('comité de inversión') &&
-      t.titulo.toLowerCase().includes('aprobación')
+export function gatePromocion(
+  tareas: readonly { estado: string; obligatoriedad_snapshot?: string | null }[],
+  ctx: { isAdmin: boolean; yaConvertido: boolean }
+): { puede: boolean; razon: string } {
+  if (ctx.yaConvertido) {
+    return { puede: false, razon: 'Este anteproyecto ya fue convertido.' };
+  }
+  if (!ctx.isAdmin) {
+    return {
+      puede: false,
+      razon: 'Solo dirección (rol admin) puede autorizar y promover a desarrollo.',
+    };
+  }
+  const obligatoriasPendientes = tareas.filter(
+    (t) => (t.obligatoriedad_snapshot ?? '') === 'obligatoria' && t.estado !== 'completada'
   );
-  return {
-    existe: gate !== undefined,
-    completado: gate?.estado === 'completada',
-  };
+  if (obligatoriasPendientes.length > 0) {
+    return {
+      puede: false,
+      razon: `Faltan ${obligatoriasPendientes.length} tarea(s) obligatoria(s) por completar.`,
+    };
+  }
+  return { puede: true, razon: 'Listo para autorizar y promover.' };
 }
 
 /**
@@ -303,9 +317,9 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
   if (!anteproyecto) return null;
 
   const analisis = deriveAnalisis(anteproyecto);
-  const gate = gateComitePromocion(tareas);
   const yaConvertido = anteproyecto.estado === 'completado';
-  const puedePromover = gate.completado && !yaConvertido && !loadingExtras;
+  const gate = gatePromocion(tareas, { isAdmin: puedeAutorizar, yaConvertido });
+  const puedePromover = gate.puede && !loadingExtras;
 
   const handlePromote = () => {
     setPromoteError(null);
@@ -513,63 +527,61 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
         {extrasError && <p className="mt-2 text-sm text-red-600/80">{extrasError}</p>}
       </DetailDrawerSection>
 
-      <DetailDrawerSection
-        title="Promoción a desarrollo"
-        description={
-          yaConvertido
-            ? 'Este anteproyecto ya fue convertido.'
-            : gate.completado
-              ? 'Listo para promover.'
-              : gate.existe
-                ? 'Pendiente: la tarea "Aprobación de Comité de Inversión" no está completada.'
-                : 'Pendiente: pobla la plantilla canónica para tener el gate.'
-        }
-      >
+      <DetailDrawerSection title="Autorización y promoción a desarrollo" description={gate.razon}>
         {promoteSuccess ? (
           <div className="rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800">
-            <div className="font-medium">Anteproyecto promovido.</div>
+            <div className="font-medium">Ejecución autorizada y anteproyecto promovido.</div>
             <div className="mt-1 text-xs">
               Nuevo desarrollo creado con ID <code>{promoteSuccess}</code>. El anteproyecto queda
               como histórico (estado completado). Cambia a la tab Activos para verlo.
             </div>
           </div>
         ) : confirmingPromote ? (
-          <div className="space-y-3 rounded-md border border-[var(--border)] bg-[var(--card)] p-3">
-            <div className="text-sm text-[var(--text)]">
-              Al promover se creará un nuevo proyecto con <strong>tipo desarrollo</strong> apuntando
-              a este anteproyecto como predecesor. Se llevarán las tareas trabajadas (estado en
-              curso o completada con aplicación desarrollo/ambas) y las partidas presupuestales
-              autorizadas (con monto aprobado snapshot). Este anteproyecto queda como histórico
-              inmutable.
+          <div className="space-y-3 rounded-md border border-amber-300 bg-amber-50 p-3">
+            <div className="text-sm font-medium text-amber-900">
+              Al confirmar, como dirección autorizas la ejecución del proyecto.
+            </div>
+            <div className="text-sm text-amber-900/90">
+              Se creará un nuevo proyecto con <strong>tipo desarrollo</strong> apuntando a este
+              anteproyecto como predecesor. Se copiarán las tareas trabajadas (en curso o
+              completadas con aplicación desarrollo/ambas) y las partidas presupuestales autorizadas
+              (con monto aprobado snapshot). Este anteproyecto queda como histórico inmutable.
             </div>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={handlePromote}
                 disabled={promotePending}
-                className="h-9 rounded-md bg-[var(--accent)] px-4 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+                className="h-9 rounded-md bg-amber-600 px-4 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
               >
-                {promotePending ? 'Promoviendo…' : 'Confirmar promoción'}
+                {promotePending
+                  ? 'Autorizando y promoviendo…'
+                  : 'Confirmar autorización y promover'}
               </button>
               <button
                 type="button"
                 onClick={() => setConfirmingPromote(false)}
                 disabled={promotePending}
-                className="h-9 rounded-md border border-[var(--border)] px-4 text-sm font-medium text-[var(--text)] hover:bg-[var(--card)] disabled:opacity-50"
+                className="h-9 rounded-md border border-amber-300 bg-white px-4 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
               >
                 Cancelar
               </button>
             </div>
           </div>
-        ) : (
+        ) : puedeAutorizar ? (
           <button
             type="button"
             onClick={() => setConfirmingPromote(true)}
             disabled={!puedePromover}
             className="h-9 rounded-md bg-[var(--accent)] px-4 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={!puedePromover ? gate.razon : undefined}
           >
-            Promover a desarrollo
+            Autorizar y promover a desarrollo
           </button>
+        ) : (
+          <div className="text-sm text-[var(--muted-text)]">
+            Solo dirección (rol admin) puede autorizar y promover este anteproyecto.
+          </div>
         )}
         {promoteError && <p className="mt-2 text-sm text-red-600/80">{promoteError}</p>}
       </DetailDrawerSection>

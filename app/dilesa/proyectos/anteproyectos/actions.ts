@@ -82,10 +82,15 @@ export async function populatePlantilla(
  * Promueve un anteproyecto a desarrollo via RPC
  * `dilesa.fn_proyecto_promote_anteproyecto`.
  *
- * Sprint 4 de la iniciativa. La RPC valida:
+ * Sprint 4A (2026-05-30): la autorización del comité se eliminó como
+ * tarea separada. La RPC ya no valida tarea Comité; el control de quién
+ * puede llamar este action vive aquí — requiere rol admin (dirección).
+ * Patrón consistente con `autorizarPaso` (Sprint 3.5) y
+ * `autorizarPartida` (Sprint 2).
+ *
+ * La RPC sigue validando:
  * - El anteproyecto existe y `tipo='anteproyecto'`.
  * - No existe ya un desarrollo apuntándolo via `proyecto_predecesor_id`.
- * - Tarea "Aprobación de Comité de Inversión" en `estado='completada'`.
  *
  * En éxito: crea row nuevo en `dilesa.proyectos` con `tipo='desarrollo'`,
  * copia tareas rehogables + partidas autorizadas, marca el anteproyecto
@@ -97,6 +102,28 @@ export async function promoteAnteproyecto(
   if (!anteproyectoId) return { ok: false, error: 'anteproyectoId requerido' };
 
   const supabase = await makeServerClient();
+
+  // Role gate (Sprint 4A): solo admin/dirección puede autorizar +
+  // promover. Mismo patrón que `autorizarPaso`.
+  const { data: userRes, error: userErr } = await supabase.auth.getUser();
+  if (userErr || !userRes?.user) return { ok: false, error: 'No autenticado' };
+  const email = userRes.user.email;
+  if (!email) return { ok: false, error: 'JWT sin email' };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: coreUser, error: roleErr } = await (supabase.schema('core') as any)
+    .from('usuarios')
+    .select('rol')
+    .eq('email', email)
+    .maybeSingle();
+  if (roleErr) return { ok: false, error: roleErr.message };
+  if (!coreUser || coreUser.rol !== 'admin') {
+    return {
+      ok: false,
+      error: 'Solo dirección puede autorizar y promover a desarrollo.',
+    };
+  }
+
   const { data, error } = await supabase
     .schema('dilesa')
     .rpc('fn_proyecto_promote_anteproyecto', { p_anteproyecto_id: anteproyectoId });

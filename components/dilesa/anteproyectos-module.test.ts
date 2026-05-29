@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { deriveKpis } from './anteproyectos-module';
-import { deriveAnalisis, gateComitePromocion } from './anteproyecto-detalle';
+import { deriveAnalisis, gatePromocion } from './anteproyecto-detalle';
 import type { ProyectoDetalle } from './proyecto-detalle';
 
 function ap(overrides: Partial<ProyectoDetalle>): ProyectoDetalle {
@@ -211,40 +211,52 @@ describe('deriveAnalisis (financiero derivado client-side)', () => {
   });
 });
 
-describe('gateComitePromocion (Sprint 4 — gate de conversión)', () => {
-  it('detecta gate completado por título canónico', () => {
-    const r = gateComitePromocion([
-      { titulo: 'Otra tarea', estado: 'pendiente' },
-      { titulo: 'Aprobación de Comité de Inversión', estado: 'completada' },
-    ]);
-    expect(r.existe).toBe(true);
-    expect(r.completado).toBe(true);
+describe('gatePromocion (Sprint 4A — autorización integrada)', () => {
+  const T = (estado: string, obligatoriedad_snapshot: string | null = 'obligatoria') => ({
+    estado,
+    obligatoriedad_snapshot,
   });
 
-  it('gate pendiente si la tarea existe pero no está completada', () => {
-    const r = gateComitePromocion([
-      { titulo: 'Aprobación de Comité de Inversión', estado: 'en_curso' },
-    ]);
-    expect(r.existe).toBe(true);
-    expect(r.completado).toBe(false);
+  it('admin con todas las obligatorias completadas → puede', () => {
+    const r = gatePromocion([T('completada'), T('completada')], {
+      isAdmin: true,
+      yaConvertido: false,
+    });
+    expect(r.puede).toBe(true);
+    expect(r.razon).toMatch(/listo/i);
   });
 
-  it('gate inexistente si no se ha poblado la plantilla', () => {
-    const r = gateComitePromocion([{ titulo: 'Levantamiento Topográfico', estado: 'completada' }]);
-    expect(r.existe).toBe(false);
-    expect(r.completado).toBe(false);
+  it('admin con obligatoria pendiente → no puede', () => {
+    const r = gatePromocion([T('completada'), T('en_curso')], {
+      isAdmin: true,
+      yaConvertido: false,
+    });
+    expect(r.puede).toBe(false);
+    expect(r.razon).toMatch(/faltan 1/i);
   });
 
-  it('case-insensitive — match aunque cambien las mayúsculas/tildes', () => {
-    const r = gateComitePromocion([
-      { titulo: 'aprobación de comité de inversión', estado: 'completada' },
-    ]);
-    expect(r.completado).toBe(true);
+  it('no-admin nunca puede (aunque todo esté completado)', () => {
+    const r = gatePromocion([T('completada')], { isAdmin: false, yaConvertido: false });
+    expect(r.puede).toBe(false);
+    expect(r.razon).toMatch(/dirección/i);
   });
 
-  it('lista vacía → gate inexistente', () => {
-    const r = gateComitePromocion([]);
-    expect(r.existe).toBe(false);
-    expect(r.completado).toBe(false);
+  it('ya convertido → no puede aunque sea admin', () => {
+    const r = gatePromocion([T('completada')], { isAdmin: true, yaConvertido: true });
+    expect(r.puede).toBe(false);
+    expect(r.razon).toMatch(/ya fue convertido/i);
+  });
+
+  it('tareas opcionales pendientes no bloquean', () => {
+    const r = gatePromocion(
+      [T('completada', 'obligatoria'), T('pendiente', 'opcional'), T('pendiente', 'informativa')],
+      { isAdmin: true, yaConvertido: false }
+    );
+    expect(r.puede).toBe(true);
+  });
+
+  it('lista vacía con admin → puede (caso anteproyecto sin plantilla aún)', () => {
+    const r = gatePromocion([], { isAdmin: true, yaConvertido: false });
+    expect(r.puede).toBe(true);
   });
 });
