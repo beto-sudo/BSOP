@@ -825,6 +825,25 @@ _(sin columnas)_
 - **nombre_externo** `text`
 - **created_at** `timestamp with time zone` NOT NULL DEFAULT `now()`
 
+### `dilesa.proyecto_tarea_pasos`
+
+> Pasos del ciclo de vida operativo de una tarea (cotización, factura, pago, resultado). Cada paso captura monto + documento + fecha + estado. UNIQUE(tarea_id, paso) garantiza un solo row por paso. Sprint 3 de dilesa-proyectos-checklist-inline.
+
+- **id** `uuid` NOT NULL DEFAULT `gen_random_uuid()` — PK
+- **empresa_id** `uuid` NOT NULL — FK → `core.empresas(id)`
+- **tarea_id** `uuid` NOT NULL — FK → `dilesa.proyecto_tareas(id)`
+- **paso** `text` NOT NULL
+- **monto** `numeric`
+- **documento_url** `text`
+- **fecha** `date`
+- **estado** `text` NOT NULL DEFAULT `'pendiente'::text`
+- **notas** `text`
+- **created_at** `timestamp with time zone` NOT NULL DEFAULT `now()`
+- **updated_at** `timestamp with time zone` NOT NULL DEFAULT `now()`
+- **deleted_at** `timestamp with time zone`
+- **autorizado_at** `timestamp with time zone`
+- **autorizado_por** `uuid` — FK → `core.usuarios(id)`
+
 ### `dilesa.proyecto_tareas`
 
 > Tareas de un proyecto. Agnóstico al tipo de proyecto (hereda el patrón del módulo Tareas existente).
@@ -1008,6 +1027,16 @@ _(sin columnas)_
 - **monto_bruto_total** `numeric`
 - **retencion_total** `numeric`
 - **monto_neto_total** `numeric`
+
+### `dilesa.v_proyecto_avance` _(view)_
+
+> Avance del proyecto derivado de `proyecto_tarea_pasos`. Promedio ponderado por obligatoriedad de la tarea (obligatoria=1, condicional=0.5, opcional=0). Sprint 3 de dilesa-proyectos-checklist-inline.
+
+- **proyecto_id** `uuid`
+- **empresa_id** `uuid`
+- **tareas_aplicables** `bigint`
+- **tareas_completadas** `bigint`
+- **avance_pct** `numeric`
 
 ### `dilesa.v_proyecto_avances` _(view)_
 
