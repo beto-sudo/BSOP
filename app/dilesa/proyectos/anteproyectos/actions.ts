@@ -30,7 +30,9 @@ import { instanciarPlantillaParaProyecto } from '@/lib/dilesa/instanciar-plantil
 import {
   TAREA_ESTADOS_VALIDOS,
   type TareaEstado,
+  esTareaCotizacion,
 } from '@/components/dilesa/tareas-checklist-types';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 type Result = { ok: true; tareasCreadas: number } | { ok: false; error: string };
 
@@ -147,8 +149,17 @@ export async function updateTareaEstado(
 
 /**
  * Captura `resultado_monto` en una tarea (ej. cotización). Acepta null
- * para limpiar. La auto-vinculación con `proyecto_presupuesto_partidas`
- * (cuando subtipo='cotizacion') se entrega en Sprint 2.
+ * para limpiar.
+ *
+ * Sprint 2 (auto-vinculación con partida): si la tarea es de cotización
+ * (`subtipo_snapshot` contiene "cotizac"), se llama a
+ * `syncPartidaDesdeTarea` para crear/actualizar/cerrar una partida
+ * preliminar vinculada vía `tarea_origen_id`. Reglas:
+ * - Si no existe partida vinculada y `monto != null` → INSERT preliminar.
+ * - Si existe y está en `preliminar` → UPDATE `monto_estimado`.
+ * - Si está en `preliminar` y `monto = null` → soft delete (`deleted_at`).
+ * - Si existe y está en `autorizada+` → NO machacamos (el monto en la
+ *   partida puede haber sido ajustado en el flujo de autorización).
  */
 export async function updateTareaMonto(
   tareaId: string,
@@ -169,6 +180,108 @@ export async function updateTareaMonto(
     .eq('id', tareaId);
 
   if (error) return { ok: false, error: error.message || 'No se pudo actualizar el monto.' };
+
+  // Sincronización con partida — no bloqueante para el éxito del update
+  // del monto; si falla, log silencioso y seguimos. El usuario puede
+  // re-disparar capturando el monto de nuevo.
+  const partidaSync = await syncPartidaDesdeTarea(supabase, tareaId, monto);
+  if (!partidaSync.ok) {
+    console.warn('[updateTareaMonto] sync partida falló:', partidaSync.error);
+  }
+
+  revalidateAnteproyectosPaths();
+  return { ok: true };
+}
+
+/**
+ * Sincroniza la partida preliminar vinculada a una tarea de cotización.
+ * NO se exporta — se llama desde `updateTareaMonto`. Service-internal.
+ */
+async function syncPartidaDesdeTarea(
+  supabase: SupabaseClient,
+  tareaId: string,
+  monto: number | null
+): Promise<SimpleResult> {
+  const { data: t, error: tErr } = await supabase
+    .schema('dilesa')
+    .from('proyecto_tareas')
+    .select('id, empresa_id, proyecto_id, titulo, subtipo_snapshot')
+    .eq('id', tareaId)
+    .is('deleted_at', null)
+    .single();
+  if (tErr || !t) return { ok: false, error: tErr?.message ?? 'tarea no encontrada' };
+  if (!esTareaCotizacion(t.subtipo_snapshot as string | null)) return { ok: true };
+
+  const { data: existing, error: eErr } = await supabase
+    .schema('dilesa')
+    .from('proyecto_presupuesto_partidas')
+    .select('id, estado')
+    .eq('tarea_origen_id', tareaId)
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (eErr) return { ok: false, error: eErr.message };
+
+  if (existing) {
+    if (existing.estado !== 'preliminar') return { ok: true };
+    if (monto === null) {
+      const { error } = await supabase
+        .schema('dilesa')
+        .from('proyecto_presupuesto_partidas')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', existing.id);
+      if (error) return { ok: false, error: error.message };
+      return { ok: true };
+    }
+    const { error } = await supabase
+      .schema('dilesa')
+      .from('proyecto_presupuesto_partidas')
+      .update({ monto_estimado: monto })
+      .eq('id', existing.id);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  }
+
+  if (monto !== null) {
+    const { error } = await supabase.schema('dilesa').from('proyecto_presupuesto_partidas').insert({
+      empresa_id: t.empresa_id,
+      proyecto_id: t.proyecto_id,
+      tarea_origen_id: tareaId,
+      partida: t.titulo,
+      monto_estimado: monto,
+      estado: 'preliminar',
+      fuente: 'cotizacion',
+    });
+    if (error) return { ok: false, error: error.message };
+  }
+  return { ok: true };
+}
+
+/**
+ * Mueve una partida de `preliminar` → `autorizada`. Set
+ * `autorizado_at=NOW()` y `autorizado_por=<userId>`. RLS de la tabla
+ * sigue gobernando quién puede actualizar (rol gate).
+ *
+ * Idempotente: si la partida ya está en `autorizada+`, no hace nada.
+ */
+export async function autorizarPartida(partidaId: string): Promise<SimpleResult> {
+  if (!partidaId) return { ok: false, error: 'partidaId requerido' };
+  const supabase = await makeServerClient();
+
+  const { data: userRes, error: userErr } = await supabase.auth.getUser();
+  if (userErr || !userRes?.user) return { ok: false, error: 'No autenticado' };
+
+  const { error } = await supabase
+    .schema('dilesa')
+    .from('proyecto_presupuesto_partidas')
+    .update({
+      estado: 'autorizada',
+      autorizado_at: new Date().toISOString(),
+      autorizado_por: userRes.user.id,
+    })
+    .eq('id', partidaId)
+    .eq('estado', 'preliminar');
+
+  if (error) return { ok: false, error: error.message || 'No se pudo autorizar la partida.' };
   revalidateAnteproyectosPaths();
   return { ok: true };
 }
