@@ -2473,6 +2473,63 @@ export type Database = {
           },
         ]
       }
+      proyecto_planos: {
+        Row: {
+          ai_analisis: Json | null
+          created_at: string
+          deleted_at: string | null
+          descripcion: string | null
+          empresa_id: string
+          id: string
+          proyecto_id: string
+          subido_por: string | null
+          updated_at: string
+          version: number
+          vigente: boolean
+        }
+        Insert: {
+          ai_analisis?: Json | null
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id: string
+          id?: string
+          proyecto_id: string
+          subido_por?: string | null
+          updated_at?: string
+          version: number
+          vigente?: boolean
+        }
+        Update: {
+          ai_analisis?: Json | null
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string
+          id?: string
+          proyecto_id?: string
+          subido_por?: string | null
+          updated_at?: string
+          version?: number
+          vigente?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proyecto_planos_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proyecto_planos_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_proyecto_avances"
+            referencedColumns: ["proyecto_id"]
+          },
+        ]
+      }
       proyecto_presupuesto_partidas: {
         Row: {
           autorizado_at: string | null

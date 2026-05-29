@@ -32,6 +32,7 @@ import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { useEffectiveUser } from '@/components/providers';
 import { AnteproyectoAnalisisFinanciero } from './anteproyecto-analisis-financiero';
 import type { AnalisisFinancieroSnapshot } from './analisis-financiero-types';
+import { PlanoAnteproyecto } from './plano-anteproyecto';
 
 const numberFmt = new Intl.NumberFormat('es-MX');
 const moneyFmt = new Intl.NumberFormat('es-MX', {
@@ -463,6 +464,12 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
         snapshot={toAnalisisSnapshot(anteproyecto)}
         productosDisponibles={productosCatalogo}
         onChange={() => void cargarExtras(anteproyecto.id)}
+      />
+
+      <PlanoAnteproyecto
+        proyectoId={anteproyecto.id}
+        empresaId={DILESA_EMPRESA_ID}
+        empresaSlug="dilesa"
       />
 
       {/* Ficha física + Costos estimados + Análisis derivado quedaron
