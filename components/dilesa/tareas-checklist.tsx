@@ -27,7 +27,11 @@ import {
   updateTareaMonto,
   updateTareaNotas,
 } from '@/app/dilesa/proyectos/anteproyectos/actions';
-import { TAREA_ESTADOS_VALIDOS, type TareaEstado } from './tareas-checklist-types';
+import {
+  TAREA_ESTADOS_VALIDOS,
+  type TareaEstado,
+  esTareaCotizacion,
+} from './tareas-checklist-types';
 import type { EmpresaSlug } from '@/lib/storage';
 
 const moneyFmt = new Intl.NumberFormat('es-MX', {
@@ -82,7 +86,7 @@ const OBLIG_TONE: Record<string, BadgeTone> = {
 };
 
 function esCotizacion(t: TareaChecklistRow): boolean {
-  return (t.subtipo_snapshot ?? '').toLowerCase().includes('cotizac');
+  return esTareaCotizacion(t.subtipo_snapshot);
 }
 
 /**

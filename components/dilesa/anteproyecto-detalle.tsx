@@ -17,7 +17,7 @@
 
 import { useCallback, useEffect, useState, useTransition } from 'react';
 import { DetailDrawerSection } from '@/components/detail-page';
-import { Badge, type BadgeTone } from '@/components/ui/badge';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
@@ -27,6 +27,7 @@ import {
 } from '@/app/dilesa/proyectos/anteproyectos/actions';
 import { type ProyectoDetalle, ESTADO_TONE, ESTADO_LABEL } from './proyecto-detalle';
 import { TareasChecklist } from './tareas-checklist';
+import { PartidasPresupuestales, type PartidaRow } from './partidas-presupuestales';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 
 const numberFmt = new Intl.NumberFormat('es-MX');
@@ -80,21 +81,7 @@ type ProyectoTarea = {
 
 type TareaDep = { tarea_id: string; depende_de_tarea_id: string };
 
-type Partida = {
-  id: string;
-  partida: string;
-  monto_estimado: number | null;
-  monto_aprobado: number | null;
-  estado: string;
-};
-
-const PARTIDA_ESTADO_TONE: Record<string, BadgeTone> = {
-  preliminar: 'neutral',
-  autorizada: 'info',
-  planeada: 'info',
-  en_ejercicio: 'warning',
-  cerrada: 'success',
-};
+type Partida = PartidaRow;
 
 /**
  * Detecta el gate de promoción: la tarea "Aprobación de Comité de
@@ -193,7 +180,9 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
       supabase
         .schema('dilesa')
         .from('proyecto_presupuesto_partidas')
-        .select('id, partida, monto_estimado, monto_aprobado, estado')
+        .select(
+          'id, partida, descripcion, monto_estimado, monto_aprobado, monto_ejercido, fuente, estado, tarea_origen_id, autorizado_at'
+        )
         .eq('proyecto_id', proyectoId)
         .is('deleted_at', null)
         .order('partida'),
@@ -475,52 +464,22 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
       </DetailDrawerSection>
 
       <DetailDrawerSection
-        title="Presupuestos preliminares"
+        title="Presupuesto"
         description={
           loadingExtras
             ? 'Cargando…'
             : partidas.length === 0
-              ? 'Sin partidas capturadas todavía.'
-              : `${partidas.length} partidas`
+              ? 'Captura un monto en una tarea de cotización para iniciar.'
+              : `${partidas.length} ${partidas.length === 1 ? 'partida' : 'partidas'}`
         }
       >
         {loadingExtras ? (
           <Skeleton className="h-16 w-full" />
-        ) : partidas.length === 0 ? (
-          <p className="text-sm text-[var(--text)]/60">
-            La captura inline + workflow de autorización viven en el próximo entregable. Cuando una
-            tarea de cotización registra `resultado_monto`, una partida preliminar se vincula con
-            ella aquí.
-          </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="text-xs uppercase text-[var(--text)]/50">
-                <tr className="border-b border-[var(--border)]">
-                  <th className="py-2 pr-4 text-left">Partida</th>
-                  <th className="py-2 pr-4 text-left">Estado</th>
-                  <th className="py-2 pr-4 text-right">Estimado</th>
-                  <th className="py-2 text-right">Aprobado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {partidas.map((p) => (
-                  <tr key={p.id} className="border-b border-[var(--border)]/40">
-                    <td className="py-2 pr-4 font-medium text-[var(--text)]">{p.partida}</td>
-                    <td className="py-2 pr-4">
-                      <Badge tone={PARTIDA_ESTADO_TONE[p.estado] ?? 'neutral'}>{p.estado}</Badge>
-                    </td>
-                    <td className="py-2 pr-4 text-right text-[var(--text)]/70">
-                      {p.monto_estimado != null ? moneyFmt.format(p.monto_estimado) : '—'}
-                    </td>
-                    <td className="py-2 text-right text-[var(--text)]/70">
-                      {p.monto_aprobado != null ? moneyFmt.format(p.monto_aprobado) : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <PartidasPresupuestales
+            partidas={partidas}
+            onChange={() => void cargarExtras(anteproyecto.id)}
+          />
         )}
         {extrasError && <p className="mt-2 text-sm text-red-600/80">{extrasError}</p>}
       </DetailDrawerSection>
