@@ -37,11 +37,22 @@ export const PARTIDA_ESTADOS_VALIDOS = [
 export type PartidaEstado = (typeof PARTIDA_ESTADOS_VALIDOS)[number];
 
 /**
- * Detecta si el subtipo (snapshot del catálogo) corresponde a una tarea
- * de cotización. Usado en cliente (decidir si mostrar input de monto)
- * y en servidor (auto-vinculación con partida presupuestal). Mismo
- * criterio en ambos lados para no divergir.
+ * Detecta si una tarea es de cotización. Las tareas canónicas vienen
+ * con `tipo='Cotización'` en el catálogo (las 3 tareas de cotización
+ * son: Urbanización / Construcción / Comercialización con
+ * subtipo='Urbanismo'/'Construcción'/'Comercial' respectivamente).
+ *
+ * El criterio mira tanto `tipo_snapshot` (canónico) como
+ * `subtipo_snapshot` (defensa por si alguien renombra el catálogo).
+ * Mismo criterio en cliente (mostrar input de monto) y servidor
+ * (auto-vinculación con partida presupuestal).
  */
-export function esTareaCotizacion(subtipoSnapshot: string | null | undefined): boolean {
-  return (subtipoSnapshot ?? '').toLowerCase().includes('cotizac');
+export function esTareaCotizacion(
+  tipoSnapshot: string | null | undefined,
+  subtipoSnapshot?: string | null | undefined
+): boolean {
+  const t = (tipoSnapshot ?? '').toLowerCase();
+  if (t.includes('cotizac')) return true;
+  const s = (subtipoSnapshot ?? '').toLowerCase();
+  return s.includes('cotizac');
 }

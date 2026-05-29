@@ -205,12 +205,14 @@ async function syncPartidaDesdeTarea(
   const { data: t, error: tErr } = await supabase
     .schema('dilesa')
     .from('proyecto_tareas')
-    .select('id, empresa_id, proyecto_id, titulo, subtipo_snapshot')
+    .select('id, empresa_id, proyecto_id, titulo, tipo_snapshot, subtipo_snapshot')
     .eq('id', tareaId)
     .is('deleted_at', null)
     .single();
   if (tErr || !t) return { ok: false, error: tErr?.message ?? 'tarea no encontrada' };
-  if (!esTareaCotizacion(t.subtipo_snapshot as string | null)) return { ok: true };
+  if (!esTareaCotizacion(t.tipo_snapshot as string | null, t.subtipo_snapshot as string | null)) {
+    return { ok: true };
+  }
 
   const { data: existing, error: eErr } = await supabase
     .schema('dilesa')
