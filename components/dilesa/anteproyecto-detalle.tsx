@@ -256,7 +256,9 @@ export function AnteproyectoDetalle({
     void supabase
       .schema('dilesa')
       .from('productos')
-      .select('id, nombre, valor_comercial_referencia, proyecto:proyectos(nombre)')
+      .select(
+        'id, nombre, valor_comercial_referencia, proyecto:proyectos!productos_proyecto_id_fkey(nombre)'
+      )
       .eq('empresa_id', DILESA_EMPRESA_ID)
       .is('deleted_at', null)
       .order('nombre')
