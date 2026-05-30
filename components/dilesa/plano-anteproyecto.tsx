@@ -119,7 +119,6 @@ export function PlanoAnteproyecto({
   }, [proyectoId]);
 
   useEffect(() => {
-     
     void cargar();
   }, [cargar]);
 
