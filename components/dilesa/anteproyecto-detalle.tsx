@@ -212,7 +212,15 @@ export function deriveAnalisis(p: ProyectoDetalle) {
   };
 }
 
-export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDetalle | null }) {
+export function AnteproyectoDetalle({
+  anteproyecto,
+  onAnteproyectoChange,
+}: {
+  anteproyecto: ProyectoDetalle | null;
+  /** Callback opcional para refrescar el row cuando un hijo (ej.
+   *  PlanoAnteproyecto al aplicar AI) muta columnas del proyecto. */
+  onAnteproyectoChange?: () => void | Promise<void>;
+}) {
   const [tareas, setTareas] = useState<ProyectoTarea[]>([]);
   const [dependencias, setDependencias] = useState<TareaDep[]>([]);
   const [pasos, setPasos] = useState<PasoRow[]>([]);
@@ -470,6 +478,9 @@ export function AnteproyectoDetalle({ anteproyecto }: { anteproyecto: ProyectoDe
         proyectoId={anteproyecto.id}
         empresaId={DILESA_EMPRESA_ID}
         empresaSlug="dilesa"
+        onAnalisisAplicado={() => {
+          void onAnteproyectoChange?.();
+        }}
       />
 
       {/* Ficha física + Costos estimados + Análisis derivado quedaron

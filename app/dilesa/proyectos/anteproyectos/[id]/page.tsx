@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
@@ -39,27 +39,36 @@ function Body() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  useEffect(() => {
+  const cargarAnteproyecto = useCallback(async () => {
     if (!id) return;
-    let activo = true;
-    void createSupabaseBrowserClient()
+    const { data } = await createSupabaseBrowserClient()
       .schema('dilesa')
       .from('proyectos')
       .select(PROYECTO_DETALLE_COLUMNAS)
       .eq('id', id)
       .eq('tipo', 'anteproyecto')
       .is('deleted_at', null)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!activo) return;
-        if (!data) setNotFound(true);
-        else setAnteproyecto(data as unknown as ProyectoDetalleType);
-        setLoading(false);
-      });
+      .maybeSingle();
+    if (!data) {
+      setNotFound(true);
+      setAnteproyecto(null);
+    } else {
+      setAnteproyecto(data as unknown as ProyectoDetalleType);
+    }
+    setLoading(false);
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    let activo = true;
+    void (async () => {
+      await cargarAnteproyecto();
+      if (!activo) return;
+    })();
     return () => {
       activo = false;
     };
-  }, [id]);
+  }, [id, cargarAnteproyecto]);
 
   return (
     <div>
@@ -78,7 +87,12 @@ function Body() {
           No se encontró el anteproyecto. Probablemente fue eliminado o convertido.
         </p>
       )}
-      {!loading && !notFound && anteproyecto && <AnteproyectoDetalle anteproyecto={anteproyecto} />}
+      {!loading && !notFound && anteproyecto && (
+        <AnteproyectoDetalle
+          anteproyecto={anteproyecto}
+          onAnteproyectoChange={cargarAnteproyecto}
+        />
+      )}
     </div>
   );
 }
