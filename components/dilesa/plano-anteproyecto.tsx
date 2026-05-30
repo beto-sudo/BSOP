@@ -586,7 +586,7 @@ function PlanoViewer({ empresaId, planoId }: { empresaId: string; planoId: strin
     if (!proxyUrl) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setBlobUrl(null);
-       
+
       setPdfBytes(null);
       setFetchErr(null);
       return;
@@ -612,7 +612,7 @@ function PlanoViewer({ empresaId, planoId }: { empresaId: string; planoId: strin
           URL.revokeObjectURL(urlLocal);
           return;
         }
-         
+
         setPdfBytes(buf);
 
         setBlobUrl(urlLocal);
