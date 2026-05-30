@@ -1,0 +1,302 @@
+'use client';
+
+/**
+ * PlanoAnteproyecto — versiones del plano del anteproyecto DILESA.
+ * Sprint 4D de `dilesa-proyectos-checklist-inline`.
+ *
+ * Beto: "en este paso aún no tenemos el plano oficial, así que aquí
+ * trabajamos con el plano del anteproyecto en el que puede haber
+ * varias iteraciones".
+ *
+ * Layout (stack vertical bajo el análisis financiero):
+ *   - Header: título + dropdown "Mostrando: versión N (vigente)" +
+ *     botón "+ Nueva versión".
+ *   - Card grande del plano seleccionado: archivos vía
+ *     `<FileAttachments entidad="proyecto_planos">`.
+ *   - Pie del card: descripción editable, fecha de subida, botón
+ *     "Marcar vigente" (si no lo es) y "Eliminar versión" (soft
+ *     delete; sale el unique vigente cuando aplica).
+ *
+ * Sprint 4E agregará el botón "Analizar con IA" sobre el plano
+ * vigente. Por ahora solo gestionamos versiones.
+ */
+
+import { useCallback, useEffect, useState, useTransition } from 'react';
+import { FileAttachments } from '@/components/file-attachments/file-attachments';
+import type { FileRole } from '@/components/file-attachments/types';
+import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import {
+  actualizarPlanoDescripcion,
+  crearPlanoVersion,
+  eliminarPlanoVersion,
+  marcarPlanoVigente,
+} from '@/app/dilesa/proyectos/anteproyectos/planos-actions';
+
+export type PlanoVersionRow = {
+  id: string;
+  version: number;
+  descripcion: string | null;
+  vigente: boolean;
+  created_at: string;
+};
+
+const fechaFmt = new Intl.DateTimeFormat('es-MX', {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+});
+
+function fmtFecha(iso: string): string {
+  return fechaFmt.format(new Date(iso));
+}
+
+const PLANO_ROLES: FileRole[] = [{ id: 'plano', label: 'Plano' }];
+
+export function PlanoAnteproyecto({
+  proyectoId,
+  empresaId,
+  empresaSlug,
+}: {
+  proyectoId: string;
+  empresaId: string;
+  empresaSlug: string;
+}) {
+  const [planos, setPlanos] = useState<PlanoVersionRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const [editingDescId, setEditingDescId] = useState<string | null>(null);
+  const [descDraft, setDescDraft] = useState('');
+
+  const cargar = useCallback(async () => {
+    setLoading(true);
+    const supabase = createSupabaseBrowserClient();
+    const { data, error: err } = await supabase
+      .schema('dilesa')
+      .from('proyecto_planos')
+      .select('id, version, descripcion, vigente, created_at')
+      .eq('proyecto_id', proyectoId)
+      .is('deleted_at', null)
+      .order('version', { ascending: false });
+    if (err) {
+      setError(err.message);
+      setPlanos([]);
+    } else {
+      const rows = (data ?? []) as PlanoVersionRow[];
+      setPlanos(rows);
+      // Selección por default: el vigente, sino el más reciente.
+      const vigente = rows.find((p) => p.vigente);
+      setSelectedId((prev) => prev ?? vigente?.id ?? rows[0]?.id ?? null);
+    }
+    setLoading(false);
+  }, [proyectoId]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void cargar();
+  }, [cargar]);
+
+  const handleNuevaVersion = () => {
+    setError(null);
+    startTransition(async () => {
+      const r = await crearPlanoVersion(proyectoId, null);
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
+      await cargar();
+      setSelectedId(r.id);
+    });
+  };
+
+  const handleMarcarVigente = (planoId: string) => {
+    setError(null);
+    startTransition(async () => {
+      const r = await marcarPlanoVigente(planoId);
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
+      await cargar();
+    });
+  };
+
+  const handleEliminar = (planoId: string) => {
+    if (!confirm('¿Eliminar esta versión del plano? Los archivos seguirán en histórico.')) return;
+    setError(null);
+    startTransition(async () => {
+      const r = await eliminarPlanoVersion(planoId);
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
+      // Si era el seleccionado, deseleccionar.
+      if (selectedId === planoId) setSelectedId(null);
+      await cargar();
+    });
+  };
+
+  const startEditingDesc = (plano: PlanoVersionRow) => {
+    setEditingDescId(plano.id);
+    setDescDraft(plano.descripcion ?? '');
+  };
+  const commitDesc = (planoId: string) => {
+    const original = planos.find((p) => p.id === planoId)?.descripcion ?? '';
+    if (descDraft === original) {
+      setEditingDescId(null);
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      const r = await actualizarPlanoDescripcion(planoId, descDraft);
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
+      setEditingDescId(null);
+      await cargar();
+    });
+  };
+
+  const selected = planos.find((p) => p.id === selectedId) ?? null;
+
+  return (
+    <section
+      aria-label="Plano del anteproyecto"
+      className="rounded-md border border-[var(--border)] bg-[var(--bg)]"
+    >
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-2">
+        <div className="flex items-center gap-3">
+          <h3 className="text-sm font-semibold text-[var(--text)]">Plano del anteproyecto</h3>
+          {planos.length > 0 && (
+            <select
+              value={selectedId ?? ''}
+              onChange={(e) => setSelectedId(e.target.value || null)}
+              disabled={pending}
+              className="h-7 rounded-sm border border-[var(--border)] bg-[var(--card)] px-2 text-xs"
+              aria-label="Versión visible"
+            >
+              {planos.map((p) => (
+                <option key={p.id} value={p.id}>
+                  Versión {p.version}
+                  {p.vigente ? ' · vigente' : ''} · {fmtFecha(p.created_at)}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleNuevaVersion}
+            disabled={pending}
+            className="h-7 rounded-sm bg-[var(--accent)] px-3 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
+          >
+            + Nueva versión
+          </button>
+        </div>
+      </header>
+
+      <div className="p-3">
+        {loading ? (
+          <p className="text-xs text-[var(--muted-text)]">Cargando versiones…</p>
+        ) : planos.length === 0 ? (
+          <div className="rounded-md border border-dashed border-[var(--border)] bg-[var(--card)] p-6 text-center">
+            <p className="text-sm font-medium text-[var(--text)]">Sin plano todavía</p>
+            <p className="mt-1 text-xs text-[var(--muted-text)]">
+              Crea la primera versión y sube el plano (PDF o imagen). Cada iteración queda guardada
+              en histórico.
+            </p>
+          </div>
+        ) : !selected ? (
+          <p className="text-xs text-[var(--muted-text)]">
+            Ninguna versión seleccionada. Usa el selector arriba para elegir.
+          </p>
+        ) : (
+          <article className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-[var(--text)]">Versión {selected.version}</span>
+                {selected.vigente ? (
+                  <span className="inline-flex rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                    Vigente
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleMarcarVigente(selected.id)}
+                    disabled={pending}
+                    className="rounded-sm border border-[var(--border)] bg-[var(--card)] px-2 py-0.5 text-[11px] hover:bg-[var(--bg)] disabled:opacity-50"
+                  >
+                    Marcar vigente
+                  </button>
+                )}
+                <span className="text-[var(--muted-text)]">
+                  Subida {fmtFecha(selected.created_at)}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleEliminar(selected.id)}
+                disabled={pending}
+                className="text-[11px] text-red-600 hover:underline disabled:opacity-50"
+              >
+                Eliminar versión
+              </button>
+            </div>
+
+            <div>
+              {editingDescId === selected.id ? (
+                <textarea
+                  value={descDraft}
+                  onChange={(e) => setDescDraft(e.target.value)}
+                  onBlur={() => commitDesc(selected.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      setEditingDescId(null);
+                      setDescDraft(selected.descripcion ?? '');
+                    }
+                  }}
+                  autoFocus
+                  rows={2}
+                  placeholder="Describe esta iteración (ej. 'V2: ajuste de áreas verdes a 12% por feedback comité')"
+                  className="w-full rounded-sm border border-[var(--accent)] bg-[var(--bg)] p-2 text-xs focus:outline-none"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => startEditingDesc(selected)}
+                  disabled={pending}
+                  className="w-full rounded-sm border border-transparent px-2 py-1 text-left text-xs hover:border-[var(--border)] disabled:opacity-50"
+                >
+                  {selected.descripcion ? (
+                    <span className="text-[var(--text)]">{selected.descripcion}</span>
+                  ) : (
+                    <span className="text-[var(--muted-text)]">
+                      Click para describir esta iteración…
+                    </span>
+                  )}
+                </button>
+              )}
+            </div>
+
+            <FileAttachments
+              empresaId={empresaId}
+              empresaSlug={empresaSlug as 'dilesa' | 'rdb' | 'ansa' | 'coagan'}
+              entidad="proyecto_planos"
+              entidadId={selected.id}
+              roles={PLANO_ROLES}
+              defaultUploadRole="plano"
+              multiple={true}
+              accept=".pdf,.png,.jpg,.jpeg,.webp,.heic,.heif,.tiff"
+              variant="grouped"
+            />
+          </article>
+        )}
+
+        {error && <p className="mt-2 text-xs text-red-600/80">{error}</p>}
+      </div>
+    </section>
+  );
+}
