@@ -43,9 +43,10 @@ export const PlanoAiAnalisisSchema = z.object({
     ),
   lotes_proyectados: z
     .number()
-    .int()
     .default(0)
-    .describe('Cantidad total de lotes proyectados. 0 si no se puede determinar.'),
+    .describe(
+      'Cantidad total de lotes proyectados (entero). 0 si no se puede determinar. El consumer lo redondea a entero.'
+    ),
   tamano_lote_promedio_m2: z
     .number()
     .default(0)
@@ -99,7 +100,7 @@ export function normalizarAnalisis(raw: PlanoAiAnalisis): {
     area_vendible_m2: num(raw.area_vendible_m2),
     areas_verdes_m2: num(raw.areas_verdes_m2),
     area_vialidades_m2: num(raw.area_vialidades_m2),
-    lotes_proyectados: num(raw.lotes_proyectados),
+    lotes_proyectados: raw.lotes_proyectados > 0 ? Math.round(raw.lotes_proyectados) : null,
     tamano_lote_promedio_m2: num(raw.tamano_lote_promedio_m2),
     tipologia_principal: str(raw.tipologia_principal),
     observaciones: str(raw.observaciones),
