@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-28
-**Última actualización:** 2026-05-29 (Sprint 4A+4B+4C mergeados — autorización integrada en promoción, análisis financiero compacto con multiselect + selector prototipo, PDF imprimible del análisis)
+**Última actualización:** 2026-05-29 (Sprint 4A→4E mergeados — análisis AI con Claude vision sobre el plano vigente, con autopopulate del análisis financiero)
 
 ## Problema
 
@@ -328,6 +328,28 @@ los pasos por tarea estén estables en anteproyecto.)
   patrón existe y funciona (otros módulos ya lo usan).
 
 ## Bitácora
+
+- **2026-05-29 (Sprint 4E — análisis AI del plano)** — PR #588
+  mergeado. Botón "Analizar con IA" sobre el plano vigente. Claude
+  Opus 4.7 vision (via `@ai-sdk/anthropic` + `generateObject`) lee el
+  plano (PDF o imagen) y devuelve JSON estructurado: 6 métricas +
+  tipología + observaciones + recomendaciones + confianza. Output
+  guardado en `proyecto_planos.ai_analisis jsonb`. Server action
+  `aplicarAiAlAnalisisFinanciero` pre-llena los campos del proyecto
+  (sin machacar manuales). UI: sub-componente `<AiPanel>` con grid
+  de métricas + badge de confianza + recomendaciones + botón
+  aplicar. 2 fixes durante integración: (1) `ANTHROPIC_API_KEY`
+  faltaba en environment Preview; (2) Anthropic rechaza `min/max`
+  en schemas de `integer`, había que quitar `.int()` de zod y
+  redondear server-side.
+
+- **2026-05-29 (Sprint 4D — versiones del plano)** — PR #587
+  mergeado. Tabla `dilesa.proyecto_planos` con unique parcial
+  enforcing 1 vigente por proyecto + RPC `fn_marcar_plano_vigente`
+  atómico. 4 server actions (crear / marcar vigente / actualizar
+  desc / eliminar). Componente `<PlanoAnteproyecto>` con selector
+  de versiones, upload reusando `<FileAttachments>` ADR-022,
+  descripción editable inline.
 
 - **2026-05-29 (Sprint 4C — PDF del análisis financiero)** — PR #585
   mergeado. Nuevo endpoint `GET /api/dilesa/anteproyectos/[id]/analisis-pdf`
