@@ -18,6 +18,7 @@
  */
 
 import { useMemo, useState, useEffect, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { updateProyectoFields, setUnidadMuestra } from '@/app/dilesa/proyectos/actions';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { DataTable, type Column } from '@/components/module-page';
@@ -25,7 +26,7 @@ import { DetailDrawerSection } from '@/components/detail-page';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Search, Boxes } from 'lucide-react';
+import { Search, Boxes, HardHat } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 
 export type ProyectoDetalle = {
@@ -197,6 +198,47 @@ const UNIDAD_ESTADO_TONE: Record<string, BadgeTone> = {
   entregada: 'success',
 };
 
+// ─── Obras de construcción ────────────────────────────────────────────────────
+
+type ObraConstruccion = {
+  id: string;
+  codigo: string | null;
+  avance_pct: number;
+  estado: string;
+  mo_ejecutado: number | null;
+  valor_contrato_mo: number | null;
+  fecha_arranque: string | null;
+  contratista_id: string | null;
+  unidad_identificador: string;
+  contratista_nombre: string;
+};
+
+const OBRA_ESTADO_LABEL: Record<string, string> = {
+  arrancada: 'Arrancada',
+  en_progreso: 'En progreso',
+  terminada: 'Terminada',
+  dtu: 'DTU',
+  seguro_calidad: 'Seguro calidad',
+  extraida: 'Extraída',
+  cancelada: 'Cancelada',
+};
+
+const OBRA_ESTADO_TONE: Record<string, BadgeTone> = {
+  arrancada: 'info',
+  en_progreso: 'warning',
+  terminada: 'success',
+  dtu: 'success',
+  seguro_calidad: 'success',
+  extraida: 'success',
+  cancelada: 'neutral',
+};
+
+function avanceColor(pct: number): string {
+  if (pct < 20) return 'bg-red-500';
+  if (pct < 66) return 'bg-amber-500';
+  return 'bg-emerald-500';
+}
+
 // ─── Formato ──────────────────────────────────────────────────────────────────
 
 const numberFmt = new Intl.NumberFormat('es-MX');
@@ -236,6 +278,66 @@ function fmtFecha(s: string | null): string | null {
   if (isNaN(d.getTime())) return s;
   return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
 }
+
+const obraColumns: Column<ObraConstruccion>[] = [
+  {
+    key: 'unidad_identificador',
+    label: 'Unidad',
+    type: 'text',
+    sticky: true,
+    width: 'min-w-[130px]',
+  },
+  {
+    key: 'contratista_nombre',
+    label: 'Contratista',
+    type: 'text',
+    width: 'min-w-[120px]',
+    render: (o) => o.contratista_nombre,
+  },
+  {
+    key: 'avance_pct',
+    label: 'Avance',
+    type: 'custom',
+    width: 'min-w-[120px]',
+    accessor: (o) => o.avance_pct,
+    render: (o) => (
+      <div className="flex items-center gap-2">
+        <div className="h-2 w-16 overflow-hidden rounded-full bg-[var(--border)]">
+          <div
+            className={`h-full transition-all ${avanceColor(o.avance_pct)}`}
+            style={{ width: `${Math.min(100, Math.max(0, o.avance_pct))}%` }}
+          />
+        </div>
+        <span className="tabular-nums text-xs">{o.avance_pct.toFixed(1)}%</span>
+      </div>
+    ),
+  },
+  {
+    key: 'estado',
+    label: 'Estado',
+    type: 'custom',
+    accessor: (o) => o.estado,
+    render: (o) => (
+      <Badge tone={OBRA_ESTADO_TONE[o.estado] ?? 'neutral'}>
+        {OBRA_ESTADO_LABEL[o.estado] ?? o.estado}
+      </Badge>
+    ),
+  },
+  {
+    key: 'mo_ejecutado',
+    label: 'MO ejecutado',
+    type: 'custom',
+    accessor: (o) => o.mo_ejecutado ?? 0,
+    render: (o) => (o.mo_ejecutado != null ? moneyFmt.format(o.mo_ejecutado) : '—'),
+  },
+  {
+    key: 'fecha_arranque',
+    label: 'Arranque',
+    type: 'custom',
+    accessor: (o) => o.fecha_arranque ?? '',
+    render: (o) => fmtFecha(o.fecha_arranque) ?? '—',
+  },
+];
 
 function buildUnidadColumns(
   onToggleMuestra: (id: string, next: boolean) => void,
@@ -287,6 +389,7 @@ function buildUnidadColumns(
 // ─── Componente ───────────────────────────────────────────────────────────────
 
 export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null }) {
+  const router = useRouter();
   const [unidades, setUnidades] = useState<Unidad[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loadedId, setLoadedId] = useState<string | null>(null);
@@ -295,6 +398,7 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
   const [tipoFiltro, setTipoFiltro] = useState('');
   const [predecesorNombre, setPredecesorNombre] = useState<string | null>(null);
   const [avances, setAvances] = useState<ProyectoAvances | null>(null);
+  const [obras, setObras] = useState<ObraConstruccion[]>([]);
   // Campos editables (Sprint A paridad-coda)
   const [planoUrl, setPlanoUrl] = useState('');
   const [imageUrl, setImageUrl] = useState('');
@@ -369,6 +473,68 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
       .then(({ data }) => {
         if (!activo) return;
         setAvances((data as unknown as ProyectoAvances | null) ?? null);
+      });
+    // Carga obras de construcción del proyecto (Sprint 5 dilesa-construccion).
+    void supabase
+      .schema('dilesa')
+      .from('construccion')
+      .select(
+        'id, codigo, avance_pct, estado, mo_ejecutado, valor_contrato_mo, fecha_arranque, contratista_id, unidad:unidades!inner(identificador, proyecto_id)'
+      )
+      .eq('unidad.proyecto_id', proyecto.id)
+      .is('deleted_at', null)
+      .order('codigo')
+      .then(async ({ data, error: err }) => {
+        if (!activo) return;
+        if (err || !data || data.length === 0) {
+          setObras([]);
+          return;
+        }
+        const contratistaIds = [
+          ...new Set(
+            (data as unknown as Array<{ contratista_id: string | null }>)
+              .map((d) => d.contratista_id)
+              .filter(Boolean) as string[]
+          ),
+        ];
+        const nombres = new Map<string, string>();
+        if (contratistaIds.length > 0) {
+          const { data: personas } = await supabase
+            .schema('erp')
+            .from('personas')
+            .select('id, nombre, apellido_paterno, apellido_materno')
+            .in('id', contratistaIds);
+          if (personas) {
+            for (const p of personas as unknown as Array<{
+              id: string;
+              nombre: string;
+              apellido_paterno: string | null;
+              apellido_materno: string | null;
+            }>) {
+              nombres.set(
+                p.id,
+                [p.nombre, p.apellido_paterno, p.apellido_materno].filter(Boolean).join(' ')
+              );
+            }
+          }
+        }
+        if (!activo) return;
+        setObras(
+          (data as unknown as Array<Record<string, unknown>>).map((d) => ({
+            id: d.id as string,
+            codigo: d.codigo as string | null,
+            avance_pct: d.avance_pct as number,
+            estado: d.estado as string,
+            mo_ejecutado: d.mo_ejecutado as number | null,
+            valor_contrato_mo: d.valor_contrato_mo as number | null,
+            fecha_arranque: d.fecha_arranque as string | null,
+            contratista_id: d.contratista_id as string | null,
+            unidad_identificador: (d.unidad as Record<string, string>)?.identificador ?? '—',
+            contratista_nombre: d.contratista_id
+              ? (nombres.get(d.contratista_id as string) ?? '—')
+              : '—',
+          }))
+        );
       });
     // Sincroniza state local de campos editables con el proyecto actual.
     void Promise.resolve().then(() => {
@@ -590,6 +756,27 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
             <Stat label="Ticket promedio" value={fmtMoney(avances.ticket_promedio)} />
             <Stat label="Ventas totales" value={fmtMoney(avances.ventas_totales)} />
           </dl>
+        </DetailDrawerSection>
+      )}
+
+      {obras.length > 0 && (
+        <DetailDrawerSection
+          title="Obras de construcción"
+          description={`${obras.length} ${obras.length === 1 ? 'obra' : 'obras'}`}
+        >
+          <DataTable
+            data={obras}
+            columns={obraColumns}
+            rowKey="id"
+            onRowClick={(o) => router.push(`/dilesa/construccion/${o.id}`)}
+            sticky={{ header: false }}
+            showDensityToggle={false}
+            density="compact"
+            initialSort={{ key: 'avance_pct', dir: 'desc' }}
+            emptyTitle="Sin obras"
+            emptyDescription="Este proyecto no tiene obras de construcción."
+            emptyIcon={<HardHat className="h-6 w-6" />}
+          />
         </DetailDrawerSection>
       )}
 
