@@ -21,7 +21,7 @@
  * vigente. Por ahora solo gestionamos versiones.
  */
 
-import { useCallback, useEffect, useState, useTransition } from 'react';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { FileAttachments } from '@/components/file-attachments/file-attachments';
 import type { FileRole } from '@/components/file-attachments/types';
 import { useAdjuntos } from '@/components/file-attachments/use-adjuntos';
@@ -682,36 +682,144 @@ function PlanoViewer({ empresaId, planoId }: { empresaId: string; planoId: strin
           className="max-h-[70vh] w-full object-contain"
         />
       ) : isPdf ? (
-        // `<object>` es más permisivo que `<iframe>` para PDF inline en
-        // Chrome/Edge — los iframes a blob:URLs de PDF disparan
-        // "content blocked" en preview deployments por el sandbox del
-        // viewer interno. El children del <object> es fallback cuando
-        // el browser no puede renderizar el plugin.
-        <object
-          data={blobUrl}
-          type="application/pdf"
-          className="block h-[70vh] w-full"
-          aria-label={`Plano ${principal.nombre}`}
-        >
-          <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-xs text-[var(--muted-text)]">
-            <p>Tu navegador no puede mostrar el PDF embebido.</p>
-            {proxyUrl && (
-              <a
-                href={proxyUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[var(--accent)] hover:underline"
-              >
-                Abrir el plano en una pestaña nueva ↗
-              </a>
-            )}
-          </div>
-        </object>
+        // Renderizado client-side con pdfjs-dist (motor de Mozilla):
+        // el plugin nativo del browser fallaba con "content blocked"
+        // en preview deployments por la auth wall + restrictions del
+        // PDF viewer interno. Pdf.js no depende del plugin, dibuja
+        // sobre <canvas>.
+        <PdfCanvas blobUrl={blobUrl} fallbackUrl={proxyUrl ?? undefined} />
       ) : (
         <div className="p-4 text-xs text-[var(--muted-text)]">
           Tipo no soportado para preview ({mime || 'desconocido'}). Usa el link arriba para abrirlo.
         </div>
       )}
     </figure>
+  );
+}
+
+// ── PDF Canvas viewer (pdfjs-dist client-side) ───────────────────────────────
+
+function PdfCanvas({ blobUrl, fallbackUrl }: { blobUrl: string; fallbackUrl?: string }) {
+  const [numPages, setNumPages] = useState<number | null>(null);
+  const [pageIdx, setPageIdx] = useState(1); // 1-indexed
+  const [renderErr, setRenderErr] = useState<string | null>(null);
+  const [containerWidth, setContainerWidth] = useState(800);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Medir el ancho disponible para escalar la página al contenedor.
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const el = containerRef.current;
+    const update = () => setContainerWidth(el.clientWidth || 800);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Render del PDF en canvas. Dynamic import de pdfjs-dist para que no
+  // afecte el bundle inicial de la página — solo se carga cuando hay
+  // un PDF que renderizar.
+  useEffect(() => {
+    if (!blobUrl) return;
+    let cancelado = false;
+     
+    setRenderErr(null);
+
+    (async () => {
+      try {
+        const pdfjs = await import('pdfjs-dist');
+        // Worker via CDN del mismo módulo (vendoriza en Vercel).
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (pdfjs as any).GlobalWorkerOptions.workerSrc = new URL(
+          'pdfjs-dist/build/pdf.worker.min.mjs',
+          import.meta.url
+        ).toString();
+
+        const loadingTask = pdfjs.getDocument({ url: blobUrl });
+        const pdf = await loadingTask.promise;
+        if (cancelado) return;
+         
+        setNumPages(pdf.numPages);
+
+        const page = await pdf.getPage(pageIdx);
+        if (cancelado) return;
+
+        const baseViewport = page.getViewport({ scale: 1 });
+        const scale = containerWidth / baseViewport.width;
+        const viewport = page.getViewport({ scale });
+
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await page.render({ canvasContext: ctx as any, viewport, canvas } as any).promise;
+      } catch (e) {
+        if (!cancelado) {
+           
+          setRenderErr(e instanceof Error ? e.message : String(e));
+        }
+      }
+    })();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [blobUrl, pageIdx, containerWidth]);
+
+  return (
+    <div ref={containerRef} className="relative w-full">
+      {renderErr ? (
+        <div className="flex h-32 flex-col items-center justify-center gap-2 p-4 text-xs text-red-600/80">
+          <span>No se pudo renderizar el PDF: {renderErr}</span>
+          {fallbackUrl && (
+            <a
+              href={fallbackUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[var(--accent)] hover:underline"
+            >
+              Abrir en pestaña nueva ↗
+            </a>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className="max-h-[70vh] w-full overflow-auto bg-neutral-100">
+            <canvas ref={canvasRef} className="block" />
+          </div>
+          {numPages != null && numPages > 1 && (
+            <div className="flex items-center justify-center gap-3 border-t border-[var(--border)] bg-[var(--bg)] py-1 text-[11px]">
+              <button
+                type="button"
+                onClick={() => setPageIdx((p) => Math.max(1, p - 1))}
+                disabled={pageIdx <= 1}
+                className="rounded-sm border border-[var(--border)] bg-[var(--card)] px-2 py-0.5 disabled:opacity-40"
+                aria-label="Página anterior"
+              >
+                ←
+              </button>
+              <span className="tabular-nums text-[var(--muted-text)]">
+                Página {pageIdx} de {numPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPageIdx((p) => Math.min(numPages, p + 1))}
+                disabled={pageIdx >= numPages}
+                className="rounded-sm border border-[var(--border)] bg-[var(--card)] px-2 py-0.5 disabled:opacity-40"
+                aria-label="Página siguiente"
+              >
+                →
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }
