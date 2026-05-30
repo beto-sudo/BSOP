@@ -559,13 +559,64 @@ function mimeFromName(name: string, declared: string | null | undefined): string
 
 function PlanoViewer({ empresaId, planoId }: { empresaId: string; planoId: string }) {
   // Reutiliza el hook canónico de FileAttachments para no duplicar la
-  // lógica de fetch + RLS. El componente FileAttachments hace su propio
-  // fetch debajo, pero el costo es despreciable y mantiene encapsulado.
+  // lógica de fetch + RLS.
   const { adjuntos, loading } = useAdjuntos({
     empresaId,
     entidadTipo: 'proyecto_plano',
     entidadId: planoId,
   });
+
+  // Tomamos el adjunto más reciente como "principal" del plano (mismo
+  // criterio que usa el endpoint analizar-ai).
+  const principal = adjuntos.length
+    ? [...adjuntos].sort((a, b) => b.created_at.localeCompare(a.created_at))[0]
+    : null;
+  const proxyUrl = principal ? getAdjuntoProxyUrl(principal.url) : null;
+
+  // Bajamos el archivo via fetch y lo mostramos con blob URL. La SSO
+  // wall de Vercel preview bloquea iframes/imgs anidados directamente
+  // al /api/adjuntos/ con "refused to connect". El fetch sí transmite
+  // las credenciales same-origin; el resultado se muestra desde un
+  // blob:URL local que ya no pasa por la auth wall.
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [fetchErr, setFetchErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!proxyUrl) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setBlobUrl(null);
+       
+      setFetchErr(null);
+      return;
+    }
+    let cancelado = false;
+    let urlLocal: string | null = null;
+     
+    setFetchErr(null);
+    void (async () => {
+      try {
+        const res = await fetch(proxyUrl, { credentials: 'same-origin' });
+        if (!res.ok) {
+          if (!cancelado) setFetchErr(`HTTP ${res.status}`);
+          return;
+        }
+        const blob = await res.blob();
+        urlLocal = URL.createObjectURL(blob);
+        if (cancelado) {
+          URL.revokeObjectURL(urlLocal);
+          return;
+        }
+         
+        setBlobUrl(urlLocal);
+      } catch (e) {
+        if (!cancelado) setFetchErr(e instanceof Error ? e.message : String(e));
+      }
+    })();
+    return () => {
+      cancelado = true;
+      if (urlLocal) URL.revokeObjectURL(urlLocal);
+    };
+  }, [proxyUrl]);
 
   if (loading) {
     return (
@@ -574,7 +625,7 @@ function PlanoViewer({ empresaId, planoId }: { empresaId: string; planoId: strin
       </div>
     );
   }
-  if (adjuntos.length === 0) {
+  if (!principal) {
     return (
       <div className="flex h-32 items-center justify-center rounded-md border border-dashed border-[var(--border)] bg-[var(--card)] text-xs text-[var(--muted-text)]">
         Sube un archivo abajo para ver el plano aquí.
@@ -582,11 +633,7 @@ function PlanoViewer({ empresaId, planoId }: { empresaId: string; planoId: strin
     );
   }
 
-  // Tomamos el adjunto más reciente como "principal" del plano (mismo
-  // criterio que usa el endpoint analizar-ai).
-  const principal = [...adjuntos].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
   const mime = mimeFromName(principal.nombre, principal.tipo_mime);
-  const proxyUrl = getAdjuntoProxyUrl(principal.url);
   const isImage = mime.startsWith('image/');
   const isPdf = mime === 'application/pdf';
   const unsupportedImage = mime === 'image/heic' || mime === 'image/heif' || mime === 'image/tiff';
@@ -608,25 +655,35 @@ function PlanoViewer({ empresaId, planoId }: { empresaId: string; planoId: strin
         <span className="truncate" title={principal.nombre}>
           {principal.nombre}
         </span>
-        <a
-          href={proxyUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="ml-2 shrink-0 hover:underline"
-        >
-          Abrir en pestaña ↗
-        </a>
+        {proxyUrl && (
+          <a
+            href={proxyUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-2 shrink-0 hover:underline"
+          >
+            Abrir en pestaña ↗
+          </a>
+        )}
       </div>
-      {isImage ? (
+      {fetchErr ? (
+        <div className="p-4 text-xs text-red-600/80">
+          No se pudo cargar el preview: {fetchErr}. Usa el link arriba para abrirlo.
+        </div>
+      ) : !blobUrl ? (
+        <div className="flex h-32 items-center justify-center text-xs text-[var(--muted-text)]">
+          Cargando archivo…
+        </div>
+      ) : isImage ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={proxyUrl}
+          src={blobUrl}
           alt={`Plano ${principal.nombre}`}
           className="max-h-[70vh] w-full object-contain"
         />
       ) : isPdf ? (
         <iframe
-          src={proxyUrl}
+          src={blobUrl}
           title={`Plano ${principal.nombre}`}
           className="h-[70vh] w-full border-0"
         />
