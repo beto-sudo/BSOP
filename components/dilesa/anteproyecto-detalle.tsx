@@ -132,6 +132,12 @@ type ProductoCatalogo = {
   nombre: string;
   proyecto_nombre: string | null;
   valor_comercial_referencia: number | null;
+  costo_urbanizacion_referencia: number | null;
+  costo_materiales_referencia: number | null;
+  costo_mo_referencia: number | null;
+  registro_ruv_referencia: number | null;
+  seguro_calidad_referencia: number | null;
+  costo_comercializacion_referencia: number | null;
 };
 
 /**
@@ -257,7 +263,7 @@ export function AnteproyectoDetalle({
       .schema('dilesa')
       .from('productos')
       .select(
-        'id, nombre, valor_comercial_referencia, proyecto:proyectos!productos_proyecto_id_fkey(nombre)'
+        'id, nombre, valor_comercial_referencia, costo_urbanizacion_referencia, costo_materiales_referencia, costo_mo_referencia, registro_ruv_referencia, seguro_calidad_referencia, costo_comercializacion_referencia, proyecto:proyectos!productos_proyecto_id_fkey(nombre)'
       )
       .eq('empresa_id', DILESA_EMPRESA_ID)
       .is('deleted_at', null)
@@ -269,6 +275,12 @@ export function AnteproyectoDetalle({
             id: string;
             nombre: string;
             valor_comercial_referencia: number | null;
+            costo_urbanizacion_referencia: number | null;
+            costo_materiales_referencia: number | null;
+            costo_mo_referencia: number | null;
+            registro_ruv_referencia: number | null;
+            seguro_calidad_referencia: number | null;
+            costo_comercializacion_referencia: number | null;
             proyecto: { nombre: string } | null;
           }>
         ).map((p) => ({
@@ -276,6 +288,12 @@ export function AnteproyectoDetalle({
           nombre: p.nombre,
           proyecto_nombre: p.proyecto?.nombre ?? null,
           valor_comercial_referencia: p.valor_comercial_referencia,
+          costo_urbanizacion_referencia: p.costo_urbanizacion_referencia,
+          costo_materiales_referencia: p.costo_materiales_referencia,
+          costo_mo_referencia: p.costo_mo_referencia,
+          registro_ruv_referencia: p.registro_ruv_referencia,
+          seguro_calidad_referencia: p.seguro_calidad_referencia,
+          costo_comercializacion_referencia: p.costo_comercializacion_referencia,
         }));
         setProductosCatalogo(norm);
       });

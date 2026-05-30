@@ -191,6 +191,12 @@ type ProductoOption = {
   nombre: string;
   proyecto_nombre: string | null;
   valor_comercial_referencia: number | null;
+  costo_urbanizacion_referencia: number | null;
+  costo_materiales_referencia: number | null;
+  costo_mo_referencia: number | null;
+  registro_ruv_referencia: number | null;
+  seguro_calidad_referencia: number | null;
+  costo_comercializacion_referencia: number | null;
 };
 
 function PrototipoReferenciaSelect({
@@ -383,8 +389,19 @@ export function AnteproyectoAnalisisFinanciero({
       setLocal((prev) => {
         const proto = productosDisponibles.find((p) => p.id === productoId);
         const next = { ...prev, prototipo_referencia_id: productoId };
-        if (proto && proto.valor_comercial_referencia != null) {
-          next.valor_comercial_referencia = proto.valor_comercial_referencia;
+        if (proto) {
+          const refFields = [
+            ['valor_comercial_referencia', 'valor_comercial_referencia'],
+            ['costo_urbanizacion_referencia', 'costo_urbanizacion_referencia'],
+            ['costo_materiales_referencia', 'costo_materiales_referencia'],
+            ['costo_mo_referencia', 'costo_mo_referencia'],
+            ['registro_ruv_referencia', 'registro_ruv_referencia'],
+            ['seguro_calidad_referencia', 'seguro_calidad_referencia'],
+            ['costo_comercializacion_referencia', 'costo_comercializacion_referencia'],
+          ] as const;
+          for (const [src, dst] of refFields) {
+            if (proto[src] != null) (next as Record<string, unknown>)[dst] = proto[src];
+          }
         }
         return next;
       });
@@ -396,6 +413,12 @@ export function AnteproyectoAnalisisFinanciero({
             ...prev,
             prototipo_referencia_id: snapshot.prototipo_referencia_id,
             valor_comercial_referencia: snapshot.valor_comercial_referencia,
+            costo_urbanizacion_referencia: snapshot.costo_urbanizacion_referencia,
+            costo_materiales_referencia: snapshot.costo_materiales_referencia,
+            costo_mo_referencia: snapshot.costo_mo_referencia,
+            registro_ruv_referencia: snapshot.registro_ruv_referencia,
+            seguro_calidad_referencia: snapshot.seguro_calidad_referencia,
+            costo_comercializacion_referencia: snapshot.costo_comercializacion_referencia,
           }));
         } else {
           onChange?.();
@@ -408,6 +431,12 @@ export function AnteproyectoAnalisisFinanciero({
       productosDisponibles,
       snapshot.prototipo_referencia_id,
       snapshot.valor_comercial_referencia,
+      snapshot.costo_urbanizacion_referencia,
+      snapshot.costo_materiales_referencia,
+      snapshot.costo_mo_referencia,
+      snapshot.registro_ruv_referencia,
+      snapshot.seguro_calidad_referencia,
+      snapshot.costo_comercializacion_referencia,
     ]
   );
 
