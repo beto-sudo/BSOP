@@ -21,9 +21,11 @@
  * vigente. Por ahora solo gestionamos versiones.
  */
 
-import { useCallback, useEffect, useState, useTransition } from 'react';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { FileAttachments } from '@/components/file-attachments/file-attachments';
 import type { FileRole } from '@/components/file-attachments/types';
+import { useAdjuntos } from '@/components/file-attachments/use-adjuntos';
+import { getAdjuntoProxyUrl } from '@/lib/adjuntos';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import {
   actualizarPlanoDescripcion,
@@ -348,6 +350,8 @@ export function PlanoAnteproyecto({
               )}
             </div>
 
+            <PlanoViewer empresaId={empresaId} planoId={selected.id} />
+
             <FileAttachments
               empresaId={empresaId}
               empresaSlug={empresaSlug as 'dilesa' | 'rdb' | 'ansa' | 'coagan'}
@@ -524,6 +528,312 @@ function KV({ k, v }: { k: string; v: string }) {
     <div className="flex flex-col">
       <span className="text-[10px] uppercase tracking-wide text-[var(--muted-text)]">{k}</span>
       <span className="text-xs font-semibold tabular-nums text-[var(--text)]">{v}</span>
+    </div>
+  );
+}
+
+// ── Viewer del plano (imagen o PDF embebido) ─────────────────────────────────
+
+function mimeFromName(name: string, declared: string | null | undefined): string {
+  if (declared && declared.length > 0) return declared;
+  const ext = name.toLowerCase().split('.').pop() ?? '';
+  switch (ext) {
+    case 'pdf':
+      return 'application/pdf';
+    case 'png':
+      return 'image/png';
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'webp':
+      return 'image/webp';
+    case 'heic':
+    case 'heif':
+      return 'image/heic';
+    case 'tiff':
+      return 'image/tiff';
+    default:
+      return '';
+  }
+}
+
+function PlanoViewer({ empresaId, planoId }: { empresaId: string; planoId: string }) {
+  // Reutiliza el hook canónico de FileAttachments para no duplicar la
+  // lógica de fetch + RLS.
+  const { adjuntos, loading } = useAdjuntos({
+    empresaId,
+    entidadTipo: 'proyecto_plano',
+    entidadId: planoId,
+  });
+
+  // Tomamos el adjunto más reciente como "principal" del plano (mismo
+  // criterio que usa el endpoint analizar-ai).
+  const principal = adjuntos.length
+    ? [...adjuntos].sort((a, b) => b.created_at.localeCompare(a.created_at))[0]
+    : null;
+  const proxyUrl = principal ? getAdjuntoProxyUrl(principal.url) : null;
+
+  // Bajamos el archivo via fetch y lo mostramos con blob URL. La SSO
+  // wall de Vercel preview bloquea iframes/imgs anidados directamente
+  // al /api/adjuntos/ con "refused to connect". El fetch sí transmite
+  // las credenciales same-origin; el resultado se muestra desde un
+  // blob:URL local que ya no pasa por la auth wall.
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [pdfBytes, setPdfBytes] = useState<Uint8Array | null>(null);
+  const [fetchErr, setFetchErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!proxyUrl) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setBlobUrl(null);
+
+      setPdfBytes(null);
+      setFetchErr(null);
+      return;
+    }
+    let cancelado = false;
+    let urlLocal: string | null = null;
+
+    setFetchErr(null);
+    void (async () => {
+      try {
+        const res = await fetch(proxyUrl, { credentials: 'same-origin' });
+        if (!res.ok) {
+          if (!cancelado) setFetchErr(`HTTP ${res.status}`);
+          return;
+        }
+        const blob = await res.blob();
+        // PDF: guardamos los bytes para pasarlos directo al canvas
+        // (evita un segundo fetch desde el canvas component que falla
+        // por race con revokeObjectURL).
+        const buf = new Uint8Array(await blob.slice().arrayBuffer());
+        urlLocal = URL.createObjectURL(blob);
+        if (cancelado) {
+          URL.revokeObjectURL(urlLocal);
+          return;
+        }
+
+        setPdfBytes(buf);
+
+        setBlobUrl(urlLocal);
+      } catch (e) {
+        if (!cancelado) setFetchErr(e instanceof Error ? e.message : String(e));
+      }
+    })();
+    return () => {
+      cancelado = true;
+      if (urlLocal) URL.revokeObjectURL(urlLocal);
+    };
+  }, [proxyUrl]);
+
+  if (loading) {
+    return (
+      <div className="flex h-32 items-center justify-center rounded-md border border-dashed border-[var(--border)] bg-[var(--card)] text-xs text-[var(--muted-text)]">
+        Cargando preview…
+      </div>
+    );
+  }
+  if (!principal) {
+    return (
+      <div className="flex h-32 items-center justify-center rounded-md border border-dashed border-[var(--border)] bg-[var(--card)] text-xs text-[var(--muted-text)]">
+        Sube un archivo abajo para ver el plano aquí.
+      </div>
+    );
+  }
+
+  const mime = mimeFromName(principal.nombre, principal.tipo_mime);
+  const isImage = mime.startsWith('image/');
+  const isPdf = mime === 'application/pdf';
+  const unsupportedImage = mime === 'image/heic' || mime === 'image/heif' || mime === 'image/tiff';
+
+  if (unsupportedImage) {
+    return (
+      <div className="flex h-32 flex-col items-center justify-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 text-xs text-amber-800">
+        <span>
+          El formato {mime} no se puede mostrar embebido. Descarga el archivo desde la lista de
+          abajo para verlo.
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <figure className="overflow-hidden rounded-md border border-[var(--border)] bg-[var(--card)]">
+      <div className="flex items-center justify-between border-b border-[var(--border)] px-2 py-1 text-[10px] text-[var(--muted-text)]">
+        <span className="truncate" title={principal.nombre}>
+          {principal.nombre}
+        </span>
+        {proxyUrl && (
+          <a
+            href={proxyUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-2 shrink-0 hover:underline"
+          >
+            Abrir en pestaña ↗
+          </a>
+        )}
+      </div>
+      {fetchErr ? (
+        <div className="p-4 text-xs text-red-600/80">
+          No se pudo cargar el preview: {fetchErr}. Usa el link arriba para abrirlo.
+        </div>
+      ) : !blobUrl ? (
+        <div className="flex h-32 items-center justify-center text-xs text-[var(--muted-text)]">
+          Cargando archivo…
+        </div>
+      ) : isImage ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={blobUrl}
+          alt={`Plano ${principal.nombre}`}
+          className="max-h-[70vh] w-full object-contain"
+        />
+      ) : isPdf ? (
+        // Renderizado client-side con pdfjs-dist (motor de Mozilla):
+        // el plugin nativo del browser fallaba con "content blocked"
+        // en preview deployments por la auth wall + restrictions del
+        // PDF viewer interno. Pdf.js no depende del plugin, dibuja
+        // sobre <canvas>.
+        <PdfCanvas bytes={pdfBytes} fallbackUrl={proxyUrl ?? undefined} />
+      ) : (
+        <div className="p-4 text-xs text-[var(--muted-text)]">
+          Tipo no soportado para preview ({mime || 'desconocido'}). Usa el link arriba para abrirlo.
+        </div>
+      )}
+    </figure>
+  );
+}
+
+// ── PDF Canvas viewer (pdfjs-dist client-side) ───────────────────────────────
+
+function PdfCanvas({ bytes, fallbackUrl }: { bytes: Uint8Array | null; fallbackUrl?: string }) {
+  const [numPages, setNumPages] = useState<number | null>(null);
+  const [pageIdx, setPageIdx] = useState(1); // 1-indexed
+  const [renderErr, setRenderErr] = useState<string | null>(null);
+  const [containerWidth, setContainerWidth] = useState(800);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Medir el ancho disponible para escalar la página al contenedor.
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const el = containerRef.current;
+    const update = () => setContainerWidth(el.clientWidth || 800);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Render del PDF en canvas. Dynamic import de pdfjs-dist para que no
+  // afecte el bundle inicial de la página — solo se carga cuando hay
+  // un PDF que renderizar.
+  useEffect(() => {
+    if (!bytes || bytes.byteLength === 0) return;
+    let cancelado = false;
+
+    setRenderErr(null);
+
+    (async () => {
+      try {
+        const pdfjs = await import('pdfjs-dist');
+        // Worker via CDN del mismo módulo (vendoriza en Vercel).
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (pdfjs as any).GlobalWorkerOptions.workerSrc = new URL(
+          'pdfjs-dist/build/pdf.worker.min.mjs',
+          import.meta.url
+        ).toString();
+
+        // Pasamos los bytes directo (recibidos como prop del padre,
+        // sin re-fetch). El web worker de pdfjs los recibe vía
+        // postMessage sin hacer red — evita race con el blob URL
+        // que cuando se hacía fetch desde aquí daba "Failed to fetch".
+        // Cloneamos a Uint8Array porque pdfjs muta/transfiere el
+        // buffer; mantener la prop intacta evita inválidos en re-render.
+        const data = new Uint8Array(bytes);
+        const loadingTask = pdfjs.getDocument({ data });
+        const pdf = await loadingTask.promise;
+        if (cancelado) return;
+
+        setNumPages(pdf.numPages);
+
+        const page = await pdf.getPage(pageIdx);
+        if (cancelado) return;
+
+        const baseViewport = page.getViewport({ scale: 1 });
+        const scale = containerWidth / baseViewport.width;
+        const viewport = page.getViewport({ scale });
+
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await page.render({ canvasContext: ctx as any, viewport, canvas } as any).promise;
+      } catch (e) {
+        if (!cancelado) {
+          setRenderErr(e instanceof Error ? e.message : String(e));
+        }
+      }
+    })();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [bytes, pageIdx, containerWidth]);
+
+  return (
+    <div ref={containerRef} className="relative w-full">
+      {renderErr ? (
+        <div className="flex h-32 flex-col items-center justify-center gap-2 p-4 text-xs text-red-600/80">
+          <span>No se pudo renderizar el PDF: {renderErr}</span>
+          {fallbackUrl && (
+            <a
+              href={fallbackUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[var(--accent)] hover:underline"
+            >
+              Abrir en pestaña nueva ↗
+            </a>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className="max-h-[70vh] w-full overflow-auto bg-neutral-100">
+            <canvas ref={canvasRef} className="block" />
+          </div>
+          {numPages != null && numPages > 1 && (
+            <div className="flex items-center justify-center gap-3 border-t border-[var(--border)] bg-[var(--bg)] py-1 text-[11px]">
+              <button
+                type="button"
+                onClick={() => setPageIdx((p) => Math.max(1, p - 1))}
+                disabled={pageIdx <= 1}
+                className="rounded-sm border border-[var(--border)] bg-[var(--card)] px-2 py-0.5 disabled:opacity-40"
+                aria-label="Página anterior"
+              >
+                ←
+              </button>
+              <span className="tabular-nums text-[var(--muted-text)]">
+                Página {pageIdx} de {numPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPageIdx((p) => Math.min(numPages, p + 1))}
+                disabled={pageIdx >= numPages}
+                className="rounded-sm border border-[var(--border)] bg-[var(--card)] px-2 py-0.5 disabled:opacity-40"
+                aria-label="Página siguiente"
+              >
+                →
+              </button>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
