@@ -4,16 +4,13 @@
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa` (8 tablas nuevas + extender `productos`),
 `erp` (extender `personas.tipo` con `'contratista'`)
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-05-24
-**Última actualización:** 2026-05-25 (Sprint 4 refactor post-Coda-review:
-colapsado a 2 forms reales. El standalone "Arrancar construcción"
-quedó borrado; el form combinado `/contratos/nuevo` ahora crea
-contrato + arranca N lotes en una sola operación. MO por tarea pasa
-a ser derivado vía vista SQL `v_construccion_tareas_terminadas_con_mo`
-(no se captura en UI). Sprint 5 — integración con ventas + cierre —
-pendiente.)
+**Última actualización:** 2026-05-30 (Sprint 5 cerrado — vista de obras
+de construcción en detalle del proyecto + cierre de iniciativa. Trigger
+"20% → disponible" activo en prod, form de ventas consume
+`en_construccion`/`terminada` con producto_id.)
 
 ## Problema
 
@@ -613,3 +610,31 @@ porcentaje_costo / 100)`. SECURITY INVOKER para respetar RLS. Vista
      número esperado.
 - Cleanup opcional: borrar slug deprecado `dilesa.construccion.arrancar`
   de `core.modulos` si quiere mantener DB limpia.
+
+### 2026-05-30 — Sprint 5 (integración con ventas + cierre)
+
+**PR:** [#593](https://github.com/beto-sudo/BSOP/pull/593)
+
+**Cambios:**
+
+- Sección "Obras de construcción" en `components/dilesa/proyecto-detalle.tsx`:
+  tabla compacta con barra de avance coloreada (rojo <20%, ámbar 20-66%,
+  verde ≥66%), contratista, estado, MO ejecutado, fecha de arranque.
+  Click en fila navega a `/dilesa/construccion/[id]`.
+- Datos: `dilesa.construccion` con embed `!inner` a `unidades` filtrado
+  por `proyecto_id` + lookup de contratistas en `erp.personas`.
+- Sección solo se muestra si el proyecto tiene obras (proyectos sin
+  construcción, como anteproyectos, no la ven).
+
+**Verificación de items del Sprint 5 (planning):**
+
+| Item                                  | Estado                                                                   |
+| ------------------------------------- | ------------------------------------------------------------------------ |
+| Trigger "20% → disponible" end-to-end | ✅ Activo desde migración `20260525202809`                               |
+| Form de ventas muestra prototipo      | ✅ `ventas/nueva` filtra `en_construccion`+`terminada` con `producto_id` |
+| Vista global de avance por proyecto   | ✅ PR #593                                                               |
+| Reabrir Sprint 7c de ventas           | ✅ Sprint 7c-2 (KYC/FICU) mergeado en PR #554                            |
+
+**Cierre de iniciativa:** todos los 5 sprints planificados completados.
+Fuera de alcance v1 documentado en planning (Gantt, comisiones, adjuntos
+por tarea, integración CapEx, notificaciones, app móvil).
