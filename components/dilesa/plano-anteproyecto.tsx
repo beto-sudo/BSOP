@@ -24,6 +24,8 @@
 import { useCallback, useEffect, useState, useTransition } from 'react';
 import { FileAttachments } from '@/components/file-attachments/file-attachments';
 import type { FileRole } from '@/components/file-attachments/types';
+import { useAdjuntos } from '@/components/file-attachments/use-adjuntos';
+import { getAdjuntoProxyUrl } from '@/lib/adjuntos';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import {
   actualizarPlanoDescripcion,
@@ -348,6 +350,8 @@ export function PlanoAnteproyecto({
               )}
             </div>
 
+            <PlanoViewer empresaId={empresaId} planoId={selected.id} />
+
             <FileAttachments
               empresaId={empresaId}
               empresaSlug={empresaSlug as 'dilesa' | 'rdb' | 'ansa' | 'coagan'}
@@ -525,5 +529,112 @@ function KV({ k, v }: { k: string; v: string }) {
       <span className="text-[10px] uppercase tracking-wide text-[var(--muted-text)]">{k}</span>
       <span className="text-xs font-semibold tabular-nums text-[var(--text)]">{v}</span>
     </div>
+  );
+}
+
+// ── Viewer del plano (imagen o PDF embebido) ─────────────────────────────────
+
+function mimeFromName(name: string, declared: string | null | undefined): string {
+  if (declared && declared.length > 0) return declared;
+  const ext = name.toLowerCase().split('.').pop() ?? '';
+  switch (ext) {
+    case 'pdf':
+      return 'application/pdf';
+    case 'png':
+      return 'image/png';
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'webp':
+      return 'image/webp';
+    case 'heic':
+    case 'heif':
+      return 'image/heic';
+    case 'tiff':
+      return 'image/tiff';
+    default:
+      return '';
+  }
+}
+
+function PlanoViewer({ empresaId, planoId }: { empresaId: string; planoId: string }) {
+  // Reutiliza el hook canónico de FileAttachments para no duplicar la
+  // lógica de fetch + RLS. El componente FileAttachments hace su propio
+  // fetch debajo, pero el costo es despreciable y mantiene encapsulado.
+  const { adjuntos, loading } = useAdjuntos({
+    empresaId,
+    entidadTipo: 'proyecto_plano',
+    entidadId: planoId,
+  });
+
+  if (loading) {
+    return (
+      <div className="flex h-32 items-center justify-center rounded-md border border-dashed border-[var(--border)] bg-[var(--card)] text-xs text-[var(--muted-text)]">
+        Cargando preview…
+      </div>
+    );
+  }
+  if (adjuntos.length === 0) {
+    return (
+      <div className="flex h-32 items-center justify-center rounded-md border border-dashed border-[var(--border)] bg-[var(--card)] text-xs text-[var(--muted-text)]">
+        Sube un archivo abajo para ver el plano aquí.
+      </div>
+    );
+  }
+
+  // Tomamos el adjunto más reciente como "principal" del plano (mismo
+  // criterio que usa el endpoint analizar-ai).
+  const principal = [...adjuntos].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+  const mime = mimeFromName(principal.nombre, principal.tipo_mime);
+  const proxyUrl = getAdjuntoProxyUrl(principal.url);
+  const isImage = mime.startsWith('image/');
+  const isPdf = mime === 'application/pdf';
+  const unsupportedImage = mime === 'image/heic' || mime === 'image/heif' || mime === 'image/tiff';
+
+  if (unsupportedImage) {
+    return (
+      <div className="flex h-32 flex-col items-center justify-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 text-xs text-amber-800">
+        <span>
+          El formato {mime} no se puede mostrar embebido. Descarga el archivo desde la lista de
+          abajo para verlo.
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <figure className="overflow-hidden rounded-md border border-[var(--border)] bg-[var(--card)]">
+      <div className="flex items-center justify-between border-b border-[var(--border)] px-2 py-1 text-[10px] text-[var(--muted-text)]">
+        <span className="truncate" title={principal.nombre}>
+          {principal.nombre}
+        </span>
+        <a
+          href={proxyUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="ml-2 shrink-0 hover:underline"
+        >
+          Abrir en pestaña ↗
+        </a>
+      </div>
+      {isImage ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={proxyUrl}
+          alt={`Plano ${principal.nombre}`}
+          className="max-h-[70vh] w-full object-contain"
+        />
+      ) : isPdf ? (
+        <iframe
+          src={proxyUrl}
+          title={`Plano ${principal.nombre}`}
+          className="h-[70vh] w-full border-0"
+        />
+      ) : (
+        <div className="p-4 text-xs text-[var(--muted-text)]">
+          Tipo no soportado para preview ({mime || 'desconocido'}). Usa el link arriba para abrirlo.
+        </div>
+      )}
+    </figure>
   );
 }
