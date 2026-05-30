@@ -191,3 +191,94 @@ export async function eliminarPlanoVersion(planoId: string): Promise<SimpleResul
   revalidateAnteproyectosPaths();
   return { ok: true };
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Sprint 4E — aplicar análisis AI al análisis financiero del proyecto
+// ──────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Toma el `ai_analisis` del plano y pre-llena los campos del análisis
+ * financiero del proyecto (área total, vendible, verdes, vialidades,
+ * lotes, lote promedio). NO machaca valores ya capturados — solo
+ * llena los que están en NULL.
+ *
+ * Si `overwrite=true`, sí pisa los existentes (admin opcionalmente).
+ *
+ * El AI puede equivocarse. Después de aplicar, el usuario revisa en
+ * el componente del análisis financiero y edita lo que necesite.
+ */
+export async function aplicarAiAlAnalisisFinanciero(
+  planoId: string,
+  options: { overwrite?: boolean } = {}
+): Promise<{ ok: true; aplicados: string[] } | { ok: false; error: string }> {
+  if (!planoId) return { ok: false, error: 'planoId requerido' };
+  const supabase = await makeServerClient();
+
+  // Cargar análisis del plano + proyecto_id.
+  const { data: plano, error: pErr } = await supabase
+    .schema('dilesa')
+    .from('proyecto_planos')
+    .select('id, proyecto_id, ai_analisis')
+    .eq('id', planoId)
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (pErr) return { ok: false, error: pErr.message };
+  if (!plano) return { ok: false, error: 'Plano no encontrado' };
+  if (!plano.ai_analisis) {
+    return { ok: false, error: 'Esta versión no tiene análisis AI todavía' };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ai = plano.ai_analisis as any;
+
+  // Mapeo AI → columnas del proyecto.
+  const candidatos: Array<{ col: string; value: number | null }> = [
+    { col: 'area_m2', value: ai.area_total_m2 ?? null },
+    { col: 'area_vendible_m2', value: ai.area_vendible_m2 ?? null },
+    { col: 'areas_verdes_m2', value: ai.areas_verdes_m2 ?? null },
+    { col: 'area_vialidades_m2', value: ai.area_vialidades_m2 ?? null },
+    { col: 'lotes_proyectados', value: ai.lotes_proyectados ?? null },
+    { col: 'tamano_lote_promedio', value: ai.tamano_lote_promedio_m2 ?? null },
+  ];
+
+  // Cargar el proyecto para no machacar valores existentes (unless overwrite).
+  const { data: proy, error: pyErr } = await supabase
+    .schema('dilesa')
+    .from('proyectos')
+    .select(
+      'area_m2, area_vendible_m2, areas_verdes_m2, area_vialidades_m2, lotes_proyectados, tamano_lote_promedio'
+    )
+    .eq('id', plano.proyecto_id)
+    .maybeSingle();
+  if (pyErr) return { ok: false, error: pyErr.message };
+  if (!proy) return { ok: false, error: 'Proyecto no encontrado' };
+
+  const patch: Record<string, number> = {};
+  const aplicados: string[] = [];
+  for (const c of candidatos) {
+    if (c.value == null) continue;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const current = (proy as any)[c.col] as number | null;
+    if (options.overwrite || current == null) {
+      patch[c.col] = c.value;
+      aplicados.push(c.col);
+    }
+  }
+
+  if (aplicados.length === 0) {
+    return {
+      ok: true,
+      aplicados: [],
+    };
+  }
+
+  const { error: upErr } = await supabase
+    .schema('dilesa')
+    .from('proyectos')
+    .update(patch)
+    .eq('id', plano.proyecto_id);
+  if (upErr) return { ok: false, error: upErr.message };
+
+  revalidateAnteproyectosPaths();
+  return { ok: true, aplicados };
+}

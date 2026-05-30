@@ -27,6 +27,7 @@ import type { FileRole } from '@/components/file-attachments/types';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import {
   actualizarPlanoDescripcion,
+  aplicarAiAlAnalisisFinanciero,
   crearPlanoVersion,
   eliminarPlanoVersion,
   marcarPlanoVigente,
@@ -38,6 +39,25 @@ export type PlanoVersionRow = {
   descripcion: string | null;
   vigente: boolean;
   created_at: string;
+  ai_analisis: PlanoAiAnalisisPersistido | null;
+};
+
+/** Shape persistida del análisis AI en `ai_analisis jsonb`. */
+export type PlanoAiAnalisisPersistido = {
+  area_total_m2: number | null;
+  area_vendible_m2: number | null;
+  areas_verdes_m2: number | null;
+  area_vialidades_m2: number | null;
+  lotes_proyectados: number | null;
+  tamano_lote_promedio_m2: number | null;
+  tipologia_principal: string | null;
+  observaciones: string | null;
+  recomendaciones: string[];
+  confianza: 'alta' | 'media' | 'baja';
+  archivo_nombre?: string;
+  archivo_adjunto_id?: string;
+  analizado_en?: string;
+  modelo?: string;
 };
 
 const fechaFmt = new Intl.DateTimeFormat('es-MX', {
@@ -56,10 +76,14 @@ export function PlanoAnteproyecto({
   proyectoId,
   empresaId,
   empresaSlug,
+  onAnalisisAplicado,
 }: {
   proyectoId: string;
   empresaId: string;
   empresaSlug: string;
+  /** Se llama después de "Aplicar al análisis financiero" para que el
+   *  padre refresque la sección de análisis financiero. */
+  onAnalisisAplicado?: () => void;
 }) {
   const [planos, setPlanos] = useState<PlanoVersionRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,6 +92,8 @@ export function PlanoAnteproyecto({
   const [pending, startTransition] = useTransition();
   const [editingDescId, setEditingDescId] = useState<string | null>(null);
   const [descDraft, setDescDraft] = useState('');
+  const [analizandoAi, setAnalizandoAi] = useState(false);
+  const [aiMessage, setAiMessage] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -75,7 +101,7 @@ export function PlanoAnteproyecto({
     const { data, error: err } = await supabase
       .schema('dilesa')
       .from('proyecto_planos')
-      .select('id, version, descripcion, vigente, created_at')
+      .select('id, version, descripcion, vigente, created_at, ai_analisis')
       .eq('proyecto_id', proyectoId)
       .is('deleted_at', null)
       .order('version', { ascending: false });
@@ -93,7 +119,6 @@ export function PlanoAnteproyecto({
   }, [proyectoId]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void cargar();
   }, [cargar]);
 
@@ -156,6 +181,48 @@ export function PlanoAnteproyecto({
       }
       setEditingDescId(null);
       await cargar();
+    });
+  };
+
+  const handleAnalizarAi = async (planoId: string) => {
+    setError(null);
+    setAiMessage(null);
+    setAnalizandoAi(true);
+    try {
+      const res = await fetch(`/api/dilesa/anteproyectos/planos/${planoId}/analizar-ai`, {
+        method: 'POST',
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+      };
+      if (!res.ok || !json.ok) {
+        setError(json.error ?? `HTTP ${res.status}`);
+        return;
+      }
+      await cargar();
+    } finally {
+      setAnalizandoAi(false);
+    }
+  };
+
+  const handleAplicarAi = (planoId: string) => {
+    setError(null);
+    setAiMessage(null);
+    startTransition(async () => {
+      const r = await aplicarAiAlAnalisisFinanciero(planoId);
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
+      if (r.aplicados.length === 0) {
+        setAiMessage(
+          'Todos los campos ya tenían valor. Edita manualmente si quieres reemplazarlos.'
+        );
+      } else {
+        setAiMessage(`Aplicado: ${r.aplicados.length} campos pre-llenados al análisis.`);
+      }
+      onAnalisisAplicado?.();
     });
   };
 
@@ -292,11 +359,171 @@ export function PlanoAnteproyecto({
               accept=".pdf,.png,.jpg,.jpeg,.webp,.heic,.heif,.tiff"
               variant="grouped"
             />
+
+            <AiPanel
+              plano={selected}
+              analizando={analizandoAi}
+              pending={pending}
+              onAnalizar={() => handleAnalizarAi(selected.id)}
+              onAplicar={() => handleAplicarAi(selected.id)}
+              message={aiMessage}
+            />
           </article>
         )}
 
         {error && <p className="mt-2 text-xs text-red-600/80">{error}</p>}
       </div>
     </section>
+  );
+}
+
+// ── Panel del análisis AI ────────────────────────────────────────────────────
+
+const numFmt = new Intl.NumberFormat('es-MX');
+const fmtM2 = (n: number | null | undefined): string =>
+  n == null ? '—' : `${numFmt.format(n)} m²`;
+const fmtInt = (n: number | null | undefined): string => (n == null ? '—' : numFmt.format(n));
+
+function confianzaTone(c: 'alta' | 'media' | 'baja' | undefined): string {
+  if (c === 'alta') return 'border-emerald-300 bg-emerald-50 text-emerald-700';
+  if (c === 'media') return 'border-amber-300 bg-amber-50 text-amber-700';
+  if (c === 'baja') return 'border-red-300 bg-red-50 text-red-700';
+  return 'border-[var(--border)] bg-[var(--card)] text-[var(--muted-text)]';
+}
+
+function AiPanel({
+  plano,
+  analizando,
+  pending,
+  onAnalizar,
+  onAplicar,
+  message,
+}: {
+  plano: PlanoVersionRow;
+  analizando: boolean;
+  pending: boolean;
+  onAnalizar: () => void;
+  onAplicar: () => void;
+  message: string | null;
+}) {
+  const ai = plano.ai_analisis;
+  const tieneAnalisis = ai != null;
+  const disabled = analizando || pending;
+
+  return (
+    <div className="rounded-md border border-[var(--border)] bg-[var(--card)] p-3">
+      <header className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--text)]">
+            Análisis con IA
+          </h4>
+          {tieneAnalisis && (
+            <span
+              className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${confianzaTone(ai?.confianza)}`}
+            >
+              Confianza: {ai?.confianza ?? '—'}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onAnalizar}
+            disabled={disabled}
+            className="h-7 rounded-sm bg-[var(--accent)] px-3 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
+          >
+            {analizando ? 'Analizando…' : tieneAnalisis ? 'Re-analizar' : 'Analizar con IA'}
+          </button>
+          {tieneAnalisis && (
+            <button
+              type="button"
+              onClick={onAplicar}
+              disabled={disabled}
+              className="h-7 rounded-sm border border-[var(--border)] bg-[var(--bg)] px-3 text-xs font-medium text-[var(--text)] hover:bg-[var(--card)] disabled:opacity-50"
+              title="Llena los campos vacíos del análisis financiero con estos valores. No machaca lo capturado."
+            >
+              Aplicar al análisis financiero
+            </button>
+          )}
+        </div>
+      </header>
+
+      {!tieneAnalisis ? (
+        <p className="mt-2 text-xs text-[var(--muted-text)]">
+          Sube un PDF o imagen del plano arriba, luego presiona <strong>Analizar con IA</strong>.
+          Claude vision detecta áreas, lotes, vialidades y propone recomendaciones. Después puedes
+          aplicarlo al análisis financiero (solo llena campos vacíos).
+        </p>
+      ) : (
+        <div className="mt-3 space-y-3">
+          {/* Métricas extraídas */}
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs sm:grid-cols-3 lg:grid-cols-6">
+            <KV k="Área total" v={fmtM2(ai?.area_total_m2 ?? null)} />
+            <KV k="Vendible" v={fmtM2(ai?.area_vendible_m2 ?? null)} />
+            <KV k="Áreas verdes" v={fmtM2(ai?.areas_verdes_m2 ?? null)} />
+            <KV k="Vialidades" v={fmtM2(ai?.area_vialidades_m2 ?? null)} />
+            <KV k="Lotes" v={fmtInt(ai?.lotes_proyectados ?? null)} />
+            <KV k="Lote prom." v={fmtM2(ai?.tamano_lote_promedio_m2 ?? null)} />
+          </div>
+
+          {/* Tipología detectada */}
+          {ai?.tipologia_principal && (
+            <div className="text-xs">
+              <span className="text-[var(--muted-text)]">Tipología detectada: </span>
+              <span className="font-medium text-[var(--text)]">{ai.tipologia_principal}</span>
+            </div>
+          )}
+
+          {/* Observaciones */}
+          {ai?.observaciones && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-[var(--muted-text)]">
+                Observaciones
+              </div>
+              <p className="mt-1 whitespace-pre-line text-xs text-[var(--text)]">
+                {ai.observaciones}
+              </p>
+            </div>
+          )}
+
+          {/* Recomendaciones */}
+          {ai?.recomendaciones && ai.recomendaciones.length > 0 && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-[var(--muted-text)]">
+                Recomendaciones
+              </div>
+              <ul className="mt-1 space-y-1 text-xs text-[var(--text)]">
+                {ai.recomendaciones.map((r, i) => (
+                  <li key={i} className="flex gap-2">
+                    <span aria-hidden className="text-[var(--muted-text)]">
+                      •
+                    </span>
+                    <span>{r}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {ai?.analizado_en && (
+            <p className="text-[10px] text-[var(--muted-text)]">
+              Analizado {new Date(ai.analizado_en).toLocaleString('es-MX')} con{' '}
+              <code>{ai?.modelo ?? 'claude'}</code>.
+            </p>
+          )}
+        </div>
+      )}
+
+      {message && <p className="mt-2 text-xs text-emerald-700">{message}</p>}
+    </div>
+  );
+}
+
+function KV({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex flex-col">
+      <span className="text-[10px] uppercase tracking-wide text-[var(--muted-text)]">{k}</span>
+      <span className="text-xs font-semibold tabular-nums text-[var(--text)]">{v}</span>
+    </div>
   );
 }
