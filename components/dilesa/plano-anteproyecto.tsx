@@ -579,13 +579,15 @@ function PlanoViewer({ empresaId, planoId }: { empresaId: string; planoId: strin
   // las credenciales same-origin; el resultado se muestra desde un
   // blob:URL local que ya no pasa por la auth wall.
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [pdfBytes, setPdfBytes] = useState<Uint8Array | null>(null);
   const [fetchErr, setFetchErr] = useState<string | null>(null);
 
   useEffect(() => {
     if (!proxyUrl) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setBlobUrl(null);
-
+       
+      setPdfBytes(null);
       setFetchErr(null);
       return;
     }
@@ -601,11 +603,17 @@ function PlanoViewer({ empresaId, planoId }: { empresaId: string; planoId: strin
           return;
         }
         const blob = await res.blob();
+        // PDF: guardamos los bytes para pasarlos directo al canvas
+        // (evita un segundo fetch desde el canvas component que falla
+        // por race con revokeObjectURL).
+        const buf = new Uint8Array(await blob.slice().arrayBuffer());
         urlLocal = URL.createObjectURL(blob);
         if (cancelado) {
           URL.revokeObjectURL(urlLocal);
           return;
         }
+         
+        setPdfBytes(buf);
 
         setBlobUrl(urlLocal);
       } catch (e) {
@@ -687,7 +695,7 @@ function PlanoViewer({ empresaId, planoId }: { empresaId: string; planoId: strin
         // en preview deployments por la auth wall + restrictions del
         // PDF viewer interno. Pdf.js no depende del plugin, dibuja
         // sobre <canvas>.
-        <PdfCanvas blobUrl={blobUrl} fallbackUrl={proxyUrl ?? undefined} />
+        <PdfCanvas bytes={pdfBytes} fallbackUrl={proxyUrl ?? undefined} />
       ) : (
         <div className="p-4 text-xs text-[var(--muted-text)]">
           Tipo no soportado para preview ({mime || 'desconocido'}). Usa el link arriba para abrirlo.
@@ -699,7 +707,7 @@ function PlanoViewer({ empresaId, planoId }: { empresaId: string; planoId: strin
 
 // ── PDF Canvas viewer (pdfjs-dist client-side) ───────────────────────────────
 
-function PdfCanvas({ blobUrl, fallbackUrl }: { blobUrl: string; fallbackUrl?: string }) {
+function PdfCanvas({ bytes, fallbackUrl }: { bytes: Uint8Array | null; fallbackUrl?: string }) {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageIdx, setPageIdx] = useState(1); // 1-indexed
   const [renderErr, setRenderErr] = useState<string | null>(null);
@@ -722,7 +730,7 @@ function PdfCanvas({ blobUrl, fallbackUrl }: { blobUrl: string; fallbackUrl?: st
   // afecte el bundle inicial de la página — solo se carga cuando hay
   // un PDF que renderizar.
   useEffect(() => {
-    if (!blobUrl) return;
+    if (!bytes || bytes.byteLength === 0) return;
     let cancelado = false;
 
     setRenderErr(null);
@@ -737,15 +745,14 @@ function PdfCanvas({ blobUrl, fallbackUrl }: { blobUrl: string; fallbackUrl?: st
           import.meta.url
         ).toString();
 
-        // Pasamos los bytes directo al worker (no `{ url }`). El web
-        // worker de pdfjs corre en contexto distinto y NO puede hacer
-        // fetch del blob:URL del main thread — eso disparaba
-        // "Unexpected server response (0)". Con `{ data: Uint8Array }`
-        // los bytes se transfieren al worker via postMessage y nunca
-        // hace red.
-        const respPdf = await fetch(blobUrl);
-        const bytes = new Uint8Array(await respPdf.arrayBuffer());
-        const loadingTask = pdfjs.getDocument({ data: bytes });
+        // Pasamos los bytes directo (recibidos como prop del padre,
+        // sin re-fetch). El web worker de pdfjs los recibe vía
+        // postMessage sin hacer red — evita race con el blob URL
+        // que cuando se hacía fetch desde aquí daba "Failed to fetch".
+        // Cloneamos a Uint8Array porque pdfjs muta/transfiere el
+        // buffer; mantener la prop intacta evita inválidos en re-render.
+        const data = new Uint8Array(bytes);
+        const loadingTask = pdfjs.getDocument({ data });
         const pdf = await loadingTask.promise;
         if (cancelado) return;
 
@@ -777,7 +784,7 @@ function PdfCanvas({ blobUrl, fallbackUrl }: { blobUrl: string; fallbackUrl?: st
     return () => {
       cancelado = true;
     };
-  }, [blobUrl, pageIdx, containerWidth]);
+  }, [bytes, pageIdx, containerWidth]);
 
   return (
     <div ref={containerRef} className="relative w-full">
