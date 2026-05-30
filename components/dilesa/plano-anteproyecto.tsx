@@ -682,11 +682,31 @@ function PlanoViewer({ empresaId, planoId }: { empresaId: string; planoId: strin
           className="max-h-[70vh] w-full object-contain"
         />
       ) : isPdf ? (
-        <iframe
-          src={blobUrl}
-          title={`Plano ${principal.nombre}`}
-          className="h-[70vh] w-full border-0"
-        />
+        // `<object>` es más permisivo que `<iframe>` para PDF inline en
+        // Chrome/Edge — los iframes a blob:URLs de PDF disparan
+        // "content blocked" en preview deployments por el sandbox del
+        // viewer interno. El children del <object> es fallback cuando
+        // el browser no puede renderizar el plugin.
+        <object
+          data={blobUrl}
+          type="application/pdf"
+          className="block h-[70vh] w-full"
+          aria-label={`Plano ${principal.nombre}`}
+        >
+          <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-xs text-[var(--muted-text)]">
+            <p>Tu navegador no puede mostrar el PDF embebido.</p>
+            {proxyUrl && (
+              <a
+                href={proxyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[var(--accent)] hover:underline"
+              >
+                Abrir el plano en una pestaña nueva ↗
+              </a>
+            )}
+          </div>
+        </object>
       ) : (
         <div className="p-4 text-xs text-[var(--muted-text)]">
           Tipo no soportado para preview ({mime || 'desconocido'}). Usa el link arriba para abrirlo.
