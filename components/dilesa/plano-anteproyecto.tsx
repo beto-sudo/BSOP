@@ -585,13 +585,13 @@ function PlanoViewer({ empresaId, planoId }: { empresaId: string; planoId: strin
     if (!proxyUrl) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setBlobUrl(null);
-       
+
       setFetchErr(null);
       return;
     }
     let cancelado = false;
     let urlLocal: string | null = null;
-     
+
     setFetchErr(null);
     void (async () => {
       try {
@@ -606,7 +606,7 @@ function PlanoViewer({ empresaId, planoId }: { empresaId: string; planoId: strin
           URL.revokeObjectURL(urlLocal);
           return;
         }
-         
+
         setBlobUrl(urlLocal);
       } catch (e) {
         if (!cancelado) setFetchErr(e instanceof Error ? e.message : String(e));
