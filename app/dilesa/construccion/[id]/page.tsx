@@ -657,12 +657,28 @@ function DetailInner() {
     return base.toISOString().slice(0, 10);
   }, [fechaArranque, diasPendientes]);
 
-  /** % tiempo transcurrido = días_transcurridos / días_estimados × 100.
-   *  Null si no arrancó o si la plantilla no tiene días estimados. */
+  /** Días que tomó (o lleva) la obra para medir el plazo real. Si ya
+   *  terminó, mide arranque → fecha_terminada (el plazo real que tomó);
+   *  si sigue en curso, arranque → hoy. Difiere de `diasTranscurridos`
+   *  (siempre hasta hoy) que alimenta el subtítulo "hace X días". */
+  const fechaTerminadaObra = obra?.fecha_terminada ?? null;
+  const diasHastaCierre = useMemo(() => {
+    if (!fechaArranque) return null;
+    const start = new Date(`${fechaArranque}T00:00:00`).getTime();
+    const end = fechaTerminadaObra
+      ? new Date(`${fechaTerminadaObra}T00:00:00`).getTime()
+      : new Date().setHours(0, 0, 0, 0);
+    return Math.max(0, Math.floor((end - start) / (1000 * 60 * 60 * 24)));
+  }, [fechaArranque, fechaTerminadaObra]);
+
+  /** % tiempo transcurrido = días_hasta_cierre / días_estimados × 100.
+   *  Para obras terminadas refleja el plazo real que tomaron (no el
+   *  tiempo corrido desde el arranque hasta hoy). Null si no arrancó o
+   *  si la plantilla no tiene días estimados. */
   const pctTiempoTranscurrido = useMemo(() => {
-    if (diasTranscurridos == null || totalDiasEstimado <= 0) return null;
-    return (diasTranscurridos / totalDiasEstimado) * 100;
-  }, [diasTranscurridos, totalDiasEstimado]);
+    if (diasHastaCierre == null || totalDiasEstimado <= 0) return null;
+    return (diasHastaCierre / totalDiasEstimado) * 100;
+  }, [diasHastaCierre, totalDiasEstimado]);
 
   /** KPI Efectividad de construcción = % avance / % tiempo transcurrido.
    *   - >= 1.10 → adelantado (verde)
@@ -811,6 +827,7 @@ function DetailInner() {
         fechaTerminada={obra.fecha_terminada}
         totalDiasEstimado={totalDiasEstimado}
         diasTranscurridos={diasTranscurridos}
+        diasHastaCierre={diasHastaCierre}
         diasPendientes={diasPendientes}
         diasRealesAcumulados={diasRealesAcumulados}
         pctTiempoTranscurrido={pctTiempoTranscurrido}
@@ -1107,6 +1124,7 @@ function CronogramaSection({
   fechaTerminada,
   totalDiasEstimado,
   diasTranscurridos,
+  diasHastaCierre,
   diasPendientes,
   diasRealesAcumulados,
   pctTiempoTranscurrido,
@@ -1120,6 +1138,7 @@ function CronogramaSection({
   fechaTerminada: string | null;
   totalDiasEstimado: number;
   diasTranscurridos: number | null;
+  diasHastaCierre: number | null;
   diasPendientes: number;
   diasRealesAcumulados: number;
   pctTiempoTranscurrido: number | null;
@@ -1132,20 +1151,14 @@ function CronogramaSection({
 
   const obraTerminada = !!fechaTerminada || avancePct >= 100;
 
-  // Clasificación de efectividad — bandas operativas DILESA.
+  // Clasificación de efectividad — bandas operativas DILESA. Para obras
+  // terminadas la efectividad mide el plazo real (arranque → terminada) y
+  // los labels van en pasado/femenino (la obra); en progreso describen el
+  // ritmo actual. "Crítico" (urgencia presente) → "Muy atrasada" al cerrar.
   const efectividadInfo = (() => {
-    if (obraTerminada) {
-      return {
-        label: 'Completada',
-        tone: 'success' as const,
-        gradient: 'from-emerald-500 to-emerald-600',
-        textColor: 'text-emerald-700 dark:text-emerald-300',
-        ringColor: 'ring-emerald-500/30',
-      };
-    }
     if (efectividad == null) {
       return {
-        label: 'Sin datos suficientes',
+        label: obraTerminada ? 'Completada' : 'Sin datos suficientes',
         tone: 'neutral' as const,
         gradient: 'from-slate-400 to-slate-500',
         textColor: 'text-[var(--text)]/60',
@@ -1154,7 +1167,7 @@ function CronogramaSection({
     }
     if (efectividad >= 1.1) {
       return {
-        label: 'Adelantado',
+        label: obraTerminada ? 'Adelantada' : 'Adelantado',
         tone: 'success' as const,
         gradient: 'from-emerald-500 to-emerald-600',
         textColor: 'text-emerald-700 dark:text-emerald-300',
@@ -1172,7 +1185,7 @@ function CronogramaSection({
     }
     if (efectividad >= 0.7) {
       return {
-        label: 'Atrasado',
+        label: obraTerminada ? 'Atrasada' : 'Atrasado',
         tone: 'warning' as const,
         gradient: 'from-amber-500 to-amber-600',
         textColor: 'text-amber-700 dark:text-amber-300',
@@ -1180,7 +1193,7 @@ function CronogramaSection({
       };
     }
     return {
-      label: 'Crítico',
+      label: obraTerminada ? 'Muy atrasada' : 'Crítico',
       tone: 'destructive' as const,
       gradient: 'from-rose-500 to-rose-600',
       textColor: 'text-rose-700 dark:text-rose-300',
@@ -1215,8 +1228,7 @@ function CronogramaSection({
           ? 'warning'
           : 'success';
 
-  const efectividadPct =
-    efectividad != null && !obraTerminada ? Math.round(efectividad * 100) : null;
+  const efectividadPct = efectividad != null ? Math.round(efectividad * 100) : null;
   const proyectadaSubtitleColor =
     proyectadaTone === 'success'
       ? 'text-emerald-600 dark:text-emerald-400'
@@ -1253,8 +1265,16 @@ function CronogramaSection({
           value={totalDiasEstimado > 0 ? `${totalDiasEstimado.toFixed(1)}d` : '—'}
         />
         <InlineStat
-          label="Transcurridos"
-          value={diasTranscurridos != null ? `${diasTranscurridos}d` : '—'}
+          label={obraTerminada ? 'Duración' : 'Transcurridos'}
+          value={
+            obraTerminada
+              ? diasHastaCierre != null
+                ? `${diasHastaCierre}d`
+                : '—'
+              : diasTranscurridos != null
+                ? `${diasTranscurridos}d`
+                : '—'
+          }
         />
         <InlineStat
           label="Pendientes"
