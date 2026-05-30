@@ -3,10 +3,10 @@
 **Slug:** `dilesa-proyectos-checklist-inline`
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa.proyecto_tarea_pasos` (tabla nueva Sprint 3); reusa `dilesa.proyecto_tareas` + `proyecto_tareas_dependencias` + `proyecto_presupuesto_partidas` + `proyecto_documentos` + `proyecto_hitos` + `plantilla_proyecto_tareas`.
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-05-28
-**Última actualización:** 2026-05-29 (Sprint 4A→4E mergeados — análisis AI con Claude vision sobre el plano vigente, con autopopulate del análisis financiero)
+**Última actualización:** 2026-05-30 (CERRADA — 15 sprints + 12 PRs. Pipeline completo: checklist → análisis financiero → PDF → plano versionado → análisis AI → viewer embebido)
 
 ## Problema
 
