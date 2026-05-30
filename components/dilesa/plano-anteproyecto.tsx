@@ -724,7 +724,7 @@ function PdfCanvas({ blobUrl, fallbackUrl }: { blobUrl: string; fallbackUrl?: st
   useEffect(() => {
     if (!blobUrl) return;
     let cancelado = false;
-     
+
     setRenderErr(null);
 
     (async () => {
@@ -737,10 +737,18 @@ function PdfCanvas({ blobUrl, fallbackUrl }: { blobUrl: string; fallbackUrl?: st
           import.meta.url
         ).toString();
 
-        const loadingTask = pdfjs.getDocument({ url: blobUrl });
+        // Pasamos los bytes directo al worker (no `{ url }`). El web
+        // worker de pdfjs corre en contexto distinto y NO puede hacer
+        // fetch del blob:URL del main thread — eso disparaba
+        // "Unexpected server response (0)". Con `{ data: Uint8Array }`
+        // los bytes se transfieren al worker via postMessage y nunca
+        // hace red.
+        const respPdf = await fetch(blobUrl);
+        const bytes = new Uint8Array(await respPdf.arrayBuffer());
+        const loadingTask = pdfjs.getDocument({ data: bytes });
         const pdf = await loadingTask.promise;
         if (cancelado) return;
-         
+
         setNumPages(pdf.numPages);
 
         const page = await pdf.getPage(pageIdx);
@@ -761,7 +769,6 @@ function PdfCanvas({ blobUrl, fallbackUrl }: { blobUrl: string; fallbackUrl?: st
         await page.render({ canvasContext: ctx as any, viewport, canvas } as any).promise;
       } catch (e) {
         if (!cancelado) {
-           
           setRenderErr(e instanceof Error ? e.message : String(e));
         }
       }
