@@ -729,22 +729,29 @@ export async function updateAnteproyectoPrototipoReferencia(
   const patch: Record<string, unknown> = { prototipo_referencia_id: productoId };
 
   if (productoId) {
-    // Lookup del prototipo para autopopular valor_comercial_referencia
-    // si está poblado en `dilesa.productos`. RLS valida acceso.
     const { data: producto, error: prodErr } = await supabase
       .schema('dilesa')
       .from('productos')
-      .select('valor_comercial_referencia, costo_referencia')
+      .select(
+        'valor_comercial_referencia, costo_urbanizacion_referencia, costo_materiales_referencia, costo_mo_referencia, registro_ruv_referencia, seguro_calidad_referencia, costo_comercializacion_referencia'
+      )
       .eq('id', productoId)
       .maybeSingle();
     if (prodErr) return { ok: false, error: prodErr.message };
     if (!producto) return { ok: false, error: 'Prototipo no encontrado' };
 
-    if (producto.valor_comercial_referencia != null) {
-      patch.valor_comercial_referencia = producto.valor_comercial_referencia;
+    const refFields = [
+      'valor_comercial_referencia',
+      'costo_urbanizacion_referencia',
+      'costo_materiales_referencia',
+      'costo_mo_referencia',
+      'registro_ruv_referencia',
+      'seguro_calidad_referencia',
+      'costo_comercializacion_referencia',
+    ] as const;
+    for (const f of refFields) {
+      if (producto[f] != null) patch[f] = producto[f];
     }
-    // costo_referencia en dilesa.productos es total — no lo desglosamos
-    // a urbanizacion/materiales/MO/etc. v1 sólo pull-ea valor comercial.
   }
 
   const { error } = await supabase

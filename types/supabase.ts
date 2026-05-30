@@ -1502,6 +1502,7 @@ export type Database = {
           coda_row_id: string | null
           codigo: string
           contratista_id: string
+          costo_materiales: number | null
           created_at: string
           cuv: string | null
           deleted_at: string | null
@@ -1531,6 +1532,7 @@ export type Database = {
           coda_row_id?: string | null
           codigo: string
           contratista_id: string
+          costo_materiales?: number | null
           created_at?: string
           cuv?: string | null
           deleted_at?: string | null
@@ -1560,6 +1562,7 @@ export type Database = {
           coda_row_id?: string | null
           codigo?: string
           contratista_id?: string
+          costo_materiales?: number | null
           created_at?: string
           cuv?: string | null
           deleted_at?: string | null
@@ -2208,7 +2211,11 @@ export type Database = {
       productos: {
         Row: {
           atributos: Json
+          costo_comercializacion_referencia: number | null
+          costo_materiales_referencia: number | null
+          costo_mo_referencia: number | null
           costo_referencia: number | null
+          costo_urbanizacion_referencia: number | null
           created_at: string
           deleted_at: string | null
           descripcion: string | null
@@ -2217,12 +2224,18 @@ export type Database = {
           nombre: string
           planos: Json
           proyecto_id: string
+          registro_ruv_referencia: number | null
+          seguro_calidad_referencia: number | null
           updated_at: string
           valor_comercial_referencia: number | null
         }
         Insert: {
           atributos?: Json
+          costo_comercializacion_referencia?: number | null
+          costo_materiales_referencia?: number | null
+          costo_mo_referencia?: number | null
           costo_referencia?: number | null
+          costo_urbanizacion_referencia?: number | null
           created_at?: string
           deleted_at?: string | null
           descripcion?: string | null
@@ -2231,12 +2244,18 @@ export type Database = {
           nombre: string
           planos?: Json
           proyecto_id: string
+          registro_ruv_referencia?: number | null
+          seguro_calidad_referencia?: number | null
           updated_at?: string
           valor_comercial_referencia?: number | null
         }
         Update: {
           atributos?: Json
+          costo_comercializacion_referencia?: number | null
+          costo_materiales_referencia?: number | null
+          costo_mo_referencia?: number | null
           costo_referencia?: number | null
+          costo_urbanizacion_referencia?: number | null
           created_at?: string
           deleted_at?: string | null
           descripcion?: string | null
@@ -2245,6 +2264,8 @@ export type Database = {
           nombre?: string
           planos?: Json
           proyecto_id?: string
+          registro_ruv_referencia?: number | null
+          seguro_calidad_referencia?: number | null
           updated_at?: string
           valor_comercial_referencia?: number | null
         }
@@ -3884,6 +3905,10 @@ export type Database = {
           p_retencion_pct?: number
         }
         Returns: string
+      }
+      fn_marcar_plano_vigente: {
+        Args: { p_plano_id: string }
+        Returns: undefined
       }
       fn_proyecto_promote_anteproyecto: {
         Args: { p_anteproyecto_id: string }
