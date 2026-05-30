@@ -538,26 +538,15 @@ export function AnteproyectoDetalle({
         )}
       </DetailDrawerSection>
 
-      <DetailDrawerSection
-        title="Presupuesto"
-        description={
-          loadingExtras
-            ? 'Cargando…'
-            : partidas.length === 0
-              ? 'Captura un monto en una tarea de cotización para iniciar.'
-              : `${partidas.length} ${partidas.length === 1 ? 'partida' : 'partidas'}`
-        }
-      >
-        {loadingExtras ? (
-          <Skeleton className="h-16 w-full" />
-        ) : (
-          <PartidasPresupuestales
-            partidas={partidas}
-            onChange={() => void cargarExtras(anteproyecto.id)}
-          />
-        )}
-        {extrasError && <p className="mt-2 text-sm text-red-600/80">{extrasError}</p>}
-      </DetailDrawerSection>
+      {/* La sección "Presupuesto" (partidas presupuestales del Sprint 2)
+          se eliminó en Sprint 4E refinamiento. El flujo de entrada
+          original — capturar monto en tareas de cotización — ya no
+          existe: las 4 tareas de cotización + comité se eliminaron en
+          Sprint 4A. El análisis financiero del Sprint 4B captura
+          todos los costos (urbanización, materiales, MO, RUV, seguro,
+          comercialización) con su comparativo referencia vs proyecto.
+          La tabla `dilesa.proyecto_presupuesto_partidas` se mantiene
+          para histórico y para uso en desarrollo. */}
 
       <DetailDrawerSection title="Autorización y promoción a desarrollo" description={gate.razon}>
         {promoteSuccess ? (
