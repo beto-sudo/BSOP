@@ -39,7 +39,7 @@ import {
 } from '@/components/filters/date-range-filter';
 import { HardHat, Plus, RefreshCw, Search } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
-import { formatPercent } from '@/lib/format';
+import { formatCurrency, formatPercent } from '@/lib/format';
 
 type ConstruccionRow = {
   id: string;
@@ -56,6 +56,8 @@ type ConstruccionRow = {
   fecha_dtu: string | null;
   avance_pct: number;
   estado: string;
+  costo_materiales: number | null;
+  valor_contrato_mo: number | null;
 };
 
 export type ConstruccionListaRow = ConstruccionRow & {
@@ -186,7 +188,7 @@ export function ConstruccionModule({ empresaId }: { empresaId: string }) {
       .schema('dilesa')
       .from('construccion')
       .select(
-        'id, codigo, unidad_id, producto_id, contratista_id, supervisor_persona_id, fecha_arranque, fecha_compromiso_terminar, fecha_terminada, fecha_seguro_calidad, fecha_paquete_ruv, fecha_dtu, avance_pct, estado'
+        'id, codigo, unidad_id, producto_id, contratista_id, supervisor_persona_id, fecha_arranque, fecha_compromiso_terminar, fecha_terminada, fecha_seguro_calidad, fecha_paquete_ruv, fecha_dtu, avance_pct, estado, costo_materiales, valor_contrato_mo'
       )
       .eq('empresa_id', empresaId)
       .is('deleted_at', null);
@@ -396,6 +398,30 @@ export function ConstruccionModule({ empresaId }: { empresaId: string }) {
           {ESTADO_LABEL[o.estado] ?? o.estado}
         </Badge>
       ),
+    },
+    {
+      key: 'valor_contrato_mo',
+      label: 'MO contrato',
+      type: 'custom',
+      accessor: (o) => o.valor_contrato_mo ?? 0,
+      render: (o) =>
+        o.valor_contrato_mo != null ? (
+          <span className="tabular-nums">{formatCurrency(o.valor_contrato_mo)}</span>
+        ) : (
+          <span className="text-[var(--text)]/30">—</span>
+        ),
+    },
+    {
+      key: 'costo_materiales',
+      label: 'Materiales',
+      type: 'custom',
+      accessor: (o) => o.costo_materiales ?? 0,
+      render: (o) =>
+        o.costo_materiales != null ? (
+          <span className="tabular-nums">{formatCurrency(o.costo_materiales)}</span>
+        ) : (
+          <span className="text-[var(--text)]/30">—</span>
+        ),
     },
     { key: 'fecha_arranque', label: 'Arranque', type: 'date' },
     { key: 'fecha_compromiso_terminar', label: 'Compromiso', type: 'date' },
