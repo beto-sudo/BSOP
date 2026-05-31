@@ -35,10 +35,15 @@ let rpcResult: { data: string | null; error: { message: string } | null } = {
 };
 
 // Sprint 4B refinamiento — lookup de producto para autopopulate.
-let productoRow: {
-  valor_comercial_referencia: number | null;
-  costo_referencia: number | null;
-} | null = { valor_comercial_referencia: 900_000, costo_referencia: null };
+let productoRow: Record<string, number | null> | null = {
+  valor_comercial_referencia: 900_000,
+  costo_urbanizacion_referencia: null,
+  costo_materiales_referencia: null,
+  costo_mo_referencia: null,
+  registro_ruv_referencia: null,
+  seguro_calidad_referencia: null,
+  costo_comercializacion_referencia: null,
+};
 let productoError: { message: string } | null = null;
 
 // ── Mocks ──────────────────────────────────────────────────────────────
@@ -107,7 +112,6 @@ vi.mock('@supabase/ssr', () => ({
           };
         }
         if (schemaName === 'dilesa' && table === 'proyectos') {
-          // Distinguir entre SELECT (promote: leer empresa) y UPDATE (Sprint 4B análisis).
           const chain = {
             update: (patch: Record<string, unknown>) => {
               lastPatch = patch;
@@ -121,6 +125,18 @@ vi.mock('@supabase/ssr', () => ({
             select: () => ({
               eq: () => ({
                 maybeSingle: async () => ({ data: anteproyectoRow, error: anteproyectoError }),
+                single: async () => ({
+                  data: {
+                    valor_comercial_proyecto: null,
+                    costo_urbanizacion: null,
+                    costo_materiales_proyecto: null,
+                    costo_mo: null,
+                    registro_ruv_proyecto: null,
+                    seguro_calidad_proyecto: null,
+                    costo_comercializacion: null,
+                  },
+                  error: null,
+                }),
               }),
             }),
           };
@@ -158,7 +174,15 @@ beforeEach(() => {
   rolesData = [];
   asignacionesData = [];
   rpcResult = { data: 'desarrollo-1', error: null };
-  productoRow = { valor_comercial_referencia: 900_000, costo_referencia: null };
+  productoRow = {
+    valor_comercial_referencia: 900_000,
+    costo_urbanizacion_referencia: null,
+    costo_materiales_referencia: null,
+    costo_mo_referencia: null,
+    registro_ruv_referencia: null,
+    seguro_calidad_referencia: null,
+    costo_comercializacion_referencia: null,
+  };
   productoError = null;
 });
 
@@ -219,19 +243,42 @@ describe('updateAnteproyectoPrototipoReferencia (Sprint 4B refinamiento)', () =>
     expect(lastPatch).toEqual({ prototipo_referencia_id: null });
   });
 
-  it('productoId válido autopopula valor_comercial_referencia', async () => {
-    productoRow = { valor_comercial_referencia: 1_200_000, costo_referencia: null };
+  it('productoId válido autopopula referencia + proyecto baseline', async () => {
+    productoRow = {
+      valor_comercial_referencia: 1_200_000,
+      costo_urbanizacion_referencia: 50_000,
+      costo_materiales_referencia: null,
+      costo_mo_referencia: 120_000,
+      registro_ruv_referencia: null,
+      seguro_calidad_referencia: null,
+      costo_comercializacion_referencia: 24_000,
+    };
     const { updateAnteproyectoPrototipoReferencia } = await import('./actions');
     const r = await updateAnteproyectoPrototipoReferencia('p1', 'prod-1');
     expect(r.ok).toBe(true);
-    expect(lastPatch).toEqual({
+    expect(lastPatch).toMatchObject({
       prototipo_referencia_id: 'prod-1',
       valor_comercial_referencia: 1_200_000,
+      costo_urbanizacion_referencia: 50_000,
+      costo_mo_referencia: 120_000,
+      costo_comercializacion_referencia: 24_000,
+      valor_comercial_proyecto: 1_200_000,
+      costo_urbanizacion: 50_000,
+      costo_mo: 120_000,
+      costo_comercializacion: 24_000,
     });
   });
 
-  it('producto sin valor_comercial_referencia → solo setea el FK', async () => {
-    productoRow = { valor_comercial_referencia: null, costo_referencia: null };
+  it('producto sin valores → solo setea el FK', async () => {
+    productoRow = {
+      valor_comercial_referencia: null,
+      costo_urbanizacion_referencia: null,
+      costo_materiales_referencia: null,
+      costo_mo_referencia: null,
+      registro_ruv_referencia: null,
+      seguro_calidad_referencia: null,
+      costo_comercializacion_referencia: null,
+    };
     const { updateAnteproyectoPrototipoReferencia } = await import('./actions');
     const r = await updateAnteproyectoPrototipoReferencia('p1', 'prod-1');
     expect(r.ok).toBe(true);
