@@ -42,6 +42,13 @@ export type PrototipoRow = {
   totalMoCalculado: number | null;
   obrasEnConstruccion: number;
   obrasTerminadas: number;
+  valor_comercial_referencia: number | null;
+  costo_urbanizacion_referencia: number | null;
+  costo_materiales_referencia: number | null;
+  costo_mo_referencia: number | null;
+  registro_ruv_referencia: number | null;
+  seguro_calidad_referencia: number | null;
+  costo_comercializacion_referencia: number | null;
 };
 
 const EN_CURSO = new Set(['arrancada', 'en_progreso']);
@@ -111,7 +118,9 @@ export function PrototiposModule({ empresaId }: { empresaId: string }) {
       sb
         .schema('dilesa')
         .from('productos')
-        .select('id, nombre, proyecto_id, atributos')
+        .select(
+          'id, nombre, proyecto_id, atributos, valor_comercial_referencia, costo_urbanizacion_referencia, costo_materiales_referencia, costo_mo_referencia, registro_ruv_referencia, seguro_calidad_referencia, costo_comercializacion_referencia'
+        )
         .eq('empresa_id', empresaId)
         .is('deleted_at', null),
       sb
@@ -190,6 +199,13 @@ export function PrototiposModule({ empresaId }: { empresaId: string }) {
         totalMoCalculado: totalMo,
         obrasEnConstruccion: agg.enCurso,
         obrasTerminadas: agg.terminadas,
+        valor_comercial_referencia: p.valor_comercial_referencia as number | null,
+        costo_urbanizacion_referencia: p.costo_urbanizacion_referencia as number | null,
+        costo_materiales_referencia: p.costo_materiales_referencia as number | null,
+        costo_mo_referencia: p.costo_mo_referencia as number | null,
+        registro_ruv_referencia: p.registro_ruv_referencia as number | null,
+        seguro_calidad_referencia: p.seguro_calidad_referencia as number | null,
+        costo_comercializacion_referencia: p.costo_comercializacion_referencia as number | null,
       };
     });
 
@@ -295,6 +311,92 @@ export function PrototiposModule({ empresaId }: { empresaId: string }) {
       render: (p) =>
         p.totalMoCalculado != null ? (
           <span className="tabular-nums">${p.totalMoCalculado.toFixed(0)}</span>
+        ) : (
+          <span className="text-[var(--text)]/40">—</span>
+        ),
+    },
+    {
+      key: 'valor_comercial_referencia',
+      label: 'Valor comercial',
+      type: 'custom',
+      accessor: (p) => p.valor_comercial_referencia ?? 0,
+      render: (p) =>
+        p.valor_comercial_referencia != null ? (
+          <span className="tabular-nums">{formatCurrency(p.valor_comercial_referencia)}</span>
+        ) : (
+          <span className="text-[var(--text)]/40">—</span>
+        ),
+    },
+    {
+      key: 'costo_materiales_referencia',
+      label: 'Materiales ref',
+      type: 'custom',
+      accessor: (p) => p.costo_materiales_referencia ?? 0,
+      render: (p) =>
+        p.costo_materiales_referencia != null ? (
+          <span className="tabular-nums">{formatCurrency(p.costo_materiales_referencia)}</span>
+        ) : (
+          <span className="text-[var(--text)]/40">—</span>
+        ),
+    },
+    {
+      key: 'costo_mo_referencia',
+      label: 'MO ref',
+      type: 'custom',
+      accessor: (p) => p.costo_mo_referencia ?? 0,
+      render: (p) =>
+        p.costo_mo_referencia != null ? (
+          <span className="tabular-nums">{formatCurrency(p.costo_mo_referencia)}</span>
+        ) : (
+          <span className="text-[var(--text)]/40">—</span>
+        ),
+    },
+    {
+      key: 'costo_urbanizacion_referencia',
+      label: 'Urbanización ref',
+      type: 'custom',
+      accessor: (p) => p.costo_urbanizacion_referencia ?? 0,
+      render: (p) =>
+        p.costo_urbanizacion_referencia != null ? (
+          <span className="tabular-nums">{formatCurrency(p.costo_urbanizacion_referencia)}</span>
+        ) : (
+          <span className="text-[var(--text)]/40">—</span>
+        ),
+    },
+    {
+      key: 'registro_ruv_referencia',
+      label: 'RUV ref',
+      type: 'custom',
+      accessor: (p) => p.registro_ruv_referencia ?? 0,
+      render: (p) =>
+        p.registro_ruv_referencia != null ? (
+          <span className="tabular-nums">{formatCurrency(p.registro_ruv_referencia)}</span>
+        ) : (
+          <span className="text-[var(--text)]/40">—</span>
+        ),
+    },
+    {
+      key: 'seguro_calidad_referencia',
+      label: 'Seguro cal. ref',
+      type: 'custom',
+      accessor: (p) => p.seguro_calidad_referencia ?? 0,
+      render: (p) =>
+        p.seguro_calidad_referencia != null ? (
+          <span className="tabular-nums">{formatCurrency(p.seguro_calidad_referencia)}</span>
+        ) : (
+          <span className="text-[var(--text)]/40">—</span>
+        ),
+    },
+    {
+      key: 'costo_comercializacion_referencia',
+      label: 'Comercializ. ref',
+      type: 'custom',
+      accessor: (p) => p.costo_comercializacion_referencia ?? 0,
+      render: (p) =>
+        p.costo_comercializacion_referencia != null ? (
+          <span className="tabular-nums">
+            {formatCurrency(p.costo_comercializacion_referencia)}
+          </span>
         ) : (
           <span className="text-[var(--text)]/40">—</span>
         ),

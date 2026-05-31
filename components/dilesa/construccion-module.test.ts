@@ -23,6 +23,8 @@ function o(overrides: Partial<ConstruccionListaRow>): ConstruccionListaRow {
     contratistaNombre: 'Contratista',
     contratistaAbreviacion: null,
     supervisorNombre: null,
+    costo_materiales: null,
+    valor_contrato_mo: null,
     ...overrides,
   };
 }

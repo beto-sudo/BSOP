@@ -13,6 +13,13 @@ function p(overrides: Partial<PrototipoRow>): PrototipoRow {
     totalMoCalculado: null,
     obrasEnConstruccion: 0,
     obrasTerminadas: 0,
+    valor_comercial_referencia: null,
+    costo_urbanizacion_referencia: null,
+    costo_materiales_referencia: null,
+    costo_mo_referencia: null,
+    registro_ruv_referencia: null,
+    seguro_calidad_referencia: null,
+    costo_comercializacion_referencia: null,
     ...overrides,
   };
 }
