@@ -752,6 +752,37 @@ export async function updateAnteproyectoPrototipoReferencia(
     for (const f of refFields) {
       if (producto[f] != null) patch[f] = producto[f];
     }
+
+    // Pre-llenar campos Proyecto con los valores de Referencia como
+    // baseline editable (solo donde el campo está null).
+    const { data: proyecto, error: projErr } = await supabase
+      .schema('dilesa')
+      .from('proyectos')
+      .select(
+        'valor_comercial_proyecto, costo_urbanizacion, costo_materiales_proyecto, costo_mo, registro_ruv_proyecto, seguro_calidad_proyecto, costo_comercializacion'
+      )
+      .eq('id', proyectoId)
+      .single();
+    if (projErr) return { ok: false, error: projErr.message };
+
+    const refToProj: [keyof typeof producto, string][] = [
+      ['valor_comercial_referencia', 'valor_comercial_proyecto'],
+      ['costo_urbanizacion_referencia', 'costo_urbanizacion'],
+      ['costo_materiales_referencia', 'costo_materiales_proyecto'],
+      ['costo_mo_referencia', 'costo_mo'],
+      ['registro_ruv_referencia', 'registro_ruv_proyecto'],
+      ['seguro_calidad_referencia', 'seguro_calidad_proyecto'],
+      ['costo_comercializacion_referencia', 'costo_comercializacion'],
+    ];
+    for (const [refKey, projKey] of refToProj) {
+      if (
+        producto[refKey] != null &&
+        (proyecto[projKey as keyof typeof proyecto] == null ||
+          proyecto[projKey as keyof typeof proyecto] === 0)
+      ) {
+        patch[projKey] = producto[refKey];
+      }
+    }
   }
 
   const { error } = await supabase

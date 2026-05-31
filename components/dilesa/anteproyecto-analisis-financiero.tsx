@@ -402,6 +402,22 @@ export function AnteproyectoAnalisisFinanciero({
           for (const [src, dst] of refFields) {
             if (proto[src] != null) (next as Record<string, unknown>)[dst] = proto[src];
           }
+          // Pre-llenar Proyecto con Referencia como baseline (solo si null o 0)
+          const refToProj: [keyof typeof proto, string][] = [
+            ['valor_comercial_referencia', 'valor_comercial_proyecto'],
+            ['costo_urbanizacion_referencia', 'costo_urbanizacion'],
+            ['costo_materiales_referencia', 'costo_materiales_proyecto'],
+            ['costo_mo_referencia', 'costo_mo'],
+            ['registro_ruv_referencia', 'registro_ruv_proyecto'],
+            ['seguro_calidad_referencia', 'seguro_calidad_proyecto'],
+            ['costo_comercializacion_referencia', 'costo_comercializacion'],
+          ];
+          for (const [refKey, projKey] of refToProj) {
+            const current = prev[projKey as keyof typeof prev] as number | null;
+            if (proto[refKey] != null && (current == null || current === 0)) {
+              (next as Record<string, unknown>)[projKey] = proto[refKey];
+            }
+          }
         }
         return next;
       });
@@ -419,6 +435,13 @@ export function AnteproyectoAnalisisFinanciero({
             registro_ruv_referencia: snapshot.registro_ruv_referencia,
             seguro_calidad_referencia: snapshot.seguro_calidad_referencia,
             costo_comercializacion_referencia: snapshot.costo_comercializacion_referencia,
+            valor_comercial_proyecto: snapshot.valor_comercial_proyecto,
+            costo_urbanizacion: snapshot.costo_urbanizacion,
+            costo_materiales_proyecto: snapshot.costo_materiales_proyecto,
+            costo_mo: snapshot.costo_mo,
+            registro_ruv_proyecto: snapshot.registro_ruv_proyecto,
+            seguro_calidad_proyecto: snapshot.seguro_calidad_proyecto,
+            costo_comercializacion: snapshot.costo_comercializacion,
           }));
         } else {
           onChange?.();
@@ -437,6 +460,13 @@ export function AnteproyectoAnalisisFinanciero({
       snapshot.registro_ruv_referencia,
       snapshot.seguro_calidad_referencia,
       snapshot.costo_comercializacion_referencia,
+      snapshot.valor_comercial_proyecto,
+      snapshot.costo_urbanizacion,
+      snapshot.costo_materiales_proyecto,
+      snapshot.costo_mo,
+      snapshot.registro_ruv_proyecto,
+      snapshot.seguro_calidad_proyecto,
+      snapshot.costo_comercializacion,
     ]
   );
 
