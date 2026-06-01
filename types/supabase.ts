@@ -1794,6 +1794,7 @@ export type Database = {
       }
       contratos_construccion: {
         Row: {
+          anticipo_pct: number
           coda_row_id: string | null
           codigo: string
           contratista_id: string
@@ -1803,12 +1804,18 @@ export type Database = {
           fecha_contrato: string
           fianzas_url: string | null
           id: string
+          iva_tasa: number | null
           notas: string | null
           proyecto_id: string | null
+          retencion_pct: number
+          tipo: string
           updated_at: string
+          valor_iva: number | null
+          valor_subtotal: number | null
           valor_total: number
         }
         Insert: {
+          anticipo_pct?: number
           coda_row_id?: string | null
           codigo: string
           contratista_id: string
@@ -1818,12 +1825,18 @@ export type Database = {
           fecha_contrato: string
           fianzas_url?: string | null
           id?: string
+          iva_tasa?: number | null
           notas?: string | null
           proyecto_id?: string | null
+          retencion_pct?: number
+          tipo?: string
           updated_at?: string
+          valor_iva?: number | null
+          valor_subtotal?: number | null
           valor_total?: number
         }
         Update: {
+          anticipo_pct?: number
           coda_row_id?: string | null
           codigo?: string
           contratista_id?: string
@@ -1833,9 +1846,14 @@ export type Database = {
           fecha_contrato?: string
           fianzas_url?: string | null
           id?: string
+          iva_tasa?: number | null
           notas?: string | null
           proyecto_id?: string | null
+          retencion_pct?: number
+          tipo?: string
           updated_at?: string
+          valor_iva?: number | null
+          valor_subtotal?: number | null
           valor_total?: number
         }
         Relationships: [
@@ -2041,6 +2059,177 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      obra_estimaciones: {
+        Row: {
+          contrato_id: string
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          es_anticipo: boolean
+          es_finiquito: boolean
+          etiqueta: string
+          factura_ref: string | null
+          fecha: string | null
+          id: string
+          iva: number | null
+          iva_tasa: number | null
+          monto_total: number
+          nota_pago: string | null
+          orden: number
+          retencion: number
+          source_ref: string | null
+          subtotal: number | null
+          updated_at: string
+        }
+        Insert: {
+          contrato_id: string
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          es_anticipo?: boolean
+          es_finiquito?: boolean
+          etiqueta: string
+          factura_ref?: string | null
+          fecha?: string | null
+          id?: string
+          iva?: number | null
+          iva_tasa?: number | null
+          monto_total?: number
+          nota_pago?: string | null
+          orden?: number
+          retencion?: number
+          source_ref?: string | null
+          subtotal?: number | null
+          updated_at?: string
+        }
+        Update: {
+          contrato_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          es_anticipo?: boolean
+          es_finiquito?: boolean
+          etiqueta?: string
+          factura_ref?: string | null
+          fecha?: string | null
+          id?: string
+          iva?: number | null
+          iva_tasa?: number | null
+          monto_total?: number
+          nota_pago?: string | null
+          orden?: number
+          retencion?: number
+          source_ref?: string | null
+          subtotal?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "obra_estimaciones_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos_construccion"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      obra_presupuesto: {
+        Row: {
+          concepto: string
+          contrato_id: string | null
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          etapa: string | null
+          factura_ref: string | null
+          fecha_compromiso: string | null
+          gasto_real_iva: number | null
+          gasto_real_iva_tasa: number | null
+          gasto_real_subtotal: number | null
+          gasto_real_total: number | null
+          id: string
+          notas: string | null
+          orden: number
+          presupuesto_actualizado: number | null
+          presupuesto_previo: number | null
+          proveedor_persona_id: string | null
+          proveedor_texto: string | null
+          proyecto_id: string
+          source_ref: string | null
+          updated_at: string
+        }
+        Insert: {
+          concepto: string
+          contrato_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          etapa?: string | null
+          factura_ref?: string | null
+          fecha_compromiso?: string | null
+          gasto_real_iva?: number | null
+          gasto_real_iva_tasa?: number | null
+          gasto_real_subtotal?: number | null
+          gasto_real_total?: number | null
+          id?: string
+          notas?: string | null
+          orden?: number
+          presupuesto_actualizado?: number | null
+          presupuesto_previo?: number | null
+          proveedor_persona_id?: string | null
+          proveedor_texto?: string | null
+          proyecto_id: string
+          source_ref?: string | null
+          updated_at?: string
+        }
+        Update: {
+          concepto?: string
+          contrato_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          etapa?: string | null
+          factura_ref?: string | null
+          fecha_compromiso?: string | null
+          gasto_real_iva?: number | null
+          gasto_real_iva_tasa?: number | null
+          gasto_real_subtotal?: number | null
+          gasto_real_total?: number | null
+          id?: string
+          notas?: string | null
+          orden?: number
+          presupuesto_actualizado?: number | null
+          presupuesto_previo?: number | null
+          proveedor_persona_id?: string | null
+          proveedor_texto?: string | null
+          proyecto_id?: string
+          source_ref?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "obra_presupuesto_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos_construccion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "obra_presupuesto_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "obra_presupuesto_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_proyecto_avances"
+            referencedColumns: ["proyecto_id"]
+          },
+        ]
       }
       plantilla_proyecto_tareas: {
         Row: {
@@ -3552,6 +3741,9 @@ export type Database = {
           deleted_at: string | null
           descuento_total: number | null
           empresa_id: string
+          enganche_fecha_primer_pago: string | null
+          enganche_num_parcialidades: number
+          enganche_periodicidad: string
           enganche_requerido: number | null
           es_pep: boolean | null
           estado: string
@@ -3601,6 +3793,9 @@ export type Database = {
           deleted_at?: string | null
           descuento_total?: number | null
           empresa_id: string
+          enganche_fecha_primer_pago?: string | null
+          enganche_num_parcialidades?: number
+          enganche_periodicidad?: string
           enganche_requerido?: number | null
           es_pep?: boolean | null
           estado?: string
@@ -3650,6 +3845,9 @@ export type Database = {
           deleted_at?: string | null
           descuento_total?: number | null
           empresa_id?: string
+          enganche_fecha_primer_pago?: string | null
+          enganche_num_parcialidades?: number
+          enganche_periodicidad?: string
           enganche_requerido?: number | null
           es_pep?: boolean | null
           estado?: string
@@ -3866,6 +4064,13 @@ export type Database = {
       }
     }
     Functions: {
+      fn_backfill_cxc: {
+        Args: never
+        Returns: {
+          metrica: string
+          valor: number
+        }[]
+      }
       fn_calcular_avance_construccion: {
         Args: { p_construccion_id: string }
         Returns: number
@@ -3906,6 +4111,7 @@ export type Database = {
         }
         Returns: string
       }
+      fn_generar_plan_pagos: { Args: { p_venta_id: string }; Returns: number }
       fn_marcar_plano_vigente: {
         Args: { p_plano_id: string }
         Returns: undefined
@@ -4832,6 +5038,214 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      cxc_cargos: {
+        Row: {
+          concepto: string | null
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          estado: string
+          fecha_vencimiento: string | null
+          fuente_esperada: string
+          id: string
+          monto: number
+          monto_pagado: number
+          notas: string | null
+          numero: number
+          origen_id: string | null
+          origen_tipo: string
+          persona_id: string
+          saldo: number | null
+          tipo_cargo: string
+          updated_at: string
+        }
+        Insert: {
+          concepto?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          estado?: string
+          fecha_vencimiento?: string | null
+          fuente_esperada?: string
+          id?: string
+          monto: number
+          monto_pagado?: number
+          notas?: string | null
+          numero?: number
+          origen_id?: string | null
+          origen_tipo?: string
+          persona_id: string
+          saldo?: number | null
+          tipo_cargo: string
+          updated_at?: string
+        }
+        Update: {
+          concepto?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          estado?: string
+          fecha_vencimiento?: string | null
+          fuente_esperada?: string
+          id?: string
+          monto?: number
+          monto_pagado?: number
+          notas?: string | null
+          numero?: number
+          origen_id?: string | null
+          origen_tipo?: string
+          persona_id?: string
+          saldo?: number | null
+          tipo_cargo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cxc_cargos_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cxc_cargos_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "v_empleados_full"
+            referencedColumns: ["persona_id"]
+          },
+        ]
+      }
+      cxc_pago_aplicaciones: {
+        Row: {
+          cargo_id: string
+          created_at: string
+          empresa_id: string
+          id: string
+          monto_aplicado: number
+          pago_id: string
+        }
+        Insert: {
+          cargo_id: string
+          created_at?: string
+          empresa_id: string
+          id?: string
+          monto_aplicado: number
+          pago_id: string
+        }
+        Update: {
+          cargo_id?: string
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          monto_aplicado?: number
+          pago_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cxc_pago_aplicaciones_cargo_id_fkey"
+            columns: ["cargo_id"]
+            isOneToOne: false
+            referencedRelation: "cxc_cargos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cxc_pago_aplicaciones_pago_id_fkey"
+            columns: ["pago_id"]
+            isOneToOne: false
+            referencedRelation: "cxc_pagos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cxc_pagos: {
+        Row: {
+          coda_row_id: string | null
+          comprobante_adjunto_id: string | null
+          created_at: string
+          cuenta_bancaria_id: string | null
+          deleted_at: string | null
+          empresa_id: string
+          fecha: string
+          forma_pago: string | null
+          fuente: string
+          id: string
+          monto_total: number
+          notas: string | null
+          origen_id: string | null
+          origen_tipo: string
+          persona_id: string
+          referencia: string | null
+          registrado_por: string | null
+          updated_at: string
+          uuid_sat: string | null
+        }
+        Insert: {
+          coda_row_id?: string | null
+          comprobante_adjunto_id?: string | null
+          created_at?: string
+          cuenta_bancaria_id?: string | null
+          deleted_at?: string | null
+          empresa_id: string
+          fecha?: string
+          forma_pago?: string | null
+          fuente?: string
+          id?: string
+          monto_total: number
+          notas?: string | null
+          origen_id?: string | null
+          origen_tipo?: string
+          persona_id: string
+          referencia?: string | null
+          registrado_por?: string | null
+          updated_at?: string
+          uuid_sat?: string | null
+        }
+        Update: {
+          coda_row_id?: string | null
+          comprobante_adjunto_id?: string | null
+          created_at?: string
+          cuenta_bancaria_id?: string | null
+          deleted_at?: string | null
+          empresa_id?: string
+          fecha?: string
+          forma_pago?: string | null
+          fuente?: string
+          id?: string
+          monto_total?: number
+          notas?: string | null
+          origen_id?: string | null
+          origen_tipo?: string
+          persona_id?: string
+          referencia?: string | null
+          registrado_por?: string | null
+          updated_at?: string
+          uuid_sat?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cxc_pagos_cuenta_bancaria_id_fkey"
+            columns: ["cuenta_bancaria_id"]
+            isOneToOne: false
+            referencedRelation: "cuentas_bancarias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cxc_pagos_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cxc_pagos_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "v_empleados_full"
+            referencedColumns: ["persona_id"]
+          },
+        ]
       }
       departamentos: {
         Row: {
@@ -6191,6 +6605,8 @@ export type Database = {
           moneda_id: string | null
           monto: number
           referencia: string | null
+          referencia_id: string | null
+          referencia_tipo: string | null
           tipo: string
           updated_at: string | null
         }
@@ -6206,6 +6622,8 @@ export type Database = {
           moneda_id?: string | null
           monto: number
           referencia?: string | null
+          referencia_id?: string | null
+          referencia_tipo?: string | null
           tipo: string
           updated_at?: string | null
         }
@@ -6221,6 +6639,8 @@ export type Database = {
           moneda_id?: string | null
           monto?: number
           referencia?: string | null
+          referencia_id?: string | null
+          referencia_tipo?: string | null
           tipo?: string
           updated_at?: string | null
         }
@@ -8340,6 +8760,36 @@ export type Database = {
       }
     }
     Functions: {
+      cxc_cargo_ajustar: {
+        Args: { p_cargo_id: string; p_motivo?: string; p_nuevo_monto: number }
+        Returns: undefined
+      }
+      cxc_pago_aplicar: {
+        Args: { p_aplicaciones: Json; p_pago_id: string }
+        Returns: number
+      }
+      cxc_pago_cancelar: {
+        Args: { p_motivo?: string; p_pago_id: string }
+        Returns: undefined
+      }
+      cxc_pago_registrar: {
+        Args: {
+          p_auto_aplicar?: boolean
+          p_comprobante_adjunto_id?: string
+          p_cuenta_bancaria_id?: string
+          p_empresa_id: string
+          p_fecha?: string
+          p_forma_pago?: string
+          p_fuente?: string
+          p_monto: number
+          p_notas?: string
+          p_origen_id: string
+          p_persona_id: string
+          p_referencia?: string
+          p_uuid_sat?: string
+        }
+        Returns: string
+      }
       fn_aplicar_levantamiento: {
         Args: { p_levantamiento_id: string }
         Returns: number
