@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-28
-**Última actualización:** 2026-06-01 (**Sprint 1 aplicado a prod** + corrección del gate: extiende `erp.facturas` + crea `cxp_pagos`/`cxp_pago_aplicaciones` + 6 RPCs + trigger de saldo. Gate de aprobación = **rol "Dirección"** vía `core.fn_user_has_role` (corregido del puesto "Comité Ejecutivo" por Beto; mig `214500` elimina `es_comite_ejecutivo`). Sin override de admin. Modo autónomo. Próximo: Sprint 2 ingesta XML. Ver Bitácora.)
+**Última actualización:** 2026-06-01 (**Sprint 1 aplicado a prod** + corrección del gate: extiende `erp.facturas` + crea `cxp_pagos`/`cxp_pago_aplicaciones` + 6 RPCs + trigger de saldo. Gate de aprobación = **rol "Dirección"** vía `core.fn_user_has_role` (corregido del puesto "Comité Ejecutivo" por Beto; mig `214500` elimina `es_comite_ejecutivo`). Sin override de admin. **Sprint 2** (ingesta XML CFDI: parser determinista + endpoint upload-xml) en este PR. Modo autónomo. Próximo: Sprint 3 UI. Ver Bitácora.)
 
 ## Problema
 
@@ -71,7 +71,7 @@ Resultado operativo: doble captura entre la realidad bancaria y la contable, rie
   - Toda transición escribe a `audit_log`.
   - **Regenerar `SCHEMA_REF.md`** y commitearlo.
 
-- [ ] **Sprint 2 — Ingesta XML CFDI + match con OC**:
+- [x] **Sprint 2 — Ingesta XML CFDI** (parser + endpoint; match-OC y PDF-LLM diferidos):
   - Endpoint `POST /api/<empresa>/cxp/facturas/upload-xml` (parser determinista, no LLM — el CFDI es estructurado).
   - Validaciones: `Receptor.Rfc = empresa.rfc`, dedup por `uuid_sat`, emisor existe en `erp.proveedores` (si no, sugiere alta — reutiliza `proveedores-csf-ai`).
   - Sugerencia automática de OC: si el emisor tiene OCs cerradas con saldo pendiente de pagar, las propone para match.
@@ -143,7 +143,7 @@ Resultado operativo: doble captura entre la realidad bancaria y la contable, rie
 | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | --------- |
 | 0   | Promoción: este doc + fila en INITIATIVES.md                                                                                                                                                                         | _este PR_ | —         |
 | 1   | DB: extender `erp.facturas` + crear `cxp_pagos` + `cxp_pago_aplicaciones` + RPCs (alta, cancelar, programar, aprobar, marcar_pagado, cancelar_pago) + helper `es_comite_ejecutivo` + backfill + regenerar SCHEMA_REF | aplicado  | _este PR_ |
-| 2   | Ingesta XML CFDI (parser determinista) + match con OC + bulk upload + sugerencia de alta de proveedor                                                                                                                | pending   | —         |
+| 2   | Parser CFDI determinista (`lib/cxp`) + endpoint `upload-xml` (bulk + dedup `uuid_sat` + validación receptor + sugerencia de proveedor). Match-OC automático y PDF-LLM diferidos a Sprint 3/follow-up                 | en PR     | _este PR_ |
 | 3   | UI RDB facturas (lista + drawer) + aging + vista por proveedor                                                                                                                                                       | pending   | —         |
 | 4   | UI RDB programación + aprobación por Comité + email de notificación                                                                                                                                                  | pending   | —         |
 | 5   | Pago efectivo + conciliación contra cortes (engancha con `cortes-conciliacion`)                                                                                                                                      | pending   | —         |
@@ -191,6 +191,30 @@ patrón canónico de **ADR-037** (subledger gemelo):
   reusan CxC y CxP (convención `shared-modules-refactor`, ADR-011).
 
 ## Bitácora
+
+### 2026-06-01 — Sprint 2 (ingesta XML CFDI: parser + endpoint)
+
+App-layer (sin migración). Backend de la carga de facturas de egreso.
+
+- **`lib/cxp/cfdi-parser.ts`** — parser determinista de CFDI 4.0/3.3 (con
+  `fast-xml-parser`, sin LLM). Extrae folio fiscal (UUID del TimbreFiscalDigital),
+  emisor/receptor, montos, IVA trasladado + tasa derivada (0/8/16), retenciones
+  IVA (002) e ISR (001), forma/método de pago, uso CFDI y tipo. 13 tests
+  (`cfdi-parser.test.ts`): CFDI completo, retenciones de servicios profesionales,
+  frontera 8%, sin timbrar (uuid null) y errores.
+- **`POST /api/[empresa]/cxp/facturas/upload-xml`** — acepta 1..N XML (bulk). Por
+  archivo: auth + acceso a la empresa (miembro o admin) → parse → valida que el
+  receptor sea la empresa (por RFC) → dedup por `uuid_sat` → matchea emisor a
+  proveedor (persona por RFC; si no existe, factura con proveedor nulo + sugiere
+  alta) → `erp.cxp_factura_alta` → sube el XML a storage + `erp.adjuntos` +
+  `xml_url`. Devuelve un resultado por archivo (no aborta el lote por un XML malo).
+- Dep nueva: `fast-xml-parser ^5.8.0`. `'facturas'` agregado a `AdjuntoEntidad`.
+- **Diferido** (Sprint 3 UI / follow-up): sugerencia automática de OC del emisor
+  con saldo pendiente, y el parser opcional de PDF vía LLM (`extraction-core`)
+  para facturas sin XML.
+- typecheck + 1155 tests + lint + format verdes. PR _(este PR)_.
+
+**Próximo:** Sprint 3 — UI RDB (lista de facturas + drawer + aging por proveedor).
 
 ### 2026-06-01 — Corrección del gate de aprobación: rol "Dirección" (no puesto Comité)
 
