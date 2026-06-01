@@ -5,11 +5,13 @@
 **Schemas afectados:** `dilesa` (generalizar `contratos_construccion` + tablas
 nuevas de presupuesto de obra y estimaciones de monto), `erp` (`personas` como
 proveedores/contratistas; futura emisión a CxP)
-**Estado:** planned
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-06-01
-**Última actualización:** 2026-06-01 (promovida; exploración de los Excel de
-LDLE y LDS hecha; modelo propuesto a validar antes de tocar schema)
+**Última actualización:** 2026-06-01 (Sprint 1 schema aplicado a prod: tipo +
+anticipo/retención/IVA en `contratos_construccion` + `obra_presupuesto` +
+`obra_estimaciones`. IVA 8% frontera / 16% excepción. ADR-038. Próximo: traspaso
+de LDLE+LDS.)
 
 ## Problema
 
@@ -170,3 +172,30 @@ esperar a CxP. Razón: hay dolor real (todo en Excel) y el registro del contrato
 ## Bitácora
 
 (append-only, escrito por Claude Code al ejecutar)
+
+### 2026-06-01 — Sprint 1 (schema) aplicado a prod
+
+**Decisiones cerradas con Beto** (D1–D5 del planning): IVA **8% frontera /
+16% excepción**, desglose donde esté especificado (no se infiere tasa fija);
+estimaciones de obra en **tabla nueva** `obra_estimaciones` (separada de
+`dilesa.estimaciones` de vivienda, ADR-033); proveedor como `proveedor_texto`
+
+- `proveedor_persona_id` opcional; traspaso **completo** (RESUMEN + contratos +
+  estimaciones). Ver **ADR-038**.
+
+**Migración** `20260601172336_dilesa_contratos_obra_generalizar.sql` (aplicada
+vía MCP, version sincronizada con el archivo):
+
+- `dilesa.contratos_construccion` + `tipo` (CHECK vivienda/urbanizacion/
+  obra_cabecera/tarea_menor), `anticipo_pct`, `retencion_pct`, `valor_subtotal`,
+  `valor_iva`, `iva_tasa`. Backfill: 266 contratos existentes → `vivienda`.
+- `dilesa.obra_presupuesto` (presupuesto vs gasto real por concepto × etapa).
+- `dilesa.obra_estimaciones` (estimaciones de monto, etiqueta libre).
+- RLS/triggers/índices iguales al resto de `dilesa`. `NOTIFY pgrst`.
+
+Verificado en prod: 6 columnas nuevas, 2 tablas, 266 backfill. `SCHEMA_REF` +
+`types/supabase.ts` regenerados.
+
+**Pendiente:** ADR → índice §5 de `ARCHITECTURE.md` (piggyback al cerrar
+iniciativa). **Próximo sprint:** parser de traspaso LDLE+LDS (best-effort,
+marca renglones sin tasa de IVA clara para revisión de Beto).
