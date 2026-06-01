@@ -4,13 +4,13 @@
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa` (8 tablas nuevas + extender `productos`),
 `erp` (extender `personas.tipo` con `'contratista'`)
-**Estado:** done
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-24
-**Última actualización:** 2026-05-30 (Sprint 5 cerrado — vista de obras
-de construcción en detalle del proyecto + cierre de iniciativa. Trigger
-"20% → disponible" activo en prod, form de ventas consume
-`en_construccion`/`terminada` con producto_id.)
+**Última actualización:** 2026-06-01 (Sprint 6 — PDF del contrato de obra
+generable/imprimible desde el detalle del contrato. Reabre la iniciativa
+con un add-on: el documento legal "Contrato de Servicios a Precios
+Unitarios" replicado de Coda + ANEXO 3 de precios unitarios derivados.)
 
 ## Problema
 
@@ -299,6 +299,33 @@ END $$ LANGUAGE plpgsql;
 ## Decisiones registradas
 
 (append-only)
+
+### 2026-06-01 — ANEXO 3: precio unitario por actividad derivado del % de costo
+
+El "ANEXO 3 — plantilla de precios unitarios por actividad y prototipo"
+referido en la cláusula SÉPTIMA no tiene precios MO absolutos por
+actividad capturados: la columna `dilesa.plantilla_tareas.costo_mo_plantilla`
+está en 0 para las 1,746 filas, y en la tabla origen de Coda ("Plantilla
+Tareas de Construcción Prototipos") las columnas `Costo MO` y `Costo MO
+Plantilla` también están en $0.00. Lo único poblado es `porcentaje_costo`.
+
+Decisión: el precio unitario de cada actividad en el PDF se **deriva**
+como `porcentaje_costo × valor_contrato_mo(prototipo)`, donde el valor MO
+del prototipo proviene de `dilesa.construccion.valor_contrato_mo` (=
+`precio_mo_x_m2 × m2_construccion`) de un lote representativo de ese
+prototipo en el contrato. Es la única reconstrucción posible y coincide
+con el modelo del contrato (% del valor MO total). **Pendiente de validar
+por Beto contra un Anexo 3 real de Coda** antes de tratar el PDF como
+documento final firmable.
+
+### 2026-06-01 — Datos de DILESA del contrato de obra ≠ compraventa
+
+El contrato de obra cita representante (Adalberto Santos de los Santos)
+y escritura constitutiva (177) distintos a los del Contrato de Promesa de
+Compraventa (Norberto Gutiérrez Infante, escritura 167, en `constantes.ts`).
+Se replicaron tal cual del doc vivo en Coda en un archivo separado
+`lib/dilesa/contrato/constantes-obra.ts`. Reconciliar cuál es el vigente es
+decisión legal de Beto.
 
 ## Bitácora
 
@@ -638,3 +665,41 @@ porcentaje_costo / 100)`. SECURITY INVOKER para respetar RLS. Vista
 **Cierre de iniciativa:** todos los 5 sprints planificados completados.
 Fuera de alcance v1 documentado en planning (Gantt, comisiones, adjuntos
 por tarea, integración CapEx, notificaciones, app móvil).
+
+### 2026-06-01 — Sprint 6 (PDF del contrato de obra) — reapertura
+
+**Contexto:** Beto reportó que el contrato de construcción no tenía dónde
+imprimirse/generarse. Diagnóstico: el módulo solo tenía captura (form
+"nuevo") + detalle de lectura; nunca existió generación de documento (lo
+que Beto recordaba haber probado era la Promesa de Compraventa del flujo
+de Ventas, que sí genera PDF). Decisión de Beto: implementar el PDF formal
+con clausulado. Fuente del clausulado: doc vivo en Coda `canvas-KMlO5KM81i`
+("Contrato de Construcción", último generado, folio 2026/2-DIE-ANA-CONTRATO#273).
+
+**Cambios:**
+
+- `lib/dilesa/contrato/constantes-obra.ts` — datos fijos de DILESA para el
+  contrato de obra (representante, escrituras, domicilio, almacén, email
+  compras, % retención, pena convencional, jurisdicción, 2 testigos).
+- `lib/dilesa/pdf/contrato-obra.tsx` — componente React-PDF que replica el
+  documento: encabezado, declaraciones I/II/III, 18 cláusulas, tabla de
+  lotes (cláusula PRIMERA) con total, firmas (cliente + contratista + 2
+  testigos) y ANEXO 3 (precios unitarios por actividad y prototipo).
+  Reusa `header-footer.tsx` + `styles.ts` del flujo de Ventas.
+- `app/api/dilesa/construccion/contratos/[id]/pdf/route.tsx` — route handler
+  (`renderToBuffer`, attachment, `runtime=nodejs`). Lookups cross-schema en
+  memoria (patrón ventas). Deriva el Anexo 3 por % de costo (ver Decisiones).
+- `app/dilesa/construccion/contratos/[id]/page.tsx` — botón "Descargar
+  contrato (PDF)" en el header del detalle.
+
+**Sin migración, sin cambios de RBAC** — reusa el sub-slug existente
+`dilesa.construccion.contratos`.
+
+**Verificación:** typecheck + lint + format:check + 1,134 tests verdes.
+Smoke test de render (data sintética, 8 páginas) OK. Pendiente: validación
+de Beto en preview Vercel — especialmente el Anexo 3 derivado y los datos
+de DILESA del encabezado.
+
+**Alcance no incluido (posible Sprint 7):** Anexo 1 (checklist de recepción)
+y Anexo 2 (materiales entregados); persistir el PDF generado como adjunto;
+captura de testigos/superintendente por contrato.
