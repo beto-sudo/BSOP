@@ -5247,6 +5247,136 @@ export type Database = {
           },
         ]
       }
+      cxp_pago_aplicaciones: {
+        Row: {
+          created_at: string
+          empresa_id: string
+          factura_id: string
+          id: string
+          monto_aplicado: number
+          pago_id: string
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: string
+          factura_id: string
+          id?: string
+          monto_aplicado: number
+          pago_id: string
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: string
+          factura_id?: string
+          id?: string
+          monto_aplicado?: number
+          pago_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cxp_pago_aplicaciones_factura_id_fkey"
+            columns: ["factura_id"]
+            isOneToOne: false
+            referencedRelation: "facturas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cxp_pago_aplicaciones_pago_id_fkey"
+            columns: ["pago_id"]
+            isOneToOne: false
+            referencedRelation: "cxp_pagos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cxp_pagos: {
+        Row: {
+          aprobado_at: string | null
+          aprobado_por: string | null
+          created_at: string
+          cuenta_bancaria_id: string | null
+          deleted_at: string | null
+          empresa_id: string
+          estado: string
+          fecha_pago: string | null
+          fecha_programada: string | null
+          id: string
+          metodo_pago: string | null
+          monto_total: number
+          notas: string | null
+          pagado_at: string | null
+          pagado_por: string | null
+          programado_por: string | null
+          proveedor_id: string | null
+          referencia: string | null
+          updated_at: string
+        }
+        Insert: {
+          aprobado_at?: string | null
+          aprobado_por?: string | null
+          created_at?: string
+          cuenta_bancaria_id?: string | null
+          deleted_at?: string | null
+          empresa_id: string
+          estado?: string
+          fecha_pago?: string | null
+          fecha_programada?: string | null
+          id?: string
+          metodo_pago?: string | null
+          monto_total: number
+          notas?: string | null
+          pagado_at?: string | null
+          pagado_por?: string | null
+          programado_por?: string | null
+          proveedor_id?: string | null
+          referencia?: string | null
+          updated_at?: string
+        }
+        Update: {
+          aprobado_at?: string | null
+          aprobado_por?: string | null
+          created_at?: string
+          cuenta_bancaria_id?: string | null
+          deleted_at?: string | null
+          empresa_id?: string
+          estado?: string
+          fecha_pago?: string | null
+          fecha_programada?: string | null
+          id?: string
+          metodo_pago?: string | null
+          monto_total?: number
+          notas?: string | null
+          pagado_at?: string | null
+          pagado_por?: string | null
+          programado_por?: string | null
+          proveedor_id?: string | null
+          referencia?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cxp_pagos_cuenta_bancaria_id_fkey"
+            columns: ["cuenta_bancaria_id"]
+            isOneToOne: false
+            referencedRelation: "cuentas_bancarias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cxp_pagos_proveedor_id_fkey"
+            columns: ["proveedor_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cxp_pagos_proveedor_id_fkey"
+            columns: ["proveedor_id"]
+            isOneToOne: false
+            referencedRelation: "v_empleados_full"
+            referencedColumns: ["persona_id"]
+          },
+        ]
+      }
       departamentos: {
         Row: {
           activo: boolean
@@ -5898,69 +6028,124 @@ export type Database = {
       }
       facturas: {
         Row: {
+          cancelada_at: string | null
+          cancelada_por: string | null
+          condiciones_pago_dias: number | null
           created_at: string
           emisor_nombre: string | null
           emisor_rfc: string | null
           empresa_id: string
+          estado_cxp: string
           estado_id: string | null
           fecha_emision: string
+          fecha_pago_programada: string | null
           fecha_vencimiento: string | null
           flujo: string
+          forma_pago_sat: string | null
           id: string
           iva: number | null
+          metodo_pago_sat: string | null
+          monto_pagado: number
+          motivo_cancelacion: string | null
+          orden_compra_id: string | null
           pdf_url: string | null
           persona_id: string | null
+          proveedor_id: string | null
           receptor_rfc: string | null
+          retencion_isr: number
+          retencion_iva: number
+          saldo: number | null
           subtotal: number | null
+          tasa_iva: number | null
           tipo_ingreso_id: string | null
           total: number | null
           updated_at: string | null
+          uso_cfdi: string | null
           uuid_sat: string | null
           xml_url: string | null
         }
         Insert: {
+          cancelada_at?: string | null
+          cancelada_por?: string | null
+          condiciones_pago_dias?: number | null
           created_at?: string
           emisor_nombre?: string | null
           emisor_rfc?: string | null
           empresa_id: string
+          estado_cxp?: string
           estado_id?: string | null
           fecha_emision: string
+          fecha_pago_programada?: string | null
           fecha_vencimiento?: string | null
           flujo: string
+          forma_pago_sat?: string | null
           id?: string
           iva?: number | null
+          metodo_pago_sat?: string | null
+          monto_pagado?: number
+          motivo_cancelacion?: string | null
+          orden_compra_id?: string | null
           pdf_url?: string | null
           persona_id?: string | null
+          proveedor_id?: string | null
           receptor_rfc?: string | null
+          retencion_isr?: number
+          retencion_iva?: number
+          saldo?: number | null
           subtotal?: number | null
+          tasa_iva?: number | null
           tipo_ingreso_id?: string | null
           total?: number | null
           updated_at?: string | null
+          uso_cfdi?: string | null
           uuid_sat?: string | null
           xml_url?: string | null
         }
         Update: {
+          cancelada_at?: string | null
+          cancelada_por?: string | null
+          condiciones_pago_dias?: number | null
           created_at?: string
           emisor_nombre?: string | null
           emisor_rfc?: string | null
           empresa_id?: string
+          estado_cxp?: string
           estado_id?: string | null
           fecha_emision?: string
+          fecha_pago_programada?: string | null
           fecha_vencimiento?: string | null
           flujo?: string
+          forma_pago_sat?: string | null
           id?: string
           iva?: number | null
+          metodo_pago_sat?: string | null
+          monto_pagado?: number
+          motivo_cancelacion?: string | null
+          orden_compra_id?: string | null
           pdf_url?: string | null
           persona_id?: string | null
+          proveedor_id?: string | null
           receptor_rfc?: string | null
+          retencion_isr?: number
+          retencion_iva?: number
+          saldo?: number | null
           subtotal?: number | null
+          tasa_iva?: number | null
           tipo_ingreso_id?: string | null
           total?: number | null
           updated_at?: string | null
+          uso_cfdi?: string | null
           uuid_sat?: string | null
           xml_url?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "facturas_orden_compra_id_fkey"
+            columns: ["orden_compra_id"]
+            isOneToOne: false
+            referencedRelation: "ordenes_compra"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "facturas_persona_id_fkey"
             columns: ["persona_id"]
@@ -5971,6 +6156,20 @@ export type Database = {
           {
             foreignKeyName: "facturas_persona_id_fkey"
             columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "v_empleados_full"
+            referencedColumns: ["persona_id"]
+          },
+          {
+            foreignKeyName: "facturas_proveedor_id_fkey"
+            columns: ["proveedor_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facturas_proveedor_id_fkey"
+            columns: ["proveedor_id"]
             isOneToOne: false
             referencedRelation: "v_empleados_full"
             referencedColumns: ["persona_id"]
@@ -8789,6 +8988,66 @@ export type Database = {
           p_uuid_sat?: string
         }
         Returns: string
+      }
+      cxp_factura_alta: {
+        Args: {
+          p_condiciones_pago_dias?: number
+          p_emisor_nombre?: string
+          p_emisor_rfc?: string
+          p_empresa_id: string
+          p_fecha_emision?: string
+          p_forma_pago_sat?: string
+          p_iva?: number
+          p_metodo_pago_sat?: string
+          p_notas?: string
+          p_orden_compra_id?: string
+          p_pdf_url?: string
+          p_proveedor_id: string
+          p_receptor_rfc?: string
+          p_retencion_isr?: number
+          p_retencion_iva?: number
+          p_subtotal?: number
+          p_tasa_iva?: number
+          p_total: number
+          p_uso_cfdi?: string
+          p_uuid_sat?: string
+          p_xml_url?: string
+        }
+        Returns: string
+      }
+      cxp_factura_cancelar: {
+        Args: { p_factura_id: string; p_motivo?: string }
+        Returns: undefined
+      }
+      cxp_pago_aprobar: { Args: { p_pago_id: string }; Returns: undefined }
+      cxp_pago_cancelar: {
+        Args: { p_motivo?: string; p_pago_id: string }
+        Returns: undefined
+      }
+      cxp_pago_marcar_pagado: {
+        Args: {
+          p_fecha_pago?: string
+          p_pago_id: string
+          p_referencia?: string
+        }
+        Returns: undefined
+      }
+      cxp_pago_programar: {
+        Args: {
+          p_aplicaciones: Json
+          p_cuenta_bancaria_id?: string
+          p_empresa_id: string
+          p_fecha_programada?: string
+          p_metodo_pago?: string
+          p_notas?: string
+          p_proveedor_id: string
+          p_referencia?: string
+        }
+        Returns: string
+      }
+      es_comite_ejecutivo: {
+        Args: { p_empresa_id: string; p_usuario_id: string }
+        Returns: boolean
       }
       fn_aplicar_levantamiento: {
         Args: { p_levantamiento_id: string }

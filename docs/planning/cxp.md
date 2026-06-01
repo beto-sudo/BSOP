@@ -3,10 +3,10 @@
 **Slug:** `cxp`
 **Empresas:** todas (golden: RDB; rollout DILESA/COAGAN/ANSA en Sprint 6)
 **Schemas afectados:** `erp` (extiende `facturas`; nuevas `cxp_pagos`, `cxp_pago_aplicaciones`; absorbe `gastos`; extiende `movimientos_bancarios` con referencia polimórfica, ADR-037)
-**Estado:** planned
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-28
-**Última actualización:** 2026-06-01 (re-sincronizada como **gemela de CxC** — ADR-037: patrón de subledger compartido + emisión de movimiento bancario; ver Decisiones registradas. Alcance v1 original cerrado 2026-04-28: RDB golden, aprobación por Comité Ejecutivo, captura inclusiva, retenciones por régimen vía CSF, gastos se migran)
+**Última actualización:** 2026-06-01 (**Sprint 1 aplicado a prod**: extiende `erp.facturas` + crea `cxp_pagos`/`cxp_pago_aplicaciones` + 6 RPCs + `es_comite_ejecutivo` + trigger de saldo. Gate de aprobación **estricto a Comité Ejecutivo** sin override de admin (decisión de Beto). Modo autónomo. Próximo: Sprint 2 ingesta XML. Ver Bitácora.)
 
 ## Problema
 
@@ -37,7 +37,7 @@ Resultado operativo: doble captura entre la realidad bancaria y la contable, rie
 
 ## Alcance v1
 
-- [ ] **Sprint 1 — Schema (DB-puro)**:
+- [x] **Sprint 1 — Schema (DB-puro)** ✅ aplicado a prod 2026-06-01:
   - Extender `erp.facturas`:
     - `orden_compra_id` (uuid, FK → `erp.ordenes_compra`, nullable)
     - `condiciones_pago_dias` (int, nullable — 0 = contado, 30 = neto 30, etc.)
@@ -139,15 +139,15 @@ Resultado operativo: doble captura entre la realidad bancaria y la contable, rie
 
 ## Sprints / hitos
 
-| #   | Scope                                                                                                                                                                                                                                      | Estado    | PR  |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------- | --- |
-| 0   | Promoción: este doc + fila en INITIATIVES.md                                                                                                                                                                                               | _este PR_ | —   |
-| 1   | DB: extender `erp.facturas` + crear `cxp_pagos` + `cxp_pago_aplicaciones` + RPCs (alta, alta_xml, cancelar, programar, aprobar, marcar_pagado, cancelar_pago) + helper `es_comite_ejecutivo` + backfill + tests SQL + regenerar SCHEMA_REF | pending   | —   |
-| 2   | Ingesta XML CFDI (parser determinista) + match con OC + bulk upload + sugerencia de alta de proveedor                                                                                                                                      | pending   | —   |
-| 3   | UI RDB facturas (lista + drawer) + aging + vista por proveedor                                                                                                                                                                             | pending   | —   |
-| 4   | UI RDB programación + aprobación por Comité + email de notificación                                                                                                                                                                        | pending   | —   |
-| 5   | Pago efectivo + conciliación contra cortes (engancha con `cortes-conciliacion`)                                                                                                                                                            | pending   | —   |
-| 6   | Migración de `erp.gastos` a CxP + rollout multi-empresa (DILESA, COAGAN, ANSA)                                                                                                                                                             | pending   | —   |
+| #   | Scope                                                                                                                                                                                                                | Estado    | PR        |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | --------- |
+| 0   | Promoción: este doc + fila en INITIATIVES.md                                                                                                                                                                         | _este PR_ | —         |
+| 1   | DB: extender `erp.facturas` + crear `cxp_pagos` + `cxp_pago_aplicaciones` + RPCs (alta, cancelar, programar, aprobar, marcar_pagado, cancelar_pago) + helper `es_comite_ejecutivo` + backfill + regenerar SCHEMA_REF | aplicado  | _este PR_ |
+| 2   | Ingesta XML CFDI (parser determinista) + match con OC + bulk upload + sugerencia de alta de proveedor                                                                                                                | pending   | —         |
+| 3   | UI RDB facturas (lista + drawer) + aging + vista por proveedor                                                                                                                                                       | pending   | —         |
+| 4   | UI RDB programación + aprobación por Comité + email de notificación                                                                                                                                                  | pending   | —         |
+| 5   | Pago efectivo + conciliación contra cortes (engancha con `cortes-conciliacion`)                                                                                                                                      | pending   | —         |
+| 6   | Migración de `erp.gastos` a CxP + rollout multi-empresa (DILESA, COAGAN, ANSA)                                                                                                                                       | pending   | —         |
 
 ## Decisiones registradas
 
@@ -192,4 +192,42 @@ patrón canónico de **ADR-037** (subledger gemelo):
 
 ## Bitácora
 
-_(vacía hasta Sprint 1)_
+### 2026-06-01 — Sprint 1 (schema CxP, DB-puro) aplicado a prod
+
+Gemelo de CxC (ADR-037). Migración `20260601200000_erp_cxp_subledger.sql`
+aplicada a prod con `supabase db push` (OK de Beto). Modo autónomo.
+
+- **Extiende `erp.facturas`** (16 cols CxP): `orden_compra_id`, `proveedor_id`,
+  `condiciones_pago_dias`, `fecha_pago_programada`, `monto_pagado` (trigger),
+  `saldo` (generated), `estado_cxp`, campos SAT (`forma_pago_sat`,
+  `metodo_pago_sat`, `uso_cfdi`, `tasa_iva`, `retencion_iva/isr`), cancelación.
+  El legacy `estado_id` coexiste (CxP opera con `estado_cxp`). RLS de facturas
+  ya existía, no se tocó.
+- **`erp.cxp_pagos` + `erp.cxp_pago_aplicaciones`** — espejo de `cxc_*`: trigger
+  `AFTER … SELECT SUM` sin recursión recalcula `facturas.monto_pagado` y
+  `estado_cxp`. cancelar/rechazar borran aplicaciones → el trigger descuenta.
+- **6 RPCs**: `cxp_factura_alta` (dedup `uuid_sat` + valida OC), `cxp_factura_cancelar`,
+  `cxp_pago_programar`, `cxp_pago_aprobar` (gate Comité), `cxp_pago_marcar_pagado`
+  (emite `movimientos_bancarios` `tipo='cargo'`, `referencia_tipo='cxp_pago'`),
+  `cxp_pago_cancelar`. `audit_log` en cada transición.
+- **`es_comite_ejecutivo(usuario, empresa)`** — mapea usuario→persona por email
+  (core.usuarios no tiene `persona_id`) → empleado → puesto 'Comité Ejecutivo'
+  (`ILIKE 'comit%ejecutivo'`, evita "Asistente Ejecutivo"). **Estricto a Comité,
+  SIN override de admin** (decisión de Beto, control financiero fuerte): el smoke
+  detectó que `adalberto.ss@dilesa.mx` es admin no-Comité y un override de admin
+  lo dejaba aprobar pagos de cualquier empresa → se quitó. Verificado en prod:
+  Comité→true en su empresa, admin-no-Comité→false, empresa ajena→false.
+- **Decisión de scope**: el parser CFDI XML vive en el endpoint app de Sprint 2;
+  `cxp_factura_alta` hace el dedup por `uuid_sat` (no se metió parser XML en SQL).
+- Reusa la ref polimórfica de `movimientos_bancarios` que entregó CxC. `erp.facturas`
+  vacía → backfill no-op. SCHEMA_REF + types regenerados. 5 checks verdes (1142 tests).
+- **Cobertura del gate**: solo 2 de los 6 empleados-Comité mapean a una cuenta
+  `core.usuarios` por email hoy → asegurar el match persona↔usuario de Ale/Michelle
+  es pre-requisito de Sprint 4 (aprobación), ya flageado en Riesgos.
+- **Hallazgo aparte (no CxP):** `erp.cxc_pago_registrar` inserta movimiento con
+  `tipo='ingreso'`, que viola el CHECK `tipo IN ('cargo','abono')` de
+  `movimientos_bancarios`. **Latente** (la UI de abonos no pasa `cuenta_bancaria_id`,
+  ese path no corre). Fix pendiente en PR chico aparte.
+
+**Próximo:** Sprint 2 — ingesta XML CFDI (parser determinista en endpoint app) +
+match con OC + bulk upload + sugerencia de alta de proveedor.
