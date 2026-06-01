@@ -93,6 +93,8 @@ export function ProyectoChecklist({
   empresaSlug,
   puedeAutorizar = false,
   mostrarBannerHistorico = false,
+  collapsible = false,
+  defaultCollapsed = false,
   onChecklistState,
 }: {
   proyectoId: string;
@@ -106,6 +108,11 @@ export function ProyectoChecklist({
   puedeAutorizar?: boolean;
   /** Muestra el banner "Marcar histórico" (típicamente solo desarrollo). */
   mostrarBannerHistorico?: boolean;
+  /** Hace colapsable la sección "Checklist de tareas" (passthrough al
+   *  `<DetailDrawerSection>` interno). */
+  collapsible?: boolean;
+  /** Estado inicial colapsado (solo si `collapsible`). */
+  defaultCollapsed?: boolean;
   /** Reporta las tareas + estado de carga al padre (para el gate del
    *  anteproyecto). Memoizar en el caller para evitar refetch. */
   onChecklistState?: (s: { tareas: ProyectoTarea[]; loading: boolean }) => void;
@@ -253,6 +260,8 @@ export function ProyectoChecklist({
       description={
         loading ? 'Cargando…' : tareas.length === 0 ? copy.titulo : `${tareas.length} tareas`
       }
+      collapsible={collapsible}
+      defaultCollapsed={defaultCollapsed}
     >
       {loading ? (
         <Skeleton className="h-20 w-full" />

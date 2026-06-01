@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { ChevronRight } from 'lucide-react';
 
 /**
  * `<DetailDrawer>` — sibling to `<DetailPage>` for entity-detail surfaces
@@ -193,6 +194,10 @@ export type DetailDrawerSectionProps = {
   padding?: 'default' | 'none';
   className?: string;
   children: React.ReactNode;
+  /** Make the section collapsible: the header becomes a button with a chevron. Requires `title`. Default `false`. */
+  collapsible?: boolean;
+  /** Initial collapsed state (only when `collapsible`). Default `false`. */
+  defaultCollapsed?: boolean;
 };
 
 /**
@@ -213,15 +218,50 @@ export function DetailDrawerSection({
   padding = 'default',
   className,
   children,
+  collapsible = false,
+  defaultCollapsed = false,
 }: DetailDrawerSectionProps) {
+  const [collapsed, setCollapsed] = React.useState(collapsible ? defaultCollapsed : false);
+
+  const sectionClass = cn(
+    padding === 'default' && (divider ? 'mt-4 pt-4 border-t border-[var(--border)]' : 'mt-1'),
+    padding === 'default' && 'first:mt-0 first:pt-0 first:border-t-0',
+    className
+  );
+
+  // Collapsible mode: the header is a button with a chevron; the body is
+  // hidden with `hidden` (NOT unmounted) so form state survives and children
+  // that report to the parent (e.g. the anteproyecto promotion gate) stay
+  // mounted even while collapsed.
+  if (collapsible && title) {
+    return (
+      <section className={sectionClass}>
+        <button
+          type="button"
+          onClick={() => setCollapsed((c) => !c)}
+          aria-expanded={!collapsed}
+          className="-mx-1 flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-left hover:bg-[var(--card)]/60"
+        >
+          <ChevronRight
+            className={cn(
+              'h-4 w-4 shrink-0 text-[var(--text)]/40 transition-transform',
+              !collapsed && 'rotate-90'
+            )}
+          />
+          <span className={cn('flex-1', description ? 'space-y-0.5' : '')}>
+            <span className="block text-sm font-semibold text-[var(--text)]">{title}</span>
+            {description ? (
+              <span className="block text-xs text-[var(--text-subtle)]">{description}</span>
+            ) : null}
+          </span>
+        </button>
+        <div className={cn('mt-2', collapsed && 'hidden')}>{children}</div>
+      </section>
+    );
+  }
+
   return (
-    <section
-      className={cn(
-        padding === 'default' && (divider ? 'mt-4 pt-4 border-t border-[var(--border)]' : 'mt-1'),
-        padding === 'default' && 'first:mt-0 first:pt-0 first:border-t-0',
-        className
-      )}
-    >
+    <section className={sectionClass}>
       {title ? (
         <div className={cn('mb-2', description ? 'space-y-0.5' : '')}>
           <h3 className="text-sm font-semibold text-[var(--text)]">{title}</h3>

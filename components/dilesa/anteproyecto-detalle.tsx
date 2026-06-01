@@ -330,6 +330,8 @@ export function AnteproyectoDetalle({
         onAnalisisAplicado={() => {
           void onAnteproyectoChange?.();
         }}
+        collapsible
+        defaultCollapsed
       />
 
       {/* Ficha física + Costos estimados + Análisis derivado quedaron
@@ -338,7 +340,7 @@ export function AnteproyectoDetalle({
           sobrando"). */}
 
       {anteproyecto.notas ? (
-        <DetailDrawerSection title="Notas">
+        <DetailDrawerSection title="Notas" collapsible defaultCollapsed>
           <p className="whitespace-pre-line text-sm text-[var(--text)]/80">{anteproyecto.notas}</p>
         </DetailDrawerSection>
       ) : null}
@@ -351,6 +353,8 @@ export function AnteproyectoDetalle({
         empresaSlug="dilesa"
         puedeAutorizar={puedeAutorizar}
         onChecklistState={handleChecklistState}
+        collapsible
+        defaultCollapsed
       />
 
       {/* La sección "Presupuesto" (partidas presupuestales del Sprint 2)

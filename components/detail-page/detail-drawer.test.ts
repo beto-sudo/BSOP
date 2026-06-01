@@ -57,4 +57,16 @@ describe('<DetailDrawer> source invariants', () => {
     expect(source).toMatch(/print:max-w-full/);
     expect(source).toMatch(/print:p-0/);
   });
+
+  it('supports opt-in collapsible sections that hide (not unmount) the body', () => {
+    // Espejar-a-desarrollo: secciones colapsables para listas largas
+    // (unidades/obras). Opt-in via `collapsible` (default false → render
+    // idéntico al previo). El body se oculta con `hidden`, NO se desmonta —
+    // así sobrevive el estado de forms y el montaje de hijos que reportan al
+    // padre (ej. el gate de promoción del anteproyecto vía onChecklistState).
+    expect(source).toMatch(/collapsible = false/);
+    expect(source).toMatch(/defaultCollapsed = false/);
+    expect(source).toMatch(/aria-expanded=\{!collapsed\}/);
+    expect(source).toMatch(/collapsed && 'hidden'/);
+  });
 });

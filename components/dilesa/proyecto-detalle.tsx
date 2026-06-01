@@ -702,6 +702,7 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
       <DetailDrawerSection
         title="Datos del proyecto"
         divider={proyecto.proyecto_predecesor_id != null}
+        collapsible
       >
         {ficha.length > 0 ? (
           <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
@@ -739,6 +740,7 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
               ? `Estado sugerido: ${ESTADO_LABEL[avances.estado_sugerido] ?? avances.estado_sugerido}`
               : undefined
           }
+          collapsible
         >
           <div className="space-y-3">
             <ProgressBar label="Urbanización" pct={avances.avance_urb_pct} />
@@ -777,6 +779,8 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
         empresaSlug="dilesa"
         puedeAutorizar={puedeAutorizar}
         mostrarBannerHistorico
+        collapsible
+        defaultCollapsed
       />
 
       <PlanoAnteproyecto
@@ -784,9 +788,11 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
         empresaId={DILESA_EMPRESA_ID}
         empresaSlug="dilesa"
         titulo="Plano del proyecto"
+        collapsible
+        defaultCollapsed
       />
 
-      <DetailDrawerSection title="Documentos y configuración">
+      <DetailDrawerSection title="Documentos y configuración" collapsible defaultCollapsed>
         <div className="space-y-3">
           <FieldRow
             label="Plano oficial (URL)"
@@ -877,6 +883,8 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
         <DetailDrawerSection
           title="Obras de construcción"
           description={`${obras.length} ${obras.length === 1 ? 'obra' : 'obras'}`}
+          collapsible
+          defaultCollapsed
         >
           <DataTable
             data={obras}
@@ -903,6 +911,8 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
                 filtradas.length !== unidades.length ? ` de ${unidades.length}` : ''
               } ${unidades.length === 1 ? 'unidad' : 'unidades'}`
         }
+        collapsible
+        defaultCollapsed
       >
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <div className="relative">
