@@ -25,7 +25,16 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Check, Circle, Download, ExternalLink, FileText, Pencil } from 'lucide-react';
+import {
+  ArrowLeft,
+  Check,
+  Circle,
+  Download,
+  ExternalLink,
+  FileText,
+  Pencil,
+  Plus,
+} from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Badge } from '@/components/ui/badge';
@@ -33,6 +42,8 @@ import type { BadgeTone } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getAdjuntoProxyUrl } from '@/lib/adjuntos';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { useToast } from '@/components/ui/toast';
+import { AbonoCaptureDrawer } from '@/components/dilesa/abono-capture-drawer';
 import {
   snapshotHold,
   formatearVencimiento,
@@ -42,6 +53,7 @@ import {
 
 type Venta = {
   id: string;
+  empresa_id: string;
   persona_id: string;
   unidad_id: string | null;
   vendedor_usuario_id: string | null;
@@ -297,6 +309,9 @@ function DetailInner() {
   const [holdSnapshot, setHoldSnapshot] = useState<HoldSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [abonoOpen, setAbonoOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const toast = useToast();
 
   useEffect(() => {
     if (!id) return;
@@ -507,7 +522,24 @@ function DetailInner() {
     return () => {
       activo = false;
     };
-  }, [id]);
+  }, [id, refreshKey]);
+
+  const handleGenerarPlan = async () => {
+    const sb = createSupabaseBrowserClient();
+    const { error: rpcErr } = await sb
+      .schema('dilesa')
+      .rpc('fn_generar_plan_pagos', { p_venta_id: id });
+    if (rpcErr) {
+      toast.add({
+        title: 'No se pudo generar el plan',
+        description: getSupabaseErrorMessage(rpcErr, 'Error en el RPC.'),
+        type: 'error',
+      });
+      return;
+    }
+    toast.add({ title: 'Plan de pagos generado', type: 'success' });
+    setRefreshKey((k) => k + 1);
+  };
 
   const clienteNombre = useMemo(() => {
     if (!persona) return '';
@@ -894,6 +926,24 @@ function DetailInner() {
             : `saldo ${moneyFmt.format(saldoPendiente)} de ${moneyFmt.format(totalACobrar)}`
         }
       >
+        <div className="mb-4 flex flex-wrap justify-end gap-2">
+          {cargos.length === 0 ? (
+            <button
+              type="button"
+              onClick={handleGenerarPlan}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--text)] hover:bg-[var(--panel)]"
+            >
+              Generar plan
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setAbonoOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--text)] px-3 py-1.5 text-sm font-medium text-[var(--card)] hover:opacity-90"
+          >
+            <Plus className="h-4 w-4" /> Registrar abono
+          </button>
+        </div>
         {cargos.length === 0 && abonos.length === 0 ? (
           <p className="text-sm text-[var(--text)]/60">
             Sin plan de pagos generado para esta venta.
@@ -1037,6 +1087,16 @@ function DetailInner() {
           </div>
         )}
       </Section>
+
+      <AbonoCaptureDrawer
+        open={abonoOpen}
+        onOpenChange={setAbonoOpen}
+        ventaId={id}
+        empresaId={venta.empresa_id}
+        personaId={venta.persona_id}
+        clienteNombre={clienteNombre}
+        onDone={() => setRefreshKey((k) => k + 1)}
+      />
     </div>
   );
 }
