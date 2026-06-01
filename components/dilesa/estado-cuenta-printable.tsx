@@ -108,6 +108,10 @@ export function EstadoCuentaPrintable({
 }: EstadoCuentaPrintableProps) {
   const branding = getEmpresaBranding(empresa);
 
+  const totalAbonado = abonos.reduce((s, a) => s + a.monto, 0);
+  const totalAplicado = abonos.reduce((s, a) => s + a.aplicado, 0);
+  const totalFavorAbonos = abonos.reduce((s, a) => s + Math.max(0, a.monto - a.aplicado), 0);
+
   const fichaOperacion: { label: string; value: string }[] = (
     [
       ['Proyecto', operacion.proyecto],
@@ -145,8 +149,8 @@ export function EstadoCuentaPrintable({
         .estado-cuenta-doc th { background: #f0f0f0; font-weight: 700; }
         .estado-cuenta-doc td.num, .estado-cuenta-doc th.num { text-align: right; font-variant-numeric: tabular-nums; }
         .estado-cuenta-doc tr { break-inside: avoid; }
-        .estado-cuenta-doc .ec-membrete { width: 100%; max-width: 540px; height: auto; }
-        .estado-cuenta-doc .ec-footer-img { width: 100%; max-width: 540px; height: auto; }
+        .estado-cuenta-doc .ec-membrete { display: block; width: 100%; height: auto; }
+        .estado-cuenta-doc .ec-footer-img { display: block; width: 100%; height: auto; margin-top: 12px; }
         .estado-cuenta-doc .ec-datos { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; font-size: 11px; }
         .estado-cuenta-doc .ec-dato-label { color: #666; }
         .estado-cuenta-doc .ec-resumen { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
@@ -156,14 +160,12 @@ export function EstadoCuentaPrintable({
         .estado-cuenta-doc .ec-total-row td { background: #f6f6f6; font-weight: 700; }
       `}</style>
 
-      <header className="mb-3 flex items-start justify-between gap-4 border-b border-black/20 pb-3">
+      <header className="mb-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={branding.logoPath} alt={branding.membreteAlt} className="ec-membrete" />
-        <div className="text-right">
+        <div className="mt-3 flex items-baseline justify-between border-b border-black/20 pb-2">
           <h1>Estado de cuenta</h1>
-          <p className="mt-1 text-[11px] text-black/70">
-            Al corte del {fmtFechaLarga(fechaCorteISO)}
-          </p>
+          <p className="text-[11px] text-black/70">Al corte del {fmtFechaLarga(fechaCorteISO)}</p>
         </div>
       </header>
 
@@ -280,6 +282,12 @@ export function EstadoCuentaPrintable({
                   </tr>
                 );
               })}
+              <tr className="ec-total-row">
+                <td colSpan={3}>Total</td>
+                <td className="num">{money(totalAbonado)}</td>
+                <td className="num">{money(totalAplicado)}</td>
+                <td className="num">{totalFavorAbonos > 0 ? money(totalFavorAbonos) : '—'}</td>
+              </tr>
             </tbody>
           </table>
         </>

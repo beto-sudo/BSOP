@@ -73,8 +73,8 @@ export function ReciboCajaPrintable({
       <style>{`
         .recibo-caja-doc { color: #000; font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
         .recibo-caja-doc h1 { font-size: 17px; font-weight: 700; margin: 0; letter-spacing: 0.5px; text-transform: uppercase; }
-        .recibo-caja-doc .rc-membrete { width: 100%; max-width: 540px; height: auto; }
-        .recibo-caja-doc .rc-footer-img { width: 100%; max-width: 540px; height: auto; }
+        .recibo-caja-doc .rc-membrete { display: block; width: 100%; height: auto; }
+        .recibo-caja-doc .rc-footer-img { display: block; width: 100%; height: auto; margin-top: 12px; }
         .recibo-caja-doc .rc-folio { font-size: 12px; font-weight: 700; color: #b00; }
         .recibo-caja-doc .rc-box { border: 1px solid #999; border-radius: 8px; padding: 14px 16px; margin: 12px 0; }
         .recibo-caja-doc .rc-row { display: flex; gap: 8px; margin: 6px 0; font-size: 13px; }
@@ -85,13 +85,15 @@ export function ReciboCajaPrintable({
         .recibo-caja-doc .rc-firma { margin-top: 56px; width: 260px; margin-left: auto; margin-right: auto; border-top: 1px solid #000; padding-top: 4px; text-align: center; font-size: 11px; }
       `}</style>
 
-      <header className="mb-3 flex items-start justify-between gap-4 border-b border-black/20 pb-3">
+      <header className="mb-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={branding.logoPath} alt={branding.membreteAlt} className="rc-membrete" />
-        <div className="text-right">
+        <div className="mt-3 flex items-baseline justify-between border-b border-black/20 pb-2">
           <h1>Recibo de caja</h1>
-          <p className="mt-1 rc-folio">Folio {folio}</p>
-          <p className="text-[11px] text-black/70">{fmtFechaLarga(fechaISO)}</p>
+          <div className="text-right">
+            <p className="rc-folio">Folio {folio}</p>
+            <p className="text-[11px] text-black/70">{fmtFechaLarga(fechaISO)}</p>
+          </div>
         </div>
       </header>
 
