@@ -3552,6 +3552,9 @@ export type Database = {
           deleted_at: string | null
           descuento_total: number | null
           empresa_id: string
+          enganche_fecha_primer_pago: string | null
+          enganche_num_parcialidades: number
+          enganche_periodicidad: string
           enganche_requerido: number | null
           es_pep: boolean | null
           estado: string
@@ -3601,6 +3604,9 @@ export type Database = {
           deleted_at?: string | null
           descuento_total?: number | null
           empresa_id: string
+          enganche_fecha_primer_pago?: string | null
+          enganche_num_parcialidades?: number
+          enganche_periodicidad?: string
           enganche_requerido?: number | null
           es_pep?: boolean | null
           estado?: string
@@ -3650,6 +3656,9 @@ export type Database = {
           deleted_at?: string | null
           descuento_total?: number | null
           empresa_id?: string
+          enganche_fecha_primer_pago?: string | null
+          enganche_num_parcialidades?: number
+          enganche_periodicidad?: string
           enganche_requerido?: number | null
           es_pep?: boolean | null
           estado?: string
@@ -3906,6 +3915,7 @@ export type Database = {
         }
         Returns: string
       }
+      fn_generar_plan_pagos: { Args: { p_venta_id: string }; Returns: number }
       fn_marcar_plano_vigente: {
         Args: { p_plano_id: string }
         Returns: undefined
