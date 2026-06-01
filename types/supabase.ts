@@ -4833,6 +4833,208 @@ export type Database = {
         }
         Relationships: []
       }
+      cxc_cargos: {
+        Row: {
+          concepto: string | null
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          estado: string
+          fecha_vencimiento: string | null
+          fuente_esperada: string
+          id: string
+          monto: number
+          monto_pagado: number
+          notas: string | null
+          numero: number
+          origen_id: string | null
+          origen_tipo: string
+          persona_id: string
+          saldo: number | null
+          tipo_cargo: string
+          updated_at: string
+        }
+        Insert: {
+          concepto?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          estado?: string
+          fecha_vencimiento?: string | null
+          fuente_esperada?: string
+          id?: string
+          monto: number
+          monto_pagado?: number
+          notas?: string | null
+          numero?: number
+          origen_id?: string | null
+          origen_tipo?: string
+          persona_id: string
+          saldo?: number | null
+          tipo_cargo: string
+          updated_at?: string
+        }
+        Update: {
+          concepto?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          estado?: string
+          fecha_vencimiento?: string | null
+          fuente_esperada?: string
+          id?: string
+          monto?: number
+          monto_pagado?: number
+          notas?: string | null
+          numero?: number
+          origen_id?: string | null
+          origen_tipo?: string
+          persona_id?: string
+          saldo?: number | null
+          tipo_cargo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cxc_cargos_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cxc_cargos_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "v_empleados_full"
+            referencedColumns: ["persona_id"]
+          },
+        ]
+      }
+      cxc_pago_aplicaciones: {
+        Row: {
+          cargo_id: string
+          created_at: string
+          empresa_id: string
+          id: string
+          monto_aplicado: number
+          pago_id: string
+        }
+        Insert: {
+          cargo_id: string
+          created_at?: string
+          empresa_id: string
+          id?: string
+          monto_aplicado: number
+          pago_id: string
+        }
+        Update: {
+          cargo_id?: string
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          monto_aplicado?: number
+          pago_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cxc_pago_aplicaciones_cargo_id_fkey"
+            columns: ["cargo_id"]
+            isOneToOne: false
+            referencedRelation: "cxc_cargos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cxc_pago_aplicaciones_pago_id_fkey"
+            columns: ["pago_id"]
+            isOneToOne: false
+            referencedRelation: "cxc_pagos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cxc_pagos: {
+        Row: {
+          coda_row_id: string | null
+          comprobante_adjunto_id: string | null
+          created_at: string
+          cuenta_bancaria_id: string | null
+          deleted_at: string | null
+          empresa_id: string
+          fecha: string
+          forma_pago: string | null
+          fuente: string
+          id: string
+          monto_total: number
+          notas: string | null
+          persona_id: string
+          referencia: string | null
+          registrado_por: string | null
+          updated_at: string
+          uuid_sat: string | null
+        }
+        Insert: {
+          coda_row_id?: string | null
+          comprobante_adjunto_id?: string | null
+          created_at?: string
+          cuenta_bancaria_id?: string | null
+          deleted_at?: string | null
+          empresa_id: string
+          fecha?: string
+          forma_pago?: string | null
+          fuente?: string
+          id?: string
+          monto_total: number
+          notas?: string | null
+          persona_id: string
+          referencia?: string | null
+          registrado_por?: string | null
+          updated_at?: string
+          uuid_sat?: string | null
+        }
+        Update: {
+          coda_row_id?: string | null
+          comprobante_adjunto_id?: string | null
+          created_at?: string
+          cuenta_bancaria_id?: string | null
+          deleted_at?: string | null
+          empresa_id?: string
+          fecha?: string
+          forma_pago?: string | null
+          fuente?: string
+          id?: string
+          monto_total?: number
+          notas?: string | null
+          persona_id?: string
+          referencia?: string | null
+          registrado_por?: string | null
+          updated_at?: string
+          uuid_sat?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cxc_pagos_cuenta_bancaria_id_fkey"
+            columns: ["cuenta_bancaria_id"]
+            isOneToOne: false
+            referencedRelation: "cuentas_bancarias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cxc_pagos_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cxc_pagos_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "v_empleados_full"
+            referencedColumns: ["persona_id"]
+          },
+        ]
+      }
       departamentos: {
         Row: {
           activo: boolean
@@ -6191,6 +6393,8 @@ export type Database = {
           moneda_id: string | null
           monto: number
           referencia: string | null
+          referencia_id: string | null
+          referencia_tipo: string | null
           tipo: string
           updated_at: string | null
         }
@@ -6206,6 +6410,8 @@ export type Database = {
           moneda_id?: string | null
           monto: number
           referencia?: string | null
+          referencia_id?: string | null
+          referencia_tipo?: string | null
           tipo: string
           updated_at?: string | null
         }
@@ -6221,6 +6427,8 @@ export type Database = {
           moneda_id?: string | null
           monto?: number
           referencia?: string | null
+          referencia_id?: string | null
+          referencia_tipo?: string | null
           tipo?: string
           updated_at?: string | null
         }
