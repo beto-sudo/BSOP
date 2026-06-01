@@ -297,10 +297,30 @@ porque comparten patrón.
   cargado + 4 filas de cargos) — no blanco. Sin DDL. 5 checks verdes (1142
   tests). PR _(este PR)_.
 
+- **Pulido post-feedback de Beto** (commit posterior): membrete y footer a
+  ancho completo (estaban capados a `max-width:540px`, descuadraban vs el
+  cuerpo full-width) — ahora `width:100%` alineados al cuerpo, como el `w-full`
+  del kardex; header reestructurado (membrete banner + fila título/corte con
+  divisor). + Fila **Total** en la tabla de Abonos (Monto/Aplicado/Saldo a
+  favor), como en Cargos. Verificado en preview (membrete=footer=cuerpo=754px).
+
 **Pendiente:** recordatorios de vencimiento (catálogo `notificaciones`, solo
-`fuente=cliente`) + limpieza de los $2.0M de saldos a favor + retiro de Coda.
-Desde cobranza (búsqueda por cliente) se puede sumar un disparo de impresión
-on-demand si Beto lo pide (requiere fetch del estado completo en el click).
+`fuente=cliente`) + retiro de Coda. Desde cobranza se puede sumar un disparo
+de impresión on-demand si se pide (requiere fetch del estado al click).
+
+**Limpieza de saldos a favor — FRENTE APARTE (no tocar datos sin OK de Beto).**
+Surgió cuando Beto vio un estado de cuenta con saldo a favor pese a cargos
+liquidados. Diagnóstico 2026-06-01 (read-only, no es defecto del documento ni
+del modelo CxC — es dato heredado de Coda): **185 de 1,179 ventas** (~16%)
+tienen saldo a favor, total **$2,015,311.81** — **$1,941,717 (96%) de
+institución**, $73,594 de cliente. De las 179 ventas con favor de institución,
+**140 (78%)** tienen el depósito Infonavit/Fovissste capturado **≥ el precio
+completo** en vez de la disposición real (_precio − enganche_), lo que dobla el
+enganche (lo pagan institución + cliente). El favor varía $0.88–$89,664 (prom.
+$10,847) → no hay corrección por constante; requiere regla + revisión. Beto
+decidió tratarlo como tarea/iniciativa aparte (no bloquea la impresión). Al
+atacarlo: validar muestra, decidir si el exceso se corrige (abono =
+disposición) o queda como crédito real, y ejecutar con aprobación explícita.
 
 ### 2026-06-01 — Sprint 2 (UI) + fix del cálculo + Sprint 3 (módulo CxC)
 
