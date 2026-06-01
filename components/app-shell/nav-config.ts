@@ -82,6 +82,9 @@ export const NAV_ITEMS: NavItem[] = [
           // Contratistas / Prototipos) — el sidebar muestra solo la entry
           // del padre; las tabs viven en el layout (sprint tabs+protos).
           { label: 'Construcción', href: '/dilesa/construccion' },
+          // Cobranza (CxC) — hub con 2 tabs (Pagos / Saldos). El padre
+          // `dilesa.cobranza` es umbrella; las tabs viven en el layout.
+          { label: 'Cobranza', href: '/dilesa/cobranza' },
         ],
       },
     ],
