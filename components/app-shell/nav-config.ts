@@ -54,6 +54,9 @@ export const NAV_ITEMS: NavItem[] = [
           { label: 'Tareas', href: '/dilesa/admin/tasks' },
           { label: 'Juntas', href: '/dilesa/admin/juntas' },
           { label: 'Documentos', href: '/dilesa/admin/documentos' },
+          // CxC (Cuentas por Cobrar) — hub con 2 tabs (Pagos / Saldos).
+          // El slug/URL internos siguen siendo `cobranza`.
+          { label: 'CxC', href: '/dilesa/cobranza' },
         ],
       },
       {
@@ -82,9 +85,6 @@ export const NAV_ITEMS: NavItem[] = [
           // Contratistas / Prototipos) — el sidebar muestra solo la entry
           // del padre; las tabs viven en el layout (sprint tabs+protos).
           { label: 'Construcción', href: '/dilesa/construccion' },
-          // Cobranza (CxC) — hub con 2 tabs (Pagos / Saldos). El padre
-          // `dilesa.cobranza` es umbrella; las tabs viven en el layout.
-          { label: 'Cobranza', href: '/dilesa/cobranza' },
         ],
       },
     ],

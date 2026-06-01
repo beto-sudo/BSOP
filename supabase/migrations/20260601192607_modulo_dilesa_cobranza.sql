@@ -24,22 +24,22 @@ BEGIN;
 -- ─── Módulo padre + sub-slugs ─────────────────────────────────────────
 
 INSERT INTO core.modulos (slug, nombre, descripcion, empresa_id, seccion)
-SELECT s.slug, s.nombre, s.descripcion, e.id, 'operaciones'
+SELECT s.slug, s.nombre, s.descripcion, e.id, 'administracion'
 FROM (
   VALUES
     (
       'dilesa.cobranza',
-      'Cobranza',
+      'CxC',
       'Cuentas por cobrar: captura de pagos, antigüedad de saldos y estado de cuenta'
     ),
     (
       'dilesa.cobranza.pagos',
-      'Cobranza · Pagos',
+      'CxC · Pagos',
       'Captura y consulta de abonos desde administración'
     ),
     (
       'dilesa.cobranza.aging',
-      'Cobranza · Saldos',
+      'CxC · Saldos',
       'Antigüedad de saldos por cliente y venta'
     )
 ) AS s(slug, nombre, descripcion)
