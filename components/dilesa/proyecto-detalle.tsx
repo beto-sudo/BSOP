@@ -28,6 +28,10 @@ import type { BadgeTone } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Search, Boxes, HardHat } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { ProyectoChecklist } from './proyecto-checklist';
+import { PlanoAnteproyecto } from './plano-anteproyecto';
+import { useEffectiveUser } from '@/components/providers';
+import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 
 export type ProyectoDetalle = {
   id: string;
@@ -390,6 +394,12 @@ function buildUnidadColumns(
 
 export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null }) {
   const router = useRouter();
+  const { data: effectiveUser } = useEffectiveUser();
+  // Autoriza pasos/partidas en el checklist: admin global O rol
+  // "Dirección" en DILESA (este componente solo monta proyectos DILESA).
+  const puedeAutorizar =
+    !!effectiveUser?.isAdmin ||
+    (effectiveUser?.direccionEmpresaIds ?? []).includes(DILESA_EMPRESA_ID);
   const [unidades, setUnidades] = useState<Unidad[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loadedId, setLoadedId] = useState<string | null>(null);
@@ -692,6 +702,7 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
       <DetailDrawerSection
         title="Datos del proyecto"
         divider={proyecto.proyecto_predecesor_id != null}
+        collapsible
       >
         {ficha.length > 0 ? (
           <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
@@ -729,6 +740,7 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
               ? `Estado sugerido: ${ESTADO_LABEL[avances.estado_sugerido] ?? avances.estado_sugerido}`
               : undefined
           }
+          collapsible
         >
           <div className="space-y-3">
             <ProgressBar label="Urbanización" pct={avances.avance_urb_pct} />
@@ -759,28 +771,28 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
         </DetailDrawerSection>
       )}
 
-      {obras.length > 0 && (
-        <DetailDrawerSection
-          title="Obras de construcción"
-          description={`${obras.length} ${obras.length === 1 ? 'obra' : 'obras'}`}
-        >
-          <DataTable
-            data={obras}
-            columns={obraColumns}
-            rowKey="id"
-            onRowClick={(o) => router.push(`/dilesa/construccion/${o.id}`)}
-            sticky={{ header: false }}
-            showDensityToggle={false}
-            density="compact"
-            initialSort={{ key: 'avance_pct', dir: 'desc' }}
-            emptyTitle="Sin obras"
-            emptyDescription="Este proyecto no tiene obras de construcción."
-            emptyIcon={<HardHat className="h-6 w-6" />}
-          />
-        </DetailDrawerSection>
-      )}
+      <ProyectoChecklist
+        proyectoId={proyecto.id}
+        tipo={proyecto.tipo}
+        fechaArranque={proyecto.fecha_inicio}
+        empresaId={DILESA_EMPRESA_ID}
+        empresaSlug="dilesa"
+        puedeAutorizar={puedeAutorizar}
+        mostrarBannerHistorico
+        collapsible
+        defaultCollapsed
+      />
 
-      <DetailDrawerSection title="Documentos y configuración">
+      <PlanoAnteproyecto
+        proyectoId={proyecto.id}
+        empresaId={DILESA_EMPRESA_ID}
+        empresaSlug="dilesa"
+        titulo="Plano del proyecto"
+        collapsible
+        defaultCollapsed
+      />
+
+      <DetailDrawerSection title="Documentos y configuración" collapsible defaultCollapsed>
         <div className="space-y-3">
           <FieldRow
             label="Plano oficial (URL)"
@@ -867,6 +879,29 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
         </div>
       </DetailDrawerSection>
 
+      {obras.length > 0 && (
+        <DetailDrawerSection
+          title="Obras de construcción"
+          description={`${obras.length} ${obras.length === 1 ? 'obra' : 'obras'}`}
+          collapsible
+          defaultCollapsed
+        >
+          <DataTable
+            data={obras}
+            columns={obraColumns}
+            rowKey="id"
+            onRowClick={(o) => router.push(`/dilesa/construccion/${o.id}`)}
+            sticky={{ header: false }}
+            showDensityToggle={false}
+            density="compact"
+            initialSort={{ key: 'avance_pct', dir: 'desc' }}
+            emptyTitle="Sin obras"
+            emptyDescription="Este proyecto no tiene obras de construcción."
+            emptyIcon={<HardHat className="h-6 w-6" />}
+          />
+        </DetailDrawerSection>
+      )}
+
       <DetailDrawerSection
         title="Unidades"
         description={
@@ -876,6 +911,8 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
                 filtradas.length !== unidades.length ? ` de ${unidades.length}` : ''
               } ${unidades.length === 1 ? 'unidad' : 'unidades'}`
         }
+        collapsible
+        defaultCollapsed
       >
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <div className="relative">

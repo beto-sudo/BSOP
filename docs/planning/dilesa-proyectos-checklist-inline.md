@@ -3,10 +3,10 @@
 **Slug:** `dilesa-proyectos-checklist-inline`
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa.proyecto_tarea_pasos` (tabla nueva Sprint 3); reusa `dilesa.proyecto_tareas` + `proyecto_tareas_dependencias` + `proyecto_presupuesto_partidas` + `proyecto_documentos` + `proyecto_hitos` + `plantilla_proyecto_tareas`.
-**Estado:** done
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-28
-**Última actualización:** 2026-05-30 (CERRADA — 15 sprints + 12 PRs. Pipeline completo: checklist → análisis financiero → PDF → plano versionado → análisis AI → viewer embebido)
+**Última actualización:** 2026-05-31 (Sprint 4 "espejar a desarrollo" reabierto y entregado en PR — checklist + plano versionado/IA montados en el detalle del desarrollo vía componente compartido `<ProyectoChecklist>` + banner "Marcar histórico" + script de backfill. Pendiente: correr backfill contra prod + merge tras revisión del preview)
 
 ## Problema
 
@@ -287,16 +287,48 @@ es atajo al de la tarea hoy).
 - `<PartidasPresupuestales>` queda igual; el auto-flujo lo alimenta
   desde los pasos en lugar del campo `resultado_monto` antiguo.
 
-### Sprint 4 — Espejar a desarrollo + backfill desarrollos
+### Sprint 4 — Espejar a desarrollo + backfill desarrollos ✅ (2026-05-31)
 
-(Pospuesto desde el plan original Sprint 3 — se ejecuta una vez que
-los pasos por tarea estén estables en anteproyecto.)
+(Pospuesto desde el plan original al cerrar la iniciativa el 2026-05-30;
+reabierto el 2026-05-31 a pedido de Beto: "habíamos quedado de espejear
+lo que hicimos con el control de documentos y tareas hacia Proyectos".)
 
-1. Backfill SQL para los 8 desarrollos vivos (tareas + pasos).
-2. `<ProyectoDetalle>` agrega `<TareasChecklist>` +
-   `<PartidasPresupuestales>` filtradas por
-   `aplicacion_snapshot IN ('desarrollo','ambas')`.
-3. Banner sticky "Marcar histórico" para acelerar marcado en bulk.
+Entregado:
+
+1. **Componente compartido** `components/dilesa/proyecto-checklist.tsx`
+   (`<ProyectoChecklist>`) — encapsula el fetch (tareas + dependencias +
+   pasos) + estado vacío con botón "Poblar plantilla canónica" +
+   `<TareasChecklist>` + banner "Marcar histórico". El fetch vive aquí
+   adentro; el padre que necesite las tareas (anteproyecto, para su gate
+   de promoción) las recibe vía `onChecklistState`. ADR-011: un solo
+   dueño de mantenimiento.
+2. **`<ProyectoDetalle>`** (detalle del desarrollo) monta
+   `<ProyectoChecklist mostrarBannerHistorico>` +
+   `<PlanoAnteproyecto titulo="Plano del proyecto">`. No hace falta
+   filtrar por `aplicacion_snapshot` en el fetch: la instanciación ya
+   filtró por tipo al poblar (`instanciarPlantillaParaProyecto` →
+   `aplicacion IN ('desarrollo','ambas')`).
+3. **`<AnteproyectoDetalle>`** refactorizado al mismo componente
+   (-245 LOC netas), preservando el gate de promoción.
+4. **Server action `marcarTareasHistorico(proyectoId)`** — marca en bulk
+   las tareas no-terminales (pendiente/en_curso/bloqueada) → completada.
+   Reversible tarea por tarea. Alimenta el banner.
+5. **Backfill** `scripts/backfill_dilesa_desarrollo_tareas.ts`
+   (idempotente, `DRY_RUN`): puebla la plantilla 'desarrollo' en los 8
+   desarrollos vivos reusando `instanciarPlantillaParaProyecto`.
+
+Decisiones de alcance (Beto, 2026-05-31): (a) backfill masivo de los 8
+ahora — no on-demand; (b) espejo = checklist **+ plano** versionado/IA
+(no solo checklist). `<PartidasPresupuestales>` NO se monta: se eliminó
+del anteproyecto en Sprint 4E, no se replica.
+
+Backfill **ejecutado contra prod 2026-05-31** (Beto eligió poblar en
+`pendiente`, no auto-completar): 152 tareas (19 × 8 desarrollos)
+instanciadas con fechas objetivo en cascada (2026-06-01 → 2026-11-02).
+Verificado: 19 tareas + 18 dependencias por desarrollo, todas en
+`pendiente`. Pendiente: que Beto cierre con el banner "Marcar histórico"
+las tareas ya superadas de cada desarrollo (proyectos en marcha pueden
+tener trámites/comercialización aún vivos — por eso no se auto-completó).
 
 ### Sprint 5 — Documentos + hitos unificados
 
@@ -328,6 +360,20 @@ los pasos por tarea estén estables en anteproyecto.)
   patrón existe y funciona (otros módulos ya lo usan).
 
 ## Bitácora
+
+- **2026-05-31 (Sprint 4 — espejar a desarrollo)** — Reabierto a pedido
+  de Beto. Extraído el bloque checklist (fetch tareas/deps/pasos + estado
+  vacío + `<TareasChecklist>`) del anteproyecto a un componente
+  compartido `components/dilesa/proyecto-checklist.tsx`; `<ProyectoDetalle>`
+  (detalle del desarrollo) ahora monta `<ProyectoChecklist>` con banner
+  "Marcar histórico" + `<PlanoAnteproyecto titulo="Plano del proyecto">`.
+  `<AnteproyectoDetalle>` refactorizado al mismo componente (-245 LOC
+  netas) preservando el gate de promoción vía `onChecklistState`. Server
+  action `marcarTareasHistorico` (bulk, reversible). Script
+  `backfill_dilesa_desarrollo_tareas.ts` (idempotente, DRY_RUN) para los
+  8 desarrollos. Cero DDL — el modelo ya lo soportaba. 5 checks locales
+  verdes (1133 tests). UI visible → PR a preview sin auto-merge. Backfill
+  contra prod queda como paso operativo tras OK del preview.
 
 - **2026-05-29 (Sprint 4E — análisis AI del plano)** — PR #588
   mergeado. Botón "Analizar con IA" sobre el plano vigente. Claude
