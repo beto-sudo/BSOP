@@ -34,6 +34,7 @@ import {
   FileText,
   Pencil,
   Plus,
+  Printer,
 } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
@@ -44,6 +45,10 @@ import { getAdjuntoProxyUrl } from '@/lib/adjuntos';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { useToast } from '@/components/ui/toast';
 import { AbonoCaptureDrawer } from '@/components/dilesa/abono-capture-drawer';
+import { EstadoCuentaPrintable } from '@/components/dilesa/estado-cuenta-printable';
+import { ReciboCajaPrintable } from '@/components/dilesa/recibo-caja-printable';
+import { useTriggerPrint } from '@/components/print';
+import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import {
   snapshotHold,
   formatearVencimiento,
@@ -149,6 +154,7 @@ type Abono = {
   monto_total: number;
   fuente: string;
   forma_pago: string | null;
+  referencia: string | null;
   notas: string | null;
 };
 type Adjunto = {
@@ -314,7 +320,10 @@ function DetailInner() {
   const [error, setError] = useState<string | null>(null);
   const [abonoOpen, setAbonoOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [estadoCuentaOpen, setEstadoCuentaOpen] = useState(false);
+  const [reciboAbono, setReciboAbono] = useState<Abono | null>(null);
   const toast = useToast();
+  const triggerPrint = useTriggerPrint();
 
   useEffect(() => {
     if (!id) return;
@@ -375,7 +384,7 @@ function DetailInner() {
         sb
           .schema('erp')
           .from('cxc_pagos')
-          .select('id, fecha, monto_total, fuente, forma_pago, notas')
+          .select('id, fecha, monto_total, fuente, forma_pago, referencia, notas')
           .eq('origen_tipo', 'venta_dilesa')
           .eq('origen_id', ventaRow.id)
           .is('deleted_at', null)
@@ -955,6 +964,15 @@ function DetailInner() {
               Generar plan
             </button>
           ) : null}
+          {cargos.length > 0 || abonos.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setEstadoCuentaOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--text)] hover:bg-[var(--panel)]"
+            >
+              <Printer className="h-4 w-4" /> Imprimir estado de cuenta
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => setAbonoOpen(true)}
@@ -1039,7 +1057,8 @@ function DetailInner() {
                       <th className="py-1 pr-2 text-right font-medium">Monto</th>
                       <th className="py-1 pr-2 text-right font-medium">Aplicado</th>
                       <th className="py-1 pr-2 text-right font-medium">Saldo a favor</th>
-                      <th className="py-1 pl-2 font-medium">Comprobante</th>
+                      <th className="py-1 pr-2 font-medium">Comprobante</th>
+                      <th className="py-1 pl-2 font-medium"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1067,7 +1086,7 @@ function DetailInner() {
                               <span className="text-[var(--text)]/30">—</span>
                             )}
                           </td>
-                          <td className="py-1.5 pl-2">
+                          <td className="py-1.5 pr-2">
                             <div className="flex flex-wrap gap-1">
                               {(comprobantesPorAbono.get(a.id) ?? []).map((adj) => (
                                 <AdjuntoLink key={adj.id} a={adj} compact />
@@ -1076,6 +1095,16 @@ function DetailInner() {
                                 <span className="text-[var(--text)]/30">—</span>
                               ) : null}
                             </div>
+                          </td>
+                          <td className="py-1.5 pl-2 text-right">
+                            <button
+                              type="button"
+                              onClick={() => setReciboAbono(a)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-xs text-[var(--text)] hover:bg-[var(--panel)]"
+                              title="Imprimir recibo de caja"
+                            >
+                              <Printer className="h-3 w-3" /> Recibo
+                            </button>
                           </td>
                         </tr>
                       );
@@ -1127,6 +1156,107 @@ function DetailInner() {
         clienteNombre={clienteNombre}
         onDone={() => setRefreshKey((k) => k + 1)}
       />
+
+      {/* Estado de cuenta imprimible — el documento vive dentro del drawer; el
+          aislamiento de impresión lo da la maquinaria del repo (data-print-sheet-open
+          + @media print en globals.css), igual que el kardex. El título del header va
+          print:hidden para que el membrete del documento sea el encabezado impreso. */}
+      <DetailDrawer
+        open={estadoCuentaOpen}
+        onOpenChange={setEstadoCuentaOpen}
+        size="lg"
+        title={<span className="print:hidden">Estado de cuenta</span>}
+        description={<span className="print:hidden">{clienteNombre}</span>}
+        actions={
+          <button
+            type="button"
+            onClick={triggerPrint}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--text)] px-3 py-1.5 text-sm font-medium text-[var(--card)] hover:opacity-90"
+          >
+            <Printer className="h-4 w-4" /> Imprimir
+          </button>
+        }
+      >
+        <DetailDrawerContent>
+          <EstadoCuentaPrintable
+            cliente={{
+              nombre: clienteNombre,
+              rfc: persona?.rfc,
+              telefono: persona?.telefono,
+              email: persona?.email,
+            }}
+            operacion={{
+              proyecto: proyectoNombre,
+              unidad: unidad?.identificador,
+              prototipo: prototipoNombre,
+              tipoCredito: venta.tipo_credito,
+              valorEscrituracion: venta.valor_escrituracion,
+              asesor: vendedorNombre ?? venta.vendedor,
+            }}
+            cargos={cargos.map((c) => ({
+              concepto: c.concepto ?? capitalizar(c.tipo_cargo),
+              vence: c.fecha_vencimiento,
+              fuente: c.fuente_esperada,
+              monto: c.monto,
+              pagado: c.monto_pagado,
+              saldo: c.saldo,
+              estado: c.estado,
+            }))}
+            abonos={abonos.map((a) => ({
+              fecha: a.fecha,
+              fuente: a.fuente,
+              formaPago: a.forma_pago,
+              monto: a.monto_total,
+              aplicado: aplicadoPorAbono.get(a.id) ?? 0,
+            }))}
+            totales={{
+              aCobrar: totalACobrar,
+              cobrado: totalCobrado,
+              saldo: saldoPendiente,
+              saldoFavor,
+            }}
+            fechaCorteISO={new Date().toISOString().slice(0, 10)}
+          />
+        </DetailDrawerContent>
+      </DetailDrawer>
+
+      <DetailDrawer
+        open={!!reciboAbono}
+        onOpenChange={(o) => !o && setReciboAbono(null)}
+        size="md"
+        title={<span className="print:hidden">Recibo de caja</span>}
+        description={<span className="print:hidden">{clienteNombre}</span>}
+        actions={
+          <button
+            type="button"
+            onClick={triggerPrint}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--text)] px-3 py-1.5 text-sm font-medium text-[var(--card)] hover:opacity-90"
+          >
+            <Printer className="h-4 w-4" /> Imprimir
+          </button>
+        }
+      >
+        <DetailDrawerContent>
+          {reciboAbono ? (
+            <ReciboCajaPrintable
+              folio={`RC-${reciboAbono.id.slice(0, 8).toUpperCase()}`}
+              fechaISO={reciboAbono.fecha}
+              cliente={clienteNombre}
+              concepto={
+                [proyectoNombre, unidad?.identificador].filter(Boolean).join(' · ')
+                  ? `Abono a cuenta — ${[proyectoNombre, unidad?.identificador]
+                      .filter(Boolean)
+                      .join(' · ')}`
+                  : 'Abono a cuenta'
+              }
+              monto={reciboAbono.monto_total}
+              formaPago={reciboAbono.forma_pago}
+              referencia={reciboAbono.referencia}
+              fuente={reciboAbono.fuente}
+            />
+          ) : null}
+        </DetailDrawerContent>
+      </DetailDrawer>
     </div>
   );
 }

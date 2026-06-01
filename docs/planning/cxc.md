@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-06-01
-**Última actualización:** 2026-06-01 (Sprints 1-3 en prod: backend + fix del FIFO + UI estado de cuenta + captura + comprobante + módulo CxC. Pendiente: estado de cuenta imprimible, recordatorios, limpieza de los $2.0M de saldos a favor, retiro de Coda. Ver Bitácora.)
+**Última actualización:** 2026-06-01 (Sprints 1-3 en prod + impresión: estado de cuenta imprimible **por venta** + recibo de caja por abono (ADR-021). Pendiente: recordatorios, limpieza de los $2.0M de saldos a favor, retiro de Coda. Ver Bitácora.)
 
 ## Problema
 
@@ -254,6 +254,53 @@ cxc_cargos.saldo = precio − Σ aplicaciones`, y la suma de buckets de
   queda `proposed` hasta que CxC+CxP emitan movimientos.
 
 ## Bitácora
+
+### 2026-06-01 — Impresión: estado de cuenta + recibo de caja (ADR-021)
+
+Cierra los dos imprimibles que faltaban del CxC. Decisión de Beto: estado
+de cuenta **por venta** (anclado a un lote + su plan), no consolidado por
+cliente — encaja con la captura y el detalle, que ya son por venta; el
+aging por cliente cubre el agregado. Los dos documentos se hicieron juntos
+porque comparten patrón.
+
+- **`<EstadoCuentaPrintable>`** (`components/dilesa/`): membrete DILESA +
+  datos del cliente + datos de la operación + tabla de cargos (con total) +
+  tabla de abonos + resumen de saldos al corte. Nota de que no es CFDI.
+- **`<ReciboCajaPrintable>`**: recibo por abono con folio (`RC-` + id corto),
+  fecha, cliente, monto + **monto en letra** (`lib/format/numero-a-letras`),
+  concepto (proyecto · unidad), forma de pago + referencia, origen y firma.
+- **Patrón de impresión (ADR-021 + mecanismo de drawer del repo)**: cada
+  documento se monta dentro de un `<DetailDrawer>` y el aislamiento de
+  impresión lo provee la maquinaria del repo — `<SheetContent>` setea
+  `data-print-sheet-open` (`components/ui/sheet.tsx`) y el `@media print` de
+  `app/globals.css` oculta el app-shell y saca el portal del drawer en flujo.
+  Es el mismo patrón del kardex (`StockDetailDrawer`) y de todos los
+  documentos que ya imprimen bien. El título del header del drawer va
+  `print:hidden` para que el membrete del documento sea el encabezado impreso.
+- **Integración en `app/dilesa/ventas/[id]/page.tsx`**: botón "Imprimir
+  estado de cuenta" en la sección Estado de cuenta + botón "Recibo" por fila
+  de abono → abren un `<DetailDrawer>` con el documento (vista previa) y un
+  botón "Imprimir" (`useTriggerPrint`). Se agregó `referencia` al select de
+  `cxc_pagos`.
+- **Falso arranque corregido**: el primer intento metió un aislamiento propio
+  (`body * { visibility:hidden }` + `position:absolute` + toggling de
+  `display`) embebido en la página. Salía **en blanco** porque competía con el
+  mecanismo del repo en vez de usarlo (el documento no vivía en el portal de
+  un sheet, así que el app-shell no se ocultaba). Fix: reescritos como
+  contenido puro dentro del `<DetailDrawer>`.
+- **Test** `cxc-printables.test.ts`: invariantes source-level (env=node sin
+  DOM) — guardan que los documentos NO reintroduzcan el truco propio
+  (`visibility:hidden` / `position:absolute`) + membrete + monto en letra.
+- **Verificado en el preview** (Chrome MCP, emulando `@media print`): con el
+  drawer abierto `data-print-sheet-open='true'`, el app-shell queda
+  `display:none` y el documento renderiza con dimensiones reales (membrete
+  cargado + 4 filas de cargos) — no blanco. Sin DDL. 5 checks verdes (1142
+  tests). PR _(este PR)_.
+
+**Pendiente:** recordatorios de vencimiento (catálogo `notificaciones`, solo
+`fuente=cliente`) + limpieza de los $2.0M de saldos a favor + retiro de Coda.
+Desde cobranza (búsqueda por cliente) se puede sumar un disparo de impresión
+on-demand si Beto lo pide (requiere fetch del estado completo en el click).
 
 ### 2026-06-01 — Sprint 2 (UI) + fix del cálculo + Sprint 3 (módulo CxC)
 
