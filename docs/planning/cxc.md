@@ -38,9 +38,11 @@ sueltos sin saldo. El mes que se cae, se cae feo.
 ## Outcome esperado
 
 - **Cada venta DILESA genera su plan de cargos automáticamente**,
-  derivado de los términos ya capturados en `dilesa.ventas`
-  (`precio_asignacion`, `enganche_requerido`, `tipo_credito`). El
-  operador no teclea mensualidad por mensualidad.
+  anclado al **`valor_escrituracion`** de `dilesa.ventas` — el valor
+  definitivo por el que se expide la factura (normalmente =
+  `precio_asignacion`, pero puede ajustarse por promociones posteriores
+  a la asignación) — y desglosado según `enganche_requerido` +
+  `tipo_credito`. El operador no teclea mensualidad por mensualidad.
 - **Cada depósito se aplica a cargos específicos** (FIFO por default +
   override manual), soportando pagos parciales y saldo a favor.
 - **Saldo y aging 100% derivados**, cero captura — se recalculan solos
@@ -92,10 +94,12 @@ aplicaciones ≤ pago.monto_total` (permite saldo a favor).
     directo (sin recursión, ADR-037 D3).
   - RPCs:
     - `dilesa.fn_generar_plan_pagos(venta_id)` — **originación**: deriva
-      los cargos desde `dilesa.ventas`. Idempotente (regenerable
-      mientras no haya abonos aplicados). Enganche → parcialidades;
-      crédito propio → mensualidades; crédito institucional → evento
-      único `fuente_esperada='institucion'`.
+      los cargos desde `dilesa.ventas`, anclando el total al
+      **`valor_escrituracion`** (el valor de la factura; fallback a
+      `precio_asignacion` si aún no se define). Idempotente (regenerable
+      mientras no haya abonos aplicados). Enganche → **N parcialidades
+      con fecha**; crédito propio → mensualidades; crédito institucional
+      → evento único `fuente_esperada='institucion'`.
     - `erp.cxc_pago_registrar(...)` — alta de abono + auto-aplicación
       FIFO al cargo abierto más viejo + emite `movimientos_bancarios`
       si trae `cuenta_bancaria_id`.
@@ -180,14 +184,6 @@ cxc_cargos.saldo = precio − Σ aplicaciones`, y la suma de buckets de
 
 ## Riesgos / preguntas abiertas
 
-- [ ] **Estructura del plan de enganche**: ¿N parcialidades con fechas
-      (más control y cobranza activa) vs monto único abonable libre (más
-      simple, como hoy en Coda)? **Sesgo: parcialidades para enganche y
-      crédito propio; evento único para crédito institucional.** Se
-      cierra en Sprint 1 al ver los datos reales con Beto.
-- [ ] **Campo de "precio total" en `dilesa.ventas`**: confirmar cuál
-      gobierna el cargo (`valor_comercial` vs `precio_asignacion` vs
-      `valor_escrituracion`). Afecta la originación. Sprint 1 lo valida.
 - [ ] **Disposición del crédito institucional**: el abono es un evento
       único al escriturar. ¿Cómo se entera BSOP? Captura manual en v1;
       integración con RUV/banco = futuro (cruza con `dilesa-ruv`).
@@ -213,6 +209,23 @@ cxc_cargos.saldo = precio − Σ aplicaciones`, y la suma de buckets de
 | 5   | Retiro de Coda "Depositos Clientes" + smoke E2E + cutover + closeout                                                                                                                                                                     | pending   | —   |
 
 ## Decisiones registradas
+
+### 2026-06-01 — Cierre de preguntas finas (pre-Sprint 1)
+
+- **Enganche = N parcialidades con fecha** (no monto único abonable
+  libre). El plan de enganche es una serie de cargos con vencimiento;
+  crédito propio = mensualidades; crédito institucional = evento único.
+- **Ancla del cargo total = `valor_escrituracion`** (no
+  `precio_asignacion`). Es el valor definitivo por el que se expide la
+  factura. Normalmente coincide con `precio_asignacion`, pero puede
+  ajustarse por promociones definidas después de la asignación. La RPC
+  de originación usa `precio_asignacion` como fallback solo si la
+  escrituración aún no está definida, y **regenera el plan** si el valor
+  cambia antes de haber abonos aplicados.
+- **CxC y CxP avanzan en paralelo** (no CxC primero). Ambas arrancan
+  Sprint 1 a la vez; CxC entrega el foundation compartido (extensión
+  polimórfica de `movimientos_bancarios` + patrón de subledger ADR-037)
+  que CxP reusa.
 
 ### 2026-06-01 — Decisiones cerradas por Beto al promover la iniciativa
 
