@@ -269,21 +269,33 @@ porque comparten patrón.
 - **`<ReciboCajaPrintable>`**: recibo por abono con folio (`RC-` + id corto),
   fecha, cliente, monto + **monto en letra** (`lib/format/numero-a-letras`),
   concepto (proyecto · unidad), forma de pago + referencia, origen y firma.
-- **Patrón de impresión (ADR-021)**: ambos son componentes standalone con
-  el truco de aislamiento de `<FiniquitoPrintable>` — `hidden print:block` +
-  `@media print { body * visibility:hidden; .root* visible; position:absolute }`.
-  Imprimen solo el documento aunque vivan embebidos en el detalle de venta
-  (página enorme con 5 secciones). El caller monta **un** printable a la vez
-  (estado `printTarget`) para no imprimir ambos.
+- **Patrón de impresión (ADR-021 + mecanismo de drawer del repo)**: cada
+  documento se monta dentro de un `<DetailDrawer>` y el aislamiento de
+  impresión lo provee la maquinaria del repo — `<SheetContent>` setea
+  `data-print-sheet-open` (`components/ui/sheet.tsx`) y el `@media print` de
+  `app/globals.css` oculta el app-shell y saca el portal del drawer en flujo.
+  Es el mismo patrón del kardex (`StockDetailDrawer`) y de todos los
+  documentos que ya imprimen bien. El título del header del drawer va
+  `print:hidden` para que el membrete del documento sea el encabezado impreso.
 - **Integración en `app/dilesa/ventas/[id]/page.tsx`**: botón "Imprimir
   estado de cuenta" en la sección Estado de cuenta + botón "Recibo" por fila
-  de abono. `useTriggerPrint()` disparado en effect tras montar el printable
-  (un `requestAnimationFrame` para que membrete/layout estén listos; limpia
-  en `afterprint`). Se agregó `referencia` al select de `cxc_pagos`.
-- **Test** `cxc-printables.test.ts`: invariantes source-level (mismo patrón
-  que `detail-drawer.test.ts`, env=node sin DOM) — guarda el aislamiento de
-  impresión, el `hidden print:block`, el membrete y el monto en letra.
-- Sin DDL. 5 checks locales verdes (1144 tests). PR _(este PR)_.
+  de abono → abren un `<DetailDrawer>` con el documento (vista previa) y un
+  botón "Imprimir" (`useTriggerPrint`). Se agregó `referencia` al select de
+  `cxc_pagos`.
+- **Falso arranque corregido**: el primer intento metió un aislamiento propio
+  (`body * { visibility:hidden }` + `position:absolute` + toggling de
+  `display`) embebido en la página. Salía **en blanco** porque competía con el
+  mecanismo del repo en vez de usarlo (el documento no vivía en el portal de
+  un sheet, así que el app-shell no se ocultaba). Fix: reescritos como
+  contenido puro dentro del `<DetailDrawer>`.
+- **Test** `cxc-printables.test.ts`: invariantes source-level (env=node sin
+  DOM) — guardan que los documentos NO reintroduzcan el truco propio
+  (`visibility:hidden` / `position:absolute`) + membrete + monto en letra.
+- **Verificado en el preview** (Chrome MCP, emulando `@media print`): con el
+  drawer abierto `data-print-sheet-open='true'`, el app-shell queda
+  `display:none` y el documento renderiza con dimensiones reales (membrete
+  cargado + 4 filas de cargos) — no blanco. Sin DDL. 5 checks verdes (1142
+  tests). PR _(este PR)_.
 
 **Pendiente:** recordatorios de vencimiento (catálogo `notificaciones`, solo
 `fuente=cliente`) + limpieza de los $2.0M de saldos a favor + retiro de Coda.
