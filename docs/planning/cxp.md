@@ -2,11 +2,11 @@
 
 **Slug:** `cxp`
 **Empresas:** todas (golden: RDB; rollout DILESA/COAGAN/ANSA en Sprint 6)
-**Schemas afectados:** `erp` (extiende `facturas`; nuevas `cxp_pagos`, `cxp_pago_aplicaciones`; absorbe `gastos`)
+**Schemas afectados:** `erp` (extiende `facturas`; nuevas `cxp_pagos`, `cxp_pago_aplicaciones`; absorbe `gastos`; extiende `movimientos_bancarios` con referencia polimórfica, ADR-037)
 **Estado:** planned
 **Dueño:** Beto
 **Creada:** 2026-04-28
-**Última actualización:** 2026-04-28 (alcance v1 cerrado tras 5 decisiones de Beto: RDB golden, aprobación por Comité Ejecutivo, captura inclusiva, retenciones por régimen vía CSF, gastos se migran)
+**Última actualización:** 2026-06-01 (re-sincronizada como **gemela de CxC** — ADR-037: patrón de subledger compartido + emisión de movimiento bancario; ver Decisiones registradas. Alcance v1 original cerrado 2026-04-28: RDB golden, aprobación por Comité Ejecutivo, captura inclusiva, retenciones por régimen vía CSF, gastos se migran)
 
 ## Problema
 
@@ -160,6 +160,35 @@ Resultado operativo: doble captura entre la realidad bancaria y la contable, rie
 - **Gastos se migran.** `erp.gastos` se absorbe como facturas de egreso (con o sin XML). Decisión final entre deprecar la tabla o mantenerla como vista de compatibilidad se cierra en Sprint 6 cuando se vea el shape real de los datos migrados.
 - **CxP empieza por RDB y se diseña genérico.** Lógica de DB + RPCs son multi-empresa desde Sprint 1; UI RDB primero (Sprints 3-5); rollout DILESA/COAGAN/ANSA en Sprint 6. Particularidades por empresa (ANSA volumen, COAGAN AGAPES, DILESA materiales) entran como sub-iniciativas si emergen.
 - **Modo de ejecución pendiente de definir al arrancar Sprint 1.** Beto autorizó modo autónomo en `oc-recepciones`; aplica caso por caso. Para CxP, el primer PR de promoción se entrega y se espera green light explícito antes de Sprint 1.
+
+### 2026-06-01 — Re-sincronización como gemela de CxC (ADR-037)
+
+Al promover [`cxc`](cxc.md), Beto pidió diseñar CxC y CxP **juntas como
+gemelas**. CxP no cambia su alcance v1 ni sus sprints; se alinea al
+patrón canónico de **ADR-037** (subledger gemelo):
+
+- **`cxp_pagos` / `cxp_pago_aplicaciones` siguen el mismo shape** que sus
+  espejos `cxc_*`. La capa de aplicación N:M, el `CHECK Σ ≤ total`, el
+  trigger de saldo `AFTER ... FOR EACH ROW` con `SELECT SUM` directo, y
+  la derivación de estado (`vencido` por fecha, no almacenado) son
+  idénticos en ambos lados.
+- **Emisión de movimiento bancario**: `cxp_pago_marcar_pagado` escribe
+  `erp.movimientos_bancarios` con `referencia_tipo='cxp_pago'` +
+  `referencia_id`. La **extensión polimórfica de `movimientos_bancarios`
+  la entrega CxC en su Sprint 1** (es quien arranca primero); CxP la
+  consume sin volver a crearla.
+- **Asimetría documentada (ADR-037 D2)**: CxP usa `erp.facturas` como
+  documento de adeudo (semántica fiscal SAT propia); CxC usa
+  `erp.cxc_cargos`. El resto del patrón es simétrico.
+- **Conciliación (Sprint 5)**: el casamiento contra el estado de cuenta
+  bancario se reorienta a la iniciativa hermana
+  [`conciliacion-bancaria`](conciliacion-bancaria.md) (3er vértice del
+  triángulo de tesorería). CxP Sprint 5 se limita a **emitir** el
+  movimiento y conciliar contra cortes; la conciliación bancaria full
+  vive en la hermana.
+- **Componentes UI compartidos**: vista de aging por buckets, drawer de
+  aplicación de pago y badges de estado se extraen a `components/` y los
+  reusan CxC y CxP (convención `shared-modules-refactor`, ADR-011).
 
 ## Bitácora
 
