@@ -54,6 +54,9 @@ export const NAV_ITEMS: NavItem[] = [
           { label: 'Tareas', href: '/dilesa/admin/tasks' },
           { label: 'Juntas', href: '/dilesa/admin/juntas' },
           { label: 'Documentos', href: '/dilesa/admin/documentos' },
+          // CxC (Cuentas por Cobrar) — hub con 2 tabs (Pagos / Saldos).
+          // El slug/URL internos siguen siendo `cobranza`.
+          { label: 'CxC', href: '/dilesa/cobranza' },
         ],
       },
       {

@@ -49,6 +49,10 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   '/dilesa/ventas/fases': 'dilesa.ventas.fases',
   '/dilesa/ventas/clientes': 'dilesa.ventas.clientes',
   '/dilesa/ventas/vendedores': 'dilesa.ventas.vendedores',
+  // Cobranza (CxC) es un hub con 2 tabs. La URL default mapea al sub-slug
+  // del primer tab (`.pagos`). ADR-030 SS2.
+  '/dilesa/cobranza': 'dilesa.cobranza.pagos',
+  '/dilesa/cobranza/aging': 'dilesa.cobranza.aging',
   // Construcción es un hub con 4 tabs (sprint tabs+protos). El padre
   // `dilesa.construccion` queda como umbrella; cada tab tiene su sub-slug
   // (ADR-030 SS2). La URL default mapea al sub-slug del primer tab.
