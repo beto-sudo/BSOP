@@ -28,6 +28,10 @@ import type { BadgeTone } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Search, Boxes, HardHat } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { ProyectoChecklist } from './proyecto-checklist';
+import { PlanoAnteproyecto } from './plano-anteproyecto';
+import { useEffectiveUser } from '@/components/providers';
+import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 
 export type ProyectoDetalle = {
   id: string;
@@ -390,6 +394,12 @@ function buildUnidadColumns(
 
 export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null }) {
   const router = useRouter();
+  const { data: effectiveUser } = useEffectiveUser();
+  // Autoriza pasos/partidas en el checklist: admin global O rol
+  // "Dirección" en DILESA (este componente solo monta proyectos DILESA).
+  const puedeAutorizar =
+    !!effectiveUser?.isAdmin ||
+    (effectiveUser?.direccionEmpresaIds ?? []).includes(DILESA_EMPRESA_ID);
   const [unidades, setUnidades] = useState<Unidad[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loadedId, setLoadedId] = useState<string | null>(null);
@@ -779,6 +789,23 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
           />
         </DetailDrawerSection>
       )}
+
+      <ProyectoChecklist
+        proyectoId={proyecto.id}
+        tipo={proyecto.tipo}
+        fechaArranque={proyecto.fecha_inicio}
+        empresaId={DILESA_EMPRESA_ID}
+        empresaSlug="dilesa"
+        puedeAutorizar={puedeAutorizar}
+        mostrarBannerHistorico
+      />
+
+      <PlanoAnteproyecto
+        proyectoId={proyecto.id}
+        empresaId={DILESA_EMPRESA_ID}
+        empresaSlug="dilesa"
+        titulo="Plano del proyecto"
+      />
 
       <DetailDrawerSection title="Documentos y configuración">
         <div className="space-y-3">

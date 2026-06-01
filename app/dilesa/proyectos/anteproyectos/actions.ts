@@ -225,6 +225,35 @@ export async function updateTareaEstado(
 }
 
 /**
+ * Marca en bulk todas las tareas no-terminales de un proyecto como
+ * `completada` (con `fecha_completada=hoy`). Pensado para el banner
+ * "Marcar histórico" del detalle del desarrollo: los desarrollos llevan
+ * años corriendo y, tras el backfill de la plantilla canónica, sus
+ * tareas de trámite/factibilidad suelen estar ya superadas.
+ *
+ * Solo toca estados `pendiente | en_curso | bloqueada` — no revierte
+ * `cancelada` ni re-toca `completada`. Reversible: cada tarea se puede
+ * reabrir individualmente con `updateTareaEstado`. RLS gobierna el
+ * acceso por empresa del proyecto.
+ */
+export async function marcarTareasHistorico(proyectoId: string): Promise<SimpleResult> {
+  if (!proyectoId) return { ok: false, error: 'proyectoId requerido' };
+
+  const supabase = await makeServerClient();
+  const { error } = await supabase
+    .schema('dilesa')
+    .from('proyecto_tareas')
+    .update({ estado: 'completada', fecha_completada: new Date().toISOString().slice(0, 10) })
+    .eq('proyecto_id', proyectoId)
+    .is('deleted_at', null)
+    .in('estado', ['pendiente', 'en_curso', 'bloqueada']);
+
+  if (error) return { ok: false, error: error.message || 'No se pudieron marcar las tareas.' };
+  revalidateAnteproyectosPaths();
+  return { ok: true };
+}
+
+/**
  * Captura `resultado_monto` en una tarea (ej. cotización). Acepta null
  * para limpiar.
  *

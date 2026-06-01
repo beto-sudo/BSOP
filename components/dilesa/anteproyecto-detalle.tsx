@@ -1,33 +1,28 @@
 'use client';
 
 /**
- * AnteproyectoDetailDrawer — detalle de un anteproyecto DILESA.
+ * AnteproyectoDetalle — detalle de un anteproyecto DILESA.
  *
- * Iniciativa `dilesa-proyectos-anteproyectos` Sprint 2 (ficha + análisis)
- * + Sprint 3 (checklist + presupuestos preliminares).
- *
- * Secciones:
- * - Ficha física (área, lotes, fechas)
- * - Costos estimados (4 partidas + delta vs presupuesto)
- * - Análisis derivado (aprovechamiento, costo/lote, costo/m² vendible)
+ * Secciones (en orden de render):
+ * - Análisis financiero (`<AnteproyectoAnalisisFinanciero>`)
+ * - Plano del anteproyecto + análisis IA (`<PlanoAnteproyecto>`)
  * - Notas (si hay)
- * - Checklist de tareas (instanciadas desde plantilla canónica)
- * - Presupuestos preliminares
+ * - Checklist de tareas (`<ProyectoChecklist>`, componente compartido
+ *   con el detalle del desarrollo desde el Sprint 4 de
+ *   `dilesa-proyectos-checklist-inline`)
+ * - Autorización y promoción a desarrollo (gate `gatePromocion`)
+ *
+ * El gate de promoción depende del estado de las tareas obligatorias,
+ * que `<ProyectoChecklist>` reporta vía `onChecklistState`.
  */
 
 import { useCallback, useEffect, useState, useTransition } from 'react';
 import { DetailDrawerSection } from '@/components/detail-page';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import { getSupabaseErrorMessage } from '@/lib/supabase-error';
-import {
-  populatePlantilla,
-  promoteAnteproyecto,
-} from '@/app/dilesa/proyectos/anteproyectos/actions';
+import { promoteAnteproyecto } from '@/app/dilesa/proyectos/anteproyectos/actions';
 import { type ProyectoDetalle, ESTADO_TONE, ESTADO_LABEL } from './proyecto-detalle';
-import { TareasChecklist, type PasoRow } from './tareas-checklist';
-import { PartidasPresupuestales, type PartidaRow } from './partidas-presupuestales';
+import { ProyectoChecklist, type ProyectoTarea } from './proyecto-checklist';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { useEffectiveUser } from '@/components/providers';
 import { AnteproyectoAnalisisFinanciero } from './anteproyecto-analisis-financiero';
@@ -63,29 +58,6 @@ function fmtFecha(s: string | null): string | null {
   if (isNaN(d.getTime())) return s;
   return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
 }
-
-type ProyectoTarea = {
-  id: string;
-  titulo: string;
-  descripcion: string | null;
-  estado: string;
-  orden: number;
-  tipo_snapshot: string | null;
-  subtipo_snapshot: string | null;
-  entidad_responsable_snapshot: string | null;
-  obligatoriedad_snapshot: string | null;
-  requiere_archivo_snapshot: boolean | null;
-  fecha_objetivo_inicio: string | null;
-  fecha_objetivo_fin: string | null;
-  fecha_completada: string | null;
-  resultado_monto: number | null;
-  resultado_documento_url: string | null;
-  plantilla_tarea_id: string | null;
-};
-
-type TareaDep = { tarea_id: string; depende_de_tarea_id: string };
-
-type Partida = PartidaRow;
 
 /**
  * Mapea el row de `dilesa.proyectos` a la shape esperada por
@@ -227,9 +199,6 @@ export function AnteproyectoDetalle({
    *  PlanoAnteproyecto al aplicar AI) muta columnas del proyecto. */
   onAnteproyectoChange?: () => void | Promise<void>;
 }) {
-  const [tareas, setTareas] = useState<ProyectoTarea[]>([]);
-  const [dependencias, setDependencias] = useState<TareaDep[]>([]);
-  const [pasos, setPasos] = useState<PasoRow[]>([]);
   const { data: effectiveUser } = useEffectiveUser();
   // Sprint 4A: puede autorizar si es admin global, O tiene rol
   // "Dirección" en la empresa DILESA. Este componente solo se usa para
@@ -238,20 +207,19 @@ export function AnteproyectoDetalle({
   const puedeAutorizar =
     !!effectiveUser?.isAdmin ||
     (effectiveUser?.direccionEmpresaIds ?? []).includes(DILESA_EMPRESA_ID);
-  const [partidas, setPartidas] = useState<Partida[]>([]);
   const [productosCatalogo, setProductosCatalogo] = useState<ProductoCatalogo[]>([]);
-  const [loadedId, setLoadedId] = useState<string | null>(null);
-  const [extrasError, setExtrasError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-  const [populateError, setPopulateError] = useState<string | null>(null);
+  // El fetch del checklist (tareas/deps/pasos) vive en <ProyectoChecklist>
+  // (Sprint 4 — espejar a desarrollo). El padre solo necesita las tareas +
+  // loading para el gate de promoción, que el hijo reporta vía
+  // onChecklistState.
+  const [checklist, setChecklist] = useState<{ tareas: ProyectoTarea[]; loading: boolean }>({
+    tareas: [],
+    loading: true,
+  });
   const [promotePending, startPromoteTransition] = useTransition();
   const [promoteError, setPromoteError] = useState<string | null>(null);
   const [promoteSuccess, setPromoteSuccess] = useState<string | null>(null);
   const [confirmingPromote, setConfirmingPromote] = useState(false);
-  // Derivamos loading desde `loadedId` para evitar setState síncrono en el
-  // effect (ver eslint react-hooks): si el drawer está abierto y el id del
-  // proyecto cargado no coincide con el actual, estamos cargando.
-  const loadingExtras = anteproyecto != null && loadedId !== anteproyecto.id;
 
   // Catálogo de productos DILESA con valor_comercial_referencia
   // poblado — pull-eables al seleccionarlos en el selector de
@@ -302,144 +270,18 @@ export function AnteproyectoDetalle({
     };
   }, []);
 
-  const fetchExtras = useCallback(async (proyectoId: string) => {
-    const supabase = createSupabaseBrowserClient();
-    // Tareas + partidas en paralelo. Las dependencias requieren los IDs de
-    // tareas como input, por lo que viven en una segunda fase.
-    const [tareasRes, partidasRes] = await Promise.all([
-      supabase
-        .schema('dilesa')
-        .from('proyecto_tareas')
-        .select(
-          'id, titulo, descripcion, estado, orden, tipo_snapshot, subtipo_snapshot, entidad_responsable_snapshot, obligatoriedad_snapshot, requiere_archivo_snapshot, fecha_objetivo_inicio, fecha_objetivo_fin, fecha_completada, resultado_monto, resultado_documento_url, plantilla_tarea_id'
-        )
-        .eq('proyecto_id', proyectoId)
-        .is('deleted_at', null)
-        .order('orden'),
-      supabase
-        .schema('dilesa')
-        .from('proyecto_presupuesto_partidas')
-        .select(
-          'id, partida, descripcion, monto_estimado, monto_aprobado, monto_ejercido, fuente, estado, tarea_origen_id, autorizado_at'
-        )
-        .eq('proyecto_id', proyectoId)
-        .is('deleted_at', null)
-        .order('partida'),
-    ]);
-
-    // Dependencias + pasos por IN sobre los IDs de las tareas del proyecto.
-    // Patrón sin embed PostgREST: si la query falla (RLS, parsing del embed),
-    // el shape de `.data` queda consistentemente array vacío en vez de null
-    // wrapped en algo raro. Aceptamos el round-trip extra.
-    const tareaIds =
-      Array.isArray(tareasRes.data) && tareasRes.data.length > 0
-        ? tareasRes.data.map((t) => t.id as string)
-        : [];
-    const [depsRes, pasosRes] =
-      tareaIds.length === 0
-        ? [
-            { data: [] as Array<{ tarea_id: string; depende_de_tarea_id: string }>, error: null },
-            { data: [] as PasoRow[], error: null },
-          ]
-        : await Promise.all([
-            supabase
-              .schema('dilesa')
-              .from('proyecto_tareas_dependencias')
-              .select('tarea_id, depende_de_tarea_id')
-              .in('tarea_id', tareaIds),
-            supabase
-              .schema('dilesa')
-              .from('proyecto_tarea_pasos')
-              .select(
-                'id, tarea_id, paso, monto, documento_url, fecha, estado, notas, autorizado_at, autorizado_por'
-              )
-              .in('tarea_id', tareaIds)
-              .is('deleted_at', null),
-          ]);
-    return [tareasRes, partidasRes, depsRes, pasosRes] as const;
-  }, []);
-
-  const cargarExtras = useCallback(
-    async (proyectoId: string) => {
-      const [tareasRes, partidasRes, depsRes, pasosRes] = await fetchExtras(proyectoId);
-      if (tareasRes.error) {
-        setExtrasError(
-          getSupabaseErrorMessage(tareasRes.error, 'No se pudieron cargar las tareas.')
-        );
-        setTareas([]);
-      } else {
-        setExtrasError(null);
-        setTareas(Array.isArray(tareasRes.data) ? (tareasRes.data as ProyectoTarea[]) : []);
-      }
-      if (partidasRes.error) {
-        setExtrasError(
-          getSupabaseErrorMessage(partidasRes.error, 'No se pudieron cargar las partidas.')
-        );
-        setPartidas([]);
-      } else {
-        setPartidas(Array.isArray(partidasRes.data) ? (partidasRes.data as Partida[]) : []);
-      }
-      if (!depsRes.error && Array.isArray(depsRes.data)) {
-        setDependencias(depsRes.data as TareaDep[]);
-      } else {
-        setDependencias([]);
-      }
-      if (!pasosRes.error && Array.isArray(pasosRes.data)) {
-        setPasos(pasosRes.data as PasoRow[]);
-      } else {
-        setPasos([]);
-      }
-      setLoadedId(proyectoId);
-    },
-    [fetchExtras]
+  // Callback estable: <ProyectoChecklist> reporta sus tareas + loading sin
+  // redisparar su propio fetch. Alimenta el gate de promoción.
+  const handleChecklistState = useCallback(
+    (s: { tareas: ProyectoTarea[]; loading: boolean }) => setChecklist(s),
+    []
   );
-
-  // Carga inicial: setStates van dentro del then para no triggerear renders
-  // en cascada (regla ESLint react-hooks/exhaustive-deps stricter).
-  useEffect(() => {
-    if (!anteproyecto) return;
-    let activo = true;
-    void fetchExtras(anteproyecto.id).then(([tareasRes, partidasRes, depsRes, pasosRes]) => {
-      if (!activo) return;
-      if (tareasRes.error) {
-        setExtrasError(
-          getSupabaseErrorMessage(tareasRes.error, 'No se pudieron cargar las tareas.')
-        );
-        setTareas([]);
-      } else {
-        setExtrasError(null);
-        setTareas(Array.isArray(tareasRes.data) ? (tareasRes.data as ProyectoTarea[]) : []);
-      }
-      if (partidasRes.error) {
-        setExtrasError(
-          getSupabaseErrorMessage(partidasRes.error, 'No se pudieron cargar las partidas.')
-        );
-        setPartidas([]);
-      } else {
-        setPartidas(Array.isArray(partidasRes.data) ? (partidasRes.data as Partida[]) : []);
-      }
-      if (!depsRes.error && Array.isArray(depsRes.data)) {
-        setDependencias(depsRes.data as TareaDep[]);
-      } else {
-        setDependencias([]);
-      }
-      if (!pasosRes.error && Array.isArray(pasosRes.data)) {
-        setPasos(pasosRes.data as PasoRow[]);
-      } else {
-        setPasos([]);
-      }
-      setLoadedId(anteproyecto.id);
-    });
-    return () => {
-      activo = false;
-    };
-  }, [anteproyecto, fetchExtras]);
 
   if (!anteproyecto) return null;
 
   const yaConvertido = anteproyecto.estado === 'completado';
-  const gate = gatePromocion(tareas, { puedeAutorizar, yaConvertido });
-  const puedePromover = gate.puede && !loadingExtras;
+  const gate = gatePromocion(checklist.tareas, { puedeAutorizar, yaConvertido });
+  const puedePromover = gate.puede && !checklist.loading;
 
   const handlePromote = () => {
     setPromoteError(null);
@@ -452,19 +294,6 @@ export function AnteproyectoDetalle({
       } else {
         setPromoteSuccess(r.proyectoId);
         setConfirmingPromote(false);
-      }
-    });
-  };
-
-  const handlePopulate = () => {
-    setPopulateError(null);
-    const fecha = anteproyecto.fecha_inicio ?? new Date().toISOString().slice(0, 10);
-    startTransition(async () => {
-      const r = await populatePlantilla(anteproyecto.id, fecha);
-      if (!r.ok) {
-        setPopulateError(r.error);
-      } else {
-        await cargarExtras(anteproyecto.id);
       }
     });
   };
@@ -491,7 +320,7 @@ export function AnteproyectoDetalle({
       <AnteproyectoAnalisisFinanciero
         snapshot={toAnalisisSnapshot(anteproyecto)}
         productosDisponibles={productosCatalogo}
-        onChange={() => void cargarExtras(anteproyecto.id)}
+        onChange={() => void onAnteproyectoChange?.()}
       />
 
       <PlanoAnteproyecto
@@ -514,49 +343,15 @@ export function AnteproyectoDetalle({
         </DetailDrawerSection>
       ) : null}
 
-      <DetailDrawerSection
-        title="Checklist de tareas"
-        description={
-          loadingExtras
-            ? 'Cargando…'
-            : tareas.length === 0
-              ? 'Sin tareas instanciadas todavía.'
-              : `${tareas.length} tareas`
-        }
-      >
-        {loadingExtras ? (
-          <Skeleton className="h-20 w-full" />
-        ) : tareas.length === 0 ? (
-          <div className="space-y-3">
-            <p className="text-sm text-[var(--text)]/60">
-              Las 16 tareas canónicas del anteproyecto (incluyendo gate &quot;Comité de
-              Inversión&quot;) se instancian con fechas objetivo calculadas desde la fecha de
-              arranque + grafo de dependencias + calendario hábil MX. Sprint 1 de
-              `dilesa-proyectos-checklist-inline` automatiza esto al crear el proyecto desde el
-              formulario; los 13 proyectos vivos se backfillean con un script one-shot.
-            </p>
-            <button
-              type="button"
-              onClick={handlePopulate}
-              disabled={pending}
-              className="h-9 rounded-md bg-[var(--accent)] px-4 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
-            >
-              {pending ? 'Poblando…' : 'Poblar plantilla canónica'}
-            </button>
-            {populateError && <p className="text-sm text-red-600/80">{populateError}</p>}
-          </div>
-        ) : (
-          <TareasChecklist
-            tareas={tareas}
-            dependencias={dependencias}
-            pasos={pasos}
-            empresaId={DILESA_EMPRESA_ID}
-            empresaSlug="dilesa"
-            puedeAutorizar={puedeAutorizar}
-            onChange={() => void cargarExtras(anteproyecto.id)}
-          />
-        )}
-      </DetailDrawerSection>
+      <ProyectoChecklist
+        proyectoId={anteproyecto.id}
+        tipo="anteproyecto"
+        fechaArranque={anteproyecto.fecha_inicio}
+        empresaId={DILESA_EMPRESA_ID}
+        empresaSlug="dilesa"
+        puedeAutorizar={puedeAutorizar}
+        onChecklistState={handleChecklistState}
+      />
 
       {/* La sección "Presupuesto" (partidas presupuestales del Sprint 2)
           se eliminó en Sprint 4E refinamiento. El flujo de entrada

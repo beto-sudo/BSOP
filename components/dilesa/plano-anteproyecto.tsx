@@ -79,6 +79,7 @@ export function PlanoAnteproyecto({
   empresaId,
   empresaSlug,
   onAnalisisAplicado,
+  titulo = 'Plano del anteproyecto',
 }: {
   proyectoId: string;
   empresaId: string;
@@ -86,6 +87,9 @@ export function PlanoAnteproyecto({
   /** Se llama después de "Aplicar al análisis financiero" para que el
    *  padre refresque la sección de análisis financiero. */
   onAnalisisAplicado?: () => void;
+  /** Título de la sección. El desarrollo lo override a "Plano del
+   *  proyecto" (el mismo componente sirve a ambos tipos). */
+  titulo?: string;
 }) {
   const [planos, setPlanos] = useState<PlanoVersionRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -232,12 +236,12 @@ export function PlanoAnteproyecto({
 
   return (
     <section
-      aria-label="Plano del anteproyecto"
+      aria-label={titulo}
       className="rounded-md border border-[var(--border)] bg-[var(--bg)]"
     >
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-2">
         <div className="flex items-center gap-3">
-          <h3 className="text-sm font-semibold text-[var(--text)]">Plano del anteproyecto</h3>
+          <h3 className="text-sm font-semibold text-[var(--text)]">{titulo}</h3>
           {planos.length > 0 && (
             <select
               value={selectedId ?? ''}
