@@ -3,16 +3,19 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 /**
- * Source-level invariants for the CxC printables (iniciativa `cxc`,
- * ADR-021): <EstadoCuentaPrintable> y <ReciboCajaPrintable>.
+ * Source-level invariants for the CxC printables (iniciativa `cxc`, ADR-021):
+ * <EstadoCuentaPrintable> y <ReciboCajaPrintable>.
  *
  * Por qué source-level y no render: el setup de este repo es env=node sin
- * jsdom ni @testing-library/react (ver detail-drawer.test.ts). Leer la
- * fuente y aseverar sobre strings críticos atrapa la regresión específica
- * que importa aquí: el AISLAMIENTO DE IMPRESIÓN. Ambos documentos viven
- * embebidos en una página llena de UI (el detalle de venta); si alguien
- * quita la regla `body * { visibility: hidden }` o el `hidden print:block`,
- * imprimir filtraría toda la página en vez de solo el documento.
+ * jsdom ni @testing-library/react (ver detail-drawer.test.ts).
+ *
+ * Invariante clave: estos documentos son SOLO contenido y NO reimplementan el
+ * aislamiento de impresión. Se montan dentro de un <DetailDrawer> y el
+ * aislamiento lo provee la maquinaria del repo — `data-print-sheet-open`
+ * (components/ui/sheet.tsx) + `@media print` (app/globals.css), igual que el
+ * kardex. Un intento previo metió un truco propio (`visibility: hidden` en
+ * todo el DOM + `position: absolute`) y los documentos salían EN BLANCO. Este
+ * test guarda esa regresión.
  */
 
 const estadoPath = path.resolve(__dirname, 'estado-cuenta-printable.tsx');
@@ -25,24 +28,11 @@ describe('<EstadoCuentaPrintable> source invariants', () => {
     expect(estadoSrc).toContain('export function EstadoCuentaPrintable');
   });
 
-  it('isola la impresión: oculta todo lo demás del DOM al imprimir', () => {
-    // Sin esto, imprimir el estado de cuenta sacaría toda la página del
-    // detalle de venta (5 secciones, pipeline, expediente).
-    expect(estadoSrc).toContain('body * { visibility: hidden');
-    expect(estadoSrc).toContain(
-      '.estado-cuenta-print-root, .estado-cuenta-print-root * { visibility: visible'
-    );
-    expect(estadoSrc).toContain('position: absolute');
-  });
-
-  it('está oculto con display propio (NO Tailwind hidden) y se muestra al imprimir', () => {
-    // Regresión "hoja en blanco": en Tailwind v4 `.hidden` (display:none) le
-    // gana a `.print:block` en media print, así que el documento no se rendía.
-    // Controlamos display con CSS propio + !important, sin hidden/print:block.
-    // El className del root es exactamente la clase raíz (sin hidden/print:block).
-    expect(estadoSrc).toContain('className="estado-cuenta-print-root"');
-    expect(estadoSrc).toContain('display: none');
-    expect(estadoSrc).toContain('display: block !important');
+  it('NO reimplementa el aislamiento de impresión (lo da el DetailDrawer)', () => {
+    // Regresión "hoja en blanco": el documento NO debe traer su propio truco
+    // de aislamiento. El DetailDrawer + globals.css se encargan.
+    expect(estadoSrc).not.toContain('visibility: hidden');
+    expect(estadoSrc).not.toContain('position: absolute');
   });
 
   it('rinde el membrete y el pie de la empresa', () => {
@@ -60,19 +50,9 @@ describe('<ReciboCajaPrintable> source invariants', () => {
     expect(reciboSrc).toContain('export function ReciboCajaPrintable');
   });
 
-  it('isola la impresión igual que el estado de cuenta', () => {
-    expect(reciboSrc).toContain('body * { visibility: hidden');
-    expect(reciboSrc).toContain(
-      '.recibo-caja-print-root, .recibo-caja-print-root * { visibility: visible'
-    );
-    expect(reciboSrc).toContain('position: absolute');
-  });
-
-  it('está oculto con display propio (NO Tailwind hidden) y se muestra al imprimir', () => {
-    // Mismo guard de regresión "hoja en blanco" que el estado de cuenta.
-    expect(reciboSrc).toContain('className="recibo-caja-print-root"');
-    expect(reciboSrc).toContain('display: none');
-    expect(reciboSrc).toContain('display: block !important');
+  it('NO reimplementa el aislamiento de impresión (lo da el DetailDrawer)', () => {
+    expect(reciboSrc).not.toContain('visibility: hidden');
+    expect(reciboSrc).not.toContain('position: absolute');
   });
 
   it('imprime el monto en letra (formato notarial MX)', () => {

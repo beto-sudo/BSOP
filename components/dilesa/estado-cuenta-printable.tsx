@@ -1,23 +1,22 @@
 'use client';
 
 /**
- * EstadoCuentaPrintable — estado de cuenta imprimible de una venta DILESA
+ * EstadoCuentaPrintable — contenido del estado de cuenta de una venta DILESA
  * (CxC, iniciativa `cxc`). Documento informativo por venta: membrete +
  * datos del cliente + datos de la operación + plan de cargos + abonos +
  * resumen de saldos al corte. NO es comprobante fiscal — el CFDI lo emite
  * CONTPAQi por separado (ADR-037 / planning cxc).
  *
- * Patrón de impresión (ADR-021): el documento se oculta en pantalla con
- * `display:none` PROPIO (en el `<style>`, no la clase Tailwind `hidden`) y
- * al imprimir aísla la página con el truco de `visibility` heredado de
- * <FiniquitoPrintable>: `@media print` lo vuelve `display:block` + visible y
- * oculta todo lo demás del DOM, posicionado al tope de la hoja. El caller
- * monta UN solo printable a la vez (estado de cuenta o recibo).
- *
- * ⚠️ NO usar las clases Tailwind `hidden`/`print:block` para el toggle: en
- * este build (Tailwind v4) `.hidden` (display:none) le gana a `.print:block`
- * en media print, así que el documento salía EN BLANCO. Por eso controlamos
- * `display` con CSS propio + `!important` en `@media print`.
+ * IMPRESIÓN (patrón del repo, ADR-021): este componente es SOLO el contenido
+ * del documento; NO reimplementa el aislamiento de impresión. Se monta dentro
+ * de un `<DetailDrawer>` y el aislamiento lo provee la maquinaria del repo —
+ * `<SheetContent>` setea `data-print-sheet-open` (components/ui/sheet.tsx) y el
+ * bloque `@media print` de `app/globals.css` oculta el app-shell y saca el
+ * contenido del drawer en flujo. Es el mismo patrón del kardex
+ * (`StockDetailDrawer`) y de todos los documentos que ya imprimen bien.
+ * Por eso aquí NO hay truco de aislamiento propio (ni ocultar el resto del
+ * DOM, ni posicionar el documento aparte) — eso rompía la impresión y los
+ * documentos salían en blanco.
  */
 
 import { getEmpresaBranding, type EmpresaSlug } from '@/lib/empresa-branding';
@@ -136,31 +135,25 @@ export function EstadoCuentaPrintable({
     .map(([label, value]) => ({ label, value }));
 
   return (
-    <article className="estado-cuenta-print-root">
+    <div className="estado-cuenta-doc">
       <style>{`
-        .estado-cuenta-print-root { display: none; background: #fff; font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #000; }
-        .estado-cuenta-print-root h1 { font-size: 16px; font-weight: 700; margin: 0; letter-spacing: 0.3px; text-transform: uppercase; }
-        .estado-cuenta-print-root h2 { font-size: 11px; font-weight: 700; margin: 14px 0 4px; text-transform: uppercase; letter-spacing: 0.4px; color: #444; }
-        .estado-cuenta-print-root table { width: 100%; border-collapse: collapse; margin: 4px 0; font-size: 11px; }
-        .estado-cuenta-print-root th, .estado-cuenta-print-root td { border: 1px solid #bbb; padding: 4px 8px; text-align: left; }
-        .estado-cuenta-print-root th { background: #f0f0f0; font-weight: 700; }
-        .estado-cuenta-print-root td.num, .estado-cuenta-print-root th.num { text-align: right; font-variant-numeric: tabular-nums; }
-        .estado-cuenta-print-root tr { break-inside: avoid; }
-        .estado-cuenta-print-root .ec-membrete { width: 100%; max-width: 540px; height: auto; }
-        .estado-cuenta-print-root .ec-footer-img { width: 100%; max-width: 540px; height: auto; }
-        .estado-cuenta-print-root .ec-datos { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; font-size: 11px; }
-        .estado-cuenta-print-root .ec-dato-label { color: #666; }
-        .estado-cuenta-print-root .ec-resumen { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
-        .estado-cuenta-print-root .ec-resumen-item { border: 1px solid #bbb; border-radius: 6px; padding: 6px 12px; min-width: 120px; }
-        .estado-cuenta-print-root .ec-resumen-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.4px; color: #666; }
-        .estado-cuenta-print-root .ec-resumen-value { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
-        .estado-cuenta-print-root .ec-total-row td { background: #f6f6f6; font-weight: 700; }
-        @media print {
-          body * { visibility: hidden !important; }
-          .estado-cuenta-print-root, .estado-cuenta-print-root * { visibility: visible !important; }
-          .estado-cuenta-print-root { display: block !important; position: absolute; left: 0; top: 0; width: 100%; max-width: none; margin: 0; padding: 14mm 16mm; box-shadow: none; }
-          .no-print { display: none !important; }
-        }
+        .estado-cuenta-doc { color: #000; font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+        .estado-cuenta-doc h1 { font-size: 16px; font-weight: 700; margin: 0; letter-spacing: 0.3px; text-transform: uppercase; }
+        .estado-cuenta-doc h2 { font-size: 11px; font-weight: 700; margin: 14px 0 4px; text-transform: uppercase; letter-spacing: 0.4px; color: #444; }
+        .estado-cuenta-doc table { width: 100%; border-collapse: collapse; margin: 4px 0; font-size: 11px; }
+        .estado-cuenta-doc th, .estado-cuenta-doc td { border: 1px solid #bbb; padding: 4px 8px; text-align: left; }
+        .estado-cuenta-doc th { background: #f0f0f0; font-weight: 700; }
+        .estado-cuenta-doc td.num, .estado-cuenta-doc th.num { text-align: right; font-variant-numeric: tabular-nums; }
+        .estado-cuenta-doc tr { break-inside: avoid; }
+        .estado-cuenta-doc .ec-membrete { width: 100%; max-width: 540px; height: auto; }
+        .estado-cuenta-doc .ec-footer-img { width: 100%; max-width: 540px; height: auto; }
+        .estado-cuenta-doc .ec-datos { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; font-size: 11px; }
+        .estado-cuenta-doc .ec-dato-label { color: #666; }
+        .estado-cuenta-doc .ec-resumen { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
+        .estado-cuenta-doc .ec-resumen-item { border: 1px solid #bbb; border-radius: 6px; padding: 6px 12px; min-width: 120px; }
+        .estado-cuenta-doc .ec-resumen-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.4px; color: #666; }
+        .estado-cuenta-doc .ec-resumen-value { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .estado-cuenta-doc .ec-total-row td { background: #f6f6f6; font-weight: 700; }
       `}</style>
 
       <header className="mb-3 flex items-start justify-between gap-4 border-b border-black/20 pb-3">
@@ -308,6 +301,6 @@ export function EstadoCuentaPrintable({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={`/brand/${empresa}/footer-doc.png`} alt="" className="ec-footer-img" />
       </footer>
-    </article>
+    </div>
   );
 }

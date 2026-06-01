@@ -1,16 +1,17 @@
 'use client';
 
 /**
- * ReciboCajaPrintable — recibo de caja imprimible por abono CxC (iniciativa
+ * ReciboCajaPrintable — contenido del recibo de caja por abono CxC (iniciativa
  * `cxc`). Reemplaza el PDF de recibo del módulo Coda "Depositos Clientes".
  * Ampara un pago individual; NO sustituye al CFDI, que CONTPAQi emite por
  * separado (ADR-037 / planning cxc).
  *
- * Patrón de impresión (ADR-021): igual que <EstadoCuentaPrintable> —
- * `display:none` propio en pantalla (NO la clase Tailwind `hidden`, que en
- * media print le gana a `print:block` y deja el documento en blanco) +
- * aislamiento por `visibility` al imprimir. El caller monta UN solo
- * printable a la vez.
+ * IMPRESIÓN (patrón del repo, ADR-021): igual que <EstadoCuentaPrintable> —
+ * este componente es SOLO el contenido del documento y NO reimplementa el
+ * aislamiento de impresión. Se monta dentro de un `<DetailDrawer>` y el
+ * aislamiento lo provee la maquinaria del repo (`data-print-sheet-open` en
+ * components/ui/sheet.tsx + `@media print` en app/globals.css), igual que el
+ * kardex (`StockDetailDrawer`).
  */
 
 import { formatMontoEnLetras } from '@/lib/format/numero-a-letras';
@@ -68,26 +69,20 @@ export function ReciboCajaPrintable({
   const branding = getEmpresaBranding(empresa);
 
   return (
-    <article className="recibo-caja-print-root">
+    <div className="recibo-caja-doc">
       <style>{`
-        .recibo-caja-print-root { display: none; background: #fff; font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #000; }
-        .recibo-caja-print-root h1 { font-size: 17px; font-weight: 700; margin: 0; letter-spacing: 0.5px; text-transform: uppercase; }
-        .recibo-caja-print-root .rc-membrete { width: 100%; max-width: 540px; height: auto; }
-        .recibo-caja-print-root .rc-footer-img { width: 100%; max-width: 540px; height: auto; }
-        .recibo-caja-print-root .rc-folio { font-size: 12px; font-weight: 700; color: #b00; }
-        .recibo-caja-print-root .rc-box { border: 1px solid #999; border-radius: 8px; padding: 14px 16px; margin: 12px 0; }
-        .recibo-caja-print-root .rc-row { display: flex; gap: 8px; margin: 6px 0; font-size: 13px; }
-        .recibo-caja-print-root .rc-label { color: #555; min-width: 130px; }
-        .recibo-caja-print-root .rc-value { font-weight: 600; }
-        .recibo-caja-print-root .rc-monto { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
-        .recibo-caja-print-root .rc-letra { font-size: 12px; font-style: italic; color: #333; margin-top: 2px; }
-        .recibo-caja-print-root .rc-firma { margin-top: 56px; width: 260px; margin-left: auto; margin-right: auto; border-top: 1px solid #000; padding-top: 4px; text-align: center; font-size: 11px; }
-        @media print {
-          body * { visibility: hidden !important; }
-          .recibo-caja-print-root, .recibo-caja-print-root * { visibility: visible !important; }
-          .recibo-caja-print-root { display: block !important; position: absolute; left: 0; top: 0; width: 100%; max-width: none; margin: 0; padding: 16mm 18mm; box-shadow: none; }
-          .no-print { display: none !important; }
-        }
+        .recibo-caja-doc { color: #000; font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+        .recibo-caja-doc h1 { font-size: 17px; font-weight: 700; margin: 0; letter-spacing: 0.5px; text-transform: uppercase; }
+        .recibo-caja-doc .rc-membrete { width: 100%; max-width: 540px; height: auto; }
+        .recibo-caja-doc .rc-footer-img { width: 100%; max-width: 540px; height: auto; }
+        .recibo-caja-doc .rc-folio { font-size: 12px; font-weight: 700; color: #b00; }
+        .recibo-caja-doc .rc-box { border: 1px solid #999; border-radius: 8px; padding: 14px 16px; margin: 12px 0; }
+        .recibo-caja-doc .rc-row { display: flex; gap: 8px; margin: 6px 0; font-size: 13px; }
+        .recibo-caja-doc .rc-label { color: #555; min-width: 130px; }
+        .recibo-caja-doc .rc-value { font-weight: 600; }
+        .recibo-caja-doc .rc-monto { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .recibo-caja-doc .rc-letra { font-size: 12px; font-style: italic; color: #333; margin-top: 2px; }
+        .recibo-caja-doc .rc-firma { margin-top: 56px; width: 260px; margin-left: auto; margin-right: auto; border-top: 1px solid #000; padding-top: 4px; text-align: center; font-size: 11px; }
       `}</style>
 
       <header className="mb-3 flex items-start justify-between gap-4 border-b border-black/20 pb-3">
@@ -140,6 +135,6 @@ export function ReciboCajaPrintable({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={`/brand/${empresa}/footer-doc.png`} alt="" className="rc-footer-img" />
       </footer>
-    </article>
+    </div>
   );
 }

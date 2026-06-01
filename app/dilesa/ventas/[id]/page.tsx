@@ -48,6 +48,7 @@ import { AbonoCaptureDrawer } from '@/components/dilesa/abono-capture-drawer';
 import { EstadoCuentaPrintable } from '@/components/dilesa/estado-cuenta-printable';
 import { ReciboCajaPrintable } from '@/components/dilesa/recibo-caja-printable';
 import { useTriggerPrint } from '@/components/print';
+import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import {
   snapshotHold,
   formatearVencimiento,
@@ -165,9 +166,6 @@ type Adjunto = {
   url: string;
   tipo_mime: string | null;
 };
-
-/** Documento a imprimir: estado de cuenta (uno por venta) o recibo de un abono. */
-type PrintTarget = null | 'estado' | { reciboAbonoId: string };
 
 const ESTADO_TONE: Record<string, BadgeTone> = {
   activa: 'info',
@@ -322,7 +320,8 @@ function DetailInner() {
   const [error, setError] = useState<string | null>(null);
   const [abonoOpen, setAbonoOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [printTarget, setPrintTarget] = useState<PrintTarget>(null);
+  const [estadoCuentaOpen, setEstadoCuentaOpen] = useState(false);
+  const [reciboAbono, setReciboAbono] = useState<Abono | null>(null);
   const toast = useToast();
   const triggerPrint = useTriggerPrint();
 
@@ -553,21 +552,6 @@ function DetailInner() {
     };
   }, [id, refreshKey]);
 
-  // Impresión (ADR-021): al elegir un documento, monta el printable, espera
-  // un frame para que layout y membrete estén listos, y abre el diálogo.
-  // Limpia al terminar para no dejar dos printables montados a la vez (cada
-  // uno aísla la página con `visibility`, así que solo debe haber uno).
-  useEffect(() => {
-    if (!printTarget) return;
-    const raf = requestAnimationFrame(() => triggerPrint());
-    const clear = () => setPrintTarget(null);
-    window.addEventListener('afterprint', clear);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener('afterprint', clear);
-    };
-  }, [printTarget, triggerPrint]);
-
   const handleGenerarPlan = async () => {
     const sb = createSupabaseBrowserClient();
     const { error: rpcErr } = await sb
@@ -666,11 +650,6 @@ function DetailInner() {
       ),
     [abonos, aplicadoPorAbono]
   );
-
-  const reciboAbono =
-    printTarget && typeof printTarget === 'object'
-      ? (abonos.find((a) => a.id === printTarget.reciboAbonoId) ?? null)
-      : null;
 
   if (loading) {
     return (
@@ -988,7 +967,7 @@ function DetailInner() {
           {cargos.length > 0 || abonos.length > 0 ? (
             <button
               type="button"
-              onClick={() => setPrintTarget('estado')}
+              onClick={() => setEstadoCuentaOpen(true)}
               className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--text)] hover:bg-[var(--panel)]"
             >
               <Printer className="h-4 w-4" /> Imprimir estado de cuenta
@@ -1120,7 +1099,7 @@ function DetailInner() {
                           <td className="py-1.5 pl-2 text-right">
                             <button
                               type="button"
-                              onClick={() => setPrintTarget({ reciboAbonoId: a.id })}
+                              onClick={() => setReciboAbono(a)}
                               className="inline-flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-xs text-[var(--text)] hover:bg-[var(--panel)]"
                               title="Imprimir recibo de caja"
                             >
@@ -1178,66 +1157,106 @@ function DetailInner() {
         onDone={() => setRefreshKey((k) => k + 1)}
       />
 
-      {printTarget === 'estado' ? (
-        <EstadoCuentaPrintable
-          cliente={{
-            nombre: clienteNombre,
-            rfc: persona?.rfc,
-            telefono: persona?.telefono,
-            email: persona?.email,
-          }}
-          operacion={{
-            proyecto: proyectoNombre,
-            unidad: unidad?.identificador,
-            prototipo: prototipoNombre,
-            tipoCredito: venta.tipo_credito,
-            valorEscrituracion: venta.valor_escrituracion,
-            asesor: vendedorNombre ?? venta.vendedor,
-          }}
-          cargos={cargos.map((c) => ({
-            concepto: c.concepto ?? capitalizar(c.tipo_cargo),
-            vence: c.fecha_vencimiento,
-            fuente: c.fuente_esperada,
-            monto: c.monto,
-            pagado: c.monto_pagado,
-            saldo: c.saldo,
-            estado: c.estado,
-          }))}
-          abonos={abonos.map((a) => ({
-            fecha: a.fecha,
-            fuente: a.fuente,
-            formaPago: a.forma_pago,
-            monto: a.monto_total,
-            aplicado: aplicadoPorAbono.get(a.id) ?? 0,
-          }))}
-          totales={{
-            aCobrar: totalACobrar,
-            cobrado: totalCobrado,
-            saldo: saldoPendiente,
-            saldoFavor,
-          }}
-          fechaCorteISO={new Date().toISOString().slice(0, 10)}
-        />
-      ) : null}
+      {/* Estado de cuenta imprimible — el documento vive dentro del drawer; el
+          aislamiento de impresión lo da la maquinaria del repo (data-print-sheet-open
+          + @media print en globals.css), igual que el kardex. El título del header va
+          print:hidden para que el membrete del documento sea el encabezado impreso. */}
+      <DetailDrawer
+        open={estadoCuentaOpen}
+        onOpenChange={setEstadoCuentaOpen}
+        size="lg"
+        title={<span className="print:hidden">Estado de cuenta</span>}
+        description={<span className="print:hidden">{clienteNombre}</span>}
+        actions={
+          <button
+            type="button"
+            onClick={triggerPrint}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--text)] px-3 py-1.5 text-sm font-medium text-[var(--card)] hover:opacity-90"
+          >
+            <Printer className="h-4 w-4" /> Imprimir
+          </button>
+        }
+      >
+        <DetailDrawerContent>
+          <EstadoCuentaPrintable
+            cliente={{
+              nombre: clienteNombre,
+              rfc: persona?.rfc,
+              telefono: persona?.telefono,
+              email: persona?.email,
+            }}
+            operacion={{
+              proyecto: proyectoNombre,
+              unidad: unidad?.identificador,
+              prototipo: prototipoNombre,
+              tipoCredito: venta.tipo_credito,
+              valorEscrituracion: venta.valor_escrituracion,
+              asesor: vendedorNombre ?? venta.vendedor,
+            }}
+            cargos={cargos.map((c) => ({
+              concepto: c.concepto ?? capitalizar(c.tipo_cargo),
+              vence: c.fecha_vencimiento,
+              fuente: c.fuente_esperada,
+              monto: c.monto,
+              pagado: c.monto_pagado,
+              saldo: c.saldo,
+              estado: c.estado,
+            }))}
+            abonos={abonos.map((a) => ({
+              fecha: a.fecha,
+              fuente: a.fuente,
+              formaPago: a.forma_pago,
+              monto: a.monto_total,
+              aplicado: aplicadoPorAbono.get(a.id) ?? 0,
+            }))}
+            totales={{
+              aCobrar: totalACobrar,
+              cobrado: totalCobrado,
+              saldo: saldoPendiente,
+              saldoFavor,
+            }}
+            fechaCorteISO={new Date().toISOString().slice(0, 10)}
+          />
+        </DetailDrawerContent>
+      </DetailDrawer>
 
-      {reciboAbono ? (
-        <ReciboCajaPrintable
-          folio={`RC-${reciboAbono.id.slice(0, 8).toUpperCase()}`}
-          fechaISO={reciboAbono.fecha}
-          cliente={clienteNombre}
-          concepto={
-            [proyectoNombre, unidad?.identificador].filter(Boolean).join(' · ')
-              ? `Abono a cuenta — ${[proyectoNombre, unidad?.identificador]
-                  .filter(Boolean)
-                  .join(' · ')}`
-              : 'Abono a cuenta'
-          }
-          monto={reciboAbono.monto_total}
-          formaPago={reciboAbono.forma_pago}
-          referencia={reciboAbono.referencia}
-          fuente={reciboAbono.fuente}
-        />
-      ) : null}
+      <DetailDrawer
+        open={!!reciboAbono}
+        onOpenChange={(o) => !o && setReciboAbono(null)}
+        size="md"
+        title={<span className="print:hidden">Recibo de caja</span>}
+        description={<span className="print:hidden">{clienteNombre}</span>}
+        actions={
+          <button
+            type="button"
+            onClick={triggerPrint}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--text)] px-3 py-1.5 text-sm font-medium text-[var(--card)] hover:opacity-90"
+          >
+            <Printer className="h-4 w-4" /> Imprimir
+          </button>
+        }
+      >
+        <DetailDrawerContent>
+          {reciboAbono ? (
+            <ReciboCajaPrintable
+              folio={`RC-${reciboAbono.id.slice(0, 8).toUpperCase()}`}
+              fechaISO={reciboAbono.fecha}
+              cliente={clienteNombre}
+              concepto={
+                [proyectoNombre, unidad?.identificador].filter(Boolean).join(' · ')
+                  ? `Abono a cuenta — ${[proyectoNombre, unidad?.identificador]
+                      .filter(Boolean)
+                      .join(' · ')}`
+                  : 'Abono a cuenta'
+              }
+              monto={reciboAbono.monto_total}
+              formaPago={reciboAbono.forma_pago}
+              referencia={reciboAbono.referencia}
+              fuente={reciboAbono.fuente}
+            />
+          ) : null}
+        </DetailDrawerContent>
+      </DetailDrawer>
     </div>
   );
 }
