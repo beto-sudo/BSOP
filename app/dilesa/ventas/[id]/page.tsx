@@ -10,7 +10,8 @@
  *   1. Datos del cliente (`erp.personas`, cross-schema).
  *   2. Datos de la venta — ficha + KYC/PLD + notas.
  *   3. Pipeline — 17 fases con docs asociados (cargados vs. faltantes).
- *   4. Pagos — `dilesa.venta_pagos` con sus adjuntos.
+ *   4. Estado de cuenta — CxC: cargos (`erp.cxc_cargos`) + abonos
+ *      (`erp.cxc_pagos`) + saldo/saldo a favor. Iniciativa `cxc`.
  *   5. Expediente digital — `erp.adjuntos` agrupados por rol.
  *
  * Pipeline (sección 3): cada fase declara qué documento(s) de rol son
@@ -118,7 +119,26 @@ type DesgloseCalculo = {
   gastos_notariales_6pct: number;
 };
 type Fase = { id: string; fase: string; posicion: number | null; fecha: string | null };
-type Pago = { id: string; fecha: string | null; monto: number; tipo: string | null };
+type Cargo = {
+  id: string;
+  tipo_cargo: string;
+  numero: number;
+  concepto: string | null;
+  monto: number;
+  monto_pagado: number;
+  saldo: number;
+  fecha_vencimiento: string | null;
+  estado: string;
+  fuente_esperada: string;
+};
+type Abono = {
+  id: string;
+  fecha: string | null;
+  monto_total: number;
+  fuente: string;
+  forma_pago: string | null;
+  notas: string | null;
+};
 type Adjunto = {
   id: string;
   entidad_tipo: string;
@@ -268,7 +288,9 @@ function DetailInner() {
   const [proyectoNombre, setProyectoNombre] = useState<string | null>(null);
   const [prototipoNombre, setPrototipoNombre] = useState<string | null>(null);
   const [fases, setFases] = useState<Fase[]>([]);
-  const [pagos, setPagos] = useState<Pago[]>([]);
+  const [cargos, setCargos] = useState<Cargo[]>([]);
+  const [abonos, setAbonos] = useState<Abono[]>([]);
+  const [aplicadoPorAbono, setAplicadoPorAbono] = useState<Map<string, number>>(new Map());
   const [adjuntos, setAdjuntos] = useState<Adjunto[]>([]);
   const [calculo, setCalculo] = useState<DesgloseCalculo | null>(null);
   const [vendedorNombre, setVendedorNombre] = useState<string | null>(null);
@@ -305,7 +327,7 @@ function DetailInner() {
       const ventaRow = vRow as unknown as Venta;
       setVenta(ventaRow);
 
-      const [pRes, fRes, pagosRes, uRes] = await Promise.all([
+      const [pRes, fRes, cargosRes, abonosRes, uRes] = await Promise.all([
         sb
           .schema('erp')
           .from('personas')
@@ -322,10 +344,22 @@ function DetailInner() {
           .is('deleted_at', null)
           .order('posicion', { ascending: true }),
         sb
-          .schema('dilesa')
-          .from('venta_pagos')
-          .select('id, fecha, monto, tipo')
-          .eq('venta_id', ventaRow.id)
+          .schema('erp')
+          .from('cxc_cargos')
+          .select(
+            'id, tipo_cargo, numero, concepto, monto, monto_pagado, saldo, fecha_vencimiento, estado, fuente_esperada'
+          )
+          .eq('origen_tipo', 'venta_dilesa')
+          .eq('origen_id', ventaRow.id)
+          .is('deleted_at', null)
+          .order('fecha_vencimiento', { ascending: true, nullsFirst: false })
+          .order('numero', { ascending: true }),
+        sb
+          .schema('erp')
+          .from('cxc_pagos')
+          .select('id, fecha, monto_total, fuente, forma_pago, notas')
+          .eq('origen_tipo', 'venta_dilesa')
+          .eq('origen_id', ventaRow.id)
           .is('deleted_at', null)
           .order('fecha', { ascending: true }),
         ventaRow.unidad_id
@@ -339,7 +373,7 @@ function DetailInner() {
       ]);
       if (!activo) return;
 
-      const firstErr = pRes.error ?? fRes.error ?? pagosRes.error ?? uRes.error;
+      const firstErr = pRes.error ?? fRes.error ?? cargosRes.error ?? abonosRes.error ?? uRes.error;
       if (firstErr) {
         setError(getSupabaseErrorMessage(firstErr, 'No se pudo cargar el detalle de la venta.'));
         setLoading(false);
@@ -348,7 +382,28 @@ function DetailInner() {
 
       setPersona((pRes.data as unknown as Persona) ?? null);
       setFases((fRes.data ?? []) as Fase[]);
-      setPagos((pagosRes.data ?? []) as Pago[]);
+      const cargosData = (cargosRes.data ?? []) as Cargo[];
+      const abonosData = (abonosRes.data ?? []) as Abono[];
+      setCargos(cargosData);
+      setAbonos(abonosData);
+
+      // Aplicaciones para derivar el saldo a favor por abono.
+      const abonoIds = abonosData.map((a) => a.id);
+      if (abonoIds.length > 0) {
+        const { data: aplData } = await sb
+          .schema('erp')
+          .from('cxc_pago_aplicaciones')
+          .select('pago_id, monto_aplicado')
+          .in('pago_id', abonoIds);
+        if (activo) {
+          const m = new Map<string, number>();
+          for (const ap of (aplData ?? []) as { pago_id: string; monto_aplicado: number }[]) {
+            m.set(ap.pago_id, (m.get(ap.pago_id) ?? 0) + Number(ap.monto_aplicado));
+          }
+          setAplicadoPorAbono(m);
+        }
+      }
+
       const uData = uRes.data as UnidadInfo | null;
       setUnidad(uData);
 
@@ -374,14 +429,12 @@ function DetailInner() {
       setProyectoNombre((prjRes.data?.nombre as string | null) ?? null);
       setPrototipoNombre((prodRes.data?.nombre as string | null) ?? null);
 
-      const pagoIds = ((pagosRes.data ?? []) as Pago[]).map((p) => p.id);
-      const allIds = [ventaRow.id, ...pagoIds];
       const { data: adjRows, error: adjErr } = await sb
         .schema('erp')
         .from('adjuntos')
         .select('id, entidad_tipo, entidad_id, rol, nombre, url, tipo_mime')
-        .in('entidad_tipo', ['venta', 'venta_pago'])
-        .in('entidad_id', allIds);
+        .eq('entidad_tipo', 'venta')
+        .eq('entidad_id', ventaRow.id);
       if (!activo) return;
       if (adjErr) {
         setError(getSupabaseErrorMessage(adjErr, 'No se pudieron cargar los adjuntos.'));
@@ -526,17 +579,17 @@ function DetailInner() {
     [pipelineRows]
   );
 
-  const adjuntosPorPago = useMemo(() => {
-    const m = new Map<string, Adjunto[]>();
-    for (const a of adjuntos.filter((x) => x.entidad_tipo === 'venta_pago')) {
-      const arr = m.get(a.entidad_id) ?? [];
-      arr.push(a);
-      m.set(a.entidad_id, arr);
-    }
-    return m;
-  }, [adjuntos]);
-
-  const totalPagos = useMemo(() => pagos.reduce((s, p) => s + (p.monto ?? 0), 0), [pagos]);
+  const totalACobrar = useMemo(() => cargos.reduce((s, c) => s + c.monto, 0), [cargos]);
+  const totalCobrado = useMemo(() => cargos.reduce((s, c) => s + c.monto_pagado, 0), [cargos]);
+  const saldoPendiente = useMemo(() => cargos.reduce((s, c) => s + c.saldo, 0), [cargos]);
+  const saldoFavor = useMemo(
+    () =>
+      abonos.reduce(
+        (s, a) => s + Math.max(0, a.monto_total - (aplicadoPorAbono.get(a.id) ?? 0)),
+        0
+      ),
+    [abonos, aplicadoPorAbono]
+  );
 
   if (loading) {
     return (
@@ -834,44 +887,124 @@ function DetailInner() {
       </Section>
 
       <Section
-        title="Pagos"
+        title="Estado de cuenta"
         description={
-          pagos.length === 0 ? 'sin pagos' : `${pagos.length} · ${moneyFmt.format(totalPagos)}`
+          cargos.length === 0
+            ? 'sin plan de pagos'
+            : `saldo ${moneyFmt.format(saldoPendiente)} de ${moneyFmt.format(totalACobrar)}`
         }
       >
-        {pagos.length === 0 ? (
-          <p className="text-sm text-[var(--text)]/60">No hay depósitos registrados.</p>
+        {cargos.length === 0 && abonos.length === 0 ? (
+          <p className="text-sm text-[var(--text)]/60">
+            Sin plan de pagos generado para esta venta.
+          </p>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[var(--border)] text-left text-xs uppercase tracking-wide text-[var(--text)]/50">
-                <th className="py-1 pr-2 font-medium">Fecha</th>
-                <th className="py-1 pr-2 font-medium">Tipo</th>
-                <th className="py-1 text-right font-medium">Monto</th>
-                <th className="py-1 pl-2 font-medium">Adjuntos</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pagos.map((p) => {
-                const ads = adjuntosPorPago.get(p.id) ?? [];
-                return (
-                  <tr key={p.id} className="border-b border-[var(--border)]/40">
-                    <td className="py-1.5 pr-2">{fmtFecha(p.fecha) ?? '—'}</td>
-                    <td className="py-1.5 pr-2 text-[var(--text)]/70">{p.tipo ?? '—'}</td>
-                    <td className="py-1.5 text-right tabular-nums">{moneyFmt.format(p.monto)}</td>
-                    <td className="py-1.5 pl-2">
-                      <div className="flex flex-wrap gap-1">
-                        {ads.map((a) => (
-                          <AdjuntoLink key={a.id} a={a} compact />
-                        ))}
-                        {ads.length === 0 ? <span className="text-[var(--text)]/30">—</span> : null}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="space-y-6">
+            <div className="flex flex-wrap gap-x-8 gap-y-3">
+              <ResumenItem label="A cobrar" value={moneyFmt.format(totalACobrar)} />
+              <ResumenItem label="Cobrado" value={moneyFmt.format(totalCobrado)} />
+              <ResumenItem label="Saldo" value={moneyFmt.format(saldoPendiente)} />
+              {saldoFavor > 0 ? (
+                <ResumenItem label="Saldo a favor" value={moneyFmt.format(saldoFavor)} warn />
+              ) : null}
+            </div>
+
+            {cargos.length > 0 ? (
+              <div>
+                <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
+                  Cargos
+                </div>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--border)] text-left text-xs uppercase tracking-wide text-[var(--text)]/50">
+                      <th className="py-1 pr-2 font-medium">Concepto</th>
+                      <th className="py-1 pr-2 font-medium">Vence</th>
+                      <th className="py-1 pr-2 font-medium">Fuente</th>
+                      <th className="py-1 pr-2 text-right font-medium">Monto</th>
+                      <th className="py-1 pr-2 text-right font-medium">Pagado</th>
+                      <th className="py-1 pr-2 text-right font-medium">Saldo</th>
+                      <th className="py-1 pl-2 font-medium">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cargos.map((c) => (
+                      <tr key={c.id} className="border-b border-[var(--border)]/40">
+                        <td className="py-1.5 pr-2">{c.concepto ?? capitalizar(c.tipo_cargo)}</td>
+                        <td className="py-1.5 pr-2 text-[var(--text)]/70">
+                          {fmtFecha(c.fecha_vencimiento) ?? '—'}
+                        </td>
+                        <td className="py-1.5 pr-2">
+                          <Badge tone={fuenteTone(c.fuente_esperada)}>
+                            {fuenteLabel(c.fuente_esperada)}
+                          </Badge>
+                        </td>
+                        <td className="py-1.5 pr-2 text-right tabular-nums">
+                          {moneyFmt.format(c.monto)}
+                        </td>
+                        <td className="py-1.5 pr-2 text-right tabular-nums text-[var(--text)]/70">
+                          {moneyFmt.format(c.monto_pagado)}
+                        </td>
+                        <td className="py-1.5 pr-2 text-right tabular-nums">
+                          {moneyFmt.format(c.saldo)}
+                        </td>
+                        <td className="py-1.5 pl-2">
+                          <Badge tone={estadoTone(c.estado)}>{capitalizar(c.estado)}</Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+
+            {abonos.length > 0 ? (
+              <div>
+                <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
+                  Abonos
+                </div>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--border)] text-left text-xs uppercase tracking-wide text-[var(--text)]/50">
+                      <th className="py-1 pr-2 font-medium">Fecha</th>
+                      <th className="py-1 pr-2 font-medium">Fuente</th>
+                      <th className="py-1 pr-2 text-right font-medium">Monto</th>
+                      <th className="py-1 pr-2 text-right font-medium">Aplicado</th>
+                      <th className="py-1 pl-2 text-right font-medium">Saldo a favor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {abonos.map((a) => {
+                      const aplicado = aplicadoPorAbono.get(a.id) ?? 0;
+                      const favor = a.monto_total - aplicado;
+                      return (
+                        <tr key={a.id} className="border-b border-[var(--border)]/40">
+                          <td className="py-1.5 pr-2">{fmtFecha(a.fecha) ?? '—'}</td>
+                          <td className="py-1.5 pr-2">
+                            <Badge tone={fuenteTone(a.fuente)}>{fuenteLabel(a.fuente)}</Badge>
+                          </td>
+                          <td className="py-1.5 pr-2 text-right tabular-nums">
+                            {moneyFmt.format(a.monto_total)}
+                          </td>
+                          <td className="py-1.5 pr-2 text-right tabular-nums text-[var(--text)]/70">
+                            {moneyFmt.format(aplicado)}
+                          </td>
+                          <td className="py-1.5 pl-2 text-right tabular-nums">
+                            {favor > 0 ? (
+                              <span className="font-medium text-amber-600">
+                                {moneyFmt.format(favor)}
+                              </span>
+                            ) : (
+                              <span className="text-[var(--text)]/30">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </div>
         )}
       </Section>
 
@@ -957,6 +1090,54 @@ function FichaGrid({ rows, cols = 2 }: { rows: { label: string; value: string }[
         </div>
       ))}
     </dl>
+  );
+}
+
+function capitalizar(s: string): string {
+  return s.length ? s[0].toUpperCase() + s.slice(1) : s;
+}
+
+function fuenteLabel(f: string): string {
+  return f === 'institucion' ? 'Institución' : 'Cliente';
+}
+
+function estadoTone(e: string): BadgeTone {
+  switch (e) {
+    case 'liquidado':
+      return 'success';
+    case 'parcial':
+      return 'warning';
+    case 'cancelado':
+      return 'danger';
+    default:
+      return 'neutral';
+  }
+}
+
+function fuenteTone(f: string): BadgeTone {
+  return f === 'institucion' ? 'accent' : 'info';
+}
+
+function ResumenItem({
+  label,
+  value,
+  warn = false,
+}: {
+  label: string;
+  value: string;
+  warn?: boolean;
+}) {
+  return (
+    <div>
+      <div className="text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
+        {label}
+      </div>
+      <div
+        className={`mt-0.5 text-base font-semibold tabular-nums ${warn ? 'text-amber-600' : 'text-[var(--text)]'}`}
+      >
+        {value}
+      </div>
+    </div>
   );
 }
 
