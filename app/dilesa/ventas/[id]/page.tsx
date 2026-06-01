@@ -303,6 +303,9 @@ function DetailInner() {
   const [cargos, setCargos] = useState<Cargo[]>([]);
   const [abonos, setAbonos] = useState<Abono[]>([]);
   const [aplicadoPorAbono, setAplicadoPorAbono] = useState<Map<string, number>>(new Map());
+  const [comprobantesPorAbono, setComprobantesPorAbono] = useState<Map<string, Adjunto[]>>(
+    new Map()
+  );
   const [adjuntos, setAdjuntos] = useState<Adjunto[]>([]);
   const [calculo, setCalculo] = useState<DesgloseCalculo | null>(null);
   const [vendedorNombre, setVendedorNombre] = useState<string | null>(null);
@@ -416,6 +419,22 @@ function DetailInner() {
             m.set(ap.pago_id, (m.get(ap.pago_id) ?? 0) + Number(ap.monto_aplicado));
           }
           setAplicadoPorAbono(m);
+        }
+
+        const { data: adjAbonos } = await sb
+          .schema('erp')
+          .from('adjuntos')
+          .select('id, entidad_tipo, entidad_id, rol, nombre, url, tipo_mime')
+          .eq('entidad_tipo', 'cxc_pago')
+          .in('entidad_id', abonoIds);
+        if (activo) {
+          const am = new Map<string, Adjunto[]>();
+          for (const a of (adjAbonos ?? []) as Adjunto[]) {
+            const arr = am.get(a.entidad_id) ?? [];
+            arr.push(a);
+            am.set(a.entidad_id, arr);
+          }
+          setComprobantesPorAbono(am);
         }
       }
 
@@ -1019,7 +1038,8 @@ function DetailInner() {
                       <th className="py-1 pr-2 font-medium">Fuente</th>
                       <th className="py-1 pr-2 text-right font-medium">Monto</th>
                       <th className="py-1 pr-2 text-right font-medium">Aplicado</th>
-                      <th className="py-1 pl-2 text-right font-medium">Saldo a favor</th>
+                      <th className="py-1 pr-2 text-right font-medium">Saldo a favor</th>
+                      <th className="py-1 pl-2 font-medium">Comprobante</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1038,7 +1058,7 @@ function DetailInner() {
                           <td className="py-1.5 pr-2 text-right tabular-nums text-[var(--text)]/70">
                             {moneyFmt.format(aplicado)}
                           </td>
-                          <td className="py-1.5 pl-2 text-right tabular-nums">
+                          <td className="py-1.5 pr-2 text-right tabular-nums">
                             {favor > 0 ? (
                               <span className="font-medium text-amber-600">
                                 {moneyFmt.format(favor)}
@@ -1046,6 +1066,16 @@ function DetailInner() {
                             ) : (
                               <span className="text-[var(--text)]/30">—</span>
                             )}
+                          </td>
+                          <td className="py-1.5 pl-2">
+                            <div className="flex flex-wrap gap-1">
+                              {(comprobantesPorAbono.get(a.id) ?? []).map((adj) => (
+                                <AdjuntoLink key={adj.id} a={adj} compact />
+                              ))}
+                              {(comprobantesPorAbono.get(a.id) ?? []).length === 0 ? (
+                                <span className="text-[var(--text)]/30">—</span>
+                              ) : null}
+                            </div>
                           </td>
                         </tr>
                       );

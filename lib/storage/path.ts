@@ -36,6 +36,7 @@ export type AdjuntoEntidad =
   | 'empresa'
   | 'ventas'
   | 'venta_pagos'
+  | 'cxc_pagos'
   | 'proyecto_tareas'
   | 'proyecto_tarea_pasos'
   | 'proyecto_planos';

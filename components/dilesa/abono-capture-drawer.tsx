@@ -10,6 +10,7 @@
  * no filtra el cálculo.
  */
 
+import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { z } from 'zod';
 
@@ -21,6 +22,8 @@ import { useToast } from '@/components/ui/toast';
 import { Form, FormActions, FormField, FormRow, useZodForm } from '@/components/forms';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { buildAdjuntoPath } from '@/lib/storage/path';
+import { WizardFileSlot } from '@/components/wizard/wizard-file-slot';
 
 const FUENTE_OPTIONS = [
   { value: 'cliente', label: 'Cliente' },
@@ -80,16 +83,22 @@ export function AbonoCaptureDrawer({
   onDone,
 }: AbonoCaptureDrawerProps) {
   const toast = useToast();
+  const [comprobante, setComprobante] = useState<File | null>(null);
   const form = useZodForm({ schema: AbonoSchema, defaultValues: defaults });
 
+  const reset = () => {
+    form.reset(defaults);
+    setComprobante(null);
+  };
+
   const handleOpenChange = (next: boolean) => {
-    if (!next) form.reset(defaults);
+    if (!next) reset();
     onOpenChange(next);
   };
 
   const handleSubmit = async (values: AbonoValues) => {
     const sb = createSupabaseBrowserClient();
-    const { error } = await sb.schema('erp').rpc('cxc_pago_registrar', {
+    const { data: pagoId, error } = await sb.schema('erp').rpc('cxc_pago_registrar', {
       p_empresa_id: empresaId,
       p_persona_id: personaId,
       p_origen_id: ventaId,
@@ -110,8 +119,43 @@ export function AbonoCaptureDrawer({
       return;
     }
 
+    // Sube el comprobante ligado al abono recién creado (deferred upload,
+    // ADR-022): el abono ya existe, así que tenemos su id como entidadId.
+    if (comprobante && typeof pagoId === 'string') {
+      const path = buildAdjuntoPath({
+        empresa: 'dilesa',
+        entidad: 'cxc_pagos',
+        entidadId: pagoId,
+        filename: comprobante.name,
+      });
+      const { error: upErr } = await sb.storage.from('adjuntos').upload(path, comprobante, {
+        contentType: comprobante.type || 'application/octet-stream',
+        upsert: false,
+      });
+      if (upErr) {
+        toast.add({
+          title: 'Abono registrado, pero el comprobante no se subió',
+          description: getSupabaseErrorMessage(upErr, 'Reintenta adjuntar el comprobante.'),
+          type: 'error',
+        });
+      } else {
+        await sb
+          .schema('erp')
+          .from('adjuntos')
+          .insert({
+            empresa_id: empresaId,
+            entidad_tipo: 'cxc_pago',
+            entidad_id: pagoId,
+            rol: 'comprobante',
+            nombre: comprobante.name,
+            url: path,
+            tipo_mime: comprobante.type || null,
+          });
+      }
+    }
+
     toast.add({ title: 'Abono registrado', type: 'success' });
-    form.reset(defaults);
+    reset();
     onOpenChange(false);
     onDone();
   };
@@ -216,6 +260,17 @@ export function AbonoCaptureDrawer({
               />
             )}
           </FormField>
+
+          <div>
+            <span className="mb-1.5 block text-xs font-medium text-[var(--text)]">Comprobante</span>
+            <WizardFileSlot
+              role="comprobante"
+              label="Comprobante del pago"
+              file={comprobante}
+              onChange={setComprobante}
+              accept=".pdf,.jpg,.jpeg,.png,.webp,.heic"
+            />
+          </div>
 
           <FormActions
             cancelLabel="Cancelar"
