@@ -204,6 +204,11 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   'dilesa.ventas.fases',
   'dilesa.ventas.clientes',
   'dilesa.ventas.vendedores',
+  // Cobranza (CxC) — hub con 2 tabs. Migración
+  // 20260601192607_modulo_dilesa_cobranza.sql.
+  'dilesa.cobranza',
+  'dilesa.cobranza.pagos',
+  'dilesa.cobranza.aging',
   'dilesa.construccion',
   // Sub-slugs del hub Construcción (sprint tabs+protos, ADR-030). El padre
   // `dilesa.construccion` queda como umbrella en sidebar; cada tab
