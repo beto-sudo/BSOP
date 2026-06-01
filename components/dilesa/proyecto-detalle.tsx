@@ -769,27 +769,6 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
         </DetailDrawerSection>
       )}
 
-      {obras.length > 0 && (
-        <DetailDrawerSection
-          title="Obras de construcción"
-          description={`${obras.length} ${obras.length === 1 ? 'obra' : 'obras'}`}
-        >
-          <DataTable
-            data={obras}
-            columns={obraColumns}
-            rowKey="id"
-            onRowClick={(o) => router.push(`/dilesa/construccion/${o.id}`)}
-            sticky={{ header: false }}
-            showDensityToggle={false}
-            density="compact"
-            initialSort={{ key: 'avance_pct', dir: 'desc' }}
-            emptyTitle="Sin obras"
-            emptyDescription="Este proyecto no tiene obras de construcción."
-            emptyIcon={<HardHat className="h-6 w-6" />}
-          />
-        </DetailDrawerSection>
-      )}
-
       <ProyectoChecklist
         proyectoId={proyecto.id}
         tipo={proyecto.tipo}
@@ -893,6 +872,27 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
           </div>
         </div>
       </DetailDrawerSection>
+
+      {obras.length > 0 && (
+        <DetailDrawerSection
+          title="Obras de construcción"
+          description={`${obras.length} ${obras.length === 1 ? 'obra' : 'obras'}`}
+        >
+          <DataTable
+            data={obras}
+            columns={obraColumns}
+            rowKey="id"
+            onRowClick={(o) => router.push(`/dilesa/construccion/${o.id}`)}
+            sticky={{ header: false }}
+            showDensityToggle={false}
+            density="compact"
+            initialSort={{ key: 'avance_pct', dir: 'desc' }}
+            emptyTitle="Sin obras"
+            emptyDescription="Este proyecto no tiene obras de construcción."
+            emptyIcon={<HardHat className="h-6 w-6" />}
+          />
+        </DetailDrawerSection>
+      )}
 
       <DetailDrawerSection
         title="Unidades"
