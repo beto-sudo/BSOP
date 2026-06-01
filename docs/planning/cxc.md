@@ -1,0 +1,245 @@
+# Iniciativa — Cuentas por Cobrar (CxC)
+
+**Slug:** `cxc`
+**Empresas:** todas (golden: DILESA; rollout RDB/COAGAN/ANSA en sub-iniciativas posteriores)
+**Schemas afectados:** `erp` (nuevas `cxc_cargos`, `cxc_pagos`, `cxc_pago_aplicaciones`; extiende `movimientos_bancarios` con referencia polimórfica), `dilesa` (originación `fn_generar_plan_pagos`; absorbe `venta_pagos`), `core` (helper de roles)
+**Estado:** planned
+**Dueño:** Beto
+**Creada:** 2026-06-01
+**Última actualización:** 2026-06-01 (alcance v1 cerrado tras 6 decisiones de Beto + diseño gemelo con CxP en ADR-037)
+
+## Problema
+
+DILESA captura los depósitos de clientes en `dilesa.venta_pagos`
+(migrado del módulo Coda "Depositos Clientes": cliente, fecha, monto,
+tipo, comprobante, recibo de caja). Eso registra **que entró dinero y de
+quién**, pero no modela el adeudo. Hoy **no existe**:
+
+- **Plan de pagos / cargos**: qué debe el cliente y cuándo vence
+  (enganche en parcialidades, mensualidades de crédito propio, evento de
+  disposición del crédito institucional).
+- **Aplicación del abono a cargos específicos**: un depósito solo apunta
+  a la venta, no a la mensualidad que cubre. No hay parciales limpios, ni
+  saldo a favor, ni anticipos.
+- **Saldo y antigüedad** por cliente/venta: el "¿cuánto me debe cada
+  quién y cuánto falta para saldo 0?" vive en Coda y en la cabeza del
+  operador.
+- **Cobranza activa**: vencidos, estados de cuenta, recordatorios.
+
+Toda venta —pague el cliente el enganche, un crédito propio, o lo pague
+una institución (INFONAVIT / FOVISSSTE / banco)— genera un adeudo que
+hay que rastrear **hasta saldo 0**, sin importar la fuente del pago. Hoy
+ese seguimiento no es trazable en BSOP.
+
+Resultado operativo: doble captura entre Coda y la realidad, nula
+visibilidad de cobranza a futuro, y un módulo Coda que registra abonos
+sueltos sin saldo. El mes que se cae, se cae feo.
+
+## Outcome esperado
+
+- **Cada venta DILESA genera su plan de cargos automáticamente**,
+  derivado de los términos ya capturados en `dilesa.ventas`
+  (`precio_asignacion`, `enganche_requerido`, `tipo_credito`). El
+  operador no teclea mensualidad por mensualidad.
+- **Cada depósito se aplica a cargos específicos** (FIFO por default +
+  override manual), soportando pagos parciales y saldo a favor.
+- **Saldo y aging 100% derivados**, cero captura — se recalculan solos
+  (mismo espíritu que los KPIs reactivos de ADR-034).
+- **Cobranza activa**: bandeja de vencidos, estado de cuenta imprimible
+  por cliente, recordatorios por email con branding por empresa —
+  distinguiendo `fuente='cliente'` (se cobra) de `fuente='institucion'`
+  (solo visibilidad del adeudo).
+- **Cada abono cobrado emite un movimiento bancario** (`referencia_tipo=
+'cxc_pago'`), dejando listo el enganche para `conciliacion-bancaria`.
+- **CFDI lo sigue generando CONTPAQi**; BSOP solo registra el adeudo/
+  abono y **referencia el `uuid_sat`** cuando existe.
+- **Recibo de caja imprimible** por abono (reemplaza el PDF de Coda,
+  patrón de print ADR-021).
+- **El módulo Coda "Depositos Clientes" se retira**; BSOP pasa a ser el
+  system-of-record.
+- **DILESA golden**; RDB/COAGAN/ANSA replican con la misma maquinaria
+  (núcleo genérico + originación por empresa, ADR-037 D5).
+
+## Alcance v1
+
+- [ ] **Sprint 1 — Schema (DB-puro) + ADR-037**:
+  - Nueva `erp.cxc_cargos` (documento de adeudo, ADR-037 D1):
+    `id`, `empresa_id`, `cliente_id` (FK → `erp.clientes`), `origen_tipo`
+    (`'venta_dilesa'` en v1), `origen_id` (uuid → `dilesa.ventas`),
+    `tipo_cargo` (`'enganche'|'mensualidad'|'credito'|'contado'|'otro'`),
+    `numero` (orden dentro del plan), `concepto`, `monto`,
+    `fecha_vencimiento`, `monto_pagado` (numeric default 0, recalculado
+    por trigger), `saldo` (generated `monto - COALESCE(monto_pagado,0)`),
+    `estado` (CHECK `'pendiente'|'parcial'|'liquidado'|'cancelado'`),
+    `fuente_esperada` (`'cliente'|'institucion'`, para gobernar
+    cobranza), `notas`, timestamps, `deleted_at`.
+  - Nueva `erp.cxc_pagos` (el abono): `id`, `empresa_id`, `cliente_id`
+    (denormalizado), `fecha`, `monto_total`, `fuente`
+    (`'cliente'|'institucion'`, ADR-037 D6), `forma_pago`
+    (efectivo/transferencia/cheque/...), `referencia`,
+    `cuenta_bancaria_id` (FK → `erp.cuentas_bancarias`, null hasta
+    conocer cuenta), `uuid_sat` (nullable — referencia al CFDI de
+    CONTPAQi), `comprobante_adjunto_id`, `notas`, `registrado_por`,
+    timestamps, `deleted_at`, `coda_row_id` (para la migración).
+  - Nueva `erp.cxc_pago_aplicaciones`: `id`, `empresa_id`, `pago_id`
+    (FK), `cargo_id` (FK), `monto_aplicado`, `created_at`. `CHECK Σ
+aplicaciones ≤ pago.monto_total` (permite saldo a favor).
+  - Extender `erp.movimientos_bancarios`: agregar `referencia_tipo` +
+    `referencia_id` (ADR-037 D4). **Esta extensión la entrega CxC y la
+    consume CxP.**
+  - Trigger: `AFTER INSERT/UPDATE/DELETE ON cxc_pago_aplicaciones`
+    recalcula `cargo.monto_pagado` y `cargo.estado` con `SELECT SUM`
+    directo (sin recursión, ADR-037 D3).
+  - RPCs:
+    - `dilesa.fn_generar_plan_pagos(venta_id)` — **originación**: deriva
+      los cargos desde `dilesa.ventas`. Idempotente (regenerable
+      mientras no haya abonos aplicados). Enganche → parcialidades;
+      crédito propio → mensualidades; crédito institucional → evento
+      único `fuente_esperada='institucion'`.
+    - `erp.cxc_pago_registrar(...)` — alta de abono + auto-aplicación
+      FIFO al cargo abierto más viejo + emite `movimientos_bancarios`
+      si trae `cuenta_bancaria_id`.
+    - `erp.cxc_pago_aplicar(pago_id, [{cargo_id, monto}])` — override
+      manual de la aplicación (reasignar).
+    - `erp.cxc_pago_cancelar(pago_id, motivo)`.
+    - `erp.cxc_cargo_ajustar(cargo_id, ...)` — descuento/condonación con
+      audit.
+  - **Migración** de `dilesa.venta_pagos` → `erp.cxc_pagos` (preservar
+    `coda_row_id`, `tipo`→`forma_pago`, `fecha`, `monto`, `notas`).
+  - **Backfill**: generar planes de cargos para ventas activas + aplicar
+    los pagos históricos FIFO para reconstruir saldos.
+  - RLS canónica (`core.fn_has_empresa OR core.fn_is_admin`) + escritura
+    a `audit_log` en cada transición.
+  - **Regenerar `SCHEMA_REF.md` + `types/supabase.ts`** y commitear.
+
+- [ ] **Sprint 2 — Plan de pagos + captura de abono (DILESA, en el detalle de venta)**:
+  - Sección "Estado de cuenta" en el detalle de `dilesa.ventas`: cargos
+    con vencimiento, abonos aplicados, saldo corriente, badge de estado.
+  - Generar/regenerar plan desde los términos de la venta.
+  - Captura de abono inline (reemplaza el form de Coda): cliente, fecha,
+    monto, `fuente`, forma de pago, comprobante. Auto-aplicación FIFO
+    visible + override manual.
+  - Recibo de caja imprimible por abono (ADR-021).
+
+- [ ] **Sprint 3 — Módulo Cobranza + aging (DILESA)**:
+  - `/dilesa/cobranza` con sub-rutas (ADR-005 + sub-slugs ADR-030):
+    - `estado` — antigüedad por cliente/venta con buckets (vigente /
+      1-30 / 31-60 / 61-90 / >90), filtros (`useUrlFilters`).
+    - `cargos` — todos los cargos, filtro de vencidos.
+    - `abonos` — todos los abonos (la vista "Resumen/Consulta" del Coda).
+  - Estado de cuenta PDF por cliente.
+  - RBAC: slug `dilesa.cobranza` + sub-slugs + backfill defensivo (regla
+    "Liberación de módulo nuevo" del `CLAUDE.md` del repo).
+
+- [ ] **Sprint 4 — Recordatorios + forecast + gancho de conciliación**:
+  - Recordatorios de vencimiento por email (catálogo `notificaciones` +
+    branding `lib/juntas/email.ts`), **solo `fuente='cliente'`**.
+  - Forecast de cobranza (lo que entra por fecha — el inverso del
+    calendario de pagos de CxP).
+  - Confirmar emisión de `movimientos_bancarios` al cobrar (engancha con
+    `conciliacion-bancaria`).
+
+- [ ] **Sprint 5 — Retiro de Coda + closeout**:
+  - Validar paridad con Coda, smoke E2E, cutover (pausar Coda).
+  - Barrido de Reminders + actualizar planning + INITIATIVES.
+
+## Fuera de alcance v1
+
+- **Interés moratorio** sobre cargos vencidos: **V2** (decisión de
+  Beto). Común en venta a plazos; se modela como cargo derivado cuando
+  se aborde.
+- **Generación de CFDI de ingreso + complemento de pago PPD** desde
+  BSOP: CONTPAQi lo genera; BSOP referencia el `uuid_sat`. Sacar la
+  facturación a BSOP = sub-iniciativa futura (Beto: "lo sacaremos de
+  BSOP, pero por ahorita seguimos con CONTPAQi").
+- **Conciliación bancaria completa**: iniciativa hermana
+  [`conciliacion-bancaria`](conciliacion-bancaria.md). CxC **solo emite**
+  el movimiento bancario; el casamiento contra estado de cuenta vive
+  allá.
+- **Rollout ANSA / RDB / COAGAN**: la maquinaria queda genérica desde
+  Sprint 1, pero la originación y la UI por empresa entran como
+  sub-iniciativas (ANSA autos+taller+CFDI, RDB membresías recurrentes,
+  COAGAN cosecha net-30).
+- **Cobranza activa a instituciones** (INFONAVIT/FOVISSSTE): v1 solo da
+  **visibilidad** del adeudo institucional, no gestión de cobranza.
+- **Multi-moneda**: MXN asumido en v1.
+
+## Métricas de éxito
+
+- **Saldo correcto**: para toda venta DILESA activa, `Σ
+cxc_cargos.saldo = precio − Σ aplicaciones`, y la suma de buckets de
+  aging = `Σ saldos por cliente`.
+- **Migración sin pérdida**: `count(dilesa.venta_pagos)` previo =
+  `count(erp.cxc_pagos WHERE coda_row_id IS NOT NULL)`.
+- **Captura ágil**: registrar un abono toma ≤ lo que toma hoy en Coda.
+- **Estado de cuenta confiable**: en muestra de 10 clientes, el saldo de
+  BSOP coincide con el cálculo manual.
+- **Gancho de tesorería**: 100% de los abonos con `cuenta_bancaria_id`
+  tienen su `movimientos_bancarios` emitido (listo para conciliar).
+- **Coda retirado** sin pérdida operativa tras Sprint 5.
+
+## Riesgos / preguntas abiertas
+
+- [ ] **Estructura del plan de enganche**: ¿N parcialidades con fechas
+      (más control y cobranza activa) vs monto único abonable libre (más
+      simple, como hoy en Coda)? **Sesgo: parcialidades para enganche y
+      crédito propio; evento único para crédito institucional.** Se
+      cierra en Sprint 1 al ver los datos reales con Beto.
+- [ ] **Campo de "precio total" en `dilesa.ventas`**: confirmar cuál
+      gobierna el cargo (`valor_comercial` vs `precio_asignacion` vs
+      `valor_escrituracion`). Afecta la originación. Sprint 1 lo valida.
+- [ ] **Disposición del crédito institucional**: el abono es un evento
+      único al escriturar. ¿Cómo se entera BSOP? Captura manual en v1;
+      integración con RUV/banco = futuro (cruza con `dilesa-ruv`).
+- [ ] **Legacy `erp.cobranza` / `erp.pagos` / `erp.ventas_inmobiliarias`**:
+      ¿tienen datos vivos? Si sí, migrar a `cxc_*`; si no, deprecar.
+      Sprint 1 audita. Beto ya decidió que el modelo activo es
+      `dilesa.*`, no el legacy.
+- [ ] **Backfill FIFO**: los `venta_pagos` de Coda no dicen a qué
+      mensualidad aplican. FIFO es la heurística; documentar y permitir
+      reasignación manual post-backfill.
+- [ ] **`erp.clientes` ↔ `erp.personas`**: confirmar el link para no
+      duplicar identidades (los 1,300 clientes DILESA ya importados).
+
+## Sprints / hitos
+
+| #   | Scope                                                                                                                                                                                                                                    | Estado    | PR  |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | --- |
+| 0   | Promoción: este doc + ADR-037 + esbozo `conciliacion-bancaria` + re-sync `cxp` + fila en INITIATIVES.md                                                                                                                                  | _este PR_ | —   |
+| 1   | DB: 3 tablas `cxc_*` + ref polimórfica en `movimientos_bancarios` + trigger de saldo + RPCs (`fn_generar_plan_pagos`, `registrar/aplicar/cancelar`, `cargo_ajustar`) + migrar `venta_pagos` + backfill FIFO + RLS + regenerar SCHEMA_REF | pending   | —   |
+| 2   | UI plan de pagos + estado de cuenta + captura de abono en el detalle de venta DILESA + recibo de caja                                                                                                                                    | pending   | —   |
+| 3   | Módulo `/dilesa/cobranza` (estado/cargos/abonos) + aging por buckets + RBAC sub-slugs + estado de cuenta PDF                                                                                                                             | pending   | —   |
+| 4   | Recordatorios de vencimiento (solo cliente) + forecast de cobranza + confirmar emisión de movimiento bancario                                                                                                                            | pending   | —   |
+| 5   | Retiro de Coda "Depositos Clientes" + smoke E2E + cutover + closeout                                                                                                                                                                     | pending   | —   |
+
+## Decisiones registradas
+
+### 2026-06-01 — Decisiones cerradas por Beto al promover la iniciativa
+
+- **System-of-record = modelo activo `dilesa.*`** (`ventas` /
+  `venta_pagos` / `unidades`, con 1,425 ventas y 1,300 clientes ya
+  importados). Se jubila el legacy `erp.cobranza` / `erp.pagos` /
+  `erp.ventas_inmobiliarias` (la maquinaria genérica vive en `erp.cxc_*`,
+  no en esas tablas tempranas).
+- **CxC y CxP son gemelas, diseñadas juntas.** Mismo patrón de subledger
+  codificado en **ADR-037** (documento → pago → aplicación → saldo →
+  aging → movimiento bancario). Se comparten componentes UI y la
+  emisión de movimiento bancario.
+- **Golden = DILESA**, por el dolor real + datos + el módulo Coda a
+  retirar. RDB/COAGAN/ANSA después como sub-iniciativas.
+- **Interés moratorio diferido a V2.**
+- **CFDI lo sigue generando CONTPAQi**; BSOP registra adeudo/abono y
+  referencia el `uuid_sat`. Sacar la facturación a BSOP = follow-up.
+- **Todas las ventas generan CxC hasta saldo 0**, sin importar quién
+  pague. Cada abono lleva `fuente` (`cliente` | `institucion`): a
+  cliente se le cobra (recordatorios, estado de cuenta); a institución
+  (INFONAVIT/FOVISSSTE/banco) es solo visibilidad del adeudo.
+- **Conciliación bancaria = 3er vértice del triángulo de tesorería**
+  (CxC ingresos / CxP egresos / banco realidad). Se construye **encima**
+  de `erp.movimientos_bancarios` (ya existe con flag `conciliado`); CxC
+  solo emite el movimiento. Iniciativa hermana `conciliacion-bancaria`
+  queda `proposed` hasta que CxC+CxP emitan movimientos.
+
+## Bitácora
+
+_(vacía hasta Sprint 1)_
