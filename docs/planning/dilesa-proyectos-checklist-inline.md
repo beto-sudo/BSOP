@@ -3,10 +3,10 @@
 **Slug:** `dilesa-proyectos-checklist-inline`
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa.proyecto_tarea_pasos` (tabla nueva Sprint 3); reusa `dilesa.proyecto_tareas` + `proyecto_tareas_dependencias` + `proyecto_presupuesto_partidas` + `proyecto_documentos` + `proyecto_hitos` + `plantilla_proyecto_tareas`.
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-05-28
-**Última actualización:** 2026-05-31 (Sprint 4 "espejar a desarrollo" reabierto y entregado en PR — checklist + plano versionado/IA montados en el detalle del desarrollo vía componente compartido `<ProyectoChecklist>` + banner "Marcar histórico" + script de backfill. Pendiente: correr backfill contra prod + merge tras revisión del preview)
+**Última actualización:** 2026-06-01 (Sprint 4 entregado y MERGEADO en PR #604 — checklist + plano + secciones colapsables + reordenamiento de secciones. Backfill de los 8 desarrollos corrido (19 tareas c/u) + 29 documentos de Coda importados a las tareas de anteproyecto. Iniciativa vuelve a `done`)
 
 ## Problema
 
@@ -360,6 +360,27 @@ tener trámites/comercialización aún vivos — por eso no se auto-completó).
   patrón existe y funciona (otros módulos ya lo usan).
 
 ## Bitácora
+
+- **2026-06-01 (Sprint 4 — backfill + import de documentos de Coda)** —
+  Backfill de la plantilla canónica corrido en los 8 desarrollos vivos
+  (19 tareas c/u = 152 instancias, en `pendiente`). Import de documentos
+  desde la tabla Coda `grid-XLc0Md6iHp` (control de trámites por proyecto,
+  86 filas) vía el script existente `import_dilesa_anteproyecto_documentos_coda.ts`:
+  **29 archivos** (PDF/JPG) descargados de Coda CDN → Storage `adjuntos`
+  → `erp.adjuntos` + `resultado_documento_url` en cada tarea. Hallazgo
+  clave: los 27 trámites terminados de Coda (🟢) son **todos de fase
+  anteproyecto** (factibilidades, escrituras, estudios, mecánica de suelos)
+  — matchean tareas de los anteproyectos, que ya estaban `completada`
+  (Delicias 12/12, Ampliación 12/12, Loma Escondida 3/12). Solo faltaban
+  los archivos (0 adjuntos antes → 29 después). Verificado en prod:
+  Ampliación 13 adjuntos, Delicias 13, Loma Escondida 3, Lomas del Bosque 0.
+  Decisión (Beto): los documentos viven en el anteproyecto; el desarrollo
+  los alcanza vía la sección "Origen → vino del anteproyecto X" (no se
+  duplican al desarrollo). Coda no tiene trámites de fase construcción
+  terminados, así que las 152 tareas de desarrollo quedan en `pendiente`
+  legítimamente. Reordenamiento de secciones del detalle del desarrollo
+  (checklist/plano/documentos entre Avances y Obras) y colapsables
+  entregados en el mismo PR #604.
 
 - **2026-05-31 (Sprint 4 — espejar a desarrollo)** — Reabierto a pedido
   de Beto. Extraído el bloque checklist (fetch tareas/deps/pasos + estado
