@@ -255,4 +255,37 @@ cxc_cargos.saldo = precio − Σ aplicaciones`, y la suma de buckets de
 
 ## Bitácora
 
-_(vacía hasta Sprint 1)_
+### 2026-06-01 — Sprint 1 completo (schema + originación + RPCs + backfill)
+
+Ejecutado en modo autónomo (Beto autorizó), 4 PRs aplicados a prod:
+
+- **PR A1** (#609, mig `20260601152629`): foundation — `movimientos_bancarios`
+  +referencia polimórfica + 3 tablas `cxc_*` + trigger de saldo + RLS.
+- **PR A2** (#610, mig `20260601155951`): términos del enganche en
+  `dilesa.ventas` (3 cols) + RPC `fn_generar_plan_pagos`. Validado: Σ
+  cargos = `valor_escrituracion` exacto.
+- **PR A3** (#612, mig `20260601164158`): RPCs de pago
+  (`cxc_pago_registrar` con FIFO + movimiento bancario, `_aplicar`,
+  `_cancelar`, `cxc_cargo_ajustar`) + `cxc_pagos.origen_id`. Validado
+  E2E: parcial→liquidado, FIFO no sobre-aplica, cancelar revierte.
+- **PR A4** (mig `20260601170826`): `fn_backfill_cxc()`. Ejecutado sobre
+  prod: **1,179 planes generados, 989 abonos migrados, 930 aplicaciones,
+  $293.7M cobrado**. (Migración requirió 3 fixes pre-ejecución: 2
+  colisiones alias/variable `vp`, CHECK de `forma_pago`, skip de monto
+  ≤ 0; resueltas vía `migration repair` + re-push, sin datos sucios.)
+
+**Hallazgo abierto para la próxima sesión (limpieza de datos):** el
+backfill dejó **$69.8M en saldos a favor** (508 pagos): $34M institución
+(222 pagos) + $36M cliente (286). Causa raíz = desajuste Coda↔modelo, NO
+bug del FIFO (validado E2E). El grueso institucional viene de pagos
+clasificados `institucion` que caen en ventas sin cargo de disposición
+que cubrir (enganche ≥ valor, o disposición chica) → quedan sin aplicar.
+Los abonos cliente que exceden el `enganche_requerido` capturado también
+generan saldo a favor. **Acción pendiente:** sesión de revisión/limpieza
+— reclasificar fuentes dudosas, revisar enganches mal capturados, decidir
+si el excedente cliente reduce la disposición o queda como crédito. El
+backfill es idempotente (`coda_row_id`) y re-ejecutable tras limpiar.
+
+**Pendiente de Sprint 2+:** UI (estado de cuenta en el detalle de venta,
+módulo `/dilesa/cobranza`, captura de abono, recibo de caja), recordatorios,
+forecast, retiro de Coda. Ver Alcance v1.

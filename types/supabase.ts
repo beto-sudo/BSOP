@@ -3875,6 +3875,13 @@ export type Database = {
       }
     }
     Functions: {
+      fn_backfill_cxc: {
+        Args: never
+        Returns: {
+          metrica: string
+          valor: number
+        }[]
+      }
       fn_calcular_avance_construccion: {
         Args: { p_construccion_id: string }
         Returns: number
