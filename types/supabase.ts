@@ -4977,6 +4977,8 @@ export type Database = {
           id: string
           monto_total: number
           notas: string | null
+          origen_id: string | null
+          origen_tipo: string
           persona_id: string
           referencia: string | null
           registrado_por: string | null
@@ -4996,6 +4998,8 @@ export type Database = {
           id?: string
           monto_total: number
           notas?: string | null
+          origen_id?: string | null
+          origen_tipo?: string
           persona_id: string
           referencia?: string | null
           registrado_por?: string | null
@@ -5015,6 +5019,8 @@ export type Database = {
           id?: string
           monto_total?: number
           notas?: string | null
+          origen_id?: string | null
+          origen_tipo?: string
           persona_id?: string
           referencia?: string | null
           registrado_por?: string | null
@@ -8558,6 +8564,36 @@ export type Database = {
       }
     }
     Functions: {
+      cxc_cargo_ajustar: {
+        Args: { p_cargo_id: string; p_motivo?: string; p_nuevo_monto: number }
+        Returns: undefined
+      }
+      cxc_pago_aplicar: {
+        Args: { p_aplicaciones: Json; p_pago_id: string }
+        Returns: number
+      }
+      cxc_pago_cancelar: {
+        Args: { p_motivo?: string; p_pago_id: string }
+        Returns: undefined
+      }
+      cxc_pago_registrar: {
+        Args: {
+          p_auto_aplicar?: boolean
+          p_comprobante_adjunto_id?: string
+          p_cuenta_bancaria_id?: string
+          p_empresa_id: string
+          p_fecha?: string
+          p_forma_pago?: string
+          p_fuente?: string
+          p_monto: number
+          p_notas?: string
+          p_origen_id: string
+          p_persona_id: string
+          p_referencia?: string
+          p_uuid_sat?: string
+        }
+        Returns: string
+      }
       fn_aplicar_levantamiento: {
         Args: { p_levantamiento_id: string }
         Returns: number
