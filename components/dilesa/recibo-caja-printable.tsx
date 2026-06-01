@@ -7,8 +7,10 @@
  * separado (ADR-037 / planning cxc).
  *
  * Patrón de impresión (ADR-021): igual que <EstadoCuentaPrintable> —
- * `hidden print:block` + aislamiento por `visibility` (todo lo demás del
- * DOM se oculta al imprimir). El caller monta UN solo printable a la vez.
+ * `display:none` propio en pantalla (NO la clase Tailwind `hidden`, que en
+ * media print le gana a `print:block` y deja el documento en blanco) +
+ * aislamiento por `visibility` al imprimir. El caller monta UN solo
+ * printable a la vez.
  */
 
 import { formatMontoEnLetras } from '@/lib/format/numero-a-letras';
@@ -66,9 +68,9 @@ export function ReciboCajaPrintable({
   const branding = getEmpresaBranding(empresa);
 
   return (
-    <article className="recibo-caja-print-root hidden bg-white text-black print:block">
+    <article className="recibo-caja-print-root">
       <style>{`
-        .recibo-caja-print-root { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #000; }
+        .recibo-caja-print-root { display: none; background: #fff; font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #000; }
         .recibo-caja-print-root h1 { font-size: 17px; font-weight: 700; margin: 0; letter-spacing: 0.5px; text-transform: uppercase; }
         .recibo-caja-print-root .rc-membrete { width: 100%; max-width: 540px; height: auto; }
         .recibo-caja-print-root .rc-footer-img { width: 100%; max-width: 540px; height: auto; }
@@ -83,7 +85,7 @@ export function ReciboCajaPrintable({
         @media print {
           body * { visibility: hidden !important; }
           .recibo-caja-print-root, .recibo-caja-print-root * { visibility: visible !important; }
-          .recibo-caja-print-root { position: absolute; left: 0; top: 0; width: 100%; max-width: none; margin: 0; padding: 16mm 18mm; box-shadow: none; }
+          .recibo-caja-print-root { display: block !important; position: absolute; left: 0; top: 0; width: 100%; max-width: none; margin: 0; padding: 16mm 18mm; box-shadow: none; }
           .no-print { display: none !important; }
         }
       `}</style>

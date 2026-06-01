@@ -35,8 +35,14 @@ describe('<EstadoCuentaPrintable> source invariants', () => {
     expect(estadoSrc).toContain('position: absolute');
   });
 
-  it('está oculto en pantalla y solo aparece al imprimir', () => {
-    expect(estadoSrc).toMatch(/hidden[^"]*print:block/);
+  it('está oculto con display propio (NO Tailwind hidden) y se muestra al imprimir', () => {
+    // Regresión "hoja en blanco": en Tailwind v4 `.hidden` (display:none) le
+    // gana a `.print:block` en media print, así que el documento no se rendía.
+    // Controlamos display con CSS propio + !important, sin hidden/print:block.
+    // El className del root es exactamente la clase raíz (sin hidden/print:block).
+    expect(estadoSrc).toContain('className="estado-cuenta-print-root"');
+    expect(estadoSrc).toContain('display: none');
+    expect(estadoSrc).toContain('display: block !important');
   });
 
   it('rinde el membrete y el pie de la empresa', () => {
@@ -62,8 +68,11 @@ describe('<ReciboCajaPrintable> source invariants', () => {
     expect(reciboSrc).toContain('position: absolute');
   });
 
-  it('está oculto en pantalla y solo aparece al imprimir', () => {
-    expect(reciboSrc).toMatch(/hidden[^"]*print:block/);
+  it('está oculto con display propio (NO Tailwind hidden) y se muestra al imprimir', () => {
+    // Mismo guard de regresión "hoja en blanco" que el estado de cuenta.
+    expect(reciboSrc).toContain('className="recibo-caja-print-root"');
+    expect(reciboSrc).toContain('display: none');
+    expect(reciboSrc).toContain('display: block !important');
   });
 
   it('imprime el monto en letra (formato notarial MX)', () => {

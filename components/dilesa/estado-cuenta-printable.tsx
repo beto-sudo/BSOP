@@ -7,12 +7,17 @@
  * resumen de saldos al corte. NO es comprobante fiscal — el CFDI lo emite
  * CONTPAQi por separado (ADR-037 / planning cxc).
  *
- * Patrón de impresión (ADR-021): el documento se renderiza oculto en
- * pantalla (`hidden print:block`) y al imprimir aísla la página con el
- * truco de `visibility` heredado de <FiniquitoPrintable> — todo lo demás
- * del DOM se oculta y solo este `article` queda visible, posicionado al
- * tope de la hoja. El caller monta UN solo printable a la vez (estado de
- * cuenta o recibo) para no imprimir ambos.
+ * Patrón de impresión (ADR-021): el documento se oculta en pantalla con
+ * `display:none` PROPIO (en el `<style>`, no la clase Tailwind `hidden`) y
+ * al imprimir aísla la página con el truco de `visibility` heredado de
+ * <FiniquitoPrintable>: `@media print` lo vuelve `display:block` + visible y
+ * oculta todo lo demás del DOM, posicionado al tope de la hoja. El caller
+ * monta UN solo printable a la vez (estado de cuenta o recibo).
+ *
+ * ⚠️ NO usar las clases Tailwind `hidden`/`print:block` para el toggle: en
+ * este build (Tailwind v4) `.hidden` (display:none) le gana a `.print:block`
+ * en media print, así que el documento salía EN BLANCO. Por eso controlamos
+ * `display` con CSS propio + `!important` en `@media print`.
  */
 
 import { getEmpresaBranding, type EmpresaSlug } from '@/lib/empresa-branding';
@@ -131,9 +136,9 @@ export function EstadoCuentaPrintable({
     .map(([label, value]) => ({ label, value }));
 
   return (
-    <article className="estado-cuenta-print-root hidden bg-white text-black print:block">
+    <article className="estado-cuenta-print-root">
       <style>{`
-        .estado-cuenta-print-root { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #000; }
+        .estado-cuenta-print-root { display: none; background: #fff; font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #000; }
         .estado-cuenta-print-root h1 { font-size: 16px; font-weight: 700; margin: 0; letter-spacing: 0.3px; text-transform: uppercase; }
         .estado-cuenta-print-root h2 { font-size: 11px; font-weight: 700; margin: 14px 0 4px; text-transform: uppercase; letter-spacing: 0.4px; color: #444; }
         .estado-cuenta-print-root table { width: 100%; border-collapse: collapse; margin: 4px 0; font-size: 11px; }
@@ -153,7 +158,7 @@ export function EstadoCuentaPrintable({
         @media print {
           body * { visibility: hidden !important; }
           .estado-cuenta-print-root, .estado-cuenta-print-root * { visibility: visible !important; }
-          .estado-cuenta-print-root { position: absolute; left: 0; top: 0; width: 100%; max-width: none; margin: 0; padding: 14mm 16mm; box-shadow: none; }
+          .estado-cuenta-print-root { display: block !important; position: absolute; left: 0; top: 0; width: 100%; max-width: none; margin: 0; padding: 14mm 16mm; box-shadow: none; }
           .no-print { display: none !important; }
         }
       `}</style>
