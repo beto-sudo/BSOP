@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-28
-**Última actualización:** 2026-06-01 (**Sprint 1 aplicado a prod**: extiende `erp.facturas` + crea `cxp_pagos`/`cxp_pago_aplicaciones` + 6 RPCs + `es_comite_ejecutivo` + trigger de saldo. Gate de aprobación **estricto a Comité Ejecutivo** sin override de admin (decisión de Beto). Modo autónomo. Próximo: Sprint 2 ingesta XML. Ver Bitácora.)
+**Última actualización:** 2026-06-01 (**Sprint 1 aplicado a prod** + corrección del gate: extiende `erp.facturas` + crea `cxp_pagos`/`cxp_pago_aplicaciones` + 6 RPCs + trigger de saldo. Gate de aprobación = **rol "Dirección"** vía `core.fn_user_has_role` (corregido del puesto "Comité Ejecutivo" por Beto; mig `214500` elimina `es_comite_ejecutivo`). Sin override de admin. Modo autónomo. Próximo: Sprint 2 ingesta XML. Ver Bitácora.)
 
 ## Problema
 
@@ -191,6 +191,26 @@ patrón canónico de **ADR-037** (subledger gemelo):
   reusan CxC y CxP (convención `shared-modules-refactor`, ADR-011).
 
 ## Bitácora
+
+### 2026-06-01 — Corrección del gate de aprobación: rol "Dirección" (no puesto Comité)
+
+Beto corrigió un día después de Sprint 1: la autoridad para aprobar pagos es el
+**rol "Dirección"** (modelo `core.usuarios_empresas` + `core.roles`), que tienen
+asignado Ale, Michelle y Beto — **no** el puesto "Comité Ejecutivo" de
+`erp.empleados_puestos` que se usó por error en Sprint 1. Beto además tiene admin,
+que **no** cuenta para aprobar (control financiero estricto).
+
+- Migración `20260601214500_cxp_gate_aprobacion_direccion.sql`: `cxp_pago_aprobar`
+  pasa a gatear con `core.fn_user_has_role('Dirección', empresa)` (helper canónico,
+  ver memoria `reference_roles_por_empresa`) y se **elimina** `erp.es_comite_ejecutivo`.
+- Verificado en prod: `es_comite_ejecutivo` eliminado, `cxp_pago_aprobar` usa
+  Dirección, **4 usuarios con rol Dirección** (6 asignaciones usuario-empresa) →
+  mejor cobertura que el modelo de puesto (solo mapeaba 2). Resuelve el riesgo de
+  cobertura del gate que se había flageado.
+- Aplicado a prod vía `execute_sql` (DDL idempotente: CREATE OR REPLACE + DROP)
+  para evitar carrera de `db push` con el PR paralelo del fix de CxC (#627). El
+  archivo de migración queda como fuente de verdad y la CI lo valida fresco en el
+  Supabase Preview branch.
 
 ### 2026-06-01 — Sprint 1 (schema CxP, DB-puro) aplicado a prod
 
