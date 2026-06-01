@@ -1794,6 +1794,7 @@ export type Database = {
       }
       contratos_construccion: {
         Row: {
+          anticipo_pct: number
           coda_row_id: string | null
           codigo: string
           contratista_id: string
@@ -1803,12 +1804,18 @@ export type Database = {
           fecha_contrato: string
           fianzas_url: string | null
           id: string
+          iva_tasa: number | null
           notas: string | null
           proyecto_id: string | null
+          retencion_pct: number
+          tipo: string
           updated_at: string
+          valor_iva: number | null
+          valor_subtotal: number | null
           valor_total: number
         }
         Insert: {
+          anticipo_pct?: number
           coda_row_id?: string | null
           codigo: string
           contratista_id: string
@@ -1818,12 +1825,18 @@ export type Database = {
           fecha_contrato: string
           fianzas_url?: string | null
           id?: string
+          iva_tasa?: number | null
           notas?: string | null
           proyecto_id?: string | null
+          retencion_pct?: number
+          tipo?: string
           updated_at?: string
+          valor_iva?: number | null
+          valor_subtotal?: number | null
           valor_total?: number
         }
         Update: {
+          anticipo_pct?: number
           coda_row_id?: string | null
           codigo?: string
           contratista_id?: string
@@ -1833,9 +1846,14 @@ export type Database = {
           fecha_contrato?: string
           fianzas_url?: string | null
           id?: string
+          iva_tasa?: number | null
           notas?: string | null
           proyecto_id?: string | null
+          retencion_pct?: number
+          tipo?: string
           updated_at?: string
+          valor_iva?: number | null
+          valor_subtotal?: number | null
           valor_total?: number
         }
         Relationships: [
@@ -2041,6 +2059,177 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      obra_estimaciones: {
+        Row: {
+          contrato_id: string
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          es_anticipo: boolean
+          es_finiquito: boolean
+          etiqueta: string
+          factura_ref: string | null
+          fecha: string | null
+          id: string
+          iva: number | null
+          iva_tasa: number | null
+          monto_total: number
+          nota_pago: string | null
+          orden: number
+          retencion: number
+          source_ref: string | null
+          subtotal: number | null
+          updated_at: string
+        }
+        Insert: {
+          contrato_id: string
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          es_anticipo?: boolean
+          es_finiquito?: boolean
+          etiqueta: string
+          factura_ref?: string | null
+          fecha?: string | null
+          id?: string
+          iva?: number | null
+          iva_tasa?: number | null
+          monto_total?: number
+          nota_pago?: string | null
+          orden?: number
+          retencion?: number
+          source_ref?: string | null
+          subtotal?: number | null
+          updated_at?: string
+        }
+        Update: {
+          contrato_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          es_anticipo?: boolean
+          es_finiquito?: boolean
+          etiqueta?: string
+          factura_ref?: string | null
+          fecha?: string | null
+          id?: string
+          iva?: number | null
+          iva_tasa?: number | null
+          monto_total?: number
+          nota_pago?: string | null
+          orden?: number
+          retencion?: number
+          source_ref?: string | null
+          subtotal?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "obra_estimaciones_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos_construccion"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      obra_presupuesto: {
+        Row: {
+          concepto: string
+          contrato_id: string | null
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          etapa: string | null
+          factura_ref: string | null
+          fecha_compromiso: string | null
+          gasto_real_iva: number | null
+          gasto_real_iva_tasa: number | null
+          gasto_real_subtotal: number | null
+          gasto_real_total: number | null
+          id: string
+          notas: string | null
+          orden: number
+          presupuesto_actualizado: number | null
+          presupuesto_previo: number | null
+          proveedor_persona_id: string | null
+          proveedor_texto: string | null
+          proyecto_id: string
+          source_ref: string | null
+          updated_at: string
+        }
+        Insert: {
+          concepto: string
+          contrato_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          etapa?: string | null
+          factura_ref?: string | null
+          fecha_compromiso?: string | null
+          gasto_real_iva?: number | null
+          gasto_real_iva_tasa?: number | null
+          gasto_real_subtotal?: number | null
+          gasto_real_total?: number | null
+          id?: string
+          notas?: string | null
+          orden?: number
+          presupuesto_actualizado?: number | null
+          presupuesto_previo?: number | null
+          proveedor_persona_id?: string | null
+          proveedor_texto?: string | null
+          proyecto_id: string
+          source_ref?: string | null
+          updated_at?: string
+        }
+        Update: {
+          concepto?: string
+          contrato_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          etapa?: string | null
+          factura_ref?: string | null
+          fecha_compromiso?: string | null
+          gasto_real_iva?: number | null
+          gasto_real_iva_tasa?: number | null
+          gasto_real_subtotal?: number | null
+          gasto_real_total?: number | null
+          id?: string
+          notas?: string | null
+          orden?: number
+          presupuesto_actualizado?: number | null
+          presupuesto_previo?: number | null
+          proveedor_persona_id?: string | null
+          proveedor_texto?: string | null
+          proyecto_id?: string
+          source_ref?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "obra_presupuesto_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos_construccion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "obra_presupuesto_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "obra_presupuesto_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_proyecto_avances"
+            referencedColumns: ["proyecto_id"]
+          },
+        ]
       }
       plantilla_proyecto_tareas: {
         Row: {
