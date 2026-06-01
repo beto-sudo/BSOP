@@ -199,3 +199,54 @@ Verificado en prod: 6 columnas nuevas, 2 tablas, 266 backfill. `SCHEMA_REF` +
 **Pendiente:** ADR → índice §5 de `ARCHITECTURE.md` (piggyback al cerrar
 iniciativa). **Próximo sprint:** parser de traspaso LDLE+LDS (best-effort,
 marca renglones sin tasa de IVA clara para revisión de Beto).
+
+### 2026-06-01 — Traspaso Capa A (RESUMEN → obra_presupuesto) cargado a prod
+
+Parser `scripts/import_dilesa_obra_presupuesto.py` (DRY_RUN + genera JSON; la
+carga se hizo por `psql` con `SUPABASE_DB_URL`, transaccional con DELETE previo
+idempotente). **128 renglones cargados y verificados en prod:**
+
+- **Lomas del Sol** (`a506b99f-…`): 73 conceptos, 3 etapas, presup. actual.
+  $12,186,209.13, gasto real $11,708,916.24, 26 proveedores.
+- **Lomas de los Encinos** (`42c64197-…`): 55 conceptos, 3 etapas, presup.
+  actual. $73,845,012.61, gasto real $61,002,480.36, 27 proveedores.
+
+Bug detectado y corregido en DRY_RUN: el RESUMEN de LDLE trae un bloque
+agregado "RESUMEN POR ETAPA" cuyo header es "ETAPA" (no la cadena literal que
+sí trae LDS) → causaba doble conteo. La etapa se deriva de cada fila
+`TOTAL <ETAPA>` (LDLE no la marca en la columna). IVA: 128 renglones con total
+c/IVA, sin desglose (`gasto_real_subtotal/iva/iva_tasa` null) — el Excel no lo
+especifica; se completa con facturas.
+
+## Handover — estado y próximos pasos (para la siguiente sesión)
+
+**Hecho (en prod + main):** schema Sprint 1 (#615) + Capa A de costeo
+(`obra_presupuesto`, 128 renglones de LDLE+LDS). Este PR registra el script.
+
+**Decisiones ya cerradas (no re-preguntar):**
+
+- Proyecto del Excel **LDLE = "Lomas de los Encinos"** (`42c64197-2358-4607-a21c-97556ceb3110`),
+  **LDS = "Lomas del Sol"** (`a506b99f-1b6e-4024-a94a-59deaed48727`). empresa
+  DILESA `f5942ed4-7a6b-4c39-af18-67b9fbf7f479`.
+- IVA **8% frontera / 16% excepción**, desglose solo donde esté especificado
+  (ver [[project_iva_frontera]] y ADR-038).
+- Estimaciones de obra en tabla nueva `obra_estimaciones` (no en `dilesa.estimaciones`).
+
+**Pendiente — Capa B (contratos + estimaciones):** parsear las **hojas de
+detalle** de `~/Downloads/Proyecto LDLE.xlsx` y `Proyecto LDS.xlsx`
+(ELECTRIFICACION, AGUA POTABLE DRENAJE, PAVIMENTACION, CORDON, BARDA, CASETA,
+PORTON, PLAZA, MAQUINARIA, etc.) → `contratos_construccion` (tipo no-vivienda,
+con `anticipo_pct`/`retencion_pct`/`iva_tasa`) + `obra_estimaciones`. Layout por
+hoja: bloque de cabecera (Contrato · Anticipo % · Retención % · Total de
+estimaciones · Total Pagado) + tabla de estimaciones (Fecha · Estímación
+etiqueta libre "Anticipo/1/2A/Finiquito" · # Factura · Total · nota de pago).
+**Ojo:** una hoja puede tener **varios contratos** (1ª/2ª etapa, o subobras como
+Red Eléctrica vs Voz y Datos) — cada uno con su propio anticipo/retención. Usar
+DRY_RUN igual que la Capa A; ligar cada contrato a su concepto de
+`obra_presupuesto` por proveedor/nombre cuando sea claro (campo `contrato_id`).
+
+**Pendientes menores:** normalizar variantes de proveedor ("Electrogaza" vs
+"Electrogaza SA de CV", "DILESA (Proyectos/maquinaria)") a `erp.personas`;
+**limpiar el duplicado** "Ampliación Lomas de los Encinos" en `dilesa.proyectos`
+(dos filas idénticas, ids `cd7c9cae-…` y `26352cac-…`); ADR-038 → índice §5 de
+`ARCHITECTURE.md`.

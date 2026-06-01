@@ -26,7 +26,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ExternalLink, FileText, HardHat } from 'lucide-react';
+import { ArrowLeft, Download, ExternalLink, FileText, HardHat } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -346,6 +346,13 @@ function DetailInner() {
             </p>
           ) : null}
         </div>
+        <a
+          href={`/api/dilesa/construccion/contratos/${contrato.id}/pdf`}
+          className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40 hover:text-[var(--text)]"
+        >
+          <Download className="h-4 w-4" />
+          Descargar contrato (PDF)
+        </a>
       </header>
 
       <Section title="Datos generales">

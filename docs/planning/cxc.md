@@ -3,10 +3,10 @@
 **Slug:** `cxc`
 **Empresas:** todas (golden: DILESA; rollout RDB/COAGAN/ANSA en sub-iniciativas posteriores)
 **Schemas afectados:** `erp` (nuevas `cxc_cargos`, `cxc_pagos`, `cxc_pago_aplicaciones`; extiende `movimientos_bancarios` con referencia polimórfica), `dilesa` (originación `fn_generar_plan_pagos`; absorbe `venta_pagos`), `core` (helper de roles)
-**Estado:** planned
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-06-01
-**Última actualización:** 2026-06-01 (alcance v1 cerrado tras 6 decisiones de Beto + diseño gemelo con CxP en ADR-037)
+**Última actualización:** 2026-06-01 (Sprint 1 completo en prod: schema + originación + RPCs + backfill — PRs #609/#610/#612/#613. Pendiente: limpieza de datos del backfill + Sprint 2 UI. Ver Bitácora.)
 
 ## Problema
 
