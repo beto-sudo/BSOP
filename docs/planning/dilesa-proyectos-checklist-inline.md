@@ -322,9 +322,13 @@ ahora — no on-demand; (b) espejo = checklist **+ plano** versionado/IA
 (no solo checklist). `<PartidasPresupuestales>` NO se monta: se eliminó
 del anteproyecto en Sprint 4E, no se replica.
 
-Pendiente operativo: correr el backfill contra prod tras OK del preview /
-merge, y que Beto cierre con el banner "Marcar histórico" las tareas ya
-superadas de cada desarrollo.
+Backfill **ejecutado contra prod 2026-05-31** (Beto eligió poblar en
+`pendiente`, no auto-completar): 152 tareas (19 × 8 desarrollos)
+instanciadas con fechas objetivo en cascada (2026-06-01 → 2026-11-02).
+Verificado: 19 tareas + 18 dependencias por desarrollo, todas en
+`pendiente`. Pendiente: que Beto cierre con el banner "Marcar histórico"
+las tareas ya superadas de cada desarrollo (proyectos en marcha pueden
+tener trámites/comercialización aún vivos — por eso no se auto-completó).
 
 ### Sprint 5 — Documentos + hitos unificados
 
