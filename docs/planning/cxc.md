@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-06-01
-**Última actualización:** 2026-06-01 (Sprints 1-3 en prod: backend + fix del FIFO + UI estado de cuenta + captura + comprobante + módulo CxC. Pendiente: estado de cuenta imprimible, recordatorios, limpieza de los $2.0M de saldos a favor, retiro de Coda. Ver Bitácora.)
+**Última actualización:** 2026-06-01 (Sprints 1-3 en prod + impresión: estado de cuenta imprimible **por venta** + recibo de caja por abono (ADR-021). Pendiente: recordatorios, limpieza de los $2.0M de saldos a favor, retiro de Coda. Ver Bitácora.)
 
 ## Problema
 
@@ -254,6 +254,41 @@ cxc_cargos.saldo = precio − Σ aplicaciones`, y la suma de buckets de
   queda `proposed` hasta que CxC+CxP emitan movimientos.
 
 ## Bitácora
+
+### 2026-06-01 — Impresión: estado de cuenta + recibo de caja (ADR-021)
+
+Cierra los dos imprimibles que faltaban del CxC. Decisión de Beto: estado
+de cuenta **por venta** (anclado a un lote + su plan), no consolidado por
+cliente — encaja con la captura y el detalle, que ya son por venta; el
+aging por cliente cubre el agregado. Los dos documentos se hicieron juntos
+porque comparten patrón.
+
+- **`<EstadoCuentaPrintable>`** (`components/dilesa/`): membrete DILESA +
+  datos del cliente + datos de la operación + tabla de cargos (con total) +
+  tabla de abonos + resumen de saldos al corte. Nota de que no es CFDI.
+- **`<ReciboCajaPrintable>`**: recibo por abono con folio (`RC-` + id corto),
+  fecha, cliente, monto + **monto en letra** (`lib/format/numero-a-letras`),
+  concepto (proyecto · unidad), forma de pago + referencia, origen y firma.
+- **Patrón de impresión (ADR-021)**: ambos son componentes standalone con
+  el truco de aislamiento de `<FiniquitoPrintable>` — `hidden print:block` +
+  `@media print { body * visibility:hidden; .root* visible; position:absolute }`.
+  Imprimen solo el documento aunque vivan embebidos en el detalle de venta
+  (página enorme con 5 secciones). El caller monta **un** printable a la vez
+  (estado `printTarget`) para no imprimir ambos.
+- **Integración en `app/dilesa/ventas/[id]/page.tsx`**: botón "Imprimir
+  estado de cuenta" en la sección Estado de cuenta + botón "Recibo" por fila
+  de abono. `useTriggerPrint()` disparado en effect tras montar el printable
+  (un `requestAnimationFrame` para que membrete/layout estén listos; limpia
+  en `afterprint`). Se agregó `referencia` al select de `cxc_pagos`.
+- **Test** `cxc-printables.test.ts`: invariantes source-level (mismo patrón
+  que `detail-drawer.test.ts`, env=node sin DOM) — guarda el aislamiento de
+  impresión, el `hidden print:block`, el membrete y el monto en letra.
+- Sin DDL. 5 checks locales verdes (1144 tests). PR _(este PR)_.
+
+**Pendiente:** recordatorios de vencimiento (catálogo `notificaciones`, solo
+`fuente=cliente`) + limpieza de los $2.0M de saldos a favor + retiro de Coda.
+Desde cobranza (búsqueda por cliente) se puede sumar un disparo de impresión
+on-demand si Beto lo pide (requiere fetch del estado completo en el click).
 
 ### 2026-06-01 — Sprint 2 (UI) + fix del cálculo + Sprint 3 (módulo CxC)
 
