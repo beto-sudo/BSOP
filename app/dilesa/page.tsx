@@ -5,7 +5,18 @@ import { RequireAccess } from '@/components/require-access';
 import { usePermissions } from '@/components/providers';
 import { canAccessModulo, ROUTE_TO_MODULE } from '@/lib/permissions';
 import Link from 'next/link';
-import { ClipboardList, Users, FileText, Briefcase, Building2 } from 'lucide-react';
+import {
+  ClipboardList,
+  Users,
+  FileText,
+  Briefcase,
+  Building2,
+  ShoppingCart,
+  FolderKanban,
+  MapPin,
+  DollarSign,
+  HardHat,
+} from 'lucide-react';
 
 type ModuleGroup = {
   title: string;
@@ -65,6 +76,46 @@ const moduleGroups: ModuleGroup[] = [
       },
     ],
   },
+  {
+    title: 'Compras',
+    items: [
+      {
+        label: 'Proveedores',
+        href: '/dilesa/proveedores',
+        icon: ShoppingCart,
+        color: 'bg-orange-500/10 text-orange-500',
+      },
+    ],
+  },
+  {
+    title: 'Inmobiliario',
+    items: [
+      {
+        label: 'Portafolio',
+        href: '/dilesa/portafolio',
+        icon: FolderKanban,
+        color: 'bg-indigo-500/10 text-indigo-500',
+      },
+      {
+        label: 'Proyectos',
+        href: '/dilesa/proyectos',
+        icon: MapPin,
+        color: 'bg-teal-500/10 text-teal-500',
+      },
+      {
+        label: 'Ventas',
+        href: '/dilesa/ventas',
+        icon: DollarSign,
+        color: 'bg-green-500/10 text-green-500',
+      },
+      {
+        label: 'Construcción',
+        href: '/dilesa/construccion',
+        icon: HardHat,
+        color: 'bg-yellow-500/10 text-yellow-500',
+      },
+    ],
+  },
 ];
 
 /**
@@ -113,7 +164,7 @@ export default function DilesaPage() {
                 Panel DILESA
               </h1>
               <p className="mt-1 text-sm text-[var(--text)]/60">
-                Administración, recursos humanos y documentos de DILESA.
+                Administración, recursos humanos, compras e inmobiliario de DILESA.
               </p>
             </div>
           </div>
