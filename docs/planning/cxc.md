@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-06-01
-**Última actualización:** 2026-06-01 (Sprint 1 completo en prod: schema + originación + RPCs + backfill — PRs #609/#610/#612/#613. Pendiente: limpieza de datos del backfill + Sprint 2 UI. Ver Bitácora.)
+**Última actualización:** 2026-06-01 (Sprints 1-3 en prod: backend + fix del FIFO + UI estado de cuenta + captura + comprobante + módulo CxC. Pendiente: estado de cuenta imprimible, recordatorios, limpieza de los $2.0M de saldos a favor, retiro de Coda. Ver Bitácora.)
 
 ## Problema
 
@@ -254,6 +254,41 @@ cxc_cargos.saldo = precio − Σ aplicaciones`, y la suma de buckets de
   queda `proposed` hasta que CxC+CxP emitan movimientos.
 
 ## Bitácora
+
+### 2026-06-01 — Sprint 2 (UI) + fix del cálculo + Sprint 3 (módulo CxC)
+
+Mismo día que Sprint 1, en modo autónomo. Continuación:
+
+- **Fix del FIFO (#619)**: el FIFO separaba cargos/abonos por fuente
+  (cliente/institución), produciendo saldo pendiente + saldo a favor
+  grandes coexistiendo (el cliente liquidaba el enganche chico y el resto
+  quedaba "a favor", mientras la disposición institucional quedaba
+  pendiente). Corregido: un abono baja el **saldo total** de la venta (la
+  fuente es etiqueta, no barrera del cálculo). Redefine `cxc_pago_registrar`
+  - `fn_backfill_cxc` + re-backfill. El saldo a favor global cayó de
+    **$69.8M a $2.0M** (sobrepagos reales).
+- **Sprint 2 — UI estado de cuenta + captura**:
+  - #616: sección "Estado de cuenta" en el detalle de venta (cargos +
+    abonos + saldo, read-only), reemplaza la vieja sección Pagos.
+  - #620: captura de abono (`<AbonoCaptureDrawer>` → `cxc_pago_registrar`)
+    - upload de comprobante (deferred ADR-022, `entidad_tipo='cxc_pago'`)
+    - columna comprobante en la tabla de abonos.
+- **Sprint 3 — módulo CxC dedicado (#621)**:
+  - Módulo `dilesa.cobranza` (nombre visible **"CxC"**, sección
+    **Administración**) + sub-slugs `pagos`/`aging` + RBAC (Admin/Contab/
+    Dirección capturan; Gerencia Ventas/Vendedor lectura). Slug/URL
+    internos quedaron `cobranza` por decisión de no romper rutas.
+  - `/dilesa/cobranza` (tab Pagos): captura desde administración (buscar
+    cliente → registrar abono, reusa el drawer).
+  - `/dilesa/cobranza/aging` (tab Saldos): antigüedad por cliente con
+    buckets (vigente / 1-30 / 31-60 / 61-90 / >90).
+
+**Pendiente (próxima sesión):** estado de cuenta imprimible por cliente
+(ADR-021) + recordatorios de vencimiento (catálogo `notificaciones`, solo
+`fuente=cliente`) + **limpieza de los $2.0M de saldos a favor reales**
+(reclasificar fuentes dudosas, revisar enganches mal capturados) + retiro
+de Coda "Depositos Clientes" + términos del enganche capturables en la UI
+de la venta (hoy default 1 parcialidad). CxP (gemela) sigue `planned`.
 
 ### 2026-06-01 — Sprint 1 completo (schema + originación + RPCs + backfill)
 
