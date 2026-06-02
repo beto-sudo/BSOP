@@ -107,6 +107,21 @@ export function Sidebar({
         return acc;
       }
 
+      // `settings` no es una empresa operativa: es el bucket de módulos de
+      // sistema (Acceso, Notificaciones, Empresas). Su visibilidad se decide
+      // por MÓDULO, no por pertenencia a una empresa — mostrar solo los
+      // children con módulo accesible y ocultar el grupo si no queda ninguno.
+      // Los children sin módulo mapeado (placeholders como Integraciones /
+      // Preferencias) quedan solo para admin, que retorna arriba en :86.
+      if (empresaSlug === 'settings') {
+        const visibleChildren = (item.children ?? []).filter((child) => {
+          const moduloSlug = ROUTE_TO_MODULE[child.href];
+          return moduloSlug ? canAccessModulo(permissions, moduloSlug) : false;
+        });
+        if (visibleChildren.length > 0) acc.push({ ...item, children: visibleChildren });
+        return acc;
+      }
+
       // Check empresa-level access.
       if (!canAccessEmpresa(permissions, empresaSlug)) return acc;
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { RequireAccess } from '@/components/require-access';
+import { usePermissions } from '@/components/providers';
 import { DesktopOnlyNotice } from '@/components/responsive';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -160,6 +161,7 @@ function EmpresaGroupTable({
 
 function EmpresasSettingsInner() {
   const supabase = createSupabaseBrowserClient();
+  const { permissions } = usePermissions();
   const [empresas, setEmpresas] = useState<EmpresaRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -199,12 +201,16 @@ function EmpresasSettingsInner() {
     for (const e of empresas) {
       if (!e.activa) continue;
       if (e.slug === 'settings') continue;
+      // Solo las empresas a las que el usuario tiene acceso (admin ve todas).
+      // El acceso a la página lo gobierna el módulo `settings.empresas`; QUÉ
+      // empresas ve sale de core.usuarios_empresas (permissions.empresas).
+      if (!permissions.isAdmin && !permissions.empresas.has(e.slug)) continue;
       if (e.tipo_contribuyente === 'persona_moral') out.persona_moral.push(e);
       else if (e.tipo_contribuyente === 'persona_fisica') out.persona_fisica.push(e);
       else out.otros.push(e);
     }
     return out;
-  }, [empresas]);
+  }, [empresas, permissions]);
 
   const totalVisibles =
     grupos.persona_moral.length + grupos.persona_fisica.length + grupos.otros.length;
@@ -300,7 +306,7 @@ function EmpresasSettingsInner() {
  */
 export default function Page() {
   return (
-    <RequireAccess adminOnly>
+    <RequireAccess modulo="settings.empresas">
       <DesktopOnlyNotice module="Empresas" />
       <div className="hidden sm:block">
         <EmpresasSettingsInner />

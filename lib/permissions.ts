@@ -127,6 +127,10 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   '/rdb/rh/departamentos': 'rdb.rh.departamentos',
 
   // Settings
+  // `/settings/empresas` pasó de admin-only a RBAC por módulo: el módulo
+  // gobierna el acceso a la página; QUÉ empresas ve cada quien lo filtra la
+  // UI desde core.usuarios_empresas. Ver migración 20260602160000.
+  '/settings/empresas': 'settings.empresas',
   '/settings/acceso': 'settings.acceso',
   '/settings/notificaciones': 'settings.notificaciones',
 };
