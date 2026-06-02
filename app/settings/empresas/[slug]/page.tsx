@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Building2, Construction, RefreshCw } from 'lucide-react';
 import { EmpresaDetail, type Empresa } from '../_components/empresa-detail';
 import { EmpresaBranding } from '../_components/empresa-branding';
+import { CuadroAccionarioPanel } from '../_components/cuadro-accionario-panel';
 
 type EmpresaWithBranding = Empresa & {
   color_primario: string | null;
@@ -189,12 +190,7 @@ function EmpresaPageInner() {
 
       {tab === 'fiscal' && <EmpresaDetail empresa={empresa} onSaved={fetchEmpresa} />}
       {tab === 'branding' && <EmpresaBranding branding={empresa} slug={empresa.slug} />}
-      {tab === 'cuadro-accionario' && (
-        <PlaceholderTab
-          title="Cuadro accionario"
-          description="Aquí vivirá la lista de accionistas con su % de participación, certificados de acciones y cambios históricos. Hoy esa información está en Coda."
-        />
-      )}
+      {tab === 'cuadro-accionario' && <CuadroAccionarioPanel empresaId={empresa.id} />}
       {tab === 'beneficiario-controlador' && (
         <PlaceholderTab
           title="Beneficiario controlador"
