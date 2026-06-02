@@ -168,9 +168,9 @@ describe('route maps', () => {
  * permisos. El test falla si tocas (2) sin tocar (3) — recordatorio
  * de que falta migración. Ver `BSOP/CLAUDE.md` sección "Reglas DB".
  *
- * NO incluye slugs que existen solo en DB sin URL en sidebar
- * (ej. `settings.empresas` vive en `core.modulos` pero no se mapea
- * desde una URL — Settings → Empresas no tiene gating fino por módulo).
+ * NO incluye slugs que existen solo en DB sin URL en sidebar. (Históricamente
+ * `settings.empresas` era uno de esos casos; desde la migración
+ * 20260602160000 /settings/empresas se gobierna por módulo y sí se mapea.)
  */
 const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   // DILESA
@@ -311,6 +311,7 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   'rdb.rh.departamentos',
 
   // Settings
+  'settings.empresas',
   'settings.acceso',
   'settings.notificaciones',
 ]);

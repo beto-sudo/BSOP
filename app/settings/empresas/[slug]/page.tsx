@@ -217,13 +217,25 @@ function EmpresaPageInner() {
  * @module Settings — Empresa detail
  * @responsive desktop-only
  */
+function EmpresaPageGate() {
+  const params = useParams<{ slug: string }>();
+  // Requiere el módulo settings.empresas Y acceso a la empresa del slug, para
+  // que ni escribiendo la URL de otra empresa (p. ej. /settings/empresas/ansa)
+  // se abra una a la que el usuario no tiene acceso. Admin bypasea ambos.
+  return (
+    <RequireAccess modulo="settings.empresas" empresa={params?.slug}>
+      <EmpresaPageInner />
+    </RequireAccess>
+  );
+}
+
 export default function Page() {
   return (
-    <RequireAccess adminOnly>
+    <>
       <DesktopOnlyNotice module="Empresa" />
       <div className="hidden sm:block">
-        <EmpresaPageInner />
+        <EmpresaPageGate />
       </div>
-    </RequireAccess>
+    </>
   );
 }
