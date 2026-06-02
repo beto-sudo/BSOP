@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-06-02
-**Última actualización:** 2026-06-02 (Sprint 1 **cerrado** — 3 tablas en `health` (RLS deny-all) + seed de 3 compuestos (Retatrutide/KLOW/Semax, 13 tomas) en prod. Próximo: Sprint 2 — lectura/UI)
+**Última actualización:** 2026-06-02 (Sprint 2 **cerrado** — sección de protocolo en `/health` (lectura) + fix de exposición de `health` a PostgREST; mergeado en #648. Próximo: Sprint 3 — captura por drawer)
 
 ## Problema
 
@@ -124,9 +124,10 @@ Los biomarcadores (peso, RHR, HRV, BP) **no se duplican**: viven en
 
 ### Sprint 2 — Lectura (read-only)
 
-- [ ] `lib/protocolo.ts` — `getProtocoloData()`: compuestos activos + tomas recientes + efectos (server-side).
-- [ ] `components/health/protocolo-section.tsx` — tarjetas de compuestos activos (dosis vigente, última toma, próxima estimada) + bitácora de tomas (timeline/lista). Reusa `Surface`, `tones.ts`, helpers existentes.
-- [ ] Insertar `<ProtocoloSection>` en `app/health/page.tsx`.
+- [x] `lib/protocolo.ts` — `getProtocoloData()`: compuestos + tomas con service role vía `.schema('health')`.
+- [x] `components/health/protocolo-section.tsx` — tarjetas de compuestos activos (dosis vigente, última toma, total) + mini-timeline de tomas. Reusa `Surface`, `tones.ts`.
+- [x] Insertar `<ProtocoloSection>` en `app/health/page.tsx` (fetch en paralelo con el dashboard).
+- [x] **Fix PostgREST**: `health` no estaba en `pgrst.db_schemas` → la sección fallaba con "Invalid schema: health". Migración `20260602165059_health_expose_to_pgrst` (autorizada por Beto, patrón `*_expose_schema`) lo expone. Verificado HTTP 200. Mergeado en PR #648.
 
 ### Sprint 3 — Captura (la primera escritura del módulo health)
 
@@ -171,6 +172,7 @@ Los biomarcadores (peso, RHR, HRV, BP) **no se duplican**: viven en
 - **2026-06-02** — Promovida a `planned`. Beto pidió una bitácora de péptidos en SANREN → Salud (arranque: Retatrutide 2.5 mg SC semanal; planea agregar otros "para medir interacciones con su cuerpo"). Exploración: `/health` es dashboard read-only de Apple Health; `health.health_medications` existe pero no se renderiza; los biomarcadores viven en `health.health_metrics`. Alcance v1 cerrado con 4 decisiones (protocolo completo / escalas 0–5 + nota / drawer web / promover). Modelo de 3 tablas en `health` propuesto. Pendiente: OK verbal de Beto para aplicar el schema (Sprint 1).
 - **2026-06-02** — Sprint 1 aplicado a prod (proyecto `ybklderteyhuugzfmxbi`, migración `20260602145253_health_protocolo_peptidos`). Tras OK explícito de Beto. `db push` descartado por drift (migraciones `20260602020000`/`20260602180000` de otras sesiones en remoto sin archivo local — no se tocaron); aplicado quirúrgicamente vía connector `apply_migration`. RLS deny-all verificada (cero grants a authenticated/anon). `SCHEMA_REF.md` + `types/supabase.ts` regenerados (diff limpio, solo las 3 tablas). **Pendiente para cerrar Sprint 1: seed del Retatrutide** — falta fecha de la 1ª inyección + historial de tomas (PERSONAL.md solo tiene compuesto + dosis 2.5 mg, no fechas).
 - **2026-06-02** — **Sprint 1 cerrado.** Seed aplicado a prod vía `execute_sql`: 3 compuestos activos + 13 tomas. **Retatrutide** 2.5 mg semanal — 11 tomas (martes 17-mar → 5-may; lunes 11-may adelantada por viaje de moto SD–Seattle; viernes 22 y 29-may; ya en cadencia de viernes; plan subir a 3 mg el 5-jun). **KLOW** 0.2 ml/día (80 mg en 3 ml agua BAC) desde 1-jun. **Semax** 500 mcg/día desde 2-jun. Fechas validadas por día de semana antes de insertar. Seed fuera de migraciones versionadas (data personal, no debe correr en preview). Próximo: Sprint 2 (lectura/UI).
+- **2026-06-02** — **Sprint 2 cerrado** (PR #648, mergeado por Beto). Sección **Protocolo** en `/health`: `lib/protocolo.ts` (lectura con service role vía `.schema('health')`) + `ProtocoloSection` (tarjetas de compuestos activos + mini-timeline de tomas), arriba del dashboard. Topamos con que el schema `health` **no estaba expuesto a PostgREST** (el dashboard funciona vía vistas shim en `public`); se expuso con `20260602165059_health_expose_to_pgrst` (autorizada por Beto, patrón `*_expose_schema`), verificado HTTP 200. El commit también sincronizó un drift de `SCHEMA_REF` (`obra_estimacion_id`, ADR-039) que `main` traía pendiente. Lección: no rebasar una branch ya pusheada con PR abierto (divergió el SHA del Sprint 2; se reconcilió con merge, no force-push). Próximo: Sprint 3 (captura por drawer).
 
 ## Decisiones registradas
 
