@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-28
-**Última actualización:** 2026-06-02 (**Sprint 3** en PR: módulo UI `/rdb/cxp` (facturas + drawer + aging + proveedores) + migración de módulos `rdb.cxp` × 3 sub-slugs + 4 lugares RBAC. UI visible — sin auto-merge, preview para revisión de Beto. Sprints 1+2 ya en prod. Modo autónomo. Próximo: Sprint 4 (programación + aprobación de pagos). Ver Bitácora.)
+**Última actualización:** 2026-06-02 (**Sprint 3 + rollout DILESA** en PR #630: módulo UI `/rdb/cxp` + `/dilesa/cxp` (facturas + drawer + aging + proveedores), **UI extraída a `components/cxp/` compartidos (ADR-011)**, + migraciones de módulos `rdb.cxp` y `dilesa.cxp` × 3 sub-slugs c/u + 4 lugares RBAC por empresa. UI visible — sin auto-merge, preview para revisión de Beto. Sprints 1+2 ya en prod. Modo autónomo. Próximo: Sprint 4 (programación + aprobación de pagos). Ver Bitácora.)
 
 ## Problema
 
@@ -191,6 +191,64 @@ patrón canónico de **ADR-037** (subledger gemelo):
   reusan CxC y CxP (convención `shared-modules-refactor`, ADR-011).
 
 ## Bitácora
+
+### 2026-06-02 — Rollout DILESA + extracción de componentes compartidos (ADR-011)
+
+Rollout del módulo CxP a **DILESA** (`/dilesa/cxp`) + extracción de la UI RDB a
+componentes compartidos cross-empresa (ADR-011, SM1-SM6). Modo autónomo, **sin
+auto-merge** (UI visible → preview para revisión de Beto). Extiende PR #630
+(RDB + DILESA).
+
+- **Extracción a `components/cxp/`** (ADR-011): la lógica/JSX de las 3 pages RDB
+  se movió a 3 módulos parametrizados por `empresa: EmpresaSlug` + `empresaId`:
+  - `CxpFacturasModule` (`cxp-facturas-module.tsx`) — lista + drawer
+    (`FacturaDrawer`) + uploader (`UploadXmlDialog`), todo en un archivo (el
+    drawer y el uploader solo los usa facturas). El uploader construye la URL
+    `/api/${empresa}/cxp/facturas/upload-xml` y el copy del dialog dice el
+    receptor por empresa; el link de la OC usa `/${empresa}/ordenes-compra`.
+  - `CxpAgingModule` (`cxp-aging-module.tsx`) — buckets por proveedor.
+  - `CxpProveedoresModule` (`cxp-proveedores-module.tsx`) — agregado por proveedor.
+  - Reusa el `EmpresaSlug` (`'dilesa' | 'rdb'`) y los UUIDs de
+    `lib/empresa-constants.ts` (single source of truth, SM3). Sin `as any`;
+    `as unknown as` solo para el shape del embed `cxp_pagos`.
+- **Pages RDB reescritas como wrappers delgados** (SM1): `app/rdb/cxp/page.tsx`
+  (904→21 líneas), `aging/page.tsx` (263→21), `proveedores/page.tsx` (222→21).
+  El `layout.tsx` RDB no cambia (tabs RDB). RDB sigue funcionando idéntico:
+  typecheck + 1155 tests verdes, mismas queries (filtradas por `empresaId`),
+  mismo drawer, mismo uploader.
+- **Pages DILESA nuevas** (`app/dilesa/cxp/`): `layout.tsx` (RoutedModuleTabs con
+  sub-slugs `dilesa.cxp.*`), `page.tsx` (facturas), `aging/`, `proveedores/`,
+  cada una `<RequireAccess empresa="dilesa" modulo="dilesa.cxp.<sub>">` →
+  módulo compartido con `empresa="dilesa"`. El gate de `RequireAccess` (que
+  retorna null mientras carga) provee el boundary para el `useSearchParams` que
+  el módulo de facturas usa vía `useUrlFilters` — mismo patrón que la page RDB
+  original que ya pasaba CI.
+- **4 lugares RBAC** (regla "Liberación de módulo nuevo" + ADR-030):
+  (1) `NAV_ITEMS` — entry `{ label: 'CxP', href: '/dilesa/cxp' }` en sección
+  Administración de DILESA, junto a CxC; (2) `ROUTE_TO_MODULE` — `/dilesa/cxp`→
+  `.facturas`, `/aging`→`.aging`, `/proveedores`→`.proveedores`;
+  (3) `EXPECTED_DB_MODULE_SLUGS` — padre `dilesa.cxp` + 3 sub-slugs;
+  (4) migración `20260602010000_modulos_dilesa_cxp.sql`.
+- **Migración** (espejo de la de RDB): inserta `dilesa.cxp` + 3 sub-slugs
+  resolviendo `empresa_id` con JOIN a `core.empresas WHERE slug='dilesa'`
+  (robusto a Preview) + `ON CONFLICT DO NOTHING`, sección `administracion`.
+  **Backfill defensivo**: clona los permisos de cada rol DILESA sobre
+  `dilesa.cobranza` (CxC, mismo sección/finanzas, gemelo del subledger ADR-037)
+  hacia los 4 slugs nuevos. `NOTIFY pgrst`. **Aplicada a prod vía `execute_sql`**
+  (no `db push`) para evitar carrera con la migración paralela
+  `20260602004906_core_gobierno_corporativo` (aplicada a prod por otra sesión,
+  su archivo aún no en main). Verificado en prod: 4 slugs en `administracion`,
+  cada uno con 9 roles backfilled (5 lectura / 3 escritura) — espejo de
+  `dilesa.cobranza`. Registrada en `schema_migrations`.
+- **Nota de drift (no CxP):** `schema:check` local contra prod marca las tablas
+  `core.gobierno_*` de la migración paralela (no en este branch). Mi cambio no
+  toca schema (solo data en `core.modulos`/`core.permisos_rol`), así que
+  `SCHEMA_REF.md`/`types/supabase.ts` se dejaron en el estado del branch (no se
+  commitearon artefactos de gobierno sin su migración). Se reconcilian al
+  rebasar sobre main cuando el PR de gobierno mergee.
+- typecheck + 1155 tests + lint (0 errores) + format verdes.
+
+**Próximo:** Sprint 4 — programación + aprobación de pagos por rol Dirección.
 
 ### 2026-06-02 — Sprint 3 (UI RDB: facturas + drawer + aging + proveedores)
 
