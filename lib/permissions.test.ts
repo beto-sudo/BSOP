@@ -241,6 +241,10 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   // Control granular (quién aprueba/paga + override de lock para tareas
   // pagadas) vive en código UI + trigger SQL `tg_ctt_lock_pagadas`.
   'dilesa.construccion.estimaciones',
+  // Sub-slug del tab Costeo (iniciativa dilesa-contratos-obra · Sprint 3).
+  // Vista de CapEx: presupuesto vs gasto real (obra_presupuesto) + saldo de
+  // contratos de obra. Migración 20260602030000_modulos_dilesa_construccion_costeo.sql.
+  'dilesa.construccion.costeo',
   // Sub-slugs por fase del pipeline (Sprint 7a captura por fase)
   'dilesa.ventas.fase01_solicitud',
   'dilesa.ventas.fase02_asignada',
