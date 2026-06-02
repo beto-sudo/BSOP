@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-28
-**Última actualización:** 2026-06-02 (**Sprint 3 + rollout DILESA** en PR #630: módulo UI `/rdb/cxp` + `/dilesa/cxp` (facturas + drawer + aging + proveedores), **UI extraída a `components/cxp/` compartidos (ADR-011)**, + migraciones de módulos `rdb.cxp` y `dilesa.cxp` × 3 sub-slugs c/u + 4 lugares RBAC por empresa. UI visible — sin auto-merge, preview para revisión de Beto. Sprints 1+2 ya en prod. Modo autónomo. Próximo: Sprint 4 (programación + aprobación de pagos). Ver Bitácora.)
+**Última actualización:** 2026-06-02 (**Sprint 4** — UI de programación + aprobación de pagos para RDB + DILESA: 2 sub-páginas nuevas (`programacion`, `pagos`) vía 2 componentes compartidos `components/cxp/` + 4 sub-slugs RBAC nuevos (`{rdb,dilesa}.cxp.{programacion,pagos}`) en los 4 lugares + migración `20260602020000`. Cablea las RPCs `cxp_pago_programar`/`aprobar`/`marcar_pagado`/`cancelar` (gate Dirección server-side). Email de notificación al aprobador **diferido a follow-up**. UI visible — sin auto-merge, preview para revisión de Beto. Modo autónomo. Próximo: Sprint 5 (pago efectivo + conciliación). Ver Bitácora.)
 
 ## Problema
 
@@ -87,11 +87,11 @@ Resultado operativo: doble captura entre la realidad bancaria y la contable, rie
   - Acción "Cargar XML" + "Captura manual" en header.
   - Badge de estado por factura (vence en X días / vencida / pagada / parcial).
 
-- [ ] **Sprint 4 — Programación + aprobación de pagos**:
-  - `/rdb/cxp/programacion` — calendario semanal (lo que vence) + tabla "para programar esta semana" (selección masiva de facturas → genera 1 `cxp_pago` por proveedor).
-  - `/rdb/cxp/pagos` — lista de pagos en cada estado (programado/aprobado/pagado).
-  - Botón "Aprobar" visible solo si el usuario pertenece al Comité Ejecutivo (RPC valida).
-  - Notificación email al Comité cuando hay pagos pendientes de aprobación (reutiliza `lib/juntas/email.ts` para branding por empresa).
+- [x] **Sprint 4 — Programación + aprobación de pagos** (RDB + DILESA, componentes compartidos):
+  - `/{empresa}/cxp/programacion` — tabla de facturas por pagar (`saldo > 0`, `estado_cxp` por_pagar/parcial) ordenada por lo que vence primero (marca vencidas); selección múltiple → agrupa por proveedor → 1 `cxp_pago` por proveedor con `cxp_pago_programar`. Cuenta bancaria / método / fecha programada al lote. Confirmación antes de programar.
+  - `/{empresa}/cxp/pagos` — lista de `cxp_pagos` por estado (programado/aprobado/pagado/cancelado) con filtro; acciones por estado: Aprobar (`cxp_pago_aprobar`, gate Dirección server-side, error elegante si no), Marcar pagado (`cxp_pago_marcar_pagado`, confirmación fuerte + fecha/referencia), Cancelar (`cxp_pago_cancelar` con motivo). Drawer con facturas aplicadas + trazabilidad.
+  - El botón "Aprobar" NO se esconde por rol en cliente (defensa: el RPC manda); si el caller no es Dirección, el toast muestra el error del RPC.
+  - **Diferido a follow-up**: notificación email al aprobador cuando hay pagos pendientes (infra de notificación separada; reusaría `lib/juntas/email.ts` para branding por empresa). No es parte de este PR.
 
 - [ ] **Sprint 5 — Pago efectivo + conciliación**:
   - "Marcar pagado" registra `fecha_pago` real, `referencia` (folio cheque o número de transferencia), y crea movimiento en `erp.cuentas_bancarias_movimientos` (o equivalente que use cortes hoy) con `referencia_tipo='cxp_pago'` + `referencia_id=pago.id`.
@@ -145,7 +145,7 @@ Resultado operativo: doble captura entre la realidad bancaria y la contable, rie
 | 1   | DB: extender `erp.facturas` + crear `cxp_pagos` + `cxp_pago_aplicaciones` + RPCs (alta, cancelar, programar, aprobar, marcar_pagado, cancelar_pago) + helper `es_comite_ejecutivo` + backfill + regenerar SCHEMA_REF | aplicado  | _este PR_ |
 | 2   | Parser CFDI determinista (`lib/cxp`) + endpoint `upload-xml` (bulk + dedup `uuid_sat` + validación receptor + sugerencia de proveedor). Match-OC automático y PDF-LLM diferidos a Sprint 3/follow-up                 | en PR     | _este PR_ |
 | 3   | UI RDB facturas (lista + drawer) + aging + vista por proveedor                                                                                                                                                       | en PR     | _este PR_ |
-| 4   | UI RDB programación + aprobación por Comité + email de notificación                                                                                                                                                  | pending   | —         |
+| 4   | UI programación + aprobación (RDB + DILESA, componentes compartidos). Email de notificación diferido a follow-up                                                                                                     | en PR     | _este PR_ |
 | 5   | Pago efectivo + conciliación contra cortes (engancha con `cortes-conciliacion`)                                                                                                                                      | pending   | —         |
 | 6   | Migración de `erp.gastos` a CxP + rollout multi-empresa (DILESA, COAGAN, ANSA)                                                                                                                                       | pending   | —         |
 
@@ -191,6 +191,72 @@ patrón canónico de **ADR-037** (subledger gemelo):
   reusan CxC y CxP (convención `shared-modules-refactor`, ADR-011).
 
 ## Bitácora
+
+### 2026-06-02 — Sprint 4 (UI programación + aprobación de pagos · RDB + DILESA)
+
+Programación y aprobación de pagos a proveedores, componentes compartidos
+cross-empresa desde el inicio (ADR-011, SM1-SM6). Modo autónomo, **sin
+auto-merge** (UI visible → preview para revisión de Beto).
+
+- **`components/cxp/cxp-programacion-module.tsx`** (`CxpProgramacionModule`,
+  `empresa` + `empresaId`): tabla de facturas de egreso con `saldo > 0` y
+  `estado_cxp IN ('por_pagar','parcial')`, ordenada por la fecha que vence
+  primero (`fecha_pago_programada` || `fecha_vencimiento`), con badge de
+  urgencia (vencida Nd / vence hoy / vence Nd). Selección múltiple
+  (checkbox por fila + select-all de lo filtrado, footer con total y #
+  proveedores). Al confirmar, **agrupa por proveedor** (clave id→RFC→nombre)
+  y llama `erp.cxp_pago_programar` **una vez por proveedor** con
+  `[{factura_id, monto: saldo}]`. El dialog elige cuenta bancaria
+  (`erp.cuentas_bancarias` activas de la empresa), método y fecha programada
+  (comunes al lote); bloquea si alguna factura no tiene proveedor enlazado.
+  Secuencial por grupo → reporta fallas por proveedor sin abortar el lote
+  (la RPC valida saldo factura por factura).
+- **`components/cxp/cxp-pagos-module.tsx`** (`CxpPagosModule`, `empresaId`):
+  lista de `erp.cxp_pagos` por estado (filtro, default «programado»), con
+  proveedor/cuenta resueltos por query puntual. Acciones por estado:
+  - **Aprobar** (programado): `ConfirmDialog` → `cxp_pago_aprobar`. El botón
+    **NO se esconde por rol** en cliente (defensa: manda el RPC); si el caller
+    no es Dirección, el RPC lanza y se muestra su mensaje con toast claro
+    («Solo un miembro del Comité Ejecutivo puede aprobar pagos» — copy del RPC).
+  - **Marcar pagado** (aprobado): dialog con `fecha_pago` + `referencia` y
+    **confirmación fuerte** (egreso real; advierte si emite o no movimiento
+    bancario según haya cuenta) → `cxp_pago_marcar_pagado`.
+  - **Cancelar** (no pagado): dialog con motivo → `cxp_pago_cancelar`.
+  - **Drawer** (`<DetailDrawer>`): datos del pago, trazabilidad
+    (aprobado/pagado), y facturas aplicadas vía embed
+    `cxp_pago_aplicaciones → facturas!factura_id`.
+- **4 pages delgadas** (`app/{rdb,dilesa}/cxp/{programacion,pagos}/page.tsx`):
+  wrappers `<RequireAccess modulo="<sub-slug>">` → componente compartido con
+  la identidad de la empresa (`*_EMPRESA_ID` de `lib/empresa-constants.ts`).
+  El gate de `RequireAccess` (retorna null mientras carga) provee el boundary
+  de Suspense para el `useSearchParams` que programación usa vía
+  `useUrlFilters` — mismo patrón que la page de facturas.
+- **2 tabs nuevos** en AMBOS layouts (rdb + dilesa) con su `module:`
+  (`Facturas · Programación · Pagos · Saldos · Proveedores`). Sidebar parent
+  no cambia.
+- **4 lugares RBAC** (regla "Liberación de módulo nuevo" + ADR-030):
+  (1) layouts `TABS`; (2) `ROUTE_TO_MODULE` — 4 URLs nuevas → sus sub-slugs;
+  (3) `EXPECTED_DB_MODULE_SLUGS` — `{rdb,dilesa}.cxp.{programacion,pagos}`;
+  (4) migración `20260602020000_modulos_cxp_pagos_subslugs.sql`: INSERT de los
+  4 sub-slugs (sección `administracion`, JOIN a `core.empresas`, `ON CONFLICT
+DO NOTHING`) + **backfill defensivo** clonando los permisos del sub-slug
+  hermano `<empresa>.cxp.facturas` a cada nuevo. **Aplicada a prod vía
+  `execute_sql`** (no `db push`) para evitar carrera con migraciones paralelas;
+  archivo committeado como fuente de verdad (CI lo valida en el Preview branch)
+  - registrada en `schema_migrations`. Verificado en prod: 10 slugs `%.cxp.%`,
+    los nuevos espejo de `facturas` (DILESA 9 roles 5L/3E, RDB 6 roles 5L/4E).
+- Sin migración de schema → `SCHEMA_REF.md`/`types/supabase.ts` sin cambios
+  (RBAC-only). Sin `as any`; `as unknown as Json` solo para el JSONB de
+  aplicaciones y `as unknown as` para el shape del embed de facturas.
+- **Diferido a follow-up (pendiente operativo)**: notificación email al
+  aprobador cuando hay pagos en estado «programado». Es infra de notificación
+  separada (reusaría `lib/juntas/email.ts` para branding por empresa); no se
+  incluyó en este PR para mantenerlo acotado a la UI.
+- 5 checks verdes: typecheck + 1177 tests + lint (0 errores) + format +
+  schema:check.
+
+**Próximo:** Sprint 5 — pago efectivo + conciliación contra cortes (engancha
+con `cortes-conciliacion`).
 
 ### 2026-06-02 — Rollout DILESA + extracción de componentes compartidos (ADR-011)
 
