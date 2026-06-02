@@ -9045,10 +9045,6 @@ export type Database = {
         }
         Returns: string
       }
-      es_comite_ejecutivo: {
-        Args: { p_empresa_id: string; p_usuario_id: string }
-        Returns: boolean
-      }
       fn_aplicar_levantamiento: {
         Args: { p_levantamiento_id: string }
         Returns: number

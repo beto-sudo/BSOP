@@ -104,6 +104,7 @@ export const NAV_ITEMS: NavItem[] = [
           { label: 'Tareas', href: '/rdb/admin/tasks' },
           { label: 'Juntas', href: '/rdb/admin/juntas' },
           { label: 'Documentos', href: '/rdb/admin/documentos' },
+          { label: 'CxP', href: '/rdb/cxp' },
         ],
       },
       {
