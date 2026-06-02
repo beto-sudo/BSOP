@@ -1,0 +1,178 @@
+# Iniciativa — Bitácora de protocolo (péptidos + suplementos)
+
+**Slug:** `salud-protocolo`
+**Empresas:** SANREN (salud personal — gateada `RequireAccess empresa="sanren"`)
+**Schemas afectados:** `health` (3 tablas nuevas: `protocolo_compuestos`, `protocolo_tomas`, `protocolo_efectos`); lectura de `health.health_metrics` para el overlay
+**Estado:** planned
+**Dueño:** Beto
+**Creada:** 2026-06-02
+**Última actualización:** 2026-06-02 (promovida a `planned`; alcance v1 cerrado con Beto — 4 decisiones)
+
+## Problema
+
+Beto empezó un protocolo de péptidos inyectables auto-administrados (arranque
+documentado: **Retatrutide 2.5 mg subcutáneo semanal**) y planea **agregar otros
+compuestos para medir cómo reacciona su cuerpo**. Hoy no hay dónde registrarlo:
+
+1. **Apple Health no lo sabe.** El módulo `/health` (SANREN → Salud) es un
+   dashboard 100% read-only que consume el ingest automático de Apple Health
+   (HAE). Una inyección auto-administrada no la reporta ningún wearable — es un
+   dato que **solo Beto puede capturar a mano**. El módulo nunca ha tenido
+   escritura manual.
+2. **No hay bitácora ni catálogo.** Existe `health.health_medications` pero la
+   llena el ingest y **no se renderiza en ningún lado**. No sirve para un
+   protocolo con dosis que titran, sitios de inyección, procedencia del
+   compuesto y efectos subjetivos.
+3. **No se puede medir la interacción con el cuerpo.** Beto quiere ver, para
+   cada compuesto, qué pasa con su **peso, frecuencia en reposo (RHR), HRV y
+   presión** alrededor de los cambios de dosis. Esos biomarcadores ya viven en
+   `health.health_metrics`, pero no hay forma de cruzarlos contra un evento de
+   dosis.
+
+Contexto que pesa en el diseño: Beto es **post triple-bypass (jul-2024)**. El
+Retatrutide (triple agonista GLP-1/GIP/glucagón) mueve justo RHR, presión y
+peso — los marcadores que su cardiólogo vigila. El tracker se diseña centrado en
+esos marcadores y con **export para llevar a consulta**.
+
+## Outcome esperado
+
+Una **bitácora de protocolo** dentro de `/health` que permita:
+
+- **Catalogar** cada compuesto que Beto se administra (péptido inyectable,
+  suplemento, oral), con dosis objetivo vigente, vía, frecuencia, **procedencia**
+  (farmacia de compounding / research-grade / marca — trazabilidad) y estado.
+- **Registrar cada toma** en <15 s desde un drawer web: compuesto, fecha/hora,
+  dosis real, sitio de inyección (rotación), nota.
+- **Capturar cómo cae** con escalas rápidas 0–5 (apetito, náusea, energía,
+  molestia GI) + nota libre, ligadas opcionalmente a la toma — el único formato
+  que después permite **graficar y correlacionar**.
+- **Ver la interacción con el cuerpo**: overlay de los eventos de dosis (inicio
+  de compuesto, cambios de dosis) sobre las curvas de peso/RHR/HRV/BP que ya
+  trae `health.health_metrics`, con el mismo patrón visual que el
+  `PostBypassTimeline` (marcador vertical sobre la serie).
+- **Exportar** un resumen (PDF/CSV) para el cardiólogo.
+
+Lo que esta iniciativa **no** es: no es consejo médico, no valida dosis ni
+recomienda compuestos. Registra y visualiza. La procedencia se captura para
+trazabilidad, no como aval clínico.
+
+## Decisiones de alcance (cerradas con Beto 2026-06-02)
+
+1. **Alcance** → protocolo completo: **péptidos + suplementos/orales** (no solo
+   inyectables). El catálogo lleva una columna `clase` para distinguirlos.
+2. **Efectos** → **escalas rápidas 0–5 + nota libre** (apetito/náusea/energía/GI),
+   para que sea correlacionable, no solo un diario.
+3. **Captura** → **web BSOP, drawer rápido** en `/health` (no por mensajería en v1).
+4. **Gobierno** → **promover a iniciativa** formal (este doc + fila en INITIATIVES).
+
+## Modelo de datos (3 tablas nuevas en `health`)
+
+Nombres en **español** (consistente con el dominio de negocio del repo —
+core/erp/dilesa/rdb), sin el prefijo redundante `health_` (ya viven en el schema
+`health`).
+
+### `health.protocolo_compuestos` — catálogo de lo que Beto se administra
+
+- `id` bigint PK
+- `nombre` text NOT NULL — "Retatrutide", "BPC-157", "Vitamina D3"…
+- `clase` text NOT NULL CHECK in (`peptido`, `suplemento`, `oral`, `otro`)
+- `via` text CHECK in (`subcutanea`, `intramuscular`, `oral`, `topica`, `nasal`) — nullable
+- `unidad_dosis` text — `mg` | `mcg` | `UI` | `ml` | `g`
+- `dosis_objetivo` numeric — dosis vigente planeada (ej. 2.5)
+- `frecuencia` text — `semanal` | `diaria` | `2x_semana` | texto libre
+- `procedencia` text — farmacia compounding / research-grade / marca / proveedor
+- `estado` text NOT NULL DEFAULT `activo` CHECK in (`activo`, `pausado`, `suspendido`, `completado`)
+- `fecha_inicio` date · `fecha_fin` date (null = vigente)
+- `color` text — opcional, para el overlay
+- `notas` text
+- `created_at` / `updated_at` timestamptz DEFAULT now()
+
+### `health.protocolo_tomas` — la bitácora literal (cada administración)
+
+- `id` bigint PK
+- `compuesto_id` bigint NOT NULL FK → `protocolo_compuestos(id)` ON DELETE CASCADE
+- `fecha` timestamptz NOT NULL — cuándo se la administró
+- `dosis` numeric NOT NULL — dosis **real** aplicada (puede diferir del objetivo → histórico de titración)
+- `unidad` text — denormalizada del compuesto al momento de la toma
+- `sitio` text — sitio de inyección para rotación (`abdomen_izq`, `muslo_der`…); null para orales
+- `nota` text
+- `created_at` timestamptz DEFAULT now()
+- Índice `(compuesto_id, fecha)`
+
+### `health.protocolo_efectos` — cómo cae (escalas + nota, correlacionable)
+
+- `id` bigint PK
+- `fecha` timestamptz NOT NULL
+- `toma_id` bigint NULL FK → `protocolo_tomas(id)` ON DELETE SET NULL — liga opcional a la inyección
+- `apetito` smallint CHECK 0–5 · `nausea` smallint CHECK 0–5 · `energia` smallint CHECK 0–5 · `gi` smallint CHECK 0–5
+- `nota` text
+- `created_at` timestamptz DEFAULT now()
+- Semántica de escalas: apetito/energía → 0 muy bajo … 5 muy alto; náusea/GI → 0 sin molestia … 5 severo. Documentar en la UI.
+
+Los biomarcadores (peso, RHR, HRV, BP) **no se duplican**: viven en
+`health.health_metrics` y se cruzan por fecha en el overlay.
+
+## Alcance v1
+
+### Sprint 1 — Schema + seed (DB-puro)
+
+- [ ] Migración `supabase/migrations/` con las 3 tablas en `health` + CHECKs + FKs + índice.
+- [ ] **RLS privada**: verificar primero la política actual del schema `health` (¿`health_*` tiene RLS? ¿service-role only?) y aplicar política estricta — datos clínicos personales, solo Beto / admin global. Sin `USING(true)`.
+- [ ] `NOTIFY pgrst, 'reload schema';` al final.
+- [ ] Aplicar con `supabase db push` **tras OK verbal de Beto** (memoria `feedback_migraciones_db_bsop.md`), verificar con `\d health.protocolo_*`, regenerar `SCHEMA_REF.md` + `types/supabase.ts`.
+- [ ] **Seed** del Retatrutide (clase `peptido`, vía `subcutanea`, unidad `mg`, dosis*objetivo `2.5`, frecuencia `semanal`, estado `activo`) + las tomas que ya lleva. \_Dato pendiente: fecha de inicio + tomas — recuperar de `~/.claude/PERSONAL.md` o confirmar con Beto al ejecutar.*
+
+### Sprint 2 — Lectura (read-only)
+
+- [ ] `lib/protocolo.ts` — `getProtocoloData()`: compuestos activos + tomas recientes + efectos (server-side).
+- [ ] `components/health/protocolo-section.tsx` — tarjetas de compuestos activos (dosis vigente, última toma, próxima estimada) + bitácora de tomas (timeline/lista). Reusa `Surface`, `tones.ts`, helpers existentes.
+- [ ] Insertar `<ProtocoloSection>` en `app/health/page.tsx`.
+
+### Sprint 3 — Captura (la primera escritura del módulo health)
+
+- [ ] `components/health/protocolo-drawer.tsx` — drawer (patrón `DetailDrawer`, ADR-018/026) para: registrar toma (compuesto, fecha, dosis, sitio, nota) + efectos (4 escalas 0–5 + nota); alta de compuesto nuevo ("agregar otro péptido").
+- [ ] Mutación vía route handler `app/api/health/protocolo/route.ts` (o server action según patrón del repo) con `assertNotInPreview()` (ADR-027) — read-only de "viendo como" se respeta.
+- [ ] Validación de inputs (Zod) + `getSupabaseErrorMessage` en catches (memoria `feedback_supabase_error_helper`).
+
+### Sprint 4 — Overlay + export + cierre
+
+- [ ] Overlay de eventos de dosis (inicio de compuesto, cambios de dosis) sobre las series de peso/RHR/HRV/BP, patrón `PostBypassTimeline` (`components/health/post-bypass-timeline.tsx`).
+- [ ] Export PDF/CSV del protocolo + bitácora + efectos para consulta médica (patrón de impresión BSOP: vista de pantalla con `print:` modifiers — memoria `feedback_print_pattern_bsop`).
+- [ ] Evaluar **ADR**: el patrón de escritura manual + RLS de datos clínicos en el módulo `health` cruza convención (hoy es read-only de ingest) → candidato a ADR si se reusa.
+- [ ] Bitácora final + mover a `## Done` en INITIATIVES.md.
+
+## Fuera de alcance (v1)
+
+- **Captura por mensajería** (iMessage/WhatsApp → registro automático). Beto eligió drawer web; la captura por mensaje queda como posible v2.
+- **Recordatorios/alertas** de próxima dosis (cron + push). v2.
+- **Análisis estadístico de interacción** (correlación formal dosis↔biomarcador). v1 muestra el overlay temporal; la lectura la hace Beto (o yo, ad-hoc). Correlación ≠ causalidad — la UI lo encuadra así.
+- **Interacciones fármaco-fármaco** entre péptidos (motor farmacológico). No aplica.
+- **Multi-usuario** (Graciela, etc.). El módulo es de Beto.
+
+## Métricas de éxito
+
+- Beto registra una inyección + cómo cayó en **<15 s** desde `/health`.
+- Para cualquier compuesto: ve su **serie de dosis + efectos + overlay** con peso/RHR/HRV/BP.
+- Beto **agrega un péptido nuevo** y empieza a loguearlo sin tocar SQL.
+- Hay un **export** listo para llevar al cardiólogo.
+- CI verde en cada sprint.
+
+## Riesgos / preguntas abiertas
+
+- **Primera escritura manual en `health`.** El módulo era read-only de ingest. Sprint 3 define el patrón de mutación; debe respetar el read-only de preview (ADR-027) y la RLS privada.
+- **RLS del schema `health` desconocida.** Verificar en Sprint 1 antes de exponer escritura — datos clínicos no deben filtrarse a otros usuarios de SANREN ni a previews.
+- **Datos clínicos sensibles.** No exponer valores en logs ni en audit con payload crudo; export controlado.
+- **No es consejo médico.** El tracker no valida dosis ni recomienda. Compuestos research-grade tienen perfil de seguridad incierto, sobre todo con historia cardiovascular; se registra **procedencia** para trazabilidad, no como aval. Encuadrar en la UI.
+- **Seed pendiente de dato real.** Fecha de inicio del Retatrutide + tomas a la fecha — confirmar antes del seed (PERSONAL.md o Beto).
+- **Unidades mixtas** (mg para péptidos, UI/mcg para suplementos). `unidad_dosis` por compuesto lo resuelve; el overlay agrupa por compuesto, no mezcla unidades.
+
+## Bitácora
+
+- **2026-06-02** — Promovida a `planned`. Beto pidió una bitácora de péptidos en SANREN → Salud (arranque: Retatrutide 2.5 mg SC semanal; planea agregar otros "para medir interacciones con su cuerpo"). Exploración: `/health` es dashboard read-only de Apple Health; `health.health_medications` existe pero no se renderiza; los biomarcadores viven en `health.health_metrics`. Alcance v1 cerrado con 4 decisiones (protocolo completo / escalas 0–5 + nota / drawer web / promover). Modelo de 3 tablas en `health` propuesto. Pendiente: OK verbal de Beto para aplicar el schema (Sprint 1).
+
+## Decisiones registradas
+
+- **2026-06-02** — Modelo de 3 tablas (`protocolo_compuestos` / `protocolo_tomas` / `protocolo_efectos`) en lugar de extender `health.health_medications`. _Razón:_ `health_medications` lo llena el ingest automático y su shape (name/dose/raw*json) no soporta dosis que titran, sitio de inyección, procedencia ni efectos correlacionables. Separar catálogo (identidad estable) de tomas (eventos reales, ground truth de la titración) de efectos (subjetivo, escalable) da audit trail nativo (regla dura de Beto). \_Aplica a:* todo el schema de la iniciativa.
+- **2026-06-02** — Nombres en **español** dentro del schema `health` (que es inglés por mapear Apple Health). _Razón:_ estas tablas son dominio de negocio personal, no métricas de Apple Health; consistencia con core/erp/dilesa/rdb pesa más que con el prefijo legacy `health_`.
+- **2026-06-02** — Los biomarcadores **no se duplican**; el overlay cruza `health.health_metrics` por fecha. _Razón:_ peso/RHR/HRV/BP ya se ingieren; duplicarlos crearía dos fuentes de verdad. El evento de dosis es lo único nuevo que se superpone.
+- **2026-06-02** — Diseño centrado en **RHR/BP/peso + export** por el perfil post-bypass de Beto. _Razón:_ son los marcadores que el Retatrutide mueve y que su cardiólogo vigila; el valor del tracker es clínico-personal, no solo un diario.
