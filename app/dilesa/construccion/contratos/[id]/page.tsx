@@ -31,6 +31,7 @@ import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { ObraContratoDetalle } from '@/components/dilesa/obra-contrato-detalle';
 
 type Contrato = {
   id: string;
@@ -41,6 +42,9 @@ type Contrato = {
   valor_total: number;
   fianzas_url: string | null;
   notas: string | null;
+  tipo: string;
+  anticipo_pct: number | null;
+  retencion_pct: number | null;
 };
 
 type Lote = {
@@ -346,13 +350,15 @@ function DetailInner() {
             </p>
           ) : null}
         </div>
-        <a
-          href={`/api/dilesa/construccion/contratos/${contrato.id}/pdf`}
-          className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40 hover:text-[var(--text)]"
-        >
-          <Download className="h-4 w-4" />
-          Descargar contrato (PDF)
-        </a>
+        {contrato.tipo === 'vivienda' ? (
+          <a
+            href={`/api/dilesa/construccion/contratos/${contrato.id}/pdf`}
+            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40 hover:text-[var(--text)]"
+          >
+            <Download className="h-4 w-4" />
+            Descargar contrato (PDF)
+          </a>
+        ) : null}
       </header>
 
       <Section title="Datos generales">
@@ -373,93 +379,106 @@ function DetailInner() {
         ) : null}
       </Section>
 
-      <Section title="KPIs">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Kpi label="Lotes asignados" value={lotes.length.toString()} accent />
-          <Kpi label="MO ejecutado" value={fmtMoney(kpis.moEjecutado) ?? '$0'} />
-          <Kpi label="MO por ejecutar" value={fmtMoney(kpis.moPorEjecutar) ?? '$0'} />
-          <Kpi label="Avance promedio" value={`${kpis.avancePromedio.toFixed(0)}%`} />
-        </div>
-      </Section>
+      {contrato.tipo !== 'vivienda' ? (
+        <ObraContratoDetalle
+          contratoId={contrato.id}
+          valorTotal={contrato.valor_total}
+          anticipoPct={contrato.anticipo_pct ?? 0}
+          retencionPct={contrato.retencion_pct ?? 0}
+        />
+      ) : null}
 
-      <Section
-        title="Lotes asignados"
-        description={
-          lotes.length === 0
-            ? 'sin lotes'
-            : `${lotes.length} lote(s) · MO contratado ${moneyFmt.format(kpis.valorContratoMo)}`
-        }
-      >
-        {lotes.length === 0 ? (
-          <p className="text-sm text-[var(--text)]/60">
-            Este contrato no tiene lotes asignados todavía.
-          </p>
-        ) : (
-          <ul className="space-y-1.5">
-            {lotes.map((l) => {
-              const obra = obrasByConstruccionId.get(l.construccion_id);
-              if (!obra) {
-                return (
-                  <li
-                    key={l.id}
-                    className="rounded-md border border-[var(--border)] bg-[var(--bg)]/30 px-3 py-2 text-sm text-[var(--text)]/50"
-                  >
-                    Construcción {l.construccion_id} no encontrada (¿borrada?).
-                  </li>
-                );
-              }
-              const ident = unidadById.get(obra.unidad_id) ?? obra.codigo;
-              const proto = productoById.get(obra.producto_id) ?? null;
-              const protoSufijo = proto ? proto.split('-').pop() : null;
-              const display = protoSufijo ? `${ident}-${protoSufijo}` : ident;
-              return (
-                <li key={l.id}>
-                  <Link
-                    href={`/dilesa/construccion/${obra.id}`}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--bg)]/30 px-3 py-2 hover:border-[var(--accent)] hover:bg-[var(--bg)]/60"
-                  >
-                    <div className="flex items-center gap-2">
-                      <HardHat className="h-4 w-4 text-[var(--text)]/40" />
-                      <div>
-                        <div className="text-sm font-medium text-[var(--text)]">{display}</div>
-                        <div className="text-[11px] text-[var(--text)]/50">
-                          {ESTADO_LABEL[obra.estado] ?? obra.estado}
-                          {obra.m2_construccion != null
-                            ? ` · ${Number(obra.m2_construccion).toFixed(2)} m²`
-                            : ''}
+      {contrato.tipo === 'vivienda' ? (
+        <>
+          <Section title="KPIs">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <Kpi label="Lotes asignados" value={lotes.length.toString()} accent />
+              <Kpi label="MO ejecutado" value={fmtMoney(kpis.moEjecutado) ?? '$0'} />
+              <Kpi label="MO por ejecutar" value={fmtMoney(kpis.moPorEjecutar) ?? '$0'} />
+              <Kpi label="Avance promedio" value={`${kpis.avancePromedio.toFixed(0)}%`} />
+            </div>
+          </Section>
+
+          <Section
+            title="Lotes asignados"
+            description={
+              lotes.length === 0
+                ? 'sin lotes'
+                : `${lotes.length} lote(s) · MO contratado ${moneyFmt.format(kpis.valorContratoMo)}`
+            }
+          >
+            {lotes.length === 0 ? (
+              <p className="text-sm text-[var(--text)]/60">
+                Este contrato no tiene lotes asignados todavía.
+              </p>
+            ) : (
+              <ul className="space-y-1.5">
+                {lotes.map((l) => {
+                  const obra = obrasByConstruccionId.get(l.construccion_id);
+                  if (!obra) {
+                    return (
+                      <li
+                        key={l.id}
+                        className="rounded-md border border-[var(--border)] bg-[var(--bg)]/30 px-3 py-2 text-sm text-[var(--text)]/50"
+                      >
+                        Construcción {l.construccion_id} no encontrada (¿borrada?).
+                      </li>
+                    );
+                  }
+                  const ident = unidadById.get(obra.unidad_id) ?? obra.codigo;
+                  const proto = productoById.get(obra.producto_id) ?? null;
+                  const protoSufijo = proto ? proto.split('-').pop() : null;
+                  const display = protoSufijo ? `${ident}-${protoSufijo}` : ident;
+                  return (
+                    <li key={l.id}>
+                      <Link
+                        href={`/dilesa/construccion/${obra.id}`}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--bg)]/30 px-3 py-2 hover:border-[var(--accent)] hover:bg-[var(--bg)]/60"
+                      >
+                        <div className="flex items-center gap-2">
+                          <HardHat className="h-4 w-4 text-[var(--text)]/40" />
+                          <div>
+                            <div className="text-sm font-medium text-[var(--text)]">{display}</div>
+                            <div className="text-[11px] text-[var(--text)]/50">
+                              {ESTADO_LABEL[obra.estado] ?? obra.estado}
+                              {obra.m2_construccion != null
+                                ? ` · ${Number(obra.m2_construccion).toFixed(2)} m²`
+                                : ''}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-24 overflow-hidden rounded-full bg-[var(--border)]/40">
-                          <div
-                            className={`h-full rounded-full ${avanceColorClass(obra.avance_pct)}`}
-                            style={{
-                              width: `${Math.min(100, Math.max(0, obra.avance_pct))}%`,
-                            }}
-                          />
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-2">
+                            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-[var(--border)]/40">
+                              <div
+                                className={`h-full rounded-full ${avanceColorClass(obra.avance_pct)}`}
+                                style={{
+                                  width: `${Math.min(100, Math.max(0, obra.avance_pct))}%`,
+                                }}
+                              />
+                            </div>
+                            <span className="w-9 shrink-0 text-right text-xs tabular-nums text-[var(--text)]/70">
+                              {obra.avance_pct.toFixed(0)}%
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-[10px] uppercase tracking-wide text-[var(--text)]/50">
+                              MO lote
+                            </div>
+                            <div className="text-sm tabular-nums text-[var(--text)]">
+                              {l.monto_lote != null ? moneyFmt.format(l.monto_lote) : '—'}
+                            </div>
+                          </div>
                         </div>
-                        <span className="w-9 shrink-0 text-right text-xs tabular-nums text-[var(--text)]/70">
-                          {obra.avance_pct.toFixed(0)}%
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-[10px] uppercase tracking-wide text-[var(--text)]/50">
-                          MO lote
-                        </div>
-                        <div className="text-sm tabular-nums text-[var(--text)]">
-                          {l.monto_lote != null ? moneyFmt.format(l.monto_lote) : '—'}
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Section>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Section>
+        </>
+      ) : null}
     </div>
   );
 }
