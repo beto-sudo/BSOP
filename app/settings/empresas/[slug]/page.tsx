@@ -11,6 +11,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Building2, Construction, RefreshCw } from 'lucide-react';
 import { EmpresaDetail, type Empresa } from '../_components/empresa-detail';
 import { EmpresaBranding } from '../_components/empresa-branding';
+import { CuadroAccionarioPanel } from '../_components/cuadro-accionario-panel';
+import { GobiernoCorporativoPanel } from '../_components/gobierno-corporativo-panel';
+import { ActasAsambleaPanel } from '../_components/actas-asamblea-panel';
 
 type EmpresaWithBranding = Empresa & {
   color_primario: string | null;
@@ -45,12 +48,20 @@ const SELECT_COLS = [
   'header_email_url, footer_doc_url, watermark_url, branding_updated_at',
 ].join(' ');
 
-type Tab = 'fiscal' | 'branding' | 'cuadro-accionario' | 'beneficiario-controlador';
+type Tab =
+  | 'fiscal'
+  | 'branding'
+  | 'cuadro-accionario'
+  | 'gobierno-corporativo'
+  | 'actas-asamblea'
+  | 'beneficiario-controlador';
 
 const TABS: ReadonlyArray<{ key: Tab; label: string }> = [
   { key: 'fiscal', label: 'Datos fiscales y dirección' },
   { key: 'branding', label: 'Branding' },
   { key: 'cuadro-accionario', label: 'Cuadro accionario' },
+  { key: 'gobierno-corporativo', label: 'Gobierno corporativo' },
+  { key: 'actas-asamblea', label: 'Actas de asamblea' },
   { key: 'beneficiario-controlador', label: 'Beneficiario controlador' },
 ];
 
@@ -189,12 +200,9 @@ function EmpresaPageInner() {
 
       {tab === 'fiscal' && <EmpresaDetail empresa={empresa} onSaved={fetchEmpresa} />}
       {tab === 'branding' && <EmpresaBranding branding={empresa} slug={empresa.slug} />}
-      {tab === 'cuadro-accionario' && (
-        <PlaceholderTab
-          title="Cuadro accionario"
-          description="Aquí vivirá la lista de accionistas con su % de participación, certificados de acciones y cambios históricos. Hoy esa información está en Coda."
-        />
-      )}
+      {tab === 'cuadro-accionario' && <CuadroAccionarioPanel empresaId={empresa.id} />}
+      {tab === 'gobierno-corporativo' && <GobiernoCorporativoPanel empresaId={empresa.id} />}
+      {tab === 'actas-asamblea' && <ActasAsambleaPanel empresaId={empresa.id} />}
       {tab === 'beneficiario-controlador' && (
         <PlaceholderTab
           title="Beneficiario controlador"
