@@ -17,12 +17,15 @@
  * saldo (`valor_total − Σ estimaciones`, ADR-038) y un form inline para
  * registrar una estimación nueva.
  *
- * Saldo simple v1 (sin CxP). El pago formal se delega a CxP en Fase 2 —
- * ver ADR-039.
+ * **Puente a CxP (ADR-039 Fase 2):** cada estimación con monto > 0 se puede
+ * "Emitir a CxP" → crea una factura de egreso (`erp.cxp_factura_desde_estimacion`)
+ * que entra al flujo de Cuentas por Pagar. La columna CxP muestra el estado de
+ * la factura ligada (por pagar / parcial / pagada) con link al módulo CxP.
  */
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Plus, Receipt } from 'lucide-react';
+import { Loader2, Plus, Receipt, Send } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { usePermissions } from '@/components/providers';
 import { Input } from '@/components/ui/input';
@@ -44,6 +47,15 @@ export type ObraEstimacion = {
   nota_pago: string | null;
 };
 
+/** Estado CxP de la factura de egreso ligada → etiqueta + estilo del badge. */
+const ESTADO_CXP: Record<string, { label: string; cls: string }> = {
+  borrador: { label: 'borrador', cls: 'bg-[var(--text)]/10 text-[var(--text)]/60' },
+  por_pagar: { label: 'por pagar', cls: 'bg-amber-500/15 text-amber-600' },
+  parcial: { label: 'parcial', cls: 'bg-amber-500/15 text-amber-600' },
+  pagada: { label: 'pagada', cls: 'bg-emerald-500/15 text-emerald-600' },
+  cancelada: { label: 'cancelada', cls: 'bg-[var(--text)]/10 text-[var(--text)]/40' },
+};
+
 export function ObraContratoDetalle({
   contratoId,
   valorTotal,
@@ -62,6 +74,11 @@ export function ObraContratoDetalle({
     permissions.isAdmin || permissions.modulos.get('dilesa.construccion.contratos')?.write === true;
 
   const [estimaciones, setEstimaciones] = useState<ObraEstimacion[]>([]);
+  /** estimacion_id → factura de egreso ligada (puente CxP, ADR-039). */
+  const [facturaByEst, setFacturaByEst] = useState<Map<string, { id: string; estado: string }>>(
+    new Map()
+  );
+  const [emitiendo, setEmitiendo] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,21 +109,40 @@ export function ObraContratoDetalle({
     if (e) {
       setError(getSupabaseErrorMessage(e, 'No se pudieron cargar las estimaciones.'));
       setEstimaciones([]);
-    } else {
-      setEstimaciones(
-        (data ?? []).map((r) => ({
-          id: r.id as string,
-          orden: Number(r.orden ?? 0),
-          etiqueta: (r.etiqueta as string) ?? '',
-          fecha: (r.fecha as string | null) ?? null,
-          factura_ref: (r.factura_ref as string | null) ?? null,
-          monto_total: Number(r.monto_total ?? 0),
-          es_anticipo: Boolean(r.es_anticipo),
-          es_finiquito: Boolean(r.es_finiquito),
-          nota_pago: (r.nota_pago as string | null) ?? null,
-        }))
-      );
+      setFacturaByEst(new Map());
+      setLoading(false);
+      return;
     }
+    const rows: ObraEstimacion[] = (data ?? []).map((r) => ({
+      id: r.id as string,
+      orden: Number(r.orden ?? 0),
+      etiqueta: (r.etiqueta as string) ?? '',
+      fecha: (r.fecha as string | null) ?? null,
+      factura_ref: (r.factura_ref as string | null) ?? null,
+      monto_total: Number(r.monto_total ?? 0),
+      es_anticipo: Boolean(r.es_anticipo),
+      es_finiquito: Boolean(r.es_finiquito),
+      nota_pago: (r.nota_pago as string | null) ?? null,
+    }));
+    setEstimaciones(rows);
+
+    // Facturas de egreso ligadas a estas estimaciones (puente CxP, ADR-039).
+    const facMap = new Map<string, { id: string; estado: string }>();
+    const ids = rows.map((r) => r.id);
+    if (ids.length) {
+      const { data: facs } = await sb
+        .schema('erp')
+        .from('facturas')
+        .select('id, obra_estimacion_id, estado_cxp')
+        .in('obra_estimacion_id', ids)
+        .is('cancelada_at', null);
+      for (const f of facs ?? []) {
+        const eid = f.obra_estimacion_id as string | null;
+        if (eid)
+          facMap.set(eid, { id: f.id as string, estado: (f.estado_cxp as string) ?? 'por_pagar' });
+      }
+    }
+    setFacturaByEst(facMap);
     setLoading(false);
   }, [sb, contratoId]);
 
@@ -165,6 +201,31 @@ export function ObraContratoDetalle({
     setOpen(false);
     setSubmitting(false);
     void cargar();
+  }
+
+  // Puente CxP (ADR-039): emite la estimación como factura de egreso por pagar.
+  async function emitir(estId: string) {
+    if (emitiendo) return;
+    setEmitiendo(estId);
+    const { error: e } = await sb
+      .schema('erp')
+      .rpc('cxp_factura_desde_estimacion', { p_estimacion_id: estId });
+    if (e) {
+      toast.add({
+        title: 'No se pudo emitir a CxP',
+        description: getSupabaseErrorMessage(e, 'Error al crear la factura de egreso.'),
+        type: 'error',
+      });
+    } else {
+      toast.add({
+        title: 'Emitida a CxP',
+        description:
+          'Factura de egreso «por pagar» creada — programa el pago en Cuentas por Pagar.',
+        type: 'success',
+      });
+      await cargar();
+    }
+    setEmitiendo(null);
   }
 
   return (
@@ -298,6 +359,7 @@ export function ObraContratoDetalle({
                 <th className="py-1.5 pr-3">Factura</th>
                 <th className="py-1.5 pr-3 text-right">Monto</th>
                 <th className="py-1.5 pr-3">Nota</th>
+                <th className="py-1.5 pr-3">CxP</th>
               </tr>
             </thead>
             <tbody>
@@ -325,6 +387,44 @@ export function ObraContratoDetalle({
                     {formatCurrency(e.monto_total)}
                   </td>
                   <td className="py-1.5 pr-3 text-[var(--text)]/60">{e.nota_pago ?? '—'}</td>
+                  <td className="py-1.5 pr-3">
+                    {(() => {
+                      const fac = facturaByEst.get(e.id);
+                      if (fac) {
+                        const meta = ESTADO_CXP[fac.estado] ?? {
+                          label: fac.estado,
+                          cls: 'bg-[var(--text)]/10 text-[var(--text)]/60',
+                        };
+                        return (
+                          <Link
+                            href="/dilesa/cxp"
+                            title="Ver en Cuentas por Pagar"
+                            className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium ${meta.cls}`}
+                          >
+                            {meta.label}
+                          </Link>
+                        );
+                      }
+                      if (e.monto_total > 0 && puedeCrear) {
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => void emitir(e.id)}
+                            disabled={emitiendo === e.id}
+                            className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] px-2 py-0.5 text-[11px] text-[var(--text)]/70 hover:border-[var(--accent)] hover:text-[var(--text)] disabled:opacity-50"
+                          >
+                            {emitiendo === e.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Send className="h-3 w-3" />
+                            )}
+                            Emitir
+                          </button>
+                        );
+                      }
+                      return <span className="text-[var(--text)]/30">—</span>;
+                    })()}
+                  </td>
                 </tr>
               ))}
             </tbody>
