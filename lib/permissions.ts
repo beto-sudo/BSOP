@@ -86,6 +86,7 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   // access para palomear tareas inline en /construccion/[id] (post-2026-05-25
   // la página /registrar-tarea fue removida en favor del click directo).
   '/dilesa/construccion/contratos/nuevo': 'dilesa.construccion.contratos',
+  '/dilesa/construccion/contratos/nuevo-obra': 'dilesa.construccion.contratos',
 
   // RDB — home + operaciones
   '/rdb/home': 'rdb.home',

@@ -375,6 +375,15 @@ export function ContratosModule({ empresaId }: { empresaId: string }) {
             Nuevo contrato + arranques
           </Link>
         ) : null}
+        {puedeCrear ? (
+          <Link
+            href="/dilesa/construccion/contratos/nuevo-obra"
+            className="flex h-9 items-center gap-1.5 rounded-md border border-[var(--border)] px-3 text-sm font-medium text-[var(--text)]/80 hover:text-[var(--text)]"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Nuevo contrato de obra
+          </Link>
+        ) : null}
       </div>
 
       <DataTable
