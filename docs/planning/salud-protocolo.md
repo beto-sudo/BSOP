@@ -3,10 +3,10 @@
 **Slug:** `salud-protocolo`
 **Empresas:** SANREN (salud personal — gateada `RequireAccess empresa="sanren"`)
 **Schemas afectados:** `health` (3 tablas nuevas: `protocolo_compuestos`, `protocolo_tomas`, `protocolo_efectos`); lectura de `health.health_metrics` para el overlay
-**Estado:** planned
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-06-02
-**Última actualización:** 2026-06-02 (promovida a `planned`; alcance v1 cerrado con Beto — 4 decisiones)
+**Última actualización:** 2026-06-02 (Sprint 1 aplicado a prod — 3 tablas en `health` con RLS deny-all; `SCHEMA_REF`/`types` regenerados. Pendiente: seed del Retatrutide tras confirmar fecha)
 
 ## Problema
 
@@ -116,10 +116,10 @@ Los biomarcadores (peso, RHR, HRV, BP) **no se duplican**: viven en
 
 ### Sprint 1 — Schema + seed (DB-puro)
 
-- [ ] Migración `supabase/migrations/` con las 3 tablas en `health` + CHECKs + FKs + índice.
-- [ ] **RLS privada**: verificar primero la política actual del schema `health` (¿`health_*` tiene RLS? ¿service-role only?) y aplicar política estricta — datos clínicos personales, solo Beto / admin global. Sin `USING(true)`.
-- [ ] `NOTIFY pgrst, 'reload schema';` al final.
-- [ ] Aplicar con `supabase db push` **tras OK verbal de Beto** (memoria `feedback_migraciones_db_bsop.md`), verificar con `\d health.protocolo_*`, regenerar `SCHEMA_REF.md` + `types/supabase.ts`.
+- [x] Migración `supabase/migrations/20260602145253_health_protocolo_peptidos.sql` — 3 tablas en `health` + CHECKs + FKs + índices.
+- [x] **RLS privada** aplicada. Hallazgo: `health` no usaba RLS (grants a `authenticated`; `lib/health.ts` lee con `service_role`). Decisión: RLS **deny-all** + grant solo `service_role` — más estricto que `health_metrics`/etc. Verificado en prod: `rls_on=true`, cero grants a authenticated/anon/authenticator.
+- [x] `NOTIFY pgrst, 'reload schema';` al final.
+- [x] Aplicado a prod tras OK explícito de Beto. **No** vía `db push` (drift: 2 migraciones remotas de otras sesiones sin archivo local) → vía connector `apply_migration` (quirúrgico, solo mi DDL). Verificado con SELECT a `pg_class`/grants. `SCHEMA_REF.md` + `types/supabase.ts` regenerados.
 - [ ] **Seed** del Retatrutide (clase `peptido`, vía `subcutanea`, unidad `mg`, dosis*objetivo `2.5`, frecuencia `semanal`, estado `activo`) + las tomas que ya lleva. \_Dato pendiente: fecha de inicio + tomas — recuperar de `~/.claude/PERSONAL.md` o confirmar con Beto al ejecutar.*
 
 ### Sprint 2 — Lectura (read-only)
@@ -169,6 +169,7 @@ Los biomarcadores (peso, RHR, HRV, BP) **no se duplican**: viven en
 ## Bitácora
 
 - **2026-06-02** — Promovida a `planned`. Beto pidió una bitácora de péptidos en SANREN → Salud (arranque: Retatrutide 2.5 mg SC semanal; planea agregar otros "para medir interacciones con su cuerpo"). Exploración: `/health` es dashboard read-only de Apple Health; `health.health_medications` existe pero no se renderiza; los biomarcadores viven en `health.health_metrics`. Alcance v1 cerrado con 4 decisiones (protocolo completo / escalas 0–5 + nota / drawer web / promover). Modelo de 3 tablas en `health` propuesto. Pendiente: OK verbal de Beto para aplicar el schema (Sprint 1).
+- **2026-06-02** — Sprint 1 aplicado a prod (proyecto `ybklderteyhuugzfmxbi`, migración `20260602145253_health_protocolo_peptidos`). Tras OK explícito de Beto. `db push` descartado por drift (migraciones `20260602020000`/`20260602180000` de otras sesiones en remoto sin archivo local — no se tocaron); aplicado quirúrgicamente vía connector `apply_migration`. RLS deny-all verificada (cero grants a authenticated/anon). `SCHEMA_REF.md` + `types/supabase.ts` regenerados (diff limpio, solo las 3 tablas). **Pendiente para cerrar Sprint 1: seed del Retatrutide** — falta fecha de la 1ª inyección + historial de tomas (PERSONAL.md solo tiene compuesto + dosis 2.5 mg, no fechas).
 
 ## Decisiones registradas
 
@@ -176,3 +177,5 @@ Los biomarcadores (peso, RHR, HRV, BP) **no se duplican**: viven en
 - **2026-06-02** — Nombres en **español** dentro del schema `health` (que es inglés por mapear Apple Health). _Razón:_ estas tablas son dominio de negocio personal, no métricas de Apple Health; consistencia con core/erp/dilesa/rdb pesa más que con el prefijo legacy `health_`.
 - **2026-06-02** — Los biomarcadores **no se duplican**; el overlay cruza `health.health_metrics` por fecha. _Razón:_ peso/RHR/HRV/BP ya se ingieren; duplicarlos crearía dos fuentes de verdad. El evento de dosis es lo único nuevo que se superpone.
 - **2026-06-02** — Diseño centrado en **RHR/BP/peso + export** por el perfil post-bypass de Beto. _Razón:_ son los marcadores que el Retatrutide mueve y que su cardiólogo vigila; el valor del tracker es clínico-personal, no solo un diario.
+- **2026-06-02** — RLS **deny-all** + grant solo `service_role` (más estricto que el resto de `health`). _Razón:_ `health_metrics`/etc. otorgan SELECT a `authenticated` (cualquier usuario logueado podría leerlas por la API REST). Para un protocolo médico eso no es aceptable. Como `lib/health.ts` ya lee con `service_role` (bypassa RLS), no hace falta política para `authenticated`: deny-all protege contra acceso directo por API, y el módulo lee/escribe server-side con service role. _Aplica a:_ las 3 tablas `protocolo_*` y cualquier tabla futura de datos clínicos en `health`.
+- **2026-06-02** — Schema aplicado vía connector `apply_migration`, **no** `supabase db push`. _Razón:_ el dry-run reveló drift (migraciones remotas de CxP/CxC de otras sesiones sin archivo local); `db push` intentaría reconciliar todo el historial compartido — no es mi lugar arreglar el drift ajeno. `apply_migration` aplica solo mi DDL. Mi archivo local se renombró a la versión que registró el connector (`20260602145253`) para que coincida con el historial remoto. _Aplica a:_ flujo de migraciones cuando hay drift multi-sesión.
