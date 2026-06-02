@@ -8,10 +8,10 @@ proveedores/contratistas; futura emisión a CxP)
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-06-01
-**Última actualización:** 2026-06-01 (v1 completa: Capa A (#617) + Capa B (#631,
-32 contratos / 275 estimaciones) en prod + ADR-039 puente CxP (#637) + Sprint 3
-tab Costeo (UI de CapEx por proyecto, en PR). Pendiente: aplicar la migración del
-sub-slug a prod (OK de Beto) + reasignar los 8 contratos placeholder.)
+**Última actualización:** 2026-06-02 (Capa A (#617) + Capa B (#631) + ADR-039
+(#637) + Sprint 3 tab Costeo (#639) en prod. **Sprint 4** (captura de contratos +
+estimaciones de obra) en PR. Próximo: puente a CxP (pagos, ADR-039 Fase 2),
+cotizaciones, captura de presupuesto; reasignar los 8 contratos placeholder.)
 
 ## Problema
 
@@ -274,12 +274,34 @@ Trazabilidad: cada estimación guarda `source_ref` = `archivo/hoja/celda` exacta
   EXPECTED_DB_MODULE_SLUGS) + migración `20260602030000` (sub-slug + backfill de
   permisos, data-only). Saldo de obra = `valor_total − Σ obra_estimaciones`.
 
+### 2026-06-02 — Sprint 4 (captura de contratos + estimaciones de obra)
+
+UI de captura para operar obra hacia adelante (no solo ver lo traspasado):
+
+- **Nuevo contrato de obra** (`/contratos/nuevo-obra`, botón en el tab Contratos):
+  form `useState` calcando el de vivienda **sin lotes** — contratista, proyecto,
+  `tipo` (urbanización/cabecera/tarea_menor), fecha, valor, anticipo%/retención%,
+  notas. Código auto `YYYY/n-DIE-{ABREV}-{URB|CAB|TAR}#n`. Insert directo →
+  detalle.
+- **Detalle ramificado por `tipo`**: los contratos no-vivienda muestran
+  `<ObraContratoDetalle>` (estimaciones + saldo `valor − Σ` + anticipo/retención)
+  en vez de la sección de lotes; el PDF lote-based se oculta para obra. Vivienda
+  intacto.
+- **Registrar estimación** (form inline en el detalle): etiqueta libre, fecha,
+  factura, monto (negativo para amortizaciones), anticipo/finiquito, nota →
+  insert a `obra_estimaciones`.
+- Reúsa el sub-slug `dilesa.construccion.contratos` (write) — **sin migración**,
+  no toca schema. 5 checks verdes (1184 tests).
+
 ## Handover — estado y próximos pasos (para la siguiente sesión)
 
 **Hecho (en prod):** schema Sprint 1 (#615) + Capa A de costeo (`obra_presupuesto`,
 128 renglones, #617) + **Capa B de contratos + estimaciones** (32 contratos, 275
-estimaciones, #631) + **ADR-039** (puente CxP, #637) + **Sprint 3** (tab Costeo —
-este PR). v1 de la iniciativa completa.
+estimaciones, #631) + **ADR-039** (puente CxP, #637) + **Sprint 3** tab Costeo
+(#639) + **Sprint 4** captura de obra (contratos + estimaciones — este PR).
+Ciclo de obra operable end-to-end (crear → estimar → costear); falta el puente a
+CxP (pagos formales, ADR-039 Fase 2) y los módulos upstream (cotizaciones,
+captura de presupuesto).
 
 **Decisiones ya cerradas (no re-preguntar):**
 
