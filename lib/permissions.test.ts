@@ -209,11 +209,14 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   'dilesa.cobranza',
   'dilesa.cobranza.pagos',
   'dilesa.cobranza.aging',
-  // CxP (Cuentas por Pagar) — hub con 3 tabs (ADR-030). El padre `dilesa.cxp`
-  // queda como umbrella; cada tab tiene su sub-slug. Migración
-  // 20260602010000_modulos_dilesa_cxp.sql. Espejo de `rdb.cxp`.
+  // CxP (Cuentas por Pagar) — hub con 5 tabs (ADR-030). El padre `dilesa.cxp`
+  // queda como umbrella; cada tab tiene su sub-slug. Migración base
+  // 20260602010000_modulos_dilesa_cxp.sql; programacion/pagos (Sprint 4) en
+  // 20260602020000_modulos_cxp_pagos_subslugs.sql. Espejo de `rdb.cxp`.
   'dilesa.cxp',
   'dilesa.cxp.facturas',
+  'dilesa.cxp.programacion',
+  'dilesa.cxp.pagos',
   'dilesa.cxp.aging',
   'dilesa.cxp.proveedores',
   'dilesa.construccion',
@@ -292,12 +295,15 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   'rdb.admin.tasks',
   'rdb.admin.juntas',
   'rdb.admin.documentos',
-  // CxP (Cuentas por Pagar) — hub con 3 tabs (ADR-030). Migración
-  // 20260602001532_modulos_rdb_cxp.sql. El padre `rdb.cxp` queda como
-  // umbrella en sidebar; cada tab (Facturas / Saldos / Proveedores) tiene
-  // su sub-slug que gobierna acceso real al contenido.
+  // CxP (Cuentas por Pagar) — hub con 5 tabs (ADR-030). Migración base
+  // 20260602001532_modulos_rdb_cxp.sql; programacion/pagos (Sprint 4) en
+  // 20260602020000_modulos_cxp_pagos_subslugs.sql. El padre `rdb.cxp` queda
+  // como umbrella en sidebar; cada tab (Facturas / Programación / Pagos /
+  // Saldos / Proveedores) tiene su sub-slug que gobierna acceso real.
   'rdb.cxp',
   'rdb.cxp.facturas',
+  'rdb.cxp.programacion',
+  'rdb.cxp.pagos',
   'rdb.cxp.aging',
   'rdb.cxp.proveedores',
   'rdb.rh.empleados',
