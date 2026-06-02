@@ -9813,6 +9813,145 @@ export type Database = {
         }
         Relationships: []
       }
+      protocolo_compuestos: {
+        Row: {
+          clase: string
+          color: string | null
+          created_at: string
+          dosis_objetivo: number | null
+          estado: string
+          fecha_fin: string | null
+          fecha_inicio: string | null
+          frecuencia: string | null
+          id: string
+          nombre: string
+          notas: string | null
+          procedencia: string | null
+          unidad_dosis: string | null
+          updated_at: string
+          via: string | null
+        }
+        Insert: {
+          clase: string
+          color?: string | null
+          created_at?: string
+          dosis_objetivo?: number | null
+          estado?: string
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          frecuencia?: string | null
+          id?: string
+          nombre: string
+          notas?: string | null
+          procedencia?: string | null
+          unidad_dosis?: string | null
+          updated_at?: string
+          via?: string | null
+        }
+        Update: {
+          clase?: string
+          color?: string | null
+          created_at?: string
+          dosis_objetivo?: number | null
+          estado?: string
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          frecuencia?: string | null
+          id?: string
+          nombre?: string
+          notas?: string | null
+          procedencia?: string | null
+          unidad_dosis?: string | null
+          updated_at?: string
+          via?: string | null
+        }
+        Relationships: []
+      }
+      protocolo_efectos: {
+        Row: {
+          apetito: number | null
+          created_at: string
+          energia: number | null
+          fecha: string
+          gi: number | null
+          id: string
+          nausea: number | null
+          nota: string | null
+          toma_id: string | null
+        }
+        Insert: {
+          apetito?: number | null
+          created_at?: string
+          energia?: number | null
+          fecha: string
+          gi?: number | null
+          id?: string
+          nausea?: number | null
+          nota?: string | null
+          toma_id?: string | null
+        }
+        Update: {
+          apetito?: number | null
+          created_at?: string
+          energia?: number | null
+          fecha?: string
+          gi?: number | null
+          id?: string
+          nausea?: number | null
+          nota?: string | null
+          toma_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "protocolo_efectos_toma_id_fkey"
+            columns: ["toma_id"]
+            isOneToOne: false
+            referencedRelation: "protocolo_tomas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      protocolo_tomas: {
+        Row: {
+          compuesto_id: string
+          created_at: string
+          dosis: number
+          fecha: string
+          id: string
+          nota: string | null
+          sitio: string | null
+          unidad: string | null
+        }
+        Insert: {
+          compuesto_id: string
+          created_at?: string
+          dosis: number
+          fecha: string
+          id?: string
+          nota?: string | null
+          sitio?: string | null
+          unidad?: string | null
+        }
+        Update: {
+          compuesto_id?: string
+          created_at?: string
+          dosis?: number
+          fecha?: string
+          id?: string
+          nota?: string | null
+          sitio?: string | null
+          unidad?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "protocolo_tomas_compuesto_id_fkey"
+            columns: ["compuesto_id"]
+            isOneToOne: false
+            referencedRelation: "protocolo_compuestos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
