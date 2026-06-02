@@ -6519,6 +6519,7 @@ export type Database = {
           metodo_pago_sat: string | null
           monto_pagado: number
           motivo_cancelacion: string | null
+          obra_estimacion_id: string | null
           orden_compra_id: string | null
           pdf_url: string | null
           persona_id: string | null
@@ -6556,6 +6557,7 @@ export type Database = {
           metodo_pago_sat?: string | null
           monto_pagado?: number
           motivo_cancelacion?: string | null
+          obra_estimacion_id?: string | null
           orden_compra_id?: string | null
           pdf_url?: string | null
           persona_id?: string | null
@@ -6593,6 +6595,7 @@ export type Database = {
           metodo_pago_sat?: string | null
           monto_pagado?: number
           motivo_cancelacion?: string | null
+          obra_estimacion_id?: string | null
           orden_compra_id?: string | null
           pdf_url?: string | null
           persona_id?: string | null
@@ -9490,6 +9493,10 @@ export type Database = {
       cxp_factura_cancelar: {
         Args: { p_factura_id: string; p_motivo?: string }
         Returns: undefined
+      }
+      cxp_factura_desde_estimacion: {
+        Args: { p_condiciones_pago_dias?: number; p_estimacion_id: string }
+        Returns: string
       }
       cxp_pago_aprobar: { Args: { p_pago_id: string }; Returns: undefined }
       cxp_pago_cancelar: {
