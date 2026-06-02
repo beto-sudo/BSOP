@@ -120,6 +120,35 @@ function modulosParaEmpresa(modulos: Modulo[], empresaId: string): Modulo[] {
 }
 
 /**
+ * Slug del único módulo de sistema que NO se delega por rol: la gestión de
+ * accesos es admin-only por diseño (la página /settings/acceso valida admin).
+ * El resto de `settings.*` (Empresas, Notificaciones) sí es asignable a roles.
+ */
+const SYSTEM_MODULE_SLUG_NO_DELEGABLE = 'settings.acceso';
+
+/**
+ * Módulos asignables a un rol: los de su propia empresa MÁS los módulos de
+ * sistema (empresa "Configuración"), que son transversales. Así "Empresas" o
+ * "Notificaciones" se marcan directo en el rol que sea (p. ej. Dirección de
+ * DILESA) sin pasar por una excepción por usuario. `settings.acceso` se
+ * excluye — la gestión de accesos sigue admin-only.
+ */
+function modulosAsignablesParaRol(
+  modulos: Modulo[],
+  rolEmpresaId: string,
+  empresas: Empresa[]
+): Modulo[] {
+  const propios = modulosParaEmpresa(modulos, rolEmpresaId);
+  const settingsEmpresaId = empresas.find((e) => e.slug === 'settings')?.id ?? null;
+  // Rol de la propia empresa de sistema: `propios` ya trae sus módulos.
+  if (!settingsEmpresaId || rolEmpresaId === settingsEmpresaId) return propios;
+  const sistema = modulos.filter(
+    (m) => m.empresa_id === settingsEmpresaId && m.slug !== SYSTEM_MODULE_SLUG_NO_DELEGABLE
+  );
+  return [...propios, ...sistema];
+}
+
+/**
  * Orden y labels de las secciones — espejo del sidebar (ADR-014).
  * `operativa` va al inicio (Home / dashboard del giro). `sistema` va al
  * final como catch-all para módulos transversales.
@@ -286,7 +315,9 @@ export function AccesoClient({
 
   const rolesDeEmpresa = roles.filter((r) => r.empresa_id === filterEmpresaId);
   const selectedRol = roles.find((r) => r.id === selectedRolId) ?? null;
-  const modulosDelRol = selectedRol ? modulosParaEmpresa(modulos, selectedRol.empresa_id) : [];
+  const modulosDelRol = selectedRol
+    ? modulosAsignablesParaRol(modulos, selectedRol.empresa_id, empresas)
+    : [];
   const modulosExcepcion = newExcEmpresaId ? modulosParaEmpresa(modulos, newExcEmpresaId) : [];
 
   // ── Render ──
