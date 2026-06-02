@@ -8,10 +8,11 @@ proveedores/contratistas; futura emisión a CxP)
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-06-01
-**Última actualización:** 2026-06-01 (Sprint 1 schema aplicado a prod: tipo +
-anticipo/retención/IVA en `contratos_construccion` + `obra_presupuesto` +
-`obra_estimaciones`. IVA 8% frontera / 16% excepción. ADR-038. Próximo: traspaso
-de LDLE+LDS.)
+**Última actualización:** 2026-06-01 (Capa B cargada a prod: 32 contratos de obra
+y 275 estimaciones de las hojas de detalle de LDLE+LDS, incluido SIMAS como
+convenio. 29/31 reconcilian al centavo vs el "Total Pagado" del Excel. Próximo:
+Sprint 3 — UI de costeo + rollup + reasignar los 8 contratos con contratista
+placeholder.)
 
 ## Problema
 
@@ -218,10 +219,50 @@ sí trae LDS) → causaba doble conteo. La etapa se deriva de cada fila
 c/IVA, sin desglose (`gasto_real_subtotal/iva/iva_tasa` null) — el Excel no lo
 especifica; se completa con facturas.
 
+### 2026-06-01 — Traspaso Capa B (hojas de detalle → contratos + estimaciones) cargado a prod
+
+Parser `scripts/import_dilesa_obra_contratos.py` (DRY_RUN por default genera el
+JSON; `--emit-sql` genera SQL idempotente y transaccional; la carga se aplicó por
+`psql` con `SUPABASE_DB_URL`). Detección de bloques **por ancla**
+(`Contrato`/`Presupuesto` + `Anticipo`/`Por estimar`), robusta al **tiling
+horizontal** (ESTRELLA = 4 contratos lado a lado) y al **apilado vertical**
+(ELECTRIFICACION LDLE = 5 etapas/contratos apilados). **Cargado y verificado en
+prod:**
+
+- **32 contratos** (`tipo` urbanizacion/obra_cabecera/tarea_menor) +
+  **275 estimaciones** (21 anticipos, 18 amortizaciones negativas/NC, 6
+  finiquitos). Valor contratado **$47.95 M** (incl. SIMAS), pagado **$42.67 M**.
+- **Reconciliación:** 29/31 bloques cuadran al **centavo** contra el "Total
+  Pagado" del Excel (la captura de estimaciones reconcilia contra el pagado, no
+  contra "Total de estimaciones" que excluye el anticipo). 2 no cuadran por
+  inconsistencia del **propio Excel** (no del parser) y se cargaron con nota ⚠️:
+  `BANQUETA`-Quintero LDS (0 estimaciones pero Total Pagado $29,285) y
+  `ELECTRIFICACION` LDLE 3ª etapa add-on (anticipo pagado > contractual,
+  dif $10,254).
+- **6 personas nuevas** en `erp.personas` (ROMEO GONZALEZ, WILLYSONS
+  CONSTRUCCIONES, MIGUEL ÁNGEL QUINTERO FUENTES, MAYRA M. PÉREZ ARENAS, ESTRELLA
+  - 1 placeholder). Los demás contratistas (ELECTROGAZA, MATERIALES SAN RODRIGO,
+    TUBOS Y CONEXIONES, TELECOMUNICACIONES DE COAHUILA, EMMA CAZARES, EMANUEL
+    MORADO, SIMAS) ya existían y se matchearon por nombre.
+- **SIMAS** modelado como contrato (decisión Beto): convenio de derechos de agua
+  $5,492,640.90, 15 pagos programados como estimaciones (8 `pagada` = $2.93 M que
+  cuadra con el Excel, 7 `programado` = $2.56 M).
+- **8 contratos sin contratista nombrado** ("MANO DE OBRA" de BARDA/BARDA2/
+  CASETA/BANQUETA-Santos/PAVIMENTACION LDS + ELECTRIFICACION LDS ×2) → ligados a
+  **placeholder** `CONTRATISTA POR ASIGNAR — OBRA`, con el hint del Excel en
+  `notas` para reasignar en la UI.
+- **9 hojas saltadas** (no son contratos de obra): MAQUINARIA/MAQ1ERAETAPA/
+  MAQ2DA3ERAETAPA (avance terracerías volumen×PU), IB TRAYMAQ (cotización),
+  HANKAT (detalle de laboratorio tipo-RESUMEN), CASA MUESTRA/PLAZA/MUNICIPIO
+  (listas de compra).
+
+Trazabilidad: cada estimación guarda `source_ref` = `archivo/hoja/celda` exacta.
+
 ## Handover — estado y próximos pasos (para la siguiente sesión)
 
-**Hecho (en prod + main):** schema Sprint 1 (#615) + Capa A de costeo
-(`obra_presupuesto`, 128 renglones de LDLE+LDS). Este PR registra el script.
+**Hecho (en prod):** schema Sprint 1 (#615) + Capa A de costeo (`obra_presupuesto`,
+128 renglones, #617) + **Capa B de contratos + estimaciones** (32 contratos, 275
+estimaciones). Falta solo el Sprint 3 (UI de costeo + rollup).
 
 **Decisiones ya cerradas (no re-preguntar):**
 
@@ -231,22 +272,24 @@ especifica; se completa con facturas.
 - IVA **8% frontera / 16% excepción**, desglose solo donde esté especificado
   (ver [[project_iva_frontera]] y ADR-038).
 - Estimaciones de obra en tabla nueva `obra_estimaciones` (no en `dilesa.estimaciones`).
+- Contratistas sin nombre → placeholder reasignable; SIMAS = contrato.
 
-**Pendiente — Capa B (contratos + estimaciones):** parsear las **hojas de
-detalle** de `~/Downloads/Proyecto LDLE.xlsx` y `Proyecto LDS.xlsx`
-(ELECTRIFICACION, AGUA POTABLE DRENAJE, PAVIMENTACION, CORDON, BARDA, CASETA,
-PORTON, PLAZA, MAQUINARIA, etc.) → `contratos_construccion` (tipo no-vivienda,
-con `anticipo_pct`/`retencion_pct`/`iva_tasa`) + `obra_estimaciones`. Layout por
-hoja: bloque de cabecera (Contrato · Anticipo % · Retención % · Total de
-estimaciones · Total Pagado) + tabla de estimaciones (Fecha · Estímación
-etiqueta libre "Anticipo/1/2A/Finiquito" · # Factura · Total · nota de pago).
-**Ojo:** una hoja puede tener **varios contratos** (1ª/2ª etapa, o subobras como
-Red Eléctrica vs Voz y Datos) — cada uno con su propio anticipo/retención. Usar
-DRY_RUN igual que la Capa A; ligar cada contrato a su concepto de
-`obra_presupuesto` por proveedor/nombre cuando sea claro (campo `contrato_id`).
+**Pendiente — Sprint 3 (UI de costeo + rollup):** integrar presupuesto-vs-real
+(Capa A) + contratos/estimaciones (Capa B) al análisis financiero del proyecto
+(CapEx total = viviendas + urbanización + cabecera).
 
-**Pendientes menores:** normalizar variantes de proveedor ("Electrogaza" vs
-"Electrogaza SA de CV", "DILESA (Proyectos/maquinaria)") a `erp.personas`;
-**limpiar el duplicado** "Ampliación Lomas de los Encinos" en `dilesa.proyectos`
-(dos filas idénticas, ids `cd7c9cae-…` y `26352cac-…`); ADR-038 → índice §5 de
-`ARCHITECTURE.md`.
+**Pendientes menores (post-carga, para retomar):**
+
+- **Reasignar los 8 contratos** con contratista `CONTRATISTA POR ASIGNAR — OBRA`
+  al contratista real (el hint del Excel quedó en `notas` de cada contrato). Ojo
+  con `BANQUETA`-Quintero LDS (¿= MIGUEL ÁNGEL QUINTERO FUENTES?) y confirmar si
+  **MATERIALES SAN RODRIGO** es el contratista de pavimentación o solo proveedor
+  de materiales.
+- **Ligar `obra_presupuesto.contrato_id`** a su contrato por proveedor/concepto
+  (diferido: el match por `proveedor_texto` es fuzzy y los contratistas con
+  varios contratos —Electrogaza ×5, San Rodrigo ×4, Estrella ×4— necesitan
+  desambiguar por concepto; hacerlo al construir la UI de rollup que lo consume).
+- **Duplicado ELECTROGAZA** en `erp.personas` (2 filas; se usó la más antigua) y
+  **duplicado** "Ampliación Lomas de los Encinos" en `dilesa.proyectos`
+  (`cd7c9cae-…` y `26352cac-…`) — limpiar.
+- ADR-038 → índice §5 de `ARCHITECTURE.md`.
