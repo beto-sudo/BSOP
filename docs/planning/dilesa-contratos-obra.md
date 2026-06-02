@@ -8,11 +8,10 @@ proveedores/contratistas; futura emisión a CxP)
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-06-01
-**Última actualización:** 2026-06-01 (Capa B cargada a prod: 32 contratos de obra
-y 275 estimaciones de las hojas de detalle de LDLE+LDS, incluido SIMAS como
-convenio. 29/31 reconcilian al centavo vs el "Total Pagado" del Excel. Próximo:
-Sprint 3 — UI de costeo + rollup + reasignar los 8 contratos con contratista
-placeholder.)
+**Última actualización:** 2026-06-01 (v1 completa: Capa A (#617) + Capa B (#631,
+32 contratos / 275 estimaciones) en prod + ADR-039 puente CxP (#637) + Sprint 3
+tab Costeo (UI de CapEx por proyecto, en PR). Pendiente: aplicar la migración del
+sub-slug a prod (OK de Beto) + reasignar los 8 contratos placeholder.)
 
 ## Problema
 
@@ -258,11 +257,29 @@ prod:**
 
 Trazabilidad: cada estimación guarda `source_ref` = `archivo/hoja/celda` exacta.
 
+### 2026-06-01 — ADR-039 (puente Capa B → CxP) + Sprint 3 (UI de costeo)
+
+- **ADR-039** (`docs/adr/039_puente_obra_cxp.md`): diseño de la frontera Fase 2.
+  La estimación (no el contrato) cruza a CxP como factura de egreso (link nuevo
+  `erp.facturas.obra_estimacion_id`); go-forward (el histórico ya pagado queda
+  como registro); **neto a CxP** (estimación − amortización; anticipo = factura
+  única). Reúsa el flujo `cxp_pago`. Índice §5 de `ARCHITECTURE.md` actualizado
+  (037/038/039). Es diseño — la implementación es Fase 2 (cuando CxP llegue a
+  DILESA).
+- **Sprint 3 — tab "Costeo"** del hub Construcción (`/dilesa/construccion/costeo`,
+  sub-slug `dilesa.construccion.costeo`): vista de CapEx del desarrollo —
+  presupuesto vs gasto real por concepto/etapa (`obra_presupuesto`, Capa A, que
+  no tenía UI) + KPIs de rollup con contratado/saldo de los contratos (Capa B).
+  `components/dilesa/costeo-module.tsx` + page + wiring RBAC (ROUTE_TO_MODULE +
+  EXPECTED_DB_MODULE_SLUGS) + migración `20260602030000` (sub-slug + backfill de
+  permisos, data-only). Saldo de obra = `valor_total − Σ obra_estimaciones`.
+
 ## Handover — estado y próximos pasos (para la siguiente sesión)
 
 **Hecho (en prod):** schema Sprint 1 (#615) + Capa A de costeo (`obra_presupuesto`,
 128 renglones, #617) + **Capa B de contratos + estimaciones** (32 contratos, 275
-estimaciones). Falta solo el Sprint 3 (UI de costeo + rollup).
+estimaciones, #631) + **ADR-039** (puente CxP, #637) + **Sprint 3** (tab Costeo —
+este PR). v1 de la iniciativa completa.
 
 **Decisiones ya cerradas (no re-preguntar):**
 
@@ -274,9 +291,14 @@ estimaciones). Falta solo el Sprint 3 (UI de costeo + rollup).
 - Estimaciones de obra en tabla nueva `obra_estimaciones` (no en `dilesa.estimaciones`).
 - Contratistas sin nombre → placeholder reasignable; SIMAS = contrato.
 
-**Pendiente — Sprint 3 (UI de costeo + rollup):** integrar presupuesto-vs-real
-(Capa A) + contratos/estimaciones (Capa B) al análisis financiero del proyecto
-(CapEx total = viviendas + urbanización + cabecera).
+**Pendiente de aplicar a prod:** la migración `20260602030000` (sub-slug
+`dilesa.construccion.costeo` + backfill de permisos) — se aplica con OK de Beto;
+hasta entonces el tab Costeo es admin-only. Es data-only (no cambia
+SCHEMA_REF/types).
+
+**Posible evolución de Sprint 3** (si Beto lo pide): drilldown por proyecto
+(`/costeo/[proyecto_id]`) con el breakdown de conceptos/etapas + contratos con su
+saldo; hoy v1 es la tabla de conceptos + KPIs de rollup.
 
 **Pendientes menores (post-carga, para retomar):**
 
@@ -292,4 +314,4 @@ estimaciones). Falta solo el Sprint 3 (UI de costeo + rollup).
 - **Duplicado ELECTROGAZA** en `erp.personas` (2 filas; se usó la más antigua) y
   **duplicado** "Ampliación Lomas de los Encinos" en `dilesa.proyectos`
   (`cd7c9cae-…` y `26352cac-…`) — limpiar.
-- ADR-038 → índice §5 de `ARCHITECTURE.md`.
+- ~~ADR-038 → índice §5 de `ARCHITECTURE.md`~~ ✅ hecho (037/038/039, #637).
