@@ -152,6 +152,69 @@ export type Database = {
           },
         ]
       }
+      empresa_socios: {
+        Row: {
+          activo: boolean
+          created_at: string
+          empresa_id: string
+          familia: string | null
+          id: string
+          nombre: string
+          notas: string | null
+          orden: number
+          porcentaje: number
+          socio_empresa_id: string | null
+          socio_persona_id: string | null
+          tipo: string
+          updated_at: string | null
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          empresa_id: string
+          familia?: string | null
+          id?: string
+          nombre: string
+          notas?: string | null
+          orden?: number
+          porcentaje: number
+          socio_empresa_id?: string | null
+          socio_persona_id?: string | null
+          tipo?: string
+          updated_at?: string | null
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          empresa_id?: string
+          familia?: string | null
+          id?: string
+          nombre?: string
+          notas?: string | null
+          orden?: number
+          porcentaje?: number
+          socio_empresa_id?: string | null
+          socio_persona_id?: string | null
+          tipo?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "empresa_socios_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "empresa_socios_socio_empresa_id_fkey"
+            columns: ["socio_empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       empresas: {
         Row: {
           activa: boolean | null
@@ -322,6 +385,415 @@ export type Database = {
           watermark_url?: string | null
         }
         Relationships: []
+      }
+      gobierno_acta_acuerdos: {
+        Row: {
+          acta_id: string
+          empresa_id: string
+          id: string
+          notas: string | null
+          orden: number
+          punto: string
+          resultado: string
+        }
+        Insert: {
+          acta_id: string
+          empresa_id: string
+          id?: string
+          notas?: string | null
+          orden?: number
+          punto: string
+          resultado?: string
+        }
+        Update: {
+          acta_id?: string
+          empresa_id?: string
+          id?: string
+          notas?: string | null
+          orden?: number
+          punto?: string
+          resultado?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gobierno_acta_acuerdos_acta_id_fkey"
+            columns: ["acta_id"]
+            isOneToOne: false
+            referencedRelation: "gobierno_actas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gobierno_acta_acuerdos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gobierno_acta_asistentes: {
+        Row: {
+          acta_id: string
+          empresa_id: string
+          id: string
+          porcentaje: number | null
+          presente: boolean
+          representado_por: string | null
+          socio_id: string | null
+        }
+        Insert: {
+          acta_id: string
+          empresa_id: string
+          id?: string
+          porcentaje?: number | null
+          presente?: boolean
+          representado_por?: string | null
+          socio_id?: string | null
+        }
+        Update: {
+          acta_id?: string
+          empresa_id?: string
+          id?: string
+          porcentaje?: number | null
+          presente?: boolean
+          representado_por?: string | null
+          socio_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gobierno_acta_asistentes_acta_id_fkey"
+            columns: ["acta_id"]
+            isOneToOne: false
+            referencedRelation: "gobierno_actas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gobierno_acta_asistentes_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gobierno_acta_asistentes_socio_id_fkey"
+            columns: ["socio_id"]
+            isOneToOne: false
+            referencedRelation: "empresa_socios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gobierno_acta_votos: {
+        Row: {
+          acuerdo_id: string
+          empresa_id: string
+          id: string
+          representado_por: string | null
+          sentido: string
+          socio_id: string | null
+        }
+        Insert: {
+          acuerdo_id: string
+          empresa_id: string
+          id?: string
+          representado_por?: string | null
+          sentido: string
+          socio_id?: string | null
+        }
+        Update: {
+          acuerdo_id?: string
+          empresa_id?: string
+          id?: string
+          representado_por?: string | null
+          sentido?: string
+          socio_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gobierno_acta_votos_acuerdo_id_fkey"
+            columns: ["acuerdo_id"]
+            isOneToOne: false
+            referencedRelation: "gobierno_acta_acuerdos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gobierno_acta_votos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gobierno_acta_votos_socio_id_fkey"
+            columns: ["socio_id"]
+            isOneToOne: false
+            referencedRelation: "empresa_socios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gobierno_actas: {
+        Row: {
+          asunto: string | null
+          created_at: string
+          created_by: string | null
+          documento_id: string | null
+          empresa_id: string
+          estado: string
+          fecha: string
+          fecha_protocolizacion: string | null
+          folio: string | null
+          id: string
+          lugar: string | null
+          notario: string | null
+          notas: string | null
+          numero_escritura: string | null
+          orden_dia: Json | null
+          protocolizada: boolean
+          quorum_pct: number | null
+          registro_publico: string | null
+          tipo: string
+          updated_at: string | null
+        }
+        Insert: {
+          asunto?: string | null
+          created_at?: string
+          created_by?: string | null
+          documento_id?: string | null
+          empresa_id: string
+          estado?: string
+          fecha: string
+          fecha_protocolizacion?: string | null
+          folio?: string | null
+          id?: string
+          lugar?: string | null
+          notario?: string | null
+          notas?: string | null
+          numero_escritura?: string | null
+          orden_dia?: Json | null
+          protocolizada?: boolean
+          quorum_pct?: number | null
+          registro_publico?: string | null
+          tipo: string
+          updated_at?: string | null
+        }
+        Update: {
+          asunto?: string | null
+          created_at?: string
+          created_by?: string | null
+          documento_id?: string | null
+          empresa_id?: string
+          estado?: string
+          fecha?: string
+          fecha_protocolizacion?: string | null
+          folio?: string | null
+          id?: string
+          lugar?: string | null
+          notario?: string | null
+          notas?: string | null
+          numero_escritura?: string | null
+          orden_dia?: Json | null
+          protocolizada?: boolean
+          quorum_pct?: number | null
+          registro_publico?: string | null
+          tipo?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gobierno_actas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gobierno_actas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gobierno_config: {
+        Row: {
+          consejo_max_miembros: number | null
+          consejo_sesiones_por_anio: number | null
+          dividendo_anual_monto: number | null
+          dividendo_moneda: string
+          empresa_id: string
+          mandato_meses_default: number | null
+          notas: string | null
+          reglamento_documento_id: string | null
+          reglamento_fecha: string | null
+          tanto_aplica: boolean
+          tanto_orden_prelacion: string | null
+          tanto_plazo_dias: number | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          consejo_max_miembros?: number | null
+          consejo_sesiones_por_anio?: number | null
+          dividendo_anual_monto?: number | null
+          dividendo_moneda?: string
+          empresa_id: string
+          mandato_meses_default?: number | null
+          notas?: string | null
+          reglamento_documento_id?: string | null
+          reglamento_fecha?: string | null
+          tanto_aplica?: boolean
+          tanto_orden_prelacion?: string | null
+          tanto_plazo_dias?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          consejo_max_miembros?: number | null
+          consejo_sesiones_por_anio?: number | null
+          dividendo_anual_monto?: number | null
+          dividendo_moneda?: string
+          empresa_id?: string
+          mandato_meses_default?: number | null
+          notas?: string | null
+          reglamento_documento_id?: string | null
+          reglamento_fecha?: string | null
+          tanto_aplica?: boolean
+          tanto_orden_prelacion?: string | null
+          tanto_plazo_dias?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gobierno_config_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: true
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gobierno_config_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gobierno_consejeros: {
+        Row: {
+          activo: boolean
+          cargo: string
+          created_at: string
+          empresa_id: string
+          id: string
+          nombre: string
+          notas: string | null
+          organo: string
+          ostenta_voto: boolean
+          periodo_fin: string | null
+          periodo_inicio: string | null
+          persona_id: string | null
+          socio_id: string | null
+          updated_at: string | null
+          vitalicio: boolean
+        }
+        Insert: {
+          activo?: boolean
+          cargo?: string
+          created_at?: string
+          empresa_id: string
+          id?: string
+          nombre: string
+          notas?: string | null
+          organo?: string
+          ostenta_voto?: boolean
+          periodo_fin?: string | null
+          periodo_inicio?: string | null
+          persona_id?: string | null
+          socio_id?: string | null
+          updated_at?: string | null
+          vitalicio?: boolean
+        }
+        Update: {
+          activo?: boolean
+          cargo?: string
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          nombre?: string
+          notas?: string | null
+          organo?: string
+          ostenta_voto?: boolean
+          periodo_fin?: string | null
+          periodo_inicio?: string | null
+          persona_id?: string | null
+          socio_id?: string | null
+          updated_at?: string | null
+          vitalicio?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gobierno_consejeros_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gobierno_consejeros_socio_id_fkey"
+            columns: ["socio_id"]
+            isOneToOne: false
+            referencedRelation: "empresa_socios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gobierno_mayorias: {
+        Row: {
+          created_at: string
+          empresa_id: string
+          id: string
+          notas: string | null
+          orden: number
+          organo: string
+          quorum_pct: number | null
+          tipo_decision: string
+          umbral_pct: number
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: string
+          id?: string
+          notas?: string | null
+          orden?: number
+          organo: string
+          quorum_pct?: number | null
+          tipo_decision: string
+          umbral_pct: number
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          notas?: string | null
+          orden?: number
+          organo?: string
+          quorum_pct?: number | null
+          tipo_decision?: string
+          umbral_pct?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gobierno_mayorias_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       modulos: {
         Row: {
@@ -9044,10 +9516,6 @@ export type Database = {
           p_referencia?: string
         }
         Returns: string
-      }
-      es_comite_ejecutivo: {
-        Args: { p_empresa_id: string; p_usuario_id: string }
-        Returns: boolean
       }
       fn_aplicar_levantamiento: {
         Args: { p_levantamiento_id: string }
