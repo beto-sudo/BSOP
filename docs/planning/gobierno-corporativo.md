@@ -36,6 +36,7 @@ En el contexto de una **reestructura patrimonial**, no tener el gobierno corpora
 - **2026-06-01 — D1 (cuadro accionario): tabla real `core.empresa_socios`.** Beto eligió construir el cap-table de verdad (vs. mini-tabla self-contained en gobierno). Llena el tab placeholder "Cuadro accionario" y es la referencia de consejeros + votación de actas. Amplía alcance v1 pero evita duplicar/migrar después.
 - **2026-06-01 — D2 (votación de actas): voto por socio por acuerdo.** Beto eligió `gobierno_acta_votos` granular (vs. resumen por acuerdo) — alineado a la regla dura de audit trails. Permite recalcular quórum y mayorías contra el cuadro accionario.
 - **2026-06-01 — El reglamento se liga por FK directo en `gobierno_config`, no por rol en `core.empresa_documentos`.** Mantiene el gobierno self-contained; el panel de documentos legales se queda enfocado en docs de RH/LFT. El histórico de reformas del reglamento queda como filas previas en `erp.documentos`.
+- **2026-06-02 — Escrituras de gobierno por browser client, no API routes.** El plan original preveía `/api/empresas/[id]/gobierno` con `requireAdmin`. Para socios/mayorías/consejeros/config (data de configuración, sin cross-schema complejo) las escrituras van directo por el browser client: la página es `<RequireAccess adminOnly>` **y** la RLS de las tablas exige admin para UPDATE/DELETE. Ahorra ~10 endpoints. Las referencias cross-schema (reglamento/acta → `erp.documentos`) se resuelven con lectura directa + hidratación, no necesitan route handler. Si más adelante se quiere audit server-side, se agrega sin reescribir la UI.
 - **Pendiente al ejecutar (no bloquea schema):** sembrar los datos reales de DILESA (% por familia, las mayorías y derecho del tanto del Reglamento ago-2021, composición del consejo y mandatos) requiere leer el **Reglamento de Gobierno** — Beto lo aporta en Sprint 4.
 
 ## Modelo de datos (migración propuesta — Sprint 1)
@@ -203,10 +204,9 @@ NOTIFY pgrst, 'reload schema';
 ## Alcance v1
 
 - [x] **Sprint 1 — Schema (DB-puro)** ✅ aplicado a prod 2026-06-02: las 8 tablas + RLS canónica + índices + `NOTIFY pgrst` + `SCHEMA_REF`/`types` regenerados. Verificado: 8 tablas, RLS on, 4 policies c/u.
-- [ ] **Sprint 2 — Tab "Cuadro accionario" + "Gobierno corporativo"**:
-  - Llenar el placeholder `cuadro-accionario` con CRUD de `empresa_socios` (familia, %, liga opcional a empresa BSOP, orden). Warning si Σ% ≠ 100.
-  - Tab nuevo `gobierno-corporativo`: reglamento (link/asignación a `erp.documentos`) + `gobierno_config` (derecho del tanto, mandato default) + tabla de `gobierno_mayorias` (CRUD) + lista de `gobierno_consejeros` (CRUD, liga a socio, ostenta_voto, periodo).
-  - Route handlers `/api/empresas/[id]/gobierno` (+ sub-recursos) con `requireAdmin`, espejando el patrón de `/documentos`. Tests.
+- **Sprint 2 — Tab "Cuadro accionario" + "Gobierno corporativo"**:
+  - [x] **2a · Cuadro accionario** — lleno el placeholder con CRUD de `empresa_socios` (nombre, familia, tipo, %, liga opcional a empresa BSOP, orden, activo) + badge de Σ% con warning (`incompleto`/`excedido`). Helpers puros en `lib/gobierno/cap-table.ts` + 10 tests. Escrituras directas por browser client.
+  - [ ] **2b · Gobierno corporativo** — tab nuevo: `gobierno_config` (reglamento link a `erp.documentos`, derecho del tanto, dividendo, cadencia/tamaño consejo) + `gobierno_mayorias` (CRUD) + `gobierno_consejeros` (CRUD, liga a socio, ostenta_voto, vitalicio, periodo).
 - [ ] **Sprint 3 — Tab "Actas de asamblea"**:
   - Tab nuevo `actas-asamblea`: lista por empresa (folio, tipo, fecha, estado, quórum) + drawer de detalle (header + orden del día + acuerdos con votación por socio + asistentes/representación + protocolización notarial + link al PDF en `erp.documentos`).
   - Alta/edición de acta + acuerdos + votos + asistentes. Cálculo de quórum y % representado derivado de asistentes (con override manual).
@@ -267,5 +267,6 @@ NOTIFY pgrst, 'reload schema';
 
 ## Bitácora
 
+- **2026-06-02 (Sprint 2a)** — Tab **Cuadro accionario** construido (llena el placeholder): `CuadroAccionarioPanel` con tabla + drawer de alta/edición + delete, badge de Σ% con estado (ok/incompleto/excedido). Helpers puros `lib/gobierno/cap-table.ts` + 10 tests. Escrituras directas por browser client (decisión registrada). Checks verdes (typecheck, 1165 tests, lint, format). Próximo: Sprint 2b (tab Gobierno corporativo).
 - **2026-06-02 (Sprint 1)** — Leí el Reglamento de Gobierno completo (21 pp) + el índice de 35 actas (`1 RESUMEN ACTAS.xlsx`). Refiné el modelo con 4 ajustes derivados del documento (familia controladora; política de dividendos + cadencia/tamaño del consejo; consejero vitalicio + órgano). Migración `20260602004906` aplicada a prod vía `supabase db push` — drift de historial con la sesión hermana `cxp-sprint-3` (`001532`, módulo `rdb.cxp`, data-only) resuelto alineando el archivo local sin tocar su trabajo ni commitearlo. 8 tablas verificadas (RLS on, 4 policies c/u). `SCHEMA_REF`/`types` regenerados. Datos del Reglamento documentados arriba para el seed. Próximo: Sprint 2.
 - **2026-06-01** — Iniciativa promovida por Beto. Exploración del patrón existente: `core.empresas` + host de tabs `app/settings/empresas/[slug]/page.tsx` (tabs Cuadro accionario y Beneficiario controlador son placeholders sin schema); patrón de oro de PDFs = `core.empresa_documentos` → `erp.documentos`; RBAC admin-only. Confirmado: no existe ninguna tabla de socios/gobierno/asamblea en el schema. Cerradas D1 (cuadro accionario real), D2 (voto por socio) y promoción golden DILESA. Modelo completo (8 tablas) + migración propuesta documentados arriba. Pendiente: OK del modelo para aplicar Sprint 1.
