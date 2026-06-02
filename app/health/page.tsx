@@ -3,6 +3,8 @@ import { HealthRangeSelector } from '@/components/health/health-range-selector';
 import { ContentShell } from '@/components/ui/content-shell';
 import { HealthDashboardView } from '@/components/health/health-dashboard-view';
 import { getHealthDashboardData, type HealthRangePreset } from '@/lib/health';
+import { getProtocoloData } from '@/lib/protocolo';
+import { ProtocoloSection } from '@/components/health/protocolo-section';
 
 function resolveRangeParams(searchParams?: Record<string, string | string[] | undefined>) {
   const rawRange = typeof searchParams?.range === 'string' ? searchParams.range : undefined;
@@ -32,12 +34,16 @@ export default async function HealthPage({
 }) {
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const requestedRange = resolveRangeParams(resolvedSearchParams);
-  const data = await getHealthDashboardData(requestedRange);
+  const [data, protocolo] = await Promise.all([
+    getHealthDashboardData(requestedRange),
+    getProtocoloData(),
+  ]);
 
   return (
     <RequireAccess empresa="sanren">
       <ContentShell>
-        <div className="mb-6">
+        <ProtocoloSection compuestos={protocolo.compuestos} errors={protocolo.errors} />
+        <div className="mb-6 mt-10">
           <HealthRangeSelector
             initialPreset={data.range.preset}
             initialFrom={data.range.requestedFrom}
