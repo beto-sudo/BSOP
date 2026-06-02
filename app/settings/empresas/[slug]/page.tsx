@@ -13,6 +13,7 @@ import { EmpresaDetail, type Empresa } from '../_components/empresa-detail';
 import { EmpresaBranding } from '../_components/empresa-branding';
 import { CuadroAccionarioPanel } from '../_components/cuadro-accionario-panel';
 import { GobiernoCorporativoPanel } from '../_components/gobierno-corporativo-panel';
+import { ActasAsambleaPanel } from '../_components/actas-asamblea-panel';
 
 type EmpresaWithBranding = Empresa & {
   color_primario: string | null;
@@ -52,6 +53,7 @@ type Tab =
   | 'branding'
   | 'cuadro-accionario'
   | 'gobierno-corporativo'
+  | 'actas-asamblea'
   | 'beneficiario-controlador';
 
 const TABS: ReadonlyArray<{ key: Tab; label: string }> = [
@@ -59,6 +61,7 @@ const TABS: ReadonlyArray<{ key: Tab; label: string }> = [
   { key: 'branding', label: 'Branding' },
   { key: 'cuadro-accionario', label: 'Cuadro accionario' },
   { key: 'gobierno-corporativo', label: 'Gobierno corporativo' },
+  { key: 'actas-asamblea', label: 'Actas de asamblea' },
   { key: 'beneficiario-controlador', label: 'Beneficiario controlador' },
 ];
 
@@ -199,6 +202,7 @@ function EmpresaPageInner() {
       {tab === 'branding' && <EmpresaBranding branding={empresa} slug={empresa.slug} />}
       {tab === 'cuadro-accionario' && <CuadroAccionarioPanel empresaId={empresa.id} />}
       {tab === 'gobierno-corporativo' && <GobiernoCorporativoPanel empresaId={empresa.id} />}
+      {tab === 'actas-asamblea' && <ActasAsambleaPanel empresaId={empresa.id} />}
       {tab === 'beneficiario-controlador' && (
         <PlaceholderTab
           title="Beneficiario controlador"
