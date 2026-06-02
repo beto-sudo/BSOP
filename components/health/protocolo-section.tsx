@@ -1,8 +1,13 @@
 'use client';
 
-import { Syringe, Pill, Beaker, type LucideIcon } from 'lucide-react';
+import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
+import { Syringe, Pill, Beaker, Plus, type LucideIcon } from 'lucide-react';
 import { Surface } from '@/components/ui/surface';
+import { Button } from '@/components/ui/button';
 import { TONES, type ToneKey } from './tones';
+import { ProtocoloDrawer } from './protocolo-drawer';
+import { registrarToma } from '@/app/health/actions';
 import type { ProtocoloClase, ProtocoloCompuestoConTomas, ProtocoloEstado } from '@/lib/protocolo';
 
 const CLASE_META: Record<ProtocoloClase, { label: string; icon: LucideIcon; tomaLabel: string }> = {
@@ -41,13 +46,20 @@ function formatDosis(compuesto: ProtocoloCompuestoConTomas) {
 function CompuestoCard({
   compuesto,
   tone,
+  onQuick,
+  onDetalle,
+  quickPending,
 }: {
   compuesto: ProtocoloCompuestoConTomas;
   tone: (typeof TONES)[ToneKey];
+  onQuick: (c: ProtocoloCompuestoConTomas) => void;
+  onDetalle: (c: ProtocoloCompuestoConTomas) => void;
+  quickPending: boolean;
 }) {
   const meta = CLASE_META[compuesto.clase];
   const Icon = meta.icon;
   const estadoBadge = ESTADO_BADGE[compuesto.estado];
+  const activo = compuesto.estado === 'activo';
   // Últimas 14 tomas en orden cronológico (izq → der) para el mini-timeline.
   const recientes = compuesto.tomas.slice(0, 14).reverse();
 
@@ -135,15 +147,36 @@ function CompuestoCard({
           {compuesto.notas}
         </p>
       ) : null}
+
+      {activo ? (
+        <div className="mt-4 flex items-center gap-2 border-t border-[var(--border)] pt-3">
+          <Button
+            size="sm"
+            onClick={() => onQuick(compuesto)}
+            disabled={quickPending || compuesto.dosis_objetivo == null}
+            title={
+              compuesto.dosis_objetivo == null
+                ? 'Define una dosis objetivo para el registro rápido'
+                : `Registrar ${formatDosis(compuesto)} hoy`
+            }
+          >
+            <Plus className="h-4 w-4" />
+            {quickPending ? 'Guardando…' : 'Hoy'}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => onDetalle(compuesto)}>
+            Registrar…
+          </Button>
+        </div>
+      ) : null}
     </Surface>
   );
 }
 
 /**
  * Bitácora de protocolo — tarjetas de compuestos activos (péptidos, suplementos)
- * con dosis vigente, última toma y un mini-timeline de inyecciones. Lectura
- * (Sprint 2); la captura por drawer y el overlay con biomarcadores llegan
- * después. Iniciativa salud-protocolo.
+ * con dosis vigente, última toma y mini-timeline. Captura por drawer + registro
+ * rápido "Hoy" (Sprint 3). El overlay con biomarcadores llega en Sprint 4.
+ * Iniciativa salud-protocolo.
  */
 export function ProtocoloSection({
   compuestos,
@@ -152,27 +185,70 @@ export function ProtocoloSection({
   compuestos: ProtocoloCompuestoConTomas[];
   errors: string[];
 }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [quickId, setQuickId] = useState<string | null>(null);
+  const [quickError, setQuickError] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerCompuestoId, setDrawerCompuestoId] = useState<string | null>(null);
+
   if (!compuestos.length && !errors.length) return null;
+
+  const activos = compuestos.filter((c) => c.estado === 'activo');
+
+  function quickRegister(c: ProtocoloCompuestoConTomas) {
+    if (c.dosis_objetivo == null) return;
+    setQuickError(null);
+    setQuickId(c.id);
+    startTransition(async () => {
+      const res = await registrarToma({
+        compuestoId: c.id,
+        dosis: c.dosis_objetivo as number,
+        unidad: c.unidad_dosis,
+      });
+      setQuickId(null);
+      if (res.ok) router.refresh();
+      else setQuickError(`${c.nombre}: ${res.error}`);
+    });
+  }
+
+  function openDrawer(compuestoId: string | null) {
+    setQuickError(null);
+    setDrawerCompuestoId(compuestoId);
+    setDrawerOpen(true);
+  }
 
   return (
     <section className="mt-10">
-      <div className="mb-4">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-emerald-600 dark:text-emerald-300">
-          <Syringe className="h-4 w-4" />
-          Protocolo
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-emerald-600 dark:text-emerald-300">
+            <Syringe className="h-4 w-4" />
+            Protocolo
+          </div>
+          <h2 className="mt-2 text-xl font-semibold text-[var(--text)] dark:text-white">
+            Péptidos y suplementos
+          </h2>
+          <p className="mt-2 text-sm text-[var(--muted-foreground)] dark:text-white/55">
+            Lo que te estás administrando, su dosis vigente y la bitácora de cada aplicación. El
+            cruce con peso, pulso en reposo y presión llega en una próxima fase.
+          </p>
         </div>
-        <h2 className="mt-2 text-xl font-semibold text-[var(--text)] dark:text-white">
-          Péptidos y suplementos
-        </h2>
-        <p className="mt-2 text-sm text-[var(--muted-foreground)] dark:text-white/55">
-          Lo que te estás administrando, su dosis vigente y la bitácora de cada aplicación. El cruce
-          con peso, pulso en reposo y presión llega en una próxima fase.
-        </p>
+        <Button size="sm" className="shrink-0" onClick={() => openDrawer(activos[0]?.id ?? null)}>
+          <Plus className="h-4 w-4" />
+          Registrar
+        </Button>
       </div>
 
       {errors.length ? (
         <Surface className="mb-6 border-amber-300/30 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-300/20 dark:bg-amber-300/8 dark:text-amber-100">
           {errors[0]}
+        </Surface>
+      ) : null}
+
+      {quickError ? (
+        <Surface className="mb-6 border-rose-300/30 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-300/20 dark:bg-rose-300/8 dark:text-rose-100">
+          {quickError}
         </Surface>
       ) : null}
 
@@ -182,9 +258,19 @@ export function ProtocoloSection({
             key={compuesto.id}
             compuesto={compuesto}
             tone={TONES[PALETTE[index % PALETTE.length]]}
+            onQuick={quickRegister}
+            onDetalle={(c) => openDrawer(c.id)}
+            quickPending={pending && quickId === compuesto.id}
           />
         ))}
       </div>
+
+      <ProtocoloDrawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        compuestos={compuestos}
+        compuestoInicialId={drawerCompuestoId}
+      />
     </section>
   );
 }
