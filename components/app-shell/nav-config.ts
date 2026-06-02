@@ -57,6 +57,9 @@ export const NAV_ITEMS: NavItem[] = [
           // CxC (Cuentas por Cobrar) — hub con 2 tabs (Pagos / Saldos).
           // El slug/URL internos siguen siendo `cobranza`.
           { label: 'CxC', href: '/dilesa/cobranza' },
+          // CxP (Cuentas por Pagar) — hub con 3 tabs (Facturas / Saldos /
+          // Proveedores). El padre `dilesa.cxp` es umbrella del sidebar.
+          { label: 'CxP', href: '/dilesa/cxp' },
         ],
       },
       {
@@ -104,6 +107,7 @@ export const NAV_ITEMS: NavItem[] = [
           { label: 'Tareas', href: '/rdb/admin/tasks' },
           { label: 'Juntas', href: '/rdb/admin/juntas' },
           { label: 'Documentos', href: '/rdb/admin/documentos' },
+          { label: 'CxP', href: '/rdb/cxp' },
         ],
       },
       {

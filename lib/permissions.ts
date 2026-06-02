@@ -53,6 +53,13 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   // del primer tab (`.pagos`). ADR-030 SS2.
   '/dilesa/cobranza': 'dilesa.cobranza.pagos',
   '/dilesa/cobranza/aging': 'dilesa.cobranza.aging',
+  // CxP (Cuentas por Pagar) es un hub con 3 tabs (ADR-030). El padre
+  // `dilesa.cxp` queda como umbrella en sidebar; cada tab tiene su sub-slug.
+  // La URL default `/dilesa/cxp` mapea al sub-slug del primer tab
+  // (`.facturas`). Espejo de `rdb.cxp`. Ver docs/planning/cxp.md.
+  '/dilesa/cxp': 'dilesa.cxp.facturas',
+  '/dilesa/cxp/aging': 'dilesa.cxp.aging',
+  '/dilesa/cxp/proveedores': 'dilesa.cxp.proveedores',
   // Construcción es un hub con 4 tabs (sprint tabs+protos). El padre
   // `dilesa.construccion` queda como umbrella; cada tab tiene su sub-slug
   // (ADR-030 SS2). La URL default mapea al sub-slug del primer tab.
@@ -101,6 +108,13 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   '/rdb/admin/tasks': 'rdb.admin.tasks',
   '/rdb/admin/juntas': 'rdb.admin.juntas',
   '/rdb/admin/documentos': 'rdb.admin.documentos',
+  // CxP (Cuentas por Pagar) es un hub con 3 tabs (ADR-030). El padre
+  // `rdb.cxp` queda como umbrella en sidebar; cada tab tiene su sub-slug
+  // que gobierna acceso real al contenido. La URL default `/rdb/cxp` mapea
+  // al sub-slug del primer tab (`.facturas`). Ver docs/planning/cxp.md.
+  '/rdb/cxp': 'rdb.cxp.facturas',
+  '/rdb/cxp/aging': 'rdb.cxp.aging',
+  '/rdb/cxp/proveedores': 'rdb.cxp.proveedores',
   '/rdb/rh/personal': 'rdb.rh.empleados',
   '/rdb/rh/puestos': 'rdb.rh.puestos',
   '/rdb/rh/departamentos': 'rdb.rh.departamentos',
