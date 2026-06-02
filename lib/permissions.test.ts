@@ -281,6 +281,14 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   'rdb.admin.tasks',
   'rdb.admin.juntas',
   'rdb.admin.documentos',
+  // CxP (Cuentas por Pagar) — hub con 3 tabs (ADR-030). Migración
+  // 20260602001532_modulos_rdb_cxp.sql. El padre `rdb.cxp` queda como
+  // umbrella en sidebar; cada tab (Facturas / Saldos / Proveedores) tiene
+  // su sub-slug que gobierna acceso real al contenido.
+  'rdb.cxp',
+  'rdb.cxp.facturas',
+  'rdb.cxp.aging',
+  'rdb.cxp.proveedores',
   'rdb.rh.empleados',
   'rdb.rh.puestos',
   'rdb.rh.departamentos',

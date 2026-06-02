@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-04-28
-**Última actualización:** 2026-06-01 (**Sprint 1 aplicado a prod** + corrección del gate: extiende `erp.facturas` + crea `cxp_pagos`/`cxp_pago_aplicaciones` + 6 RPCs + trigger de saldo. Gate de aprobación = **rol "Dirección"** vía `core.fn_user_has_role` (corregido del puesto "Comité Ejecutivo" por Beto; mig `214500` elimina `es_comite_ejecutivo`). Sin override de admin. **Sprint 2** (ingesta XML CFDI: parser determinista + endpoint upload-xml) en este PR. Modo autónomo. Próximo: Sprint 3 UI. Ver Bitácora.)
+**Última actualización:** 2026-06-02 (**Sprint 3** en PR: módulo UI `/rdb/cxp` (facturas + drawer + aging + proveedores) + migración de módulos `rdb.cxp` × 3 sub-slugs + 4 lugares RBAC. UI visible — sin auto-merge, preview para revisión de Beto. Sprints 1+2 ya en prod. Modo autónomo. Próximo: Sprint 4 (programación + aprobación de pagos). Ver Bitácora.)
 
 ## Problema
 
@@ -78,7 +78,7 @@ Resultado operativo: doble captura entre la realidad bancaria y la contable, rie
   - PDF parser opcional con LLM (reutiliza `lib/documentos/extraction-core.ts`) para casos donde solo hay PDF: extrae RFC, monto, fecha, conceptos. El usuario revisa antes de guardar.
   - Bulk upload (drag de varios XML).
 
-- [ ] **Sprint 3 — UI factura + aging (RDB golden)**:
+- [x] **Sprint 3 — UI factura + aging (RDB golden)**:
   - `/rdb/cxp/` con sub-rutas (sigue patrón `module-page-submodules` ADR-005):
     - `facturas` — lista con filtros (proveedor, fecha, vencimiento, estado, OC). Usa `<DataTable>` ADR-010. Filtros con `useUrlFilters` ADR-007.
     - `aging` — antigüedad de saldos por proveedor con buckets.
@@ -144,7 +144,7 @@ Resultado operativo: doble captura entre la realidad bancaria y la contable, rie
 | 0   | Promoción: este doc + fila en INITIATIVES.md                                                                                                                                                                         | _este PR_ | —         |
 | 1   | DB: extender `erp.facturas` + crear `cxp_pagos` + `cxp_pago_aplicaciones` + RPCs (alta, cancelar, programar, aprobar, marcar_pagado, cancelar_pago) + helper `es_comite_ejecutivo` + backfill + regenerar SCHEMA_REF | aplicado  | _este PR_ |
 | 2   | Parser CFDI determinista (`lib/cxp`) + endpoint `upload-xml` (bulk + dedup `uuid_sat` + validación receptor + sugerencia de proveedor). Match-OC automático y PDF-LLM diferidos a Sprint 3/follow-up                 | en PR     | _este PR_ |
-| 3   | UI RDB facturas (lista + drawer) + aging + vista por proveedor                                                                                                                                                       | pending   | —         |
+| 3   | UI RDB facturas (lista + drawer) + aging + vista por proveedor                                                                                                                                                       | en PR     | _este PR_ |
 | 4   | UI RDB programación + aprobación por Comité + email de notificación                                                                                                                                                  | pending   | —         |
 | 5   | Pago efectivo + conciliación contra cortes (engancha con `cortes-conciliacion`)                                                                                                                                      | pending   | —         |
 | 6   | Migración de `erp.gastos` a CxP + rollout multi-empresa (DILESA, COAGAN, ANSA)                                                                                                                                       | pending   | —         |
@@ -191,6 +191,48 @@ patrón canónico de **ADR-037** (subledger gemelo):
   reusan CxC y CxP (convención `shared-modules-refactor`, ADR-011).
 
 ## Bitácora
+
+### 2026-06-02 — Sprint 3 (UI RDB: facturas + drawer + aging + proveedores)
+
+Módulo UI `/rdb/cxp` (golden = RDB). Gemelo del módulo CxC `/dilesa/cobranza`.
+Patrón routed-tabs (ADR-005) + sub-slugs (ADR-030). Modo autónomo, **sin
+auto-merge** (UI visible → preview para revisión de Beto).
+
+- **Migración `20260602001532_modulos_rdb_cxp.sql`** (aplicada a prod con
+  `supabase db push`): inserta el padre `rdb.cxp` (umbrella, sección
+  `administracion`) + 3 sub-slugs `rdb.cxp.facturas` / `.aging` / `.proveedores`
+  con `ON CONFLICT DO NOTHING`. **Backfill defensivo**: clona los permisos que
+  cada rol RDB tiene sobre `rdb.ordenes_compra` (módulo de Compras comparable —
+  antecesor natural del flujo OC→factura→pago) hacia los 4 slugs nuevos →
+  verificado: 6 roles con fila `permisos_rol`, 5 con lectura. `NOTIFY pgrst`.
+- **4 lugares RBAC** (regla "Liberación de módulo nuevo" + ADR-030):
+  (1) `NAV_ITEMS` — entry del padre `/rdb/cxp` en sección Administración de RDB;
+  (2) `ROUTE_TO_MODULE` — 1 entry por URL (`/rdb/cxp`→`.facturas`,
+  `/aging`→`.aging`, `/proveedores`→`.proveedores`); (3) `EXPECTED_DB_MODULE_SLUGS`
+  — padre + 3 sub-slugs; (4) la migración anterior.
+- **UI** (`app/rdb/cxp/`): `layout.tsx` (tabs Facturas/Saldos/Proveedores con
+  `module:` por tab), `page.tsx` (lista `<DataTable>` ADR-010: proveedor, folio
+  fiscal, emisión, vence, total, saldo, badge de estado derivado por vencimiento
+  —vence Nd / vencida Nd / pagada / parcial—, OC; filtros `useUrlFilters` de
+  búsqueda + estado; header "Cargar XML" → dialog multi-archivo que pega al
+  endpoint Sprint 2 `/api/rdb/cxp/facturas/upload-xml` y muestra resultado por
+  archivo; **drawer `<DetailDrawer>`** con cabecera fiscal, montos
+  subtotal/IVA/retenciones/total/pagado/saldo, OC enlazada, pagos aplicados de
+  `cxp_pago_aplicaciones` —embed tipado a `cxp_pagos`— y link al XML/PDF vía el
+  proxy `/api/adjuntos/<path>`), `aging/page.tsx` (buckets vigente/1-30/31-60/
+  61-90/>90 por proveedor, fecha base `fecha_pago_programada`||`fecha_vencimiento`,
+  filtro `saldo>0` + `estado_cxp != cancelada`), `proveedores/page.tsx`
+  (saldo total + # facturas abiertas + último pago desde `cxp_pagos`).
+- Sin `as any` (regla del repo): clientes supabase tipados + `as unknown as`
+  solo para el shape del embed. Nombre de proveedor prefiere `emisor_nombre`
+  (denormalizado del CFDI); fallback a `erp.personas` por id (sin `razon_social`
+  — esa columna no existe en `erp.personas`). `erp.facturas` arranca vacía →
+  empty states en las 3 vistas hasta que se cargue el primer XML.
+- typecheck + 1155 tests + lint (0 errores) + format + schema:check verdes.
+  El regen de `types/supabase.ts` arrastró la baja de `es_comite_ejecutivo`
+  (la migración `214500` se registró en historial al hacer `db push`).
+
+**Próximo:** Sprint 4 — programación + aprobación de pagos por rol Dirección.
 
 ### 2026-06-01 — Sprint 2 (ingesta XML CFDI: parser + endpoint)
 
