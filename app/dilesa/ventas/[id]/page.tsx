@@ -1597,6 +1597,12 @@ function RegresarFaseDialog({
       onDone(baseMsg + emailMsg);
       onOpenChange(false);
       setMotivo('');
+    } catch (e) {
+      // Server action arrojó excepción sin manejarse — la mostramos al
+      // operador en vez de dejarla pasar silenciosa (era el bug del PR #664).
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('[RegresarFaseDialog] uncaught', e);
+      onError(`No se pudo regresar la venta: ${msg}`);
     } finally {
       setSubmitting(false);
     }
@@ -1697,6 +1703,12 @@ function DesasignarDialog({
       onDone('Venta desasignada.' + emailMsg);
       onOpenChange(false);
       setMotivo('');
+    } catch (e) {
+      // Server action arrojó excepción sin manejarse — la mostramos al
+      // operador en vez de dejarla pasar silenciosa (era el bug del PR #664).
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('[DesasignarDialog] uncaught', e);
+      onError(`No se pudo desasignar la venta: ${msg}`);
     } finally {
       setSubmitting(false);
     }

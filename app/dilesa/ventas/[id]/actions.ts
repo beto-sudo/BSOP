@@ -172,6 +172,20 @@ export async function regresarAFase(
   faseDestino: number,
   motivo: string
 ): Promise<ActionResult> {
+  try {
+    return await regresarAFaseInner(ventaId, faseDestino, motivo);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn('[regresarAFase] uncaught error', { ventaId, error: msg });
+    return { ok: false, error: `Error inesperado: ${msg}` };
+  }
+}
+
+async function regresarAFaseInner(
+  ventaId: string,
+  faseDestino: number,
+  motivo: string
+): Promise<ActionResult> {
   const gate = await requireAutorizar();
   if (!gate.ok) return gate;
 
@@ -275,6 +289,16 @@ export async function regresarAFase(
  * decisión gerencial, no una expiración natural.
  */
 export async function desasignarVenta(ventaId: string, motivo: string): Promise<ActionResult> {
+  try {
+    return await desasignarVentaInner(ventaId, motivo);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn('[desasignarVenta] uncaught error', { ventaId, error: msg });
+    return { ok: false, error: `Error inesperado: ${msg}` };
+  }
+}
+
+async function desasignarVentaInner(ventaId: string, motivo: string): Promise<ActionResult> {
   const gate = await requireAutorizar();
   if (!gate.ok) return gate;
 
