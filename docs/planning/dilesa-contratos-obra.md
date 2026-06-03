@@ -321,6 +321,39 @@ Ciclo de obra **end-to-end**: crear contrato → estimar → emitir a CxP → co
 Faltan los módulos upstream: **cotizaciones** y **captura de presupuesto**
 (`obra_presupuesto` aún solo-lectura).
 
+**Próximo trabajo — handoff para sesión nueva (orden: presupuesto → cotizaciones).**
+
+_1. Captura de presupuesto (Sprint 5 — contenido, sin schema nuevo)._ La tabla
+`dilesa.obra_presupuesto` ya existe (128 renglones) pero solo se lee (tab Costeo).
+Falta el CRUD: en el tab **Costeo** (`components/dilesa/costeo-module.tsx`),
+"Nuevo concepto" + edición/borrado inline por renglón. Campos: `concepto`,
+`etapa`, `presupuesto_previo`, `presupuesto_actualizado`, `gasto_real_total`,
+`proveedor_texto`, `fecha_compromiso`, `orden`. Insert/update directo a
+`dilesa.obra_presupuesto` (RLS dilesa). El sub-slug `dilesa.construccion.costeo`
+ya tiene write → **sin migración**. Calca la captura inline de
+`obra-contrato-detalle.tsx`.
+
+_2. Cotizaciones (iniciativa nueva — promover con Beto antes de construir)._ Hoy
+no hay dónde capturar/comparar cotizaciones antes de adjudicar un contrato (el
+`IB TRAYMAQ` del Excel —2 postores lado a lado— se saltó en el traspaso). Sketch:
+tabla nueva `dilesa.obra_cotizaciones` (`proyecto_id`, frente/concepto, proveedor
+[texto o `erp.personas`], `monto`, vigencia, `archivo_url`, `estado`
+recibida/adjudicada/descartada, notas) + opcional `cotizacion_partidas` para
+volumen×PU. Flujo: capturar N por frente → comparar (side-by-side) → **adjudicar →
+genera contrato de obra** (pre-llena el form `/contratos/nuevo-obra`). UI: tab
+nuevo "Cotizaciones" en `/dilesa/construccion` (sub-slug nuevo + migración de
+módulo — regla de 4 lugares en `BSOP/CLAUDE.md`). Es **dominio nuevo, no un sprint
+de esta iniciativa**: estresar (problema/métrica/riesgos) + crear su planning doc
+
+- fila en `INITIATIVES.md` + ADR si el modelo lo amerita, antes de construir.
+
+**Patrones a calcar:** `costeo-module.tsx` (tabla + KPIs + fetch cross-schema),
+`obra-contrato-detalle.tsx` (captura inline + emitir-a-CxP),
+`app/dilesa/construccion/contratos/nuevo-obra/page.tsx` (form de alta). **Gotcha
+vivo:** serializar migración↔merge — aplicar DDL a prod antes de mergear rompe
+`schema:check` en todos los PRs (ver [[reference_bsop_merge_flow_multisesion]]).
+**PR en vuelo:** #654 (UI del puente CxP) — Beto lo revisa en preview y mergea.
+
 **Decisiones ya cerradas (no re-preguntar):**
 
 - Proyecto del Excel **LDLE = "Lomas de los Encinos"** (`42c64197-2358-4607-a21c-97556ceb3110`),
@@ -331,10 +364,8 @@ Faltan los módulos upstream: **cotizaciones** y **captura de presupuesto**
 - Estimaciones de obra en tabla nueva `obra_estimaciones` (no en `dilesa.estimaciones`).
 - Contratistas sin nombre → placeholder reasignable; SIMAS = contrato.
 
-**Pendiente de aplicar a prod:** la migración `20260602030000` (sub-slug
-`dilesa.construccion.costeo` + backfill de permisos) — se aplica con OK de Beto;
-hasta entonces el tab Costeo es admin-only. Es data-only (no cambia
-SCHEMA_REF/types).
+**Migraciones aplicadas a prod:** sub-slug Costeo `20260602030000` (Sprint 3) y
+puente CxP `20260602200000` (`obra_estimacion_id` + RPC) — ambas verificadas.
 
 **Posible evolución de Sprint 3** (si Beto lo pide): drilldown por proyecto
 (`/costeo/[proyecto_id]`) con el breakdown de conceptos/etapas + contratos con su
