@@ -145,9 +145,14 @@ function NuevaSolicitudForm() {
   // La fecha + hora de la solicitud la setea el servidor al guardar (now()).
   // Importante para orden FIFO en Fase 2 cuando hay inventario limitado.
 
-  // Cliente: modo (existente o nuevo)
-  const [clienteModo, setClienteModo] = useState<'existente' | 'nuevo'>('nuevo');
-  const [personaIdSeleccionada, setPersonaIdSeleccionada] = useState<string>('');
+  // Cliente: modo (existente o nuevo). Si llega `?persona=<id>` en la URL
+  // (caso típico: reasignar tras desasignación), arrancamos con cliente
+  // existente y ese persona_id pre-seleccionado.
+  const personaIdFromUrl = searchParams.get('persona') ?? '';
+  const [clienteModo, setClienteModo] = useState<'existente' | 'nuevo'>(
+    personaIdFromUrl ? 'existente' : 'nuevo'
+  );
+  const [personaIdSeleccionada, setPersonaIdSeleccionada] = useState<string>(personaIdFromUrl);
   const [busquedaPersona, setBusquedaPersona] = useState('');
 
   // Cliente nuevo — KYC completo (Sprint 7c-2: todo en Fase 1, no se difiere).

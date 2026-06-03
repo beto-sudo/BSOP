@@ -334,9 +334,17 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
       key: 'fase_actual',
       label: 'Fase',
       type: 'custom',
-      accessor: (v) => v.fase_posicion ?? 0,
+      accessor: (v) => (v.estado === 'desasignada' ? -1 : (v.fase_posicion ?? 0)),
       render: (v) =>
-        v.fase_actual ? <Badge tone="neutral">{v.fase_actual}</Badge> : <span>—</span>,
+        // Si la venta está desasignada, no mostramos la fase — evita el
+        // efecto contradictorio "Asignada + Desasignada" que Beto reportó.
+        v.estado === 'desasignada' ? (
+          <span className="text-[var(--text)]/30">—</span>
+        ) : v.fase_actual ? (
+          <Badge tone="neutral">{v.fase_actual}</Badge>
+        ) : (
+          <span>—</span>
+        ),
     },
     { key: 'precio', label: 'Precio', type: 'currency' },
     {
