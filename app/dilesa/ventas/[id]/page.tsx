@@ -23,7 +23,7 @@
  */
 
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
@@ -1502,6 +1502,7 @@ function MovimientosAdministrativos({
 }) {
   const { permissions } = usePermissions();
   const toast = useToast();
+  const router = useRouter();
   const [openRegresar, setOpenRegresar] = useState(false);
   const [openDesasignar, setOpenDesasignar] = useState(false);
 
@@ -1510,6 +1511,19 @@ function MovimientosAdministrativos({
   if (!puedeAutorizar) return null;
   if (estado !== 'activa') return null;
   const pos = fasePosicion ?? 0;
+
+  /**
+   * Callback común: muestra toast + refresca el detalle para que el
+   * estado nuevo (fase_actual, estado) se renderee inmediatamente.
+   * Sin esto el operador no veía feedback de que el cambio aplicó.
+   */
+  function handleDone(msg: string) {
+    toast.add({ title: 'Listo', description: msg, type: 'success' });
+    router.refresh();
+  }
+  function handleError(msg: string) {
+    toast.add({ title: 'Error', description: msg, type: 'error' });
+  }
 
   return (
     <div className="flex flex-wrap gap-2">
@@ -1527,15 +1541,15 @@ function MovimientosAdministrativos({
         faseActual={pos}
         open={openRegresar}
         onOpenChange={setOpenRegresar}
-        onDone={(msg) => toast.add({ title: 'Listo', description: msg, type: 'success' })}
-        onError={(msg) => toast.add({ title: 'Error', description: msg, type: 'error' })}
+        onDone={handleDone}
+        onError={handleError}
       />
       <DesasignarDialog
         ventaId={ventaId}
         open={openDesasignar}
         onOpenChange={setOpenDesasignar}
-        onDone={(msg) => toast.add({ title: 'Listo', description: msg, type: 'success' })}
-        onError={(msg) => toast.add({ title: 'Error', description: msg, type: 'error' })}
+        onDone={handleDone}
+        onError={handleError}
       />
     </div>
   );
@@ -1573,11 +1587,14 @@ function RegresarFaseDialog({
         onError(res.error);
         return;
       }
-      onDone(
-        `Venta regresada a Fase ${faseDestino}.${
-          faseDestino === 1 ? ' Email de bienvenida enviado al cliente.' : ''
-        }`
-      );
+      const baseMsg = `Venta regresada a Fase ${faseDestino}.`;
+      const emailMsg =
+        faseDestino === 1
+          ? res.emailSent
+            ? ` Email de bienvenida enviado a ${res.emailSentTo?.join(', ') ?? 'cliente'}.`
+            : ` ⚠️ El correo no se pudo enviar${res.emailError ? ` (${res.emailError})` : ''}.`
+          : '';
+      onDone(baseMsg + emailMsg);
       onOpenChange(false);
       setMotivo('');
     } finally {
@@ -1674,7 +1691,10 @@ function DesasignarDialog({
         onError(res.error);
         return;
       }
-      onDone('Venta desasignada. Email enviado al cliente.');
+      const emailMsg = res.emailSent
+        ? ` Email enviado a ${res.emailSentTo?.join(', ') ?? 'cliente'}.`
+        : ` ⚠️ El correo no se pudo enviar${res.emailError ? ` (${res.emailError})` : ''}.`;
+      onDone('Venta desasignada.' + emailMsg);
       onOpenChange(false);
       setMotivo('');
     } finally {
