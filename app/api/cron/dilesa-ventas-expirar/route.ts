@@ -80,7 +80,7 @@ async function buildEmailContext(
     sb
       .schema('dilesa')
       .from('unidades')
-      .select('identificador, proyecto_id')
+      .select('identificador, proyecto_id, manzana, numero_lote, producto_id')
       .eq('id', venta.unidad_id)
       .maybeSingle(),
   ]);
@@ -95,6 +95,7 @@ async function buildEmailContext(
     null;
 
   let proyectoNombre = '';
+  let prototipoSufijo: string | null = null;
   if (unidad?.proyecto_id) {
     const { data: proyecto } = await sb
       .schema('dilesa')
@@ -103,6 +104,15 @@ async function buildEmailContext(
       .eq('id', unidad.proyecto_id)
       .maybeSingle();
     proyectoNombre = proyecto?.nombre ?? '';
+  }
+  if (unidad?.producto_id) {
+    const { data: producto } = await sb
+      .schema('dilesa')
+      .from('productos')
+      .select('nombre')
+      .eq('id', unidad.producto_id)
+      .maybeSingle();
+    prototipoSufijo = producto?.nombre ? (producto.nombre.split('-').pop() ?? null) : null;
   }
 
   return {
@@ -114,6 +124,9 @@ async function buildEmailContext(
     clienteNombre,
     unidadIdentificador: unidad?.identificador ?? '(sin unidad)',
     proyectoNombre,
+    manzana: unidad?.manzana ?? null,
+    lote: unidad?.numero_lote ?? null,
+    prototipo: prototipoSufijo,
     expiraAt: venta.expira_at ? new Date(venta.expira_at) : null,
   };
 }
