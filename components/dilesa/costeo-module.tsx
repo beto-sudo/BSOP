@@ -141,7 +141,7 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
       sb
         .schema('dilesa')
         .from('proyectos')
-        .select('id, nombre')
+        .select('id, nombre, tipo')
         .eq('empresa_id', empresaId)
         .is('deleted_at', null),
       sb
@@ -164,11 +164,19 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
       return { error: getSupabaseErrorMessage(firstErr, 'No se pudo cargar el costeo.') };
     }
 
+    // proyectoMap resuelve nombres de TODOS los proyectos (incluye anteproyectos,
+    // por si un renglón de presupuesto los referencia). El selector del form de
+    // captura, en cambio, solo ofrece DESARROLLOS: el presupuesto de obra (Capa A)
+    // es de un desarrollo en ejecución, no de un anteproyecto en análisis. Esto
+    // además evita el duplicado visual de los proyectos que ya pasaron
+    // anteproyecto→desarrollo (mismo nombre en dos filas, ligadas por predecesor).
     const proyectoMap = new Map<string, string>();
     const proyectos: { id: string; nombre: string }[] = [];
     for (const p of proyectosRes.data ?? []) {
       proyectoMap.set(p.id as string, p.nombre as string);
-      proyectos.push({ id: p.id as string, nombre: (p.nombre as string) ?? '' });
+      if (p.tipo === 'desarrollo') {
+        proyectos.push({ id: p.id as string, nombre: (p.nombre as string) ?? '' });
+      }
     }
     proyectos.sort((a, b) => a.nombre.localeCompare(b.nombre));
 

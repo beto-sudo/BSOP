@@ -336,6 +336,19 @@ Sin schema, sin migración: el sub-slug `dilesa.construccion.costeo` ya tiene wr
   D2). 5 checks verdes (1184 tests). **PR de UI → sin auto-merge** (Beto revisa el
   preview).
 
+### 2026-06-03 — Fix selector de proyectos (Sprint 5, mismo PR #656)
+
+Beto notó duplicados en el dropdown "Proyecto" del form de captura. Diagnóstico
+(SELECT a `dilesa.proyectos`): **no eran duplicados de datos** sino pares
+anteproyecto→desarrollo legítimos (Ampliación LDLE y Lomas de las Delicias ya
+pasaron de anteproyecto `completado` a desarrollo `ejecutando`, ligados por
+`proyecto_predecesor_id`). El selector mostraba ambos `tipo`. Fix: el dropdown de
+captura filtra a `tipo='desarrollo'` (el presupuesto de obra / Capa A es de un
+desarrollo en ejecución, no de un anteproyecto en análisis). `proyectoMap` (que
+resuelve nombres en la tabla de costeo) se deja con TODOS los proyectos por
+robustez. Sin schema. Corregida la nota errónea de "duplicado a limpiar" en
+Pendientes menores.
+
 ## Handover — estado y próximos pasos (para la siguiente sesión)
 
 **Hecho (en prod):** schema Sprint 1 (#615) + Capa A de costeo (`obra_presupuesto`,
@@ -403,7 +416,13 @@ saldo; hoy v1 es la tabla de conceptos + KPIs de rollup.
   (diferido: el match por `proveedor_texto` es fuzzy y los contratistas con
   varios contratos —Electrogaza ×5, San Rodrigo ×4, Estrella ×4— necesitan
   desambiguar por concepto; hacerlo al construir la UI de rollup que lo consume).
-- **Duplicado ELECTROGAZA** en `erp.personas` (2 filas; se usó la más antigua) y
-  **duplicado** "Ampliación Lomas de los Encinos" en `dilesa.proyectos`
-  (`cd7c9cae-…` y `26352cac-…`) — limpiar.
+- **Duplicado ELECTROGAZA** en `erp.personas` (2 filas; se usó la más antigua) —
+  limpiar.
+- ~~"duplicado" Ampliación Lomas de los Encinos en `dilesa.proyectos`~~ ✅
+  **NO era duplicado** (verificado 2026-06-03): `cd7c9cae` es el **anteproyecto**
+  (completado) y `26352cac` el **desarrollo** (ejecutando) ligado por
+  `proyecto_predecesor_id` — par legítimo del flujo anteproyecto→desarrollo.
+  Igual Lomas de las Delicias (`34920025` antep. / `dd4a4e44` desarrollo). NO
+  borrar. El "duplicado visual" en el selector se resolvió filtrando el dropdown
+  de captura a `tipo='desarrollo'` (ver Bitácora 2026-06-03).
 - ~~ADR-038 → índice §5 de `ARCHITECTURE.md`~~ ✅ hecho (037/038/039, #637).
