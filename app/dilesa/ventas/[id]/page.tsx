@@ -55,6 +55,16 @@ import {
   type ColaItem,
   type HoldSnapshot,
 } from '@/lib/dilesa/hold-cola';
+import { usePermissions } from '@/components/providers';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { regresarAFase, desasignarVenta } from './actions';
 
 type Venta = {
   id: string;
@@ -784,6 +794,12 @@ function DetailInner() {
         />
       </div>
 
+      <MovimientosAdministrativos
+        ventaId={venta.id}
+        estado={venta.estado}
+        fasePosicion={venta.fase_posicion}
+      />
+
       <Section title="Datos del cliente">
         {fichaPersona.length === 0 ? (
           <p className="text-sm text-[var(--text)]/60">Sin datos del cliente.</p>
@@ -1463,5 +1479,246 @@ function AdjuntoLink({ a, compact = false }: { a: Adjunto; compact?: boolean }) 
       <span className="max-w-[220px] truncate">{a.nombre}</span>
       <ExternalLink className={compact ? 'h-2.5 w-2.5' : 'h-3 w-3'} />
     </a>
+  );
+}
+
+/**
+ * Movimientos administrativos sobre la venta — solo visibles para roles
+ * con escritura sobre `dilesa.ventas.autorizar` (Dirección + Nelcy).
+ *
+ *  - Regresar a fase: dialog con selector de fase destino + motivo.
+ *  - Desasignar: dialog con motivo. Manda email al cliente + vendedor.
+ *
+ * Si la venta ya está desasignada o en fase 17, no se muestran botones.
+ */
+function MovimientosAdministrativos({
+  ventaId,
+  estado,
+  fasePosicion,
+}: {
+  ventaId: string;
+  estado: string;
+  fasePosicion: number | null;
+}) {
+  const { permissions } = usePermissions();
+  const toast = useToast();
+  const [openRegresar, setOpenRegresar] = useState(false);
+  const [openDesasignar, setOpenDesasignar] = useState(false);
+
+  const puedeAutorizar =
+    permissions.isAdmin || permissions.modulos.get('dilesa.ventas.autorizar')?.write === true;
+  if (!puedeAutorizar) return null;
+  if (estado !== 'activa') return null;
+  const pos = fasePosicion ?? 0;
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {pos > 1 ? (
+        <Button variant="outline" size="sm" onClick={() => setOpenRegresar(true)}>
+          Regresar a fase…
+        </Button>
+      ) : null}
+      <Button variant="outline" size="sm" onClick={() => setOpenDesasignar(true)}>
+        Desasignar venta…
+      </Button>
+
+      <RegresarFaseDialog
+        ventaId={ventaId}
+        faseActual={pos}
+        open={openRegresar}
+        onOpenChange={setOpenRegresar}
+        onDone={(msg) => toast.add({ title: 'Listo', description: msg, type: 'success' })}
+        onError={(msg) => toast.add({ title: 'Error', description: msg, type: 'error' })}
+      />
+      <DesasignarDialog
+        ventaId={ventaId}
+        open={openDesasignar}
+        onOpenChange={setOpenDesasignar}
+        onDone={(msg) => toast.add({ title: 'Listo', description: msg, type: 'success' })}
+        onError={(msg) => toast.add({ title: 'Error', description: msg, type: 'error' })}
+      />
+    </div>
+  );
+}
+
+function RegresarFaseDialog({
+  ventaId,
+  faseActual,
+  open,
+  onOpenChange,
+  onDone,
+  onError,
+}: {
+  ventaId: string;
+  faseActual: number;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onDone: (msg: string) => void;
+  onError: (msg: string) => void;
+}) {
+  const [faseDestino, setFaseDestino] = useState<number>(1);
+  const [motivo, setMotivo] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const opciones = Array.from({ length: Math.max(0, faseActual - 1) }, (_, i) => i + 1);
+
+  async function onSubmit() {
+    if (motivo.trim().length < 5) {
+      onError('El motivo es obligatorio (mínimo 5 caracteres).');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await regresarAFase(ventaId, faseDestino, motivo);
+      if (!res.ok) {
+        onError(res.error);
+        return;
+      }
+      onDone(
+        `Venta regresada a Fase ${faseDestino}.${
+          faseDestino === 1 ? ' Email de bienvenida enviado al cliente.' : ''
+        }`
+      );
+      onOpenChange(false);
+      setMotivo('');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function handleOpenChange(v: boolean) {
+    if (!v) {
+      setMotivo('');
+      setFaseDestino(1);
+    }
+    onOpenChange(v);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Regresar venta a fase anterior</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <div>
+            <label className="mb-1 block text-xs text-[var(--text)]/60">Fase destino</label>
+            <select
+              value={faseDestino}
+              onChange={(e) => setFaseDestino(Number(e.target.value))}
+              className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm"
+              disabled={submitting}
+            >
+              {opciones.map((p) => (
+                <option key={p} value={p}>
+                  Fase {p}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-[var(--text)]/60">Motivo (obligatorio)</label>
+            <textarea
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              rows={3}
+              className="w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm"
+              disabled={submitting}
+              placeholder="Ej. Cliente solicita corregir CURP del expediente digital."
+            />
+          </div>
+          {faseDestino === 1 ? (
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+              Al regresar a Fase 1 se enviará un email de bienvenida nuevo al cliente con plazo
+              fresco de 2 días hábiles.
+            </p>
+          ) : null}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={submitting}>
+            Cancelar
+          </Button>
+          <Button onClick={onSubmit} disabled={submitting || opciones.length === 0}>
+            {submitting ? 'Regresando…' : 'Regresar venta'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DesasignarDialog({
+  ventaId,
+  open,
+  onOpenChange,
+  onDone,
+  onError,
+}: {
+  ventaId: string;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onDone: (msg: string) => void;
+  onError: (msg: string) => void;
+}) {
+  const [motivo, setMotivo] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  async function onSubmit() {
+    if (motivo.trim().length < 5) {
+      onError('El motivo es obligatorio (mínimo 5 caracteres).');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await desasignarVenta(ventaId, motivo);
+      if (!res.ok) {
+        onError(res.error);
+        return;
+      }
+      onDone('Venta desasignada. Email enviado al cliente.');
+      onOpenChange(false);
+      setMotivo('');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function handleOpenChange(v: boolean) {
+    if (!v) setMotivo('');
+    onOpenChange(v);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Desasignar venta</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <p className="text-sm text-[var(--text)]/70">
+            La venta pasará a estado <b>desasignada</b>. La unidad quedará disponible para nuevas
+            solicitudes. El cliente y el vendedor recibirán un correo con el motivo.
+          </p>
+          <div>
+            <label className="mb-1 block text-xs text-[var(--text)]/60">Motivo (obligatorio)</label>
+            <textarea
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              rows={3}
+              className="w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm"
+              disabled={submitting}
+              placeholder="Ej. Cliente decidió cancelar la compra por motivos personales."
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={submitting}>
+            Cancelar
+          </Button>
+          <Button onClick={onSubmit} disabled={submitting}>
+            {submitting ? 'Desasignando…' : 'Desasignar venta'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
