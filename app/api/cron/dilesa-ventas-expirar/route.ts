@@ -24,6 +24,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { AVISO_HOLD_4H_MS, calcularExpiraAt } from '@/lib/dilesa/hold-cola';
 import { sendHoldEmail, type HoldEmailContext } from '@/lib/dilesa/hold-emails';
+import { loadEmpresaBranding } from '@/lib/dilesa/email-branding';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -115,7 +116,9 @@ async function buildEmailContext(
     prototipoSufijo = producto?.nombre ? (producto.nombre.split('-').pop() ?? null) : null;
   }
 
+  const branding = await loadEmpresaBranding(sb, venta.empresa_id);
   return {
+    branding,
     ventaId: venta.id,
     empresaId: venta.empresa_id,
     vendedorEmail: usuario?.email ?? null,
