@@ -28,6 +28,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { proyectoOptionLabel, type ProyectoOption } from '@/lib/dilesa/proyectos-selector';
 import type { CosteoRow } from '@/components/dilesa/costeo-module';
 
 /** "" o no-numérico → null; en otro caso el número. */
@@ -47,7 +48,7 @@ export function CosteoConceptoForm({
   onSaved,
 }: {
   empresaId: string;
-  proyectos: readonly { id: string; nombre: string; esAnteproyecto: boolean }[];
+  proyectos: readonly ProyectoOption[];
   /** Conceptos visibles — fuente del autocálculo de `orden` en alta. */
   rows: readonly CosteoRow[];
   /** null = alta; row = edición (form pre-llenado). */
@@ -143,7 +144,7 @@ export function CosteoConceptoForm({
             <option value="">Selecciona…</option>
             {proyectos.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.esAnteproyecto ? `${p.nombre} (anteproyecto)` : p.nombre}
+                {proyectoOptionLabel(p)}
               </option>
             ))}
           </select>
