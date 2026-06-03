@@ -307,6 +307,31 @@ function NuevaSolicitudForm() {
     }
   }, [searchParams, unidades, unidadId]);
 
+  // Pre-popular la búsqueda con el apellido del cliente preseleccionado
+  // desde `?persona=<id>` para que la lista filtre a 1-2 coincidencias y el
+  // highlight de selección quede visible sin scroll. Caso típico: usuario
+  // viene de una venta desasignada y reasigna al mismo cliente.
+  useEffect(() => {
+    if (!personaIdFromUrl || personasExistentes.length === 0) return;
+    const p = personasExistentes.find((x) => x.id === personaIdFromUrl);
+    if (p && !busquedaPersona) {
+      const seed = p.apellido_paterno?.trim() || p.nombre?.trim() || '';
+      if (seed) setBusquedaPersona(seed);
+    }
+    // Solo corre una vez cuando se carga el catálogo — no re-disparar si
+    // Beto edita la búsqueda manualmente.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [personaIdFromUrl, personasExistentes]);
+
+  // Datos de la persona seleccionada (para chip de confirmación visual).
+  const personaSeleccionadaInfo = useMemo(
+    () =>
+      personaIdSeleccionada
+        ? (personasExistentes.find((p) => p.id === personaIdSeleccionada) ?? null)
+        : null,
+    [personaIdSeleccionada, personasExistentes]
+  );
+
   // ── Recalcular precio cuando cambian inputs ─────────────────────────────────
   useEffect(() => {
     if (!unidadId) {
@@ -706,6 +731,39 @@ function NuevaSolicitudForm() {
 
         {clienteModo === 'existente' ? (
           <div className="mt-4 space-y-3">
+            {personaSeleccionadaInfo ? (
+              <div className="flex items-start justify-between gap-3 rounded-md border border-[var(--accent)]/40 bg-[var(--accent)]/10 px-3 py-2 text-sm">
+                <div className="min-w-0">
+                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Cliente seleccionado
+                  </div>
+                  <div className="font-medium">
+                    {[
+                      personaSeleccionadaInfo.nombre,
+                      personaSeleccionadaInfo.apellido_paterno,
+                      personaSeleccionadaInfo.apellido_materno,
+                    ]
+                      .filter(Boolean)
+                      .join(' ') || '(sin nombre)'}
+                  </div>
+                  {personaSeleccionadaInfo.curp ? (
+                    <div className="font-mono text-xs text-muted-foreground">
+                      {personaSeleccionadaInfo.curp}
+                    </div>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPersonaIdSeleccionada('');
+                    setBusquedaPersona('');
+                  }}
+                  className="shrink-0 text-xs text-muted-foreground underline hover:text-foreground"
+                >
+                  Cambiar
+                </button>
+              </div>
+            ) : null}
             <Input
               placeholder="Buscar por nombre, apellido o CURP…"
               value={busquedaPersona}
