@@ -214,7 +214,7 @@ const moneyFmt = new Intl.NumberFormat('es-MX', {
  */
 const FASE_ROLES: Record<string, string[]> = {
   'Solicitud de Asignación': ['solicitud_asignacion'],
-  Asignada: ['expediente_digital', 'ficu', 'aviso_privacidad'],
+  Asignada: ['solicitud_asignacion', 'expediente_digital', 'ficu', 'aviso_privacidad'],
   Formalizada: ['contrato_promesa'],
   'Solicitud de Avalúo': [],
   'Avalúo Cerrado': ['avaluo_comercial'],

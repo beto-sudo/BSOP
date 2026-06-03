@@ -32,10 +32,16 @@ import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { marcarFase, type DocCaptura } from '@/lib/dilesa/captura/marcar-fase';
 
-const ROLES_REQUERIDOS = ['aviso_privacidad', 'ficu', 'expediente_digital'] as const;
+const ROLES_REQUERIDOS = [
+  'solicitud_asignacion',
+  'aviso_privacidad',
+  'ficu',
+  'expediente_digital',
+] as const;
 type RolRequerido = (typeof ROLES_REQUERIDOS)[number];
 
 const ROL_LABEL: Record<RolRequerido, string> = {
+  solicitud_asignacion: 'Solicitud de asignación firmada por cliente',
   aviso_privacidad: 'Aviso de privacidad firmado',
   ficu: 'FICU firmado',
   expediente_digital: 'Expediente digital (paquete KYC)',
@@ -43,9 +49,21 @@ const ROL_LABEL: Record<RolRequerido, string> = {
 
 type VentaCtx = {
   id: string;
+  empresa_id: string;
+  persona_id: string;
   unidad_id: string | null;
   fase_posicion: number | null;
   estado: string;
+  enganche_requerido: number | null;
+};
+
+type ReciboEnganche = {
+  id: string;
+  fecha: string | null;
+  monto: number;
+  forma_pago: string | null;
+  referencia: string | null;
+  notas: string | null;
 };
 
 export default function CapturarFase2Page() {
@@ -65,6 +83,8 @@ function CapturarFase2Body() {
   const [esLider, setEsLider] = useState<boolean | null>(null);
   const [adjuntosCargados, setAdjuntosCargados] = useState<Set<string>>(new Set());
   const [archivos, setArchivos] = useState<Partial<Record<RolRequerido, File>>>({});
+  const [recibos, setRecibos] = useState<ReciboEnganche[]>([]);
+  const [totalEnganchePagado, setTotalEnganchePagado] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -76,7 +96,7 @@ function CapturarFase2Body() {
     const { data: v, error: vErr } = await sb
       .schema('dilesa')
       .from('ventas')
-      .select('id, unidad_id, fase_posicion, estado')
+      .select('id, empresa_id, persona_id, unidad_id, fase_posicion, estado, enganche_requerido')
       .eq('id', ventaId)
       .maybeSingle();
     if (vErr || !v) {
@@ -110,6 +130,38 @@ function CapturarFase2Body() {
       .eq('entidad_id', ventaId);
     const set = new Set<string>(((adj ?? []) as Array<{ rol: string }>).map((a) => a.rol));
     setAdjuntosCargados(set);
+
+    // Recibos del enganche — la asignación requiere ver que el cliente
+    // ya pagó el enganche. Leemos dilesa.venta_pagos con tipo='enganche'
+    // (o variantes legacy de Coda) para que el autorizador vea el monto
+    // pagado vs el requerido antes de aprobar.
+    const { data: pagosRows } = await sb
+      .schema('dilesa')
+      .from('venta_pagos')
+      .select('id, fecha, monto, tipo, notas')
+      .eq('venta_id', ventaId)
+      .is('deleted_at', null)
+      .order('fecha', { ascending: true });
+    const recibosEnganche = (
+      (pagosRows ?? []) as Array<{
+        id: string;
+        fecha: string | null;
+        monto: number;
+        tipo: string | null;
+        notas: string | null;
+      }>
+    )
+      .filter((p) => (p.tipo ?? '').toLowerCase().includes('enganche'))
+      .map((p) => ({
+        id: p.id,
+        fecha: p.fecha,
+        monto: Number(p.monto) || 0,
+        forma_pago: null as string | null,
+        referencia: null as string | null,
+        notas: p.notas,
+      }));
+    setRecibos(recibosEnganche);
+    setTotalEnganchePagado(recibosEnganche.reduce((acc, r) => acc + r.monto, 0));
 
     setLoading(false);
   }, [ventaId]);
@@ -271,6 +323,13 @@ function CapturarFase2Body() {
         </div>
       </section>
 
+      {/* Recibos del enganche — referencia para autorizar */}
+      <RecibosEngancheSection
+        recibos={recibos}
+        totalPagado={totalEnganchePagado}
+        engancheRequerido={venta.enganche_requerido}
+      />
+
       <div className="flex justify-end pt-2">
         <Button onClick={onAutorizar} disabled={!puedeAutorizar}>
           {submitting ? (
@@ -283,5 +342,87 @@ function CapturarFase2Body() {
         </Button>
       </div>
     </div>
+  );
+}
+
+const moneyFmt = new Intl.NumberFormat('es-MX', {
+  style: 'currency',
+  currency: 'MXN',
+  maximumFractionDigits: 0,
+});
+
+function RecibosEngancheSection({
+  recibos,
+  totalPagado,
+  engancheRequerido,
+}: {
+  recibos: ReciboEnganche[];
+  totalPagado: number;
+  engancheRequerido: number | null;
+}) {
+  const requerido = Number(engancheRequerido ?? 0);
+  const cubre = requerido > 0 ? totalPagado >= requerido : totalPagado > 0;
+  return (
+    <section>
+      <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-[var(--text)]/50">
+        Recibos del enganche
+      </h2>
+      <p className="mb-3 text-xs text-[var(--text)]/60">
+        La asignación requiere que el cliente haya pagado el enganche. Verifica que los recibos
+        registrados cubran el monto requerido antes de autorizar.
+      </p>
+      <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4">
+        <div className="mb-3 grid grid-cols-3 gap-3 text-xs">
+          <div>
+            <div className="text-[var(--text)]/50">Enganche requerido</div>
+            <div className="mt-0.5 text-sm font-medium">{moneyFmt.format(requerido)}</div>
+          </div>
+          <div>
+            <div className="text-[var(--text)]/50">Pagado</div>
+            <div className="mt-0.5 text-sm font-medium">{moneyFmt.format(totalPagado)}</div>
+          </div>
+          <div>
+            <div className="text-[var(--text)]/50">Estado</div>
+            <div
+              className={`mt-0.5 inline-flex items-center gap-1 text-xs ${
+                cubre
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : 'text-amber-600 dark:text-amber-400'
+              }`}
+            >
+              {cubre ? (
+                <>
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Cubre el enganche
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-3.5 w-3.5" /> Pendiente de cubrir
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        {recibos.length === 0 ? (
+          <p className="text-xs text-[var(--text)]/40">
+            Aún no hay recibos de enganche registrados para esta venta.
+          </p>
+        ) : (
+          <ul className="space-y-1.5 text-xs">
+            {recibos.map((r) => (
+              <li
+                key={r.id}
+                className="flex items-center justify-between border-t border-[var(--border)] pt-1.5"
+              >
+                <span className="text-[var(--text)]/70">
+                  {r.fecha ?? '—'}
+                  {r.notas ? ` · ${r.notas}` : ''}
+                </span>
+                <span className="font-mono font-medium">{moneyFmt.format(r.monto)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
   );
 }
