@@ -29,9 +29,14 @@ import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { formatCurrency } from '@/lib/format';
+import {
+  buildProyectoOptions,
+  proyectoOptionLabel,
+  type ProyectoOption,
+  type ProyectoSelectorRow,
+} from '@/lib/dilesa/proyectos-selector';
 
 type Contratista = { id: string; nombre: string; abreviacion: string | null };
-type Proyecto = { id: string; nombre: string };
 
 /** Tipos de obra no-vivienda (ADR-038). `vivienda` se captura en /nuevo. */
 const TIPOS_OBRA = [
@@ -62,7 +67,7 @@ function NuevoContratoObraBody() {
   const [loadingMeta, setLoadingMeta] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [contratistas, setContratistas] = useState<Contratista[]>([]);
-  const [proyectos, setProyectos] = useState<Proyecto[]>([]);
+  const [proyectos, setProyectos] = useState<ProyectoOption[]>([]);
   const [seqByContratista, setSeqByContratista] = useState<Map<string, number>>(new Map());
 
   // ── Form ───────────────────────────────────────────────────────────────
@@ -99,7 +104,7 @@ function NuevoContratoObraBody() {
       sb
         .schema('dilesa')
         .from('proyectos')
-        .select('id, nombre')
+        .select('id, nombre, tipo, proyecto_predecesor_id')
         .eq('empresa_id', DILESA_EMPRESA_ID)
         .is('deleted_at', null),
       // Conteo de contratos de obra (no-vivienda) por contratista → seq del código.
@@ -136,7 +141,7 @@ function NuevoContratoObraBody() {
         .sort((a, b) => a.nombre.localeCompare(b.nombre))
     );
     setProyectos(
-      ((proyectosRes.data ?? []) as Proyecto[]).sort((a, b) => a.nombre.localeCompare(b.nombre))
+      buildProyectoOptions((proyectosRes.data ?? []) as unknown as ProyectoSelectorRow[])
     );
 
     const seq = new Map<string, number>();
@@ -270,7 +275,7 @@ function NuevoContratoObraBody() {
               <option value="">— selecciona —</option>
               {proyectos.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.nombre}
+                  {proyectoOptionLabel(p)}
                 </option>
               ))}
             </select>

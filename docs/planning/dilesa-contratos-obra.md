@@ -359,6 +359,24 @@ proyectos por robustez. Sin schema. Los anteproyectos convertidos **no se borran
 de la DB** (son el registro del anteproyecto ganador, trazabilidad del flujo);
 solo se ocultan del selector. Corregida la nota errónea de "duplicado a limpiar".
 
+### 2026-06-03 — Helper compartido del selector + réplica a nuevo-obra (PR aparte)
+
+A pedido de Beto, se replicó el patrón del selector a los demás forms de captura.
+Para no duplicar la lógica se extrajo a **`lib/dilesa/proyectos-selector.ts`**
+(`buildProyectoOptions` + `proyectoOptionLabel`, helper puro + test de 7 casos):
+
+- **`costeo-module` / `costeo-concepto-form`** → ahora usan el helper (antes inline).
+- **`/contratos/nuevo-obra`** (contrato de obra) → aplica el mismo patrón; antes
+  listaba los proyectos crudos y mostraba el duplicado anteproyecto/desarrollo.
+
+**Forms que NO lo necesitan** (verificado): `/contratos/nuevo` (vivienda) y
+`/ventas/nueva` ya derivan su selector de las **unidades/lotes** elegibles
+(`proyectosConUnidades`), así que un anteproyecto sin unidades nunca aparece —
+no tienen el duplicado. Los **filtros** de proyecto en las vistas de lista
+(contratos-module, ventas-module, etc.) sí muestran el duplicado, pero es de bajo
+impacto (filtrar por el gemelo viejo da 0 filas); pendiente menor si Beto lo quiere.
+Sin schema, sin migración.
+
 ## Handover — estado y próximos pasos (para la siguiente sesión)
 
 **Hecho (en prod):** schema Sprint 1 (#615) + Capa A de costeo (`obra_presupuesto`,

@@ -27,6 +27,11 @@ import { usePermissions } from '@/components/providers';
 import { useToast } from '@/components/ui/toast';
 import { RowActions } from '@/components/shared/row-actions';
 import { CosteoConceptoForm } from '@/components/dilesa/costeo-concepto-form';
+import {
+  buildProyectoOptions,
+  type ProyectoOption,
+  type ProyectoSelectorRow,
+} from '@/lib/dilesa/proyectos-selector';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency, formatPercent } from '@/lib/format';
 
@@ -110,9 +115,7 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
     Map<string, { contratado: number; pagado: number }>
   >(new Map());
   /** Proyectos DILESA para el selector del form (desarrollos + anteproyectos no convertidos). */
-  const [proyectos, setProyectos] = useState<
-    { id: string; nombre: string; esAnteproyecto: boolean }[]
-  >([]);
+  const [proyectos, setProyectos] = useState<ProyectoOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -125,7 +128,7 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
   const fetchCosteo = useCallback(async (): Promise<{
     rows?: CosteoRow[];
     agg?: Map<string, { contratado: number; pagado: number }>;
-    proyectos?: { id: string; nombre: string; esAnteproyecto: boolean }[];
+    proyectos?: ProyectoOption[];
     error?: string;
   }> => {
     const sb = createSupabaseBrowserClient();
@@ -166,27 +169,17 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
       return { error: getSupabaseErrorMessage(firstErr, 'No se pudo cargar el costeo.') };
     }
 
-    // proyectoMap resuelve nombres de TODOS los proyectos. El selector del form
-    // de captura ofrece desarrollos + anteproyectos NO convertidos (sí se
-    // presupuesta en fase de anteproyecto), etiquetando estos últimos. Los
-    // anteproyectos YA convertidos a desarrollo se omiten: cualquier presupuesto
-    // va sobre el desarrollo sucesor (que referencia al anteproyecto vía
-    // `proyecto_predecesor_id`), así desaparece el duplicado por nombre.
+    // proyectoMap resuelve nombres de TODOS los proyectos (para la tabla de
+    // costeo). El selector del form usa buildProyectoOptions: oculta los
+    // anteproyectos ya convertidos y etiqueta los no convertidos
+    // (ver lib/dilesa/proyectos-selector).
     const proyectoMap = new Map<string, string>();
-    const convertidos = new Set<string>(); // ids de anteproyectos con desarrollo sucesor
     for (const p of proyectosRes.data ?? []) {
       proyectoMap.set(p.id as string, p.nombre as string);
-      const pred = p.proyecto_predecesor_id as string | null;
-      if (pred) convertidos.add(pred);
     }
-    const proyectos: { id: string; nombre: string; esAnteproyecto: boolean }[] = [];
-    for (const p of proyectosRes.data ?? []) {
-      const id = p.id as string;
-      const esAnteproyecto = (p.tipo as string) === 'anteproyecto';
-      if (esAnteproyecto && convertidos.has(id)) continue; // ya convertido → va sobre el desarrollo
-      proyectos.push({ id, nombre: (p.nombre as string) ?? '', esAnteproyecto });
-    }
-    proyectos.sort((a, b) => a.nombre.localeCompare(b.nombre));
+    const proyectos = buildProyectoOptions(
+      (proyectosRes.data ?? []) as unknown as ProyectoSelectorRow[]
+    );
 
     // Capa B: pagado por contrato → contratado/pagado por proyecto.
     const pagadoByContrato = new Map<string, number>();
