@@ -31,7 +31,12 @@ import { formatearVencimiento } from './hold-cola';
 const RESEND_FROM = 'DILESA <noreply@bsop.io>';
 const URL_BSOP = 'https://bsop.io';
 
-export type HoldEventType = 'hold_creado' | 'hold_promovido' | 'hold_4h_warning' | 'hold_expirada';
+export type HoldEventType =
+  | 'hold_creado'
+  | 'hold_promovido'
+  | 'hold_4h_warning'
+  | 'hold_expirada'
+  | 'desasignada';
 
 export interface HoldEmailContext {
   ventaId: string;
@@ -45,6 +50,8 @@ export interface HoldEmailContext {
   expiraAt: Date | null;
   /** Lista de adjuntos que faltan para completar expediente. */
   faltantes?: string[];
+  /** Motivo de la desasignación (solo aplica para evento `desasignada`). */
+  motivo?: string | null;
 }
 
 interface SendResult {
@@ -176,6 +183,28 @@ function renderTemplate(
           <p>— DILESA</p>
         `.trim(),
       };
+    case 'desasignada': {
+      const motivoHtml = ctx.motivo ? `<p><b>Motivo:</b> ${escapeHtml(ctx.motivo)}</p>` : '';
+      return {
+        subject: `Desasignación de la unidad ${ref}`,
+        html: `
+          <p>Estimado/a <b>${escapeHtml(ctx.clienteNombre)}</b>,</p>
+          <p>Te escribimos para informarte que la asignación de la unidad
+             <b>${escapeHtml(ref)}</b> que estaba a tu nombre fue cancelada
+             por nuestra dirección.</p>
+          ${motivoHtml}
+          <p>Sabemos que es una noticia que no esperabas y lamentamos las
+             molestias que esto pueda causar. Si quieres entender mejor la
+             situación o explorar otra unidad disponible, tu asesor de ventas
+             <b>${escapeHtml(ctx.vendedorNombre ?? 'asignado')}</b> está a tus
+             órdenes para acompañarte.</p>
+          <p>Agradecemos sinceramente la confianza que depositaste en
+             DILESA. Quedamos a tus órdenes para cualquier siguiente paso
+             que decidas dar.</p>
+          <p>Atentamente,<br/>— Equipo DILESA</p>
+        `.trim(),
+      };
+    }
   }
 }
 
