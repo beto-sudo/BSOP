@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deriveKpis, type UnidadListaRow } from './inventario-module';
+import { computeDiasInventario, deriveKpis, type UnidadListaRow } from './inventario-module';
 
 function row(overrides: Partial<UnidadListaRow>): UnidadListaRow {
   return {
@@ -16,6 +16,11 @@ function row(overrides: Partial<UnidadListaRow>): UnidadListaRow {
     proyectoNombre: 'Proyecto',
     prototipo: null,
     identificadorCompleto: 'M1-L1',
+    valorComercial: null,
+    valorExcedente: null,
+    valorEsquina: null,
+    valorFrenteVerde: null,
+    valorVentaFuturo: null,
     precio: null,
     diasInventario: 0,
     ...overrides,
@@ -84,5 +89,49 @@ describe('deriveKpis (Inventario DILESA — ADR-034)', () => {
     expect(k[1]?.value).toBe(0);
     expect(k[2]?.value).toBe(1);
     expect(k[4]?.value).toBe('90 días');
+  });
+});
+
+describe('computeDiasInventario', () => {
+  it('en_construccion siempre reporta 0 (no aplica)', () => {
+    expect(computeDiasInventario('en_construccion', null)).toBe(0);
+    // Aunque haya fecha_terminada, si estado es en_construccion = 0.
+    expect(computeDiasInventario('en_construccion', '2020-01-01')).toBe(0);
+  });
+
+  it('terminada sin fecha_terminada reporta 0 (fallback)', () => {
+    expect(computeDiasInventario('terminada', null)).toBe(0);
+  });
+
+  it('terminada con fecha_terminada de hoy reporta 0', () => {
+    const hoy = new Date();
+    const iso = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+    expect(computeDiasInventario('terminada', iso)).toBe(0);
+  });
+
+  it('terminada con fecha_terminada de hace N días reporta N', () => {
+    const hoy = new Date();
+    const past = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 45);
+    const iso = `${past.getFullYear()}-${String(past.getMonth() + 1).padStart(2, '0')}-${String(past.getDate()).padStart(2, '0')}`;
+    expect(computeDiasInventario('terminada', iso)).toBe(45);
+  });
+
+  it('terminada con fecha futura (raro) cae a 0', () => {
+    const hoy = new Date();
+    const futura = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + 10);
+    const iso = `${futura.getFullYear()}-${String(futura.getMonth() + 1).padStart(2, '0')}-${String(futura.getDate()).padStart(2, '0')}`;
+    expect(computeDiasInventario('terminada', iso)).toBe(0);
+  });
+
+  it('fecha_terminada con timestamp completo solo usa los primeros 10 chars', () => {
+    const hoy = new Date();
+    const past = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 7);
+    const iso = `${past.getFullYear()}-${String(past.getMonth() + 1).padStart(2, '0')}-${String(past.getDate()).padStart(2, '0')}T15:30:00Z`;
+    expect(computeDiasInventario('terminada', iso)).toBe(7);
+  });
+
+  it('fecha mal formada cae a 0 (defensivo)', () => {
+    expect(computeDiasInventario('terminada', 'no-es-fecha')).toBe(0);
+    expect(computeDiasInventario('terminada', '')).toBe(0);
   });
 });
