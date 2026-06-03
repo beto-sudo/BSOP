@@ -171,6 +171,15 @@ function CapturarFase2Body() {
   }, [cargar]);
 
   const todosCompletos = ROLES_REQUERIDOS.every((r) => adjuntosCargados.has(r) || archivos[r]);
+  // Bool tri-state: true=cubre, false=no cubre, null=no se sabe (loading).
+  // Se usa para el banner de alerta — el botón NO se gatea por este valor
+  // (decisión Beto: queda a criterio de Dirección/Nelcy).
+  const engancheCubierto: boolean | null = !venta
+    ? null
+    : (() => {
+        const req = Number(venta.enganche_requerido ?? 0);
+        return req > 0 ? totalEnganchePagado >= req : totalEnganchePagado > 0;
+      })();
   const puedeAutorizar =
     !!venta &&
     venta.estado === 'activa' &&
@@ -329,6 +338,22 @@ function CapturarFase2Body() {
         totalPagado={totalEnganchePagado}
         engancheRequerido={venta.enganche_requerido}
       />
+
+      {/* Alerta prominente si el enganche no está cubierto. NO bloquea el
+          botón — Beto: "que quede a criterio de quien asigna (Nelcy o
+          Dirección) pero sí marcar una alerta de que no tiene enganche". */}
+      {engancheCubierto === false ? (
+        <div className="rounded-lg border-2 border-amber-500/50 bg-amber-500/10 px-4 py-3">
+          <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+            ⚠️ Esta venta no tiene el enganche pagado completo
+          </p>
+          <p className="mt-1 text-sm text-amber-900/85 dark:text-amber-100/85">
+            Normalmente la asignación requiere el enganche cubierto. Puedes autorizar de todos modos
+            si es una excepción aprobada (promoción, descuento, asignación sin enganche por decisión
+            de Dirección). La autorización queda registrada con tu usuario.
+          </p>
+        </div>
+      ) : null}
 
       <div className="flex justify-end pt-2">
         <Button onClick={onAutorizar} disabled={!puedeAutorizar}>
