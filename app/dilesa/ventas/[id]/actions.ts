@@ -394,7 +394,7 @@ async function desasignarVentaInner(ventaId: string, motivo: string): Promise<Ac
   const { data: v } = await admin
     .schema('dilesa')
     .from('ventas')
-    .select('id, estado, notas')
+    .select('id, estado, notas, unidad_id')
     .eq('id', ventaId)
     .maybeSingle();
   if (!v) return { ok: false, error: 'Venta no encontrada' };
@@ -402,8 +402,34 @@ async function desasignarVentaInner(ventaId: string, motivo: string): Promise<Ac
     return { ok: false, error: 'La venta ya está desasignada.' };
   }
 
+  // Resolver identificador de unidad + proyecto para incluir en la nota
+  // y dar trazabilidad de qué inventario se liberó.
+  let inventarioDesc = '';
+  if (v.unidad_id) {
+    const { data: u } = await admin
+      .schema('dilesa')
+      .from('unidades')
+      .select('identificador, proyecto_id')
+      .eq('id', v.unidad_id)
+      .maybeSingle();
+    if (u) {
+      let proyectoNombre = '';
+      if (u.proyecto_id) {
+        const { data: p } = await admin
+          .schema('dilesa')
+          .from('proyectos')
+          .select('nombre')
+          .eq('id', u.proyecto_id)
+          .maybeSingle();
+        proyectoNombre = p?.nombre ?? '';
+      }
+      inventarioDesc = [proyectoNombre, u.identificador].filter(Boolean).join(' · ');
+    }
+  }
+
   const ahora = new Date().toISOString();
-  const notaDesasignacion = `[${ahora}] Desasignada por motivo: ${motivoTrim}`;
+  const inventarioPart = inventarioDesc ? ` (${inventarioDesc})` : '';
+  const notaDesasignacion = `[${ahora}] Desasignada del inventario${inventarioPart} por motivo: ${motivoTrim}`;
   const notasNuevas = v.notas ? `${v.notas}\n${notaDesasignacion}` : notaDesasignacion;
 
   const { error: upErr } = await admin

@@ -629,7 +629,10 @@ function DetailInner() {
       const slugCaptura = CAPTURAR_SLUG_BY_POSICION[pos];
       const previaCerrada = pos === 1 || posicionesAlcanzadas.has(pos - 1);
       const alcanzada = !!f?.fecha;
-      const puedeCapturar = !!slugCaptura && !alcanzada && previaCerrada;
+      // Si la venta ya está desasignada, el pipeline queda como histórico
+      // — el operador no puede avanzar fases. La unidad está liberada.
+      const desasignada = venta?.estado === 'desasignada';
+      const puedeCapturar = !!slugCaptura && !alcanzada && previaCerrada && !desasignada;
       return {
         pos,
         nombre,
@@ -642,7 +645,7 @@ function DetailInner() {
         previaCerrada,
       };
     });
-  }, [fases, adjuntosPorRolMap]);
+  }, [fases, adjuntosPorRolMap, venta?.estado]);
 
   const pipelineAlcanzadas = useMemo(
     () => pipelineRows.filter((r) => r.alcanzada).length,
@@ -814,6 +817,7 @@ function DetailInner() {
         ventaId={venta.id}
         estado={venta.estado}
         fasePosicion={venta.fase_posicion}
+        personaId={venta.persona_id}
       />
 
       <Section title="Datos del cliente">
@@ -1511,10 +1515,12 @@ function MovimientosAdministrativos({
   ventaId,
   estado,
   fasePosicion,
+  personaId,
 }: {
   ventaId: string;
   estado: string;
   fasePosicion: number | null;
+  personaId: string;
 }) {
   const { permissions } = usePermissions();
   const toast = useToast();
@@ -1525,6 +1531,21 @@ function MovimientosAdministrativos({
   const puedeAutorizar =
     permissions.isAdmin || permissions.modulos.get('dilesa.ventas.autorizar')?.write === true;
   if (!puedeAutorizar) return null;
+
+  // Si está desasignada, ofrecemos crear una nueva solicitud para el
+  // mismo cliente con otra unidad — caso de uso operativo común.
+  if (estado === 'desasignada') {
+    return (
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href={`/dilesa/ventas/nueva?persona=${personaId}`}
+          className="inline-flex items-center gap-1.5 rounded-md border border-[var(--accent)] bg-[var(--accent)]/10 px-3 py-1.5 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent)]/20"
+        >
+          + Crear nueva solicitud para este cliente
+        </Link>
+      </div>
+    );
+  }
   if (estado !== 'activa') return null;
   const pos = fasePosicion ?? 0;
 
