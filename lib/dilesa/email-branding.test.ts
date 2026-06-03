@@ -119,4 +119,26 @@ describe('loadEmpresaBranding', () => {
     const b = await loadEmpresaBranding(sb, 'x');
     expect(b.headerUrl).toBe('https://cdn.dilesa.mx/header.png');
   });
+
+  it('headerUrl relativa se resuelve contra el dominio de prod (Next public/)', async () => {
+    const sb = mockSupabase({
+      id: 'x',
+      slug: 'dilesa',
+      nombre: 'DILESA',
+      header_url: '/brand/dilesa/header-email.png',
+    });
+    const b = await loadEmpresaBranding(sb, 'x');
+    expect(b.headerUrl).toBe('https://bsop.io/brand/dilesa/header-email.png');
+  });
+
+  it('headerUrl sin slash inicial se normaliza con uno', async () => {
+    const sb = mockSupabase({
+      id: 'x',
+      slug: 'dilesa',
+      nombre: 'DILESA',
+      header_url: 'brand/dilesa/header-email.png',
+    });
+    const b = await loadEmpresaBranding(sb, 'x');
+    expect(b.headerUrl).toBe('https://bsop.io/brand/dilesa/header-email.png');
+  });
 });
