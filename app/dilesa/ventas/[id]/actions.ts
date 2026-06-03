@@ -22,6 +22,7 @@ import { revalidatePath } from 'next/cache';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { sendHoldEmail, type HoldEmailContext } from '@/lib/dilesa/hold-emails';
+import { loadEmpresaBranding } from '@/lib/dilesa/email-branding';
 
 const FASES_CANONICAS: Record<number, string> = {
   1: 'Solicitud de Asignación',
@@ -223,7 +224,9 @@ async function buildEmailContext(
     v.vendedor ||
     null;
 
+  const branding = await loadEmpresaBranding(admin, v.empresa_id);
   return {
+    branding,
     ventaId: v.id,
     empresaId: v.empresa_id,
     vendedorEmail: usuario?.email ?? null,

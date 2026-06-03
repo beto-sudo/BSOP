@@ -29,8 +29,10 @@ import {
   renderEmailLayout,
   renderSeccionDatos,
   pillIdentificador,
+  renderMotivoBloque,
   escapeHtml,
 } from './email-layout';
+import type { EmpresaBranding } from './email-branding';
 
 /**
  * `From` para Resend. Usa `noreply@bsop.io` porque es el dominio que el
@@ -68,6 +70,8 @@ export interface HoldEmailContext {
   faltantes?: string[];
   /** Motivo de la desasignación (solo aplica para evento `desasignada`). */
   motivo?: string | null;
+  /** Branding de la empresa para el layout del email. */
+  branding: EmpresaBranding;
 }
 
 interface SendResult {
@@ -137,6 +141,7 @@ function fechaTextoMx(): string {
 
 function seccionDatosVivienda(ctx: HoldEmailContext, tituloSeccion: string): string {
   return renderSeccionDatos({
+    branding: ctx.branding,
     titulo: tituloSeccion,
     filas: [
       { label: 'FRACCIONAMIENTO', value: ctx.proyectoNombre || null },
@@ -173,7 +178,7 @@ function renderTemplate(
         <p style="font-size: 15px;">Hola <b>${escapeHtml(ctx.clienteNombre)}</b>,</p>
         <p>En DILESA estamos felices de acompañarte en el proceso de compra de tu nueva vivienda.
            Te damos la bienvenida y te confirmamos que se registró tu <b>solicitud de asignación</b>
-           para la unidad ${pillIdentificador(ctx.unidadIdentificador)}.</p>
+           para la unidad ${pillIdentificador(ctx.branding, ctx.unidadIdentificador)}.</p>
         ${seccionDatosVivienda(ctx, 'Datos de la vivienda apartada')}
         <p style="margin-top: 20px;">A partir de hoy te <b>llevaremos de la mano</b> paso a paso por todo el proceso —
            desde la firma del contrato de promesa, el avalúo del banco, la dictaminación del
@@ -192,13 +197,18 @@ function renderTemplate(
       `.trim();
       return {
         subject: `Bienvenido a DILESA — Tu solicitud por ${ref}`,
-        html: renderEmailLayout({ titulo: 'BIENVENIDA', fechaTexto: fecha, bodyHtml: body }),
+        html: renderEmailLayout({
+          branding: ctx.branding,
+          titulo: 'BIENVENIDA',
+          fechaTexto: fecha,
+          bodyHtml: body,
+        }),
       };
     }
     case 'hold_promovido': {
       const body = `
         <p style="font-size: 15px;">Estimad@ <b>${escapeHtml(ctx.clienteNombre)}</b>,</p>
-        <p>La solicitud anterior para la unidad ${pillIdentificador(ctx.unidadIdentificador)}
+        <p>La solicitud anterior para la unidad ${pillIdentificador(ctx.branding, ctx.unidadIdentificador)}
            expiró sin completar expediente. Tu solicitud sube a <b>líder de la fila</b>.</p>
         ${seccionDatosVivienda(ctx, 'Datos de la vivienda apartada')}
         <p style="margin-top: 20px;">Tienes hasta <b>${escapeHtml(fechaDeadline ?? 'el plazo definido')}</b>
@@ -212,6 +222,7 @@ function renderTemplate(
       return {
         subject: `Subes a líder de la fila — ${ref}`,
         html: renderEmailLayout({
+          branding: ctx.branding,
           titulo: 'NUEVO LÍDER DE LA FILA',
           fechaTexto: fecha,
           bodyHtml: body,
@@ -221,7 +232,7 @@ function renderTemplate(
     case 'hold_4h_warning': {
       const body = `
         <p style="font-size: 15px;">Estimad@ <b>${escapeHtml(ctx.clienteNombre)}</b>,</p>
-        <p>El apartado de tu unidad ${pillIdentificador(ctx.unidadIdentificador)}
+        <p>El apartado de tu unidad ${pillIdentificador(ctx.branding, ctx.unidadIdentificador)}
            <b>expira en menos de 4 horas</b> (${escapeHtml(fechaDeadline ?? 'pronto')}).</p>
         ${seccionDatosVivienda(ctx, 'Datos de la vivienda apartada')}
         <p style="margin-top: 20px;">Si no completas el expediente antes de esa hora, el apartado pasa
@@ -234,6 +245,7 @@ function renderTemplate(
       return {
         subject: `Tu apartado expira en menos de 4 horas — ${ref}`,
         html: renderEmailLayout({
+          branding: ctx.branding,
           titulo: 'EXPIRACIÓN PRÓXIMA',
           fechaTexto: fecha,
           bodyHtml: body,
@@ -243,7 +255,7 @@ function renderTemplate(
     case 'hold_expirada': {
       const body = `
         <p style="font-size: 15px;">Estimad@ <b>${escapeHtml(ctx.clienteNombre)}</b>,</p>
-        <p>El apartado de la unidad ${pillIdentificador(ctx.unidadIdentificador)} expiró porque el
+        <p>El apartado de la unidad ${pillIdentificador(ctx.branding, ctx.unidadIdentificador)} expiró porque el
            expediente no quedó completo en el plazo de 2 días hábiles.</p>
         ${seccionDatosVivienda(ctx, 'Datos de la vivienda apartada')}
         <p style="margin-top: 20px;">La unidad pasó a la siguiente persona en la fila. Si sigues
@@ -255,6 +267,7 @@ function renderTemplate(
       return {
         subject: `Apartado expirado — ${ref}`,
         html: renderEmailLayout({
+          branding: ctx.branding,
           titulo: 'APARTADO EXPIRADO',
           fechaTexto: fecha,
           bodyHtml: body,
@@ -262,15 +275,7 @@ function renderTemplate(
       };
     }
     case 'desasignada': {
-      const motivoBloque = ctx.motivo
-        ? `
-          <h2 style="color: #5E6A2D; font-size: 14px; font-weight: 700; letter-spacing: 1.5px; margin: 20px 0 8px; text-transform: uppercase;">
-            Motivo de desasignación
-          </h2>
-          <p style="margin: 4px 0 16px; padding: 12px; background: #f5f5f0; border-left: 4px solid #7C8A3F; font-size: 14px;">
-            ${escapeHtml(ctx.motivo)}
-          </p>`
-        : '';
+      const motivoBloque = ctx.motivo ? renderMotivoBloque(ctx.branding, ctx.motivo) : '';
       const body = `
         <p style="font-size: 15px;">ESTIMAD@ <b>${escapeHtml(ctx.clienteNombre)}</b>,</p>
         <p>Por medio del presente le informamos que nos vimos en la necesidad de desasignar la
@@ -286,6 +291,7 @@ function renderTemplate(
       return {
         subject: `Desasignación de la unidad ${ref}`,
         html: renderEmailLayout({
+          branding: ctx.branding,
           titulo: 'DESASIGNACIÓN',
           fechaTexto: fecha,
           bodyHtml: body,

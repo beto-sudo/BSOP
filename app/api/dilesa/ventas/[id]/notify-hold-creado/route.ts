@@ -26,6 +26,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { sendHoldEmail, type HoldEmailContext } from '@/lib/dilesa/hold-emails';
+import { loadEmpresaBranding } from '@/lib/dilesa/email-branding';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -137,7 +138,9 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
     venta.vendedor ||
     null;
 
+  const branding = await loadEmpresaBranding(admin, venta.empresa_id);
   const emailCtx: HoldEmailContext = {
+    branding,
     ventaId: venta.id,
     empresaId: venta.empresa_id,
     vendedorEmail: usuario?.email ?? null,
