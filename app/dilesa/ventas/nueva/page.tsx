@@ -618,6 +618,14 @@ function NuevaSolicitudForm() {
         description: `Venta ${unidad?.identificador} para ${clienteModo === 'nuevo' ? nombre + ' ' + apellidoPaterno : 'cliente existente'} ya está en Fase 1.`,
         type: 'success',
       });
+
+      // Email "Bienvenido a DILESA" inmediato — fire-and-forget. El cron
+      // hourly sigue activo como safety net si esto falla (idempotente por
+      // `notif_hold_creado_at`).
+      void fetch(`/api/dilesa/ventas/${ventaId}/notify-hold-creado`, { method: 'POST' }).catch(
+        (e) => console.warn('[hold-creado-email] fire-and-forget failed:', e)
+      );
+
       router.push(`/dilesa/ventas/${ventaId}`);
     } catch (e) {
       toast.add({
