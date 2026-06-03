@@ -60,7 +60,12 @@ export type UnidadListaRow = UnidadRow & {
   valorVentaFuturo: number | null;
   /** Precio total calculado por la RPC (sin tipo de crédito — base) */
   precio: number | null;
-  /** Días en inventario desde unidad.created_at */
+  /**
+   * Días en inventario desde `dilesa.construccion.fecha_terminada` (más
+   * reciente si hay varias construcciones). 0 si la obra está aún
+   * `en_construccion` o si no hay fecha registrada — ver
+   * `computeDiasInventario`.
+   */
   diasInventario: number;
 };
 
@@ -73,6 +78,34 @@ const ESTADO_LABEL: Record<string, string> = {
   en_construccion: 'En construcción',
   terminada: 'Terminada',
 };
+
+/**
+ * Días en inventario para una unidad disponible.
+ *
+ * Regla operativa DILESA: el reloj de "estancamiento" arranca cuando la
+ * obra se termina físicamente, no cuando se creó el registro en la DB.
+ * Una unidad en construcción NO está estancada — todavía no se puede
+ * entregar — así que reporta 0.
+ *
+ * - `en_construccion` → 0 (no aplica, no es inventario "listo").
+ * - `terminada` con `fechaTerminada` → días civiles entre esa fecha y hoy.
+ * - `terminada` sin `fechaTerminada` → 0 (dato faltante; fallback seguro).
+ *
+ * Comparamos en hora local del cliente para que una obra terminada hoy
+ * reporte exactamente 0 días, sin que la TZ del servidor confunda.
+ */
+export function computeDiasInventario(estado: string, fechaTerminada: string | null): number {
+  if (estado !== 'terminada' || !fechaTerminada) return 0;
+  const isoDay = fechaTerminada.slice(0, 10);
+  const parts = isoDay.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(Number.isNaN)) return 0;
+  const [y, m, d] = parts as [number, number, number];
+  const fecha = new Date(y, m - 1, d);
+  fecha.setHours(0, 0, 0, 0);
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  return Math.max(0, Math.floor((hoy.getTime() - fecha.getTime()) / (1000 * 60 * 60 * 24)));
+}
 
 /**
  * KPIs reactivos a filtros — ADR-034 (Module-level KPI strips).
@@ -186,6 +219,39 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
     const prjMap = new Map((prjRes.data ?? []).map((p) => [p.id as string, p.nombre as string]));
     const prodMap = new Map((prodRes.data ?? []).map((p) => [p.id as string, p.nombre as string]));
 
+    // Fecha de terminación de obra por unidad — sale de `dilesa.construccion`.
+    // Si una unidad tiene varias construcciones (re-arranques), tomamos la
+    // `fecha_terminada` más reciente como referencia de "está terminada
+    // desde…". Solo cargamos las de las unidades visibles para mantener
+    // el payload chico. ~32 unidades → ~32 UUIDs (1.2 KB), bien debajo del
+    // límite de URL de 8 KB.
+    const unidadesIds = unidadesArr.map((u) => u.id);
+    const fechaTerminadaMap = new Map<string, string>();
+    if (unidadesIds.length > 0) {
+      const { data: cons, error: cErr } = await sb
+        .schema('dilesa')
+        .from('construccion')
+        .select('unidad_id, fecha_terminada')
+        .eq('empresa_id', empresaId)
+        .is('deleted_at', null)
+        .in('unidad_id', unidadesIds)
+        .not('fecha_terminada', 'is', null);
+      if (cErr) {
+        // No bloqueamos — si falla, "Días en inv." cae a 0 para terminadas
+        // sin fecha y los asesores siguen viendo el resto del dashboard.
+        console.warn('No se pudieron cargar fechas de terminación:', cErr.message);
+      } else {
+        for (const c of cons ?? []) {
+          const unidadId = c.unidad_id as string;
+          const fechaTerminada = c.fecha_terminada as string;
+          const prev = fechaTerminadaMap.get(unidadId);
+          if (!prev || fechaTerminada > prev) {
+            fechaTerminadaMap.set(unidadId, fechaTerminada);
+          }
+        }
+      }
+    }
+
     // Calcular precios via RPC en batch — una llamada por unidad para
     // mostrar el desglose inline. Guardamos los 4 componentes que pide ver
     // el asesor (excedente terreno, esquina, frente verde, venta futuro) +
@@ -240,11 +306,11 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
       );
     }
 
-    const now = Date.now();
     const data = unidadesArr.map((u) => {
       const proto = u.producto_id ? (prodMap.get(u.producto_id) ?? null) : null;
       const protoSufijo = proto ? proto.split('-').pop() : null;
       const calc = precios.get(u.id) ?? NULL_CALCULO;
+      const fechaTerminada = fechaTerminadaMap.get(u.id) ?? null;
       return {
         ...u,
         proyectoNombre: prjMap.get(u.proyecto_id) ?? '',
@@ -255,10 +321,7 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
         valorFrenteVerde: calc.frenteVerde,
         valorVentaFuturo: calc.ventaFuturo,
         precio: calc.total,
-        diasInventario: Math.max(
-          0,
-          Math.floor((now - new Date(u.created_at).getTime()) / (1000 * 60 * 60 * 24))
-        ),
+        diasInventario: computeDiasInventario(u.estado, fechaTerminada),
       };
     });
 
