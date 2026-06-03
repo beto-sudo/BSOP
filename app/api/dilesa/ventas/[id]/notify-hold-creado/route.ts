@@ -101,13 +101,14 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
       ? admin
           .schema('dilesa')
           .from('unidades')
-          .select('identificador, proyecto_id')
+          .select('identificador, proyecto_id, manzana, numero_lote, producto_id')
           .eq('id', venta.unidad_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
 
   let proyectoNombre = '';
+  let prototipoSufijo: string | null = null;
   if (unidad?.proyecto_id) {
     const { data: proyecto } = await admin
       .schema('dilesa')
@@ -116,6 +117,15 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
       .eq('id', unidad.proyecto_id)
       .maybeSingle();
     proyectoNombre = proyecto?.nombre ?? '';
+  }
+  if (unidad?.producto_id) {
+    const { data: producto } = await admin
+      .schema('dilesa')
+      .from('productos')
+      .select('nombre')
+      .eq('id', unidad.producto_id)
+      .maybeSingle();
+    prototipoSufijo = producto?.nombre ? (producto.nombre.split('-').pop() ?? null) : null;
   }
 
   const clienteNombre =
@@ -136,6 +146,9 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
     clienteNombre,
     unidadIdentificador: unidad?.identificador ?? '(sin unidad)',
     proyectoNombre,
+    manzana: unidad?.manzana ?? null,
+    lote: unidad?.numero_lote ?? null,
+    prototipo: prototipoSufijo,
     expiraAt: venta.expira_at ? new Date(venta.expira_at) : null,
   };
 

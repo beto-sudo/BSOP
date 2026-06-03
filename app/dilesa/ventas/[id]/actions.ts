@@ -99,13 +99,14 @@ async function buildEmailContext(
       ? admin
           .schema('dilesa')
           .from('unidades')
-          .select('identificador, proyecto_id')
+          .select('identificador, proyecto_id, manzana, numero_lote, producto_id')
           .eq('id', v.unidad_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
 
   let proyectoNombre = '';
+  let prototipoSufijo: string | null = null;
   if (unidad?.proyecto_id) {
     const { data: p } = await admin
       .schema('dilesa')
@@ -114,6 +115,15 @@ async function buildEmailContext(
       .eq('id', unidad.proyecto_id)
       .maybeSingle();
     proyectoNombre = p?.nombre ?? '';
+  }
+  if (unidad?.producto_id) {
+    const { data: producto } = await admin
+      .schema('dilesa')
+      .from('productos')
+      .select('nombre')
+      .eq('id', unidad.producto_id)
+      .maybeSingle();
+    prototipoSufijo = producto?.nombre ? (producto.nombre.split('-').pop() ?? null) : null;
   }
 
   const clienteNombre =
@@ -134,6 +144,9 @@ async function buildEmailContext(
     clienteNombre,
     unidadIdentificador: unidad?.identificador ?? '(sin unidad)',
     proyectoNombre,
+    manzana: unidad?.manzana ?? null,
+    lote: unidad?.numero_lote ?? null,
+    prototipo: prototipoSufijo,
     expiraAt: v.expira_at ? new Date(v.expira_at) : null,
     motivo: v.motivo_desasignacion ?? null,
   };
