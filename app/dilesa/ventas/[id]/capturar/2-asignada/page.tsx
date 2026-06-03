@@ -23,7 +23,7 @@
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, CheckCircle2, Loader2, Upload, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ExternalLink, Loader2, Upload, XCircle } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { marcarFase, type DocCaptura } from '@/lib/dilesa/captura/marcar-fase';
+import { getAdjuntoProxyUrl } from '@/lib/adjuntos';
 
 const ROLES_REQUERIDOS = [
   'solicitud_asignacion',
@@ -66,6 +67,14 @@ type ReciboEnganche = {
   notas: string | null;
 };
 
+type AdjuntoCargado = {
+  id: string;
+  rol: string;
+  nombre: string;
+  url: string;
+  tipo_mime: string | null;
+};
+
 export default function CapturarFase2Page() {
   return (
     <RequireAccess empresa="dilesa" modulo="dilesa.ventas.autorizar">
@@ -81,7 +90,7 @@ function CapturarFase2Body() {
 
   const [venta, setVenta] = useState<VentaCtx | null>(null);
   const [esLider, setEsLider] = useState<boolean | null>(null);
-  const [adjuntosCargados, setAdjuntosCargados] = useState<Set<string>>(new Set());
+  const [adjuntosCargados, setAdjuntosCargados] = useState<Map<string, AdjuntoCargado>>(new Map());
   const [archivos, setArchivos] = useState<Partial<Record<RolRequerido, File>>>({});
   const [recibos, setRecibos] = useState<ReciboEnganche[]>([]);
   const [totalEnganchePagado, setTotalEnganchePagado] = useState<number>(0);
@@ -121,15 +130,30 @@ function CapturarFase2Body() {
       setEsLider(false);
     }
 
-    // Adjuntos cargados
+    // Adjuntos cargados — incluimos url + nombre para hacer la card
+    // clickeable y abrir el doc. Si hay >1 adjunto por rol, se queda el
+    // más reciente por created_at DESC (primero en el array, gracias al
+    // .order). Eso es lo que el autorizador típicamente quiere ver.
     const { data: adj } = await sb
       .schema('erp')
       .from('adjuntos')
-      .select('rol')
+      .select('id, rol, nombre, url, tipo_mime, created_at')
       .eq('entidad_tipo', 'ventas')
-      .eq('entidad_id', ventaId);
-    const set = new Set<string>(((adj ?? []) as Array<{ rol: string }>).map((a) => a.rol));
-    setAdjuntosCargados(set);
+      .eq('entidad_id', ventaId)
+      .order('created_at', { ascending: false });
+    const map = new Map<string, AdjuntoCargado>();
+    for (const a of (adj ?? []) as Array<AdjuntoCargado & { created_at: string }>) {
+      if (!map.has(a.rol)) {
+        map.set(a.rol, {
+          id: a.id,
+          rol: a.rol,
+          nombre: a.nombre,
+          url: a.url,
+          tipo_mime: a.tipo_mime,
+        });
+      }
+    }
+    setAdjuntosCargados(map);
 
     // Recibos del enganche — la asignación requiere ver que el cliente
     // ya pagó el enganche. Leemos dilesa.venta_pagos con tipo='enganche'
@@ -291,41 +315,60 @@ function CapturarFase2Body() {
         </h2>
         <div className="space-y-3">
           {ROLES_REQUERIDOS.map((rol) => {
-            const cargado = adjuntosCargados.has(rol);
+            const cargado = adjuntosCargados.get(rol);
             const fileSeleccionado = archivos[rol];
+            const completo = !!cargado || !!fileSeleccionado;
+            const href = cargado ? getAdjuntoProxyUrl(cargado.url) : null;
             return (
               <div
                 key={rol}
                 className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--card)] px-4 py-3"
               >
-                <div className="flex items-center gap-2 text-sm">
-                  {cargado || fileSeleccionado ? (
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                  ) : (
-                    <XCircle className="h-4 w-4 text-[var(--text)]/35" />
-                  )}
-                  <span className="font-medium">{ROL_LABEL[rol]}</span>
-                  {cargado ? (
-                    <span className="ml-2 text-xs text-emerald-600 dark:text-emerald-400">
-                      Ya cargado
+                {/* Lado izquierdo: clickeable cuando hay adjunto cargado */}
+                {href ? (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex flex-1 items-center gap-2 text-sm hover:text-[var(--accent)]"
+                    title={cargado?.nombre ?? 'Ver documento'}
+                  >
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+                    <span className="font-medium">{ROL_LABEL[rol]}</span>
+                    <span className="ml-1 inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+                      Ver documento <ExternalLink className="h-3 w-3" />
                     </span>
-                  ) : null}
-                </div>
-                {!cargado ? (
-                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40 hover:text-[var(--text)]">
-                    <Upload className="h-3.5 w-3.5" />
-                    {fileSeleccionado ? 'Cambiar' : 'Subir PDF'}
-                    <input
-                      type="file"
-                      accept="application/pdf,image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0] ?? null;
-                        setArchivos((prev) => ({ ...prev, [rol]: f ?? undefined }));
-                      }}
-                    />
-                  </label>
-                ) : null}
+                  </a>
+                ) : (
+                  <div className="flex flex-1 items-center gap-2 text-sm">
+                    {completo ? (
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+                    ) : (
+                      <XCircle className="h-4 w-4 shrink-0 text-[var(--text)]/35" />
+                    )}
+                    <span className="font-medium">{ROL_LABEL[rol]}</span>
+                    {fileSeleccionado ? (
+                      <span className="ml-1 truncate text-xs text-[var(--text)]/60">
+                        {fileSeleccionado.name}
+                      </span>
+                    ) : null}
+                  </div>
+                )}
+
+                {/* Lado derecho: botón Subir / Cambiar / Reemplazar */}
+                <label className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40 hover:text-[var(--text)]">
+                  <Upload className="h-3.5 w-3.5" />
+                  {cargado ? 'Reemplazar' : fileSeleccionado ? 'Cambiar' : 'Subir PDF'}
+                  <input
+                    type="file"
+                    accept="application/pdf,image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] ?? null;
+                      setArchivos((prev) => ({ ...prev, [rol]: f ?? undefined }));
+                    }}
+                  />
+                </label>
               </div>
             );
           })}
