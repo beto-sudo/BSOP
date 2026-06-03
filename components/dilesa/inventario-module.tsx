@@ -54,6 +54,8 @@ export type UnidadListaRow = UnidadRow & {
   /** Identificador "Coda-style": M3-L9-LDLE-ISC (con sufijo prototipo). */
   identificadorCompleto: string;
   /** Componentes del cálculo (RPC fn_calcular_precio_venta sin crédito). */
+  /** Precio base = prototipo + terreno estándar (antes de excedentes y características). */
+  valorComercial: number | null;
   valorExcedente: number | null;
   valorEsquina: number | null;
   valorFrenteVerde: number | null;
@@ -257,6 +259,7 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
     // el asesor (excedente terreno, esquina, frente verde, venta futuro) +
     // el precio total. Concurrencia limitada para no saturar.
     type CalculoLite = {
+      comercial: number | null;
       excedente: number | null;
       esquina: number | null;
       frenteVerde: number | null;
@@ -264,6 +267,7 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
       total: number | null;
     };
     const NULL_CALCULO: CalculoLite = {
+      comercial: null,
       excedente: null,
       esquina: null,
       frenteVerde: null,
@@ -284,6 +288,7 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
             return;
           }
           const json = data as {
+            valor_comercial?: number;
             valor_excedente_terreno?: number;
             valor_esquina?: number;
             valor_frente_verde?: number;
@@ -296,6 +301,7 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
             return;
           }
           precios.set(u.id, {
+            comercial: json.valor_comercial ?? null,
             excedente: json.valor_excedente_terreno ?? null,
             esquina: json.valor_esquina ?? null,
             frenteVerde: json.valor_frente_verde ?? null,
@@ -316,6 +322,7 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
         proyectoNombre: prjMap.get(u.proyecto_id) ?? '',
         prototipo: proto,
         identificadorCompleto: protoSufijo ? `${u.identificador}-${protoSufijo}` : u.identificador,
+        valorComercial: calc.comercial,
         valorExcedente: calc.excedente,
         valorEsquina: calc.esquina,
         valorFrenteVerde: calc.frenteVerde,
@@ -415,6 +422,7 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
         </div>
       ),
     },
+    { key: 'valorComercial', label: 'Precio base', type: 'currency' },
     {
       key: 'valorExcedente',
       label: 'Excedente',

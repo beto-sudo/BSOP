@@ -16,6 +16,7 @@ function row(overrides: Partial<UnidadListaRow>): UnidadListaRow {
     proyectoNombre: 'Proyecto',
     prototipo: null,
     identificadorCompleto: 'M1-L1',
+    valorComercial: null,
     valorExcedente: null,
     valorEsquina: null,
     valorFrenteVerde: null,
