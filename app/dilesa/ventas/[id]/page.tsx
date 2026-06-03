@@ -756,13 +756,29 @@ function DetailInner() {
             {clienteNombre || '(sin nombre)'}
           </h1>
           {proyectoNombre && unidad?.identificador ? (
-            <p className="mt-1 text-sm text-[var(--text)]/60">
+            <p
+              className={`mt-1 text-sm ${
+                venta.estado === 'desasignada'
+                  ? 'text-[var(--text)]/35 line-through decoration-[var(--text)]/35'
+                  : 'text-[var(--text)]/60'
+              }`}
+              title={
+                venta.estado === 'desasignada'
+                  ? 'Unidad liberada — la venta fue desasignada'
+                  : undefined
+              }
+            >
               {proyectoNombre} · {unidad.identificador}
+              {venta.estado === 'desasignada' ? (
+                <span className="ml-2 text-xs not-italic no-underline">(liberada)</span>
+              ) : null}
             </p>
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          {venta.fase_actual ? (
+          {/* Si la venta está desasignada, NO mostramos el badge de fase —
+              evita el efecto contradictorio "2. Asignada · Desasignada". */}
+          {venta.fase_actual && venta.estado !== 'desasignada' ? (
             <Badge tone="neutral">
               {venta.fase_posicion ? `${venta.fase_posicion}. ` : ''}
               {venta.fase_actual}
