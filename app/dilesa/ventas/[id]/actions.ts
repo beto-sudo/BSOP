@@ -44,7 +44,17 @@ const FASES_CANONICAS: Record<number, string> = {
   17: 'Operación Terminada',
 };
 
-export type ActionResult = { ok: true } | { ok: false; error: string };
+export type ActionResult =
+  | {
+      ok: true;
+      /** True si el email se envió con éxito. False si falló o no se intentó. */
+      emailSent?: boolean;
+      /** Destinatarios efectivos (vacío si no se envió). */
+      emailSentTo?: string[];
+      /** Mensaje de error del envío, si aplica. */
+      emailError?: string;
+    }
+  | { ok: false; error: string };
 
 async function requireAutorizar(): Promise<ActionResult & { userId?: string }> {
   const sb = await createSupabaseServerClient();
@@ -227,22 +237,33 @@ export async function regresarAFase(
   // Si regresamos a Fase 1, mandamos el email de bienvenida otra vez
   // para que el cliente sepa que su solicitud está activa con plazo nuevo.
   // (Idempotencia: ya limpiamos notif_hold_creado_at arriba.)
+  let emailSent = false;
+  let emailSentTo: string[] = [];
+  let emailError: string | undefined;
   if (faseDestino === 1) {
     const ctx = await buildEmailContext(admin, ventaId);
-    if (ctx) {
+    if (!ctx) {
+      emailError = 'No se pudo armar el contexto del email (venta no encontrada).';
+      console.warn('[regresarAFase] buildEmailContext returned null', { ventaId });
+    } else {
       const res = await sendHoldEmail('hold_creado', ctx);
+      emailSent = res.ok;
+      emailSentTo = res.sentTo;
+      emailError = res.error;
       if (res.ok) {
         await admin
           .schema('dilesa')
           .from('ventas')
           .update({ notif_hold_creado_at: new Date().toISOString() })
           .eq('id', ventaId);
+      } else {
+        console.warn('[regresarAFase] sendHoldEmail failed', { ventaId, error: res.error });
       }
     }
   }
 
   revalidatePath(`/dilesa/ventas/${ventaId}`);
-  return { ok: true };
+  return { ok: true, emailSent, emailSentTo, emailError };
 }
 
 /**
@@ -292,12 +313,29 @@ export async function desasignarVenta(ventaId: string, motivo: string): Promise<
   if (upErr) return { ok: false, error: upErr.message };
 
   // Email al cliente + vendedor.
+  let emailSent = false;
+  let emailSentTo: string[] = [];
+  let emailError: string | undefined;
   const ctx = await buildEmailContext(admin, ventaId);
-  if (ctx) {
+  if (!ctx) {
+    emailError = 'No se pudo armar el contexto del email (venta no encontrada).';
+    console.warn('[desasignarVenta] buildEmailContext returned null', { ventaId });
+  } else {
     // Sobreescribimos motivo para que llegue fresh (la query lo trajo igual).
-    await sendHoldEmail('desasignada', { ...ctx, motivo: motivoTrim });
+    const res = await sendHoldEmail('desasignada', { ...ctx, motivo: motivoTrim });
+    emailSent = res.ok;
+    emailSentTo = res.sentTo;
+    emailError = res.error;
+    if (!res.ok) {
+      console.warn('[desasignarVenta] sendHoldEmail failed', {
+        ventaId,
+        error: res.error,
+        clienteEmail: ctx.clienteEmail,
+        vendedorEmail: ctx.vendedorEmail,
+      });
+    }
   }
 
   revalidatePath(`/dilesa/ventas/${ventaId}`);
-  return { ok: true };
+  return { ok: true, emailSent, emailSentTo, emailError };
 }
