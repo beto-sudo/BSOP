@@ -56,17 +56,23 @@ const FOOTER_DATA_BY_SLUG: Record<string, { sitioWeb: string; telefono: string }
 };
 
 /**
- * Base pública para servir imágenes de branding subidas al bucket
- * `brand-assets` (mismo patrón que `lib/juntas/email.ts`). Si la URL
- * de la empresa empieza con `http(s)://` o `data:`, se devuelve tal cual.
+ * Base pública para servir imágenes de branding. Los headers viven en
+ * `public/brand/<empresa>/header-email.png` y se sirven como asset
+ * estático de Next.js bajo el dominio de producción (mismo patrón que
+ * `lib/juntas/email.ts`). Si la URL en `core.empresas.header_url` ya
+ * empieza con `http(s)://` o `data:`, se devuelve tal cual.
+ *
+ * Hardcodeamos el dominio de prod porque los emails se envían siempre
+ * desde el deployment de producción — usar `NEXT_PUBLIC_SITE_URL` haría
+ * que previews de Vercel mandaran links a sí mismas (URLs efímeras que
+ * mueren al expirar el preview).
  */
-const ASSET_BASE_URL = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').replace(/\/+$/, '');
+const ASSET_BASE_URL = 'https://bsop.io';
 function resolveAssetUrl(path: string | null | undefined): string | null {
   if (!path) return null;
   if (/^(https?:|data:)/.test(path)) return path;
-  if (!ASSET_BASE_URL) return null;
   const cleaned = path.startsWith('/') ? path : `/${path}`;
-  return `${ASSET_BASE_URL}/storage/v1/object/public/brand-assets${cleaned}`;
+  return `${ASSET_BASE_URL}${cleaned}`;
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any --
