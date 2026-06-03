@@ -22,7 +22,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
 import { Input } from '@/components/ui/input';
-import { Coins, RefreshCw, Search } from 'lucide-react';
+import { Coins, Plus, RefreshCw, Search } from 'lucide-react';
+import { usePermissions } from '@/components/providers';
+import { useToast } from '@/components/ui/toast';
+import { RowActions } from '@/components/shared/row-actions';
+import { CosteoConceptoForm } from '@/components/dilesa/costeo-concepto-form';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency, formatPercent } from '@/lib/format';
 
@@ -32,11 +36,19 @@ export type CosteoRow = {
   proyectoNombre: string;
   etapa: string | null;
   concepto: string;
-  /** presupuesto_actualizado ?? presupuesto_previo (numeric, c/IVA). */
+  /** presupuesto_previo crudo (numeric, c/IVA) — para la captura. */
+  presupuestoPrevio: number | null;
+  /** presupuesto_actualizado crudo (numeric, c/IVA) — para la captura. */
+  presupuestoActualizado: number | null;
+  /** presupuesto_actualizado ?? presupuesto_previo (numeric, c/IVA). Derivado. */
   presupuesto: number | null;
   /** gasto_real_total (numeric, c/IVA). */
   gastoReal: number | null;
   proveedor: string | null;
+  /** fecha_compromiso (date ISO) — para la captura. */
+  fechaCompromiso: string | null;
+  /** orden dentro del proyecto — autocalculado en alta. */
+  orden: number;
   /** gastoReal / presupuesto (0–1) o null si no hay presupuesto. */
   ratio: number | null;
 };
@@ -87,20 +99,33 @@ export function deriveKpis(
 }
 
 export function CosteoModule({ empresaId }: { empresaId: string }) {
+  const { permissions } = usePermissions();
+  const toast = useToast();
+  const puedeEscribir =
+    permissions.isAdmin || permissions.modulos.get('dilesa.construccion.costeo')?.write === true;
+
   const [rows, setRows] = useState<CosteoRow[]>([]);
   /** contratado/pagado por proyecto_id (Capa B). */
   const [contratoAggByProyecto, setContratoAggByProyecto] = useState<
     Map<string, { contratado: number; pagado: number }>
   >(new Map());
+  /** Proyectos DILESA para el selector del form (desarrollos + anteproyectos no convertidos). */
+  const [proyectos, setProyectos] = useState<
+    { id: string; nombre: string; esAnteproyecto: boolean }[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [proyectoFiltro, setProyectoFiltro] = useState('');
   const [etapaFiltro, setEtapaFiltro] = useState('');
+  /** Captura de presupuesto (Sprint 5). null editRow + open = alta. */
+  const [formOpen, setFormOpen] = useState(false);
+  const [editRow, setEditRow] = useState<CosteoRow | null>(null);
 
   const fetchCosteo = useCallback(async (): Promise<{
     rows?: CosteoRow[];
     agg?: Map<string, { contratado: number; pagado: number }>;
+    proyectos?: { id: string; nombre: string; esAnteproyecto: boolean }[];
     error?: string;
   }> => {
     const sb = createSupabaseBrowserClient();
@@ -111,14 +136,14 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
         .schema('dilesa')
         .from('obra_presupuesto')
         .select(
-          'id, proyecto_id, etapa, concepto, presupuesto_actualizado, presupuesto_previo, gasto_real_total, proveedor_texto, orden'
+          'id, proyecto_id, etapa, concepto, presupuesto_actualizado, presupuesto_previo, gasto_real_total, proveedor_texto, fecha_compromiso, orden'
         )
         .eq('empresa_id', empresaId)
         .is('deleted_at', null),
       sb
         .schema('dilesa')
         .from('proyectos')
-        .select('id, nombre')
+        .select('id, nombre, tipo, proyecto_predecesor_id')
         .eq('empresa_id', empresaId)
         .is('deleted_at', null),
       sb
@@ -141,8 +166,27 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
       return { error: getSupabaseErrorMessage(firstErr, 'No se pudo cargar el costeo.') };
     }
 
+    // proyectoMap resuelve nombres de TODOS los proyectos. El selector del form
+    // de captura ofrece desarrollos + anteproyectos NO convertidos (sí se
+    // presupuesta en fase de anteproyecto), etiquetando estos últimos. Los
+    // anteproyectos YA convertidos a desarrollo se omiten: cualquier presupuesto
+    // va sobre el desarrollo sucesor (que referencia al anteproyecto vía
+    // `proyecto_predecesor_id`), así desaparece el duplicado por nombre.
     const proyectoMap = new Map<string, string>();
-    for (const p of proyectosRes.data ?? []) proyectoMap.set(p.id as string, p.nombre as string);
+    const convertidos = new Set<string>(); // ids de anteproyectos con desarrollo sucesor
+    for (const p of proyectosRes.data ?? []) {
+      proyectoMap.set(p.id as string, p.nombre as string);
+      const pred = p.proyecto_predecesor_id as string | null;
+      if (pred) convertidos.add(pred);
+    }
+    const proyectos: { id: string; nombre: string; esAnteproyecto: boolean }[] = [];
+    for (const p of proyectosRes.data ?? []) {
+      const id = p.id as string;
+      const esAnteproyecto = (p.tipo as string) === 'anteproyecto';
+      if (esAnteproyecto && convertidos.has(id)) continue; // ya convertido → va sobre el desarrollo
+      proyectos.push({ id, nombre: (p.nombre as string) ?? '', esAnteproyecto });
+    }
+    proyectos.sort((a, b) => a.nombre.localeCompare(b.nombre));
 
     // Capa B: pagado por contrato → contratado/pagado por proyecto.
     const pagadoByContrato = new Map<string, number>();
@@ -177,9 +221,14 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
           proyectoNombre: proyectoMap.get(pid) ?? '',
           etapa: (r.etapa as string | null) ?? null,
           concepto: (r.concepto as string) ?? '',
+          presupuestoPrevio: r.presupuesto_previo != null ? Number(r.presupuesto_previo) : null,
+          presupuestoActualizado:
+            r.presupuesto_actualizado != null ? Number(r.presupuesto_actualizado) : null,
           presupuesto,
           gastoReal,
           proveedor: (r.proveedor_texto as string | null) ?? null,
+          fechaCompromiso: (r.fecha_compromiso as string | null) ?? null,
+          orden: Number(r.orden ?? 0),
           ratio:
             presupuesto != null && presupuesto > 0 && gastoReal != null
               ? gastoReal / presupuesto
@@ -187,35 +236,39 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
         };
       });
 
-    return { rows: out, agg };
+    return { rows: out, agg, proyectos };
   }, [empresaId]);
 
   const cargar = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const { rows: data, agg, error: e } = await fetchCosteo();
+    const { rows: data, agg, proyectos: proy, error: e } = await fetchCosteo();
     if (e) {
       setError(e);
       setRows([]);
       setContratoAggByProyecto(new Map());
+      setProyectos([]);
     } else {
       setRows(data ?? []);
       setContratoAggByProyecto(agg ?? new Map());
+      setProyectos(proy ?? []);
     }
     setLoading(false);
   }, [fetchCosteo]);
 
   useEffect(() => {
     let activo = true;
-    void fetchCosteo().then(({ rows: data, agg, error: e }) => {
+    void fetchCosteo().then(({ rows: data, agg, proyectos: proy, error: e }) => {
       if (!activo) return;
       if (e) {
         setError(e);
         setRows([]);
         setContratoAggByProyecto(new Map());
+        setProyectos([]);
       } else {
         setRows(data ?? []);
         setContratoAggByProyecto(agg ?? new Map());
+        setProyectos(proy ?? []);
       }
       setLoading(false);
     });
@@ -223,6 +276,43 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
       activo = false;
     };
   }, [fetchCosteo]);
+
+  // Soft-delete de un concepto de presupuesto (Sprint 5). Patrón del repo:
+  // marca `deleted_at`, preserva historial para auditoría.
+  const eliminar = useCallback(
+    async (row: CosteoRow) => {
+      const sb = createSupabaseBrowserClient();
+      const { error: e } = await sb
+        .schema('dilesa')
+        .from('obra_presupuesto')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', row.id);
+      if (e) {
+        toast.add({
+          title: 'Error al eliminar',
+          description: getSupabaseErrorMessage(e, 'No se pudo eliminar el concepto.'),
+          type: 'error',
+        });
+        return;
+      }
+      toast.add({ title: 'Concepto eliminado', description: row.concepto, type: 'success' });
+      void cargar();
+    },
+    [toast, cargar]
+  );
+
+  function abrirAlta() {
+    setEditRow(null);
+    setFormOpen(true);
+  }
+  function abrirEdicion(row: CosteoRow) {
+    setEditRow(row);
+    setFormOpen(true);
+  }
+  function cerrarForm() {
+    setFormOpen(false);
+    setEditRow(null);
+  }
 
   const proyectosPresentes = useMemo(
     () => [...new Set(rows.map((r) => r.proyectoNombre).filter(Boolean))].sort(),
@@ -298,6 +388,30 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
       render: (r) => (r.ratio == null ? '—' : formatPercent(r.ratio)),
     },
     { key: 'proveedor', label: 'Proveedor', type: 'text', render: (r) => r.proveedor || '—' },
+    ...(puedeEscribir
+      ? [
+          {
+            key: 'acciones',
+            label: '',
+            type: 'custom' as const,
+            sortable: false,
+            align: 'right' as const,
+            width: 'w-12',
+            render: (r: CosteoRow) => (
+              <RowActions
+                ariaLabel={`Acciones para ${r.concepto}`}
+                onEdit={{ onClick: () => abrirEdicion(r) }}
+                onDelete={{
+                  onConfirm: () => eliminar(r),
+                  confirmTitle: `¿Eliminar “${r.concepto}”?`,
+                  confirmDescription:
+                    'Marcará el concepto de presupuesto como eliminado. Se preserva el historial para auditoría.',
+                }}
+              />
+            ),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -359,10 +473,37 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
           <RefreshCw className="h-3.5 w-3.5" />
           Refrescar
         </button>
-        <span className="ml-auto text-sm text-[var(--text)]/60">
-          {filtrados.length} de {rows.length} conceptos
-        </span>
+        <div className="ml-auto flex items-center gap-3">
+          <span className="text-sm text-[var(--text)]/60">
+            {filtrados.length} de {rows.length} conceptos
+          </span>
+          {puedeEscribir ? (
+            <button
+              type="button"
+              onClick={abrirAlta}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Nuevo concepto
+            </button>
+          ) : null}
+        </div>
       </div>
+
+      {formOpen ? (
+        <CosteoConceptoForm
+          key={editRow?.id ?? 'nuevo'}
+          empresaId={empresaId}
+          proyectos={proyectos}
+          rows={rows}
+          editRow={editRow}
+          onClose={cerrarForm}
+          onSaved={() => {
+            cerrarForm();
+            void cargar();
+          }}
+        />
+      ) : null}
 
       <DataTable
         data={filtrados}

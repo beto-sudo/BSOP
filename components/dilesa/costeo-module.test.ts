@@ -8,9 +8,13 @@ function r(overrides: Partial<CosteoRow>): CosteoRow {
     proyectoNombre: 'Lomas',
     etapa: 'Urbanización',
     concepto: 'Drenaje',
+    presupuestoPrevio: null,
+    presupuestoActualizado: null,
     presupuesto: 0,
     gastoReal: 0,
     proveedor: null,
+    fechaCompromiso: null,
+    orden: 0,
     ratio: null,
     ...overrides,
   };

@@ -10,8 +10,9 @@ proveedores/contratistas; futura emisión a CxP)
 **Creada:** 2026-06-01
 **Última actualización:** 2026-06-02 (Ciclo de obra end-to-end: Capa A (#617) +
 Capa B (#631) + Sprint 3 Costeo (#639) + Sprint 4 captura (#644) + **puente CxP**
-backend (#651, en prod) + UI "Emitir a CxP" (este PR). Próximo: cotizaciones y
-captura de presupuesto; reasignar los 8 contratos placeholder.)
+backend (#651, en prod) + UI "Emitir a CxP" (#654) + **Sprint 5 captura de
+presupuesto** (este PR). Próximo: cotizaciones (dominio nuevo, promover con
+Beto); reasignar los 8 contratos placeholder.)
 
 ## Problema
 
@@ -311,27 +312,70 @@ condiciones_pago_dias?)` que **reúsa** `cxp_factura_alta` (no modifica el RPC d
   (Dirección)/pagar/conciliar** en el módulo CxP. Depende de que CxP esté en
   DILESA (ya, vía cxp #640).
 
+### 2026-06-02 — Sprint 5 (captura de presupuesto de obra)
+
+CRUD de la Capa A (`dilesa.obra_presupuesto`), que hasta ahora era solo-lectura
+(el traspaso cargó 128 conceptos, sin forma de capturar/corregir hacia adelante).
+Sin schema, sin migración: el sub-slug `dilesa.construccion.costeo` ya tiene write.
+
+- **Form de captura** `components/dilesa/costeo-concepto-form.tsx` (alta + edición),
+  calca el inline de `obra-contrato-detalle.tsx` (`useState` plano, sin drawer).
+  Campos: proyecto (selector, requerido), concepto (requerido), etapa, presupuesto
+  previo/actualizado, gasto real, proveedor (texto), fecha compromiso. Insert/update
+  directo con RLS `dilesa`.
+- **Tab Costeo** (`costeo-module.tsx`): botón "Nuevo concepto" + columna de acciones
+  por renglón (`RowActions` → editar / eliminar con `ConfirmDialog`), ambos gated por
+  `dilesa.construccion.costeo`.write. Soft-delete (`deleted_at`). El form se remonta
+  por `key` al alternar entre conceptos. `CosteoRow` extendido con los campos crudos
+  (`presupuestoPrevio`/`presupuestoActualizado`/`fechaCompromiso`/`orden`) para
+  pre-llenar la edición; KPIs y `deriveKpis` intactos.
+- **Decisiones Sprint 5:** `orden` autocalculado (max del proyecto + 1) en alta y
+  preservado en edición — no se expone (reordenar es otra feature). IVA: v1 captura
+  `gasto_real_total` c/IVA; el desglose subtotal/iva/tasa queda null (igual que el
+  traspaso, ADR-038). Proveedor solo texto (la liga a `erp.personas` sigue diferida,
+  D2). 5 checks verdes (1184 tests). **PR de UI → sin auto-merge** (Beto revisa el
+  preview).
+
+### 2026-06-03 — Fix selector de proyectos (Sprint 5, mismo PR #656)
+
+Beto notó duplicados en el dropdown "Proyecto" del form de captura. Diagnóstico
+(SELECT a `dilesa.proyectos`): **no eran duplicados de datos** sino pares
+anteproyecto→desarrollo legítimos (Ampliación LDLE y Lomas de las Delicias ya
+pasaron de anteproyecto `completado` a desarrollo `ejecutando`, ligados por
+`proyecto_predecesor_id`).
+
+**Criterio (decisión de Beto):** sí se presupuesta en fase de anteproyecto, así
+que NO se ocultan los anteproyectos del dropdown — se **identifican**. Lógica del
+selector:
+
+- **Desarrollos** → se muestran (son los proyectos).
+- **Anteproyectos NO convertidos** → se muestran con sufijo **`(anteproyecto)`**.
+- **Anteproyectos YA convertidos** (su id aparece como `proyecto_predecesor_id`
+  de algún desarrollo) → se **omiten**: cualquier presupuesto/gasto va sobre el
+  desarrollo sucesor. Esto elimina el duplicado por nombre.
+
+`proyectoMap` (resuelve nombres en la tabla de costeo) se deja con TODOS los
+proyectos por robustez. Sin schema. Los anteproyectos convertidos **no se borran
+de la DB** (son el registro del anteproyecto ganador, trazabilidad del flujo);
+solo se ocultan del selector. Corregida la nota errónea de "duplicado a limpiar".
+
 ## Handover — estado y próximos pasos (para la siguiente sesión)
 
 **Hecho (en prod):** schema Sprint 1 (#615) + Capa A de costeo (`obra_presupuesto`,
 128 renglones, #617) + **Capa B de contratos + estimaciones** (32 contratos, 275
 estimaciones, #631) + **ADR-039** (#637) + **Sprint 3** tab Costeo (#639) +
-**Sprint 4** captura de obra (#644) + **Puente CxP** backend (#651) + UI (este PR).
-Ciclo de obra **end-to-end**: crear contrato → estimar → emitir a CxP → costear.
-Faltan los módulos upstream: **cotizaciones** y **captura de presupuesto**
-(`obra_presupuesto` aún solo-lectura).
+**Sprint 4** captura de obra (#644) + **Puente CxP** backend (#651) + UI (#654) +
+**Sprint 5** captura de presupuesto (este PR). Ciclo de obra **end-to-end**: crear
+contrato → estimar → emitir a CxP → costear; y el presupuesto (Capa A) ya es
+editable. Falta el módulo upstream: **cotizaciones**.
 
-**Próximo trabajo — handoff para sesión nueva (orden: presupuesto → cotizaciones).**
+**Próximo trabajo — handoff para sesión nueva.**
 
-_1. Captura de presupuesto (Sprint 5 — contenido, sin schema nuevo)._ La tabla
-`dilesa.obra_presupuesto` ya existe (128 renglones) pero solo se lee (tab Costeo).
-Falta el CRUD: en el tab **Costeo** (`components/dilesa/costeo-module.tsx`),
-"Nuevo concepto" + edición/borrado inline por renglón. Campos: `concepto`,
-`etapa`, `presupuesto_previo`, `presupuesto_actualizado`, `gasto_real_total`,
-`proveedor_texto`, `fecha_compromiso`, `orden`. Insert/update directo a
-`dilesa.obra_presupuesto` (RLS dilesa). El sub-slug `dilesa.construccion.costeo`
-ya tiene write → **sin migración**. Calca la captura inline de
-`obra-contrato-detalle.tsx`.
+_1. Captura de presupuesto (Sprint 5) — ✅ HECHO (este PR)._ `dilesa.obra_presupuesto`
+ya tiene CRUD en el tab Costeo: form `costeo-concepto-form.tsx` (alta + edición) +
+"Nuevo concepto" + acciones por renglón (editar / eliminar), gated por
+`dilesa.construccion.costeo`.write. Sin schema, sin migración. Ver Bitácora
+2026-06-02.
 
 _2. Cotizaciones (iniciativa nueva — promover con Beto antes de construir)._ Hoy
 no hay dónde capturar/comparar cotizaciones antes de adjudicar un contrato (el
@@ -382,7 +426,14 @@ saldo; hoy v1 es la tabla de conceptos + KPIs de rollup.
   (diferido: el match por `proveedor_texto` es fuzzy y los contratistas con
   varios contratos —Electrogaza ×5, San Rodrigo ×4, Estrella ×4— necesitan
   desambiguar por concepto; hacerlo al construir la UI de rollup que lo consume).
-- **Duplicado ELECTROGAZA** en `erp.personas` (2 filas; se usó la más antigua) y
-  **duplicado** "Ampliación Lomas de los Encinos" en `dilesa.proyectos`
-  (`cd7c9cae-…` y `26352cac-…`) — limpiar.
+- **Duplicado ELECTROGAZA** en `erp.personas` (2 filas; se usó la más antigua) —
+  limpiar.
+- ~~"duplicado" Ampliación Lomas de los Encinos en `dilesa.proyectos`~~ ✅
+  **NO era duplicado** (verificado 2026-06-03): `cd7c9cae` es el **anteproyecto**
+  (completado) y `26352cac` el **desarrollo** (ejecutando) ligado por
+  `proyecto_predecesor_id` — par legítimo del flujo anteproyecto→desarrollo.
+  Igual Lomas de las Delicias (`34920025` antep. / `dd4a4e44` desarrollo). NO
+  borrar. El "duplicado visual" en el selector se resolvió ocultando solo los
+  anteproyectos **ya convertidos** y etiquetando los no convertidos como
+  `(anteproyecto)` (ver Bitácora 2026-06-03).
 - ~~ADR-038 → índice §5 de `ARCHITECTURE.md`~~ ✅ hecho (037/038/039, #637).
