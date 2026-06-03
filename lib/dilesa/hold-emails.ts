@@ -21,7 +21,14 @@
 
 import { formatearVencimiento } from './hold-cola';
 
-const RESEND_FROM = 'DILESA <ventas@dilesa.mx>';
+/**
+ * `From` para Resend. Usa `noreply@bsop.io` porque es el dominio que el
+ * proyecto tiene verificado en Resend (mismo patrón que `lib/juntas/email.ts`).
+ * Usar `@dilesa.mx` sin verificar el dominio en Resend hace que TODOS los
+ * envíos sean rechazados silenciosamente — fue la causa de que el primer
+ * email de hold no llegara.
+ */
+const RESEND_FROM = 'DILESA <noreply@bsop.io>';
 const URL_BSOP = 'https://bsop.io';
 
 export type HoldEventType = 'hold_creado' | 'hold_promovido' | 'hold_4h_warning' | 'hold_expirada';
@@ -111,14 +118,27 @@ function renderTemplate(
   switch (type) {
     case 'hold_creado':
       return {
-        subject: `Solicitud de asignación creada — ${ref}`,
+        subject: `Bienvenido a DILESA — Tu solicitud por ${ref}`,
         html: `
-          <p>Hola,</p>
-          <p>Se registró una <b>solicitud de asignación</b> para la unidad <b>${escapeHtml(ref)}</b> a nombre de <b>${escapeHtml(ctx.clienteNombre)}</b>.</p>
-          <p>Esta unidad queda en <b>hold</b> hasta <b>${fechaDeadline ?? 'el plazo definido'}</b>. Antes de esa fecha hay que completar el expediente con todos los documentos firmados; si no, el hold se pierde y la siguiente solicitud en la fila toma el lugar.</p>
+          <p>Hola <b>${escapeHtml(ctx.clienteNombre)}</b>,</p>
+          <p>En DILESA estamos felices de acompañarte en el proceso de compra de tu nueva vivienda.
+             Te damos la bienvenida y te confirmamos que se registró tu <b>solicitud de asignación</b>
+             para la unidad <b>${escapeHtml(ref)}</b>.</p>
+          <p>A partir de hoy te <b>llevaremos de la mano</b> paso a paso por todo el proceso —
+             desde la firma del contrato de promesa, el avalúo del banco, la dictaminación del
+             crédito, hasta la escrituración y entrega de las llaves de tu vivienda.</p>
+          <p><b>Tu unidad queda apartada (en "hold") hasta ${fechaDeadline ?? 'el plazo definido'}.</b>
+             En ese plazo necesitamos que nos entregues el expediente completo con todos los
+             documentos firmados — solicitud de asignación, aviso de privacidad, FICU y expediente
+             digital — y el comprobante del pago del enganche.</p>
+          <p>Si por algún motivo no se completa el expediente en ese plazo, el apartado se libera
+             y la unidad pasa a la siguiente persona interesada. Por eso es importante que avancemos
+             juntos en estos 2 días hábiles.</p>
           ${faltantesHtml}
-          <p><a href="${linkVenta}">Ver expediente en BSOP</a></p>
-          <p>— DILESA</p>
+          <p>Cualquier duda, tu asesor de ventas
+             <b>${escapeHtml(ctx.vendedorNombre ?? 'asignado')}</b> te puede orientar en cada paso.</p>
+          <p><a href="${linkVenta}">Ver el avance de tu expediente</a></p>
+          <p>Bienvenido a tu nuevo hogar,<br/>— Equipo DILESA</p>
         `.trim(),
       };
     case 'hold_promovido':
