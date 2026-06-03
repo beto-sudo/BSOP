@@ -443,6 +443,31 @@ async function desasignarVentaInner(ventaId: string, motivo: string): Promise<Ac
     .eq('id', ventaId);
   if (upErr) return { ok: false, error: upErr.message };
 
+  // Liberar la unidad: cuando se autoriza Fase 2 (Asignada), la unidad
+  // pasa a estado='asignada'. Al desasignar, debemos regresarla a
+  // 'terminada' para que vuelva a aparecer en el form de nueva venta
+  // (que filtra por `estado IN ('en_construccion','terminada')`).
+  //
+  // Solo tocamos si el estado actual es 'asignada' — estados posteriores
+  // (escriturada, entregada) no se revierten porque implican que el
+  // proceso siguió avanzando antes del desasignar (caso operativo raro,
+  // pero Dirección puede manejarlo manual).
+  if (v.unidad_id) {
+    const { data: unidadActual } = await admin
+      .schema('dilesa')
+      .from('unidades')
+      .select('estado')
+      .eq('id', v.unidad_id)
+      .maybeSingle();
+    if (unidadActual?.estado === 'asignada') {
+      await admin
+        .schema('dilesa')
+        .from('unidades')
+        .update({ estado: 'terminada' })
+        .eq('id', v.unidad_id);
+    }
+  }
+
   // Email al cliente + vendedor.
   let emailSent = false;
   let emailSentTo: string[] = [];
