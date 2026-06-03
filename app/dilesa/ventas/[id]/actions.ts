@@ -22,7 +22,6 @@ import { revalidatePath } from 'next/cache';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { sendHoldEmail, type HoldEmailContext } from '@/lib/dilesa/hold-emails';
-import { fetchUserPermissions } from '@/lib/permissions';
 
 const FASES_CANONICAS: Record<number, string> = {
   1: 'Solicitud de Asignación',
@@ -56,19 +55,98 @@ export type ActionResult =
     }
   | { ok: false; error: string };
 
+/**
+ * Valida que el usuario actual tenga permiso de autorizar movimientos
+ * administrativos sobre ventas DILESA.
+ *
+ * Server-side puro: no podemos usar `fetchUserPermissions` de
+ * `lib/permissions.ts` porque ese archivo es `'use client'`. Hacemos
+ * los lookups directo con admin client.
+ *
+ * Tiene permiso si:
+ *  (A) `core.usuarios.rol = 'admin'` (admin global), o
+ *  (B) tiene escritura sobre `dilesa.ventas.autorizar` en algún rol
+ *      que se le haya asignado en alguna empresa.
+ */
+/* eslint-disable @typescript-eslint/no-explicit-any --
+ * supabase-js solo tipa `public`; para `core.*` casteamos `as any`.
+ * Mismo patrón que `lib/empresas/admin-guard.ts`.
+ */
 async function requireAutorizar(): Promise<ActionResult & { userId?: string }> {
   const sb = await createSupabaseServerClient();
   const {
     data: { user },
   } = await sb.auth.getUser();
   if (!user) return { ok: false, error: 'No autenticado' };
-  const perms = await fetchUserPermissions(sb);
-  const tienePermiso =
-    perms.isAdmin || perms.modulos.get('dilesa.ventas.autorizar')?.write === true;
-  if (!tienePermiso) {
-    return { ok: false, error: 'No tienes permisos para esta acción (requiere autorización).' };
+  const email = user.email;
+  if (!email) return { ok: false, error: 'JWT sin email claim' };
+
+  const admin = getSupabaseAdminClient();
+  if (!admin) return { ok: false, error: 'Admin client no disponible' };
+
+  // 1. Lookup del usuario por email → id + rol global.
+  const { data: coreUser, error: cuErr } = await (admin.schema('core') as any)
+    .from('usuarios')
+    .select('id, rol, activo')
+    .eq('email', email.toLowerCase())
+    .maybeSingle();
+  if (cuErr) return { ok: false, error: `lookup usuario: ${cuErr.message}` };
+  if (!coreUser || !coreUser.activo) {
+    return { ok: false, error: 'Usuario sin acceso activo' };
   }
-  return { ok: true, userId: user.id };
+
+  // (A) Admin global → bypass.
+  if (coreUser.rol === 'admin') {
+    return { ok: true, userId: coreUser.id };
+  }
+
+  // (B) Buscar si alguno de sus roles en alguna empresa tiene escritura
+  //     sobre el módulo `dilesa.ventas.autorizar`.
+  const { data: modulo, error: mErr } = await (admin.schema('core') as any)
+    .from('modulos')
+    .select('id')
+    .eq('slug', 'dilesa.ventas.autorizar')
+    .limit(1)
+    .maybeSingle();
+  if (mErr) return { ok: false, error: `lookup módulo: ${mErr.message}` };
+  if (!modulo) {
+    return {
+      ok: false,
+      error: 'No tienes permisos para esta acción (módulo dilesa.ventas.autorizar no existe).',
+    };
+  }
+
+  const { data: rolesUsuario } = await (admin.schema('core') as any)
+    .from('usuarios_empresas')
+    .select('rol_id')
+    .eq('usuario_id', coreUser.id)
+    .not('rol_id', 'is', null);
+  const rolIds = ((rolesUsuario ?? []) as Array<{ rol_id: string | null }>)
+    .map((r) => r.rol_id)
+    .filter((v): v is string => !!v);
+  if (rolIds.length === 0) {
+    return {
+      ok: false,
+      error: 'No tienes rol asignado en ninguna empresa (requiere autorización).',
+    };
+  }
+
+  const { data: permisos } = await (admin.schema('core') as any)
+    .from('permisos_rol')
+    .select('acceso_escritura')
+    .eq('modulo_id', modulo.id)
+    .in('rol_id', rolIds);
+  const tienePermiso = ((permisos ?? []) as Array<{ acceso_escritura: boolean }>).some(
+    (p) => p.acceso_escritura
+  );
+  if (!tienePermiso) {
+    return {
+      ok: false,
+      error: 'No tienes permisos para esta acción (requiere autorización).',
+    };
+  }
+
+  return { ok: true, userId: coreUser.id };
 }
 
 /**
