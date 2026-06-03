@@ -47,7 +47,7 @@ export function CosteoConceptoForm({
   onSaved,
 }: {
   empresaId: string;
-  proyectos: readonly { id: string; nombre: string }[];
+  proyectos: readonly { id: string; nombre: string; esAnteproyecto: boolean }[];
   /** Conceptos visibles — fuente del autocálculo de `orden` en alta. */
   rows: readonly CosteoRow[];
   /** null = alta; row = edición (form pre-llenado). */
@@ -143,7 +143,7 @@ export function CosteoConceptoForm({
             <option value="">Selecciona…</option>
             {proyectos.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.nombre}
+                {p.esAnteproyecto ? `${p.nombre} (anteproyecto)` : p.nombre}
               </option>
             ))}
           </select>

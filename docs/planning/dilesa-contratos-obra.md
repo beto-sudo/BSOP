@@ -342,12 +342,22 @@ Beto notó duplicados en el dropdown "Proyecto" del form de captura. Diagnóstic
 (SELECT a `dilesa.proyectos`): **no eran duplicados de datos** sino pares
 anteproyecto→desarrollo legítimos (Ampliación LDLE y Lomas de las Delicias ya
 pasaron de anteproyecto `completado` a desarrollo `ejecutando`, ligados por
-`proyecto_predecesor_id`). El selector mostraba ambos `tipo`. Fix: el dropdown de
-captura filtra a `tipo='desarrollo'` (el presupuesto de obra / Capa A es de un
-desarrollo en ejecución, no de un anteproyecto en análisis). `proyectoMap` (que
-resuelve nombres en la tabla de costeo) se deja con TODOS los proyectos por
-robustez. Sin schema. Corregida la nota errónea de "duplicado a limpiar" en
-Pendientes menores.
+`proyecto_predecesor_id`).
+
+**Criterio (decisión de Beto):** sí se presupuesta en fase de anteproyecto, así
+que NO se ocultan los anteproyectos del dropdown — se **identifican**. Lógica del
+selector:
+
+- **Desarrollos** → se muestran (son los proyectos).
+- **Anteproyectos NO convertidos** → se muestran con sufijo **`(anteproyecto)`**.
+- **Anteproyectos YA convertidos** (su id aparece como `proyecto_predecesor_id`
+  de algún desarrollo) → se **omiten**: cualquier presupuesto/gasto va sobre el
+  desarrollo sucesor. Esto elimina el duplicado por nombre.
+
+`proyectoMap` (resuelve nombres en la tabla de costeo) se deja con TODOS los
+proyectos por robustez. Sin schema. Los anteproyectos convertidos **no se borran
+de la DB** (son el registro del anteproyecto ganador, trazabilidad del flujo);
+solo se ocultan del selector. Corregida la nota errónea de "duplicado a limpiar".
 
 ## Handover — estado y próximos pasos (para la siguiente sesión)
 
@@ -423,6 +433,7 @@ saldo; hoy v1 es la tabla de conceptos + KPIs de rollup.
   (completado) y `26352cac` el **desarrollo** (ejecutando) ligado por
   `proyecto_predecesor_id` — par legítimo del flujo anteproyecto→desarrollo.
   Igual Lomas de las Delicias (`34920025` antep. / `dd4a4e44` desarrollo). NO
-  borrar. El "duplicado visual" en el selector se resolvió filtrando el dropdown
-  de captura a `tipo='desarrollo'` (ver Bitácora 2026-06-03).
+  borrar. El "duplicado visual" en el selector se resolvió ocultando solo los
+  anteproyectos **ya convertidos** y etiquetando los no convertidos como
+  `(anteproyecto)` (ver Bitácora 2026-06-03).
 - ~~ADR-038 → índice §5 de `ARCHITECTURE.md`~~ ✅ hecho (037/038/039, #637).

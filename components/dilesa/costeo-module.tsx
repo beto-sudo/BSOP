@@ -109,8 +109,10 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
   const [contratoAggByProyecto, setContratoAggByProyecto] = useState<
     Map<string, { contratado: number; pagado: number }>
   >(new Map());
-  /** Proyectos DILESA — selector del form de captura. */
-  const [proyectos, setProyectos] = useState<{ id: string; nombre: string }[]>([]);
+  /** Proyectos DILESA para el selector del form (desarrollos + anteproyectos no convertidos). */
+  const [proyectos, setProyectos] = useState<
+    { id: string; nombre: string; esAnteproyecto: boolean }[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -123,7 +125,7 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
   const fetchCosteo = useCallback(async (): Promise<{
     rows?: CosteoRow[];
     agg?: Map<string, { contratado: number; pagado: number }>;
-    proyectos?: { id: string; nombre: string }[];
+    proyectos?: { id: string; nombre: string; esAnteproyecto: boolean }[];
     error?: string;
   }> => {
     const sb = createSupabaseBrowserClient();
@@ -141,7 +143,7 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
       sb
         .schema('dilesa')
         .from('proyectos')
-        .select('id, nombre, tipo')
+        .select('id, nombre, tipo, proyecto_predecesor_id')
         .eq('empresa_id', empresaId)
         .is('deleted_at', null),
       sb
@@ -164,19 +166,25 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
       return { error: getSupabaseErrorMessage(firstErr, 'No se pudo cargar el costeo.') };
     }
 
-    // proyectoMap resuelve nombres de TODOS los proyectos (incluye anteproyectos,
-    // por si un renglón de presupuesto los referencia). El selector del form de
-    // captura, en cambio, solo ofrece DESARROLLOS: el presupuesto de obra (Capa A)
-    // es de un desarrollo en ejecución, no de un anteproyecto en análisis. Esto
-    // además evita el duplicado visual de los proyectos que ya pasaron
-    // anteproyecto→desarrollo (mismo nombre en dos filas, ligadas por predecesor).
+    // proyectoMap resuelve nombres de TODOS los proyectos. El selector del form
+    // de captura ofrece desarrollos + anteproyectos NO convertidos (sí se
+    // presupuesta en fase de anteproyecto), etiquetando estos últimos. Los
+    // anteproyectos YA convertidos a desarrollo se omiten: cualquier presupuesto
+    // va sobre el desarrollo sucesor (que referencia al anteproyecto vía
+    // `proyecto_predecesor_id`), así desaparece el duplicado por nombre.
     const proyectoMap = new Map<string, string>();
-    const proyectos: { id: string; nombre: string }[] = [];
+    const convertidos = new Set<string>(); // ids de anteproyectos con desarrollo sucesor
     for (const p of proyectosRes.data ?? []) {
       proyectoMap.set(p.id as string, p.nombre as string);
-      if (p.tipo === 'desarrollo') {
-        proyectos.push({ id: p.id as string, nombre: (p.nombre as string) ?? '' });
-      }
+      const pred = p.proyecto_predecesor_id as string | null;
+      if (pred) convertidos.add(pred);
+    }
+    const proyectos: { id: string; nombre: string; esAnteproyecto: boolean }[] = [];
+    for (const p of proyectosRes.data ?? []) {
+      const id = p.id as string;
+      const esAnteproyecto = (p.tipo as string) === 'anteproyecto';
+      if (esAnteproyecto && convertidos.has(id)) continue; // ya convertido → va sobre el desarrollo
+      proyectos.push({ id, nombre: (p.nombre as string) ?? '', esAnteproyecto });
     }
     proyectos.sort((a, b) => a.nombre.localeCompare(b.nombre));
 
