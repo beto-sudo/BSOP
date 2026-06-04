@@ -25,8 +25,9 @@ const CLASES: { v: ProtocoloClase; label: string }[] = [
 ];
 
 type TomaLog = ProtocoloToma & { nombre: string };
+type DoseUnit = 'mg' | 'mcg' | 'mL' | 'u';
+const DOSE_UNITS: DoseUnit[] = ['mg', 'mcg', 'mL', 'u'];
 
-// YYYY-MM-DD en tz local (Matamoros) para el input date.
 function todayInput(): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Matamoros',
@@ -54,30 +55,96 @@ function fmtFecha(iso: string): string {
   });
 }
 
-// Calculadora de reconstitución (estilo peptidescalculator):
-//   concentración = mg del vial / mL de agua bacteriostática
-//   unidades a jalar = (dosis / concentración) × 100  (jeringa de insulina U-100)
-//   dosis por vial = mg del vial / dosis
-function computeRecon(vialMg: number, bacMl: number, dosis: number) {
-  const concentracion = vialMg > 0 && bacMl > 0 ? vialMg / bacMl : null;
-  const unidades = concentracion && dosis > 0 ? (dosis / concentracion) * 100 : null;
-  const dosisPorVial = vialMg > 0 && dosis > 0 ? Math.floor(vialMg / dosis) : null;
-  return { concentracion, unidades, dosisPorVial };
+function normalizeUnit(s: string | null | undefined): DoseUnit {
+  const t = (s ?? '').toLowerCase();
+  if (t === 'mcg') return 'mcg';
+  if (t === 'ml') return 'mL';
+  if (t === 'u' || t === 'units' || t === 'unidades' || t === 'ui') return 'u';
+  return 'mg';
 }
 
-// Dosis a mg para el cálculo de unidades (los vials se etiquetan en mg).
-const toMg = (dose: number, unit: 'mg' | 'mcg'): number => (unit === 'mcg' ? dose / 1000 : dose);
+// Conversión de dosis entre unidades. Puente: concentración mg/mL (vial mg / agua mL).
+// Jeringa de insulina U-100 → 100 u = 1 mL. mg↔mcg es directo; mg/mcg ↔ mL/u necesita
+// la concentración (si no hay vial+agua, sólo se resuelve lo que no la requiere).
+function computeConversions(vialMg: number, bacMl: number, dose: number, unit: DoseUnit) {
+  const concentracion = vialMg > 0 && bacMl > 0 ? vialMg / bacMl : null; // mg/mL
+  let mg: number | null = null;
+  let mL: number | null = null;
+  if (dose > 0) {
+    if (unit === 'mg') mg = dose;
+    else if (unit === 'mcg') mg = dose / 1000;
+    else if (unit === 'mL') {
+      mL = dose;
+      mg = concentracion != null ? dose * concentracion : null;
+    } else {
+      // 'u' (U-100): dose/100 = mL
+      mL = dose / 100;
+      mg = concentracion != null ? (dose / 100) * concentracion : null;
+    }
+    if (mL == null && mg != null && concentracion != null && concentracion > 0) {
+      mL = mg / concentracion;
+    }
+  }
+  const mcg = mg != null ? mg * 1000 : null;
+  const u = mL != null ? mL * 100 : null;
+  const dosisPorVial = mg != null && mg > 0 && vialMg > 0 ? Math.floor(vialMg / mg) : null;
+  return { concentracion, mg, mcg, mL, u, dosisPorVial };
+}
+
+type Conv = ReturnType<typeof computeConversions>;
 
 const round = (n: number | null, d = 2): number | null =>
   n == null ? null : Math.round(n * 10 ** d) / 10 ** d;
 
 const inputCls = 'h-9 w-full rounded-md border bg-background px-2 text-sm';
 const labelCls = 'text-[11px] font-medium uppercase tracking-wider text-muted-foreground';
+const selCls = 'h-9 rounded-md border bg-background px-1.5 text-sm';
+
+function Equiv({
+  label,
+  value,
+  highlight,
+}: {
+  label: string;
+  value: string | number | null;
+  highlight?: boolean;
+}) {
+  return (
+    <span className="text-muted-foreground">
+      {label}:{' '}
+      <span
+        className={`font-semibold tabular-nums ${
+          highlight ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'
+        }`}
+      >
+        {value ?? '—'}
+      </span>
+    </span>
+  );
+}
+
+// Panel de equivalencias: misma dosis expresada en todas las unidades.
+function EquivPanel({ c }: { c: Conv }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-lg bg-muted/40 px-3 py-2 text-sm">
+      <Equiv
+        label="Concentración"
+        value={c.concentracion != null ? `${round(c.concentracion, 3)} mg/mL` : '—'}
+      />
+      <span className="text-muted-foreground/50">≡</span>
+      <Equiv label="mg" value={round(c.mg, 4)} />
+      <Equiv label="mcg" value={round(c.mcg, 1)} />
+      <Equiv label="mL" value={round(c.mL, 3)} />
+      <Equiv label="Jalar" value={c.u != null ? `${round(c.u, 1)} u` : '—'} highlight />
+      <Equiv label="Dosis/vial" value={c.dosisPorVial} />
+    </div>
+  );
+}
 
 /**
  * Bitácora (iniciativa sanren-peptides, Sprint 4 + 6). Registro rápido +
- * calculadora de reconstitución que guarda el cálculo con la toma + edición/
- * borrado de cada registro. Reusa health.protocolo_* y las server actions.
+ * calculadora de reconstitución con conversión entre unidades (mg/mcg/mL/u),
+ * guarda el cálculo con la toma + edición/borrado. Reusa health.protocolo_*.
  */
 export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConTomas[] }) {
   const router = useRouter();
@@ -90,7 +157,7 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
   const [vialMg, setVialMg] = useState('');
   const [bacMl, setBacMl] = useState('');
   const [dosis, setDosis] = useState('');
-  const [dosisUnidad, setDosisUnidad] = useState<'mg' | 'mcg'>('mg');
+  const [dosisUnidad, setDosisUnidad] = useState<DoseUnit>('mg');
   const [fecha, setFecha] = useState(todayInput());
   const [nota, setNota] = useState('');
 
@@ -116,10 +183,11 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
     [compuestos]
   );
 
-  const calc = computeRecon(
+  const calc = computeConversions(
     Number(vialMg) || 0,
     Number(bacMl) || 0,
-    toMg(Number(dosis) || 0, dosisUnidad)
+    Number(dosis) || 0,
+    dosisUnidad
   );
 
   function quick(c: ProtocoloCompuestoConTomas) {
@@ -145,7 +213,7 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
     if (!Number.isFinite(d) || d <= 0) return setErr('La dosis debe ser un número mayor a 0.');
     const v = Number(vialMg) || 0;
     const b = Number(bacMl) || 0;
-    const c = computeRecon(v, b, toMg(d, dosisUnidad));
+    const c = computeConversions(v, b, d, dosisUnidad);
     start(async () => {
       const r = await registrarToma({
         compuestoId,
@@ -156,7 +224,7 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
         vial_mg: v || null,
         bac_ml: b || null,
         concentracion: round(c.concentracion, 3),
-        unidades: round(c.unidades, 1),
+        unidades: round(c.u, 1),
       });
       if (r.ok) {
         setVialMg('');
@@ -203,8 +271,7 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
           ? String(c.dosis_objetivo)
           : ''
     );
-    const u = (last?.unidad ?? c.unidad_dosis ?? 'mg').toLowerCase();
-    setDosisUnidad(u === 'mcg' ? 'mcg' : 'mg');
+    setDosisUnidad(normalizeUnit(last?.unidad ?? c.unidad_dosis));
   }
 
   return (
@@ -289,7 +356,7 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
             </select>
             <input
               className={inputCls}
-              placeholder="Unidad (mg/mcg/UI)"
+              placeholder="Unidad (mg/mcg/mL/u)"
               value={nuevo.unidad}
               onChange={(e) => setNuevo({ ...nuevo, unidad: e.target.value })}
             />
@@ -358,13 +425,16 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
                 onChange={(e) => setDosis(e.target.value)}
               />
               <select
-                className="h-9 rounded-md border bg-background px-1.5 text-sm"
+                className={selCls}
                 value={dosisUnidad}
-                onChange={(e) => setDosisUnidad(e.target.value as 'mg' | 'mcg')}
+                onChange={(e) => setDosisUnidad(e.target.value as DoseUnit)}
                 aria-label="Unidad de dosis"
               >
-                <option value="mg">mg</option>
-                <option value="mcg">mcg</option>
+                {DOSE_UNITS.map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -401,26 +471,13 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
           </div>
         </div>
 
-        {/* Resultado de la calculadora */}
-        <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 rounded-lg bg-muted/40 px-3 py-2 text-sm">
-          <span className="text-muted-foreground">
-            Concentración:{' '}
-            <span className="font-semibold text-foreground tabular-nums">
-              {calc.concentracion != null ? `${round(calc.concentracion, 3)} mg/mL` : '—'}
-            </span>
-          </span>
-          <span className="text-muted-foreground">
-            Jalar:{' '}
-            <span className="font-semibold text-emerald-600 tabular-nums dark:text-emerald-400">
-              {calc.unidades != null ? `${round(calc.unidades, 1)} u` : '—'}
-            </span>
-          </span>
-          <span className="text-muted-foreground">
-            Dosis por vial:{' '}
-            <span className="font-semibold text-foreground tabular-nums">
-              {calc.dosisPorVial ?? '—'}
-            </span>
-          </span>
+        {/* Equivalencias (la misma dosis en mg/mcg/mL/u) */}
+        <div className="mt-3">
+          <EquivPanel c={calc} />
+          <p className="mt-1 text-[11px] text-muted-foreground/70">
+            mL y u requieren vial + agua (concentración). u = jeringa de insulina U-100 (100 u = 1
+            mL).
+          </p>
         </div>
 
         <div className="mt-3">
@@ -455,7 +512,7 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
                     {t.dosis}
                     {t.unidad ? ` ${t.unidad}` : ''}
                   </span>
-                  {t.unidades != null ? (
+                  {t.unidades != null && normalizeUnit(t.unidad) !== 'u' ? (
                     <span className="tabular-nums text-emerald-600 dark:text-emerald-400">
                       {t.unidades} u
                     </span>
@@ -505,7 +562,7 @@ function EditTomaDrawer({
   const [nota, setNota] = useState('');
   const [vialMg, setVialMg] = useState('');
   const [bacMl, setBacMl] = useState('');
-  const [unidad, setUnidad] = useState<'mg' | 'mcg'>('mg');
+  const [unidad, setUnidad] = useState<DoseUnit>('mg');
 
   // Prefill cuando cambia la toma seleccionada.
   const [loadedId, setLoadedId] = useState<string | null>(null);
@@ -518,13 +575,14 @@ function EditTomaDrawer({
     setNota(toma.nota ?? '');
     setVialMg(toma.vial_mg != null ? String(toma.vial_mg) : '');
     setBacMl(toma.bac_ml != null ? String(toma.bac_ml) : '');
-    setUnidad((toma.unidad ?? 'mg').toLowerCase() === 'mcg' ? 'mcg' : 'mg');
+    setUnidad(normalizeUnit(toma.unidad));
   }
 
-  const calc = computeRecon(
+  const calc = computeConversions(
     Number(vialMg) || 0,
     Number(bacMl) || 0,
-    toMg(Number(dosis) || 0, unidad)
+    Number(dosis) || 0,
+    unidad
   );
 
   function guardar() {
@@ -534,7 +592,7 @@ function EditTomaDrawer({
     if (!Number.isFinite(d) || d <= 0) return setErr('La dosis debe ser un número mayor a 0.');
     const v = Number(vialMg) || 0;
     const b = Number(bacMl) || 0;
-    const c = computeRecon(v, b, toMg(d, unidad));
+    const c = computeConversions(v, b, d, unidad);
     start(async () => {
       const r = await actualizarToma({
         id: toma.id,
@@ -545,7 +603,7 @@ function EditTomaDrawer({
         vial_mg: v || null,
         bac_ml: b || null,
         concentracion: round(c.concentracion, 3),
-        unidades: round(c.unidades, 1),
+        unidades: round(c.u, 1),
       });
       if (r.ok) onSaved();
       else setErr(r.error);
@@ -640,13 +698,16 @@ function EditTomaDrawer({
                     onChange={(e) => setDosis(e.target.value)}
                   />
                   <select
-                    className="h-9 rounded-md border bg-background px-1.5 text-sm"
+                    className={selCls}
                     value={unidad}
-                    onChange={(e) => setUnidad(e.target.value as 'mg' | 'mcg')}
+                    onChange={(e) => setUnidad(e.target.value as DoseUnit)}
                     aria-label="Unidad de dosis"
                   >
-                    <option value="mg">mg</option>
-                    <option value="mcg">mcg</option>
+                    {DOSE_UNITS.map((u) => (
+                      <option key={u} value={u}>
+                        {u}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -683,19 +744,8 @@ function EditTomaDrawer({
                 />
               </div>
             </div>
-            <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 rounded-lg bg-muted/40 px-3 py-2 text-sm">
-              <span className="text-muted-foreground">
-                Concentración:{' '}
-                <span className="font-semibold text-foreground tabular-nums">
-                  {calc.concentracion != null ? `${round(calc.concentracion, 3)} mg/mL` : '—'}
-                </span>
-              </span>
-              <span className="text-muted-foreground">
-                Jalar:{' '}
-                <span className="font-semibold text-emerald-600 tabular-nums dark:text-emerald-400">
-                  {calc.unidades != null ? `${round(calc.unidades, 1)} u` : '—'}
-                </span>
-              </span>
+            <div className="mt-3">
+              <EquivPanel c={calc} />
             </div>
           </DetailDrawerSection>
         </DetailDrawerContent>
