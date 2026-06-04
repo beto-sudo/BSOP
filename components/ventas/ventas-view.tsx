@@ -27,10 +27,11 @@ import { VentasFilters } from './ventas-filters';
 import { VentasTable } from './ventas-table';
 import { VentasPorProducto } from './ventas-por-producto';
 import { VentasPorCategoria } from './ventas-por-categoria';
+import { VentasComparativo } from './ventas-comparativo';
 import type { CategoriaFilter, CorteOption, Pedido } from './types';
 import { TZ, rangeForPreset, todayRange } from './utils';
 
-type VentasTab = 'pedidos' | 'por-producto' | 'por-categoria';
+type VentasTab = 'pedidos' | 'por-producto' | 'por-categoria' | 'comparativo';
 
 export function VentasView() {
   const [tab, setTab] = useState<VentasTab>('pedidos');
@@ -239,6 +240,7 @@ export function VentasView() {
             ['pedidos', 'Pedidos'],
             ['por-producto', 'Por producto'],
             ['por-categoria', 'Por categoría'],
+            ['comparativo', 'Comparativo'],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -260,30 +262,33 @@ export function VentasView() {
       {/* Summary stats (solo en Pedidos) */}
       {tab === 'pedidos' && !loading && !error && <SummaryBar pedidos={filtered} />}
 
-      {/* Filters */}
-      <VentasFilters
-        search={tab === 'pedidos' ? search : ''}
-        onSearchChange={(value) => setFilter('search', value)}
-        statusFilter={statusFilter}
-        onStatusFilterChange={(value) => setFilter('statusFilter', value)}
-        corteFilter={corteFilter}
-        onCorteFilterChange={(value) => setFilter('corteFilter', value)}
-        cortes={cortes}
-        dateFrom={dateFrom}
-        dateTo={dateTo}
-        onDateFromChange={(value) => setFilters({ dateFrom: value, presetKey: 'custom' })}
-        onDateToChange={(value) => setFilters({ dateTo: value, presetKey: 'custom' })}
-        presetKey={presetKey}
-        onPresetChange={handlePreset}
-        loading={loading}
-        onRefresh={() => void fetchPedidos()}
-        count={filtered.length}
-        activeCount={activeCount}
-        onClearAll={clearAll}
-        showFantasmas={showFantasmas}
-        onShowFantasmasChange={(v) => setFilter('showDuplicados', v ? 'on' : 'off')}
-        fantasmasCount={fantasmasCount}
-      />
+      {/* Filters — el comparativo usa su propia ventana fija (últimas 6
+          semanas), no el filtro global de fecha/corte. */}
+      {tab !== 'comparativo' && (
+        <VentasFilters
+          search={tab === 'pedidos' ? search : ''}
+          onSearchChange={(value) => setFilter('search', value)}
+          statusFilter={statusFilter}
+          onStatusFilterChange={(value) => setFilter('statusFilter', value)}
+          corteFilter={corteFilter}
+          onCorteFilterChange={(value) => setFilter('corteFilter', value)}
+          cortes={cortes}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          onDateFromChange={(value) => setFilters({ dateFrom: value, presetKey: 'custom' })}
+          onDateToChange={(value) => setFilters({ dateTo: value, presetKey: 'custom' })}
+          presetKey={presetKey}
+          onPresetChange={handlePreset}
+          loading={loading}
+          onRefresh={() => void fetchPedidos()}
+          count={filtered.length}
+          activeCount={activeCount}
+          onClearAll={clearAll}
+          showFantasmas={showFantasmas}
+          onShowFantasmasChange={(v) => setFilter('showDuplicados', v ? 'on' : 'off')}
+          fantasmasCount={fantasmasCount}
+        />
+      )}
 
       {/* Error */}
       {error ? <ErrorBanner error={error} onRetry={() => void fetchPedidos()} /> : null}
@@ -324,6 +329,7 @@ export function VentasView() {
           onCategoriaClick={handleCategoriaClick}
         />
       )}
+      {tab === 'comparativo' && <VentasComparativo />}
     </div>
   );
 }
