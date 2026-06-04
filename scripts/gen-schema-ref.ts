@@ -13,7 +13,7 @@
  *
  * Flags:
  *   --schemas core,erp     Limita los schemas procesados (default:
- *                          public,core,erp,rdb,playtomic,health,dilesa,maquinaria,analytics).
+ *                          public,core,erp,rdb,playtomic,health,dilesa,maquinaria,analytics,peptides).
  *   --out supabase/REF.md  Ruta de salida (default:
  *                          supabase/SCHEMA_REF.md).
  *   --dry-run              Escribe a stdout en lugar del archivo.
@@ -40,7 +40,7 @@ function flagValue(flag: string, fallback: string): string {
 
 const SCHEMAS = flagValue(
   '--schemas',
-  'public,core,erp,rdb,playtomic,health,dilesa,maquinaria,analytics'
+  'public,core,erp,rdb,playtomic,health,dilesa,maquinaria,analytics,peptides'
 )
   .split(',')
   .map((s) => s.trim())
