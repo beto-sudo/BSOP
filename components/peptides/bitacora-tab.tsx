@@ -65,6 +65,9 @@ function computeRecon(vialMg: number, bacMl: number, dosis: number) {
   return { concentracion, unidades, dosisPorVial };
 }
 
+// Dosis a mg para el cálculo de unidades (los vials se etiquetan en mg).
+const toMg = (dose: number, unit: 'mg' | 'mcg'): number => (unit === 'mcg' ? dose / 1000 : dose);
+
 const round = (n: number | null, d = 2): number | null =>
   n == null ? null : Math.round(n * 10 ** d) / 10 ** d;
 
@@ -87,6 +90,7 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
   const [vialMg, setVialMg] = useState('');
   const [bacMl, setBacMl] = useState('');
   const [dosis, setDosis] = useState('');
+  const [dosisUnidad, setDosisUnidad] = useState<'mg' | 'mcg'>('mg');
   const [fecha, setFecha] = useState(todayInput());
   const [nota, setNota] = useState('');
 
@@ -103,7 +107,6 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
   const [editToma, setEditToma] = useState<TomaLog | null>(null);
 
   const activos = compuestos.filter((c) => c.estado === 'activo');
-  const compuestoSel = compuestos.find((c) => c.id === compuestoId);
   const log = useMemo<TomaLog[]>(
     () =>
       compuestos
@@ -113,7 +116,11 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
     [compuestos]
   );
 
-  const calc = computeRecon(Number(vialMg) || 0, Number(bacMl) || 0, Number(dosis) || 0);
+  const calc = computeRecon(
+    Number(vialMg) || 0,
+    Number(bacMl) || 0,
+    toMg(Number(dosis) || 0, dosisUnidad)
+  );
 
   function quick(c: ProtocoloCompuestoConTomas) {
     if (c.dosis_objetivo == null) return;
@@ -138,12 +145,12 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
     if (!Number.isFinite(d) || d <= 0) return setErr('La dosis debe ser un número mayor a 0.');
     const v = Number(vialMg) || 0;
     const b = Number(bacMl) || 0;
-    const c = computeRecon(v, b, d);
+    const c = computeRecon(v, b, toMg(d, dosisUnidad));
     start(async () => {
       const r = await registrarToma({
         compuestoId,
         dosis: d,
-        unidad: compuestoSel?.unidad_dosis ?? 'mg',
+        unidad: dosisUnidad,
         fecha: new Date(`${fecha}T12:00:00`).toISOString(),
         nota: nota || null,
         vial_mg: v || null,
@@ -179,6 +186,25 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
         router.refresh();
       } else setErr(r.error);
     });
+  }
+
+  function pickCompuesto(id: string) {
+    setCompuestoId(id);
+    const c = compuestos.find((x) => x.id === id);
+    if (!c) return;
+    const last = c.tomas[0];
+    const lastCalc = c.tomas.find((t) => t.vial_mg != null);
+    setVialMg(lastCalc?.vial_mg != null ? String(lastCalc.vial_mg) : '');
+    setBacMl(lastCalc?.bac_ml != null ? String(lastCalc.bac_ml) : '');
+    setDosis(
+      last?.dosis != null
+        ? String(last.dosis)
+        : c.dosis_objetivo != null
+          ? String(c.dosis_objetivo)
+          : ''
+    );
+    const u = (last?.unidad ?? c.unidad_dosis ?? 'mg').toLowerCase();
+    setDosisUnidad(u === 'mcg' ? 'mcg' : 'mg');
   }
 
   return (
@@ -300,7 +326,7 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
             <select
               className={inputCls}
               value={compuestoId}
-              onChange={(e) => setCompuestoId(e.target.value)}
+              onChange={(e) => pickCompuesto(e.target.value)}
             >
               <option value="">Elige…</option>
               {compuestos.map((c) => (
@@ -321,15 +347,26 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
             />
           </div>
           <div>
-            <div className={labelCls}>Dosis ({compuestoSel?.unidad_dosis ?? 'mg'})</div>
-            <input
-              className={inputCls}
-              type="number"
-              step="any"
-              placeholder="2.5"
-              value={dosis}
-              onChange={(e) => setDosis(e.target.value)}
-            />
+            <div className={labelCls}>Dosis</div>
+            <div className="flex gap-1.5">
+              <input
+                className={inputCls}
+                type="number"
+                step="any"
+                placeholder="2.5"
+                value={dosis}
+                onChange={(e) => setDosis(e.target.value)}
+              />
+              <select
+                className="h-9 rounded-md border bg-background px-1.5 text-sm"
+                value={dosisUnidad}
+                onChange={(e) => setDosisUnidad(e.target.value as 'mg' | 'mcg')}
+                aria-label="Unidad de dosis"
+              >
+                <option value="mg">mg</option>
+                <option value="mcg">mcg</option>
+              </select>
+            </div>
           </div>
           <div>
             <div className={labelCls}>Vial total (mg)</div>
@@ -468,6 +505,7 @@ function EditTomaDrawer({
   const [nota, setNota] = useState('');
   const [vialMg, setVialMg] = useState('');
   const [bacMl, setBacMl] = useState('');
+  const [unidad, setUnidad] = useState<'mg' | 'mcg'>('mg');
 
   // Prefill cuando cambia la toma seleccionada.
   const [loadedId, setLoadedId] = useState<string | null>(null);
@@ -480,9 +518,14 @@ function EditTomaDrawer({
     setNota(toma.nota ?? '');
     setVialMg(toma.vial_mg != null ? String(toma.vial_mg) : '');
     setBacMl(toma.bac_ml != null ? String(toma.bac_ml) : '');
+    setUnidad((toma.unidad ?? 'mg').toLowerCase() === 'mcg' ? 'mcg' : 'mg');
   }
 
-  const calc = computeRecon(Number(vialMg) || 0, Number(bacMl) || 0, Number(dosis) || 0);
+  const calc = computeRecon(
+    Number(vialMg) || 0,
+    Number(bacMl) || 0,
+    toMg(Number(dosis) || 0, unidad)
+  );
 
   function guardar() {
     if (!toma) return;
@@ -491,11 +534,12 @@ function EditTomaDrawer({
     if (!Number.isFinite(d) || d <= 0) return setErr('La dosis debe ser un número mayor a 0.');
     const v = Number(vialMg) || 0;
     const b = Number(bacMl) || 0;
-    const c = computeRecon(v, b, d);
+    const c = computeRecon(v, b, toMg(d, unidad));
     start(async () => {
       const r = await actualizarToma({
         id: toma.id,
         dosis: d,
+        unidad,
         fecha: new Date(`${fecha}T12:00:00`).toISOString(),
         nota: nota || null,
         vial_mg: v || null,
@@ -586,14 +630,25 @@ function EditTomaDrawer({
                 />
               </div>
               <div>
-                <div className={labelCls}>Dosis ({toma.unidad ?? 'mg'})</div>
-                <input
-                  className={inputCls}
-                  type="number"
-                  step="any"
-                  value={dosis}
-                  onChange={(e) => setDosis(e.target.value)}
-                />
+                <div className={labelCls}>Dosis</div>
+                <div className="flex gap-1.5">
+                  <input
+                    className={inputCls}
+                    type="number"
+                    step="any"
+                    value={dosis}
+                    onChange={(e) => setDosis(e.target.value)}
+                  />
+                  <select
+                    className="h-9 rounded-md border bg-background px-1.5 text-sm"
+                    value={unidad}
+                    onChange={(e) => setUnidad(e.target.value as 'mg' | 'mcg')}
+                    aria-label="Unidad de dosis"
+                  >
+                    <option value="mg">mg</option>
+                    <option value="mcg">mcg</option>
+                  </select>
+                </div>
               </div>
               <div className="sm:col-span-2">
                 <div className={labelCls}>Nota</div>
