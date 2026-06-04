@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-06-03
-**Última actualización:** 2026-06-03 (promovida a `in_progress`; Sprint 0 — planning doc + fila en INITIATIVES)
+**Última actualización:** 2026-06-04 (Sprints 1-5 entregados — módulo en prod con score de vendor + bitácora + 12 notas curadas; **próximo:** digest del Telegram cuando Beto pase el export)
 
 ## Problema
 
@@ -185,6 +185,18 @@ Semax + 13 tomas) vía las server actions de `app/health/actions.ts`.
   export del Telegram entró en cooldown de 24h. Alcance v1 cerrado con D1+D2+D3.
   Confirmado por Explore: SANREN gatea por empresa (sin `core.modulos`), y la UI
   debe leer server-side con service-role (RLS deny-all) + filtrar client-side.
+- **2026-06-04** — Sprints 1-5 entregados. PR #674 mergeado: schema `peptides`
+  (5 tablas) en prod + importer de las 3 sheets (1,441 COAs / 29 vendors / 15
+  insumos / 59 péptidos) + UI `/peptides` (filtro estrella COA, **score de
+  vendor**, filtros región/estado, catálogo, insumos, notas) + bitácora simple
+  reusando `health.protocolo_*` (Health pasó a read-only, captura movida). Beto
+  pidió el score de vendor + filtros USA/China a media construcción (se agregó
+  antes de la bitácora). Sprint 5 (doc+wiki): el Doc de Google "Guides" entró
+  con el link corregido por Beto (OCR confundió `l`↔`I`); curé **12 notas**
+  (seguridad, reconstitución, testing, dosis, almacenamiento, labs, crypto,
+  diccionario, alerta de endotoxina) + enriquecí 5 GLP-1 vía
+  `scripts/seed_peptides_notas.ts`. **Pendiente:** digest del Telegram → notas
+  cuando Beto pase el `result.json` (export seguía en cooldown).
 
 ## Decisiones registradas
 
@@ -206,3 +218,9 @@ Semax + 13 tomas) vía las server actions de `app/health/actions.ts`.
 - **2026-06-03** — RLS **deny-all + service-role** (igual que `health.protocolo_*`).
   _Razón:_ consistencia + data de sourcing no debe ser legible por API directa;
   la app lee/escribe server-side. _Aplica a:_ las 5 tablas `peptides.*`.
+- **2026-06-04** — **Score de vendor** (`lib/peptides-score.ts`): resultados/calidad
+  40% · precio 25% · evidencia (# COAs, log-escalado) 20% · endotoxina 15%, con
+  `estado` como multiplicador (activo 1 / warning 0.75 / removido 0.4). Match
+  blando vendor↔COA por código normalizado (BFF ↔ BFF/AMO). _Razón:_ Beto pidió
+  puntuar para decidir dónde comprar; transparente y recalibrable (pesos
+  documentados + desglose en el drawer), no caja negra. _Aplica a:_ pestaña Vendors.
