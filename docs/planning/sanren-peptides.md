@@ -6,7 +6,7 @@
 **Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-06-03
-**Última actualización:** 2026-06-04 (CERRADA — módulo Peptides completo en prod: base de info, score de vendor, bitácora + calculadora, y Notas curadas de guía/wiki/Telegram/PDFs. PRs #674/#676/#677/#678/#679 + cierre)
+**Última actualización:** 2026-06-04 (CERRADA — módulo Peptides completo en prod: base de info, score de vendor, bitácora + calculadora, y Notas curadas de guía/wiki/Telegram/PDFs. PRs #674/#676/#677/#678/#679 + cierre. Post-cierre: calculadora multi-unidad mg/mcg/mL/u + blends multi-péptido (KLOW) en #683)
 
 ## Problema
 
@@ -213,6 +213,22 @@ Semax + 13 tomas) vía las server actions de `app/health/actions.ts`.
   29 vendors con score. Telegram export en `~/Downloads/Telegram Desktop/ChatExport_*`;
   re-sync = `scripts/import_peptides_stg.ts` + `scripts/seed_peptides_notas.ts`.
 
+- **2026-06-04** — _Post-cierre · mejoras a la calculadora._ La calculadora de
+  la bitácora pasó a **multi-unidad** (mg/mcg/mL/u con panel de equivalencias —
+  misma dosis en las 4 unidades vía la concentración; mL/u por jeringa U-100) en
+  [#683](https://github.com/beto-sudo/BSOP/pull/683). Sobre esa rama se agregó
+  **soporte de blends multi-péptido (caso KLOW** = TB-500 10 + BPC-157 10 + KPV
+  10 + GHK-Cu 50 = 80mg/vial**)**: columna `componentes jsonb` en
+  `health.protocolo_compuestos` (migración additive/nullable, DDL puro — el seed
+  va por `scripts/seed_protocolo_klow.ts`, no en migración), `lib/blend.ts`
+  (math puro client-safe: `blendTotalMg`/`blendBreakdown`/`parseComponentes` +
+  test), y en la UI: al elegir un blend la dosis se captura **por volumen**
+  (vial = suma derivada, no editable) y un **panel de desglose** muestra los mg
+  entregados de cada componente para el volumen jalado
+  (`mg_i = comp.mg × mL/agua`). El form "+Nuevo" gana un editor de componentes
+  para crear otros blends. KLOW ya existía como compuesto en prod → el seed le
+  adjuntó la receta vía UPDATE idempotente.
+
 ## Decisiones registradas
 
 - **2026-06-03** — Schema **`peptides` propio** (no tablas dentro de `health`).
@@ -239,3 +255,14 @@ Semax + 13 tomas) vía las server actions de `app/health/actions.ts`.
   blando vendor↔COA por código normalizado (BFF ↔ BFF/AMO). _Razón:_ Beto pidió
   puntuar para decidir dónde comprar; transparente y recalibrable (pesos
   documentados + desglose en el drawer), no caja negra. _Aplica a:_ pestaña Vendors.
+- **2026-06-04** — **Blends como `componentes jsonb` en el compuesto, dosis por
+  volumen, desglose derivado** (no persistido por toma). _Razón:_ un blend es un
+  solo vial físico con varios péptidos en proporción fija; modelarlo como un
+  compuesto con receta `[{nombre,mg}]` evita inventar tablas hijas y mantiene la
+  bitácora con un registro por inyección. El desglose por componente
+  (`mg_i = comp.mg × mL/agua`) es función pura de la receta + agua + volumen, así
+  que se calcula al vuelo (si Beto corrige la receta, las tomas viejas se
+  recalculan solas — deseable para una bitácora personal). La dosis se captura
+  por volumen (mL/u) porque es lo que se jala de la jeringa; el vial total es la
+  suma derivada (no editable). _Aplica a:_ `lib/blend.ts`, calculadora de la
+  bitácora, `crearCompuesto`.

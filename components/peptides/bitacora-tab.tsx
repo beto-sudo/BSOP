@@ -16,6 +16,7 @@ import {
   type CrearCompuestoInput,
 } from '@/app/health/actions';
 import type { ProtocoloClase, ProtocoloCompuestoConTomas, ProtocoloToma } from '@/lib/protocolo';
+import { blendBreakdown, blendTotalMg, type BlendComponente } from '@/lib/blend';
 
 const CLASES: { v: ProtocoloClase; label: string }[] = [
   { v: 'peptido', label: 'Péptido' },
@@ -24,7 +25,7 @@ const CLASES: { v: ProtocoloClase; label: string }[] = [
   { v: 'otro', label: 'Otro' },
 ];
 
-type TomaLog = ProtocoloToma & { nombre: string };
+type TomaLog = ProtocoloToma & { nombre: string; componentes: BlendComponente[] | null };
 type DoseUnit = 'mg' | 'mcg' | 'mL' | 'u';
 const DOSE_UNITS: DoseUnit[] = ['mg', 'mcg', 'mL', 'u'];
 
@@ -141,6 +142,48 @@ function EquivPanel({ c }: { c: Conv }) {
   );
 }
 
+// Desglose de un blend multi-péptido (KLOW): mg entregados de cada componente
+// para el volumen jalado. Si aún no hay agua + volumen, muestra los mg/vial.
+function BlendPanel({
+  componentes,
+  bacMl,
+  ml,
+}: {
+  componentes: BlendComponente[] | null;
+  bacMl: number;
+  ml: number | null;
+}) {
+  if (!componentes?.length) return null;
+  const rows = blendBreakdown(componentes, bacMl, ml);
+  const hay = rows.length > 0;
+  return (
+    <div className="mt-2 rounded-lg border border-emerald-300/30 bg-emerald-50/50 px-3 py-2 dark:border-emerald-300/15 dark:bg-emerald-300/5">
+      <div className="mb-1 flex items-center justify-between text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        <span>
+          Desglose del blend · {componentes.length} péptidos · {round(blendTotalMg(componentes), 1)}{' '}
+          mg/vial
+        </span>
+        <span className={hay ? '' : 'normal-case tracking-normal text-muted-foreground/70'}>
+          {hay ? 'en esta dosis' : 'define agua + volumen'}
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
+        {componentes.map((comp, i) => {
+          const r = rows[i];
+          return (
+            <span key={comp.nombre} className="text-muted-foreground">
+              {comp.nombre}:{' '}
+              <span className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
+                {r ? `${round(r.mg, 3)} mg` : `${round(comp.mg, 1)} mg/vial`}
+              </span>
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /**
  * Bitácora (iniciativa sanren-peptides, Sprint 4 + 6). Registro rápido +
  * calculadora de reconstitución con conversión entre unidades (mg/mcg/mL/u),
@@ -169,6 +212,8 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
     dosis: '',
     frecuencia: '',
   });
+  // Componentes del blend al crear un compuesto nuevo (vacío = compuesto simple).
+  const [comps, setComps] = useState<{ nombre: string; mg: string }[]>([]);
 
   // Edición
   const [editToma, setEditToma] = useState<TomaLog | null>(null);
@@ -177,11 +222,16 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
   const log = useMemo<TomaLog[]>(
     () =>
       compuestos
-        .flatMap((c) => c.tomas.map((t) => ({ ...t, nombre: c.nombre })))
+        .flatMap((c) =>
+          c.tomas.map((t) => ({ ...t, nombre: c.nombre, componentes: c.componentes }))
+        )
         .sort((a, b) => b.fecha.localeCompare(a.fecha))
         .slice(0, 60),
     [compuestos]
   );
+
+  const selected = compuestos.find((c) => c.id === compuestoId) ?? null;
+  const blend = selected?.componentes ?? null;
 
   const calc = computeConversions(
     Number(vialMg) || 0,
@@ -239,18 +289,25 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
   function submitNuevo() {
     setErr(null);
     if (!nuevo.nombre.trim()) return setErr('El nombre es obligatorio.');
+    const componentes: BlendComponente[] = comps
+      .map((c) => ({ nombre: c.nombre.trim(), mg: Number(c.mg) }))
+      .filter((c) => c.nombre && Number.isFinite(c.mg) && c.mg > 0);
+    const esBlend = componentes.length > 0;
     const input: CrearCompuestoInput = {
       nombre: nuevo.nombre,
       clase: nuevo.clase,
-      unidadDosis: nuevo.unidad || null,
+      // Un blend se dosifica por volumen → unidad 'u' (jeringa de insulina).
+      unidadDosis: esBlend ? 'u' : nuevo.unidad || null,
       dosisObjetivo: nuevo.dosis ? Number(nuevo.dosis) : null,
       frecuencia: nuevo.frecuencia || null,
+      componentes: esBlend ? componentes : null,
     };
     start(async () => {
       const r = await crearCompuesto(input);
       if (r.ok) {
         setShowNuevo(false);
         setNuevo({ nombre: '', clase: 'peptido', unidad: 'mg', dosis: '', frecuencia: '' });
+        setComps([]);
         router.refresh();
       } else setErr(r.error);
     });
@@ -262,7 +319,15 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
     if (!c) return;
     const last = c.tomas[0];
     const lastCalc = c.tomas.find((t) => t.vial_mg != null);
-    setVialMg(lastCalc?.vial_mg != null ? String(lastCalc.vial_mg) : '');
+    const esBlend = !!c.componentes?.length;
+    // En un blend el vial total = suma de los componentes (derivado, no editable).
+    setVialMg(
+      esBlend
+        ? String(blendTotalMg(c.componentes))
+        : lastCalc?.vial_mg != null
+          ? String(lastCalc.vial_mg)
+          : ''
+    );
     setBacMl(lastCalc?.bac_ml != null ? String(lastCalc.bac_ml) : '');
     setDosis(
       last?.dosis != null
@@ -271,7 +336,10 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
           ? String(c.dosis_objetivo)
           : ''
     );
-    setDosisUnidad(normalizeUnit(last?.unidad ?? c.unidad_dosis));
+    // Los blends se dosifican por volumen → forzar mL/u (default 'u', jeringa
+    // de insulina). Un compuesto simple respeta su unidad previa.
+    const u = normalizeUnit(last?.unidad ?? c.unidad_dosis ?? (esBlend ? 'u' : 'mg'));
+    setDosisUnidad(esBlend && u !== 'mL' && u !== 'u' ? 'u' : u);
   }
 
   return (
@@ -374,6 +442,72 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
               value={nuevo.frecuencia}
               onChange={(e) => setNuevo({ ...nuevo, frecuencia: e.target.value })}
             />
+
+            {/* Componentes del blend (opcional) — caso KLOW */}
+            <div className="rounded-lg border border-dashed p-2.5 sm:col-span-2 lg:col-span-5">
+              <div className="mb-1.5 flex items-center justify-between">
+                <span className={labelCls}>Componentes (blend multi-péptido) — opcional</span>
+                <button
+                  type="button"
+                  onClick={() => setComps([...comps, { nombre: '', mg: '' }])}
+                  className="text-xs text-primary hover:underline"
+                >
+                  + Componente
+                </button>
+              </div>
+              {comps.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground/70">
+                  Vacío = compuesto simple. Agrega 2+ (p. ej. KLOW: TB-500 10, BPC-157 10, KPV 10,
+                  GHK-Cu 50) para dosificar por volumen con desglose por componente.
+                </p>
+              ) : (
+                <div className="space-y-1.5">
+                  {comps.map((c, i) => (
+                    <div key={i} className="flex gap-1.5">
+                      <input
+                        className={inputCls}
+                        placeholder="Péptido"
+                        value={c.nombre}
+                        onChange={(e) => {
+                          const next = [...comps];
+                          next[i] = { ...next[i], nombre: e.target.value };
+                          setComps(next);
+                        }}
+                      />
+                      <input
+                        className={`${inputCls} w-24`}
+                        type="number"
+                        step="any"
+                        placeholder="mg"
+                        value={c.mg}
+                        onChange={(e) => {
+                          const next = [...comps];
+                          next[i] = { ...next[i], mg: e.target.value };
+                          setComps(next);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setComps(comps.filter((_, j) => j !== i))}
+                        className="px-2 text-muted-foreground hover:text-rose-600"
+                        aria-label="Quitar componente"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  <p className="text-[11px] text-muted-foreground/70">
+                    Total vial:{' '}
+                    {round(
+                      comps.reduce((s, c) => s + (Number(c.mg) || 0), 0),
+                      1
+                    )}{' '}
+                    mg · se dosifica por volumen (u/mL) y la unidad queda en “u”.
+                  </p>
+                </div>
+              )}
+            </div>
+
             <div className="sm:col-span-2 lg:col-span-5">
               <button
                 type="button"
@@ -439,14 +573,16 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
             </div>
           </div>
           <div>
-            <div className={labelCls}>Vial total (mg)</div>
+            <div className={labelCls}>Vial total (mg){blend ? ' · suma del blend' : ''}</div>
             <input
-              className={inputCls}
+              className={`${inputCls} ${blend ? 'opacity-60' : ''}`}
               type="number"
               step="any"
               placeholder="30"
               value={vialMg}
               onChange={(e) => setVialMg(e.target.value)}
+              readOnly={!!blend}
+              title={blend ? 'Derivado de la suma de los componentes del blend' : undefined}
             />
           </div>
           <div>
@@ -474,6 +610,7 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
         {/* Equivalencias (la misma dosis en mg/mcg/mL/u) */}
         <div className="mt-3">
           <EquivPanel c={calc} />
+          <BlendPanel componentes={blend} bacMl={Number(bacMl) || 0} ml={calc.mL} />
           <p className="mt-1 text-[11px] text-muted-foreground/70">
             mL y u requieren vial + agua (concentración). u = jeringa de insulina U-100 (100 u = 1
             mL).
@@ -508,6 +645,11 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
               >
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
                   <span className="font-medium">{t.nombre}</span>
+                  {t.componentes?.length ? (
+                    <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                      blend · {t.componentes.length}
+                    </span>
+                  ) : null}
                   <span className="tabular-nums text-muted-foreground">
                     {t.dosis}
                     {t.unidad ? ` ${t.unidad}` : ''}
@@ -564,6 +706,8 @@ function EditTomaDrawer({
   const [bacMl, setBacMl] = useState('');
   const [unidad, setUnidad] = useState<DoseUnit>('mg');
 
+  const blend = toma?.componentes ?? null;
+
   // Prefill cuando cambia la toma seleccionada.
   const [loadedId, setLoadedId] = useState<string | null>(null);
   if (toma && toma.id !== loadedId) {
@@ -573,7 +717,14 @@ function EditTomaDrawer({
     setDosis(String(toma.dosis));
     setFecha(dateInput(toma.fecha));
     setNota(toma.nota ?? '');
-    setVialMg(toma.vial_mg != null ? String(toma.vial_mg) : '');
+    // Blend: el vial es la suma de los componentes (derivado, no editable).
+    setVialMg(
+      toma.componentes?.length
+        ? String(blendTotalMg(toma.componentes))
+        : toma.vial_mg != null
+          ? String(toma.vial_mg)
+          : ''
+    );
     setBacMl(toma.bac_ml != null ? String(toma.bac_ml) : '');
     setUnidad(normalizeUnit(toma.unidad));
   }
@@ -724,13 +875,15 @@ function EditTomaDrawer({
           <DetailDrawerSection title="Reconstitución (calculadora)">
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <div className={labelCls}>Vial total (mg)</div>
+                <div className={labelCls}>Vial total (mg){blend ? ' · suma del blend' : ''}</div>
                 <input
-                  className={inputCls}
+                  className={`${inputCls} ${blend ? 'opacity-60' : ''}`}
                   type="number"
                   step="any"
                   value={vialMg}
                   onChange={(e) => setVialMg(e.target.value)}
+                  readOnly={!!blend}
+                  title={blend ? 'Derivado de la suma de los componentes del blend' : undefined}
                 />
               </div>
               <div>
@@ -746,6 +899,7 @@ function EditTomaDrawer({
             </div>
             <div className="mt-3">
               <EquivPanel c={calc} />
+              <BlendPanel componentes={blend} bacMl={Number(bacMl) || 0} ml={calc.mL} />
             </div>
           </DetailDrawerSection>
         </DetailDrawerContent>
