@@ -30,7 +30,7 @@ const F = '2026-05-06T00:00:00Z'; // fecha del doc "Guides"
 interface NotaSeed {
   titulo: string;
   cuerpo: string;
-  tipo: 'alerta' | 'protocolo' | 'nota';
+  tipo: 'alerta' | 'hallazgo' | 'protocolo' | 'nota';
   tags: string[];
   fuente: string;
   fecha: string;
@@ -200,15 +200,144 @@ const CATALOGO: CatalogoSeed[] = [
   },
 ];
 
+interface TelegramNota extends NotaSeed {
+  peptido?: string | null;
+  vendor?: string | null;
+}
+
+// Alertas de mods curadas del export del Telegram STG (ventana 16-30 ene 2026).
+const T = 'STG Telegram';
+const TF = '2026-01-30T00:00:00Z';
+const TELEGRAM: TelegramNota[] = [
+  {
+    titulo: 'ASC baneado de STG',
+    tipo: 'alerta',
+    tags: ['vendor', 'ban'],
+    vendor: 'ASC',
+    fuente: T,
+    fecha: TF,
+    cuerpo:
+      'STG baneó a ASC: mandó producto equivocado (un cliente testeó "AOD" en Janoshik y NO era AOD), no reembolsó LipoC con pH extremadamente ácido, y hubo reportes de Reta turbia y NAD gelificado. La garantía de pureza no sirve si mandan el producto equivocado o peligroso.',
+  },
+  {
+    titulo: '"AOD purple cap" es frag176-191, no AOD9604',
+    tipo: 'alerta',
+    tags: ['testing', 'adulteracion'],
+    peptido: 'AOD',
+    fuente: T,
+    fecha: TF,
+    cuerpo:
+      'Resultados Janoshik: todos los "purple cap AOD" testearon como frag176-191 (ASC nov/dic, QYC nov, HYB nov, SSA nov; también sep). HYB white cap = AOD subdosificado (0.97 mg). Si compras "purple cap AOD" probablemente recibes frag.',
+  },
+  {
+    titulo: 'SRY — recall multi-péptido (impureza p-chlorocresol)',
+    tipo: 'alerta',
+    tags: ['recall', 'contaminacion'],
+    vendor: 'SRY',
+    fuente: T,
+    fecha: TF,
+    cuerpo:
+      'Recall de SRY por impureza; Janoshik identificó por espectrometría de masas que la impureza es p-chlorocresol (no 4-hidroxi como decía el aviso de SRY). Recomendación de STG: no devolver el producto (riesgo + reventa); destruirlo a cambio de reship/refund.',
+  },
+  {
+    titulo: "SRYLAB — recall batch E22050528 (aditivo 4'-hidroxiacetofenona)",
+    tipo: 'alerta',
+    tags: ['recall', 'contaminacion'],
+    vendor: 'SRY',
+    fuente: T,
+    fecha: TF,
+    cuerpo:
+      "SRYLAB detectó trazas de 4'-hidroxiacetofenona (CAS 99-93-4) en el batch E22050528: CAG 5/10 mg, Reta 5/10 mg, Tirz 10/20/30 mg, MOTS-C 10 mg, MT-2 10 mg (sobre todo T30). Origen: residuo de tubing de silicón de un proveedor previo. Reemplazo/refund a afectados.",
+  },
+  {
+    titulo: 'SRY GHK-Cu 50mg blue cap — sobrellenado ~2x',
+    tipo: 'hallazgo',
+    tags: ['testing'],
+    vendor: 'SRY',
+    peptido: 'GHK-Cu',
+    fuente: T,
+    fecha: TF,
+    cuerpo:
+      '2 viales de SRY GHK-Cu 50 mg (blue cap) testearon 100% sobrellenados (~100 mg en vez de 50 mg), vía Janoshik. Recordatorio: testea tus kits.',
+  },
+  {
+    titulo: 'SSA T15 red cap (Mfg 17-ene) — mal etiquetado, es Retatrutide',
+    tipo: 'alerta',
+    tags: ['adulteracion', 'testing'],
+    vendor: 'SSA',
+    peptido: 'Tirzepatide',
+    fuente: T,
+    fecha: TF,
+    cuerpo:
+      'Kits SSA T15 red cap (Mfg 17-ene-2025) vendidos como Tirzepatide testearon como Retatrutide (confirmado por Janoshik, HPLC+LCMS: vial A = Reta 4728 Da). No se sabe si todos los kits de ese mfg están afectados — testea antes de usar.',
+  },
+  {
+    titulo: 'Checa el pH antes de inyectar',
+    tipo: 'nota',
+    tags: ['seguridad', 'reconstitucion'],
+    fuente: T,
+    fecha: TF,
+    cuerpo:
+      'Los GLP-1 reconstituidos deben quedar en pH 6-9. Para subQ, 4-9 se considera "seguro" para comodidad de inyección. Usa tiras de pH (Amazon). LipoC ácido ha causado problemas.',
+  },
+  {
+    titulo: 'NovoPen / adapters — precaución + recall de adapters',
+    tipo: 'alerta',
+    tags: ['insumos', 'seguridad'],
+    fuente: T,
+    fecha: TF,
+    cuerpo:
+      'Los cartuchos de 3 mL no entran al NovoPen sin adapter; forzarlos daña la pluma o el cartucho. Además: adapters Gansulin/NovoPen NP Max retirados por posible falla estructural bajo presión — dejar de usarlos (reemplazo/refund por email).',
+  },
+  {
+    titulo: 'SLU-PP — no inyectable',
+    tipo: 'alerta',
+    tags: ['seguridad'],
+    fuente: T,
+    fecha: TF,
+    cuerpo:
+      'SLU-PP es hidrofóbico y requiere solventes no seguros para inyección. Oral: tests de miembros sugieren que no sobrevive el ácido estomacal y se degrada en fragmentos tipo hidrazina (no ingerir).',
+  },
+  {
+    titulo: 'Botox DIY — desaconsejado',
+    tipo: 'alerta',
+    tags: ['seguridad'],
+    fuente: T,
+    fecha: TF,
+    cuerpo:
+      'No hay labs en la comunidad que verifiquen la potencia del Botox. Un vial de 100u tiene solo 5-20 ng de toxina activa; errores mínimos de dosis aumentan el riesgo de toxicidad letal. Fuertemente desaconsejado el DIY de fuentes no reguladas.',
+  },
+  {
+    titulo: 'PBS no es para inyección',
+    tipo: 'nota',
+    tags: ['seguridad'],
+    fuente: T,
+    fecha: TF,
+    cuerpo:
+      'PBS es un reactivo de laboratorio, no un producto farmacéutico; no está destinado a inyección en humanos.',
+  },
+  {
+    titulo: 'PSA — impersonadores / grupos STG falsos',
+    tipo: 'alerta',
+    tags: ['scam', 'seguridad'],
+    fuente: T,
+    fecha: TF,
+    cuerpo:
+      'Circula un impersonador con grupo STG y cuenta "Stair Master" falsos. No mandes dinero ni info. Verifica siempre vía stairwaytogray.com (tiene el Discord correcto). No confíes en DMs no solicitados (99% scam).',
+  },
+];
+
 async function main() {
   const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
   const sbp = (sb as { schema: (s: string) => ReturnType<typeof sb.schema> }).schema('peptides');
 
-  console.log(`Curado: ${NOTAS.length} notas · ${CATALOGO.length} péptidos a enriquecer`);
+  console.log(
+    `Curado: ${NOTAS.length} notas guía + ${TELEGRAM.length} alertas Telegram · ${CATALOGO.length} péptidos`
+  );
   if (DRY_RUN) {
     console.log(
       '[DRY_RUN] notas:',
-      NOTAS.map((n) => `${n.tipo}: ${n.titulo}`)
+      [...NOTAS, ...TELEGRAM].map((n) => `${n.tipo}: ${n.titulo}`)
     );
     console.log(
       '[DRY_RUN] catálogo:',
@@ -220,9 +349,20 @@ async function main() {
   // Notas: idempotente (borra las STG-sourced y re-inserta).
   const { error: delErr } = await sbp.from('notas').delete().like('fuente', 'STG%');
   if (delErr) throw new Error(`delete notas: ${delErr.message}`);
-  const { error: insErr } = await sbp
-    .from('notas')
-    .insert(NOTAS.map((n) => ({ ...n, peptido: null, vendor_codigo: null })));
+  const rows = [
+    ...NOTAS.map((n) => ({ ...n, peptido: null, vendor_codigo: null })),
+    ...TELEGRAM.map((n) => ({
+      titulo: n.titulo,
+      cuerpo: n.cuerpo,
+      tipo: n.tipo,
+      tags: n.tags,
+      fuente: n.fuente,
+      fecha: n.fecha,
+      peptido: n.peptido ?? null,
+      vendor_codigo: n.vendor ?? null,
+    })),
+  ];
+  const { error: insErr } = await sbp.from('notas').insert(rows);
   if (insErr) throw new Error(`insert notas: ${insErr.message}`);
 
   // Catálogo: UPDATE por nombre (no crea filas).
