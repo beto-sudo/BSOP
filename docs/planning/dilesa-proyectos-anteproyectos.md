@@ -377,6 +377,18 @@ RBAC + backfill defensivo. Cero churn en `<ProyectosModule>` o data.
     existentes. Presupuestos: una sola tabla con estado discriminator (no
     dos espejos). Conversión: nuevo row con `proyecto_predecesor_id`
     (campo ya cableado). Estado pasa formalmente a `in_progress`.
+- **2026-06-04 (post-cierre — catálogo extendido)** — Beto pidió sumar
+  la factibilidad municipal **"Factibilidad de Zona de Consolidación
+  Urbana"** al checklist de anteproyecto. Agregada al catálogo
+  `dilesa.plantilla_proyecto_tareas` en orden 8 (justo después de
+  "Factibilidad de Uso de Suelo"), tipo Factibilidad / subtipo Urbanismo
+  / Municipio / 15 días hábiles / obligatoria / depende de la Escritura.
+  Las tareas en orden ≥ 8 se recorrieron +1 (Agua→9 … Consejo→13).
+  Backfill a los 5 anteproyectos vivos (instancia en orden 8, pendiente,
+  fecha objetivo = ventana de su Uso de Suelo). Migración
+  `20260604170000_dilesa_factibilidad_zona_consolidacion_urbana.sql`
+  (idempotente + Preview-safe), aplicada a prod vía `apply_migration`.
+  El catálogo activo de anteproyecto queda en 13 tareas.
 
 ## Decisiones registradas
 
