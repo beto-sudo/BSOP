@@ -198,6 +198,16 @@ const CATALOGO: CatalogoSeed[] = [
     reconstitucion: 'Liofilizado; agua Hospira.',
     cautelas: 'En investigación; confirma por testing independiente.',
   },
+  {
+    nombre: 'BPC-157',
+    clase: 'healing',
+    descripcion:
+      'Pentadecapéptido de 15 aminoácidos (sec. GEPPPGKPADDAGLV; fórmula C62H98N16O22; CAS 1628202-19-6). Se investiga para reparación de tejido (tendón, intestino); SIN aprobación clínica ni ensayos de fase tardía en humanos.',
+    reconstitucion:
+      'Liofilizado, soluble en agua (≥5 mg/mL). Reconstituir con agua Hospira; almacenar refrigerado 2-8°C.',
+    cautelas:
+      'Research-grade, perfil de seguridad en humanos no establecido. Confirma identidad/pureza/endotoxina por testing independiente (la COA del vendor no basta).',
+  },
 ];
 
 interface TelegramNota extends NotaSeed {
@@ -327,17 +337,30 @@ const TELEGRAM: TelegramNota[] = [
   },
 ];
 
+// Curado de los PDFs del export (análisis comunitario "Manufacturer Groups").
+const PDFS: TelegramNota[] = [
+  {
+    titulo: 'Manufacturer Groups — 5 grupos de fábrica (96 de 97 vendors)',
+    tipo: 'hallazgo',
+    tags: ['sourcing', 'manufacturer'],
+    fuente: 'STG Manufacturer Groups (PDF)',
+    fecha: '2026-04-12T00:00:00Z',
+    cuerpo:
+      'Análisis comunitario que agrupa 96 de 97 vendors en 5 "grupos de fábrica" por su firma de COA (Diff% y pureza% por producto, ventanas de 60 días). Insight clave: vendors del mismo grupo probablemente comparten manufacturer/source — un test limpio en uno es evidencia (no garantía) para los otros, y "vendors distintos" pueden ser la misma fábrica. Grupos (vendors clave): G1 — foco Reta/Tirz, Tesamorelin bajo (ABC, PTB, QYC, Shanghai JinBei/Leader, LSPL…); G2 — el más grande (BFF/AMO, JEEP, QST, SSA, TFC, SRY, Uther, Reta-Peptide, XDR…); G3 — GHK-Cu alto (HYB, PMQ…); G4 — Tirz Diff alto (HK Peptides, Tydes, WBS…); G5 — GHK-Cu 100mg muy negativo (QSC…). Úsalo para no "diversificar" comprándole a 3 vendors que en realidad son la misma fábrica.',
+  },
+];
+
 async function main() {
   const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
   const sbp = (sb as { schema: (s: string) => ReturnType<typeof sb.schema> }).schema('peptides');
 
   console.log(
-    `Curado: ${NOTAS.length} notas guía + ${TELEGRAM.length} alertas Telegram · ${CATALOGO.length} péptidos`
+    `Curado: ${NOTAS.length} guía + ${TELEGRAM.length} Telegram + ${PDFS.length} PDF notas · ${CATALOGO.length} péptidos`
   );
   if (DRY_RUN) {
     console.log(
       '[DRY_RUN] notas:',
-      [...NOTAS, ...TELEGRAM].map((n) => `${n.tipo}: ${n.titulo}`)
+      [...NOTAS, ...TELEGRAM, ...PDFS].map((n) => `${n.tipo}: ${n.titulo}`)
     );
     console.log(
       '[DRY_RUN] catálogo:',
@@ -351,7 +374,7 @@ async function main() {
   if (delErr) throw new Error(`delete notas: ${delErr.message}`);
   const rows = [
     ...NOTAS.map((n) => ({ ...n, peptido: null, vendor_codigo: null })),
-    ...TELEGRAM.map((n) => ({
+    ...[...TELEGRAM, ...PDFS].map((n) => ({
       titulo: n.titulo,
       cuerpo: n.cuerpo,
       tipo: n.tipo,
