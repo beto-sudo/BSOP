@@ -108,6 +108,7 @@ export async function registrarToma(input: RegistrarTomaInput): Promise<ActionRe
     }
 
     revalidatePath('/health');
+    revalidatePath('/peptides');
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Error desconocido.' };
@@ -162,6 +163,7 @@ export async function crearCompuesto(input: CrearCompuestoInput): Promise<Action
     }
 
     revalidatePath('/health');
+    revalidatePath('/peptides');
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Error desconocido.' };
