@@ -7,6 +7,7 @@ import { getEffectiveUser } from '@/lib/auth/effective-user';
 import { assertNotInPreview } from '@/lib/auth/preview-guard';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import type { ProtocoloClase } from '@/lib/protocolo';
+import { parseComponentes, type BlendComponente } from '@/lib/blend';
 
 // Captura de la bitácora de protocolo (iniciativa salud-protocolo, Sprint 3).
 //
@@ -147,6 +148,7 @@ export type CrearCompuestoInput = {
   procedencia?: string | null;
   fechaInicio?: string | null; // date (YYYY-MM-DD)
   notas?: string | null;
+  componentes?: BlendComponente[] | null; // blend multi-péptido (caso KLOW)
 };
 
 export async function crearCompuesto(input: CrearCompuestoInput): Promise<ActionResult> {
@@ -164,21 +166,24 @@ export async function crearCompuesto(input: CrearCompuestoInput): Promise<Action
       return { ok: false, error: 'La dosis objetivo debe ser un número ≥ 0.' };
     }
 
-    const { error } = await admin
-      .schema('health')
-      .from('protocolo_compuestos')
-      .insert({
-        nombre,
-        clase: input.clase,
-        via: input.via || null,
-        unidad_dosis: input.unidadDosis?.trim() || null,
-        dosis_objetivo: input.dosisObjetivo ?? null,
-        frecuencia: input.frecuencia?.trim() || null,
-        procedencia: input.procedencia?.trim() || null,
-        fecha_inicio: input.fechaInicio || null,
-        notas: input.notas?.trim() || null,
-        estado: 'activo',
-      });
+    // Cast: types/supabase.ts aún no tiene `componentes` (se agrega en el
+    // próximo auto-regen de db:types); igual patrón que protocolo_tomas.
+    const compuestos = admin.schema('health').from('protocolo_compuestos') as unknown as {
+      insert: (v: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
+    };
+    const { error } = await compuestos.insert({
+      nombre,
+      clase: input.clase,
+      via: input.via || null,
+      unidad_dosis: input.unidadDosis?.trim() || null,
+      dosis_objetivo: input.dosisObjetivo ?? null,
+      frecuencia: input.frecuencia?.trim() || null,
+      procedencia: input.procedencia?.trim() || null,
+      fecha_inicio: input.fechaInicio || null,
+      notas: input.notas?.trim() || null,
+      componentes: parseComponentes(input.componentes),
+      estado: 'activo',
+    });
 
     if (error) {
       return { ok: false, error: getSupabaseErrorMessage(error, 'No se pudo crear el compuesto.') };
