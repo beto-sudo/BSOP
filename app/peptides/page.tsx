@@ -6,6 +6,11 @@ import { getPeptidesData } from '@/lib/peptides';
 import { getProtocoloData } from '@/lib/protocolo';
 import { PeptidesView } from '@/components/peptides/peptides-view';
 
+// Datos personales leídos server-side con service-role — siempre frescos. Sin
+// esto la página se renderiza estática y `router.refresh()` tras registrar una
+// toma no re-jala los datos nuevos (bug de la bitácora, 2026-06-04).
+export const dynamic = 'force-dynamic';
+
 /**
  * Base de info de sourcing de péptidos (iniciativa sanren-peptides).
  * SANREN → Péptidos. Lectura server-side con service-role (RLS deny-all);
