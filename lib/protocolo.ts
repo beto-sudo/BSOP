@@ -1,5 +1,6 @@
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { parseComponentes, type BlendComponente } from '@/lib/blend';
 
 // Bitácora de protocolo (péptidos + suplementos) — iniciativa salud-protocolo.
 // Lee health.protocolo_* con el cliente service-role (igual que lib/health.ts);
@@ -21,6 +22,8 @@ export type ProtocoloCompuesto = {
   fecha_inicio: string | null;
   fecha_fin: string | null;
   notas: string | null;
+  // Blend multi-péptido (caso KLOW). NULL = compuesto simple.
+  componentes: BlendComponente[] | null;
 };
 
 export type ProtocoloToma = {
@@ -67,7 +70,7 @@ export async function getProtocoloData(): Promise<ProtocoloData> {
       .schema('health')
       .from('protocolo_compuestos')
       .select(
-        'id, nombre, clase, via, unidad_dosis, dosis_objetivo, frecuencia, procedencia, estado, fecha_inicio, fecha_fin, notas'
+        'id, nombre, clase, via, unidad_dosis, dosis_objetivo, frecuencia, procedencia, estado, fecha_inicio, fecha_fin, notas, componentes'
       )
       .returns<ProtocoloCompuesto[]>(),
     supabase
@@ -102,6 +105,8 @@ export async function getProtocoloData(): Promise<ProtocoloData> {
       const tomas = tomasPorCompuesto.get(compuesto.id) ?? [];
       return {
         ...compuesto,
+        // El jsonb llega como JS crudo; normalizamos a BlendComponente[] | null.
+        componentes: parseComponentes(compuesto.componentes),
         tomas,
         totalTomas: tomas.length,
         ultimaToma: tomas[0]?.fecha ?? null,
