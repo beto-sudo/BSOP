@@ -15,6 +15,7 @@ import {
 } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { fetchUserPermissions, type UserPermissions, type AccessLevel } from '@/lib/permissions';
+import { fetchSidebarHidden } from '@/lib/sidebar-visibility';
 
 // ── Permissions Context ────────────────────────────────────────────────────
 
@@ -29,6 +30,13 @@ type PermissionsContextValue = {
   impersonating: ImpersonateTarget | null;
   startImpersonate: (userId: string, label: string) => void;
   stopImpersonate: () => void;
+  /**
+   * Top-level sidebar nav slugs hidden globally by an admin (denylist from
+   * `core.sidebar_oculto`). Global, NOT per-user: it applies to admin too.
+   * The sidebar filters these out; the admin visibility panel toggles them.
+   */
+  sidebarHidden: Set<string>;
+  refreshSidebarHidden: () => void;
 };
 
 const DEFAULT_PERMISSIONS: UserPermissions = {
@@ -45,10 +53,20 @@ const PermissionsContext = createContext<PermissionsContextValue>({
   impersonating: null,
   startImpersonate: () => {},
   stopImpersonate: () => {},
+  sidebarHidden: new Set(),
+  refreshSidebarHidden: () => {},
 });
 
 export function usePermissions() {
   return useContext(PermissionsContext);
+}
+
+/**
+ * Convenience hook for the set of admin-hidden top-level sidebar slugs.
+ * See `PermissionsContextValue.sidebarHidden`.
+ */
+export function useSidebarHidden(): Set<string> {
+  return useContext(PermissionsContext).sidebarHidden;
 }
 
 /**
@@ -130,6 +148,7 @@ function PermissionsProvider({ children }: { children: ReactNode }) {
   const [permissions, setPermissions] = useState<UserPermissions>(DEFAULT_PERMISSIONS);
   const [realPermissions, setRealPermissions] = useState<UserPermissions>(DEFAULT_PERMISSIONS);
   const [impersonating, setImpersonating] = useState<ImpersonateTarget | null>(null);
+  const [sidebarHidden, setSidebarHidden] = useState<Set<string>>(new Set());
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
   const impersonatingRef = useRef(impersonating);
@@ -152,6 +171,15 @@ function PermissionsProvider({ children }: { children: ReactNode }) {
     }
   }, [supabase]);
 
+  const loadSidebarHidden = useCallback(async () => {
+    try {
+      setSidebarHidden(await fetchSidebarHidden(supabase));
+    } catch {
+      // Fail open: keep whatever we had (or the empty default) so a transient
+      // error never hides the whole menu.
+    }
+  }, [supabase]);
+
   const clearImpersonateCookie = useCallback(async () => {
     try {
       await fetch('/api/impersonate/stop', { method: 'POST' });
@@ -170,6 +198,7 @@ function PermissionsProvider({ children }: { children: ReactNode }) {
         setPermissions(perms);
       }
     })();
+    void loadSidebarHidden();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -185,17 +214,19 @@ function PermissionsProvider({ children }: { children: ReactNode }) {
             setPermissions(perms);
           }
         })();
+        void loadSidebarHidden();
       } else {
         const fallback = { ...DEFAULT_PERMISSIONS, loading: false };
         setRealPermissions(fallback);
         setPermissions(fallback);
         setImpersonating(null);
+        setSidebarHidden(new Set());
         void clearImpersonateCookie();
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [supabase, loadReal, impersonating, clearImpersonateCookie]);
+  }, [supabase, loadReal, impersonating, clearImpersonateCookie, loadSidebarHidden]);
 
   const fetchImpersonatePerms = useCallback(async (userId: string): Promise<UserPermissions> => {
     const res = await fetch(`/api/impersonate?userId=${encodeURIComponent(userId)}`, {
@@ -257,8 +288,24 @@ function PermissionsProvider({ children }: { children: ReactNode }) {
   }, [realPermissions, clearImpersonateCookie]);
 
   const value = useMemo(
-    () => ({ permissions, refreshPermissions, impersonating, startImpersonate, stopImpersonate }),
-    [permissions, refreshPermissions, impersonating, startImpersonate, stopImpersonate]
+    () => ({
+      permissions,
+      refreshPermissions,
+      impersonating,
+      startImpersonate,
+      stopImpersonate,
+      sidebarHidden,
+      refreshSidebarHidden: loadSidebarHidden,
+    }),
+    [
+      permissions,
+      refreshPermissions,
+      impersonating,
+      startImpersonate,
+      stopImpersonate,
+      sidebarHidden,
+      loadSidebarHidden,
+    ]
   );
 
   return <PermissionsContext.Provider value={value}>{children}</PermissionsContext.Provider>;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   NAV_ITEMS,
+  filterHiddenNavItems,
   flattenNavChildren,
   getActiveSection,
   getSectionLabelKey,
@@ -107,6 +108,44 @@ describe('getSectionLabelKey', () => {
 
   it('falls back to nav.overview when no match', () => {
     expect(getSectionLabelKey('/unknown/route')).toBe('nav.overview');
+  });
+});
+
+describe('filterHiddenNavItems', () => {
+  const slugOf = (items: NavItem[]) => items.map((i) => i.href);
+
+  it('returns the same reference when nothing is hidden', () => {
+    const out = filterHiddenNavItems(NAV_ITEMS, new Set());
+    expect(out).toBe(NAV_ITEMS);
+  });
+
+  it('hides SANREN when its nav slug is in the denylist', () => {
+    const out = filterHiddenNavItems(NAV_ITEMS, new Set(['sanren']));
+    expect(slugOf(out)).not.toContain('/family');
+    // Other empresas stay.
+    expect(slugOf(out)).toContain('/dilesa');
+    expect(slugOf(out)).toContain('/rdb');
+  });
+
+  it('hides Personas Físicas (a virtual item, not a real empresa)', () => {
+    const out = filterHiddenNavItems(NAV_ITEMS, new Set(['personas_fisicas']));
+    expect(slugOf(out)).not.toContain('/personas-fisicas');
+  });
+
+  it('hides multiple items at once and keeps the rest', () => {
+    const out = filterHiddenNavItems(NAV_ITEMS, new Set(['sanren', 'personas_fisicas']));
+    const hrefs = slugOf(out);
+    expect(hrefs).not.toContain('/family');
+    expect(hrefs).not.toContain('/personas-fisicas');
+    expect(hrefs).toContain('/'); // Inicio (no slug) is never hidden
+    expect(hrefs).toContain('/dilesa');
+    expect(hrefs).toContain('/settings');
+  });
+
+  it('never hides items without a nav slug (e.g. Inicio)', () => {
+    // Even a bogus slug set leaves slug-less items untouched.
+    const out = filterHiddenNavItems(NAV_ITEMS, new Set(['nope', 'sanren']));
+    expect(slugOf(out)).toContain('/');
   });
 });
 

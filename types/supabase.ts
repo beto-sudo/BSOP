@@ -1112,6 +1112,32 @@ export type Database = {
           },
         ]
       }
+      sidebar_oculto: {
+        Row: {
+          nav_slug: string
+          oculto_at: string
+          oculto_por: string | null
+        }
+        Insert: {
+          nav_slug: string
+          oculto_at?: string
+          oculto_por?: string | null
+        }
+        Update: {
+          nav_slug?: string
+          oculto_at?: string
+          oculto_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sidebar_oculto_oculto_por_fkey"
+            columns: ["oculto_por"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_presence: {
         Row: {
           avatar_url: string | null

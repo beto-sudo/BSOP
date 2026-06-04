@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Building2, ChevronRight, FileText, Plus, RefreshCw } from 'lucide-react';
 
 import { NuevaEmpresaDrawer } from './_components/nueva-empresa-drawer';
+import { VisibilidadSidebarPanel } from './_components/visibilidad-sidebar-panel';
 
 type EmpresaRow = {
   id: string;
@@ -288,6 +289,8 @@ function EmpresasSettingsInner() {
           ))}
         </div>
       )}
+
+      <VisibilidadSidebarPanel />
 
       <NuevaEmpresaDrawer
         open={drawerOpen}
