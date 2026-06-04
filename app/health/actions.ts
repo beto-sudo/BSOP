@@ -38,6 +38,10 @@ function clampEscala(v: number | null | undefined): number | null {
   return n < 0 || n > 5 ? null : n;
 }
 
+function numOrNull(v: number | null | undefined): number | null {
+  return v != null && Number.isFinite(v) ? v : null;
+}
+
 export type RegistrarTomaInput = {
   compuestoId: string;
   fecha?: string | null; // ISO; default: ahora
@@ -45,6 +49,10 @@ export type RegistrarTomaInput = {
   unidad?: string | null;
   sitio?: string | null;
   nota?: string | null;
+  vial_mg?: number | null;
+  bac_ml?: number | null;
+  concentracion?: number | null;
+  unidades?: number | null;
   efectos?: {
     apetito?: number | null;
     nausea?: number | null;
@@ -64,9 +72,19 @@ export async function registrarToma(input: RegistrarTomaInput): Promise<ActionRe
     }
     const fecha = input.fecha || new Date().toISOString();
 
-    const { data: toma, error } = await admin
-      .schema('health')
-      .from('protocolo_tomas')
+    // Cast: types/supabase.ts aún no tiene vial_mg/bac_ml/concentracion/unidades
+    // (se agregaron a db:types para el próximo auto-regen).
+    const tomas = admin.schema('health').from('protocolo_tomas') as unknown as {
+      insert: (v: Record<string, unknown>) => {
+        select: (c: string) => {
+          single: () => Promise<{
+            data: { id: string } | null;
+            error: { message: string } | null;
+          }>;
+        };
+      };
+    };
+    const { data: toma, error } = await tomas
       .insert({
         compuesto_id: input.compuestoId,
         fecha,
@@ -74,6 +92,10 @@ export async function registrarToma(input: RegistrarTomaInput): Promise<ActionRe
         unidad: input.unidad?.trim() || null,
         sitio: input.sitio?.trim() || null,
         nota: input.nota?.trim() || null,
+        vial_mg: numOrNull(input.vial_mg),
+        bac_ml: numOrNull(input.bac_ml),
+        concentracion: numOrNull(input.concentracion),
+        unidades: numOrNull(input.unidades),
       })
       .select('id')
       .single();
@@ -160,6 +182,77 @@ export async function crearCompuesto(input: CrearCompuestoInput): Promise<Action
 
     if (error) {
       return { ok: false, error: getSupabaseErrorMessage(error, 'No se pudo crear el compuesto.') };
+    }
+
+    revalidatePath('/health');
+    revalidatePath('/peptides');
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Error desconocido.' };
+  }
+}
+
+export type ActualizarTomaInput = {
+  id: string;
+  fecha?: string | null;
+  dosis?: number | null;
+  unidad?: string | null;
+  sitio?: string | null;
+  nota?: string | null;
+  vial_mg?: number | null;
+  bac_ml?: number | null;
+  concentracion?: number | null;
+  unidades?: number | null;
+};
+
+// Editar una toma existente (Sprint 6). Solo aplica los campos presentes.
+export async function actualizarToma(input: ActualizarTomaInput): Promise<ActionResult> {
+  try {
+    const admin = await requireProtocoloAdmin();
+    if (!input.id) return { ok: false, error: 'Falta el id de la toma.' };
+    if (input.dosis != null && (!Number.isFinite(input.dosis) || input.dosis <= 0)) {
+      return { ok: false, error: 'La dosis debe ser un número mayor a 0.' };
+    }
+
+    const patch: Record<string, unknown> = {};
+    if (input.fecha) patch.fecha = input.fecha;
+    if (input.dosis != null) patch.dosis = input.dosis;
+    if (input.unidad !== undefined) patch.unidad = input.unidad?.trim() || null;
+    if (input.sitio !== undefined) patch.sitio = input.sitio?.trim() || null;
+    if (input.nota !== undefined) patch.nota = input.nota?.trim() || null;
+    if (input.vial_mg !== undefined) patch.vial_mg = numOrNull(input.vial_mg);
+    if (input.bac_ml !== undefined) patch.bac_ml = numOrNull(input.bac_ml);
+    if (input.concentracion !== undefined) patch.concentracion = numOrNull(input.concentracion);
+    if (input.unidades !== undefined) patch.unidades = numOrNull(input.unidades);
+    if (Object.keys(patch).length === 0) return { ok: true };
+
+    const tomas = admin.schema('health').from('protocolo_tomas') as unknown as {
+      update: (v: Record<string, unknown>) => {
+        eq: (c: string, val: string) => Promise<{ error: { message: string } | null }>;
+      };
+    };
+    const { error } = await tomas.update(patch).eq('id', input.id);
+    if (error) {
+      return { ok: false, error: getSupabaseErrorMessage(error, 'No se pudo actualizar la toma.') };
+    }
+
+    revalidatePath('/health');
+    revalidatePath('/peptides');
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Error desconocido.' };
+  }
+}
+
+// Eliminar una toma (Sprint 6). Los efectos ligados quedan con toma_id NULL (FK ON DELETE SET NULL).
+export async function eliminarToma(id: string): Promise<ActionResult> {
+  try {
+    const admin = await requireProtocoloAdmin();
+    if (!id) return { ok: false, error: 'Falta el id de la toma.' };
+
+    const { error } = await admin.schema('health').from('protocolo_tomas').delete().eq('id', id);
+    if (error) {
+      return { ok: false, error: getSupabaseErrorMessage(error, 'No se pudo eliminar la toma.') };
     }
 
     revalidatePath('/health');

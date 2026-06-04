@@ -31,6 +31,10 @@ export type ProtocoloToma = {
   unidad: string | null;
   sitio: string | null;
   nota: string | null;
+  vial_mg: number | null;
+  bac_ml: number | null;
+  concentracion: number | null;
+  unidades: number | null;
 };
 
 export type ProtocoloCompuestoConTomas = ProtocoloCompuesto & {
@@ -69,7 +73,9 @@ export async function getProtocoloData(): Promise<ProtocoloData> {
     supabase
       .schema('health')
       .from('protocolo_tomas')
-      .select('id, compuesto_id, fecha, dosis, unidad, sitio, nota')
+      .select(
+        'id, compuesto_id, fecha, dosis, unidad, sitio, nota, vial_mg, bac_ml, concentracion, unidades'
+      )
       .order('fecha', { ascending: false })
       .returns<ProtocoloToma[]>(),
   ]);
