@@ -209,6 +209,25 @@ export function flattenNavChildren(item: NavItem): NavChild[] {
   return [];
 }
 
+/**
+ * Removes top-level nav items whose nav slug is in the `hidden` denylist
+ * (sourced from `core.sidebar_oculto`). Applies to ALL users — admin included —
+ * so it must run AFTER the per-user permission filter, not instead of it.
+ *
+ * Items without a `NAV_TO_EMPRESA` mapping (e.g. Inicio) are never hidden: the
+ * denylist only governs empresa/virtual top-level entries.
+ *
+ * Pure function (no React) so the sidebar's visibility contract can be tested
+ * in isolation. Returns the same array reference when nothing is hidden.
+ */
+export function filterHiddenNavItems(items: NavItem[], hidden: Set<string>): NavItem[] {
+  if (hidden.size === 0) return items;
+  return items.filter((item) => {
+    const slug = NAV_TO_EMPRESA[item.href];
+    return !slug || !hidden.has(slug);
+  });
+}
+
 export function getActiveSection(pathname: string) {
   return (
     NAV_ITEMS.find((item) => hasNavSubItems(item) && isItemActive(pathname, item))?.href ?? null
