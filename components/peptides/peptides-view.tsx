@@ -10,6 +10,7 @@ import {
   ExternalLink,
   ShieldAlert,
   Trophy,
+  NotebookPen,
 } from 'lucide-react';
 import {
   ModuleKpiStrip,
@@ -26,8 +27,10 @@ import {
 import { useUrlFilters } from '@/hooks/use-url-filters';
 import type { PeptidesData, Test, Vendor, Insumo } from '@/lib/peptides';
 import { computeVendorScores, normCode, type VendorScore } from '@/lib/peptides-score';
+import { BitacoraTab } from '@/components/peptides/bitacora-tab';
+import type { ProtocoloCompuestoConTomas } from '@/lib/protocolo';
 
-type TabKey = 'coa' | 'vendors' | 'peptidos' | 'insumos' | 'notas';
+type TabKey = 'coa' | 'vendors' | 'peptidos' | 'insumos' | 'notas' | 'bitacora';
 type VendorRow = Vendor & { score: VendorScore };
 
 const TABS: { key: TabKey; label: string; icon: typeof FlaskConical }[] = [
@@ -36,6 +39,7 @@ const TABS: { key: TabKey; label: string; icon: typeof FlaskConical }[] = [
   { key: 'peptidos', label: 'Péptidos', icon: Pill },
   { key: 'insumos', label: 'Insumos', icon: Syringe },
   { key: 'notas', label: 'Notas', icon: FileText },
+  { key: 'bitacora', label: 'Bitácora', icon: NotebookPen },
 ];
 
 const FILTER_DEFAULTS = {
@@ -103,7 +107,13 @@ function warehouses(v: Vendor): string {
   return w.length ? w.join(' · ') : '—';
 }
 
-export function PeptidesView({ data }: { data: PeptidesData }) {
+export function PeptidesView({
+  data,
+  protocolo,
+}: {
+  data: PeptidesData;
+  protocolo: ProtocoloCompuestoConTomas[];
+}) {
   const { peptidos, vendors, tests, insumos, notas, asOf, errors } = data;
   const { filters, setFilter, clearAll } = useUrlFilters(FILTER_DEFAULTS);
   const tab = (filters.tab || 'coa') as TabKey;
@@ -587,6 +597,8 @@ export function PeptidesView({ data }: { data: PeptidesData }) {
           </div>
         )
       ) : null}
+
+      {tab === 'bitacora' ? <BitacoraTab compuestos={protocolo} /> : null}
 
       <DetailDrawer
         open={!!vendorSel}
