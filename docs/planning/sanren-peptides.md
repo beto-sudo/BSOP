@@ -3,10 +3,10 @@
 **Slug:** `sanren-peptides`
 **Empresas:** SANREN (salud/biohacking personal — gateada `RequireAccess empresa="sanren"`, igual que Salud y Familia; **sin** slug de `core.modulos`, gate puro por empresa)
 **Schemas afectados:** `peptides` (5 tablas nuevas: `peptidos`, `vendors`, `tests`, `insumos`, `notas`); **reusa** `health.protocolo_*` para la bitácora (sin tablas nuevas ahí)
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-06-03
-**Última actualización:** 2026-06-04 (Sprints 1-5 entregados — módulo en prod con score de vendor + bitácora + 12 notas curadas; **próximo:** digest del Telegram cuando Beto pase el export)
+**Última actualización:** 2026-06-04 (CERRADA — módulo Peptides completo en prod: base de info, score de vendor, bitácora + calculadora, y Notas curadas de guía/wiki/Telegram/PDFs. PRs #674/#676/#677/#678/#679 + cierre)
 
 ## Problema
 
@@ -197,6 +197,21 @@ Semax + 13 tomas) vía las server actions de `app/health/actions.ts`.
   diccionario, alerta de endotoxina) + enriquecí 5 GLP-1 vía
   `scripts/seed_peptides_notas.ts`. **Pendiente:** digest del Telegram → notas
   cuando Beto pase el `result.json` (export seguía en cooldown).
+
+- **2026-06-04** — **Iniciativa cerrada.** Sprint 6 (calculadora de
+  reconstitución + selector mg/mcg + precarga de la última config + editar/borrar
+  tomas; columnas `vial_mg`/`bac_ml`/`concentracion`/`unidades` en
+  `health.protocolo_tomas`) en [#678](https://github.com/beto-sudo/BSOP/pull/678).
+  Fix de refresco de la bitácora ([#677](https://github.com/beto-sudo/BSOP/pull/677):
+  `/peptides` force-dynamic + `revalidatePath`). Digest del Telegram: del export
+  STG (37,661 msgs) curé 12 alertas de mods a Notas — bans/recalls (ASC, SRY ×2,
+  SSA mislabel), AOD=frag, pH, SLU-PP/Botox/PBS, impersonador
+  ([#679](https://github.com/beto-sudo/BSOP/pull/679)). PDFs: análisis
+  "Manufacturer Groups" (5 grupos de fábrica) a Notas + ficha BPC-157 al catálogo;
+  los "protocolos" de Spiritys resultaron sátira ("It's all made up"). Estado
+  final: 25 notas (guía+wiki+Telegram+PDF), 6 péptidos enriquecidos, 1,441 COAs /
+  29 vendors con score. Telegram export en `~/Downloads/Telegram Desktop/ChatExport_*`;
+  re-sync = `scripts/import_peptides_stg.ts` + `scripts/seed_peptides_notas.ts`.
 
 ## Decisiones registradas
 
