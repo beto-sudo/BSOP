@@ -23,6 +23,7 @@ import {
   type NavChild,
   type NavIconKey,
   type NavItem,
+  filterHiddenNavItems,
   getActiveSection,
   hasNavSubItems,
   isItemActive,
@@ -73,7 +74,7 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const { t } = useLocale();
-  const { permissions } = usePermissions();
+  const { permissions, sidebarHidden } = usePermissions();
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
   // While permissions are still loading we render a skeleton in place of the nav
@@ -82,71 +83,80 @@ export function Sidebar({
 
   const filteredNavItems = useMemo(() => {
     if (!permissions || permissions.loading) return [];
-    // Admin sees everything.
-    if (permissions.isAdmin) return NAV_ITEMS;
 
-    const filterChild = (child: NavChild) => {
-      const moduloSlug = ROUTE_TO_MODULE[child.href];
-      // If no modulo mapping, show if empresa is accessible.
-      if (!moduloSlug) return true;
-      return canAccessModulo(permissions, moduloSlug);
-    };
+    // 1) Per-user RBAC filter. Admin bypasses to the full nav tree.
+    let byPermissions: NavItem[];
+    if (permissions.isAdmin) {
+      byPermissions = NAV_ITEMS;
+    } else {
+      const filterChild = (child: NavChild) => {
+        const moduloSlug = ROUTE_TO_MODULE[child.href];
+        // If no modulo mapping, show if empresa is accessible.
+        if (!moduloSlug) return true;
+        return canAccessModulo(permissions, moduloSlug);
+      };
 
-    return NAV_ITEMS.reduce<NavItem[]>((acc, item) => {
-      // Overview is always visible to authenticated users.
-      if (!item.href || item.href === '/') {
+      byPermissions = NAV_ITEMS.reduce<NavItem[]>((acc, item) => {
+        // Overview is always visible to authenticated users.
+        if (!item.href || item.href === '/') {
+          acc.push(item);
+          return acc;
+        }
+
+        const empresaSlug = NAV_TO_EMPRESA[item.href];
+
+        // Items with no empresa mapping are always visible (e.g., overview).
+        if (!empresaSlug) {
+          acc.push(item);
+          return acc;
+        }
+
+        // `settings` no es una empresa operativa: es el bucket de módulos de
+        // sistema (Acceso, Notificaciones, Empresas). Su visibilidad se decide
+        // por MÓDULO, no por pertenencia a una empresa — mostrar solo los
+        // children con módulo accesible y ocultar el grupo si no queda ninguno.
+        // Los children sin módulo mapeado (placeholders como Integraciones /
+        // Preferencias) quedan solo para admin, que toma la rama isAdmin arriba.
+        if (empresaSlug === 'settings') {
+          const visibleChildren = (item.children ?? []).filter((child) => {
+            const moduloSlug = ROUTE_TO_MODULE[child.href];
+            return moduloSlug ? canAccessModulo(permissions, moduloSlug) : false;
+          });
+          if (visibleChildren.length > 0) acc.push({ ...item, children: visibleChildren });
+          return acc;
+        }
+
+        // Check empresa-level access.
+        if (!canAccessEmpresa(permissions, empresaSlug)) return acc;
+
+        // Grouped shape: filter children inside each section, then drop empty
+        // sections so the divider doesn't render alone.
+        if (item.sections?.length) {
+          const visibleSections = item.sections
+            .map((section) => ({ ...section, children: section.children.filter(filterChild) }))
+            .filter((section) => section.children.length > 0);
+          acc.push({ ...item, sections: visibleSections });
+          return acc;
+        }
+
+        // Flat shape: filter children directly.
+        if (item.children?.length) {
+          const visibleChildren = item.children.filter(filterChild);
+          // If all children were filtered out, still show the parent (it has empresa access).
+          acc.push({ ...item, children: visibleChildren });
+          return acc;
+        }
+
         acc.push(item);
         return acc;
-      }
+      }, []);
+    }
 
-      const empresaSlug = NAV_TO_EMPRESA[item.href];
-
-      // Items with no empresa mapping are always visible (e.g., overview).
-      if (!empresaSlug) {
-        acc.push(item);
-        return acc;
-      }
-
-      // `settings` no es una empresa operativa: es el bucket de módulos de
-      // sistema (Acceso, Notificaciones, Empresas). Su visibilidad se decide
-      // por MÓDULO, no por pertenencia a una empresa — mostrar solo los
-      // children con módulo accesible y ocultar el grupo si no queda ninguno.
-      // Los children sin módulo mapeado (placeholders como Integraciones /
-      // Preferencias) quedan solo para admin, que retorna arriba en :86.
-      if (empresaSlug === 'settings') {
-        const visibleChildren = (item.children ?? []).filter((child) => {
-          const moduloSlug = ROUTE_TO_MODULE[child.href];
-          return moduloSlug ? canAccessModulo(permissions, moduloSlug) : false;
-        });
-        if (visibleChildren.length > 0) acc.push({ ...item, children: visibleChildren });
-        return acc;
-      }
-
-      // Check empresa-level access.
-      if (!canAccessEmpresa(permissions, empresaSlug)) return acc;
-
-      // Grouped shape: filter children inside each section, then drop empty
-      // sections so the divider doesn't render alone.
-      if (item.sections?.length) {
-        const visibleSections = item.sections
-          .map((section) => ({ ...section, children: section.children.filter(filterChild) }))
-          .filter((section) => section.children.length > 0);
-        acc.push({ ...item, sections: visibleSections });
-        return acc;
-      }
-
-      // Flat shape: filter children directly.
-      if (item.children?.length) {
-        const visibleChildren = item.children.filter(filterChild);
-        // If all children were filtered out, still show the parent (it has empresa access).
-        acc.push({ ...item, children: visibleChildren });
-        return acc;
-      }
-
-      acc.push(item);
-      return acc;
-    }, []);
-  }, [permissions]);
+    // 2) Admin-managed global denylist (core.sidebar_oculto): hides top-level
+    //    items from EVERYONE, admin included. Runs AFTER the RBAC filter, never
+    //    instead of it — so a hidden item stays hidden but access is unchanged.
+    return filterHiddenNavItems(byPermissions, sidebarHidden);
+  }, [permissions, sidebarHidden]);
 
   // Re-expand the section that matches the current route on navigation.
   useEffect(() => {
