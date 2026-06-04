@@ -3,10 +3,10 @@
 **Slug:** `dilesa-compras`
 **Empresas:** DILESA (golden); componente compartido pensado para rollout a las 5 empresas
 **Schemas afectados:** `erp` (catálogo de conceptos nuevo, cotizaciones/RFQ nuevas, binding `partida_id` en líneas de compra, posible generalización del presupuesto), `dilesa` (`proyecto_presupuesto_partidas`, integración con el checklist de anteproyecto), `core.modulos` (sub-slugs RBAC del módulo nuevo)
-**Estado:** planned
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-06-04
-**Última actualización:** 2026-06-04 (promovida a `planned`; alcance v1 cerrado con 6 decisiones + enfoque constructora. Próximo: Sprint 0 — ADR-040 cross-schema presupuesto + catálogo `erp.conceptos_compra` + seed desde `dilesa.obra_presupuesto`.)
+**Última actualización:** 2026-06-04 (Sprint 0 aplicado a prod: ADR-040 + `erp.conceptos_compra` con 3 etapas / 18 capítulos / 71 conceptos, seed normalizado de `dilesa.obra_presupuesto`. Estado → `in_progress`. Próximo: Sprint 1 — cerrar D9 (unificación de presupuesto en `erp`) + binding `partida_id` + vista `v_partida_control`.)
 
 ## Problema
 
@@ -211,3 +211,17 @@ pago: rol **Dirección** (ya vigente en CxP).
   constructora (D7) + separación de contratistas (D8) + decisión cross-schema
   diferida al ADR-040 (D9). Continuación natural de `dilesa-contratos-obra`
   (que dejó "cotizaciones" apuntado como próximo dominio a promover).
+- **2026-06-04** — **Sprint 0 aplicado a prod.** ADR-040 escrito (catálogo en
+  `erp` firme; unificación de presupuesto y `partida_id` como dirección para
+  Sprint 1). Migración `20260604190000_erp_conceptos_compra` aplicada vía MCP
+  (no `db push`, por drift multi-sesión): tabla `erp.conceptos_compra`
+  jerárquica (etapa→capitulo→concepto vía `padre_id`), RLS lectura
+  miembros/escritura admin, + seed DILESA normalizando los 93 conceptos crudos
+  de `obra_presupuesto` → **3 etapas / 18 capítulos / 71 conceptos** (verificado
+  en prod: 0 huérfanos, 0 conceptos sin padre). `tipo_insumo` decidido como
+  atributo de la partida/línea, no del concepto (un concepto se compra en
+  MO+Material+Maquinaria). Gasto suelto fuera del catálogo (concepto libre).
+  SCHEMA_REF regenerado (solo `conceptos_compra`, sin drift). `types` se difiere
+  al workflow `db-types` (Sprint 0 es DB-puro, sin TS que use la tabla).
+  Próximo: Sprint 1 cierra D9 (unificar `obra_presupuesto` en `erp`,
+  coordinando con `dilesa-contratos-obra`).
