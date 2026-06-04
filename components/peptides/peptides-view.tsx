@@ -9,6 +9,7 @@ import {
   FileText,
   ExternalLink,
   ShieldAlert,
+  Trophy,
 } from 'lucide-react';
 import {
   ModuleKpiStrip,
@@ -24,8 +25,10 @@ import {
 } from '@/components/detail-page/detail-drawer';
 import { useUrlFilters } from '@/hooks/use-url-filters';
 import type { PeptidesData, Test, Vendor, Insumo } from '@/lib/peptides';
+import { computeVendorScores, normCode, type VendorScore } from '@/lib/peptides-score';
 
 type TabKey = 'coa' | 'vendors' | 'peptidos' | 'insumos' | 'notas';
+type VendorRow = Vendor & { score: VendorScore };
 
 const TABS: { key: TabKey; label: string; icon: typeof FlaskConical }[] = [
   { key: 'coa', label: 'COA / Testing', icon: FlaskConical },
@@ -42,6 +45,8 @@ const FILTER_DEFAULTS = {
   soloEndotoxina: false,
   soloVendorsOk: false,
   q: '',
+  vRegion: '',
+  vEstado: '',
 };
 
 const ESTADO_STYLE: Record<Vendor['estado'], string> = {
@@ -67,6 +72,12 @@ function purityColor(p: number | null): string {
   if (p == null) return 'text-muted-foreground';
   if (p >= 99) return 'text-emerald-600 dark:text-emerald-400';
   if (p >= 98) return 'text-amber-600 dark:text-amber-400';
+  return 'text-rose-600 dark:text-rose-400';
+}
+
+function scoreColor(n: number): string {
+  if (n >= 70) return 'text-emerald-600 dark:text-emerald-400';
+  if (n >= 45) return 'text-amber-600 dark:text-amber-400';
   return 'text-rose-600 dark:text-rose-400';
 }
 
@@ -96,9 +107,14 @@ export function PeptidesView({ data }: { data: PeptidesData }) {
   const { peptidos, vendors, tests, insumos, notas, asOf, errors } = data;
   const { filters, setFilter, clearAll } = useUrlFilters(FILTER_DEFAULTS);
   const tab = (filters.tab || 'coa') as TabKey;
-  const [vendorSel, setVendorSel] = useState<Vendor | null>(null);
+  const [vendorSel, setVendorSel] = useState<VendorRow | null>(null);
 
-  const vendorByCode = useMemo(() => new Map(vendors.map((v) => [v.codigo, v])), [vendors]);
+  // Match blando vendor↔COA por código normalizado (BFF ↔ BFF/AMO).
+  const vendorByNorm = useMemo(
+    () => new Map(vendors.map((v) => [normCode(v.codigo), v])),
+    [vendors]
+  );
+  const vendorScores = useMemo(() => computeVendorScores(vendors, tests), [vendors, tests]);
 
   // Opciones de péptido ordenadas por # de COAs (los más probados arriba).
   const peptidoOptions = useMemo(() => {
@@ -115,7 +131,7 @@ export function PeptidesView({ data }: { data: PeptidesData }) {
       if (min && (t.purity_pct ?? 0) < min) return false;
       if (filters.soloEndotoxina && !t.endotoxin) return false;
       if (filters.soloVendorsOk) {
-        const v = t.vendor_codigo ? vendorByCode.get(t.vendor_codigo) : undefined;
+        const v = vendorByNorm.get(normCode(t.vendor_codigo));
         if (v && v.estado !== 'activo') return false;
       }
       if (q) {
@@ -131,7 +147,7 @@ export function PeptidesView({ data }: { data: PeptidesData }) {
     filters.soloEndotoxina,
     filters.soloVendorsOk,
     filters.q,
-    vendorByCode,
+    vendorByNorm,
   ]);
 
   const coaKpis = useMemo(() => {
@@ -143,13 +159,25 @@ export function PeptidesView({ data }: { data: PeptidesData }) {
     return { n, vend, avg, endo };
   }, [filteredTests]);
 
+  const scoredVendors = useMemo<VendorRow[]>(() => {
+    return vendors
+      .map((v) => ({ ...v, score: vendorScores.get(v.codigo) as VendorScore }))
+      .filter((v) => {
+        if (filters.vRegion === 'us' && !v.us_warehouse) return false;
+        if (filters.vRegion === 'china' && !v.china_warehouse) return false;
+        if (filters.vRegion === 'eu' && !v.eu_warehouse) return false;
+        if (filters.vEstado && v.estado !== filters.vEstado) return false;
+        return true;
+      });
+  }, [vendors, vendorScores, filters.vRegion, filters.vEstado]);
+
   const coaColumns: Column<Test>[] = [
     { key: 'peptido', label: 'Péptido', cellClassName: 'font-medium' },
     {
       key: 'vendor_codigo',
       label: 'Vendor',
       render: (t) => {
-        const v = t.vendor_codigo ? vendorByCode.get(t.vendor_codigo) : undefined;
+        const v = vendorByNorm.get(normCode(t.vendor_codigo));
         return (
           <span className="inline-flex items-center gap-1.5">
             {t.vendor_codigo ?? '—'}
@@ -220,7 +248,19 @@ export function PeptidesView({ data }: { data: PeptidesData }) {
     },
   ];
 
-  const vendorColumns: Column<Vendor>[] = [
+  const vendorColumns: Column<VendorRow>[] = [
+    {
+      key: 'score',
+      label: 'Score',
+      type: 'custom',
+      align: 'right',
+      accessor: (v) => v.score.total,
+      render: (v) => (
+        <span className={`text-base font-bold tabular-nums ${scoreColor(v.score.total)}`}>
+          {v.score.total}
+        </span>
+      ),
+    },
     { key: 'codigo', label: 'Código', cellClassName: 'font-medium' },
     { key: 'nombre', label: 'Nombre', render: (v) => v.nombre ?? v.codigo },
     {
@@ -237,15 +277,34 @@ export function PeptidesView({ data }: { data: PeptidesData }) {
       accessor: (v) => v.precio_mg ?? 999,
       render: (v) => <span className="tabular-nums">{fmtPrecio(v.precio_mg)}</span>,
     },
+    {
+      key: 'nCoas',
+      label: 'COAs',
+      align: 'right',
+      type: 'custom',
+      accessor: (v) => v.score.nCoas,
+      render: (v) => <span className="tabular-nums">{v.score.nCoas}</span>,
+    },
+    {
+      key: 'avgPurity',
+      label: 'Pureza prom',
+      align: 'right',
+      type: 'custom',
+      accessor: (v) => v.score.avgPurity ?? -1,
+      render: (v) => (
+        <span className={`tabular-nums ${purityColor(v.score.avgPurity)}`}>
+          {v.score.avgPurity != null ? `${v.score.avgPurity}%` : '—'}
+        </span>
+      ),
+    },
     { key: 'warehouses', label: 'Warehouses', sortable: false, render: (v) => warehouses(v) },
-    { key: 'primer_contacto', label: 'Desde', cellClassName: 'text-muted-foreground' },
     {
       key: 'notas',
       label: 'Historial / notas',
       sortable: false,
       render: (v) =>
         v.notas ? (
-          <span className="line-clamp-2 max-w-md text-xs text-muted-foreground">{v.notas}</span>
+          <span className="line-clamp-2 max-w-sm text-xs text-muted-foreground">{v.notas}</span>
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
@@ -262,7 +321,6 @@ export function PeptidesView({ data }: { data: PeptidesData }) {
         cur.best = t.purity_pct;
       m.set(t.peptido, cur);
     }
-    // Incluye los del catálogo aunque no tengan COAs aún.
     for (const p of peptidos)
       if (!m.has(p.nombre)) m.set(p.nombre, { nombre: p.nombre, nTests: 0, best: null });
     return [...m.values()].sort((a, b) => b.nTests - a.nTests);
@@ -430,19 +488,55 @@ export function PeptidesView({ data }: { data: PeptidesData }) {
       ) : null}
 
       {tab === 'vendors' ? (
-        <ModuleContent>
-          <DataTable<Vendor>
-            data={vendors}
-            columns={vendorColumns}
-            rowKey="id"
-            initialSort={{ key: 'estado', dir: 'asc' }}
-            showDensityToggle={false}
-            onRowClick={(v) => setVendorSel(v)}
-            emptyIcon={<Store className="h-8 w-8" />}
-            emptyTitle="Sin vendors"
-            emptyDescription="Corre el importer."
-          />
-        </ModuleContent>
+        <div className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            <Trophy className="mr-1 inline h-3.5 w-3.5" />
+            Score 0–100 = resultados (40%) · precio (25%) · evidencia/# COAs (20%) · endotoxina
+            (15%), con el estado como multiplicador. Click en un vendor para ver el desglose.
+          </p>
+          <ModuleFilters count={`${scoredVendors.length} de ${vendors.length}`}>
+            <select
+              value={filters.vRegion}
+              onChange={(e) => setFilter('vRegion', e.target.value)}
+              className="h-9 rounded-md border bg-background px-2 text-sm"
+            >
+              <option value="">Todas las regiones</option>
+              <option value="us">USA warehouse</option>
+              <option value="china">China warehouse</option>
+              <option value="eu">EU warehouse</option>
+            </select>
+            <select
+              value={filters.vEstado}
+              onChange={(e) => setFilter('vEstado', e.target.value)}
+              className="h-9 rounded-md border bg-background px-2 text-sm"
+            >
+              <option value="">Todos los estados</option>
+              <option value="activo">Activos</option>
+              <option value="warning">Warning</option>
+              <option value="removido">Removidos</option>
+            </select>
+            <button
+              type="button"
+              onClick={clearAll}
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              Limpiar
+            </button>
+          </ModuleFilters>
+          <ModuleContent>
+            <DataTable<VendorRow>
+              data={scoredVendors}
+              columns={vendorColumns}
+              rowKey="id"
+              initialSort={{ key: 'score', dir: 'desc' }}
+              showDensityToggle={false}
+              onRowClick={(v) => setVendorSel(v)}
+              emptyIcon={<Store className="h-8 w-8" />}
+              emptyTitle="Ningún vendor coincide"
+              emptyDescription="Ajusta los filtros."
+            />
+          </ModuleContent>
+        </div>
       ) : null}
 
       {tab === 'peptidos' ? (
@@ -502,14 +596,36 @@ export function PeptidesView({ data }: { data: PeptidesData }) {
       >
         {vendorSel ? (
           <DetailDrawerContent>
+            <DetailDrawerSection title="Score">
+              <div className="flex items-baseline gap-3">
+                <span
+                  className={`text-4xl font-bold tabular-nums ${scoreColor(vendorSel.score.total)}`}
+                >
+                  {vendorSel.score.total}
+                </span>
+                <span className="text-sm text-muted-foreground">/ 100</span>
+                <EstadoBadge estado={vendorSel.estado} />
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+                <ScorePart label="Calidad" value={vendorSel.score.calidad} />
+                <ScorePart label="Precio" value={vendorSel.score.precio} />
+                <ScorePart label="Evidencia" value={vendorSel.score.evidencia} />
+                <ScorePart label="Endotoxina" value={vendorSel.score.endotoxina} />
+              </div>
+              <div className="mt-3 text-xs text-muted-foreground">
+                {vendorSel.score.nCoas} COAs · pureza prom{' '}
+                {vendorSel.score.avgPurity != null ? `${vendorSel.score.avgPurity}%` : '—'} ·{' '}
+                {Math.round(vendorSel.score.pctAlta * 100)}% ≥99% · {fmtPrecio(vendorSel.precio_mg)}
+              </div>
+              {vendorSel.score.endotoxinaFlag ? (
+                <div className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-rose-300/40 bg-rose-50 px-2 py-1 text-xs text-rose-700 dark:border-rose-300/20 dark:bg-rose-300/10 dark:text-rose-200">
+                  <ShieldAlert className="h-3.5 w-3.5" />
+                  Algún batch reportó endotoxina alta — revisa los COAs.
+                </div>
+              ) : null}
+            </DetailDrawerSection>
             <DetailDrawerSection title="Resumen">
               <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <EstadoBadge estado={vendorSel.estado} />
-                  {vendorSel.precio_mg != null ? (
-                    <span className="text-muted-foreground">{fmtPrecio(vendorSel.precio_mg)}</span>
-                  ) : null}
-                </div>
                 <div className="text-muted-foreground">Warehouses: {warehouses(vendorSel)}</div>
                 {vendorSel.metodos_pago ? (
                   <div className="text-muted-foreground">Pago: {vendorSel.metodos_pago}</div>
@@ -535,5 +651,14 @@ export function PeptidesView({ data }: { data: PeptidesData }) {
         ) : null}
       </DetailDrawer>
     </section>
+  );
+}
+
+function ScorePart({ label, value }: { label: string; value: number | null }) {
+  return (
+    <div className="rounded-lg border bg-card px-2 py-1.5">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="text-sm font-semibold tabular-nums">{value == null ? '—' : value}</div>
+    </div>
   );
 }
