@@ -16,6 +16,7 @@ import type { BadgeTone } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Building2, RefreshCw, Search } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { ActivoDetailDrawer } from '@/components/dilesa/activo-detail-drawer';
 
 type Activo = {
   id: string;
@@ -64,6 +65,7 @@ export function PortafolioModule({ empresaId }: { empresaId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState<string>('');
+  const [detalle, setDetalle] = useState<{ id: string; tipo: string } | null>(null);
 
   const fetchActivos = useCallback(
     () =>
@@ -199,10 +201,20 @@ export function PortafolioModule({ empresaId }: { empresaId: string }) {
         loading={loading}
         error={error}
         onRetry={() => void cargar()}
+        onRowClick={(a) => setDetalle({ id: a.id, tipo: a.tipo })}
         initialSort={{ key: 'nombre', dir: 'asc' }}
         emptyTitle="Sin activos"
         emptyDescription="Aún no hay activos en el portafolio. Se llenará al importar los datos de Coda."
         emptyIcon={<Building2 className="h-6 w-6" />}
+      />
+
+      <ActivoDetailDrawer
+        activoId={detalle?.id ?? null}
+        activoTipo={detalle?.tipo ?? null}
+        open={detalle != null}
+        onOpenChange={(o) => {
+          if (!o) setDetalle(null);
+        }}
       />
     </div>
   );
