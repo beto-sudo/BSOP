@@ -20,7 +20,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FileUp, Link2, RefreshCw, Search, Upload } from 'lucide-react';
+import { FileUp, Link2, RefreshCw, Search, Upload, Wallet } from 'lucide-react';
 
 import {
   ModuleFilters,
@@ -51,6 +51,8 @@ import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency } from '@/lib/format';
 import type { EmpresaSlug } from '@/lib/empresa-branding';
+import { buildPartidaIndex, type PartidaGrupo } from '@/lib/compras/partidas';
+import { buildProyectoOptions, type ProyectoSelectorRow } from '@/lib/dilesa/proyectos-selector';
 
 const TZ = 'America/Matamoros';
 
@@ -96,6 +98,7 @@ type Factura = {
   uso_cfdi: string | null;
   xml_url: string | null;
   pdf_url: string | null;
+  partida_id: string | null;
 };
 
 type PagoAplicado = {
@@ -279,6 +282,14 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
 
+  // Binding de partida de presupuesto — solo empresas con presupuesto de obra (DILESA-first).
+  const usaPartidas = empresa === 'dilesa';
+  const [partidaGrupos, setPartidaGrupos] = useState<Map<string, PartidaGrupo[]>>(new Map());
+  const [proyectoOpts, setProyectoOpts] = useState<{ id: string; nombre: string }[]>([]);
+  const [partidaLabelMap, setPartidaLabelMap] = useState<Map<string, string>>(new Map());
+  const [proyectoNombreMap, setProyectoNombreMap] = useState<Map<string, string>>(new Map());
+  const [partidaProyectoMap, setPartidaProyectoMap] = useState<Map<string, string>>(new Map());
+
   const fetchFacturas = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -288,7 +299,7 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
         .schema('erp')
         .from('facturas')
         .select(
-          'id, uuid_sat, emisor_nombre, emisor_rfc, proveedor_id, orden_compra_id, fecha_emision, fecha_vencimiento, fecha_pago_programada, subtotal, iva, tasa_iva, retencion_iva, retencion_isr, total, monto_pagado, saldo, estado_cxp, forma_pago_sat, metodo_pago_sat, uso_cfdi, xml_url, pdf_url'
+          'id, uuid_sat, emisor_nombre, emisor_rfc, proveedor_id, orden_compra_id, fecha_emision, fecha_vencimiento, fecha_pago_programada, subtotal, iva, tasa_iva, retencion_iva, retencion_isr, total, monto_pagado, saldo, estado_cxp, forma_pago_sat, metodo_pago_sat, uso_cfdi, xml_url, pdf_url, partida_id'
         )
         .eq('empresa_id', empresaId)
         .eq('flujo', 'egreso')
@@ -351,6 +362,76 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
   useEffect(() => {
     void fetchFacturas();
   }, [fetchFacturas]);
+
+  // Índice de partidas para el selector del drawer (una vez; solo DILESA-first).
+  useEffect(() => {
+    if (!usaPartidas) return;
+    let activo = true;
+    void (async () => {
+      const sb = createSupabaseBrowserClient();
+      const [partRes, proyRes, catRes] = await Promise.all([
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (sb.schema('erp') as any)
+          .from('presupuesto_partidas')
+          .select('id, proyecto_id, concepto_id, concepto_texto')
+          .eq('empresa_id', empresaId)
+          .is('deleted_at', null),
+        sb
+          .schema('dilesa')
+          .from('proyectos')
+          .select('id, nombre, tipo, proyecto_predecesor_id')
+          .eq('empresa_id', empresaId)
+          .is('deleted_at', null),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (sb.schema('erp') as any)
+          .from('conceptos_compra')
+          .select('id, padre_id, nivel, codigo, nombre')
+          .eq('empresa_id', empresaId)
+          .is('deleted_at', null),
+      ]);
+      if (!activo) return;
+      const { partidaLabel, partidaProyecto, gruposByProyecto } = buildPartidaIndex(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (partRes.data ?? []) as any[],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (catRes.data ?? []) as any[]
+      );
+      const proyNombre = new Map<string, string>();
+      for (const p of proyRes.data ?? [])
+        proyNombre.set(p.id as string, (p.nombre as string) ?? '');
+      // Solo proyectos con presupuesto (consistente con el selector de Compras).
+      const opts = buildProyectoOptions((proyRes.data ?? []) as unknown as ProyectoSelectorRow[])
+        .filter((o) => gruposByProyecto.has(o.id))
+        .map((o) => ({ id: o.id, nombre: o.nombre }));
+      setPartidaGrupos(gruposByProyecto);
+      setPartidaLabelMap(partidaLabel);
+      setProyectoNombreMap(proyNombre);
+      setPartidaProyectoMap(partidaProyecto);
+      setProyectoOpts(opts);
+    })();
+    return () => {
+      activo = false;
+    };
+  }, [usaPartidas, empresaId]);
+
+  const asignarPartida = useCallback(
+    async (facturaId: string, partidaId: string | null) => {
+      const sb = createSupabaseBrowserClient();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: e } = await (sb.schema('erp') as any)
+        .from('facturas')
+        .update({ partida_id: partidaId })
+        .eq('id', facturaId);
+      if (e) {
+        feedback.error(getSupabaseErrorMessage(e, 'No se pudo asignar la partida.'));
+        return;
+      }
+      feedback.success(partidaId ? 'Partida asignada' : 'Partida quitada');
+      setSelected((s) => (s && s.id === facturaId ? { ...s, partida_id: partidaId } : s));
+      void fetchFacturas();
+    },
+    [feedback, fetchFacturas]
+  );
 
   const filtered = useMemo(() => {
     return facturas.filter((f) => {
@@ -449,6 +530,15 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
         empresa={empresa}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
+        usaPartidas={usaPartidas}
+        partidaGrupos={partidaGrupos}
+        proyectoOpts={proyectoOpts}
+        partidaLabelMap={partidaLabelMap}
+        proyectoNombreMap={proyectoNombreMap}
+        partidaProyectoMap={partidaProyectoMap}
+        onAsignar={async (partidaId) => {
+          if (selected) await asignarPartida(selected.id, partidaId);
+        }}
       />
 
       <UploadXmlDialog
@@ -475,15 +565,41 @@ function FacturaDrawer({
   empresa,
   open,
   onClose,
+  usaPartidas,
+  partidaGrupos,
+  proyectoOpts,
+  partidaLabelMap,
+  proyectoNombreMap,
+  partidaProyectoMap,
+  onAsignar,
 }: {
   factura: Factura | null;
   empresa: EmpresaSlug;
   open: boolean;
   onClose: () => void;
+  usaPartidas: boolean;
+  partidaGrupos: Map<string, PartidaGrupo[]>;
+  proyectoOpts: { id: string; nombre: string }[];
+  partidaLabelMap: Map<string, string>;
+  proyectoNombreMap: Map<string, string>;
+  partidaProyectoMap: Map<string, string>;
+  onAsignar: (partidaId: string | null) => Promise<void>;
 }) {
   const [pagos, setPagos] = useState<PagoAplicado[]>([]);
   const [adjuntos, setAdjuntos] = useState<Adjunto[]>([]);
   const [loading, setLoading] = useState(false);
+  const [editPartida, setEditPartida] = useState(false);
+  const [selProy, setSelProy] = useState('');
+  const [selPart, setSelPart] = useState('');
+  const [guardandoPartida, setGuardandoPartida] = useState(false);
+
+  // Cierra el editor cuando cambia la factura (ajuste de estado en render, no en effect).
+  const [trackedFacturaId, setTrackedFacturaId] = useState<string | null>(null);
+  if ((factura?.id ?? null) !== trackedFacturaId) {
+    setTrackedFacturaId(factura?.id ?? null);
+    setEditPartida(false);
+    setGuardandoPartida(false);
+  }
 
   useEffect(() => {
     if (!open || !factura) return;
@@ -657,6 +773,121 @@ function FacturaDrawer({
                     <Link2 className="h-4 w-4" />
                     {factura.oc_codigo ?? 'Ver OC enlazada'} →
                   </a>
+                </section>
+              </>
+            )}
+
+            {/* Partida del presupuesto (DILESA-first): liga el gasto a una partida.
+                Para gasto directo (sin OC) esto lo hace devengar contra el presupuesto. */}
+            {usaPartidas && (
+              <>
+                <Separator />
+                <section className="space-y-2 text-sm">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Partida del presupuesto
+                  </div>
+                  {!editPartida ? (
+                    <div className="flex items-center justify-between gap-2">
+                      {factura.partida_id ? (
+                        <span className="inline-flex items-center gap-1.5 font-medium">
+                          <Wallet className="h-4 w-4 text-muted-foreground" />
+                          {proyectoNombreMap.get(
+                            partidaProyectoMap.get(factura.partida_id) ?? ''
+                          ) ?? '—'}{' '}
+                          › {partidaLabelMap.get(factura.partida_id) ?? '—'}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">Sin asignar a presupuesto.</span>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelProy(
+                            factura.partida_id
+                              ? (partidaProyectoMap.get(factura.partida_id) ?? '')
+                              : ''
+                          );
+                          setSelPart(factura.partida_id ?? '');
+                          setEditPartida(true);
+                        }}
+                      >
+                        {factura.partida_id ? 'Cambiar' : 'Asignar partida'}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <select
+                        value={selProy}
+                        onChange={(e) => {
+                          setSelProy(e.target.value);
+                          setSelPart('');
+                        }}
+                        className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                      >
+                        <option value="">Proyecto…</option>
+                        {proyectoOpts.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.nombre}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={selPart}
+                        onChange={(e) => setSelPart(e.target.value)}
+                        disabled={!selProy}
+                        className="h-9 w-full rounded-md border bg-background px-3 text-sm disabled:opacity-50"
+                      >
+                        <option value="">Partida…</option>
+                        {(partidaGrupos.get(selProy) ?? []).map((g) => (
+                          <optgroup key={g.key} label={g.label}>
+                            {g.partidas.map((pp) => (
+                              <option key={pp.id} value={pp.id}>
+                                {pp.label}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                      <div className="flex items-center justify-end gap-2">
+                        {factura.partida_id && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={guardandoPartida}
+                            onClick={async () => {
+                              setGuardandoPartida(true);
+                              await onAsignar(null);
+                              setGuardandoPartida(false);
+                              setEditPartida(false);
+                            }}
+                          >
+                            Quitar
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={guardandoPartida}
+                          onClick={() => setEditPartida(false)}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          size="sm"
+                          disabled={!selPart || guardandoPartida}
+                          onClick={async () => {
+                            setGuardandoPartida(true);
+                            await onAsignar(selPart);
+                            setGuardandoPartida(false);
+                            setEditPartida(false);
+                          }}
+                        >
+                          {guardandoPartida ? 'Guardando…' : 'Asignar'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </section>
               </>
             )}
