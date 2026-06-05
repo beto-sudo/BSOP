@@ -229,6 +229,7 @@ export default function ProductosPage() {
   const [inventariableFilter, setInventariableFilter] = useState('all');
   const [margenFilter, setMargenFilter] = useState('all'); // all | low | mid | high | sinprecio
   const [sinMovimientoFilter, setSinMovimientoFilter] = useState(false);
+  const [sinCategoriaFilter, setSinCategoriaFilter] = useState(false);
 
   const [selectedProducto, setSelectedProducto] = useState<Producto | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -488,6 +489,7 @@ export default function ProductosPage() {
     return productos.filter((p) => {
       if (activoFilter !== 'all' && String(p.activo) !== activoFilter) return false;
       if (categoriaFilter !== 'all' && p.categoria_id !== categoriaFilter) return false;
+      if (sinCategoriaFilter && p.categoria_id !== null) return false;
       if (inventariableFilter !== 'all' && String(p.inventariable ?? true) !== inventariableFilter)
         return false;
 
@@ -522,9 +524,17 @@ export default function ProductosPage() {
     inventariableFilter,
     margenFilter,
     sinMovimientoFilter,
+    sinCategoriaFilter,
     search,
     now,
   ]);
+
+  // Productos pendientes de clasificar (auto-creados por el trigger de Waitry sin categoría,
+  // o creados a mano sin asignarla). Iniciativa rdb-waitry-autoalta-productos.
+  const sinCategoriaCount = useMemo(
+    () => productos.filter((p) => p.categoria_id === null).length,
+    [productos]
+  );
 
   return (
     <RequireAccess empresa="rdb" modulo="rdb.productos.catalogo">
@@ -542,6 +552,20 @@ export default function ProductosPage() {
             <div className="text-sm text-muted-foreground">
               Total: <span className="font-semibold text-foreground">{filtered.length}</span>
             </div>
+            {sinCategoriaCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setSinCategoriaFilter((v) => !v)}
+                className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                  sinCategoriaFilter
+                    ? 'border-amber-500 bg-amber-500/20 text-amber-700'
+                    : 'border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
+                }`}
+                title="Productos sin categoría (incluye los que entran solos desde Waitry) — clic para filtrar"
+              >
+                {sinCategoriaCount} sin categoría
+              </button>
+            )}
             <Link href="/rdb/productos/analisis">
               <Button variant="outline" className="gap-2">
                 <BarChart3 className="h-4 w-4" />
@@ -622,6 +646,15 @@ export default function ProductosPage() {
             className="h-9"
           >
             Sin movimiento &gt;30d
+          </Button>
+
+          <Button
+            variant={sinCategoriaFilter ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setSinCategoriaFilter((v) => !v)}
+            className="h-9"
+          >
+            Sin categoría
           </Button>
 
           <Button

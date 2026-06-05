@@ -3,7 +3,7 @@
 **Slug:** `rdb-waitry-autoalta-productos`
 **Empresas:** RDB
 **Schemas afectados:** `rdb` (ingesta `waitry_productos` — webhook o trigger), `erp` (`productos`)
-**Estado:** proposed
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-06-05
 **Última actualización:** 2026-06-05
@@ -133,10 +133,10 @@ OTHERS THEN RETURN` para nunca tumbar la venta.
 
 ## Sprints / hitos
 
-- **Sprint 0 — cerrar alcance v1.** Resolver D1-D5 con Beto. ⏳ Pendiente.
-- **Sprint 1 — auto-alta en la ingesta.** ⏳ Pendiente Sprint 0.
-- **Sprint 2 — visibilidad de pendientes.** ⏳ Pendiente Sprint 1.
-- **Sprint 3 — aviso (opcional).** ⏳ A evaluar.
+- **Sprint 0 — cerrar alcance v1.** ✅ Cerrado 2026-06-05: D1 = trigger DB; D2 = sin flag (`categoria_id IS NULL`); D4 = RDB-only; D3 resuelto en Sprint 2; D5 documentado.
+- **Sprint 1 — auto-alta en la ingesta.** ✅ Entregado: trigger `trg_waitry_zzz_autoalta_producto` + función `erp.fn_trg_waitry_autoalta_producto`.
+- **Sprint 2 — visibilidad de pendientes.** ✅ Entregado: filtro + contador "Sin categoría" en `/rdb/productos`.
+- **Sprint 3 — aviso (opcional).** ⏳ A evaluar si Sprint 2 no basta.
 
 ## Decisiones registradas
 
@@ -150,6 +150,23 @@ categorías faltantes — el grupo "en catálogo sin categoría" salió en 0). T
 backfill puntual (`20260605160000`), Beto eligió **iniciativa nueva acotada** para
 la raíz (vs. plegarla a la bloqueada `rdb-waitry-catalog-sync` o seguir con
 backfills manuales), por ser la vía **desbloqueada** (no necesita el NDA de Waitry).
+
+### 2026-06-05 · Sprint 0 — decisiones de diseño cerradas
+
+- **D1 — auto-alta en trigger DB (no en el webhook).** Trigger `AFTER INSERT` sobre
+  `rdb.waitry_productos` en vez de modificar la edge function `waitry-webhook`. Razón:
+  cubre **cualquier** vía de ingesta (webhook actual y el futuro "Push New Order" de
+  `rdb-waitry-catalog-sync`), vive en la DB sin acoplarse a un camino específico, y es
+  idempotente + fail-open.
+- **D2 — sin flag de origen.** `categoria_id IS NULL` es señal suficiente de "pendiente
+  de clasificar"; no se agrega columna a `erp.productos` (tabla compartida) solo para
+  distinguir auto-creados de altas manuales.
+- **D4 — RDB-only confirmado.** `rdb.waitry_productos` es RDB-específica.
+- **No se toca `erp.fn_trg_waitry_to_movimientos`.** Los productos `inventariable=false`
+  generan movimientos "legacy" pero `rdb.v_inventario_stock` filtra `inventariable=true`
+  → no contaminan el stock (preexistente: 30 productos / 3,960 movimientos). El trigger
+  de auto-alta corre **después** de `to_movimientos` (naming `zzz`) para que la primera
+  venta de un producto nuevo no genere un movimiento legacy.
 
 ## Bitácora
 
@@ -165,3 +182,22 @@ backfills manuales), por ser la vía **desbloqueada** (no necesita el NDA de Wai
   por PR). Resultado verificado: mayo a **100% categorizado**, 38 productos creados
   con categoría e `inventariable=false`.
 - Doc de planning creado en estado `proposed`. Próximo: Sprint 0 (cerrar D1-D5).
+
+### 2026-06-05 · Sprint 0+1+2 — auto-alta en automático (este PR)
+
+- **Migración `20260605180000_rdb_waitry_autoalta_producto_trigger.sql`**: función
+  `erp.fn_trg_waitry_autoalta_producto` (SECURITY DEFINER, fail-open) + trigger
+  `trg_waitry_zzz_autoalta_producto` AFTER INSERT en `rdb.waitry_productos`. Crea el
+  producto faltante (`codigo` = `product_id`, sin categoría, `inventariable=false`) en
+  la primera venta. Aplicada a prod vía MCP (drift de historial multi-sesión).
+- **Verificación E2E en prod**: línea de venta de prueba (pedido `paid=false`, aislado
+  de reportes) → el trigger auto-creó el producto con `categoria_id NULL` +
+  `inventariable=false`; rastro de prueba limpiado por completo.
+- **UI** (`app/rdb/productos/page.tsx`): contador clicable "N sin categoría" en el header
+  - botón toggle "Sin categoría" en los filtros, para que el operador vea y clasifique lo
+    que el trigger va creando. Cero queries nuevas (deriva de `categoria_id IS NULL`).
+- 4 checks verdes (typecheck/lint/format/test 1,293 ✓). El backfill histórico de los 94
+  códigos viejos sin catalogar **no** se ejecuta (cola larga pre-mayo que no toca reportes
+  recientes; el trigger los recupera si se vuelven a vender).
+- Estado `proposed → in_progress`. Próximo: observar volumen de auto-altas; evaluar Sprint
+  3 (aviso) solo si el contador no basta.
