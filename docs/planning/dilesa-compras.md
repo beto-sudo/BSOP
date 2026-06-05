@@ -225,3 +225,20 @@ pago: rol **Dirección** (ya vigente en CxP).
   al workflow `db-types` (Sprint 0 es DB-puro, sin TS que use la tabla).
   Próximo: Sprint 1 cierra D9 (unificar `obra_presupuesto` en `erp`,
   coordinando con `dilesa-contratos-obra`).
+- **2026-06-04** — **Sprint 1, fase aditiva aplicada a prod.** Tras mapear el
+  acoplamiento real (Beto cerró: solo obra en S1, checklist al S4): se descubrió
+  que `proyecto_presupuesto_partidas` (vacía) está cableada al checklist, y que
+  la vista de compat para `obra_presupuesto` es frágil con supabase-js. Decisión
+  (Beto pidió "lo más robusto"): modelo único en `erp`, re-apuntar `costeo` (no
+  vista), cross-schema `partida→proyecto` aceptado. Migración
+  `20260604230000_erp_presupuesto_partidas` aplicada vía MCP (con OK explícito de
+  Beto): `erp.presupuesto_partidas` (superset obra + futuro checklist) + copia de
+  las **128 partidas de obra** (47 clasificadas al catálogo por match único, 81
+  pendientes) preservando IDs + `partida_id` (FK) en
+  `requisiciones_detalle`/`ordenes_compra_detalle`/`facturas` + vista
+  `erp.v_partida_control` (comprometido/ejercido/pagado/disponible). Verificado:
+  128 copiadas, `obra_presupuesto` intacta (128), vista OK. Bug corregido en
+  dry-run (`max(uuid)`→`array_agg`). ADR-040 §Revisión documenta los 3 ajustes.
+  Coexistencia inerte (compras sin UI). **Próximo (fase 2, antes de Sprint 2):**
+  re-apuntar `costeo` a `erp.presupuesto_partidas` con preview + retirar
+  `obra_presupuesto`.

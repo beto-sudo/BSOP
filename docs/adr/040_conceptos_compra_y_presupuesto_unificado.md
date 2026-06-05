@@ -109,3 +109,40 @@ triggers. Sprint 1.
   campo más en partida y línea), a cambio de comparabilidad real.
 - El seed del catálogo es editable (data, no schema): Beto puede afinar nombres
   de capítulos/conceptos sin migración nueva.
+
+## Revisión 2026-06-04 — al implementar Sprint 1
+
+Al diseñar la unificación salieron tres realidades que ajustan el plan de la §4
+(sin cambiar la dirección "presupuesto en `erp`"):
+
+1. **`proyecto_presupuesto_partidas` NO se jubila en Sprint 1.** Está vacía en
+   datos pero **cableada en código** al flujo del checklist del anteproyecto
+   (`syncPartidaDesdeTarea`, `autorizarPartida`, RPC `fn_proyecto_promote_anteproyecto`).
+   Se absorbe en **Sprint 4** (integración del checklist), su momento natural.
+   El modelo `erp.presupuesto_partidas` se diseñó como superset para acomodarla
+   (lleva `monto_estimado`, `estado` preliminar/autorizada, `fuente`,
+   `tarea_origen_id`, `autorizado_*`).
+
+2. **La vista de compatibilidad para `obra_presupuesto` se descarta.** Reemplazar
+   la tabla por una vista con triggers `INSTEAD OF` choca con el patrón
+   `.insert().select()` de supabase-js (`RETURNING` sobre vista con trigger es
+   frágil). En su lugar: **re-apuntar `costeo`** al modelo nuevo (fase 2, con
+   verificación en preview). Más robusto y testeable.
+
+3. **`proyecto_id → dilesa.proyectos` es cross-schema, y es inevitable.** Una
+   partida siempre referencia un proyecto, y los proyectos son `dilesa`. Lo que
+   el modelo en `erp` SÍ logra: el binding crítico y de alto volumen
+   (línea-de-compra → partida) queda intra-`erp`. El cross-schema que queda
+   (partida → proyecto) es metadata de bajo volumen — se resuelve en vistas SQL
+   y consultas de 2 pasos (no PostgREST embed). Trade-off aceptado.
+
+**Estado tras la fase aditiva (en prod, 2026-06-04):** `erp.presupuesto_partidas`
+con las 128 partidas de obra copiadas (47 clasificadas al catálogo por match
+exacto único; 81 a clasificar después), `partida_id` (FK) en
+`requisiciones_detalle`/`ordenes_compra_detalle`/`facturas`, y la vista
+`erp.v_partida_control` (3 capas). `dilesa.obra_presupuesto` **intacta** —
+`costeo` la sigue leyendo hasta la fase 2. Coexistencia inerte (las compras no
+tienen UI hasta Sprint 2). **Fase 2 (próximo hito):** re-apuntar `costeo` a
+`erp.presupuesto_partidas` (con preview) y, una vez validado, retirar
+`dilesa.obra_presupuesto`. Debe ir **antes** de la UI de compras del Sprint 2
+para evitar divergencia entre las dos copias.
