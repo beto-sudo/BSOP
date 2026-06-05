@@ -61,6 +61,18 @@ export function ocTotal(oc: Pick<OcRow, 'lineas'>): number {
   return oc.lineas.reduce((acc, l) => acc + lineaTotal(l), 0);
 }
 
+/** Cantidad aún por recibir de una línea: pedida − recibida − cancelada (≥ 0). */
+export function lineaPendiente(
+  l: Pick<OcLinea, 'cantidad' | 'cantidadRecibida' | 'cantidadCancelada'>
+): number {
+  return Math.max(0, (l.cantidad ?? 0) - (l.cantidadRecibida ?? 0) - (l.cantidadCancelada ?? 0));
+}
+
+/** ¿La OC tiene algo pendiente de recibir? (alguna línea con pendiente > 0). */
+export function ocTienePendiente(oc: Pick<OcRow, 'lineas'>): boolean {
+  return oc.lineas.some((l) => lineaPendiente(l) > 0);
+}
+
 /** ¿La OC compromete presupuesto? (estado enviada/parcial/cerrada). */
 export function comprometeOc(estado: OcEstado): boolean {
   return OC_ESTADOS_COMPROMETEN.includes(estado);

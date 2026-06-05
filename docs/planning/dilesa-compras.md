@@ -345,3 +345,17 @@ pago: rol **Dirección** (ya vigente en CxP).
   a la vez. 1264 tests verdes. Pendiente Fase B: editar OC borrador + drawer de
   detalle con histórico (v1 es alta + acciones; sin edición de líneas existentes).
   Próximo: Fase C (recepción, RPC nueva).
+- **2026-06-05** — **`obra_presupuesto` retirada (PR #691) + Fase C construida.**
+  `dilesa.obra_presupuesto` → `_deprecated` (rename, no drop) con OK de Beto;
+  verificado seguro (cero refs runtime, cero vistas/FKs, paridad 128↔128);
+  SCHEMA_REF + types regenerados (types absorbió las tablas diferidas de S0/S1).
+  **Fase C** (recepción, este PR): RPC nueva `erp.oc_recibir_linea_partida`
+  (variante de `oc_recibir_linea` sin producto/almacén/inventario — solo actualiza
+  `cantidad_recibida` + recalcula estado + audita → mueve `ejercido`) en archivo,
+  **pendiente de aplicar a prod con OK de Beto** (en el preview se aplica al branch
+  aislado). `components/compras/recepciones-module.tsx`: bandeja de OCs
+  enviada/parcial + recibir N por línea (inline expand, "Recibir todo" + guardar)
+  contra la partida; helpers `lineaPendiente`/`ocTienePendiente` + 4 tests.
+  Recepción ligera (D11, sin documento/folio). 1268 tests verdes. Próximo:
+  Fase D (requisiciones) + extraer componente compartido + (follow-up) ajuste F4
+  de la vista si se confirma la semántica de `ejercido` con OCs canceladas.

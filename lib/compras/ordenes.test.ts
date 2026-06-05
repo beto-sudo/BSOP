@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   comprometeOc,
   deriveOcKpis,
+  lineaPendiente,
   lineaTotal,
+  ocTienePendiente,
   ocTotal,
   type OcLinea,
   type OcRow,
@@ -55,6 +57,32 @@ describe('lineaTotal / ocTotal', () => {
     expect(
       lineaTotal(linea({ cantidad: undefined as unknown as number, precioUnitario: 10 }))
     ).toBe(0);
+  });
+});
+
+describe('lineaPendiente / ocTienePendiente', () => {
+  it('pendiente = pedida − recibida − cancelada', () => {
+    expect(lineaPendiente(linea({ cantidad: 10, cantidadRecibida: 3, cantidadCancelada: 2 }))).toBe(
+      5
+    );
+  });
+  it('nunca negativo', () => {
+    expect(lineaPendiente(linea({ cantidad: 5, cantidadRecibida: 5, cantidadCancelada: 1 }))).toBe(
+      0
+    );
+  });
+  it('ocTienePendiente true si alguna línea tiene pendiente', () => {
+    const o = oc({
+      lineas: [
+        linea({ cantidad: 2, cantidadRecibida: 2 }),
+        linea({ cantidad: 3, cantidadRecibida: 1 }),
+      ],
+    });
+    expect(ocTienePendiente(o)).toBe(true);
+  });
+  it('ocTienePendiente false si todo recibido/cancelado', () => {
+    const o = oc({ lineas: [linea({ cantidad: 2, cantidadRecibida: 2 })] });
+    expect(ocTienePendiente(o)).toBe(false);
   });
 });
 
