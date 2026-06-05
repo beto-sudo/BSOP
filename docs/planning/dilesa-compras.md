@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-06-04
-**Última actualización:** 2026-06-05 (**Sprint 2 completo y mergeado** (#693: Fase D Requisiciones + gasto suelto + selector solo-con-presupuesto + clonación de catálogo a 5 proyectos). **Sprint "gasto directo"** para registrar pagos fuera del proceso (req→OC) y que sumen al control: **Fase 1 (DB)** aplicada a prod y mergeada (#696: ADR-041 + vista `ejercido` **híbrido** = recibido de OC + facturas con partida sin OC; D14) + fix de colisión de timestamp que rompía previews. **Fase 2 (UI)** sección "Partida del presupuesto" en el drawer de factura de CxP — **mergeada (#697)**; el flujo de gasto directo quedó completo (subir XML → asignar partida → pagar → suma ejercido+pagado). **Sprint "contratos de obra al control de partidas" promovido** (D15/ADR-042): el contrato compromete una partida (1:1), las estimaciones la ejercen/pagan — pendiente de arrancar Fase 1 (DB) con OK de Beto. Próximo aparte: Sprint 3 = Cotización RFQ.)
+**Última actualización:** 2026-06-05 (**Sprint 2 completo y mergeado** (#693: Fase D Requisiciones + gasto suelto + selector solo-con-presupuesto + clonación de catálogo a 5 proyectos). **Sprint "gasto directo"** para registrar pagos fuera del proceso (req→OC) y que sumen al control: **Fase 1 (DB)** aplicada a prod y mergeada (#696: ADR-041 + vista `ejercido` **híbrido** = recibido de OC + facturas con partida sin OC; D14) + fix de colisión de timestamp que rompía previews. **Fase 2 (UI)** sección "Partida del presupuesto" en el drawer de factura de CxP — **mergeada (#697)**; el flujo de gasto directo quedó completo (subir XML → asignar partida → pagar → suma ejercido+pagado). **Sprint "contratos de obra al control de partidas" promovido** (D15/ADR-042): el contrato compromete una partida (1:1), las estimaciones la ejercen/pagan — pendiente de arrancar Fase 1 (DB) con OK de Beto. **Sprint Cotización RFQ arrancado**: Fase 0 (ADR-042, contrato de obra ↔ partida) aplicada a prod; próximo Fase 1 = schema RFQ.)
 
 ## Problema
 
@@ -478,3 +478,24 @@ empresa === 'dilesa'`): RDB no carga partidas ni ve la sección (cero cambio de
   contrato; emisión a CxP con `partida_id` — cierra el pendiente de ADR-039).
   **Pendiente de arrancar la Fase 1 con OK de Beto (toca la vista de control —
   cambio financiero).**
+- **2026-06-05** — **Sprint Cotizaciones (RFQ) arrancado · Fase 0 (DB) aplicada a
+  prod.** Fase 0 del sprint Cotizaciones = Fase 1 (DB) de ADR-042/D15 (prerrequisito:
+  para que la cotización adjudique a contrato de obra, el contrato debe poder
+  comprometer una partida). Migración
+  `20260605190000_contrato_obra_partida_id_y_comprometido` aplicada vía MCP con OK de
+  Beto: (1) `dilesa.contratos_construccion.partida_id` (FK → `erp.presupuesto_partidas`,
+  nullable, cross-schema `dilesa→erp`, `ON DELETE SET NULL`) + índice parcial; (2)
+  `erp.v_partida_control.comprometido` extendido a `Σ OC (enviada/parcial/cerrada) + Σ
+contratos activos por partida_id` (join filtrado por `empresa_id`, activo =
+  `deleted_at IS NULL`), con `disponible` ajustado al comprometido total. **Aditivo
+  puro**: 0 contratos tienen partida hoy (columna nueva) → `comprometido_total` sin
+  cambio (verificado en prod: 483 partidas, $0→$0). Lógica validada read-only antes de
+  aplicar (simular ligar el contrato de urbanización más grande, $7.69M, sube el
+  comprometido y dispara la alerta de sobre-contratación de ADR-042). El comprometido de
+  contratos empieza a contar cuando la UI ligue contratos a partidas (sprint
+  `dilesa-contratos-obra` Fase 2 de ADR-042, o desde la adjudicación de la RFQ). **Nota
+  IVA**: se suma `valor_total` (c/IVA) por mandato de ADR-042; el comprometido de OC va a
+  subtotal s/IVA y el desglose `valor_subtotal/valor_iva` está NULL en los 302 contratos
+  traspasados (solo `valor_total` poblado), así que es lo único disponible. SCHEMA_REF +
+  types regenerados (1 columna, sin drift). Próximo: Fase 1 del sprint = schema RFQ (4
+  tablas en `erp` + sub-slug RBAC `dilesa.compras.cotizaciones`).

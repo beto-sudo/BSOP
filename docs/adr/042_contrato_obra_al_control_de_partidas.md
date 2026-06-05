@@ -1,6 +1,6 @@
 # ADR-042 — El contrato de obra como compromiso de una partida del presupuesto
 
-**Estado:** Aceptado (diseño; ejecución por sprint)
+**Estado:** Aceptado · Fase 1 (DB) aplicada a prod 2026-06-05 (migración `20260605190000`)
 **Fecha:** 2026-06-05
 **Iniciativas:** `dilesa-compras` (control presupuestal de 3 capas, D1) ∩ `dilesa-contratos-obra` (contratos + estimaciones) ∩ `cxp` (factura → pago)
 **Decisión registrada como:** D15 de `dilesa-compras`
@@ -108,7 +108,11 @@ materiales:
 
 Fases tentativas (cada una su PR; migraciones con OK de Beto):
 
-1. **DB** — `contratos_construccion.partida_id` + extender `v_partida_control.comprometido`.
+1. **DB** ✅ (aplicada 2026-06-05, migración `20260605190000`) — `contratos_construccion.partida_id`
+   (FK → `erp.presupuesto_partidas`, nullable, `ON DELETE SET NULL`) + índice parcial +
+   `v_partida_control.comprometido` extendido (`Σ OC + Σ contratos activos por partida_id`,
+   filtrado por `empresa_id`). Aditivo puro (0 contratos ligados hoy). Llega vía el sprint
+   Cotizaciones (RFQ) como su Fase 0, por ser prerrequisito de la adjudicación a contrato.
 2. **UI alta de contrato** — selector de partida al crear/editar el contrato.
 3. **Emisión a CxP** — RPC `cxp_factura_desde_estimacion` poblando `partida_id`
    (cierra también el pendiente de ADR-039) + UI "Emitir a CxP" que ya existe.
