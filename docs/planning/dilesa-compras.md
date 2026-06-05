@@ -388,3 +388,22 @@ pago: rol **Dirección** (ya vigente en CxP).
   próximo Sprint 3 = Cotización RFQ. Follow-ups vivos: editar OC borrador/drawer
   de detalle (Fase B), ajuste F4 de `v_partida_control` (OCs canceladas en
   `ejercido`), migración de RDB al componente compartido (backlog).
+- **2026-06-05** — **Ajustes post-Fase D pedidos por Beto (mismo PR #693).** Tres
+  cosas: (1) **Requisición libre / gasto suelto** — opción "Gasto suelto (sin
+  proyecto)" en el selector → líneas de texto libre sin partida (`partida_id`
+  null; la OC generada tampoco lleva partida ni compromete presupuesto).
+  `puedeGenerarOc` relajado: partida opcional (alineado con el alcance v1 "gasto
+  suelto soportado"). +1 test (1286). (2) **Selector "solo con presupuesto"** —
+  Requisiciones y Órdenes listan únicamente fraccionamientos con partidas
+  cargadas (o con documentos previos); los vacíos/cerrados se ocultan solos, sin
+  marcar estado en DB. (3) **Clonación de catálogo a prod (datos, no migración)**
+  — 5 proyectos sin presupuesto recibieron las 71 partidas del catálogo canónico
+  (`erp.conceptos_compra` nivel concepto) en **$0**, idempotente (`NOT EXISTS`),
+  con `fuente='catalogo_clon'` para reversión: **Ampliación Lomas de los Encinos**
+  - **Lomas de las Delicias** (desarrollos abiertos) + **Loma Escondida** +
+    **Lomas del Bosque** + **Plaza Comercial Los Encinos** (anteproyectos en
+    análisis). 355 filas, verificado (71 c/u, todas con concepto_id, todas en cero,
+    3 etapas). Beto captura los montos reales en Costeo. **Cerrados sin clon
+    (invisibles por la regla del selector):** Loma Verde, Loma Verde 2, Lomas del
+    Valle, Paseo del Valle. Reversión: `... WHERE fuente='catalogo_clon'`.
+    Presupuestos reales preexistentes: Lomas del Sol (73), Lomas de los Encinos (55).
