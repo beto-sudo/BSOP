@@ -256,6 +256,11 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   'dilesa.compras.ordenes',
   'dilesa.compras.requisiciones',
   'dilesa.compras.recepciones',
+  // Cotización RFQ (Sprint Cotizaciones, D2). Sub-slug del hub Compras; tab
+  // que captura/compara precios y adjudica a OC o contrato. La URL +
+  // ROUTE_TO_MODULE + page llegan con la UI (Fase 2). Migración
+  // 20260605191000_erp_cotizaciones_rfq.sql (INSERT slug + backfill permisos).
+  'dilesa.compras.cotizaciones',
   // Sub-slugs por fase del pipeline (Sprint 7a captura por fase)
   'dilesa.ventas.fase01_solicitud',
   'dilesa.ventas.fase02_asignada',

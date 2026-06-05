@@ -499,3 +499,28 @@ contratos activos por partida_id` (join filtrado por `empresa_id`, activo =
   traspasados (solo `valor_total` poblado), así que es lo único disponible. SCHEMA_REF +
   types regenerados (1 columna, sin drift). Próximo: Fase 1 del sprint = schema RFQ (4
   tablas en `erp` + sub-slug RBAC `dilesa.compras.cotizaciones`).
+- **2026-06-05** — **Sprint Cotizaciones · Fase 1 (schema RFQ) aplicada a prod.**
+  Migración `20260605191000_erp_cotizaciones_rfq`: 4 tablas en `erp` (`cotizaciones` la
+  RFQ con `tipo` compra|obra que decide a qué adjudica; `cotizacion_lineas` ancladas a
+  partida D12; `cotizacion_proveedores` invitados+respuesta con `UNIQUE(cotizacion,proveedor)`;
+  `cotizacion_proveedor_precios` la matriz precio×línea×proveedor con
+  `UNIQUE(cot_proveedor,linea)`), RLS por empresa (patrón `core.fn_has_empresa`, 16
+  políticas) + grants a `authenticated` + triggers `updated_at` + 2 FKs de adjudicación
+  (`erp.ordenes_compra.cotizacion_id`, `dilesa.contratos_construccion.cotizacion_id`,
+  `ON DELETE SET NULL`). RBAC: sub-slug **`dilesa.compras.cotizaciones`** en `core.modulos`
+  - backfill de 8 permisos clonados de `dilesa.compras.ordenes` (regla 4 lugares:
+    EXPECTED*DB_MODULE_SLUGS actualizado; ROUTE_TO_MODULE + page + TAB llegan con la UI en
+    Fase 2, cuando se libera la URL). Helper puro `lib/compras/cotizaciones.ts` (matriz:
+    `precioCelda`/`totalProveedorMatriz`/`mejorProveedorLinea`/`rankingProveedores`/
+    `puedeAdjudicar`/`adjudicaA`/KPIs; 12 tests). Validada en dry-run (BEGIN/ROLLBACK: 4
+    tablas, 16 policies, 8 permisos, 2 columnas) antes de aplicar; verificada en prod.
+    Tablas vacías → aditivo puro. **Fix de drift/colisión de historial (con OK de Beto):**
+    el MCP `apply_migration` registra cada migración con el timestamp del momento (no el del
+    archivo) → mis Fase 0/1 quedaron como `215128`/`222129` en el historial, y la sesión
+    paralela `rdb-waitry` colisionó el timestamp `20260605180000` con `v_partida_control`
+    (#696). Eso rompía el Supabase Preview (`MIGRATIONS_FAILED` + out-of-order). Repair:
+    alineadas las 3 entradas de historial a sus timestamps de archivo (190000/191000/184000)
+    vía UPDATE en `supabase_migrations.schema_migrations`, y **renombrado el archivo de
+    waitry** `20260605180000*…`→`20260605184000\_…`para resolver la colisión en`main`.
+Próximo: Fase 2 = UI de captura (`components/compras/cotizaciones-module.tsx` + page +
+    TAB + ROUTE_TO_MODULE).
