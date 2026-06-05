@@ -2,7 +2,8 @@
 
 /**
  * CosteoConceptoForm — alta/edición de un concepto de presupuesto de obra
- * (`dilesa.obra_presupuesto`, Capa A).
+ * (`erp.presupuesto_partidas`, modelo canónico — ADR-040; migrado desde
+ * `dilesa.obra_presupuesto` en Sprint 1 de dilesa-compras).
  *
  * Iniciativa dilesa-contratos-obra · Sprint 5 (captura de presupuesto). El
  * traspaso de los Excel (hoja RESUMEN) cargó 128 conceptos de solo-lectura;
@@ -84,32 +85,33 @@ export function CosteoConceptoForm({
 
     const payload = {
       etapa: etapa.trim() || null,
-      concepto: concepto.trim(),
+      concepto_texto: concepto.trim(),
       presupuesto_previo: toNum(presupuestoPrevio),
-      presupuesto_actualizado: toNum(presupuestoActual),
+      presupuesto_aprobado: toNum(presupuestoActual),
       gasto_real_total: toNum(gastoReal),
       proveedor_texto: proveedor.trim() || null,
       fecha_compromiso: fecha || null,
     };
 
+    // Modelo canónico erp.presupuesto_partidas (ADR-040). Aún no está en
+    // types/supabase.ts (se difiere al workflow db-types) → cast `as any`,
+    // patrón del repo para tablas nuevas.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const partidas = () => (sb.schema('erp') as any).from('presupuesto_partidas');
     const resp = editRow
-      ? await sb
-          .schema('dilesa')
-          .from('obra_presupuesto')
+      ? await partidas()
           .update({ ...payload, proyecto_id: proyectoId, updated_at: new Date().toISOString() })
           .eq('id', editRow.id)
-      : await sb
-          .schema('dilesa')
-          .from('obra_presupuesto')
-          .insert({
-            empresa_id: empresaId,
-            proyecto_id: proyectoId,
-            orden:
-              rows
-                .filter((r) => r.proyecto_id === proyectoId)
-                .reduce((m, r) => Math.max(m, r.orden), 0) + 1,
-            ...payload,
-          });
+      : await partidas().insert({
+          empresa_id: empresaId,
+          proyecto_id: proyectoId,
+          fuente: 'obra_resumen',
+          orden:
+            rows
+              .filter((r) => r.proyecto_id === proyectoId)
+              .reduce((m, r) => Math.max(m, r.orden), 0) + 1,
+          ...payload,
+        });
 
     if (resp.error) {
       toast.add({
