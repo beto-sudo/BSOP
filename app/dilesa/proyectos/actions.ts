@@ -9,11 +9,17 @@
  * excedente + costo MO). RLS valida acceso a la empresa.
  *
  * `setUnidadMuestra` controla el flag de casa demo en `dilesa.unidades`.
+ *
+ * Iniciativa `dilesa-portafolio-activos`: `liberarUnidadAlPortafolio` /
+ * `regresarUnidadAlProyecto` mueven una unidad entre el inventario del
+ * fraccionamiento y el portafolio de activos (RPCs atómicas en `dilesa`).
  */
 
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+
+import { isActivoModalidad, isActivoTipo } from '@/lib/dilesa/portafolio';
 
 type ProyectoFieldsPatch = {
   plano_oficial_url?: string | null;
@@ -34,6 +40,23 @@ function validatePositive(n: number | null | undefined, label: string): string |
   if (n == null) return null;
   if (!Number.isFinite(n) || n < 0) return `${label} debe ser número ≥ 0`;
   return null;
+}
+
+/** Cliente Supabase con la sesión del usuario (RLS aplica). */
+async function getActionClient() {
+  const cookieStore = await cookies();
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll() {},
+      },
+    }
+  );
 }
 
 export async function updateProyectoFields(
@@ -75,19 +98,7 @@ export async function updateProyectoFields(
     return { ok: false, error: 'sin campos a actualizar' };
   }
 
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll() {},
-      },
-    }
-  );
+  const supabase = await getActionClient();
 
   const { error } = await supabase
     .schema('dilesa')
@@ -112,19 +123,7 @@ export async function updateProyectoFields(
 export async function setUnidadMuestra(unidadId: string, esMuestra: boolean): Promise<Result> {
   if (!unidadId) return { ok: false, error: 'unidadId requerido' };
 
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll() {},
-      },
-    }
-  );
+  const supabase = await getActionClient();
 
   const { error } = await supabase
     .schema('dilesa')
@@ -134,6 +133,70 @@ export async function setUnidadMuestra(unidadId: string, esMuestra: boolean): Pr
 
   if (error) {
     return { ok: false, error: error.message || 'No se pudo actualizar la unidad.' };
+  }
+
+  revalidatePath('/dilesa/proyectos');
+  return { ok: true };
+}
+
+type LiberarUnidadInput = {
+  tipo: string;
+  modalidad: string;
+  valorEstimado?: number | null;
+};
+
+/**
+ * Traspasa una unidad del inventario del fraccionamiento al portafolio de
+ * activos: crea el activo + su satélite y liga `unidades.activo_id`. La unidad
+ * sale del canal de ventas del proyecto (queda excluida del avance de vivienda
+ * y del inventario disponible). Atómico vía RPC `fn_liberar_unidad_portafolio`.
+ */
+export async function liberarUnidadAlPortafolio(
+  unidadId: string,
+  input: LiberarUnidadInput
+): Promise<Result> {
+  if (!unidadId) return { ok: false, error: 'unidadId requerido' };
+  if (!isActivoTipo(input.tipo)) return { ok: false, error: 'Tipo de activo no válido' };
+  if (!isActivoModalidad(input.modalidad)) return { ok: false, error: 'Modalidad no válida' };
+  const valor = input.valorEstimado;
+  if (valor != null && (!Number.isFinite(valor) || valor < 0)) {
+    return { ok: false, error: 'El valor estimado debe ser un número ≥ 0' };
+  }
+
+  const supabase = await getActionClient();
+
+  const { error } = await supabase.schema('dilesa').rpc('fn_liberar_unidad_portafolio', {
+    p_unidad_id: unidadId,
+    p_tipo: input.tipo,
+    p_modalidad: input.modalidad,
+    p_valor: valor ?? undefined,
+  });
+
+  if (error) {
+    return { ok: false, error: error.message || 'No se pudo liberar la unidad al portafolio.' };
+  }
+
+  revalidatePath('/dilesa/proyectos');
+  return { ok: true };
+}
+
+/**
+ * Regresa una unidad del portafolio a su proyecto origen: desliga el activo
+ * (lo soft-borra, queda en historia) y limpia `activo_id`, devolviendo la
+ * unidad al inventario disponible para ventas. Atómico vía RPC
+ * `fn_regresar_unidad_proyecto`.
+ */
+export async function regresarUnidadAlProyecto(unidadId: string): Promise<Result> {
+  if (!unidadId) return { ok: false, error: 'unidadId requerido' };
+
+  const supabase = await getActionClient();
+
+  const { error } = await supabase.schema('dilesa').rpc('fn_regresar_unidad_proyecto', {
+    p_unidad_id: unidadId,
+  });
+
+  if (error) {
+    return { ok: false, error: error.message || 'No se pudo regresar la unidad al proyecto.' };
   }
 
   revalidatePath('/dilesa/proyectos');

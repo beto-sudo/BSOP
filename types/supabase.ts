@@ -1927,6 +1927,7 @@ export type Database = {
           id: string
           latitud: number | null
           longitud: number | null
+          modalidad: string | null
           municipio: string | null
           nombre: string
           notas: string | null
@@ -1951,6 +1952,7 @@ export type Database = {
           id?: string
           latitud?: number | null
           longitud?: number | null
+          modalidad?: string | null
           municipio?: string | null
           nombre: string
           notas?: string | null
@@ -1975,6 +1977,7 @@ export type Database = {
           id?: string
           latitud?: number | null
           longitud?: number | null
+          modalidad?: string | null
           municipio?: string | null
           nombre?: string
           notas?: string | null
@@ -4610,6 +4613,15 @@ export type Database = {
         Returns: string
       }
       fn_generar_plan_pagos: { Args: { p_venta_id: string }; Returns: number }
+      fn_liberar_unidad_portafolio: {
+        Args: {
+          p_modalidad: string
+          p_tipo: string
+          p_unidad_id: string
+          p_valor?: number
+        }
+        Returns: string
+      }
       fn_marcar_plano_vigente: {
         Args: { p_plano_id: string }
         Returns: undefined
@@ -4617,6 +4629,10 @@ export type Database = {
       fn_proyecto_promote_anteproyecto: {
         Args: { p_anteproyecto_id: string }
         Returns: string
+      }
+      fn_regresar_unidad_proyecto: {
+        Args: { p_unidad_id: string }
+        Returns: undefined
       }
       fn_tarea_terminada_esta_pagada: {
         Args: { p_tarea_id: string }
@@ -9903,6 +9919,14 @@ export type Database = {
         Returns: Json
       }
       oc_recibir_linea: {
+        Args: {
+          p_cantidad_recibida_total: number
+          p_costo_unitario?: number
+          p_detalle_id: string
+        }
+        Returns: Json
+      }
+      oc_recibir_linea_partida: {
         Args: {
           p_cantidad_recibida_total: number
           p_costo_unitario?: number
