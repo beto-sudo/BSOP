@@ -2299,6 +2299,7 @@ export type Database = {
           coda_row_id: string | null
           codigo: string
           contratista_id: string
+          cotizacion_id: string | null
           created_at: string
           deleted_at: string | null
           empresa_id: string
@@ -2321,6 +2322,7 @@ export type Database = {
           coda_row_id?: string | null
           codigo: string
           contratista_id: string
+          cotizacion_id?: string | null
           created_at?: string
           deleted_at?: string | null
           empresa_id: string
@@ -2343,6 +2345,7 @@ export type Database = {
           coda_row_id?: string | null
           codigo?: string
           contratista_id?: string
+          cotizacion_id?: string | null
           created_at?: string
           deleted_at?: string | null
           empresa_id?: string
@@ -5564,6 +5567,226 @@ export type Database = {
           },
         ]
       }
+      cotizacion_lineas: {
+        Row: {
+          cantidad: number
+          cotizacion_id: string
+          created_at: string
+          descripcion: string | null
+          empresa_id: string
+          id: string
+          partida_id: string | null
+          unidad: string | null
+        }
+        Insert: {
+          cantidad?: number
+          cotizacion_id: string
+          created_at?: string
+          descripcion?: string | null
+          empresa_id: string
+          id?: string
+          partida_id?: string | null
+          unidad?: string | null
+        }
+        Update: {
+          cantidad?: number
+          cotizacion_id?: string
+          created_at?: string
+          descripcion?: string | null
+          empresa_id?: string
+          id?: string
+          partida_id?: string | null
+          unidad?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cotizacion_lineas_cotizacion_id_fkey"
+            columns: ["cotizacion_id"]
+            isOneToOne: false
+            referencedRelation: "cotizaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotizacion_lineas_partida_id_fkey"
+            columns: ["partida_id"]
+            isOneToOne: false
+            referencedRelation: "presupuesto_partidas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotizacion_lineas_partida_id_fkey"
+            columns: ["partida_id"]
+            isOneToOne: false
+            referencedRelation: "v_partida_control"
+            referencedColumns: ["partida_id"]
+          },
+        ]
+      }
+      cotizacion_proveedor_precios: {
+        Row: {
+          cotizacion_linea_id: string
+          cotizacion_proveedor_id: string
+          created_at: string
+          empresa_id: string
+          id: string
+          precio_unitario: number
+        }
+        Insert: {
+          cotizacion_linea_id: string
+          cotizacion_proveedor_id: string
+          created_at?: string
+          empresa_id: string
+          id?: string
+          precio_unitario?: number
+        }
+        Update: {
+          cotizacion_linea_id?: string
+          cotizacion_proveedor_id?: string
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          precio_unitario?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cotizacion_proveedor_precios_cotizacion_linea_id_fkey"
+            columns: ["cotizacion_linea_id"]
+            isOneToOne: false
+            referencedRelation: "cotizacion_lineas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotizacion_proveedor_precios_cotizacion_proveedor_id_fkey"
+            columns: ["cotizacion_proveedor_id"]
+            isOneToOne: false
+            referencedRelation: "cotizacion_proveedores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cotizacion_proveedores: {
+        Row: {
+          adjunto_url: string | null
+          condiciones: string | null
+          cotizacion_id: string
+          created_at: string
+          empresa_id: string
+          estado: string
+          id: string
+          monto_total: number | null
+          notas: string | null
+          proveedor_id: string
+          tiempo_entrega: string | null
+          updated_at: string
+        }
+        Insert: {
+          adjunto_url?: string | null
+          condiciones?: string | null
+          cotizacion_id: string
+          created_at?: string
+          empresa_id: string
+          estado?: string
+          id?: string
+          monto_total?: number | null
+          notas?: string | null
+          proveedor_id: string
+          tiempo_entrega?: string | null
+          updated_at?: string
+        }
+        Update: {
+          adjunto_url?: string | null
+          condiciones?: string | null
+          cotizacion_id?: string
+          created_at?: string
+          empresa_id?: string
+          estado?: string
+          id?: string
+          monto_total?: number | null
+          notas?: string | null
+          proveedor_id?: string
+          tiempo_entrega?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cotizacion_proveedores_cotizacion_id_fkey"
+            columns: ["cotizacion_id"]
+            isOneToOne: false
+            referencedRelation: "cotizaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotizacion_proveedores_proveedor_id_fkey"
+            columns: ["proveedor_id"]
+            isOneToOne: false
+            referencedRelation: "proveedores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cotizaciones: {
+        Row: {
+          adjudicado_proveedor_id: string | null
+          codigo: string | null
+          creado_por: string | null
+          created_at: string
+          deleted_at: string | null
+          descripcion: string | null
+          empresa_id: string
+          estado: string
+          fecha_limite: string | null
+          id: string
+          requisicion_id: string | null
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          adjudicado_proveedor_id?: string | null
+          codigo?: string | null
+          creado_por?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id: string
+          estado?: string
+          fecha_limite?: string | null
+          id?: string
+          requisicion_id?: string | null
+          tipo?: string
+          updated_at?: string
+        }
+        Update: {
+          adjudicado_proveedor_id?: string | null
+          codigo?: string | null
+          creado_por?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string
+          estado?: string
+          fecha_limite?: string | null
+          id?: string
+          requisicion_id?: string | null
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cotizaciones_adjudicado_proveedor_id_fkey"
+            columns: ["adjudicado_proveedor_id"]
+            isOneToOne: false
+            referencedRelation: "proveedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotizaciones_requisicion_id_fkey"
+            columns: ["requisicion_id"]
+            isOneToOne: false
+            referencedRelation: "requisiciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cuentas_bancarias: {
         Row: {
           activo: boolean
@@ -7574,6 +7797,7 @@ export type Database = {
           cerrada_por: string | null
           codigo: string | null
           condiciones_pago: string | null
+          cotizacion_id: string | null
           created_at: string
           deleted_at: string | null
           direccion_entrega: string | null
@@ -7597,6 +7821,7 @@ export type Database = {
           cerrada_por?: string | null
           codigo?: string | null
           condiciones_pago?: string | null
+          cotizacion_id?: string | null
           created_at?: string
           deleted_at?: string | null
           direccion_entrega?: string | null
@@ -7620,6 +7845,7 @@ export type Database = {
           cerrada_por?: string | null
           codigo?: string | null
           condiciones_pago?: string | null
+          cotizacion_id?: string | null
           created_at?: string
           deleted_at?: string | null
           direccion_entrega?: string | null
@@ -7638,6 +7864,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ordenes_compra_cotizacion_id_fkey"
+            columns: ["cotizacion_id"]
+            isOneToOne: false
+            referencedRelation: "cotizaciones"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ordenes_compra_proveedor_id_fkey"
             columns: ["proveedor_id"]
