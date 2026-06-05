@@ -264,8 +264,9 @@ pago: rol **Dirección** (ya vigente en CxP).
   (`<optgroup>` etapa›capítulo → `concepto_id`, prellena la etiqueta) +
   proveedor de `erp.proveedores` (→ `proveedor_persona_id`, default "Por
   definir", opción "Otro (texto libre)" que **preserva el `proveedor_texto`
-  legacy** sin pérdida); (5) **botón eliminar visible** (ícono de bote directo en
-  la fila + lápiz para editar, fuera del menú `⋯`). Nuevo helper puro
+  legacy** sin pérdida); (5) **edición por click en la fila** + botón **Eliminar
+  dentro del cuadro de edición** (sin íconos en la orilla — ajuste pedido por
+  Beto al revisar el preview). Nuevo helper puro
   `lib/dilesa/conceptos-catalogo.ts` (`buildCatalogoConceptos`: árbol +
   optgroups) y `groupCosteo` exportado, ambos con test unitario (17 tests
   nuevos). Estado: **129 partidas, 47 clasificadas** (82 a reclasificar con el

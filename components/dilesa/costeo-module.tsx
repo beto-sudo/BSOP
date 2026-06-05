@@ -23,7 +23,8 @@
  *   4. El form gana 2 dropdowns: concepto del catálogo (clasifica → setea
  *      `concepto_id`) + proveedor de `erp.proveedores` (setea
  *      `proveedor_persona_id`).
- *   5. Botón eliminar visible (ícono de bote directo, no en el menú ⋯).
+ *   5. Edición por click en la fila; el botón eliminar vive dentro del cuadro
+ *      de edición (no íconos en la orilla de la fila).
  *
  * Carga cross-schema con queries paralelas + lookups Map (mismo patrón que
  * contratos-module — evita embeds de PostgREST). Los KPIs son reactivos a los
@@ -34,20 +35,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { ModuleKpiStrip, type ModuleKpi } from '@/components/module-page';
 import { Input } from '@/components/ui/input';
-import {
-  ChevronDown,
-  ChevronRight,
-  Coins,
-  Loader2,
-  Pencil,
-  Plus,
-  RefreshCw,
-  Search,
-  Trash2,
-} from 'lucide-react';
+import { ChevronDown, ChevronRight, Coins, Loader2, Plus, RefreshCw, Search } from 'lucide-react';
 import { usePermissions } from '@/components/providers';
 import { useToast } from '@/components/ui/toast';
-import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { CosteoConceptoForm } from '@/components/dilesa/costeo-concepto-form';
 import {
   buildProyectoOptions,
@@ -298,8 +288,6 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
   const [editRow, setEditRow] = useState<CosteoRow | null>(null);
   /** Colapsado de grupos (keys de etapa y capítulo). Default: todo expandido. */
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  /** Partida pendiente de confirmar borrado (trash visible). */
-  const [deleteTarget, setDeleteTarget] = useState<CosteoRow | null>(null);
 
   const fetchCosteo = useCallback(async (): Promise<FetchResult> => {
     const sb = createSupabaseBrowserClient();
@@ -529,9 +517,9 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
   }, [fetchCosteo, applyResult]);
 
   // Soft-delete de una partida. Patrón del repo: marca `deleted_at`, preserva
-  // historial para auditoría.
+  // historial para auditoría. Devuelve true si borró (para cerrar el form).
   const eliminar = useCallback(
-    async (row: CosteoRow) => {
+    async (row: CosteoRow): Promise<boolean> => {
       const sb = createSupabaseBrowserClient();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error: e } = await (sb.schema('erp') as any)
@@ -544,10 +532,11 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
           description: getSupabaseErrorMessage(e, 'No se pudo eliminar la partida.'),
           type: 'error',
         });
-        return;
+        return false;
       }
       toast.add({ title: 'Partida eliminada', description: row.concepto, type: 'success' });
       void cargar();
+      return true;
     },
     [toast, cargar]
   );
@@ -644,7 +633,8 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
 
   // Al buscar, ignora el colapsado para que los matches sean visibles.
   const isSearching = q.length > 0;
-  const colCount = puedeEscribir ? 6 : 5;
+  // Click en la fila abre la edición (solo si puede escribir).
+  const onRowClick = puedeEscribir ? abrirEdicion : undefined;
 
   return (
     <div className="space-y-6 p-6">
@@ -726,6 +716,14 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
             cerrarForm();
             void cargar();
           }}
+          onDelete={
+            editRow && puedeEscribir
+              ? async () => {
+                  const ok = await eliminar(editRow);
+                  if (ok) cerrarForm();
+                }
+              : undefined
+          }
         />
       ) : null}
 
@@ -763,7 +761,6 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
                 <th className="w-36 px-3 py-2.5 text-right">Gasto real</th>
                 <th className="w-20 px-3 py-2.5 text-right">% ejec.</th>
                 <th className="w-56 px-3 py-2.5 text-left">Proveedor</th>
-                {puedeEscribir ? <th className="w-20 px-3 py-2.5 text-right" /> : null}
               </tr>
             </thead>
             <tbody>
@@ -776,12 +773,9 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
                     etapaCollapsed={etapaCollapsed}
                     collapsed={collapsed}
                     isSearching={isSearching}
-                    colCount={colCount}
-                    puedeEscribir={puedeEscribir}
                     onToggle={toggleGrupo}
                     proveedorDisplay={proveedorDisplay}
-                    onEdit={abrirEdicion}
-                    onDelete={setDeleteTarget}
+                    onRowClick={onRowClick}
                   />
                 );
               })}
@@ -789,20 +783,6 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
           </table>
         </div>
       )}
-
-      <ConfirmDialog
-        open={deleteTarget != null}
-        onOpenChange={(o) => {
-          if (!o) setDeleteTarget(null);
-        }}
-        onConfirm={async () => {
-          if (deleteTarget) await eliminar(deleteTarget);
-          setDeleteTarget(null);
-        }}
-        title={deleteTarget ? `¿Eliminar “${deleteTarget.concepto}”?` : '¿Eliminar partida?'}
-        description="Marcará la partida de presupuesto como eliminada. Se preserva el historial para auditoría."
-        confirmLabel="Eliminar"
-      />
     </div>
   );
 }
@@ -814,23 +794,17 @@ function GrupoFragment({
   etapaCollapsed,
   collapsed,
   isSearching,
-  colCount,
-  puedeEscribir,
   onToggle,
   proveedorDisplay,
-  onEdit,
-  onDelete,
+  onRowClick,
 }: {
   etapa: CosteoEtapa;
   etapaCollapsed: boolean;
   collapsed: Set<string>;
   isSearching: boolean;
-  colCount: number;
-  puedeEscribir: boolean;
   onToggle: (key: string) => void;
   proveedorDisplay: (r: CosteoRow) => string;
-  onEdit: (r: CosteoRow) => void;
-  onDelete: (r: CosteoRow) => void;
+  onRowClick?: (r: CosteoRow) => void;
 }) {
   return (
     <>
@@ -855,7 +829,7 @@ function GrupoFragment({
         <td className="px-3 py-2 text-right font-semibold tabular-nums text-[var(--text)]/70">
           {pctEjec(etapa.gastoReal, etapa.presupuesto)}
         </td>
-        <td className="px-3 py-2" colSpan={colCount - 4} />
+        <td className="px-3 py-2" />
       </tr>
 
       {!etapaCollapsed &&
@@ -866,12 +840,9 @@ function GrupoFragment({
               key={cap.key}
               cap={cap}
               capCollapsed={capCollapsed}
-              colCount={colCount}
-              puedeEscribir={puedeEscribir}
               onToggle={onToggle}
               proveedorDisplay={proveedorDisplay}
-              onEdit={onEdit}
-              onDelete={onDelete}
+              onRowClick={onRowClick}
             />
           );
         })}
@@ -884,21 +855,15 @@ function GrupoFragment({
 function CapituloFragment({
   cap,
   capCollapsed,
-  colCount,
-  puedeEscribir,
   onToggle,
   proveedorDisplay,
-  onEdit,
-  onDelete,
+  onRowClick,
 }: {
   cap: CosteoCapitulo;
   capCollapsed: boolean;
-  colCount: number;
-  puedeEscribir: boolean;
   onToggle: (key: string) => void;
   proveedorDisplay: (r: CosteoRow) => string;
-  onEdit: (r: CosteoRow) => void;
-  onDelete: (r: CosteoRow) => void;
+  onRowClick?: (r: CosteoRow) => void;
 }) {
   return (
     <>
@@ -926,14 +891,18 @@ function CapituloFragment({
         <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]/60">
           {pctEjec(cap.gastoReal, cap.presupuesto)}
         </td>
-        <td className="px-3 py-1.5" colSpan={colCount - 4} />
+        <td className="px-3 py-1.5" />
       </tr>
 
       {!capCollapsed &&
         cap.partidas.map((r) => (
           <tr
             key={r.id}
-            className="border-b border-[var(--border)]/40 transition-colors hover:bg-[var(--card)]/40"
+            onClick={onRowClick ? () => onRowClick(r) : undefined}
+            title={onRowClick ? 'Editar partida' : undefined}
+            className={`border-b border-[var(--border)]/40 transition-colors hover:bg-[var(--card)]/40 ${
+              onRowClick ? 'cursor-pointer' : ''
+            }`}
           >
             <td className="px-3 py-1.5 pl-12 text-[var(--text)]">{r.concepto || '—'}</td>
             <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]">
@@ -946,28 +915,6 @@ function CapituloFragment({
               {r.ratio == null ? '—' : formatPercent(r.ratio)}
             </td>
             <td className="px-3 py-1.5 text-[var(--text)]/80">{proveedorDisplay(r)}</td>
-            {puedeEscribir ? (
-              <td className="px-3 py-1.5">
-                <div className="flex items-center justify-end gap-1">
-                  <button
-                    type="button"
-                    onClick={() => onEdit(r)}
-                    aria-label={`Editar ${r.concepto}`}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded text-[var(--text)]/50 hover:bg-[var(--card)] hover:text-[var(--text)]"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onDelete(r)}
-                    aria-label={`Eliminar ${r.concepto}`}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded text-[var(--text)]/50 hover:bg-red-50 hover:text-red-600"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </td>
-            ) : null}
           </tr>
         ))}
     </>

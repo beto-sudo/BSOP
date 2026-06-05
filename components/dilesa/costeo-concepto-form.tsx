@@ -26,10 +26,11 @@
  */
 
 import { useState } from 'react';
-import { Loader2, Plus, Save } from 'lucide-react';
+import { Loader2, Plus, Save, Trash2 } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { proyectoOptionLabel, type ProyectoOption } from '@/lib/dilesa/proyectos-selector';
@@ -56,6 +57,7 @@ export function CosteoConceptoForm({
   editRow,
   onClose,
   onSaved,
+  onDelete,
 }: {
   empresaId: string;
   proyectos: readonly ProyectoOption[];
@@ -69,9 +71,12 @@ export function CosteoConceptoForm({
   editRow: CosteoRow | null;
   onClose: () => void;
   onSaved: () => void;
+  /** Borra la partida (solo en edición). Soft-delete + cierra el form. */
+  onDelete?: () => void | Promise<void>;
 }) {
   const toast = useToast();
   const isEdit = editRow != null;
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const [proyectoId, setProyectoId] = useState(editRow?.proyecto_id ?? '');
   const [concepto, setConcepto] = useState(editRow?.concepto ?? '');
@@ -285,21 +290,47 @@ export function CosteoConceptoForm({
         se calcula como gasto real ÷ presupuesto actualizado (o previo si no hay actualizado).
         Montos con IVA incluido.
       </p>
-      <div className="mt-3 flex items-center justify-end gap-2">
-        <Button variant="outline" onClick={onClose} disabled={submitting}>
-          Cancelar
-        </Button>
-        <Button onClick={onSubmit} disabled={!canSubmit || submitting}>
-          {submitting ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : isEdit ? (
-            <Save className="size-4" />
-          ) : (
-            <Plus className="size-4" />
-          )}
-          {isEdit ? 'Guardar' : 'Registrar'}
-        </Button>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <div>
+          {isEdit && onDelete ? (
+            <Button
+              variant="ghost"
+              onClick={() => setConfirmDelete(true)}
+              disabled={submitting}
+              className="text-red-600 hover:bg-red-50 hover:text-red-700"
+            >
+              <Trash2 className="size-4" />
+              Eliminar
+            </Button>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={onClose} disabled={submitting}>
+            Cancelar
+          </Button>
+          <Button onClick={onSubmit} disabled={!canSubmit || submitting}>
+            {submitting ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : isEdit ? (
+              <Save className="size-4" />
+            ) : (
+              <Plus className="size-4" />
+            )}
+            {isEdit ? 'Guardar' : 'Registrar'}
+          </Button>
+        </div>
       </div>
+
+      {isEdit && onDelete ? (
+        <ConfirmDialog
+          open={confirmDelete}
+          onOpenChange={setConfirmDelete}
+          onConfirm={onDelete}
+          title={`¿Eliminar “${editRow?.concepto ?? 'partida'}”?`}
+          description="Marcará la partida de presupuesto como eliminada. Se preserva el historial para auditoría."
+          confirmLabel="Eliminar"
+        />
+      ) : null}
     </div>
   );
 }
