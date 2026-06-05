@@ -28,6 +28,7 @@ import {
   type ProyectoOption,
   type ProyectoSelectorRow,
 } from '@/lib/dilesa/proyectos-selector';
+import { buildPartidaIndex } from '@/lib/compras/partidas';
 import {
   lineaPendiente,
   lineaTotal,
@@ -129,13 +130,11 @@ export function RecepcionesModule({ empresaId }: { empresaId: string }) {
       );
     }
 
-    type PartidaRaw = { id: string; proyecto_id: string | null; concepto_texto: string | null };
-    const partidaLabel = new Map<string, string>();
-    const partidaProyecto = new Map<string, string>();
-    for (const p of (partidasRes.data ?? []) as PartidaRaw[]) {
-      partidaLabel.set(p.id, p.concepto_texto ?? '(sin concepto)');
-      if (p.proyecto_id) partidaProyecto.set(p.id, p.proyecto_id);
-    }
+    // Índice de partidas compartido (D4) — sin catálogo: Recepciones no da de alta líneas.
+    const { partidaLabel, partidaProyecto } = buildPartidaIndex(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (partidasRes.data ?? []) as any[]
+    );
 
     type OcRaw = {
       id: string;

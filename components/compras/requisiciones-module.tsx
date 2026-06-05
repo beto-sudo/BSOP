@@ -1,23 +1,33 @@
 'use client';
 
 /**
- * OrdenesCompraModule — alta y gestión de órdenes de compra de obra (DILESA).
+ * RequisicionesModule — alta y gestión de requisiciones de compra (DILESA).
  *
- * Iniciativa `dilesa-compras` · Sprint 2 Fase B. Tab "Órdenes" del hub Compras.
- * Modelo constructora-first (D7/D12): cada línea se ancla a una **partida** del
- * presupuesto del proyecto (`erp.presupuesto_partidas`, ya clasificada al
- * catálogo); `producto_id` queda null, sin inventario. Al **enviar** la OC pasa
- * a `enviada` y mueve `comprometido` en `erp.v_partida_control`.
+ * Iniciativa `dilesa-compras` · Sprint 2 Fase D. Tab "Requisiciones" del hub
+ * Compras. La requisición es la **solicitud** que abre el ciclo P2P: se captura
+ * lo que se necesita anclado a una **partida** del presupuesto (D7/D12,
+ * `producto_id` null, sin inventario), se autoriza, y de ahí se **genera la OC**
+ * con un clic.
  *
- * Un proyecto a la vez (como Costeo): el selector fija el proyecto; la OC y sus
- * partidas son de ese proyecto. Reusa las RPCs de `erp` para cerrar/cancelar.
+ * El valor central es "Generar OC": copia `partida_id` de
+ * `requisiciones_detalle` → `ordenes_compra_detalle` (lo que el `generarOrdenCompra`
+ * de RDB **no** hace, riesgo F3) — sin eso la OC generada no comprometería
+ * presupuesto. La OC nace en `borrador` y de ahí sigue su flujo en el tab Órdenes.
  *
- * Carga cross-schema con queries paralelas + lookups Map (patrón del repo).
- * La recepción (devengar `ejercido`) vive en el tab Recepciones (Fase C).
+ * Estado sin catálogo (ver `lib/compras/requisiciones.ts`): se deriva de
+ * `autorizada_at` + la OC ligada. Un proyecto a la vez (como Costeo/Órdenes).
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Coins, Loader2, Plus, RefreshCw, Search, Send, Trash2, X } from 'lucide-react';
+import {
+  ClipboardList,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Search,
+  ShoppingCart,
+  Trash2,
+} from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
 import { Input } from '@/components/ui/input';
@@ -35,37 +45,31 @@ import {
 } from '@/lib/dilesa/proyectos-selector';
 import { buildPartidaIndex, type PartidaGrupo } from '@/lib/compras/partidas';
 import {
-  deriveOcKpis,
-  ocTotal,
-  type OcEstado,
-  type OcLinea,
-  type OcRow,
-} from '@/lib/compras/ordenes';
+  deriveReqEstado,
+  deriveReqKpis,
+  puedeGenerarOc,
+  reqTotal,
+  type ReqEstado,
+  type ReqLinea,
+  type ReqRow,
+} from '@/lib/compras/requisiciones';
 
 const SIN = '__sin__';
 
-const ESTADO_TONE: Record<OcEstado, BadgeTone> = {
-  borrador: 'neutral',
-  enviada: 'info',
-  parcial: 'warning',
-  cerrada: 'success',
-  cancelada: 'danger',
+const ESTADO_TONE: Record<ReqEstado, BadgeTone> = {
+  pendiente: 'neutral',
+  autorizada: 'info',
+  con_oc: 'success',
 };
-const ESTADO_LABEL: Record<OcEstado, string> = {
-  borrador: 'Borrador',
-  enviada: 'Enviada',
-  parcial: 'Parcial',
-  cerrada: 'Cerrada',
-  cancelada: 'Cancelada',
+const ESTADO_LABEL: Record<ReqEstado, string> = {
+  pendiente: 'Pendiente',
+  autorizada: 'Autorizada',
+  con_oc: 'Con orden',
 };
-
-/** Opción de proveedor para el dropdown (OC.proveedor_id → erp.proveedores). */
-type ProveedorOption = { id: string; label: string };
 
 type FetchResult = {
-  rows?: OcRow[];
+  rows?: ReqRow[];
   proyectos?: ProyectoOption[];
-  proveedores?: ProveedorOption[];
   partidasByProyecto?: Map<string, PartidaGrupo[]>;
   error?: string;
 };
@@ -95,15 +99,14 @@ function toNum(s: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
+export function RequisicionesModule({ empresaId }: { empresaId: string }) {
   const { permissions } = usePermissions();
   const toast = useToast();
   const puedeEscribir =
-    permissions.isAdmin || permissions.modulos.get('dilesa.compras.ordenes')?.write === true;
+    permissions.isAdmin || permissions.modulos.get('dilesa.compras.requisiciones')?.write === true;
 
-  const [rows, setRows] = useState<OcRow[]>([]);
+  const [rows, setRows] = useState<ReqRow[]>([]);
   const [proyectos, setProyectos] = useState<ProyectoOption[]>([]);
-  const [proveedores, setProveedores] = useState<ProveedorOption[]>([]);
   const [partidasByProyecto, setPartidasByProyecto] = useState<Map<string, PartidaGrupo[]>>(
     new Map()
   );
@@ -114,18 +117,19 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
   const autoSelectDone = useRef(false);
 
   const [formOpen, setFormOpen] = useState(false);
-  const [proveedorId, setProveedorId] = useState('');
+  const [justificacion, setJustificacion] = useState('');
   const [lineas, setLineas] = useState<DraftLinea[]>([emptyLinea()]);
   const [submitting, setSubmitting] = useState(false);
+  const [accionId, setAccionId] = useState<string | null>(null);
 
   const fetchData = useCallback(async (): Promise<FetchResult> => {
     const sb = createSupabaseBrowserClient();
-    const [ocRes, proyectosRes, proveedoresRes, catalogoRes, partidasRes] = await Promise.all([
+    const [reqRes, proyectosRes, catalogoRes, partidasRes, ocRes, usuariosRes] = await Promise.all([
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (sb.schema('erp') as any)
-        .from('ordenes_compra')
+        .from('requisiciones')
         .select(
-          'id, codigo, proveedor_id, estado, fecha_entrega, created_at, ordenes_compra_detalle(id, partida_id, descripcion, unidad, cantidad, cantidad_recibida, cantidad_cancelada, precio_unitario, precio_real)'
+          'id, codigo, solicitante_id, autorizada_at, created_at, justificacion, requisiciones_detalle(id, partida_id, descripcion, unidad, cantidad, precio_estimado)'
         )
         .eq('empresa_id', empresaId)
         .is('deleted_at', null),
@@ -134,13 +138,6 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
         .from('proyectos')
         .select('id, nombre, tipo, proyecto_predecesor_id')
         .eq('empresa_id', empresaId)
-        .is('deleted_at', null),
-      sb
-        .schema('erp')
-        .from('proveedores')
-        .select('id, personas:persona_id(nombre, apellido_paterno, apellido_materno)')
-        .eq('empresa_id', empresaId)
-        .eq('activo', true)
         .is('deleted_at', null),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (sb.schema('erp') as any)
@@ -154,14 +151,21 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
         .select('id, proyecto_id, concepto_id, concepto_texto')
         .eq('empresa_id', empresaId)
         .is('deleted_at', null),
+      // OCs ligadas a una requisición y no canceladas → la requisición está "con orden".
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (sb.schema('erp') as any)
+        .from('ordenes_compra')
+        .select('requisicion_id, codigo, estado')
+        .eq('empresa_id', empresaId)
+        .not('requisicion_id', 'is', null)
+        .neq('estado', 'cancelada')
+        .is('deleted_at', null),
+      // Best-effort: nombre del solicitante (cross-schema erp→core, sin embed).
+      sb.schema('core').from('usuarios').select('id, first_name, email'),
     ]);
 
     const firstErr =
-      ocRes.error ??
-      proyectosRes.error ??
-      proveedoresRes.error ??
-      catalogoRes.error ??
-      partidasRes.error;
+      reqRes.error ?? proyectosRes.error ?? catalogoRes.error ?? partidasRes.error ?? ocRes.error;
     if (firstErr) return { error: getSupabaseErrorMessage(firstErr, 'No se pudo cargar.') };
 
     const proyectoMap = new Map<string, string>();
@@ -170,69 +174,53 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
       (proyectosRes.data ?? []) as unknown as ProyectoSelectorRow[]
     );
 
-    type ProvRaw = {
-      id: string;
-      personas: {
-        nombre: string | null;
-        apellido_paterno: string | null;
-        apellido_materno: string | null;
-      } | null;
-    };
-    const proveedores: ProveedorOption[] = ((proveedoresRes.data ?? []) as unknown as ProvRaw[])
-      .map((pv) => ({
-        id: pv.id,
-        label:
-          [pv.personas?.nombre, pv.personas?.apellido_paterno, pv.personas?.apellido_materno]
-            .filter(Boolean)
-            .join(' ')
-            .trim() || '(sin nombre)',
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-    const proveedorLabel = new Map(proveedores.map((p) => [p.id, p.label]));
-
-    // Índice de partidas compartido: label, proyecto y optgroups etapa›capítulo (D4).
-    const {
-      partidaLabel,
-      partidaProyecto,
-      gruposByProyecto: partidasByProyecto,
-    } = buildPartidaIndex(
+    // Índice de partidas (label, proyecto, optgroups) — compartido (D4).
+    const { partidaLabel, partidaProyecto, gruposByProyecto } = buildPartidaIndex(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (partidasRes.data ?? []) as any[],
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (catalogoRes.data ?? []) as any[]
     );
 
-    type OcRaw = {
+    type OcLink = { requisicion_id: string | null; codigo: string | null; estado: string };
+    const ocByReq = new Map<string, string>();
+    for (const o of (ocRes.data ?? []) as OcLink[]) {
+      if (o.requisicion_id && !ocByReq.has(o.requisicion_id)) {
+        ocByReq.set(o.requisicion_id, o.codigo ?? '—');
+      }
+    }
+
+    type UsuarioRaw = { id: string; first_name: string | null; email: string | null };
+    const userName = new Map<string, string>();
+    for (const u of (usuariosRes.data ?? []) as unknown as UsuarioRaw[]) {
+      userName.set(u.id, u.first_name?.trim() || u.email?.split('@')[0] || '—');
+    }
+
+    type ReqRaw = {
       id: string;
       codigo: string | null;
-      proveedor_id: string | null;
-      estado: string;
-      fecha_entrega: string | null;
+      solicitante_id: string | null;
+      autorizada_at: string | null;
       created_at: string;
-      ordenes_compra_detalle: Array<{
+      justificacion: string | null;
+      requisiciones_detalle: Array<{
         id: string;
         partida_id: string | null;
         descripcion: string | null;
         unidad: string | null;
         cantidad: number | null;
-        cantidad_recibida: number | null;
-        cantidad_cancelada: number | null;
-        precio_unitario: number | null;
-        precio_real: number | null;
+        precio_estimado: number | null;
       }> | null;
     };
-    // OC → proyecto se infiere de la partida de su primera línea (partidaProyecto del índice).
-    const out: OcRow[] = ((ocRes.data ?? []) as OcRaw[]).map((o) => {
-      const lineas: OcLinea[] = (o.ordenes_compra_detalle ?? []).map((d) => ({
+    const out: ReqRow[] = ((reqRes.data ?? []) as ReqRaw[]).map((r) => {
+      const lineas: ReqLinea[] = (r.requisiciones_detalle ?? []).map((d) => ({
         id: d.id,
         partidaId: d.partida_id,
         partidaLabel: d.partida_id ? (partidaLabel.get(d.partida_id) ?? '—') : '—',
         descripcion: d.descripcion ?? '',
         unidad: d.unidad,
         cantidad: Number(d.cantidad ?? 0),
-        cantidadRecibida: Number(d.cantidad_recibida ?? 0),
-        cantidadCancelada: Number(d.cantidad_cancelada ?? 0),
-        precioUnitario: Number(d.precio_real ?? d.precio_unitario ?? 0),
+        precioEstimado: Number(d.precio_estimado ?? 0),
       }));
       const proyectoId =
         lineas
@@ -240,19 +228,20 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
           .filter(Boolean)
           .map((pid) => partidaProyecto.get(pid!))[0] ?? null;
       return {
-        id: o.id,
-        codigo: o.codigo ?? '—',
+        id: r.id,
+        codigo: r.codigo ?? '—',
         proyectoId,
         proyectoNombre: proyectoId ? (proyectoMap.get(proyectoId) ?? '') : '',
-        proveedorId: o.proveedor_id,
-        proveedorNombre: o.proveedor_id ? (proveedorLabel.get(o.proveedor_id) ?? '—') : '—',
-        estado: (o.estado as OcEstado) ?? 'borrador',
-        fecha: o.fecha_entrega ?? o.created_at?.slice(0, 10) ?? null,
+        solicitanteNombre: r.solicitante_id ? (userName.get(r.solicitante_id) ?? '—') : '—',
+        autorizadaAt: r.autorizada_at,
+        ocCodigo: ocByReq.get(r.id) ?? null,
+        fecha: r.created_at?.slice(0, 10) ?? null,
+        justificacion: r.justificacion,
         lineas,
       };
     });
 
-    return { rows: out, proyectos, proveedores, partidasByProyecto };
+    return { rows: out, proyectos, partidasByProyecto: gruposByProyecto };
   }, [empresaId]);
 
   const apply = useCallback((res: FetchResult) => {
@@ -263,7 +252,6 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
       setError(null);
       setRows(res.rows ?? []);
       setProyectos(res.proyectos ?? []);
-      setProveedores(res.proveedores ?? []);
       setPartidasByProyecto(res.partidasByProyecto ?? new Map());
     }
   }, []);
@@ -283,7 +271,6 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
         const first = (res.rows ?? [])
           .filter((r) => r.proyectoId)
           .sort((a, b) => a.proyectoNombre.localeCompare(b.proyectoNombre))[0];
-        // Sin OCs todavía: cae al primer proyecto con partidas.
         const firstByPartida = [...(res.partidasByProyecto ?? new Map()).keys()][0];
         const pid = first?.proyectoId ?? firstByPartida ?? '';
         if (pid) setProyectoFiltro(pid);
@@ -311,7 +298,7 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
       if (q) {
         const hay =
           r.codigo.toLowerCase().includes(q) ||
-          r.proveedorNombre.toLowerCase().includes(q) ||
+          r.solicitanteNombre.toLowerCase().includes(q) ||
           r.lineas.some((l) => l.partidaLabel.toLowerCase().includes(q));
         if (!hay) return false;
       }
@@ -319,31 +306,32 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
     });
   }, [rows, q, proyectoFiltro]);
 
-  const kpisData = useMemo(() => deriveOcKpis(filtrados), [filtrados]);
+  const kpisData = useMemo(() => deriveReqKpis(filtrados), [filtrados]);
   const kpis: ModuleKpi[] = [
-    { key: 'total', label: 'Órdenes', value: kpisData.total === 0 ? '—' : String(kpisData.total) },
     {
-      key: 'borrador',
-      label: 'Borrador',
-      value: kpisData.borrador === 0 ? '—' : String(kpisData.borrador),
+      key: 'total',
+      label: 'Requisiciones',
+      value: kpisData.total === 0 ? '—' : String(kpisData.total),
     },
     {
-      key: 'activas',
-      label: 'Enviadas',
-      value: kpisData.activas === 0 ? '—' : String(kpisData.activas),
+      key: 'pendientes',
+      label: 'Pendientes',
+      value: kpisData.pendientes === 0 ? '—' : String(kpisData.pendientes),
     },
     {
-      key: 'cerradas',
-      label: 'Cerradas',
-      value: kpisData.cerradas === 0 ? '—' : String(kpisData.cerradas),
+      key: 'autorizadas',
+      label: 'Autorizadas',
+      value: kpisData.autorizadas === 0 ? '—' : String(kpisData.autorizadas),
     },
     {
-      key: 'comprometido',
-      label: 'Comprometido',
-      value:
-        kpisData.comprometido === 0
-          ? '—'
-          : formatCurrency(kpisData.comprometido, { compact: true }),
+      key: 'conOc',
+      label: 'Con orden',
+      value: kpisData.conOc === 0 ? '—' : String(kpisData.conOc),
+    },
+    {
+      key: 'estimado',
+      label: 'Estimado por comprar',
+      value: kpisData.estimado === 0 ? '—' : formatCurrency(kpisData.estimado, { compact: true }),
     },
   ];
 
@@ -351,7 +339,7 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
   const partidaGrupos = proyectoActivo ? (partidasByProyecto.get(proyectoActivo) ?? []) : [];
 
   function abrirAlta() {
-    setProveedorId('');
+    setJustificacion('');
     setLineas([emptyLinea()]);
     setFormOpen(true);
   }
@@ -367,111 +355,198 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
     if (!canSubmit || submitting) return;
     setSubmitting(true);
     const sb = createSupabaseBrowserClient();
+    const { data: auth } = await sb.auth.getUser();
     const validas = lineas.filter((l) => l.partidaId !== '' && toNum(l.cantidad) > 0);
-    const folio = `OC-${Date.now().toString(36).toUpperCase()}`;
+    const folio = `REQ-${Date.now().toString(36).toUpperCase()}`;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ocResp = await (sb.schema('erp') as any)
-      .from('ordenes_compra')
+    const reqResp = await (sb.schema('erp') as any)
+      .from('requisiciones')
       .insert({
         empresa_id: empresaId,
         codigo: folio,
-        proveedor_id: proveedorId || null,
-        estado: 'borrador',
-        total: validas.reduce((acc, l) => acc + toNum(l.cantidad) * toNum(l.precio), 0),
+        solicitante_id: auth?.user?.id ?? null,
+        justificacion: justificacion.trim() || null,
       })
       .select('id')
       .single();
-    if (ocResp.error || !ocResp.data) {
+    if (reqResp.error || !reqResp.data) {
       toast.add({
         title: 'Error',
-        description: getSupabaseErrorMessage(ocResp.error, 'No se pudo crear la OC.'),
+        description: getSupabaseErrorMessage(reqResp.error, 'No se pudo crear la requisición.'),
         type: 'error',
       });
       setSubmitting(false);
       return;
     }
-    const ocId = ocResp.data.id as string;
+    const reqId = reqResp.data.id as string;
     const detalle = validas.map((l) => ({
       empresa_id: empresaId,
-      orden_compra_id: ocId,
+      requisicion_id: reqId,
       partida_id: l.partidaId,
       producto_id: null,
       descripcion: l.descripcion.trim() || null,
       unidad: l.unidad.trim() || null,
       cantidad: toNum(l.cantidad),
-      precio_unitario: toNum(l.precio),
-      subtotal: toNum(l.cantidad) * toNum(l.precio),
+      precio_estimado: toNum(l.precio) || null,
     }));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const detResp = await (sb.schema('erp') as any).from('ordenes_compra_detalle').insert(detalle);
+    const detResp = await (sb.schema('erp') as any).from('requisiciones_detalle').insert(detalle);
     if (detResp.error) {
       toast.add({
         title: 'Error',
-        description: getSupabaseErrorMessage(detResp.error, 'OC creada pero faltaron líneas.'),
+        description: getSupabaseErrorMessage(
+          detResp.error,
+          'Requisición creada pero faltaron líneas.'
+        ),
         type: 'error',
       });
       setSubmitting(false);
       return;
     }
-    toast.add({ title: 'Orden creada', description: folio, type: 'success' });
+    toast.add({ title: 'Requisición creada', description: folio, type: 'success' });
     setSubmitting(false);
     setFormOpen(false);
     void cargar();
   }
 
-  const cambiarEstado = useCallback(
-    async (oc: OcRow, estado: OcEstado, okMsg: string) => {
+  const autorizar = useCallback(
+    async (req: ReqRow) => {
+      setAccionId(req.id);
       const sb = createSupabaseBrowserClient();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error: e } = await (sb.schema('erp') as any)
-        .from('ordenes_compra')
-        .update({ estado, updated_at: new Date().toISOString() })
-        .eq('id', oc.id);
+        .from('requisiciones')
+        .update({ autorizada_at: new Date().toISOString() })
+        .eq('id', req.id);
+      setAccionId(null);
       if (e) {
         toast.add({
           title: 'Error',
-          description: getSupabaseErrorMessage(e, 'No se pudo actualizar.'),
+          description: getSupabaseErrorMessage(e, 'No se pudo autorizar.'),
           type: 'error',
         });
         return;
       }
-      toast.add({ title: okMsg, description: oc.codigo, type: 'success' });
+      toast.add({ title: 'Requisición autorizada', description: req.codigo, type: 'success' });
       void cargar();
     },
     [toast, cargar]
   );
 
-  const cerrar = useCallback(
-    async (oc: OcRow) => {
+  const cancelar = useCallback(
+    async (req: ReqRow) => {
       const sb = createSupabaseBrowserClient();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: e } = await (sb.schema('erp') as any).rpc('oc_cerrar_orden', {
-        p_orden_id: oc.id,
-        p_motivo: 'Cierre manual desde Compras DILESA',
-      });
+      const { error: e } = await (sb.schema('erp') as any)
+        .from('requisiciones')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', req.id);
       if (e) {
         toast.add({
           title: 'Error',
-          description: getSupabaseErrorMessage(e, 'No se pudo cerrar.'),
+          description: getSupabaseErrorMessage(e, 'No se pudo cancelar.'),
           type: 'error',
         });
         return;
       }
-      toast.add({ title: 'Orden cerrada', description: oc.codigo, type: 'success' });
+      toast.add({ title: 'Requisición cancelada', description: req.codigo, type: 'success' });
       void cargar();
     },
     [toast, cargar]
   );
 
-  const columns: Column<OcRow>[] = [
+  /**
+   * Genera la OC desde la requisición. **Copia `partida_id`** de cada línea
+   * (fix del riesgo F3 de RDB) para que la OC comprometa presupuesto. La OC nace
+   * en `borrador`; el precio estimado de la requisición prellena `precio_unitario`.
+   * Marca la requisición como autorizada (convertida).
+   */
+  const generarOC = useCallback(
+    async (req: ReqRow) => {
+      if (!puedeGenerarOc(req) || accionId === req.id) return;
+      setAccionId(req.id);
+      const sb = createSupabaseBrowserClient();
+      const folio = `OC-${Date.now().toString(36).toUpperCase()}`;
+      const validas = req.lineas.filter((l) => l.partidaId !== null && l.cantidad > 0);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ocResp = await (sb.schema('erp') as any)
+        .from('ordenes_compra')
+        .insert({
+          empresa_id: empresaId,
+          codigo: folio,
+          requisicion_id: req.id,
+          proveedor_id: null,
+          estado: 'borrador',
+          total: validas.reduce((acc, l) => acc + l.cantidad * l.precioEstimado, 0),
+        })
+        .select('id')
+        .single();
+      if (ocResp.error || !ocResp.data) {
+        setAccionId(null);
+        toast.add({
+          title: 'Error',
+          description: getSupabaseErrorMessage(ocResp.error, 'No se pudo generar la orden.'),
+          type: 'error',
+        });
+        return;
+      }
+      const ocId = ocResp.data.id as string;
+      const detalle = validas.map((l) => ({
+        empresa_id: empresaId,
+        orden_compra_id: ocId,
+        partida_id: l.partidaId, // ← el fix F3: la OC hereda la partida → compromete presupuesto.
+        producto_id: null,
+        descripcion: l.descripcion.trim() || null,
+        unidad: l.unidad,
+        cantidad: l.cantidad,
+        precio_unitario: l.precioEstimado,
+        subtotal: l.cantidad * l.precioEstimado,
+      }));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const detResp = await (sb.schema('erp') as any)
+        .from('ordenes_compra_detalle')
+        .insert(detalle);
+      if (detResp.error) {
+        setAccionId(null);
+        toast.add({
+          title: 'Error',
+          description: getSupabaseErrorMessage(detResp.error, 'OC creada pero faltaron líneas.'),
+          type: 'error',
+        });
+        void cargar();
+        return;
+      }
+      // Marca la requisición como autorizada/convertida.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (sb.schema('erp') as any)
+        .from('requisiciones')
+        .update({ autorizada_at: new Date().toISOString() })
+        .eq('id', req.id);
+      setAccionId(null);
+      toast.add({
+        title: 'Orden generada',
+        description: `${folio} · desde ${req.codigo}`,
+        type: 'success',
+      });
+      void cargar();
+    },
+    [empresaId, accionId, toast, cargar]
+  );
+
+  const columns: Column<ReqRow>[] = [
     { key: 'codigo', label: 'Folio', type: 'text', sticky: true, width: 'min-w-[120px]' },
-    { key: 'proveedorNombre', label: 'Proveedor', type: 'text', width: 'min-w-[200px]' },
+    { key: 'solicitanteNombre', label: 'Solicitante', type: 'text', width: 'min-w-[160px]' },
     {
       key: 'estado',
       label: 'Estado',
       type: 'custom',
-      render: (r) => <Badge tone={ESTADO_TONE[r.estado]}>{ESTADO_LABEL[r.estado]}</Badge>,
+      accessor: (r) => deriveReqEstado(r),
+      render: (r) => {
+        const e = deriveReqEstado(r);
+        return <Badge tone={ESTADO_TONE[e]}>{ESTADO_LABEL[e]}</Badge>;
+      },
     },
+    { key: 'ocCodigo', label: 'Orden', type: 'text', render: (r) => r.ocCodigo || '—' },
     {
       key: 'lineasCount',
       label: 'Líneas',
@@ -482,11 +557,11 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
     },
     {
       key: 'total',
-      label: 'Total',
+      label: 'Estimado',
       type: 'custom',
       align: 'right',
-      accessor: (r) => ocTotal(r),
-      render: (r) => formatCurrency(ocTotal(r)),
+      accessor: (r) => reqTotal(r),
+      render: (r) => formatCurrency(reqTotal(r)),
     },
     { key: 'fecha', label: 'Fecha', type: 'text', render: (r) => r.fecha || '—' },
     ...(puedeEscribir
@@ -498,42 +573,46 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
             sortable: false,
             align: 'right' as const,
             width: 'w-12',
-            render: (r: OcRow) => (
-              <RowActions
-                ariaLabel={`Acciones para ${r.codigo}`}
-                onDelete={
-                  r.estado === 'borrador' || r.estado === 'enviada'
-                    ? {
-                        onConfirm: () => cambiarEstado(r, 'cancelada', 'Orden cancelada'),
-                        label: 'Cancelar OC',
-                        confirmTitle: `¿Cancelar ${r.codigo}?`,
-                        confirmDescription:
-                          'La orden quedará cancelada y dejará de comprometer presupuesto.',
-                        confirmLabel: 'Cancelar OC',
-                      }
-                    : undefined
-                }
-              >
-                {r.estado === 'borrador' ? (
-                  <button
-                    type="button"
-                    onClick={() => void cambiarEstado(r, 'enviada', 'Orden enviada')}
-                    className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)]"
-                  >
-                    <Send className="h-3.5 w-3.5" /> Marcar enviada
-                  </button>
-                ) : null}
-                {r.estado === 'enviada' || r.estado === 'parcial' ? (
-                  <button
-                    type="button"
-                    onClick={() => void cerrar(r)}
-                    className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)]"
-                  >
-                    <X className="h-3.5 w-3.5" /> Cerrar orden
-                  </button>
-                ) : null}
-              </RowActions>
-            ),
+            render: (r: ReqRow) => {
+              const estado = deriveReqEstado(r);
+              return (
+                <RowActions
+                  ariaLabel={`Acciones para ${r.codigo}`}
+                  onDelete={
+                    estado !== 'con_oc'
+                      ? {
+                          onConfirm: () => cancelar(r),
+                          label: 'Cancelar requisición',
+                          confirmTitle: `¿Cancelar ${r.codigo}?`,
+                          confirmDescription: 'La requisición quedará cancelada (borrado suave).',
+                          confirmLabel: 'Cancelar requisición',
+                        }
+                      : undefined
+                  }
+                >
+                  {estado === 'pendiente' ? (
+                    <button
+                      type="button"
+                      onClick={() => void autorizar(r)}
+                      disabled={accionId === r.id}
+                      className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)] disabled:opacity-50"
+                    >
+                      <ClipboardList className="h-3.5 w-3.5" /> Marcar autorizada
+                    </button>
+                  ) : null}
+                  {puedeGenerarOc(r) ? (
+                    <button
+                      type="button"
+                      onClick={() => void generarOC(r)}
+                      disabled={accionId === r.id}
+                      className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)] disabled:opacity-50"
+                    >
+                      <ShoppingCart className="h-3.5 w-3.5" /> Generar orden de compra
+                    </button>
+                  ) : null}
+                </RowActions>
+              );
+            },
           },
         ]
       : []),
@@ -543,15 +622,15 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
     <div className="space-y-6 p-6">
       <header className="flex items-center gap-3">
         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--accent)]/10 text-[var(--accent)]">
-          <Coins className="h-5 w-5" />
+          <ClipboardList className="h-5 w-5" />
         </div>
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)]">
-            Órdenes de compra
+            Requisiciones
           </h1>
           <p className="text-sm text-[var(--text)]/60">
-            Órdenes ancladas a concepto + partida del presupuesto. Al enviarse comprometen el
-            presupuesto de la partida; la recepción (ejercido) vive en el tab Recepciones.
+            Solicitudes de compra ancladas a concepto + partida del presupuesto. Al autorizarse se
+            generan en órdenes de compra con un clic (heredan la partida, comprometen presupuesto).
           </p>
         </div>
       </header>
@@ -577,7 +656,7 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar folio, proveedor o partida…"
+            placeholder="Buscar folio, solicitante o partida…"
             className="w-72 pl-9"
           />
         </div>
@@ -590,7 +669,7 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
         </button>
         <div className="ml-auto flex items-center gap-3">
           <span className="text-sm text-[var(--text)]/60">
-            {filtrados.length} de {rows.length} órdenes
+            {filtrados.length} de {rows.length} requisiciones
           </span>
           {puedeEscribir ? (
             <button
@@ -598,11 +677,13 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
               onClick={abrirAlta}
               disabled={proyectoActivo === ''}
               title={
-                proyectoActivo === '' ? 'Selecciona un proyecto para crear una orden' : undefined
+                proyectoActivo === ''
+                  ? 'Selecciona un proyecto para crear una requisición'
+                  : undefined
               }
               className="inline-flex h-9 items-center gap-1.5 rounded-md bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Plus className="h-3.5 w-3.5" /> Nueva orden
+              <Plus className="h-3.5 w-3.5" /> Nueva requisición
             </button>
           ) : null}
         </div>
@@ -610,23 +691,17 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
 
       {formOpen ? (
         <div className="rounded-md border border-[var(--border)] bg-[var(--card)] p-4">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
-              Nueva orden ·{' '}
+              Nueva requisición ·{' '}
               {proyectosPresentes.find((p) => p.id === proyectoActivo)?.nombre ?? 'Proyecto'}
             </h2>
-            <select
-              value={proveedorId}
-              onChange={(e) => setProveedorId(e.target.value)}
-              className="h-9 w-72 rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 text-sm text-[var(--text)]"
-            >
-              <option value="">Proveedor — Por definir</option>
-              {proveedores.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
+            <Input
+              value={justificacion}
+              onChange={(e) => setJustificacion(e.target.value)}
+              placeholder="Justificación (opcional)"
+              className="w-80"
+            />
           </div>
 
           <div className="space-y-2">
@@ -693,7 +768,7 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
                   }
                   type="number"
                   step="0.01"
-                  placeholder="P. unit. (c/IVA)"
+                  placeholder="P. est. (c/IVA)"
                   className="w-32"
                 />
                 <span className="w-28 text-right text-sm tabular-nums text-[var(--text)]/70">
@@ -724,7 +799,7 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
               <Plus className="h-3.5 w-3.5" /> Agregar línea
             </button>
             <span className="text-sm font-medium text-[var(--text)]">
-              Total: {formatCurrency(draftTotal)}
+              Total estimado: {formatCurrency(draftTotal)}
             </span>
           </div>
 
@@ -738,7 +813,7 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
               ) : (
                 <Plus className="size-4" />
               )}
-              Crear orden (borrador)
+              Crear requisición
             </Button>
           </div>
         </div>
@@ -752,9 +827,9 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
         error={error}
         onRetry={() => void cargar()}
         initialSort={{ key: 'fecha', dir: 'desc' }}
-        emptyTitle="Sin órdenes"
-        emptyDescription="No hay órdenes de compra que coincidan. Crea una con “Nueva orden”."
-        emptyIcon={<Coins className="h-6 w-6" />}
+        emptyTitle="Sin requisiciones"
+        emptyDescription="No hay requisiciones que coincidan. Crea una con “Nueva requisición”."
+        emptyIcon={<ClipboardList className="h-6 w-6" />}
         maxHeight="calc(100vh - 320px)"
       />
     </div>

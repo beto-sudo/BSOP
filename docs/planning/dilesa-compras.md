@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-06-04
-**Última actualización:** 2026-06-05 (Sprint 1 **cerrado** —PR #688 mergeado: rediseño Costeo + clasificación 128/128. **Sprint 2 planeado**: hub `/dilesa/compras` con tabs, modelo constructora-first; discovery hecho + 4 decisiones D10–D13. Plan de 4 fases [A hub+RBAC · B OC · C recepción · D requisiciones+componente compartido]; schema mínimo = INSERT sub-slugs + 1 RPC de recepción. Próximo: Fase A. Pendiente aparte: retiro de `dilesa.obra_presupuesto` con OK de Beto.)
+**Última actualización:** 2026-06-05 (**Sprint 2 completo** — Fases A/B/C live + **Fase D (Requisiciones)** en PR: módulo `components/compras/requisiciones-module.tsx` (alta anclada a partida + autorizar + **Generar OC que copia `partida_id`** → cierra riesgo F3) + helpers puros `lib/compras/requisiciones.ts` y `lib/compras/partidas.ts` (este último materializa D4: extrae la indexación de partidas y refactoriza OC/Recepciones). Estado vía `autorizada_at` —no hay catálogo de estados, `estado_id`/`prioridad_id` son uuid sueltos que nadie usa—. **Sin migración** (`partida_id` ya existía; slugs RBAC ya en prod desde Fase A). Próximo: Sprint 3 = Cotización RFQ.)
 
 ## Problema
 
@@ -359,3 +359,32 @@ pago: rol **Dirección** (ya vigente en CxP).
   Recepción ligera (D11, sin documento/folio). 1268 tests verdes. Próximo:
   Fase D (requisiciones) + extraer componente compartido + (follow-up) ajuste F4
   de la vista si se confirma la semántica de `ejercido` con OCs canceladas.
+- **2026-06-05** — **Fase D construida: Requisiciones + componente compartido
+  (D4) — cierra Sprint 2.** Discovery de schema confirmó que el "modelo de
+  estados" del handoff era un falso problema: `erp.requisiciones.estado_id` y
+  `prioridad_id` son `uuid` sueltos **sin FK ni catálogo** que nadie usa (0/241
+  filas vivas, todas RDB). El ciclo se modela con `autorizada_at` + la OC ligada
+  (igual que RDB): pendiente → autorizada → con_oc. `subtipo` tiene CHECK
+  (`general|combustible|servicios|activos`), se deja null. **Sin migración**:
+  `requisiciones_detalle.partida_id` ya existía y los sub-slugs RBAC entraron en
+  Fase A. Entregables: (1) `lib/compras/requisiciones.ts` (tipos + estado
+  derivado + KPIs, 11 tests); (2) `lib/compras/partidas.ts` —**materializa D4**:
+  extrae la indexación de partidas (label/proyecto/optgroups etapa›capítulo) que
+  Órdenes y Recepciones duplicaban, y **refactoriza ambos** para consumirla (OC
+  −35 líneas netas; de paso corrige un sort latente que ponía "Sin clasificar"
+  primero, inocuo hoy porque 128/128 están clasificadas; 6 tests); (3)
+  `components/compras/requisiciones-module.tsx` (lista + KPIs + alta anclada a
+  partida con selector agrupado + acciones Autorizar / Cancelar / **Generar OC**);
+  (4) page real reemplaza el placeholder `ComprasProximamente` (retirado, ya
+  huérfano en las 3 tabs). **El valor central — "Generar OC" copia `partida_id`**
+  de `requisiciones_detalle` → `ordenes_compra_detalle` (**cierra el riesgo F3**
+  que arrastra `generarOrdenCompra` de RDB), con `producto_id` null y precio
+  estimado → `precio_unitario`; la OC nace `borrador` y sigue su flujo en el tab
+  Órdenes. `solicitante_id` = usuario actual (audit trail). Un proyecto a la vez.
+  5 checks verdes (typecheck, **1285 tests**, lint 0-err, format, schema sin
+  drift). PR **UI-touching → preview-first sin auto-merge**; **sin migración → el
+  preview corre contra datos de prod** (las altas de prueba escriben a prod —
+  borrarlas tras revisar). Con esto **Sprint 2 (A/B/C/D) queda completo**;
+  próximo Sprint 3 = Cotización RFQ. Follow-ups vivos: editar OC borrador/drawer
+  de detalle (Fase B), ajuste F4 de `v_partida_control` (OCs canceladas en
+  `ejercido`), migración de RDB al componente compartido (backlog).
