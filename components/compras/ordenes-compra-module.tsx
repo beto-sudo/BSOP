@@ -296,13 +296,19 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
     };
   }, [fetchData, apply]);
 
+  // Solo proyectos con presupuesto cargado (partidas) o que ya tienen órdenes.
+  // Los fraccionamientos sin partidas (vacíos o cerrados) no estorban el selector.
   const proyectosPresentes = useMemo(() => {
+    const conPresupuesto = new Set(partidasByProyecto.keys());
+    const enRows = new Set(rows.map((r) => r.proyectoId).filter(Boolean) as string[]);
     const m = new Map<string, string>();
-    for (const p of proyectos) m.set(p.id, p.nombre);
+    for (const p of proyectos) {
+      if (conPresupuesto.has(p.id) || enRows.has(p.id)) m.set(p.id, p.nombre);
+    }
     return [...m.entries()]
       .map(([id, nombre]) => ({ id, nombre }))
       .sort((a, b) => a.nombre.localeCompare(b.nombre));
-  }, [proyectos]);
+  }, [proyectos, partidasByProyecto, rows]);
 
   const q = search.trim().toLowerCase();
   const filtrados = useMemo(() => {

@@ -86,13 +86,16 @@ describe('puedeGenerarOc', () => {
       puedeGenerarOc(req({ ocCodigo: 'OC-1', lineas: [linea({ partidaId: 'p', cantidad: 1 })] }))
     ).toBe(false);
   });
-  it('false cuando ninguna línea tiene partida o cantidad', () => {
-    expect(puedeGenerarOc(req({ ocCodigo: null, lineas: [linea({ partidaId: null })] }))).toBe(
-      false
-    );
+  it('true para gasto suelto: línea sin partida pero con cantidad', () => {
+    expect(
+      puedeGenerarOc(req({ ocCodigo: null, lineas: [linea({ partidaId: null, cantidad: 2 })] }))
+    ).toBe(true);
+  });
+  it('false cuando ninguna línea tiene cantidad > 0', () => {
     expect(
       puedeGenerarOc(req({ ocCodigo: null, lineas: [linea({ partidaId: 'p', cantidad: 0 })] }))
     ).toBe(false);
+    expect(puedeGenerarOc(req({ ocCodigo: null, lineas: [] }))).toBe(false);
   });
 });
 

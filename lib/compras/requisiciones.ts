@@ -65,12 +65,13 @@ export function deriveReqEstado(r: Pick<ReqRow, 'autorizadaAt' | 'ocCodigo'>): R
 }
 
 /**
- * ¿Se puede generar OC? Solo si no hay OC viva ligada todavía y hay al menos una
- * línea anclada a partida con cantidad > 0 (sin partida la OC no comprometería
- * presupuesto — D12).
+ * ¿Se puede generar OC? Si no hay OC viva ligada y hay al menos una línea con
+ * cantidad > 0. La partida es **opcional**: una requisición de obra la lleva
+ * (D12) pero una **requisición libre / gasto suelto** no — `partida_id` null →
+ * la OC tampoco compromete presupuesto, que es justo lo que se busca.
  */
 export function puedeGenerarOc(r: Pick<ReqRow, 'ocCodigo' | 'lineas'>): boolean {
-  return !r.ocCodigo && r.lineas.some((l) => l.partidaId !== null && (l.cantidad ?? 0) > 0);
+  return !r.ocCodigo && r.lineas.some((l) => (l.cantidad ?? 0) > 0);
 }
 
 /**

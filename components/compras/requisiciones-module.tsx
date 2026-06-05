@@ -55,6 +55,8 @@ import {
 } from '@/lib/compras/requisiciones';
 
 const SIN = '__sin__';
+/** Valor del selector para capturar una requisición libre (gasto suelto sin proyecto). */
+const LIBRE = '__libre__';
 
 const ESTADO_TONE: Record<ReqEstado, BadgeTone> = {
   pendiente: 'neutral',
@@ -283,18 +285,28 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
     };
   }, [fetchData, apply]);
 
+  // Solo proyectos con presupuesto cargado (partidas) o que ya tienen requisiciones.
+  // Los fraccionamientos sin partidas (vacíos o cerrados) no estorban el selector.
   const proyectosPresentes = useMemo(() => {
+    const conPresupuesto = new Set(partidasByProyecto.keys());
+    const enRows = new Set(rows.map((r) => r.proyectoId).filter(Boolean) as string[]);
     const m = new Map<string, string>();
-    for (const p of proyectos) m.set(p.id, p.nombre);
+    for (const p of proyectos) {
+      if (conPresupuesto.has(p.id) || enRows.has(p.id)) m.set(p.id, p.nombre);
+    }
     return [...m.entries()]
       .map(([id, nombre]) => ({ id, nombre }))
       .sort((a, b) => a.nombre.localeCompare(b.nombre));
-  }, [proyectos]);
+  }, [proyectos, partidasByProyecto, rows]);
 
   const q = search.trim().toLowerCase();
   const filtrados = useMemo(() => {
     return rows.filter((r) => {
-      if (proyectoFiltro && r.proyectoId !== proyectoFiltro) return false;
+      if (proyectoFiltro === LIBRE) {
+        if (r.proyectoId !== null) return false;
+      } else if (proyectoFiltro && r.proyectoId !== proyectoFiltro) {
+        return false;
+      }
       if (q) {
         const hay =
           r.codigo.toLowerCase().includes(q) ||
@@ -335,8 +347,12 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
     },
   ];
 
-  const proyectoActivo = proyectoFiltro && proyectoFiltro !== SIN ? proyectoFiltro : '';
+  const modoLibre = proyectoFiltro === LIBRE;
+  const proyectoActivo =
+    proyectoFiltro && proyectoFiltro !== SIN && proyectoFiltro !== LIBRE ? proyectoFiltro : '';
   const partidaGrupos = proyectoActivo ? (partidasByProyecto.get(proyectoActivo) ?? []) : [];
+  // Alta disponible con un proyecto presupuestado elegido, o en modo gasto suelto.
+  const puedeAlta = modoLibre || proyectoActivo !== '';
 
   function abrirAlta() {
     setJustificacion('');
@@ -348,15 +364,19 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
     () => lineas.reduce((acc, l) => acc + toNum(l.cantidad) * toNum(l.precio), 0),
     [lineas]
   );
-  const canSubmit =
-    proyectoActivo !== '' && lineas.some((l) => l.partidaId !== '' && toNum(l.cantidad) > 0);
+  // Gasto suelto: la línea válida es texto (descripción + cantidad). Con proyecto: partida + cantidad.
+  const canSubmit = modoLibre
+    ? lineas.some((l) => l.descripcion.trim() !== '' && toNum(l.cantidad) > 0)
+    : proyectoActivo !== '' && lineas.some((l) => l.partidaId !== '' && toNum(l.cantidad) > 0);
 
   async function onSubmit() {
     if (!canSubmit || submitting) return;
     setSubmitting(true);
     const sb = createSupabaseBrowserClient();
     const { data: auth } = await sb.auth.getUser();
-    const validas = lineas.filter((l) => l.partidaId !== '' && toNum(l.cantidad) > 0);
+    const validas = modoLibre
+      ? lineas.filter((l) => l.descripcion.trim() !== '' && toNum(l.cantidad) > 0)
+      : lineas.filter((l) => l.partidaId !== '' && toNum(l.cantidad) > 0);
     const folio = `REQ-${Date.now().toString(36).toUpperCase()}`;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const reqResp = await (sb.schema('erp') as any)
@@ -382,7 +402,7 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
     const detalle = validas.map((l) => ({
       empresa_id: empresaId,
       requisicion_id: reqId,
-      partida_id: l.partidaId,
+      partida_id: modoLibre ? null : l.partidaId,
       producto_id: null,
       descripcion: l.descripcion.trim() || null,
       unidad: l.unidad.trim() || null,
@@ -467,7 +487,8 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
       setAccionId(req.id);
       const sb = createSupabaseBrowserClient();
       const folio = `OC-${Date.now().toString(36).toUpperCase()}`;
-      const validas = req.lineas.filter((l) => l.partidaId !== null && l.cantidad > 0);
+      // Partida opcional: gasto suelto genera OC sin partida (no compromete presupuesto).
+      const validas = req.lineas.filter((l) => l.cantidad > 0);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const ocResp = await (sb.schema('erp') as any)
         .from('ordenes_compra')
@@ -650,6 +671,7 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
               {p.nombre}
             </option>
           ))}
+          <option value={LIBRE}>Gasto suelto (sin proyecto)</option>
         </select>
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text)]/40" />
@@ -675,11 +697,9 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
             <button
               type="button"
               onClick={abrirAlta}
-              disabled={proyectoActivo === ''}
+              disabled={!puedeAlta}
               title={
-                proyectoActivo === ''
-                  ? 'Selecciona un proyecto para crear una requisición'
-                  : undefined
+                !puedeAlta ? 'Elige un fraccionamiento con presupuesto o “Gasto suelto”' : undefined
               }
               className="inline-flex h-9 items-center gap-1.5 rounded-md bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -694,7 +714,9 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
               Nueva requisición ·{' '}
-              {proyectosPresentes.find((p) => p.id === proyectoActivo)?.nombre ?? 'Proyecto'}
+              {modoLibre
+                ? 'Gasto suelto'
+                : (proyectosPresentes.find((p) => p.id === proyectoActivo)?.nombre ?? 'Proyecto')}
             </h2>
             <Input
               value={justificacion}
@@ -707,26 +729,28 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
           <div className="space-y-2">
             {lineas.map((l, idx) => (
               <div key={l.key} className="flex flex-wrap items-center gap-2">
-                <select
-                  value={l.partidaId}
-                  onChange={(e) =>
-                    setLineas((prev) =>
-                      prev.map((x) => (x.key === l.key ? { ...x, partidaId: e.target.value } : x))
-                    )
-                  }
-                  className="h-9 min-w-[260px] flex-1 rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 text-sm text-[var(--text)]"
-                >
-                  <option value="">Partida…</option>
-                  {partidaGrupos.map((g) => (
-                    <optgroup key={g.key} label={g.label}>
-                      {g.partidas.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
+                {!modoLibre ? (
+                  <select
+                    value={l.partidaId}
+                    onChange={(e) =>
+                      setLineas((prev) =>
+                        prev.map((x) => (x.key === l.key ? { ...x, partidaId: e.target.value } : x))
+                      )
+                    }
+                    className="h-9 min-w-[260px] flex-1 rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 text-sm text-[var(--text)]"
+                  >
+                    <option value="">Partida…</option>
+                    {partidaGrupos.map((g) => (
+                      <optgroup key={g.key} label={g.label}>
+                        {g.partidas.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                ) : null}
                 <Input
                   value={l.descripcion}
                   onChange={(e) =>
@@ -734,8 +758,8 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
                       prev.map((x) => (x.key === l.key ? { ...x, descripcion: e.target.value } : x))
                     )
                   }
-                  placeholder="Detalle (opcional)"
-                  className="w-44"
+                  placeholder={modoLibre ? '¿Qué se requiere?' : 'Detalle (opcional)'}
+                  className={modoLibre ? 'min-w-[260px] flex-1' : 'w-44'}
                 />
                 <Input
                   value={l.cantidad}
