@@ -23,7 +23,10 @@ import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency } from '@/lib/format';
-import { ACTIVO_MODALIDAD_LABEL, ACTIVO_TIPO_LABEL } from '@/lib/dilesa/portafolio';
+import { Button } from '@/components/ui/button';
+import { useEffectiveUser } from '@/components/providers';
+import { LiberarPortafolioDialog } from '@/components/dilesa/liberar-portafolio-dialog';
+import { ACTIVO_MODALIDAD_LABEL, ACTIVO_TIPO_LABEL, puedeLiberarse } from '@/lib/dilesa/portafolio';
 
 type UnidadFull = {
   id: string;
@@ -103,14 +106,20 @@ export function UnidadDetailDrawer({
   unidadId,
   open,
   onOpenChange,
+  onChanged,
 }: {
   unidadId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Se llama tras liberar al portafolio, para que el caller refresque su lista. */
+  onChanged?: () => void;
 }) {
+  const { data: effectiveUser } = useEffectiveUser();
+  const isAdmin = !!effectiveUser?.isAdmin;
   const [data, setData] = useState<Cargado | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [liberarOpen, setLiberarOpen] = useState(false);
 
   useEffect(() => {
     if (!open || !unidadId) return;
@@ -247,117 +256,145 @@ export function UnidadDetailDrawer({
     : '';
 
   return (
-    <DetailDrawer
-      open={open}
-      onOpenChange={onOpenChange}
-      size="md"
-      title={u ? u.identificador : 'Unidad'}
-      description={data?.proyectoNombre ?? undefined}
-      meta={
-        u ? (
-          <>
-            <Badge tone={ESTADO_TONE[u.estado] ?? 'neutral'}>
-              {ESTADO_LABEL[u.estado] ?? u.estado}
-            </Badge>
-            {u.es_muestra ? <Badge tone="accent">Casa muestra</Badge> : null}
-            {u.activo_id ? <Badge tone="info">En portafolio</Badge> : null}
-          </>
-        ) : null
-      }
-    >
-      <DetailDrawerContent>
-        {loading ? (
-          <DetailDrawerSkeleton />
-        ) : error ? (
-          <p className="py-4 text-sm text-[var(--danger)]">{error}</p>
-        ) : u ? (
-          <>
-            <DetailDrawerSection title="Identificación" divider={false}>
-              <Field label="Proyecto" value={data?.proyectoNombre} />
-              <Field label="Prototipo" value={data?.prototipo} />
-              <Field label="Tipo de lote" value={u.tipo_lote} />
-              <Field label="Ubicación" value={ubicacion || '—'} />
-              {u.manzana || u.numero_lote ? (
+    <>
+      <DetailDrawer
+        open={open}
+        onOpenChange={onOpenChange}
+        size="md"
+        title={u ? u.identificador : 'Unidad'}
+        description={data?.proyectoNombre ?? undefined}
+        meta={
+          u ? (
+            <>
+              <Badge tone={ESTADO_TONE[u.estado] ?? 'neutral'}>
+                {ESTADO_LABEL[u.estado] ?? u.estado}
+              </Badge>
+              {u.es_muestra ? <Badge tone="accent">Casa muestra</Badge> : null}
+              {u.activo_id ? <Badge tone="info">En portafolio</Badge> : null}
+            </>
+          ) : null
+        }
+        actions={
+          isAdmin && u && !u.activo_id && puedeLiberarse(u.estado) ? (
+            <Button size="sm" variant="outline" onClick={() => setLiberarOpen(true)}>
+              Liberar al portafolio →
+            </Button>
+          ) : null
+        }
+      >
+        <DetailDrawerContent>
+          {loading ? (
+            <DetailDrawerSkeleton />
+          ) : error ? (
+            <p className="py-4 text-sm text-[var(--danger)]">{error}</p>
+          ) : u ? (
+            <>
+              <DetailDrawerSection title="Identificación" divider={false}>
+                <Field label="Proyecto" value={data?.proyectoNombre} />
+                <Field label="Prototipo" value={data?.prototipo} />
+                <Field label="Tipo de lote" value={u.tipo_lote} />
+                <Field label="Ubicación" value={ubicacion || '—'} />
+                {u.manzana || u.numero_lote ? (
+                  <Field
+                    label="Manzana / Lote"
+                    value={`${u.manzana ?? '—'} / ${u.numero_lote ?? '—'}`}
+                  />
+                ) : null}
+              </DetailDrawerSection>
+
+              <DetailDrawerSection title="Medidas y características">
                 <Field
-                  label="Manzana / Lote"
-                  value={`${u.manzana ?? '—'} / ${u.numero_lote ?? '—'}`}
-                />
-              ) : null}
-            </DetailDrawerSection>
-
-            <DetailDrawerSection title="Medidas y características">
-              <Field
-                label="Superficie del lote"
-                value={u.area_m2 != null ? `${u.area_m2.toFixed(2)} m²` : '—'}
-              />
-              <Field
-                label="m² de construcción"
-                value={u.m2_construccion != null ? `${u.m2_construccion.toFixed(2)} m²` : '—'}
-              />
-              <Field
-                label="Características"
-                value={
-                  <span className="inline-flex flex-wrap justify-end gap-1">
-                    {u.es_esquina ? <Badge tone="info">Esquina</Badge> : null}
-                    {u.tiene_frente_verde ? <Badge tone="success">Frente verde</Badge> : null}
-                    {!u.es_esquina && !u.tiene_frente_verde ? '—' : null}
-                  </span>
-                }
-              />
-            </DetailDrawerSection>
-
-            <DetailDrawerSection title="Precio">
-              <Field
-                label="Precio calculado (sin crédito)"
-                value={data?.precioCalculado != null ? formatCurrency(data.precioCalculado) : '—'}
-              />
-              <Field
-                label="Precio en el registro"
-                value={u.precio != null ? formatCurrency(u.precio) : '—'}
-              />
-            </DetailDrawerSection>
-
-            {data?.activo ? (
-              <DetailDrawerSection title="Portafolio de activos">
-                <Field label="Activo" value={data.activo.nombre} />
-                <Field
-                  label="Tipo"
-                  value={ACTIVO_TIPO_LABEL[data.activo.tipo as never] ?? data.activo.tipo}
+                  label="Superficie del lote"
+                  value={u.area_m2 != null ? `${u.area_m2.toFixed(2)} m²` : '—'}
                 />
                 <Field
-                  label="Destino"
+                  label="m² de construcción"
+                  value={u.m2_construccion != null ? `${u.m2_construccion.toFixed(2)} m²` : '—'}
+                />
+                <Field
+                  label="Características"
                   value={
-                    data.activo.modalidad
-                      ? (ACTIVO_MODALIDAD_LABEL[data.activo.modalidad as never] ??
-                        data.activo.modalidad)
-                      : '—'
+                    <span className="inline-flex flex-wrap justify-end gap-1">
+                      {u.es_esquina ? <Badge tone="info">Esquina</Badge> : null}
+                      {u.tiene_frente_verde ? <Badge tone="success">Frente verde</Badge> : null}
+                      {!u.es_esquina && !u.tiene_frente_verde ? '—' : null}
+                    </span>
                   }
                 />
-                <p className="pt-1 text-xs text-[var(--text)]/50">
-                  Esta unidad fue liberada al portafolio: no aparece en el inventario de ventas.
-                </p>
               </DetailDrawerSection>
-            ) : null}
 
-            {data?.venta ? (
-              <DetailDrawerSection title="Venta">
-                <Field label="Cliente" value={data.venta.persona_nombre} />
-                <Field label="Fecha de escritura" value={fmtFecha(data.venta.fecha_escritura)} />
+              <DetailDrawerSection title="Precio">
                 <Field
-                  label="Valor de escrituración"
-                  value={
-                    data.venta.valor_escrituracion != null
-                      ? formatCurrency(data.venta.valor_escrituracion)
-                      : data.venta.valor_comercial != null
-                        ? formatCurrency(data.venta.valor_comercial)
+                  label="Precio calculado (sin crédito)"
+                  value={data?.precioCalculado != null ? formatCurrency(data.precioCalculado) : '—'}
+                />
+                <Field
+                  label="Precio en el registro"
+                  value={u.precio != null ? formatCurrency(u.precio) : '—'}
+                />
+              </DetailDrawerSection>
+
+              {data?.activo ? (
+                <DetailDrawerSection title="Portafolio de activos">
+                  <Field label="Activo" value={data.activo.nombre} />
+                  <Field
+                    label="Tipo"
+                    value={ACTIVO_TIPO_LABEL[data.activo.tipo as never] ?? data.activo.tipo}
+                  />
+                  <Field
+                    label="Destino"
+                    value={
+                      data.activo.modalidad
+                        ? (ACTIVO_MODALIDAD_LABEL[data.activo.modalidad as never] ??
+                          data.activo.modalidad)
                         : '—'
-                  }
-                />
-              </DetailDrawerSection>
-            ) : null}
-          </>
-        ) : null}
-      </DetailDrawerContent>
-    </DetailDrawer>
+                    }
+                  />
+                  <p className="pt-1 text-xs text-[var(--text)]/50">
+                    Esta unidad fue liberada al portafolio: no aparece en el inventario de ventas.
+                  </p>
+                </DetailDrawerSection>
+              ) : null}
+
+              {data?.venta ? (
+                <DetailDrawerSection title="Venta">
+                  <Field label="Cliente" value={data.venta.persona_nombre} />
+                  <Field label="Fecha de escritura" value={fmtFecha(data.venta.fecha_escritura)} />
+                  <Field
+                    label="Valor de escrituración"
+                    value={
+                      data.venta.valor_escrituracion != null
+                        ? formatCurrency(data.venta.valor_escrituracion)
+                        : data.venta.valor_comercial != null
+                          ? formatCurrency(data.venta.valor_comercial)
+                          : '—'
+                    }
+                  />
+                </DetailDrawerSection>
+              ) : null}
+            </>
+          ) : null}
+        </DetailDrawerContent>
+      </DetailDrawer>
+
+      {liberarOpen && u ? (
+        <LiberarPortafolioDialog
+          unidad={{
+            id: u.id,
+            identificador: u.identificador,
+            tipo_lote: u.tipo_lote,
+            precio: u.precio,
+          }}
+          onOpenChange={(o) => {
+            if (!o) setLiberarOpen(false);
+          }}
+          onLiberated={() => {
+            setLiberarOpen(false);
+            onOpenChange(false);
+            onChanged?.();
+          }}
+        />
+      ) : null}
+    </>
   );
 }

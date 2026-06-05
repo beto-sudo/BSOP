@@ -192,6 +192,8 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
       )
       .eq('empresa_id', empresaId)
       .is('deleted_at', null)
+      // Excluye las liberadas al portafolio: ya no son inventario de venta.
+      .is('activo_id', null)
       .in('estado', ['en_construccion', 'terminada']);
     if (uErr) return { error: getSupabaseErrorMessage(uErr, 'No se pudo cargar el inventario.') };
     const unidadesArr = (uns ?? []) as UnidadRow[];
@@ -590,6 +592,7 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
         onOpenChange={(o) => {
           if (!o) setDetalleUnidadId(null);
         }}
+        onChanged={() => void cargar()}
       />
     </div>
   );

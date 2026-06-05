@@ -215,6 +215,7 @@ export function PortafolioModule({ empresaId }: { empresaId: string }) {
         onOpenChange={(o) => {
           if (!o) setDetalle(null);
         }}
+        onChanged={() => void cargar()}
       />
     </div>
   );

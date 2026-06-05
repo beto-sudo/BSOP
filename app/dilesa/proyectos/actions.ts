@@ -20,6 +20,8 @@ import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 
 import { isActivoModalidad, isActivoTipo } from '@/lib/dilesa/portafolio';
+import { getEffectiveUser } from '@/lib/auth/effective-user';
+import type { Database } from '@/types/supabase';
 
 type ProyectoFieldsPatch = {
   plano_oficial_url?: string | null;
@@ -45,7 +47,7 @@ function validatePositive(n: number | null | undefined, label: string): string |
 /** Cliente Supabase con la sesión del usuario (RLS aplica). */
 async function getActionClient() {
   const cookieStore = await cookies();
-  return createServerClient(
+  return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -57,6 +59,16 @@ async function getActionClient() {
       },
     }
   );
+}
+
+/**
+ * Gate de movimiento al portafolio: SOLO administradores globales pueden
+ * liberar/regresar unidades. Refleja el usuario impersonado en preview
+ * (que es read-only), así que un admin "viendo como" no-admin no puede mover.
+ */
+async function esAdmin(supabase: Awaited<ReturnType<typeof getActionClient>>): Promise<boolean> {
+  const eu = await getEffectiveUser(supabase);
+  return eu?.isAdmin === true;
 }
 
 export async function updateProyectoFields(
@@ -164,6 +176,9 @@ export async function liberarUnidadAlPortafolio(
   }
 
   const supabase = await getActionClient();
+  if (!(await esAdmin(supabase))) {
+    return { ok: false, error: 'Solo un administrador puede liberar unidades al portafolio.' };
+  }
 
   const { error } = await supabase.schema('dilesa').rpc('fn_liberar_unidad_portafolio', {
     p_unidad_id: unidadId,
@@ -190,6 +205,9 @@ export async function regresarUnidadAlProyecto(unidadId: string): Promise<Result
   if (!unidadId) return { ok: false, error: 'unidadId requerido' };
 
   const supabase = await getActionClient();
+  if (!(await esAdmin(supabase))) {
+    return { ok: false, error: 'Solo un administrador puede regresar unidades del portafolio.' };
+  }
 
   const { error } = await supabase.schema('dilesa').rpc('fn_regresar_unidad_proyecto', {
     p_unidad_id: unidadId,

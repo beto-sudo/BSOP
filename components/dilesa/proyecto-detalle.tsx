@@ -22,7 +22,6 @@ import { useRouter } from 'next/navigation';
 import {
   updateProyectoFields,
   setUnidadMuestra,
-  liberarUnidadAlPortafolio,
   regresarUnidadAlProyecto,
 } from '@/app/dilesa/proyectos/actions';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
@@ -32,31 +31,15 @@ import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
+import { LiberarPortafolioDialog } from '@/components/dilesa/liberar-portafolio-dialog';
 import { Search, Boxes, HardHat } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { ProyectoChecklist } from './proyecto-checklist';
 import { PlanoAnteproyecto } from './plano-anteproyecto';
 import { useEffectiveUser } from '@/components/providers';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
-import {
-  ACTIVO_TIPOS,
-  ACTIVO_TIPO_LABEL,
-  ACTIVO_MODALIDADES,
-  ACTIVO_MODALIDAD_LABEL,
-  inferActivoTipo,
-  puedeLiberarse,
-  type ActivoTipo,
-  type ActivoModalidad,
-} from '@/lib/dilesa/portafolio';
+import { puedeLiberarse } from '@/lib/dilesa/portafolio';
 
 export type ProyectoDetalle = {
   id: string;
@@ -375,7 +358,7 @@ function buildUnidadColumns(
   onLiberar: (u: Unidad) => void,
   onRegresar: (u: Unidad) => void,
   portafolioPendingId: string | null,
-  puedeAutorizar: boolean
+  puedeMover: boolean
 ): Column<Unidad>[] {
   return [
     { key: 'identificador', label: 'Lote', type: 'text', sticky: true, width: 'min-w-[140px]' },
@@ -429,7 +412,7 @@ function buildUnidadColumns(
           return (
             <div className="flex items-center gap-2">
               <Badge tone="accent">En portafolio</Badge>
-              {puedeAutorizar ? (
+              {puedeMover ? (
                 <Button variant="ghost" size="sm" disabled={pending} onClick={() => onRegresar(u)}>
                   Regresar
                 </Button>
@@ -437,7 +420,7 @@ function buildUnidadColumns(
             </div>
           );
         }
-        if (puedeAutorizar && puedeLiberarse(u.estado)) {
+        if (puedeMover && puedeLiberarse(u.estado)) {
           return (
             <Button variant="outline" size="sm" disabled={pending} onClick={() => onLiberar(u)}>
               Liberar →
@@ -460,6 +443,9 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
   const puedeAutorizar =
     !!effectiveUser?.isAdmin ||
     (effectiveUser?.direccionEmpresaIds ?? []).includes(DILESA_EMPRESA_ID);
+  // El movimiento unidad ↔ portafolio es SOLO admin (decisión de Beto),
+  // más estricto que `puedeAutorizar`. La server action lo re-valida.
+  const puedeMover = !!effectiveUser?.isAdmin;
   const [unidades, setUnidades] = useState<Unidad[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loadedId, setLoadedId] = useState<string | null>(null);
@@ -488,10 +474,6 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
   const [portafolioPendingId, setPortafolioPendingId] = useState<string | null>(null);
   const [liberando, setLiberando] = useState<Unidad | null>(null);
   const [regresando, setRegresando] = useState<Unidad | null>(null);
-  const [liberarTipo, setLiberarTipo] = useState<ActivoTipo>('lote');
-  const [liberarModalidad, setLiberarModalidad] = useState<ActivoModalidad>('venta');
-  const [liberarValor, setLiberarValor] = useState('');
-  const [liberarBusy, setLiberarBusy] = useState(false);
 
   // Carga las unidades del proyecto al montar / cambiar de proyecto.
   // Los setState van solo dentro del `.then` (no síncronos dentro del effect).
@@ -692,36 +674,13 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
     });
   };
 
-  const handleAbrirLiberar = (u: Unidad) => {
-    setLiberando(u);
-    setLiberarTipo(inferActivoTipo(u.tipo_lote));
-    setLiberarModalidad('venta');
-    setLiberarValor(u.precio != null ? String(u.precio) : '');
-  };
-
-  const handleConfirmarLiberar = () => {
-    if (!liberando) return;
-    const u = liberando;
-    setLiberarBusy(true);
-    const trimmed = liberarValor.trim();
-    const valorNum = trimmed === '' ? null : Number(trimmed);
-    void liberarUnidadAlPortafolio(u.id, {
-      tipo: liberarTipo,
-      modalidad: liberarModalidad,
-      valorEstimado: valorNum,
-    }).then((r) => {
-      setLiberarBusy(false);
-      if (!r.ok) {
-        setError(r.error);
-        return;
-      }
-      setError(null);
-      // Optimistic: la unidad pasa a "en portafolio" (sentinel hasta recargar).
-      setUnidades((prev) =>
-        prev.map((x) => (x.id === u.id ? { ...x, activo_id: `pending-${u.id}` } : x))
-      );
-      setLiberando(null);
-    });
+  const handleLiberada = (unidadId: string) => {
+    setError(null);
+    // Optimistic: la unidad pasa a "en portafolio" (sentinel hasta recargar).
+    setUnidades((prev) =>
+      prev.map((x) => (x.id === unidadId ? { ...x, activo_id: `pending-${unidadId}` } : x))
+    );
+    setLiberando(null);
   };
 
   const handleConfirmarRegresar = async () => {
@@ -1069,10 +1028,10 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
           columns={buildUnidadColumns(
             handleToggleMuestra,
             muestraPendingId,
-            handleAbrirLiberar,
+            (u) => setLiberando(u),
             (u) => setRegresando(u),
             portafolioPendingId,
-            puedeAutorizar
+            puedeMover
           )}
           rowKey="id"
           loading={loading}
@@ -1087,72 +1046,16 @@ export function ProyectoDetalle({ proyecto }: { proyecto: ProyectoDetalle | null
         />
       </DetailDrawerSection>
 
-      {/* Liberar unidad → portafolio de activos */}
-      <Dialog
-        open={liberando != null}
-        onOpenChange={(o) => {
-          if (!o) setLiberando(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Liberar al portafolio</DialogTitle>
-            <DialogDescription>
-              {liberando
-                ? `${liberando.identificador} saldrá del inventario de ventas del fraccionamiento y se registrará como activo del portafolio de DILESA.`
-                : ''}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3">
-            <label className="grid gap-1 text-sm">
-              <span className="text-[var(--text)]/70">Tipo de activo</span>
-              <select
-                value={liberarTipo}
-                onChange={(e) => setLiberarTipo(e.target.value as ActivoTipo)}
-                className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
-              >
-                {ACTIVO_TIPOS.map((t) => (
-                  <option key={t} value={t}>
-                    {ACTIVO_TIPO_LABEL[t]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="grid gap-1 text-sm">
-              <span className="text-[var(--text)]/70">Destino</span>
-              <select
-                value={liberarModalidad}
-                onChange={(e) => setLiberarModalidad(e.target.value as ActivoModalidad)}
-                className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
-              >
-                {ACTIVO_MODALIDADES.map((m) => (
-                  <option key={m} value={m}>
-                    {ACTIVO_MODALIDAD_LABEL[m]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="grid gap-1 text-sm">
-              <span className="text-[var(--text)]/70">Valor estimado (MXN)</span>
-              <Input
-                type="number"
-                inputMode="decimal"
-                value={liberarValor}
-                onChange={(e) => setLiberarValor(e.currentTarget.value)}
-                placeholder="0.00"
-              />
-            </label>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setLiberando(null)} disabled={liberarBusy}>
-              Cancelar
-            </Button>
-            <Button onClick={handleConfirmarLiberar} disabled={liberarBusy}>
-              {liberarBusy ? 'Liberando…' : 'Liberar al portafolio'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Liberar unidad → portafolio de activos (solo admin) */}
+      {liberando ? (
+        <LiberarPortafolioDialog
+          unidad={liberando}
+          onOpenChange={(o) => {
+            if (!o) setLiberando(null);
+          }}
+          onLiberated={handleLiberada}
+        />
+      ) : null}
 
       {/* Regresar unidad del portafolio → proyecto origen (vuelve a ventas) */}
       <ConfirmDialog

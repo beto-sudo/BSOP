@@ -23,6 +23,10 @@ import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency } from '@/lib/format';
+import { Button } from '@/components/ui/button';
+import { useEffectiveUser } from '@/components/providers';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
+import { regresarUnidadAlProyecto } from '@/app/dilesa/proyectos/actions';
 import { ACTIVO_MODALIDAD_LABEL, ACTIVO_TIPO_LABEL } from '@/lib/dilesa/portafolio';
 
 type ActivoFull = {
@@ -43,7 +47,12 @@ type ActivoFull = {
   notas: string | null;
 };
 
-type Origen = { identificador: string; estado: string; proyectoNombre: string | null };
+type Origen = {
+  id: string;
+  identificador: string;
+  estado: string;
+  proyectoNombre: string | null;
+};
 
 const ESTADO_TONE: Record<string, BadgeTone> = {
   prospecto: 'neutral',
@@ -120,18 +129,24 @@ export function ActivoDetailDrawer({
   activoTipo,
   open,
   onOpenChange,
+  onChanged,
 }: {
   activoId: string | null;
   /** Tipo del activo (de la fila) para resolver el satélite sin un round-trip extra. */
   activoTipo: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Se llama tras regresar la unidad a ventas, para que el caller refresque. */
+  onChanged?: () => void;
 }) {
+  const { data: effectiveUser } = useEffectiveUser();
+  const isAdmin = !!effectiveUser?.isAdmin;
   const [activo, setActivo] = useState<ActivoFull | null>(null);
   const [satelite, setSatelite] = useState<Record<string, unknown> | null>(null);
   const [origen, setOrigen] = useState<Origen | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [regresarOpen, setRegresarOpen] = useState(false);
 
   useEffect(() => {
     if (!open || !activoId) return;
@@ -194,7 +209,7 @@ export function ActivoDetailDrawer({
         sb
           .schema('dilesa')
           .from('unidades')
-          .select('identificador, estado, proyecto_id')
+          .select('id, identificador, estado, proyecto_id')
           .eq('activo_id', activoId)
           .is('deleted_at', null)
           .maybeSingle(),
@@ -204,6 +219,7 @@ export function ActivoDetailDrawer({
       setSatelite((satRes.data as Record<string, unknown> | null) ?? null);
 
       const uni = uniRes.data as {
+        id: string;
         identificador: string;
         estado: string;
         proyecto_id: string;
@@ -217,6 +233,7 @@ export function ActivoDetailDrawer({
           .maybeSingle();
         if (!vivo) return;
         setOrigen({
+          id: uni.id,
           identificador: uni.identificador,
           estado: uni.estado,
           proyectoNombre: (prj as { nombre?: string } | null)?.nombre ?? null,
@@ -234,94 +251,131 @@ export function ActivoDetailDrawer({
     ? Object.entries(satelite).filter(([k, v]) => !SAT_OMIT.has(k) && v != null && v !== '')
     : [];
 
+  const handleRegresar = async () => {
+    if (!origen) return;
+    const r = await regresarUnidadAlProyecto(origen.id);
+    if (!r.ok) {
+      setError(r.error);
+      return;
+    }
+    onOpenChange(false);
+    onChanged?.();
+  };
+
   return (
-    <DetailDrawer
-      open={open}
-      onOpenChange={onOpenChange}
-      size="md"
-      title={activo ? activo.nombre : 'Activo'}
-      description={activo ? (ACTIVO_TIPO_LABEL[activo.tipo as never] ?? activo.tipo) : undefined}
-      meta={
-        activo ? (
-          <>
-            <Badge tone={ESTADO_TONE[activo.estado] ?? 'neutral'}>
-              {ESTADO_LABEL[activo.estado] ?? activo.estado}
-            </Badge>
-            {activo.modalidad ? (
-              <Badge tone="accent">
-                {ACTIVO_MODALIDAD_LABEL[activo.modalidad as never] ?? activo.modalidad}
+    <>
+      <DetailDrawer
+        open={open}
+        onOpenChange={onOpenChange}
+        size="md"
+        title={activo ? activo.nombre : 'Activo'}
+        description={activo ? (ACTIVO_TIPO_LABEL[activo.tipo as never] ?? activo.tipo) : undefined}
+        meta={
+          activo ? (
+            <>
+              <Badge tone={ESTADO_TONE[activo.estado] ?? 'neutral'}>
+                {ESTADO_LABEL[activo.estado] ?? activo.estado}
               </Badge>
-            ) : null}
-          </>
-        ) : null
-      }
-    >
-      <DetailDrawerContent>
-        {loading ? (
-          <DetailDrawerSkeleton />
-        ) : error ? (
-          <p className="py-4 text-sm text-[var(--danger)]">{error}</p>
-        ) : activo ? (
-          <>
-            <DetailDrawerSection title="Identificación" divider={false}>
-              <Field label="Tipo" value={ACTIVO_TIPO_LABEL[activo.tipo as never] ?? activo.tipo} />
-              <Field
-                label="Destino"
-                value={
-                  activo.modalidad
-                    ? (ACTIVO_MODALIDAD_LABEL[activo.modalidad as never] ?? activo.modalidad)
-                    : '—'
-                }
-              />
-              <Field label="Clave interna" value={activo.clave_interna} />
-            </DetailDrawerSection>
-
-            <DetailDrawerSection title="Ubicación">
-              <Field label="Municipio" value={activo.municipio} />
-              <Field label="Estado" value={activo.estado_geo} />
-              <Field label="Referencia" value={activo.direccion_referencia} />
-              <Field
-                label="Superficie"
-                value={activo.area_m2 != null ? `${activo.area_m2.toFixed(2)} m²` : '—'}
-              />
-            </DetailDrawerSection>
-
-            <DetailDrawerSection title="Valor y situación legal">
-              <Field
-                label="Valor estimado"
-                value={activo.valor_estimado != null ? formatCurrency(activo.valor_estimado) : '—'}
-              />
-              <Field label="Situación legal" value={activo.situacion_legal} />
-              <Field label="Número de escritura" value={activo.numero_escritura} />
-              <Field label="Clave catastral" value={activo.clave_catastral} />
-            </DetailDrawerSection>
-
-            {satEntries.length > 0 ? (
-              <DetailDrawerSection title="Detalle del inmueble">
-                {satEntries.map(([k, v]) => (
-                  <Field key={k} label={satLabel(k)} value={fmtSatValue(v)} />
-                ))}
+              {activo.modalidad ? (
+                <Badge tone="accent">
+                  {ACTIVO_MODALIDAD_LABEL[activo.modalidad as never] ?? activo.modalidad}
+                </Badge>
+              ) : null}
+            </>
+          ) : null
+        }
+        actions={
+          isAdmin && origen ? (
+            <Button size="sm" variant="outline" onClick={() => setRegresarOpen(true)}>
+              Regresar a ventas
+            </Button>
+          ) : null
+        }
+      >
+        <DetailDrawerContent>
+          {loading ? (
+            <DetailDrawerSkeleton />
+          ) : error ? (
+            <p className="py-4 text-sm text-[var(--danger)]">{error}</p>
+          ) : activo ? (
+            <>
+              <DetailDrawerSection title="Identificación" divider={false}>
+                <Field
+                  label="Tipo"
+                  value={ACTIVO_TIPO_LABEL[activo.tipo as never] ?? activo.tipo}
+                />
+                <Field
+                  label="Destino"
+                  value={
+                    activo.modalidad
+                      ? (ACTIVO_MODALIDAD_LABEL[activo.modalidad as never] ?? activo.modalidad)
+                      : '—'
+                  }
+                />
+                <Field label="Clave interna" value={activo.clave_interna} />
               </DetailDrawerSection>
-            ) : null}
 
-            {origen ? (
-              <DetailDrawerSection title="Origen">
-                <Field label="Unidad" value={origen.identificador} />
-                <Field label="Proyecto" value={origen.proyectoNombre} />
-                <p className="pt-1 text-xs text-[var(--text)]/50">
-                  Este activo se liberó al portafolio desde una unidad del fraccionamiento.
-                </p>
+              <DetailDrawerSection title="Ubicación">
+                <Field label="Municipio" value={activo.municipio} />
+                <Field label="Estado" value={activo.estado_geo} />
+                <Field label="Referencia" value={activo.direccion_referencia} />
+                <Field
+                  label="Superficie"
+                  value={activo.area_m2 != null ? `${activo.area_m2.toFixed(2)} m²` : '—'}
+                />
               </DetailDrawerSection>
-            ) : null}
 
-            {activo.notas ? (
-              <DetailDrawerSection title="Notas">
-                <p className="text-sm text-[var(--text)]/80">{activo.notas}</p>
+              <DetailDrawerSection title="Valor y situación legal">
+                <Field
+                  label="Valor estimado"
+                  value={
+                    activo.valor_estimado != null ? formatCurrency(activo.valor_estimado) : '—'
+                  }
+                />
+                <Field label="Situación legal" value={activo.situacion_legal} />
+                <Field label="Número de escritura" value={activo.numero_escritura} />
+                <Field label="Clave catastral" value={activo.clave_catastral} />
               </DetailDrawerSection>
-            ) : null}
-          </>
-        ) : null}
-      </DetailDrawerContent>
-    </DetailDrawer>
+
+              {satEntries.length > 0 ? (
+                <DetailDrawerSection title="Detalle del inmueble">
+                  {satEntries.map(([k, v]) => (
+                    <Field key={k} label={satLabel(k)} value={fmtSatValue(v)} />
+                  ))}
+                </DetailDrawerSection>
+              ) : null}
+
+              {origen ? (
+                <DetailDrawerSection title="Origen">
+                  <Field label="Unidad" value={origen.identificador} />
+                  <Field label="Proyecto" value={origen.proyectoNombre} />
+                  <p className="pt-1 text-xs text-[var(--text)]/50">
+                    Este activo se liberó al portafolio desde una unidad del fraccionamiento.
+                  </p>
+                </DetailDrawerSection>
+              ) : null}
+
+              {activo.notas ? (
+                <DetailDrawerSection title="Notas">
+                  <p className="text-sm text-[var(--text)]/80">{activo.notas}</p>
+                </DetailDrawerSection>
+              ) : null}
+            </>
+          ) : null}
+        </DetailDrawerContent>
+      </DetailDrawer>
+
+      {origen ? (
+        <ConfirmDialog
+          open={regresarOpen}
+          onOpenChange={setRegresarOpen}
+          onConfirm={handleRegresar}
+          title="¿Regresar la unidad a ventas?"
+          description={`${origen.identificador} saldrá del portafolio y volverá a estar disponible para el equipo de ventas del fraccionamiento.`}
+          confirmLabel="Regresar a ventas"
+          confirmVariant="default"
+        />
+      ) : null}
+    </>
   );
 }
