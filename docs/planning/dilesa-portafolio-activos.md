@@ -7,15 +7,13 @@ las tablas viejas), `core.empresas` (lectura)
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-08
-**Última actualización:** 2026-05-26 (PR #554 mergeado — Sprint 7c-2:
-Fase 1 KYC expandido. Form `/dilesa/ventas/nueva` ahora captura los 14
-campos KYC del FICU (INE, domicilio estructurado, PEP, forma de pago,
-uso de efectivo, dueño beneficiario, ocupación) con catálogos cerrados
-matchando los branches del EBR, `<EbrPreview>` recalcula el score en
-vivo (verde/ámbar/rojo) y uploader de expediente PDF. Migración
-`20260527000000_erp_personas_kyc_ficu.sql` aplicada en prod con 13
-columnas nuevas en `erp.personas`. Próximo: seguir fase por fase
-(Fase 2 → Fase 17) con la venta de prueba.)
+**Última actualización:** 2026-06-05 (Workflow unidad ↔ portafolio:
+columna `modalidad` en `dilesa.activos` + RPCs `fn_liberar_unidad_portafolio`
+/ `fn_regresar_unidad_proyecto` + UI bidireccional "Liberar/Regresar" en
+la tabla de unidades de `<ProyectoDetalle>`. Backfill de 8 activos
+(2 casas LDV + 6 lotes comerciales) aplicado a prod; LDV → completado.
+Mecanismo reutilizable preview-first en PR. Sprint 7c-2 KYC FICU
+previo sigue vigente como base del flujo de ventas.)
 
 ## Problema
 
@@ -716,3 +714,39 @@ lotificación (agosto 2023, vigente).
   - **Próximo**: seguir fase por fase (Fase 2 → Fase 17) con la venta
     de prueba. Fase 3 (Formalizada / Promesa de Compraventa) ya está
     cubierta por Sprint 7c-1.
+- **2026-06-05 — Workflow unidad ↔ portafolio (liberar/regresar).** Al
+  cerrar los fraccionamientos terminados (iniciativa hermana
+  `dilesa-proyectos-paridad-coda`), Beto pidió materializar el traspaso
+  de unidades/lotes sobrantes al portafolio de activos: "una vivienda
+  puede ser rentada o vendida igual que los terrenos comerciales". El
+  campo `dilesa.unidades.activo_id` existía cableado pero el workflow
+  nunca se había construido. Entregado:
+  - **Backfill puntual** (migración `20260605181000`, aplicada a prod
+    con OK explícito de Beto — toca `valor_estimado`): columna
+    `modalidad` nueva en `dilesa.activos` (`renta`/`venta`/`uso_propio`/
+    `renta_venta`/`sin_definir`, ortogonal al `estado` de ciclo de vida)
+    - **8 activos** liberados desde Lomas del Valle / Loma Verde 2: 2
+      casas (Gardenia en renta, Magnolias como oficina/uso_propio) +
+      6 lotes comerciales (venta, ~$37.5M agregado), cada uno con su
+      satélite (`activo_casa`/`activo_lote`) y `unidades.activo_id` ligado.
+      LDV → `completado`. Detour: el primer intento abortó por
+      `activo_lote.condicion` (solo acepta esquina/intermedio/cabecera, no
+      "urbanizado") — rollback limpio, se dejó `condicion` NULL y reaplicó.
+  - **Mecanismo reutilizable** (migración `20260605182000` + código, este
+    PR, preview-first por ser UI visible): RPCs atómicas
+    `dilesa.fn_liberar_unidad_portafolio` (crea activo + satélite + liga
+    `activo_id`) y `dilesa.fn_regresar_unidad_proyecto` (desliga + soft-
+    borra el activo, vuelve a ventas). Server actions
+    `liberarUnidadAlPortafolio` / `regresarUnidadAlProyecto`. UI en
+    `<ProyectoDetalle>`: columna "Portafolio" en la tabla de unidades con
+    botón **Liberar →** (diálogo: tipo de activo + destino + valor, gated
+    a admin/Dirección DILESA) y **Regresar** (confirm), badge "En
+    portafolio". Las unidades liberadas salen del avance de vivienda
+    (`activo_id IS NOT NULL`) y del checkbox de muestra. Catálogos +
+    helpers en `lib/dilesa/portafolio.ts` (+ 7 tests). Reemplaza
+    conceptualmente el uso del flag "demo" para sacar piezas terminadas
+    del canal de ventas, dándoles destino real en el portafolio.
+  - **Próximo**: que Beto valide el flujo liberar/regresar en preview;
+    UI de detalle de activo (captura de campos del satélite). El
+    optimistic del badge no re-fetchea avances — se actualizan al
+    recargar (aceptable v1).

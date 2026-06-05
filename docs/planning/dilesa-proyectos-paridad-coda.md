@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-26
-**Última actualización:** 2026-05-27 (Sprint B + Sprint C aplicados. Migración `20260527190000` en prod con 6 columnas ALTER + flag `es_muestra` en unidades + 9 derivaciones nuevas en `v_proyecto_avances`. UI: 6 inputs editables en sección "Documentos y configuración" + sección "Avances" ampliada a 16 stats + columna "Muestra" en tabla de unidades con toggle inline. Importer Coda mapea los 6 campos nuevos.)
+**Última actualización:** 2026-06-05 (Sprint D — avance sobre vivienda. Migración `20260605183000` en prod: `v_proyecto_avances` mide construcción/ventas y `estado_sugerido` solo sobre VIVIENDA ACTIVA (excluye comercial/donación municipal/equipamiento + unidades liberadas al portafolio). PDV escriturado a socios. LV/LV2/PDV → completado; LDV → completado tras liberar sus 2 casas al portafolio en la iniciativa hermana `dilesa-portafolio-activos`.)
 
 ## Problema
 
@@ -281,6 +281,29 @@ proyecto. Todos columna escalar; idempotente con
 
 ## Bitácora
 
+- **2026-06-05 (Sprint D — avance sobre vivienda)** — Beto reportó que
+  los fraccionamientos terminados (LV, LV2, LDV, PDV) seguían
+  apareciendo "en construcción/ejecución" al ~98%. Diagnóstico: la regla
+  estricta del 2026-05-26 (`construidas = total AND vendidas = total`)
+  contaba en el denominador áreas verdes de **donación municipal**
+  (se donan, nunca se venden), equipamiento y **lotes comerciales** —
+  por eso ningún fraccionamiento terminado podía llegar a 100%. La
+  vivienda real sí estaba 100% construida y vendida. Migración
+  `20260605183000` aplicada a prod (psql, no `db push` por drift de
+  historial multi-sesión preexistente): `v_proyecto_avances` recalcula
+  `avance_const_pct` / `avance_vts_pct` / `parque_disponible` /
+  `estado_sugerido` sobre **vivienda activa** = unidades cuyo `tipo_lote`
+  no es comercial/donación municipal/área verde/equipamiento Y con
+  `activo_id IS NULL` (no liberadas al portafolio). Predicado por POSIX
+  regex sobre `lower(tipo_lote)` para tolerar la nomenclatura sucia de
+  Coda. Resto de columnas idénticas. + `UPDATE` PDV (15 lotes
+  `lote_urbanizado` → `escriturada`: ya escriturados a los socios) +
+  `UPDATE` LV/LV2/PDV → `completado`. Verificado en prod: los 4 quedan
+  100/100 y coherentes (LDV cierra en la iniciativa hermana al liberar
+  sus 2 casas). Impacto en los otros 4 desarrollos en ejecución validado
+  sin saltos sorpresa (ALDE/LDLD 0/0, LDLE 92/53, LDS 89/66). UI sin
+  cambios (mismas columnas de la vista, distinto cálculo).
+
 - **2026-05-27 (Sprint C aplicado)** — Beto aprobó el alcance del
   spike + agregó "Casa muestra/demo" como flag boolean en `dilesa.unidades`
   (no derivable, captura manual). Migración `20260527190000` aplicada
@@ -356,6 +379,20 @@ proyecto. Todos columna escalar; idempotente con
   la pide se abre iniciativa nueva. Iniciativa cierra en `done`.
 
 ## Decisiones registradas
+
+- **2026-06-05 — El avance y el "completado" se miden solo sobre
+  VIVIENDA**. La regla estricta del 2026-05-26 era correcta para
+  vivienda pero se aplicaba sobre el total de unidades. Refinamiento de
+  Beto: las **donaciones municipales** (áreas verdes) y el
+  **equipamiento** nunca se venden ni construyen → fuera del
+  denominador siempre; los **lotes comerciales** son terreno vendible,
+  no vivienda → también fuera ("pasan al portafolio de terrenos"). Un
+  desarrollo pasa a `completado` cuando su vivienda está 100%
+  construida y 100% vendida, sin importar comerciales/donaciones
+  pendientes. Las unidades liberadas al portafolio (`activo_id` no
+  nulo) tampoco cuentan. No contradice la decisión del 2026-05-26 —
+  la precisa (antes la conversación era sobre "1 vivienda sin vender";
+  hoy se aclaró que lo pendiente no es vivienda).
 
 - **2026-05-27 — Casa muestra como flag boolean**. Beto: "normalmente
   en los fraccionamientos armamos casas para demostración y cuando
