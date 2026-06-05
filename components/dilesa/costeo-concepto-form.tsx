@@ -1,36 +1,41 @@
 'use client';
 
 /**
- * CosteoConceptoForm — alta/edición de un concepto de presupuesto de obra
+ * CosteoConceptoForm — alta/edición de una partida de presupuesto de obra
  * (`erp.presupuesto_partidas`, modelo canónico — ADR-040; migrado desde
  * `dilesa.obra_presupuesto` en Sprint 1 de dilesa-compras).
  *
- * Iniciativa dilesa-contratos-obra · Sprint 5 (captura de presupuesto). El
- * traspaso de los Excel (hoja RESUMEN) cargó 128 conceptos de solo-lectura;
- * este form deja operar el presupuesto hacia adelante: capturar conceptos
- * nuevos y corregir/editar los existentes desde el tab Costeo.
+ * Iniciativa dilesa-contratos-obra · Sprint 5 (captura), rediseñado en
+ * dilesa-compras (Sprint 1 fase 2b). El traspaso de los Excel (hoja RESUMEN)
+ * cargó 128 partidas; este form deja operar el presupuesto hacia adelante:
+ * capturar partidas nuevas y corregir/editar las existentes desde el tab Costeo.
  *
- * Calca el form inline de `obra-contrato-detalle.tsx` (captura sin drawer,
- * `useState` plano). Insert/update directo con RLS de `dilesa`; el sub-slug
- * `dilesa.construccion.costeo` ya tiene write → sin migración.
+ * Dos dropdowns clave del rediseño:
+ *   - **Concepto del catálogo** (`concepto_id`): clasifica la partida en el
+ *     catálogo jerárquico (etapa›capítulo, optgroups) — sin esto la partida cae
+ *     en "Sin clasificar". El texto libre del concepto se conserva como etiqueta.
+ *   - **Proveedor** (`proveedor_persona_id`): de `erp.proveedores`. Default "Por
+ *     definir". La opción "Otro (texto libre)" preserva el `proveedor_texto`
+ *     legacy del traspaso para no perder datos al migrar al modelo estructurado.
  *
  * Notas de modelado:
  * - `orden` se autocalcula (max del proyecto + 1) en alta y se preserva en
  *   edición — no se expone en el form (reordenar es otra feature).
  * - IVA: v1 captura `gasto_real_total` c/IVA; el desglose subtotal/iva/tasa
- *   queda null (igual que el traspaso donde el Excel no lo especifica, ver
- *   ADR-038). El % de ejecución usa el total.
+ *   queda null (igual que el traspaso, ADR-038). El % de ejecución usa el total.
  */
 
 import { useState } from 'react';
-import { Loader2, Plus, Save } from 'lucide-react';
+import { Loader2, Plus, Save, Trash2 } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { proyectoOptionLabel, type ProyectoOption } from '@/lib/dilesa/proyectos-selector';
-import type { CosteoRow } from '@/components/dilesa/costeo-module';
+import type { CatalogoOptgroup } from '@/lib/dilesa/conceptos-catalogo';
+import type { CosteoRow, ProveedorOption } from '@/components/dilesa/costeo-module';
 
 /** "" o no-numérico → null; en otro caso el número. */
 function toNum(s: string): number | null {
@@ -40,28 +45,42 @@ function toNum(s: string): number | null {
   return Number.isNaN(n) ? null : n;
 }
 
+/** Valor centinela del select de proveedor para capturar texto libre. */
+const PROV_OTRO = '__otro__';
+
 export function CosteoConceptoForm({
   empresaId,
   proyectos,
+  optgroups,
+  proveedores,
   rows,
   editRow,
   onClose,
   onSaved,
+  onDelete,
 }: {
   empresaId: string;
   proyectos: readonly ProyectoOption[];
-  /** Conceptos visibles — fuente del autocálculo de `orden` en alta. */
+  /** Optgroups del catálogo (etapa›capítulo) para el selector de clasificación. */
+  optgroups: readonly CatalogoOptgroup[];
+  /** Proveedores activos (persona_id + nombre) para el dropdown. */
+  proveedores: readonly ProveedorOption[];
+  /** Partidas visibles — fuente del autocálculo de `orden` en alta. */
   rows: readonly CosteoRow[];
   /** null = alta; row = edición (form pre-llenado). */
   editRow: CosteoRow | null;
   onClose: () => void;
   onSaved: () => void;
+  /** Borra la partida (solo en edición). Soft-delete + cierra el form. */
+  onDelete?: () => void | Promise<void>;
 }) {
   const toast = useToast();
   const isEdit = editRow != null;
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const [proyectoId, setProyectoId] = useState(editRow?.proyecto_id ?? '');
   const [concepto, setConcepto] = useState(editRow?.concepto ?? '');
+  const [conceptoId, setConceptoId] = useState(editRow?.conceptoId ?? '');
   const [etapa, setEtapa] = useState(editRow?.etapa ?? '');
   const [presupuestoPrevio, setPresupuestoPrevio] = useState(
     editRow?.presupuestoPrevio != null ? String(editRow.presupuestoPrevio) : ''
@@ -72,24 +91,50 @@ export function CosteoConceptoForm({
   const [gastoReal, setGastoReal] = useState(
     editRow?.gastoReal != null ? String(editRow.gastoReal) : ''
   );
-  const [proveedor, setProveedor] = useState(editRow?.proveedor ?? '');
+  // Proveedor: si la partida ya tiene persona_id → ese; si solo tiene texto
+  // legacy → modo "Otro"; si no → "Por definir" (default).
+  const [proveedorSel, setProveedorSel] = useState(
+    editRow?.proveedorPersonaId ? editRow.proveedorPersonaId : editRow?.proveedor ? PROV_OTRO : ''
+  );
+  const [proveedorTexto, setProveedorTexto] = useState(editRow?.proveedor ?? '');
   const [fecha, setFecha] = useState(editRow?.fechaCompromiso ?? '');
   const [submitting, setSubmitting] = useState(false);
 
   const canSubmit = proyectoId !== '' && concepto.trim().length > 0;
+
+  // Al elegir un concepto del catálogo, prellena el texto libre si está vacío
+  // (atajo para captura; en edición no pisa el texto existente).
+  function onPickConcepto(id: string) {
+    setConceptoId(id);
+    if (id && concepto.trim() === '') {
+      for (const g of optgroups) {
+        const c = g.conceptos.find((x) => x.id === id);
+        if (c) {
+          setConcepto(c.nombre);
+          break;
+        }
+      }
+    }
+  }
 
   async function onSubmit() {
     if (!canSubmit || submitting) return;
     setSubmitting(true);
     const sb = createSupabaseBrowserClient();
 
+    // Proveedor: dropdown estructurado vs texto libre (mutuamente excluyentes).
+    const proveedorPersonaId = proveedorSel && proveedorSel !== PROV_OTRO ? proveedorSel : null;
+    const proveedorTextoFinal = proveedorSel === PROV_OTRO ? proveedorTexto.trim() || null : null;
+
     const payload = {
       etapa: etapa.trim() || null,
       concepto_texto: concepto.trim(),
+      concepto_id: conceptoId || null,
       presupuesto_previo: toNum(presupuestoPrevio),
       presupuesto_aprobado: toNum(presupuestoActual),
       gasto_real_total: toNum(gastoReal),
-      proveedor_texto: proveedor.trim() || null,
+      proveedor_persona_id: proveedorPersonaId,
+      proveedor_texto: proveedorTextoFinal,
       fecha_compromiso: fecha || null,
     };
 
@@ -116,14 +161,14 @@ export function CosteoConceptoForm({
     if (resp.error) {
       toast.add({
         title: isEdit ? 'Error al guardar' : 'Error al registrar',
-        description: getSupabaseErrorMessage(resp.error, 'No se pudo guardar el concepto.'),
+        description: getSupabaseErrorMessage(resp.error, 'No se pudo guardar la partida.'),
         type: 'error',
       });
       setSubmitting(false);
       return;
     }
     toast.add({
-      title: isEdit ? 'Concepto actualizado' : 'Concepto registrado',
+      title: isEdit ? 'Partida actualizada' : 'Partida registrada',
       description: concepto.trim(),
       type: 'success',
     });
@@ -134,7 +179,7 @@ export function CosteoConceptoForm({
   return (
     <div className="rounded-md border border-[var(--border)] bg-[var(--card)] p-4">
       <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
-        {isEdit ? 'Editar concepto' : 'Nuevo concepto de presupuesto'}
+        {isEdit ? 'Editar partida' : 'Nueva partida de presupuesto'}
       </h2>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Field label="Proyecto *">
@@ -151,20 +196,64 @@ export function CosteoConceptoForm({
             ))}
           </select>
         </Field>
-        <Field label="Concepto *">
+        <Field label="Clasificación (catálogo)">
+          <select
+            value={conceptoId}
+            onChange={(e) => onPickConcepto(e.target.value)}
+            className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
+          >
+            <option value="">Sin clasificar</option>
+            {optgroups.map((g) => (
+              <optgroup key={g.capituloCodigo} label={g.label}>
+                {g.conceptos.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </Field>
+        <Field label="Concepto (etiqueta) *">
           <Input
             value={concepto}
             onChange={(e) => setConcepto(e.target.value)}
             placeholder="Red de agua potable, Barda perimetral…"
           />
         </Field>
-        <Field label="Etapa">
+        <Field label="Etapa (texto)">
           <Input
             value={etapa}
             onChange={(e) => setEtapa(e.target.value)}
             placeholder="Urbanización, Cabecera…"
           />
         </Field>
+        <Field label="Proveedor">
+          <select
+            value={proveedorSel}
+            onChange={(e) => setProveedorSel(e.target.value)}
+            className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
+          >
+            <option value="">Por definir</option>
+            {proveedores.map((p) => (
+              <option key={p.personaId} value={p.personaId}>
+                {p.label}
+              </option>
+            ))}
+            <option value={PROV_OTRO}>Otro (texto libre)…</option>
+          </select>
+        </Field>
+        {proveedorSel === PROV_OTRO ? (
+          <Field label="Proveedor (texto libre)">
+            <Input
+              value={proveedorTexto}
+              onChange={(e) => setProveedorTexto(e.target.value)}
+              placeholder="Nombre del proveedor no catalogado"
+            />
+          </Field>
+        ) : (
+          <div className="hidden sm:block" />
+        )}
         <Field label="Presupuesto previo (c/IVA)">
           <Input
             type="number"
@@ -192,36 +281,56 @@ export function CosteoConceptoForm({
             placeholder="0.00"
           />
         </Field>
-        <Field label="Proveedor">
-          <Input
-            value={proveedor}
-            onChange={(e) => setProveedor(e.target.value)}
-            placeholder="Electrogaza, CFE, DILESA (obra propia)…"
-          />
-        </Field>
         <Field label="Fecha compromiso">
           <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
         </Field>
       </div>
       <p className="mt-2 text-[11px] text-[var(--text)]/50">
-        El % de ejecución se calcula como gasto real ÷ presupuesto actualizado (o previo si no hay
-        actualizado). Montos con IVA incluido.
+        La clasificación agrupa y ordena la partida por el catálogo de conceptos. El % de ejecución
+        se calcula como gasto real ÷ presupuesto actualizado (o previo si no hay actualizado).
+        Montos con IVA incluido.
       </p>
-      <div className="mt-3 flex items-center justify-end gap-2">
-        <Button variant="outline" onClick={onClose} disabled={submitting}>
-          Cancelar
-        </Button>
-        <Button onClick={onSubmit} disabled={!canSubmit || submitting}>
-          {submitting ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : isEdit ? (
-            <Save className="size-4" />
-          ) : (
-            <Plus className="size-4" />
-          )}
-          {isEdit ? 'Guardar' : 'Registrar'}
-        </Button>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <div>
+          {isEdit && onDelete ? (
+            <Button
+              variant="ghost"
+              onClick={() => setConfirmDelete(true)}
+              disabled={submitting}
+              className="text-red-600 hover:bg-red-50 hover:text-red-700"
+            >
+              <Trash2 className="size-4" />
+              Eliminar
+            </Button>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={onClose} disabled={submitting}>
+            Cancelar
+          </Button>
+          <Button onClick={onSubmit} disabled={!canSubmit || submitting}>
+            {submitting ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : isEdit ? (
+              <Save className="size-4" />
+            ) : (
+              <Plus className="size-4" />
+            )}
+            {isEdit ? 'Guardar' : 'Registrar'}
+          </Button>
+        </div>
       </div>
+
+      {isEdit && onDelete ? (
+        <ConfirmDialog
+          open={confirmDelete}
+          onOpenChange={setConfirmDelete}
+          onConfirm={onDelete}
+          title={`¿Eliminar “${editRow?.concepto ?? 'partida'}”?`}
+          description="Marcará la partida de presupuesto como eliminada. Se preserva el historial para auditoría."
+          confirmLabel="Eliminar"
+        />
+      ) : null}
     </div>
   );
 }

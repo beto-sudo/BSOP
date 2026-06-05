@@ -10,9 +10,10 @@ import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
  * @responsive desktop-only
  *
  * Tab "Costeo" del hub Construcción (iniciativa dilesa-contratos-obra,
- * Sprint 3). Vista de CapEx del desarrollo: presupuesto vs gasto real por
- * concepto/etapa (Capa A, `obra_presupuesto`) + contratado/saldo de los
- * contratos de obra (Capa B). Ver ADR-038.
+ * Sprint 3; rediseñado en dilesa-compras). Vista de CapEx del desarrollo:
+ * presupuesto vs gasto real por concepto/etapa (Capa A,
+ * `erp.presupuesto_partidas` — ADR-040) + contratado/saldo de los contratos de
+ * obra (Capa B). Ver ADR-038.
  *
  * Gate: sub-slug `dilesa.construccion.costeo` (ADR-030 SS5).
  */

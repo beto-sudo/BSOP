@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-06-04
-**Última actualización:** 2026-06-04 (Sprint 0 aplicado a prod: ADR-040 + `erp.conceptos_compra` con 3 etapas / 18 capítulos / 71 conceptos, seed normalizado de `dilesa.obra_presupuesto`. Estado → `in_progress`. Próximo: Sprint 1 — cerrar D9 (unificación de presupuesto en `erp`) + binding `partida_id` + vista `v_partida_control`.)
+**Última actualización:** 2026-06-04 (Sprint 1 fase 2b: rediseño UX de Costeo — tabla agrupada colapsable etapa › capítulo, orden por catálogo canónico, un-proyecto-a-la-vez, dropdowns de clasificación/proveedor en el form, eliminar visible. Helper `lib/dilesa/conceptos-catalogo.ts` + `groupCosteo` con 17 tests. 5 checks verdes. PR a preview sin auto-merge. Retiro de `dilesa.obra_presupuesto` pendiente del OK de Beto.)
 
 ## Problema
 
@@ -253,3 +253,38 @@ pago: rol **Dirección** (ya vigente en CxP).
   preview sin auto-merge** para validar que las 128 partidas se ven/editan bien
   antes de mergear. **Fase 2b (sigue):** retirar `dilesa.obra_presupuesto` tras
   validar en prod.
+- **2026-06-04** — **Sprint 1 fase 2b: rediseño UX de Costeo.** Plan cerrado con
+  Beto y ejecutado como PR dedicado. 5 mejoras: (1) **tabla agrupada colapsable
+  en 2 niveles etapa › capítulo** con subtotal por grupo (reemplaza el
+  `<DataTable>` plano); (2) **orden por el catálogo canónico** `erp.conceptos_compra`
+  (etapa→capítulo→concepto vía `codigo`), partidas sin `concepto_id` en grupo
+  **"Sin clasificar" al final**; (3) **un proyecto a la vez** — auto-selecciona
+  el primer proyecto al entrar; selector lista cada proyecto + "Todos" + "Sin
+  proyecto asignado"; (4) **form + 2 dropdowns**: clasificación al catálogo
+  (`<optgroup>` etapa›capítulo → `concepto_id`, prellena la etiqueta) +
+  proveedor de `erp.proveedores` (→ `proveedor_persona_id`, default "Por
+  definir", opción "Otro (texto libre)" que **preserva el `proveedor_texto`
+  legacy** sin pérdida); (5) **edición por click en la fila** + botón **Eliminar
+  dentro del cuadro de edición** (sin íconos en la orilla — ajuste pedido por
+  Beto al revisar el preview). Nuevo helper puro
+  `lib/dilesa/conceptos-catalogo.ts` (`buildCatalogoConceptos`: árbol +
+  optgroups) y `groupCosteo` exportado, ambos con test unitario (17 tests
+  nuevos). Estado: **129 partidas, 47 clasificadas** (82 a reclasificar con el
+  dropdown nuevo), **0 con proveedor estructurado** (217 proveedores activos
+  disponibles). 5 checks verdes (typecheck, **1257 tests**, lint 0-err, format).
+  PR **UI-touching → preview sin auto-merge**. **Retiro de `dilesa.obra_presupuesto`
+  pendiente del OK de Beto** (paridad verificada 128 legacy ↔ 129 canónico; cero
+  referencias runtime en código, solo JSDoc viejo + script de import histórico +
+  `types` generados).
+- **2026-06-04** — **Clasificación masiva de partidas (backfill de `concepto_id`).**
+  Beto pidió clasificar todo lo pendiente. Match `partida → concepto` por
+  similitud de nombre (la mayoría casi idéntico) + etapa como tiebreaker para
+  vialidades vs plataformas; 9 decisiones difíciles confirmadas con Beto (trío de
+  lotificación → `1.04.05`; "1era etapa" sin marcador → plataformas etapa 3; "Maq
+  2da/3era" → `2.01.10`; UID agua-drenaje-cordones → `2.04.02`). Aplicado vía MCP
+  en transacción con guarda `concepto_id IS NULL` (no pisa lo ya clasificado) +
+  el FK valida cada concepto (typo = rollback, no escritura mala). Fila de prueba
+  "Prueba" ($215k sin gasto) soft-deleted. **Resultado: 128/128 partidas vivas
+  clasificadas, 0 sin clasificar.** La tabla agrupada del rediseño ya muestra
+  todo bajo su etapa › capítulo correcto (cero "Sin clasificar"). Reversible vía
+  el dropdown del form.
