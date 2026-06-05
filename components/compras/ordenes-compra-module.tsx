@@ -33,7 +33,7 @@ import {
   type ProyectoOption,
   type ProyectoSelectorRow,
 } from '@/lib/dilesa/proyectos-selector';
-import { buildCatalogoConceptos, type ConceptoResuelto } from '@/lib/dilesa/conceptos-catalogo';
+import { buildPartidaIndex, type PartidaGrupo } from '@/lib/compras/partidas';
 import {
   deriveOcKpis,
   ocTotal,
@@ -61,10 +61,6 @@ const ESTADO_LABEL: Record<OcEstado, string> = {
 
 /** Opción de proveedor para el dropdown (OC.proveedor_id → erp.proveedores). */
 type ProveedorOption = { id: string; label: string };
-/** Partida agrupable para el selector de líneas. */
-type PartidaOption = { id: string; proyectoId: string; label: string; capituloKey: string };
-/** Optgroup de partidas por etapa › capítulo. */
-type PartidaGrupo = { key: string; label: string; partidas: PartidaOption[] };
 
 type FetchResult = {
   rows?: OcRow[];
@@ -194,44 +190,17 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
       .sort((a, b) => a.label.localeCompare(b.label));
     const proveedorLabel = new Map(proveedores.map((p) => [p.id, p.label]));
 
-    // Catálogo → resolver etapa›capítulo de cada partida para el selector.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const catalogo = buildCatalogoConceptos((catalogoRes.data ?? []) as any[]);
-    type PartidaRaw = {
-      id: string;
-      proyecto_id: string | null;
-      concepto_id: string | null;
-      concepto_texto: string | null;
-    };
-    const partidaLabel = new Map<string, string>();
-    const gruposByProyecto = new Map<string, Map<string, PartidaGrupo>>();
-    for (const p of (partidasRes.data ?? []) as PartidaRaw[]) {
-      if (!p.proyecto_id) continue;
-      const label = p.concepto_texto ?? '(sin concepto)';
-      partidaLabel.set(p.id, label);
-      const res: ConceptoResuelto | undefined = p.concepto_id
-        ? catalogo.byConcepto.get(p.concepto_id)
-        : undefined;
-      const capKey = res ? res.capituloCodigo : SIN;
-      const grupoLabel = res ? `${res.etapaNombre} › ${res.capituloNombre}` : 'Sin clasificar';
-      let grupos = gruposByProyecto.get(p.proyecto_id);
-      if (!grupos) {
-        grupos = new Map();
-        gruposByProyecto.set(p.proyecto_id, grupos);
-      }
-      let g = grupos.get(capKey);
-      if (!g) {
-        g = { key: capKey, label: grupoLabel, partidas: [] };
-        grupos.set(capKey, g);
-      }
-      g.partidas.push({ id: p.id, proyectoId: p.proyecto_id, label, capituloKey: capKey });
-    }
-    const partidasByProyecto = new Map<string, PartidaGrupo[]>();
-    for (const [pid, grupos] of gruposByProyecto) {
-      const arr = [...grupos.values()].sort((a, b) => a.key.localeCompare(b.key));
-      for (const g of arr) g.partidas.sort((a, b) => a.label.localeCompare(b.label));
-      partidasByProyecto.set(pid, arr);
-    }
+    // Índice de partidas compartido: label, proyecto y optgroups etapa›capítulo (D4).
+    const {
+      partidaLabel,
+      partidaProyecto,
+      gruposByProyecto: partidasByProyecto,
+    } = buildPartidaIndex(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (partidasRes.data ?? []) as any[],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (catalogoRes.data ?? []) as any[]
+    );
 
     type OcRaw = {
       id: string;
@@ -252,11 +221,7 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
         precio_real: number | null;
       }> | null;
     };
-    // OC → proyecto se infiere de la partida de su primera línea.
-    const partidaProyecto = new Map<string, string>();
-    for (const p of (partidasRes.data ?? []) as PartidaRaw[]) {
-      if (p.proyecto_id) partidaProyecto.set(p.id, p.proyecto_id);
-    }
+    // OC → proyecto se infiere de la partida de su primera línea (partidaProyecto del índice).
     const out: OcRow[] = ((ocRes.data ?? []) as OcRaw[]).map((o) => {
       const lineas: OcLinea[] = (o.ordenes_compra_detalle ?? []).map((d) => ({
         id: d.id,
@@ -331,13 +296,19 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
     };
   }, [fetchData, apply]);
 
+  // Solo proyectos con presupuesto cargado (partidas) o que ya tienen órdenes.
+  // Los fraccionamientos sin partidas (vacíos o cerrados) no estorban el selector.
   const proyectosPresentes = useMemo(() => {
+    const conPresupuesto = new Set(partidasByProyecto.keys());
+    const enRows = new Set(rows.map((r) => r.proyectoId).filter(Boolean) as string[]);
     const m = new Map<string, string>();
-    for (const p of proyectos) m.set(p.id, p.nombre);
+    for (const p of proyectos) {
+      if (conPresupuesto.has(p.id) || enRows.has(p.id)) m.set(p.id, p.nombre);
+    }
     return [...m.entries()]
       .map(([id, nombre]) => ({ id, nombre }))
       .sort((a, b) => a.nombre.localeCompare(b.nombre));
-  }, [proyectos]);
+  }, [proyectos, partidasByProyecto, rows]);
 
   const q = search.trim().toLowerCase();
   const filtrados = useMemo(() => {
