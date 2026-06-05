@@ -423,7 +423,7 @@ function buildUnidadColumns(
         if (puedeMover && puedeLiberarse(u.estado)) {
           return (
             <Button variant="outline" size="sm" disabled={pending} onClick={() => onLiberar(u)}>
-              Liberar →
+              Traspasar →
             </Button>
           );
         }

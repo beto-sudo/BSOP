@@ -88,7 +88,7 @@ export function LiberarPortafolioDialog({
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Liberar al portafolio</DialogTitle>
+          <DialogTitle>Traspasar al portafolio</DialogTitle>
           <DialogDescription>
             {unidad.identificador} saldrá del inventario de ventas del fraccionamiento y se
             registrará como activo del portafolio de DILESA.
@@ -140,7 +140,7 @@ export function LiberarPortafolioDialog({
             Cancelar
           </Button>
           <Button onClick={handleConfirmar} disabled={busy}>
-            {busy ? 'Liberando…' : 'Liberar al portafolio'}
+            {busy ? 'Traspasando…' : 'Traspasar al portafolio'}
           </Button>
         </DialogFooter>
       </DialogContent>

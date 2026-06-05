@@ -277,7 +277,7 @@ export function UnidadDetailDrawer({
         actions={
           isAdmin && u && !u.activo_id && puedeLiberarse(u.estado) ? (
             <Button size="sm" variant="outline" onClick={() => setLiberarOpen(true)}>
-              Liberar al portafolio →
+              Traspasar al portafolio →
             </Button>
           ) : null
         }
@@ -351,7 +351,7 @@ export function UnidadDetailDrawer({
                     }
                   />
                   <p className="pt-1 text-xs text-[var(--text)]/50">
-                    Esta unidad fue liberada al portafolio: no aparece en el inventario de ventas.
+                    Esta unidad fue traspasada al portafolio: no aparece en el inventario de ventas.
                   </p>
                 </DetailDrawerSection>
               ) : null}

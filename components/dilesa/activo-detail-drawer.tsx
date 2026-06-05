@@ -350,7 +350,7 @@ export function ActivoDetailDrawer({
                   <Field label="Unidad" value={origen.identificador} />
                   <Field label="Proyecto" value={origen.proyectoNombre} />
                   <p className="pt-1 text-xs text-[var(--text)]/50">
-                    Este activo se liberó al portafolio desde una unidad del fraccionamiento.
+                    Este activo se traspasó al portafolio desde una unidad del fraccionamiento.
                   </p>
                 </DetailDrawerSection>
               ) : null}
