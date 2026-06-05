@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-06-04
-**Última actualización:** 2026-06-04 (Sprint 1 fase 2b: rediseño UX de Costeo — tabla agrupada colapsable etapa › capítulo, orden por catálogo canónico, un-proyecto-a-la-vez, dropdowns de clasificación/proveedor en el form, eliminar visible. Helper `lib/dilesa/conceptos-catalogo.ts` + `groupCosteo` con 17 tests. 5 checks verdes. PR a preview sin auto-merge. Retiro de `dilesa.obra_presupuesto` pendiente del OK de Beto.)
+**Última actualización:** 2026-06-05 (Sprint 1 **cerrado** —PR #688 mergeado: rediseño Costeo + clasificación 128/128. **Sprint 2 planeado**: hub `/dilesa/compras` con tabs, modelo constructora-first; discovery hecho + 4 decisiones D10–D13. Plan de 4 fases [A hub+RBAC · B OC · C recepción · D requisiciones+componente compartido]; schema mínimo = INSERT sub-slugs + 1 RPC de recepción. Próximo: Fase A. Pendiente aparte: retiro de `dilesa.obra_presupuesto` con OK de Beto.)
 
 ## Problema
 
@@ -103,6 +103,27 @@ presupuesto, cuánto va comprometido vs ejercido vs pagado".
   limpio, migrando con cuidado lo que creó `dilesa-proyectos-anteproyectos`.
   **Alternativa:** puente polimórfico en `dilesa` (mantiene `erp` puro). Se
   decide en el ADR antes de tocar schema.
+- **D10 — UI = hub `/dilesa/compras` con tabs routed (ADR-030)**, NO 3 módulos
+  separados (cerrada 2026-06-05). Consistente con Ventas/Construcción. Sub-slugs:
+  umbrella `dilesa.compras` + `dilesa.compras.requisiciones` /
+  `dilesa.compras.ordenes` / `dilesa.compras.recepciones`. Proveedores se queda
+  como entry aparte en la sección Compras.
+- **D11 — Recepción ligera, sin documento formal** (cerrada 2026-06-05). Recibir
+  contra la partida = `UPDATE ordenes_compra_detalle.cantidad_recibida` (eso
+  alimenta `ejercido` en `v_partida_control`), SIN encabezado folio/fecha/firma y
+  SIN tocar inventario. Las tablas `erp.recepciones`/`recepciones_detalle` (hoy
+  vacías, no usadas por RDB) NO se adoptan en v1. Subir a documento formal queda
+  como salida futura si obra lo pide.
+- **D12 — Siempre hay partida** (cerrada 2026-06-05). Toda línea de
+  requisición/OC se ancla a una partida existente del presupuesto del proyecto;
+  si falta, se crea primero en Costeo. NO se agrega `concepto_id` a los detalles
+  (el concepto se alcanza vía `partida_id → presupuesto_partidas.concepto_id`).
+  El control de 3 capas siempre cuadra.
+- **D13 — RPC de recepción nueva, no branch en la de RDB** (cerrada 2026-06-05).
+  `oc_recibir_linea` mueve inventario de RDB en prod; en vez de meterle un branch
+  riesgoso, se crea `erp.oc_recibir_linea_partida` (mismos guards de
+  permiso/estado/cantidad, pero solo actualiza `cantidad_recibida` + recalcula
+  estado + audit; cero inventario). Aísla el riesgo a RDB.
 
 ## Alcance v1
 
@@ -287,4 +308,25 @@ pago: rol **Dirección** (ya vigente en CxP).
   "Prueba" ($215k sin gasto) soft-deleted. **Resultado: 128/128 partidas vivas
   clasificadas, 0 sin clasificar.** La tabla agrupada del rediseño ya muestra
   todo bajo su etapa › capítulo correcto (cero "Sin clasificar"). Reversible vía
-  el dropdown del form.
+  el dropdown del form. PR #688 mergeado (squash) el 2026-06-05; **Sprint 1
+  cerrado** (binding `partida_id` + `v_partida_control` + re-apunte + rediseño +
+  clasificación).
+- **2026-06-05** — **Sprint 2 planeado (discovery + 4 decisiones).** Discovery
+  read-only del fit constructora de la maquinaria `erp.*` (hecha restaurante-first
+  para RDB). Hallazgos: requisiciones/OC + RPCs `oc_cerrar_orden`/
+  `oc_cancelar_pendiente_linea`/`fn_oc_recalcular_estado` reusan limpio
+  (`producto_id` ya nullable, `partida_id` ya existe); **único bloqueo** =
+  `oc_recibir_linea` exige `producto_id` + escribe a `movimientos_inventario` con
+  almacén → necesita variante sin inventario. Mapa de `v_partida_control`:
+  `comprometido`=Σ línea OC×precio (estado enviada/parcial/cerrada), `ejercido`=Σ
+  `cantidad_recibida`×precio (sin filtro de estado — posible ajuste, ver F4 del
+  discovery), `pagado`=Σ aplicaciones vía `facturas.partida_id`. **Sorpresa
+  crítica:** `partida_id` existe pero el código (`generarOrdenCompra`,
+  `guardarRequisicion`) NO lo copia aún → `comprometido`/`ejercido` en $0 hasta
+  cablearlo end-to-end. Decisiones D10–D13 cerradas con Beto (hub con tabs,
+  recepción ligera, siempre-hay-partida, RPC nueva). Plan de 4 fases: A (hub +
+  RBAC migración sub-slugs), B (OC, mueve comprometido), C (recepción vía
+  `oc_recibir_linea_partida`, mueve ejercido), D (requisiciones + extraer
+  `components/compras/`). Schema total del sprint = INSERT sub-slugs (A) + 1 RPC
+  (C). Gates a respetar: rol Dirección (no `rol='admin'`), filtrado `empresa_id`
+  por query, scope un-proyecto-a-la-vez.

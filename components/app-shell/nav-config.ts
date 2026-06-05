@@ -72,7 +72,12 @@ export const NAV_ITEMS: NavItem[] = [
       },
       {
         label: 'Compras',
-        children: [{ label: 'Proveedores', href: '/dilesa/proveedores' }],
+        children: [
+          { label: 'Proveedores', href: '/dilesa/proveedores' },
+          // Hub P2P con tabs (Órdenes / Requisiciones / Recepciones) — ADR-030.
+          // Sidebar muestra solo el padre; la URL default cae al tab Órdenes.
+          { label: 'Órdenes de compra', href: '/dilesa/compras' },
+        ],
       },
       {
         label: 'Inmobiliario',

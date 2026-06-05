@@ -249,6 +249,13 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   // Vista de CapEx: presupuesto vs gasto real (obra_presupuesto) + saldo de
   // contratos de obra. Migración 20260602030000_modulos_dilesa_construccion_costeo.sql.
   'dilesa.construccion.costeo',
+  // Hub de Compras (P2P) — umbrella + 3 sub-slugs por tab (iniciativa
+  // dilesa-compras · Sprint 2, ADR-030). Modelo constructora-first.
+  // Migración 20260605040000_modulos_dilesa_compras.sql.
+  'dilesa.compras',
+  'dilesa.compras.ordenes',
+  'dilesa.compras.requisiciones',
+  'dilesa.compras.recepciones',
   // Sub-slugs por fase del pipeline (Sprint 7a captura por fase)
   'dilesa.ventas.fase01_solicitud',
   'dilesa.ventas.fase02_asignada',
