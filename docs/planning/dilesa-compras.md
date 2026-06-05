@@ -276,3 +276,15 @@ pago: rol **Dirección** (ya vigente en CxP).
   pendiente del OK de Beto** (paridad verificada 128 legacy ↔ 129 canónico; cero
   referencias runtime en código, solo JSDoc viejo + script de import histórico +
   `types` generados).
+- **2026-06-04** — **Clasificación masiva de partidas (backfill de `concepto_id`).**
+  Beto pidió clasificar todo lo pendiente. Match `partida → concepto` por
+  similitud de nombre (la mayoría casi idéntico) + etapa como tiebreaker para
+  vialidades vs plataformas; 9 decisiones difíciles confirmadas con Beto (trío de
+  lotificación → `1.04.05`; "1era etapa" sin marcador → plataformas etapa 3; "Maq
+  2da/3era" → `2.01.10`; UID agua-drenaje-cordones → `2.04.02`). Aplicado vía MCP
+  en transacción con guarda `concepto_id IS NULL` (no pisa lo ya clasificado) +
+  el FK valida cada concepto (typo = rollback, no escritura mala). Fila de prueba
+  "Prueba" ($215k sin gasto) soft-deleted. **Resultado: 128/128 partidas vivas
+  clasificadas, 0 sin clasificar.** La tabla agrupada del rediseño ya muestra
+  todo bajo su etapa › capítulo correcto (cero "Sin clasificar"). Reversible vía
+  el dropdown del form.
