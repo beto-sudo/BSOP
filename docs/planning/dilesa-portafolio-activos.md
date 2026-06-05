@@ -7,13 +7,14 @@ las tablas viejas), `core.empresas` (lectura)
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-08
-**Última actualización:** 2026-06-05 (Workflow unidad ↔ portafolio:
-columna `modalidad` en `dilesa.activos` + RPCs `fn_liberar_unidad_portafolio`
-/ `fn_regresar_unidad_proyecto` + UI bidireccional "Liberar/Regresar" en
-la tabla de unidades de `<ProyectoDetalle>`. Backfill de 8 activos
-(2 casas LDV + 6 lotes comerciales) aplicado a prod; LDV → completado.
-Mecanismo reutilizable preview-first en PR. Sprint 7c-2 KYC FICU
-previo sigue vigente como base del flujo de ventas.)
+**Última actualización:** 2026-06-05 (PR #700: fichas de detalle de unidad
+y activo con drill-down desde Inventario y Portafolio + botones de
+movimiento "Traspasar al portafolio" / "Regresar a ventas" SOLO admin
+(UI + enforcement en server action). Antes, PR #698: workflow unidad ↔
+portafolio — columna `modalidad` + RPCs `fn_liberar_unidad_portafolio` /
+`fn_regresar_unidad_proyecto` + 8 activos backfill (2 casas LDV + 6 lotes
+comerciales), LDV → completado. Sprint 7c-2 KYC FICU sigue vigente como
+base del flujo de ventas.)
 
 ## Problema
 
@@ -750,3 +751,34 @@ lotificación (agosto 2023, vigente).
     UI de detalle de activo (captura de campos del satélite). El
     optimistic del badge no re-fetchea avances — se actualizan al
     recargar (aceptable v1).
+- **2026-06-05 (PR #700 — fichas de detalle + movimientos en drawers)** —
+  Beto observó que ni el inventario de ventas ni el portafolio dejaban
+  abrir la información de una pieza. Entregado (preview-first, revisado y
+  mergeado por Beto):
+  - **`<UnidadDetailDrawer>`** (drill-down `onRowClick` en Inventario):
+    identificación / medidas / precio calculado (RPC `fn_calcular_precio_venta`)
+    / estado / portafolio / venta (cliente cross-schema + escrituración).
+    Autocontenido por `unidadId`.
+  - **`<ActivoDetailDrawer>`** (drill-down en Portafolio): master
+    `dilesa.activos` (incluye `modalidad`) + satélite por tipo
+    (`activo_<tipo>`, render genérico de campos poblados) + unidad/proyecto
+    de ORIGEN cuando el activo vino de un fraccionamiento.
+  - **Movimientos en los drawers, SOLO admin**: botón **Traspasar al
+    portafolio** (unidad) / **Regresar a ventas** (activo). El gate es
+    admin global en la UI **y** enforced en las server actions
+    (`getEffectiveUser → isAdmin`, no basta ocultar el botón; preview es
+    read-only por diseño). En `<ProyectoDetalle>` el movimiento se separó
+    de `puedeAutorizar` (admin O Dirección, que sigue gobernando el
+    checklist) a `puedeMover` (admin). El modal de traspaso se extrajo a
+    `<LiberarPortafolioDialog>` compartido (proyecto + drawer), eliminando
+    la duplicación.
+  - **Inventario** excluye unidades con `activo_id IS NOT NULL` (las ya
+    traspasadas salen del canal de ventas).
+  - **Texto**: el botón dice "Traspasar al portafolio" / "Traspasar →"
+    (no "Liberar"), por preferencia de Beto; los nombres internos de
+    función/RPC se mantuvieron (sin migración).
+  - Sin migraciones nuevas (Supabase Preview "skipping"); reusa las RPCs
+    `fn_liberar_unidad_portafolio` / `fn_regresar_unidad_proyecto`. 1293
+    tests verdes.
+  - **Próximo**: edición/captura de campos desde los drawers; navegación
+    unidad↔activo entre fichas; captura de campos del satélite.
