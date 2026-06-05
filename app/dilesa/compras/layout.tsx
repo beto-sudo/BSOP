@@ -34,6 +34,11 @@ const TABS = [
     module: 'dilesa.compras.requisiciones',
   },
   {
+    label: 'Cotizaciones',
+    href: '/dilesa/compras/cotizaciones',
+    module: 'dilesa.compras.cotizaciones',
+  },
+  {
     label: 'Recepciones',
     href: '/dilesa/compras/recepciones',
     module: 'dilesa.compras.recepciones',

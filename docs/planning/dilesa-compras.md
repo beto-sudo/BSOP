@@ -524,3 +524,21 @@ contratos activos por partida_id` (join filtrado por `empresa_id`, activo =
     waitry** `20260605180000*…`→`20260605184000\_…`para resolver la colisión en`main`.
 Próximo: Fase 2 = UI de captura (`components/compras/cotizaciones-module.tsx` + page +
     TAB + ROUTE_TO_MODULE).
+- **2026-06-05** — **Sprint Cotizaciones · Fase 2 (UI de captura).** Tab "Cotizaciones"
+  del hub `/dilesa/compras` (4° tab, entre Requisiciones y Recepciones). Liberación del
+  sub-slug (4 lugares completados: ROUTE_TO_MODULE + page + TAB; el slug en `core.modulos`
+  y EXPECTED_DB_MODULE_SLUGS entraron en Fase 1). `components/compras/cotizaciones-module.tsx`
+  (molde de `ordenes-compra-module.tsx`): lista + KPIs (`deriveCotizacionKpis`), **alta de
+  RFQ** (proyecto solo-con-presupuesto · tipo compra|obra · descripción · fecha límite ·
+  líneas ancladas a partida con selector agrupado etapa›capítulo vía `buildPartidaIndex` ·
+  invitar N proveedores de `erp.proveedores` por chips) → insert `cotizaciones` +
+  `cotizacion_lineas` + `cotizacion_proveedores` (estado `invitado`); y **captura de la
+  matriz** (sub-componente `CapturaPrecios`): tabla líneas×proveedores con un input de
+  precio por celda (resalta el mejor precio por renglón vía `mejorProveedorLinea`), total
+  por proveedor en vivo, + datos de respuesta (entrega/condiciones) → upsert
+  `cotizacion_proveedor_precios` (onConflict proveedor+línea) + update
+  `cotizacion_proveedores` (pasa a `respondida`, `monto_total` derivado de la matriz).
+  Client-side directo, un proyecto a la vez. 5 checks verdes (typecheck, 1305 tests, lint,
+  format, schema). **Sin migración → preview-first sin auto-merge** (Beto revisa el preview
+  visual). Próximo: Fase 3 = comparativa lado a lado + adjudicación → OC (`cotizacion_id` +
+  herencia de precios) o contrato de obra (`partida_id` + `cotizacion_id`).
