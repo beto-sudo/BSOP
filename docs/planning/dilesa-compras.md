@@ -242,3 +242,14 @@ pago: rol **Dirección** (ya vigente en CxP).
   Coexistencia inerte (compras sin UI). **Próximo (fase 2, antes de Sprint 2):**
   re-apuntar `costeo` a `erp.presupuesto_partidas` con preview + retirar
   `obra_presupuesto`.
+- **2026-06-04** — **Sprint 1 fase 2a: `costeo` re-apuntado.** `costeo-module`
+  (SELECT + mapeo + soft-delete) y `costeo-concepto-form` (alta/edición) ahora
+  leen y escriben `erp.presupuesto_partidas` (`concepto`→`concepto_texto`,
+  `presupuesto_actualizado`→`presupuesto_aprobado`; altas marcan
+  `fuente='obra_resumen'`). Cast `as any` + `eslint-disable` mientras la tabla
+  no esté en `types` (se difiere al workflow). Verificado: ventana de edición =
+  0 (las dos tablas idénticas, sin re-sync); cero queries activas a
+  `obra_presupuesto` en código; 5 checks verdes (1247 tests). PR **UI-touching →
+  preview sin auto-merge** para validar que las 128 partidas se ven/editan bien
+  antes de mergear. **Fase 2b (sigue):** retirar `dilesa.obra_presupuesto` tras
+  validar en prod.

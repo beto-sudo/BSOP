@@ -135,11 +135,14 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
 
     // Capa A (presupuesto) + proyectos + Capa B (contratos + estimaciones).
     const [presupuestoRes, proyectosRes, contratosRes, estimacionesRes] = await Promise.all([
-      sb
-        .schema('dilesa')
-        .from('obra_presupuesto')
+      // Capa A migrada al modelo canónico erp.presupuesto_partidas (ADR-040).
+      // Cast `as any`: la tabla aún no está en types (se difiere al workflow
+      // db-types). concepto→concepto_texto, presupuesto_actualizado→presupuesto_aprobado.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (sb.schema('erp') as any)
+        .from('presupuesto_partidas')
         .select(
-          'id, proyecto_id, etapa, concepto, presupuesto_actualizado, presupuesto_previo, gasto_real_total, proveedor_texto, fecha_compromiso, orden'
+          'id, proyecto_id, etapa, concepto_texto, presupuesto_aprobado, presupuesto_previo, gasto_real_total, proveedor_texto, fecha_compromiso, orden'
         )
         .eq('empresa_id', empresaId)
         .is('deleted_at', null),
@@ -197,12 +200,26 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
       agg.set(pid, cur);
     }
 
-    const out: CosteoRow[] = (presupuestoRes.data ?? [])
+    // El SELECT va por cast `as any` (presupuesto_partidas no está en types aún);
+    // tipamos la fila cruda aquí para conservar el chequeo en el mapeo.
+    type PartidaRaw = {
+      id: string;
+      proyecto_id: string | null;
+      etapa: string | null;
+      concepto_texto: string | null;
+      presupuesto_aprobado: number | null;
+      presupuesto_previo: number | null;
+      gasto_real_total: number | null;
+      proveedor_texto: string | null;
+      fecha_compromiso: string | null;
+      orden: number | null;
+    };
+    const out: CosteoRow[] = ((presupuestoRes.data ?? []) as PartidaRaw[])
       .filter((r) => r.proyecto_id != null)
       .map((r) => {
         const presupuesto =
-          r.presupuesto_actualizado != null
-            ? Number(r.presupuesto_actualizado)
+          r.presupuesto_aprobado != null
+            ? Number(r.presupuesto_aprobado)
             : r.presupuesto_previo != null
               ? Number(r.presupuesto_previo)
               : null;
@@ -213,10 +230,10 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
           proyecto_id: pid,
           proyectoNombre: proyectoMap.get(pid) ?? '',
           etapa: (r.etapa as string | null) ?? null,
-          concepto: (r.concepto as string) ?? '',
+          concepto: (r.concepto_texto as string) ?? '',
           presupuestoPrevio: r.presupuesto_previo != null ? Number(r.presupuesto_previo) : null,
           presupuestoActualizado:
-            r.presupuesto_actualizado != null ? Number(r.presupuesto_actualizado) : null,
+            r.presupuesto_aprobado != null ? Number(r.presupuesto_aprobado) : null,
           presupuesto,
           gastoReal,
           proveedor: (r.proveedor_texto as string | null) ?? null,
@@ -275,9 +292,9 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
   const eliminar = useCallback(
     async (row: CosteoRow) => {
       const sb = createSupabaseBrowserClient();
-      const { error: e } = await sb
-        .schema('dilesa')
-        .from('obra_presupuesto')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: e } = await (sb.schema('erp') as any)
+        .from('presupuesto_partidas')
         .update({ deleted_at: new Date().toISOString() })
         .eq('id', row.id);
       if (e) {
