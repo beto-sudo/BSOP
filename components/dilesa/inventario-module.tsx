@@ -34,6 +34,7 @@ import {
 import { Boxes, RefreshCw, Search, ArrowRight } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency } from '@/lib/format';
+import { UnidadDetailDrawer } from '@/components/dilesa/unidad-detail-drawer';
 
 type UnidadRow = {
   id: string;
@@ -169,6 +170,7 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
     ''
   );
   const [rangoIngreso, setRangoIngreso] = useState<DateRange>(EMPTY_DATE_RANGE);
+  const [detalleUnidadId, setDetalleUnidadId] = useState<string | null>(null);
 
   const fetchUnidades = useCallback(async (): Promise<{
     data?: UnidadListaRow[];
@@ -190,6 +192,8 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
       )
       .eq('empresa_id', empresaId)
       .is('deleted_at', null)
+      // Excluye las liberadas al portafolio: ya no son inventario de venta.
+      .is('activo_id', null)
       .in('estado', ['en_construccion', 'terminada']);
     if (uErr) return { error: getSupabaseErrorMessage(uErr, 'No se pudo cargar el inventario.') };
     const unidadesArr = (uns ?? []) as UnidadRow[];
@@ -574,11 +578,21 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
         loading={loading}
         error={error}
         onRetry={() => void cargar()}
+        onRowClick={(u) => setDetalleUnidadId(u.id)}
         initialSort={{ key: 'identificadorCompleto', dir: 'asc' }}
         emptyTitle="Sin inventario"
         emptyDescription="No hay unidades disponibles para los filtros actuales."
         emptyIcon={<Boxes className="h-6 w-6" />}
         maxHeight="calc(100vh - 280px)"
+      />
+
+      <UnidadDetailDrawer
+        unidadId={detalleUnidadId}
+        open={detalleUnidadId != null}
+        onOpenChange={(o) => {
+          if (!o) setDetalleUnidadId(null);
+        }}
+        onChanged={() => void cargar()}
       />
     </div>
   );
