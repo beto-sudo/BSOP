@@ -2307,6 +2307,7 @@ export type Database = {
           id: string
           iva_tasa: number | null
           notas: string | null
+          partida_id: string | null
           proyecto_id: string | null
           retencion_pct: number
           tipo: string
@@ -2328,6 +2329,7 @@ export type Database = {
           id?: string
           iva_tasa?: number | null
           notas?: string | null
+          partida_id?: string | null
           proyecto_id?: string | null
           retencion_pct?: number
           tipo?: string
@@ -2349,6 +2351,7 @@ export type Database = {
           id?: string
           iva_tasa?: number | null
           notas?: string | null
+          partida_id?: string | null
           proyecto_id?: string | null
           retencion_pct?: number
           tipo?: string
