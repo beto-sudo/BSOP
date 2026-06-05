@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-26
-**Última actualización:** 2026-06-05 (Sprint D — avance sobre vivienda. Migración `20260605180000` en prod: `v_proyecto_avances` mide construcción/ventas y `estado_sugerido` solo sobre VIVIENDA ACTIVA (excluye comercial/donación municipal/equipamiento + unidades liberadas al portafolio). PDV escriturado a socios. LV/LV2/PDV → completado; LDV → completado tras liberar sus 2 casas al portafolio en la iniciativa hermana `dilesa-portafolio-activos`.)
+**Última actualización:** 2026-06-05 (Sprint D — avance sobre vivienda. Migración `20260605183000` en prod: `v_proyecto_avances` mide construcción/ventas y `estado_sugerido` solo sobre VIVIENDA ACTIVA (excluye comercial/donación municipal/equipamiento + unidades liberadas al portafolio). PDV escriturado a socios. LV/LV2/PDV → completado; LDV → completado tras liberar sus 2 casas al portafolio en la iniciativa hermana `dilesa-portafolio-activos`.)
 
 ## Problema
 
@@ -289,7 +289,7 @@ proyecto. Todos columna escalar; idempotente con
   (se donan, nunca se venden), equipamiento y **lotes comerciales** —
   por eso ningún fraccionamiento terminado podía llegar a 100%. La
   vivienda real sí estaba 100% construida y vendida. Migración
-  `20260605180000` aplicada a prod (psql, no `db push` por drift de
+  `20260605183000` aplicada a prod (psql, no `db push` por drift de
   historial multi-sesión preexistente): `v_proyecto_avances` recalcula
   `avance_const_pct` / `avance_vts_pct` / `parque_disponible` /
   `estado_sugerido` sobre **vivienda activa** = unidades cuyo `tipo_lote`
