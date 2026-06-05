@@ -78,7 +78,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     admin
       .schema('core')
       .from('usuarios_empresas')
-      .select('id')
+      .select('usuario_id')
       .eq('usuario_id', user.id)
       .eq('empresa_id', emp.id)
       .eq('activo', true)
