@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { deriveKpis, type ContratoAgg, type CosteoRow } from './costeo-module';
+import { deriveKpis, groupCosteo, type ContratoAgg, type CosteoRow } from './costeo-module';
+import type { ConceptoResuelto } from '@/lib/dilesa/conceptos-catalogo';
 
 function r(overrides: Partial<CosteoRow>): CosteoRow {
   return {
@@ -8,10 +9,12 @@ function r(overrides: Partial<CosteoRow>): CosteoRow {
     proyectoNombre: 'Lomas',
     etapa: 'Urbanización',
     concepto: 'Drenaje',
+    conceptoId: null,
     presupuestoPrevio: null,
     presupuestoActualizado: null,
     presupuesto: 0,
     gastoReal: 0,
+    proveedorPersonaId: null,
     proveedor: null,
     fechaCompromiso: null,
     orden: 0,
@@ -75,5 +78,88 @@ describe('deriveKpis (Costeo DILESA — ADR-034)', () => {
     const k = deriveKpis([r({})], { contratado: 5_000_000, saldo: 1_200_000 });
     expect(String(k[3]?.value)).toContain('5'); // contratado
     expect(String(k[4]?.value)).toContain('1'); // saldo
+  });
+});
+
+// Catálogo mínimo: 1 concepto en Urbanización › Agua potable, 1 en
+// Anteproyecto › Topografía. Mismo shape que buildCatalogoConceptos.
+function resuelto(over: Partial<ConceptoResuelto>): ConceptoResuelto {
+  return {
+    id: 'k',
+    codigo: '2.03.01',
+    nombre: 'Red de agua potable',
+    capituloCodigo: '2.03',
+    capituloNombre: 'Agua potable',
+    etapaCodigo: '2',
+    etapaNombre: 'Urbanización',
+    ...over,
+  };
+}
+const CATALOGO = new Map<string, ConceptoResuelto>([
+  ['agua', resuelto({ id: 'agua', codigo: '2.03.01' })],
+  [
+    'topo',
+    resuelto({
+      id: 'topo',
+      codigo: '1.01.01',
+      nombre: 'Levantamiento',
+      capituloCodigo: '1.01',
+      capituloNombre: 'Topografía',
+      etapaCodigo: '1',
+      etapaNombre: 'Anteproyecto',
+    }),
+  ],
+]);
+
+describe('groupCosteo (Costeo DILESA — agrupado etapa›capítulo)', () => {
+  it('agrupa por etapa y capítulo del catálogo, ordenado por código', () => {
+    const grupos = groupCosteo([r({ conceptoId: 'agua' }), r({ conceptoId: 'topo' })], CATALOGO);
+    // Anteproyecto (etapa 1) antes que Urbanización (etapa 2).
+    expect(grupos.map((g) => g.nombre)).toEqual(['Anteproyecto', 'Urbanización']);
+    expect(grupos[0]?.capitulos[0]?.nombre).toBe('Topografía');
+    expect(grupos[1]?.capitulos[0]?.nombre).toBe('Agua potable');
+  });
+
+  it('manda las partidas sin concepto_id a "Sin clasificar" al final', () => {
+    const grupos = groupCosteo(
+      [r({ conceptoId: 'agua' }), r({ conceptoId: null, concepto: 'Huérfana' })],
+      CATALOGO
+    );
+    expect(grupos.at(-1)?.nombre).toBe('Sin clasificar');
+    expect(grupos.at(-1)?.capitulos[0]?.partidas[0]?.concepto).toBe('Huérfana');
+  });
+
+  it('un concepto_id que no resuelve en el catálogo cae en "Sin clasificar"', () => {
+    const grupos = groupCosteo([r({ conceptoId: 'no-existe' })], CATALOGO);
+    expect(grupos).toHaveLength(1);
+    expect(grupos[0]?.nombre).toBe('Sin clasificar');
+  });
+
+  it('suma subtotales por capítulo y por etapa (null-safe)', () => {
+    const grupos = groupCosteo(
+      [
+        r({ conceptoId: 'agua', presupuesto: 1000, gastoReal: 400 }),
+        r({ conceptoId: 'agua', presupuesto: null, gastoReal: 100 }),
+      ],
+      CATALOGO
+    );
+    const etapa = grupos[0];
+    expect(etapa?.presupuesto).toBe(1000);
+    expect(etapa?.gastoReal).toBe(500);
+    expect(etapa?.capitulos[0]?.presupuesto).toBe(1000);
+    expect(etapa?.capitulos[0]?.gastoReal).toBe(500);
+  });
+
+  it('ordena las partidas dentro del capítulo por código de concepto', () => {
+    const cat = new Map<string, ConceptoResuelto>([
+      ['a', resuelto({ id: 'a', codigo: '2.03.02', nombre: 'B' })],
+      ['b', resuelto({ id: 'b', codigo: '2.03.01', nombre: 'A' })],
+    ]);
+    const grupos = groupCosteo(
+      [r({ id: 'x', conceptoId: 'a' }), r({ id: 'y', conceptoId: 'b' })],
+      cat
+    );
+    // y (2.03.01) antes que x (2.03.02).
+    expect(grupos[0]?.capitulos[0]?.partidas.map((p) => p.id)).toEqual(['y', 'x']);
   });
 });

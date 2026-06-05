@@ -3,44 +3,73 @@
 /**
  * CosteoModule — costeo + rollup de CapEx por proyecto (DILESA).
  *
- * Iniciativa dilesa-contratos-obra · Sprint 3. Tab "Costeo" del hub
- * Construcción. Junta las dos capas del traspaso de obra (ADR-038):
+ * Iniciativa dilesa-contratos-obra · Sprint 3, rediseñado en dilesa-compras
+ * (Sprint 1 fase 2b). Tab "Costeo" del hub Construcción. Junta las dos capas
+ * del traspaso de obra (ADR-038):
  *
- *   - Capa A (`dilesa.obra_presupuesto`): presupuesto actualizado vs gasto
- *     real por concepto × etapa × proyecto. Es la tabla principal de esta
- *     vista (hasta Sprint 3 no tenía UI).
+ *   - Capa A (`erp.presupuesto_partidas`, modelo canónico ADR-040): presupuesto
+ *     actualizado vs gasto real por partida × etapa × proyecto. Es la tabla
+ *     principal de esta vista.
  *   - Capa B (`dilesa.contratos_construccion` + `dilesa.obra_estimaciones`):
  *     contratado y pagado por proyecto → saldo por pagar (`valor_total − Σ
  *     estimaciones`). Alimenta los KPIs de rollup.
  *
+ * El rediseño (2026-06-04, plan cerrado con Beto):
+ *   1. Tabla agrupada colapsable en 2 niveles: etapa › capítulo (del catálogo
+ *      `erp.conceptos_compra`), con subtotal por grupo.
+ *   2. Orden por el catálogo canónico (etapa→capítulo→concepto). Las partidas
+ *      sin `concepto_id` caen en un grupo "Sin clasificar" al final.
+ *   3. Un proyecto a la vez: auto-selecciona el primero al entrar.
+ *   4. El form gana 2 dropdowns: concepto del catálogo (clasifica → setea
+ *      `concepto_id`) + proveedor de `erp.proveedores` (setea
+ *      `proveedor_persona_id`).
+ *   5. Botón eliminar visible (ícono de bote directo, no en el menú ⋯).
+ *
  * Carga cross-schema con queries paralelas + lookups Map (mismo patrón que
- * contratos-module — evita embeds de PostgREST). Los KPIs son reactivos a
- * los filtros (ADR-034); el contratado/saldo refleja los proyectos visibles.
+ * contratos-module — evita embeds de PostgREST). Los KPIs son reactivos a los
+ * filtros (ADR-034); el contratado/saldo refleja los proyectos visibles.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
+import { ModuleKpiStrip, type ModuleKpi } from '@/components/module-page';
 import { Input } from '@/components/ui/input';
-import { Coins, Plus, RefreshCw, Search } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronRight,
+  Coins,
+  Loader2,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+  Trash2,
+} from 'lucide-react';
 import { usePermissions } from '@/components/providers';
 import { useToast } from '@/components/ui/toast';
-import { RowActions } from '@/components/shared/row-actions';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { CosteoConceptoForm } from '@/components/dilesa/costeo-concepto-form';
 import {
   buildProyectoOptions,
   type ProyectoOption,
   type ProyectoSelectorRow,
 } from '@/lib/dilesa/proyectos-selector';
+import {
+  buildCatalogoConceptos,
+  type CatalogoConceptos,
+  type ConceptoResuelto,
+} from '@/lib/dilesa/conceptos-catalogo';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency, formatPercent } from '@/lib/format';
 
 export type CosteoRow = {
   id: string;
-  proyecto_id: string;
+  proyecto_id: string | null;
   proyectoNombre: string;
   etapa: string | null;
   concepto: string;
+  /** Clasificación al catálogo `erp.conceptos_compra` (drives agrupado/orden). */
+  conceptoId: string | null;
   /** presupuesto_previo crudo (numeric, c/IVA) — para la captura. */
   presupuestoPrevio: number | null;
   /** presupuesto_actualizado crudo (numeric, c/IVA) — para la captura. */
@@ -49,6 +78,9 @@ export type CosteoRow = {
   presupuesto: number | null;
   /** gasto_real_total (numeric, c/IVA). */
   gastoReal: number | null;
+  /** Proveedor estructurado (persona_id) — preferido sobre el texto libre. */
+  proveedorPersonaId: string | null;
+  /** Proveedor en texto libre (legacy del traspaso; fallback de display). */
   proveedor: string | null;
   /** fecha_compromiso (date ISO) — para la captura. */
   fechaCompromiso: string | null;
@@ -58,8 +90,123 @@ export type CosteoRow = {
   ratio: number | null;
 };
 
+/** Opción de proveedor para el dropdown del form (persona_id + nombre). */
+export type ProveedorOption = { personaId: string; label: string };
+
 /** Contratado y pagado por proyecto (Capa B), para el rollup de saldo. */
 export type ContratoAgg = { contratado: number; saldo: number };
+
+/** Clave del bucket "sin clasificar" (etapa o capítulo sin catálogo). */
+const SIN = '__sin__';
+
+/** Un capítulo agrupado con sus partidas y subtotales. */
+export type CosteoCapitulo = {
+  key: string;
+  codigo: string | null;
+  nombre: string;
+  partidas: CosteoRow[];
+  presupuesto: number;
+  gastoReal: number;
+};
+
+/** Una etapa agrupada con sus capítulos y subtotales. */
+export type CosteoEtapa = {
+  key: string;
+  codigo: string | null;
+  nombre: string;
+  capitulos: CosteoCapitulo[];
+  presupuesto: number;
+  gastoReal: number;
+};
+
+/**
+ * Agrupa las partidas en la estructura colapsable de 2 niveles (etapa →
+ * capítulo) según la clasificación del catálogo. Las partidas sin `concepto_id`
+ * (o cuyo concepto no resuelve en el catálogo) caen en "Sin clasificar", que se
+ * ordena al final. Subtotales null-safe. Orden de hojas: código de concepto →
+ * `orden` → texto. Exportado para test unitario (ADR-034 patrón deriveKpis).
+ */
+export function groupCosteo(
+  rows: readonly CosteoRow[],
+  byConcepto: ReadonlyMap<string, ConceptoResuelto>
+): CosteoEtapa[] {
+  type EtapaAcc = {
+    key: string;
+    codigo: string | null;
+    nombre: string;
+    orderKey: string;
+    capitulos: Map<string, { cap: CosteoCapitulo; orderKey: string }>;
+    presupuesto: number;
+    gastoReal: number;
+  };
+  const etapas = new Map<string, EtapaAcc>();
+
+  for (const r of rows) {
+    const res = r.conceptoId ? byConcepto.get(r.conceptoId) : undefined;
+    const etapaKey = res ? res.etapaCodigo : SIN;
+    const capKey = res ? res.capituloCodigo : SIN;
+
+    let e = etapas.get(etapaKey);
+    if (!e) {
+      e = {
+        key: etapaKey,
+        codigo: res ? res.etapaCodigo : null,
+        nombre: res ? res.etapaNombre : 'Sin clasificar',
+        orderKey: res ? res.etapaCodigo : '￿',
+        capitulos: new Map(),
+        presupuesto: 0,
+        gastoReal: 0,
+      };
+      etapas.set(etapaKey, e);
+    }
+
+    let c = e.capitulos.get(capKey);
+    if (!c) {
+      c = {
+        cap: {
+          key: `${etapaKey}/${capKey}`,
+          codigo: res ? res.capituloCodigo : null,
+          nombre: res ? res.capituloNombre : 'Sin clasificar',
+          partidas: [],
+          presupuesto: 0,
+          gastoReal: 0,
+        },
+        orderKey: res ? res.capituloCodigo : '￿',
+      };
+      e.capitulos.set(capKey, c);
+    }
+
+    const p = r.presupuesto ?? 0;
+    const g = r.gastoReal ?? 0;
+    c.cap.partidas.push(r);
+    c.cap.presupuesto += p;
+    c.cap.gastoReal += g;
+    e.presupuesto += p;
+    e.gastoReal += g;
+  }
+
+  return [...etapas.values()]
+    .sort((a, b) => a.orderKey.localeCompare(b.orderKey))
+    .map((e) => ({
+      key: e.key,
+      codigo: e.codigo,
+      nombre: e.nombre,
+      presupuesto: e.presupuesto,
+      gastoReal: e.gastoReal,
+      capitulos: [...e.capitulos.values()]
+        .sort((a, b) => a.orderKey.localeCompare(b.orderKey))
+        .map(({ cap }) => {
+          cap.partidas.sort((x, y) => {
+            const cx = x.conceptoId ? (byConcepto.get(x.conceptoId)?.codigo ?? '') : '';
+            const cy = y.conceptoId ? (byConcepto.get(y.conceptoId)?.codigo ?? '') : '';
+            if (cx !== cy) return cx.localeCompare(cy);
+            if (x.orden !== y.orden) return x.orden - y.orden;
+            return x.concepto.localeCompare(y.concepto);
+          });
+          return cap;
+        }),
+    }));
+}
 
 /**
  * KPIs reactivos a filtros (ADR-034). `rows` = renglones de presupuesto
@@ -103,6 +250,21 @@ export function deriveKpis(
   ];
 }
 
+/** % de ejecución de un subtotal de grupo (gasto ÷ presupuesto). */
+function pctEjec(gasto: number, presupuesto: number): string {
+  return presupuesto > 0 ? formatPercent(gasto / presupuesto) : '—';
+}
+
+type FetchResult = {
+  rows?: CosteoRow[];
+  agg?: Map<string, { contratado: number; pagado: number }>;
+  proyectos?: ProyectoOption[];
+  catalogo?: CatalogoConceptos;
+  proveedores?: ProveedorOption[];
+  proveedorNombreById?: Map<string, string>;
+  error?: string;
+};
+
 export function CosteoModule({ empresaId }: { empresaId: string }) {
   const { permissions } = usePermissions();
   const toast = useToast();
@@ -116,25 +278,42 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
   >(new Map());
   /** Proyectos DILESA para el selector del form (desarrollos + anteproyectos no convertidos). */
   const [proyectos, setProyectos] = useState<ProyectoOption[]>([]);
+  /** Catálogo de conceptos (agrupado/orden de la tabla + optgroups del form). */
+  const [catalogo, setCatalogo] = useState<CatalogoConceptos>({
+    byConcepto: new Map(),
+    optgroups: [],
+  });
+  /** Proveedores activos para el dropdown del form. */
+  const [proveedores, setProveedores] = useState<ProveedorOption[]>([]);
+  /** persona_id → nombre, para resolver el proveedor en la tabla. */
+  const [proveedorNombreById, setProveedorNombreById] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  /** '' = todos · '__sin__' = sin proyecto · else proyecto_id (un proyecto a la vez). */
   const [proyectoFiltro, setProyectoFiltro] = useState('');
-  const [etapaFiltro, setEtapaFiltro] = useState('');
-  /** Captura de presupuesto (Sprint 5). null editRow + open = alta. */
+  const autoSelectDone = useRef(false);
+  /** Captura de presupuesto. null editRow + open = alta. */
   const [formOpen, setFormOpen] = useState(false);
   const [editRow, setEditRow] = useState<CosteoRow | null>(null);
+  /** Colapsado de grupos (keys de etapa y capítulo). Default: todo expandido. */
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  /** Partida pendiente de confirmar borrado (trash visible). */
+  const [deleteTarget, setDeleteTarget] = useState<CosteoRow | null>(null);
 
-  const fetchCosteo = useCallback(async (): Promise<{
-    rows?: CosteoRow[];
-    agg?: Map<string, { contratado: number; pagado: number }>;
-    proyectos?: ProyectoOption[];
-    error?: string;
-  }> => {
+  const fetchCosteo = useCallback(async (): Promise<FetchResult> => {
     const sb = createSupabaseBrowserClient();
 
-    // Capa A (presupuesto) + proyectos + Capa B (contratos + estimaciones).
-    const [presupuestoRes, proyectosRes, contratosRes, estimacionesRes] = await Promise.all([
+    // Capa A (partidas) + proyectos + Capa B (contratos + estimaciones) +
+    // catálogo de conceptos + proveedores activos.
+    const [
+      presupuestoRes,
+      proyectosRes,
+      contratosRes,
+      estimacionesRes,
+      catalogoRes,
+      proveedoresRes,
+    ] = await Promise.all([
       // Capa A migrada al modelo canónico erp.presupuesto_partidas (ADR-040).
       // Cast `as any`: la tabla aún no está en types (se difiere al workflow
       // db-types). concepto→concepto_texto, presupuesto_actualizado→presupuesto_aprobado.
@@ -142,7 +321,7 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
       (sb.schema('erp') as any)
         .from('presupuesto_partidas')
         .select(
-          'id, proyecto_id, etapa, concepto_texto, presupuesto_aprobado, presupuesto_previo, gasto_real_total, proveedor_texto, fecha_compromiso, orden'
+          'id, proyecto_id, etapa, concepto_texto, concepto_id, presupuesto_aprobado, presupuesto_previo, gasto_real_total, proveedor_persona_id, proveedor_texto, fecha_compromiso, orden'
         )
         .eq('empresa_id', empresaId)
         .is('deleted_at', null),
@@ -164,10 +343,30 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
         .select('contrato_id, monto_total')
         .eq('empresa_id', empresaId)
         .is('deleted_at', null),
+      // Catálogo de conceptos (ADR-040) — cast `as any` (no está en types aún).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (sb.schema('erp') as any)
+        .from('conceptos_compra')
+        .select('id, padre_id, nivel, codigo, nombre')
+        .eq('empresa_id', empresaId)
+        .is('deleted_at', null),
+      // Proveedores activos + nombre de la persona (embed intra-schema erp).
+      sb
+        .schema('erp')
+        .from('proveedores')
+        .select('persona_id, personas:persona_id(nombre, apellido_paterno, apellido_materno)')
+        .eq('empresa_id', empresaId)
+        .eq('activo', true)
+        .is('deleted_at', null),
     ]);
 
     const firstErr =
-      presupuestoRes.error ?? proyectosRes.error ?? contratosRes.error ?? estimacionesRes.error;
+      presupuestoRes.error ??
+      proyectosRes.error ??
+      contratosRes.error ??
+      estimacionesRes.error ??
+      catalogoRes.error ??
+      proveedoresRes.error;
     if (firstErr) {
       return { error: getSupabaseErrorMessage(firstErr, 'No se pudo cargar el costeo.') };
     }
@@ -200,95 +399,137 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
       agg.set(pid, cur);
     }
 
-    // El SELECT va por cast `as any` (presupuesto_partidas no está en types aún);
-    // tipamos la fila cruda aquí para conservar el chequeo en el mapeo.
+    // Catálogo de conceptos (árbol etapa→capítulo→concepto).
+    const catalogo = buildCatalogoConceptos(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (catalogoRes.data ?? []) as any[]
+    );
+
+    // Proveedores: dedup por persona_id, label = nombre + apellidos.
+    type ProvRaw = {
+      persona_id: string;
+      personas: {
+        nombre: string | null;
+        apellido_paterno: string | null;
+        apellido_materno: string | null;
+      } | null;
+    };
+    const proveedorNombreById = new Map<string, string>();
+    for (const pv of (proveedoresRes.data ?? []) as unknown as ProvRaw[]) {
+      if (!pv.persona_id || proveedorNombreById.has(pv.persona_id)) continue;
+      const label = [
+        pv.personas?.nombre,
+        pv.personas?.apellido_paterno,
+        pv.personas?.apellido_materno,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      proveedorNombreById.set(pv.persona_id, label || '(sin nombre)');
+    }
+    const proveedores: ProveedorOption[] = [...proveedorNombreById.entries()]
+      .map(([personaId, label]) => ({ personaId, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+
+    // El SELECT va por cast `as any`; tipamos la fila cruda aquí para conservar
+    // el chequeo en el mapeo.
     type PartidaRaw = {
       id: string;
       proyecto_id: string | null;
       etapa: string | null;
       concepto_texto: string | null;
+      concepto_id: string | null;
       presupuesto_aprobado: number | null;
       presupuesto_previo: number | null;
       gasto_real_total: number | null;
+      proveedor_persona_id: string | null;
       proveedor_texto: string | null;
       fecha_compromiso: string | null;
       orden: number | null;
     };
-    const out: CosteoRow[] = ((presupuestoRes.data ?? []) as PartidaRaw[])
-      .filter((r) => r.proyecto_id != null)
-      .map((r) => {
-        const presupuesto =
-          r.presupuesto_aprobado != null
-            ? Number(r.presupuesto_aprobado)
-            : r.presupuesto_previo != null
-              ? Number(r.presupuesto_previo)
-              : null;
-        const gastoReal = r.gasto_real_total != null ? Number(r.gasto_real_total) : null;
-        const pid = r.proyecto_id as string;
-        return {
-          id: r.id as string,
-          proyecto_id: pid,
-          proyectoNombre: proyectoMap.get(pid) ?? '',
-          etapa: (r.etapa as string | null) ?? null,
-          concepto: (r.concepto_texto as string) ?? '',
-          presupuestoPrevio: r.presupuesto_previo != null ? Number(r.presupuesto_previo) : null,
-          presupuestoActualizado:
-            r.presupuesto_aprobado != null ? Number(r.presupuesto_aprobado) : null,
-          presupuesto,
-          gastoReal,
-          proveedor: (r.proveedor_texto as string | null) ?? null,
-          fechaCompromiso: (r.fecha_compromiso as string | null) ?? null,
-          orden: Number(r.orden ?? 0),
-          ratio:
-            presupuesto != null && presupuesto > 0 && gastoReal != null
-              ? gastoReal / presupuesto
-              : null,
-        };
-      });
+    const out: CosteoRow[] = ((presupuestoRes.data ?? []) as PartidaRaw[]).map((r) => {
+      const presupuesto =
+        r.presupuesto_aprobado != null
+          ? Number(r.presupuesto_aprobado)
+          : r.presupuesto_previo != null
+            ? Number(r.presupuesto_previo)
+            : null;
+      const gastoReal = r.gasto_real_total != null ? Number(r.gasto_real_total) : null;
+      const pid = (r.proyecto_id as string | null) ?? null;
+      return {
+        id: r.id as string,
+        proyecto_id: pid,
+        proyectoNombre: pid ? (proyectoMap.get(pid) ?? '') : '',
+        etapa: (r.etapa as string | null) ?? null,
+        concepto: (r.concepto_texto as string) ?? '',
+        conceptoId: (r.concepto_id as string | null) ?? null,
+        presupuestoPrevio: r.presupuesto_previo != null ? Number(r.presupuesto_previo) : null,
+        presupuestoActualizado:
+          r.presupuesto_aprobado != null ? Number(r.presupuesto_aprobado) : null,
+        presupuesto,
+        gastoReal,
+        proveedorPersonaId: (r.proveedor_persona_id as string | null) ?? null,
+        proveedor: (r.proveedor_texto as string | null) ?? null,
+        fechaCompromiso: (r.fecha_compromiso as string | null) ?? null,
+        orden: Number(r.orden ?? 0),
+        ratio:
+          presupuesto != null && presupuesto > 0 && gastoReal != null
+            ? gastoReal / presupuesto
+            : null,
+      };
+    });
 
-    return { rows: out, agg, proyectos };
+    return { rows: out, agg, proyectos, catalogo, proveedores, proveedorNombreById };
   }, [empresaId]);
 
-  const cargar = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    const { rows: data, agg, proyectos: proy, error: e } = await fetchCosteo();
-    if (e) {
-      setError(e);
+  const applyResult = useCallback((res: FetchResult) => {
+    if (res.error) {
+      setError(res.error);
       setRows([]);
       setContratoAggByProyecto(new Map());
       setProyectos([]);
+      setProveedores([]);
+      setProveedorNombreById(new Map());
+      setCatalogo({ byConcepto: new Map(), optgroups: [] });
     } else {
-      setRows(data ?? []);
-      setContratoAggByProyecto(agg ?? new Map());
-      setProyectos(proy ?? []);
+      setError(null);
+      setRows(res.rows ?? []);
+      setContratoAggByProyecto(res.agg ?? new Map());
+      setProyectos(res.proyectos ?? []);
+      setCatalogo(res.catalogo ?? { byConcepto: new Map(), optgroups: [] });
+      setProveedores(res.proveedores ?? []);
+      setProveedorNombreById(res.proveedorNombreById ?? new Map());
     }
+  }, []);
+
+  const cargar = useCallback(async () => {
+    setLoading(true);
+    applyResult(await fetchCosteo());
     setLoading(false);
-  }, [fetchCosteo]);
+  }, [fetchCosteo, applyResult]);
 
   useEffect(() => {
     let activo = true;
-    void fetchCosteo().then(({ rows: data, agg, proyectos: proy, error: e }) => {
+    void fetchCosteo().then((res) => {
       if (!activo) return;
-      if (e) {
-        setError(e);
-        setRows([]);
-        setContratoAggByProyecto(new Map());
-        setProyectos([]);
-      } else {
-        setRows(data ?? []);
-        setContratoAggByProyecto(agg ?? new Map());
-        setProyectos(proy ?? []);
+      applyResult(res);
+      // Un proyecto a la vez: auto-selecciona el primero (por nombre) al entrar.
+      if (!autoSelectDone.current && !res.error) {
+        const first = (res.rows ?? [])
+          .filter((r) => r.proyecto_id)
+          .sort((a, b) => a.proyectoNombre.localeCompare(b.proyectoNombre))[0];
+        if (first?.proyecto_id) setProyectoFiltro(first.proyecto_id);
+        autoSelectDone.current = true;
       }
       setLoading(false);
     });
     return () => {
       activo = false;
     };
-  }, [fetchCosteo]);
+  }, [fetchCosteo, applyResult]);
 
-  // Soft-delete de un concepto de presupuesto (Sprint 5). Patrón del repo:
-  // marca `deleted_at`, preserva historial para auditoría.
+  // Soft-delete de una partida. Patrón del repo: marca `deleted_at`, preserva
+  // historial para auditoría.
   const eliminar = useCallback(
     async (row: CosteoRow) => {
       const sb = createSupabaseBrowserClient();
@@ -300,12 +541,12 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
       if (e) {
         toast.add({
           title: 'Error al eliminar',
-          description: getSupabaseErrorMessage(e, 'No se pudo eliminar el concepto.'),
+          description: getSupabaseErrorMessage(e, 'No se pudo eliminar la partida.'),
           type: 'error',
         });
         return;
       }
-      toast.add({ title: 'Concepto eliminado', description: row.concepto, type: 'success' });
+      toast.add({ title: 'Partida eliminada', description: row.concepto, type: 'success' });
       void cargar();
     },
     [toast, cargar]
@@ -324,34 +565,53 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
     setEditRow(null);
   }
 
-  const proyectosPresentes = useMemo(
-    () => [...new Set(rows.map((r) => r.proyectoNombre).filter(Boolean))].sort(),
-    [rows]
-  );
-  const etapasPresentes = useMemo(
-    () => [...new Set(rows.map((r) => r.etapa).filter((e): e is string => Boolean(e)))].sort(),
-    [rows]
-  );
+  const toggleGrupo = useCallback((key: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
 
+  // Opciones del selector de proyecto: cada proyecto presente + "sin proyecto".
+  const proyectosPresentes = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const r of rows) {
+      if (r.proyecto_id) m.set(r.proyecto_id, r.proyectoNombre || '(sin nombre)');
+    }
+    return [...m.entries()]
+      .map(([id, nombre]) => ({ id, nombre }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [rows]);
+  const haySinProyecto = useMemo(() => rows.some((r) => !r.proyecto_id), [rows]);
+
+  const q = search.trim().toLowerCase();
   const filtrados = useMemo(() => {
-    const q = search.trim().toLowerCase();
     return rows.filter((r) => {
-      if (proyectoFiltro && r.proyectoNombre !== proyectoFiltro) return false;
-      if (etapaFiltro && r.etapa !== etapaFiltro) return false;
+      if (proyectoFiltro === SIN) {
+        if (r.proyecto_id) return false;
+      } else if (proyectoFiltro !== '') {
+        if (r.proyecto_id !== proyectoFiltro) return false;
+      }
       if (q) {
+        const proveedorNombre = r.proveedorPersonaId
+          ? (proveedorNombreById.get(r.proveedorPersonaId) ?? '')
+          : '';
         const hay =
           r.concepto.toLowerCase().includes(q) ||
           (r.proveedor?.toLowerCase().includes(q) ?? false) ||
+          proveedorNombre.toLowerCase().includes(q) ||
           (r.etapa?.toLowerCase().includes(q) ?? false);
         if (!hay) return false;
       }
       return true;
     });
-  }, [rows, search, proyectoFiltro, etapaFiltro]);
+  }, [rows, q, proyectoFiltro, proveedorNombreById]);
 
   // Contratado/saldo de Capa B para los proyectos visibles en los filtros.
   const contratoTotals = useMemo<ContratoAgg>(() => {
-    const visibles = new Set(filtrados.map((r) => r.proyecto_id));
+    const visibles = new Set(filtrados.map((r) => r.proyecto_id).filter(Boolean) as string[]);
     let contratado = 0;
     let pagado = 0;
     for (const pid of visibles) {
@@ -366,63 +626,25 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
 
   const kpis = useMemo(() => deriveKpis(filtrados, contratoTotals), [filtrados, contratoTotals]);
 
-  const columns: Column<CosteoRow>[] = [
-    {
-      key: 'proyectoNombre',
-      label: 'Proyecto',
-      type: 'text',
-      sticky: true,
-      width: 'min-w-[180px]',
+  const grupos = useMemo(
+    () => groupCosteo(filtrados, catalogo.byConcepto),
+    [filtrados, catalogo.byConcepto]
+  );
+
+  // Resuelve el proveedor a mostrar: estructurado → texto libre → "—".
+  const proveedorDisplay = useCallback(
+    (r: CosteoRow): string => {
+      if (r.proveedorPersonaId) {
+        return proveedorNombreById.get(r.proveedorPersonaId) ?? r.proveedor ?? '—';
+      }
+      return r.proveedor || '—';
     },
-    { key: 'etapa', label: 'Etapa', type: 'text', render: (r) => r.etapa || '—' },
-    { key: 'concepto', label: 'Concepto', type: 'text', width: 'min-w-[260px]' },
-    {
-      key: 'presupuesto',
-      label: 'Presupuesto',
-      type: 'custom',
-      accessor: (r) => r.presupuesto ?? 0,
-      render: (r) => (r.presupuesto == null ? '—' : formatCurrency(r.presupuesto)),
-    },
-    {
-      key: 'gastoReal',
-      label: 'Gasto real',
-      type: 'custom',
-      accessor: (r) => r.gastoReal ?? 0,
-      render: (r) => (r.gastoReal == null ? '—' : formatCurrency(r.gastoReal)),
-    },
-    {
-      key: 'ratio',
-      label: '% ejec.',
-      type: 'custom',
-      accessor: (r) => r.ratio ?? 0,
-      render: (r) => (r.ratio == null ? '—' : formatPercent(r.ratio)),
-    },
-    { key: 'proveedor', label: 'Proveedor', type: 'text', render: (r) => r.proveedor || '—' },
-    ...(puedeEscribir
-      ? [
-          {
-            key: 'acciones',
-            label: '',
-            type: 'custom' as const,
-            sortable: false,
-            align: 'right' as const,
-            width: 'w-12',
-            render: (r: CosteoRow) => (
-              <RowActions
-                ariaLabel={`Acciones para ${r.concepto}`}
-                onEdit={{ onClick: () => abrirEdicion(r) }}
-                onDelete={{
-                  onConfirm: () => eliminar(r),
-                  confirmTitle: `¿Eliminar “${r.concepto}”?`,
-                  confirmDescription:
-                    'Marcará el concepto de presupuesto como eliminado. Se preserva el historial para auditoría.',
-                }}
-              />
-            ),
-          },
-        ]
-      : []),
-  ];
+    [proveedorNombreById]
+  );
+
+  // Al buscar, ignora el colapsado para que los matches sean visibles.
+  const isSearching = q.length > 0;
+  const colCount = puedeEscribir ? 6 : 5;
 
   return (
     <div className="space-y-6 p-6">
@@ -442,6 +664,20 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
       <ModuleKpiStrip stats={kpis} cols={5} />
 
       <div className="flex flex-wrap items-center gap-3">
+        <select
+          value={proyectoFiltro}
+          onChange={(e) => setProyectoFiltro(e.target.value)}
+          className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm font-medium text-[var(--text)]"
+          aria-label="Proyecto"
+        >
+          <option value="">Todos los proyectos</option>
+          {proyectosPresentes.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.nombre}
+            </option>
+          ))}
+          {haySinProyecto ? <option value={SIN}>Sin proyecto asignado</option> : null}
+        </select>
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text)]/40" />
           <Input
@@ -451,30 +687,6 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
             className="w-72 pl-9"
           />
         </div>
-        <select
-          value={proyectoFiltro}
-          onChange={(e) => setProyectoFiltro(e.target.value)}
-          className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
-        >
-          <option value="">Todos los proyectos</option>
-          {proyectosPresentes.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
-        <select
-          value={etapaFiltro}
-          onChange={(e) => setEtapaFiltro(e.target.value)}
-          className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
-        >
-          <option value="">Todas las etapas</option>
-          {etapasPresentes.map((et) => (
-            <option key={et} value={et}>
-              {et}
-            </option>
-          ))}
-        </select>
         <button
           type="button"
           onClick={() => void cargar()}
@@ -485,7 +697,7 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
         </button>
         <div className="ml-auto flex items-center gap-3">
           <span className="text-sm text-[var(--text)]/60">
-            {filtrados.length} de {rows.length} conceptos
+            {filtrados.length} de {rows.length} partidas
           </span>
           {puedeEscribir ? (
             <button
@@ -494,7 +706,7 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
               className="inline-flex h-9 items-center gap-1.5 rounded-md bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90"
             >
               <Plus className="h-3.5 w-3.5" />
-              Nuevo concepto
+              Nueva partida
             </button>
           ) : null}
         </div>
@@ -505,6 +717,8 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
           key={editRow?.id ?? 'nuevo'}
           empresaId={empresaId}
           proyectos={proyectos}
+          optgroups={catalogo.optgroups}
+          proveedores={proveedores}
           rows={rows}
           editRow={editRow}
           onClose={cerrarForm}
@@ -515,19 +729,256 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
         />
       ) : null}
 
-      <DataTable
-        data={filtrados}
-        columns={columns}
-        rowKey="id"
-        loading={loading}
-        error={error}
-        onRetry={() => void cargar()}
-        initialSort={{ key: 'gastoReal', dir: 'desc' }}
-        emptyTitle="Sin costeo"
-        emptyDescription="No hay conceptos de presupuesto que coincidan con los filtros."
-        emptyIcon={<Coins className="h-6 w-6" />}
-        maxHeight="calc(100vh - 280px)"
+      {loading ? (
+        <div className="flex items-center justify-center gap-2 rounded-md border border-[var(--border)] py-16 text-sm text-[var(--text)]/60">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Cargando costeo…
+        </div>
+      ) : error ? (
+        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <p>{error}</p>
+          <button
+            type="button"
+            onClick={() => void cargar()}
+            className="mt-2 rounded-md border border-red-300 px-3 py-1 text-xs font-medium hover:bg-red-100"
+          >
+            Reintentar
+          </button>
+        </div>
+      ) : grupos.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-2 rounded-md border border-dashed border-[var(--border)] py-16 text-center">
+          <Coins className="h-6 w-6 text-[var(--text)]/30" />
+          <p className="text-sm font-medium text-[var(--text)]">Sin costeo</p>
+          <p className="text-sm text-[var(--text)]/60">
+            No hay partidas de presupuesto que coincidan con los filtros.
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-md border border-[var(--border)]">
+          <table className="min-w-full text-sm">
+            <thead className="sticky top-0 z-10 bg-[var(--card)] text-xs uppercase tracking-wide text-[var(--text)]/50">
+              <tr className="border-b border-[var(--border)]">
+                <th className="px-3 py-2.5 text-left">Concepto</th>
+                <th className="w-36 px-3 py-2.5 text-right">Presupuesto</th>
+                <th className="w-36 px-3 py-2.5 text-right">Gasto real</th>
+                <th className="w-20 px-3 py-2.5 text-right">% ejec.</th>
+                <th className="w-56 px-3 py-2.5 text-left">Proveedor</th>
+                {puedeEscribir ? <th className="w-20 px-3 py-2.5 text-right" /> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {grupos.map((etapa) => {
+                const etapaCollapsed = !isSearching && collapsed.has(etapa.key);
+                return (
+                  <GrupoFragment
+                    key={etapa.key}
+                    etapa={etapa}
+                    etapaCollapsed={etapaCollapsed}
+                    collapsed={collapsed}
+                    isSearching={isSearching}
+                    colCount={colCount}
+                    puedeEscribir={puedeEscribir}
+                    onToggle={toggleGrupo}
+                    proveedorDisplay={proveedorDisplay}
+                    onEdit={abrirEdicion}
+                    onDelete={setDeleteTarget}
+                  />
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={deleteTarget != null}
+        onOpenChange={(o) => {
+          if (!o) setDeleteTarget(null);
+        }}
+        onConfirm={async () => {
+          if (deleteTarget) await eliminar(deleteTarget);
+          setDeleteTarget(null);
+        }}
+        title={deleteTarget ? `¿Eliminar “${deleteTarget.concepto}”?` : '¿Eliminar partida?'}
+        description="Marcará la partida de presupuesto como eliminada. Se preserva el historial para auditoría."
+        confirmLabel="Eliminar"
       />
     </div>
+  );
+}
+
+// ─── Fragmento de grupo (etapa + sus capítulos + partidas) ──────────────────
+
+function GrupoFragment({
+  etapa,
+  etapaCollapsed,
+  collapsed,
+  isSearching,
+  colCount,
+  puedeEscribir,
+  onToggle,
+  proveedorDisplay,
+  onEdit,
+  onDelete,
+}: {
+  etapa: CosteoEtapa;
+  etapaCollapsed: boolean;
+  collapsed: Set<string>;
+  isSearching: boolean;
+  colCount: number;
+  puedeEscribir: boolean;
+  onToggle: (key: string) => void;
+  proveedorDisplay: (r: CosteoRow) => string;
+  onEdit: (r: CosteoRow) => void;
+  onDelete: (r: CosteoRow) => void;
+}) {
+  return (
+    <>
+      {/* Nivel 1 · Etapa */}
+      <tr className="border-b border-[var(--border)] bg-[var(--card)]/70">
+        <td className="px-3 py-2">
+          <button
+            type="button"
+            onClick={() => onToggle(etapa.key)}
+            className="-mx-1 flex items-center gap-1.5 rounded px-1 py-0.5 text-left font-semibold text-[var(--text)] hover:bg-[var(--card)]"
+          >
+            <Chevron open={!etapaCollapsed} />
+            {etapa.nombre}
+          </button>
+        </td>
+        <td className="px-3 py-2 text-right font-semibold tabular-nums text-[var(--text)]">
+          {etapa.presupuesto === 0 ? '—' : formatCurrency(etapa.presupuesto)}
+        </td>
+        <td className="px-3 py-2 text-right font-semibold tabular-nums text-[var(--text)]">
+          {etapa.gastoReal === 0 ? '—' : formatCurrency(etapa.gastoReal)}
+        </td>
+        <td className="px-3 py-2 text-right font-semibold tabular-nums text-[var(--text)]/70">
+          {pctEjec(etapa.gastoReal, etapa.presupuesto)}
+        </td>
+        <td className="px-3 py-2" colSpan={colCount - 4} />
+      </tr>
+
+      {!etapaCollapsed &&
+        etapa.capitulos.map((cap) => {
+          const capCollapsed = !isSearching && collapsed.has(cap.key);
+          return (
+            <CapituloFragment
+              key={cap.key}
+              cap={cap}
+              capCollapsed={capCollapsed}
+              colCount={colCount}
+              puedeEscribir={puedeEscribir}
+              onToggle={onToggle}
+              proveedorDisplay={proveedorDisplay}
+              onEdit={onEdit}
+              onDelete={onDelete}
+            />
+          );
+        })}
+    </>
+  );
+}
+
+// ─── Fragmento de capítulo (capítulo + sus partidas) ────────────────────────
+
+function CapituloFragment({
+  cap,
+  capCollapsed,
+  colCount,
+  puedeEscribir,
+  onToggle,
+  proveedorDisplay,
+  onEdit,
+  onDelete,
+}: {
+  cap: CosteoCapitulo;
+  capCollapsed: boolean;
+  colCount: number;
+  puedeEscribir: boolean;
+  onToggle: (key: string) => void;
+  proveedorDisplay: (r: CosteoRow) => string;
+  onEdit: (r: CosteoRow) => void;
+  onDelete: (r: CosteoRow) => void;
+}) {
+  return (
+    <>
+      {/* Nivel 2 · Capítulo */}
+      <tr className="border-b border-[var(--border)]/60 bg-[var(--card)]/30">
+        <td className="px-3 py-1.5 pl-7">
+          <button
+            type="button"
+            onClick={() => onToggle(cap.key)}
+            className="-mx-1 flex items-center gap-1.5 rounded px-1 py-0.5 text-left font-medium text-[var(--text)]/90 hover:bg-[var(--card)]"
+          >
+            <Chevron open={!capCollapsed} small />
+            {cap.nombre}
+            <span className="text-xs font-normal text-[var(--text)]/40">
+              ({cap.partidas.length})
+            </span>
+          </button>
+        </td>
+        <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]/80">
+          {cap.presupuesto === 0 ? '—' : formatCurrency(cap.presupuesto)}
+        </td>
+        <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]/80">
+          {cap.gastoReal === 0 ? '—' : formatCurrency(cap.gastoReal)}
+        </td>
+        <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]/60">
+          {pctEjec(cap.gastoReal, cap.presupuesto)}
+        </td>
+        <td className="px-3 py-1.5" colSpan={colCount - 4} />
+      </tr>
+
+      {!capCollapsed &&
+        cap.partidas.map((r) => (
+          <tr
+            key={r.id}
+            className="border-b border-[var(--border)]/40 transition-colors hover:bg-[var(--card)]/40"
+          >
+            <td className="px-3 py-1.5 pl-12 text-[var(--text)]">{r.concepto || '—'}</td>
+            <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]">
+              {r.presupuesto == null ? '—' : formatCurrency(r.presupuesto)}
+            </td>
+            <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]">
+              {r.gastoReal == null ? '—' : formatCurrency(r.gastoReal)}
+            </td>
+            <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]/70">
+              {r.ratio == null ? '—' : formatPercent(r.ratio)}
+            </td>
+            <td className="px-3 py-1.5 text-[var(--text)]/80">{proveedorDisplay(r)}</td>
+            {puedeEscribir ? (
+              <td className="px-3 py-1.5">
+                <div className="flex items-center justify-end gap-1">
+                  <button
+                    type="button"
+                    onClick={() => onEdit(r)}
+                    aria-label={`Editar ${r.concepto}`}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded text-[var(--text)]/50 hover:bg-[var(--card)] hover:text-[var(--text)]"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDelete(r)}
+                    aria-label={`Eliminar ${r.concepto}`}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded text-[var(--text)]/50 hover:bg-red-50 hover:text-red-600"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </td>
+            ) : null}
+          </tr>
+        ))}
+    </>
+  );
+}
+
+function Chevron({ open, small = false }: { open: boolean; small?: boolean }) {
+  const cls = small ? 'h-3.5 w-3.5' : 'h-4 w-4';
+  return open ? (
+    <ChevronDown className={`${cls} text-[var(--text)]/40`} />
+  ) : (
+    <ChevronRight className={`${cls} text-[var(--text)]/40`} />
   );
 }
