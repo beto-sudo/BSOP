@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-06-04
-**Última actualización:** 2026-06-05 (**Sprint 2 completo** — Fases A/B/C live + **Fase D (Requisiciones)** en PR: módulo `components/compras/requisiciones-module.tsx` (alta anclada a partida + autorizar + **Generar OC que copia `partida_id`** → cierra riesgo F3) + helpers puros `lib/compras/requisiciones.ts` y `lib/compras/partidas.ts` (este último materializa D4: extrae la indexación de partidas y refactoriza OC/Recepciones). Estado vía `autorizada_at` —no hay catálogo de estados, `estado_id`/`prioridad_id` son uuid sueltos que nadie usa—. **Sin migración** (`partida_id` ya existía; slugs RBAC ya en prod desde Fase A). Próximo: Sprint 3 = Cotización RFQ.)
+**Última actualización:** 2026-06-05 (**Sprint 2 completo y mergeado** (#693: Fase D Requisiciones + gasto suelto + selector solo-con-presupuesto + clonación de catálogo a 5 proyectos). **Sprint "gasto directo" arrancado** para registrar pagos fuera del proceso (req→OC) y que sumen al control: **Fase 1 (DB)** en PR = ADR-041 + migración del modelo **híbrido** de `ejercido` (recibido de OC + facturas con partida sin OC; D14), validada en dry-run, **pendiente de OK para aplicar a prod**. **Fase 2** = UI para asignar partida a la factura en el drawer de CxP (aditivo DILESA-first, R2 con `cxp`). Próximo aparte: Sprint 3 = Cotización RFQ.)
 
 ## Problema
 
@@ -124,6 +124,17 @@ presupuesto, cuánto va comprometido vs ejercido vs pagado".
   riesgoso, se crea `erp.oc_recibir_linea_partida` (mismos guards de
   permiso/estado/cantidad, pero solo actualiza `cantidad_recibida` + recalcula
   estado + audit; cero inventario). Aísla el riesgo a RDB.
+- **D14 — `ejercido` cuenta gastos directos (factura con partida sin OC)**
+  (cerrada 2026-06-05, **ADR-041**). Para registrar gastos autorizados/pagados
+  **fuera del proceso** requisición→OC, `v_partida_control.ejercido` pasa al
+  **modelo híbrido**: `Σ recibido de OC + Σ facturas de egreso con partida y SIN
+OC`. La condición `orden_compra_id IS NULL` evita el doble conteo (la factura
+  de una OC ya se devengó vía su recepción). Un gasto directo se registra como
+  **factura ligada a la partida (sin OC) + su pago en CxP** y fluye
+  `ejercido → pagado`. No afecta RDB (la vista solo vive sobre el presupuesto de
+  obra) ni el 3-way match de `cxp` (que aplica a facturas con OC). La UI para
+  asignar `partida_id` a la factura va en el drawer de CxP (Fase 2, aditivo
+  DILESA-first). Cruza `dilesa-compras` ∩ `cxp` (R2).
 
 ## Alcance v1
 
@@ -407,3 +418,20 @@ pago: rol **Dirección** (ya vigente en CxP).
     (invisibles por la regla del selector):** Loma Verde, Loma Verde 2, Lomas del
     Valle, Paseo del Valle. Reversión: `... WHERE fuente='catalogo_clon'`.
     Presupuestos reales preexistentes: Lomas del Sol (73), Lomas de los Encinos (55).
+- **2026-06-05** — **Sprint "gasto directo" arrancado — Fase 1 (DB) construida.**
+  Beto necesita registrar pagos ya hechos **fuera del proceso** requisición→OC
+  (Lomas de las Delicias) y que sumen al control. Decisiones cerradas: entran como
+  **factura CFDI + asignación de partida** (carga inclusiva ya soportada por
+  `cxp`); se construye **capacidad permanente en UI**; semántica **modelo híbrido**
+  (D14/ADR-041). Discovery confirmó que `erp.facturas` ya tiene `partida_id` +
+  `orden_compra_id` nullable (factura sin OC) y que `v_partida_control.pagado` ya
+  suma facturas con partida; el único hueco era `ejercido` (solo leía recepciones
+  de OC) y la **ausencia de UI para asignar partida** (el módulo CxP solo ingesta
+  XML, 0 refs a partida). **Fase 1 (este PR):** ADR-041 + migración
+  `20260605180000_v_partida_control_ejercido_gasto_directo` (CREATE OR REPLACE
+  VIEW → ejercido híbrido). Validada en dry-run (BEGIN/ROLLBACK): compila, 483
+  partidas, totales sin cambio (0 facturas hoy → aditivo puro). **Pendiente de
+  OK de Beto para aplicar a prod.** **Fase 2 (siguiente):** acción "Asignar
+  proyecto→partida" en el drawer de factura del módulo CxP compartido (aditivo,
+  DILESA-first, reusa `buildPartidaIndex`) — coordinar con Sprint 5 de `cxp` (R2).
+  Flujo final: subir XML → asignar partida → registrar pago → suma ejercido+pagado.
