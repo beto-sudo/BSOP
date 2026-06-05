@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-06-04
-**Última actualización:** 2026-06-05 (**Sprint 2 completo y mergeado** (#693: Fase D Requisiciones + gasto suelto + selector solo-con-presupuesto + clonación de catálogo a 5 proyectos). **Sprint "gasto directo" arrancado** para registrar pagos fuera del proceso (req→OC) y que sumen al control: **Fase 1 (DB)** en PR = ADR-041 + migración del modelo **híbrido** de `ejercido` (recibido de OC + facturas con partida sin OC; D14), validada en dry-run, **pendiente de OK para aplicar a prod**. **Fase 2** = UI para asignar partida a la factura en el drawer de CxP (aditivo DILESA-first, R2 con `cxp`). Próximo aparte: Sprint 3 = Cotización RFQ.)
+**Última actualización:** 2026-06-05 (**Sprint 2 completo y mergeado** (#693: Fase D Requisiciones + gasto suelto + selector solo-con-presupuesto + clonación de catálogo a 5 proyectos). **Sprint "gasto directo"** para registrar pagos fuera del proceso (req→OC) y que sumen al control: **Fase 1 (DB)** aplicada a prod y mergeada (#696: ADR-041 + vista `ejercido` **híbrido** = recibido de OC + facturas con partida sin OC; D14) + fix de colisión de timestamp que rompía previews. **Fase 2 (UI)** en PR preview = sección "Partida del presupuesto" en el drawer de factura de CxP (aditivo DILESA-first, RDB intacto). Flujo completo: subir XML → asignar partida → pagar → suma ejercido+pagado. Próximo aparte: Sprint 3 = Cotización RFQ.)
 
 ## Problema
 
@@ -435,3 +435,20 @@ pago: rol **Dirección** (ya vigente en CxP).
   proyecto→partida" en el drawer de factura del módulo CxP compartido (aditivo,
   DILESA-first, reusa `buildPartidaIndex`) — coordinar con Sprint 5 de `cxp` (R2).
   Flujo final: subir XML → asignar partida → registrar pago → suma ejercido+pagado.
+- **2026-06-05** — **Sprint "gasto directo" — Fase 1 aplicada + Fase 2 construida.**
+  **Fase 1** (#696) aplicada a prod (vista híbrida verificada: tiene el bloque
+  `orden_compra_id IS NULL`, filtra egreso, 483 partidas legibles) y mergeada. De
+  paso se arregló una **colisión de timestamp** `20260605160000` (Fase C #692 +
+  backfill #694) que rompía el Supabase Preview de todo PR con migración (rename
+  del backfill a `...161000`). **Fase 2** (este PR, UI): en
+  `components/cxp/cxp-facturas-module.tsx` (módulo CxP compartido) se agrega, en el
+  drawer de la factura, la sección **"Partida del presupuesto"** — selector
+  proyecto + partida (agrupado etapa›capítulo vía `buildPartidaIndex`, solo
+  proyectos con presupuesto) con acciones Asignar / Cambiar / Quitar →
+  `UPDATE erp.facturas.partida_id`. **Aditivo y DILESA-first** (`usaPartidas =
+empresa === 'dilesa'`): RDB no carga partidas ni ve la sección (cero cambio de
+  comportamiento). 5 checks verdes (typecheck, 1286 tests, lint 0-err, format).
+  PR **UI-touching → preview-first sin auto-merge**. Con esto el flujo de gasto
+  directo queda completo end-to-end: subir XML → asignar partida → pagar → suma
+  ejercido+pagado de la partida. Generalizar a otras empresas constructora =
+  cambiar el gate `empresa === 'dilesa'` por lista/prop (trivial, backlog).
