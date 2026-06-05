@@ -6,7 +6,7 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-06-04
-**Última actualización:** 2026-06-05 (**Sprint 2 completo y mergeado** (#693: Fase D Requisiciones + gasto suelto + selector solo-con-presupuesto + clonación de catálogo a 5 proyectos). **Sprint "gasto directo"** para registrar pagos fuera del proceso (req→OC) y que sumen al control: **Fase 1 (DB)** aplicada a prod y mergeada (#696: ADR-041 + vista `ejercido` **híbrido** = recibido de OC + facturas con partida sin OC; D14) + fix de colisión de timestamp que rompía previews. **Fase 2 (UI)** en PR preview = sección "Partida del presupuesto" en el drawer de factura de CxP (aditivo DILESA-first, RDB intacto). Flujo completo: subir XML → asignar partida → pagar → suma ejercido+pagado. Próximo aparte: Sprint 3 = Cotización RFQ.)
+**Última actualización:** 2026-06-05 (**Sprint 2 completo y mergeado** (#693: Fase D Requisiciones + gasto suelto + selector solo-con-presupuesto + clonación de catálogo a 5 proyectos). **Sprint "gasto directo"** para registrar pagos fuera del proceso (req→OC) y que sumen al control: **Fase 1 (DB)** aplicada a prod y mergeada (#696: ADR-041 + vista `ejercido` **híbrido** = recibido de OC + facturas con partida sin OC; D14) + fix de colisión de timestamp que rompía previews. **Fase 2 (UI)** sección "Partida del presupuesto" en el drawer de factura de CxP — **mergeada (#697)**; el flujo de gasto directo quedó completo (subir XML → asignar partida → pagar → suma ejercido+pagado). **Sprint "contratos de obra al control de partidas" promovido** (D15/ADR-042): el contrato compromete una partida (1:1), las estimaciones la ejercen/pagan — pendiente de arrancar Fase 1 (DB) con OK de Beto. Próximo aparte: Sprint 3 = Cotización RFQ.)
 
 ## Problema
 
@@ -135,6 +135,17 @@ OC`. La condición `orden_compra_id IS NULL` evita el doble conteo (la factura
   obra) ni el 3-way match de `cxp` (que aplica a facturas con OC). La UI para
   asignar `partida_id` a la factura va en el drawer de CxP (Fase 2, aditivo
   DILESA-first). Cruza `dilesa-compras` ∩ `cxp` (R2).
+- **D15 — El contrato de obra compromete una partida (1:1)** (cerrada 2026-06-05,
+  **ADR-042**). El contrato de obra es a la mano de obra lo que la OC es a los
+  materiales: ambos comprometen una partida. Cada contrato se liga a **una sola**
+  partida (`dilesa.contratos_construccion.partida_id` nuevo, FK → `erp.presupuesto_partidas`);
+  su `valor_total` entra al `comprometido` de `v_partida_control` (Σ OC + Σ
+  contratos). Las estimaciones → factura **heredan la partida del contrato** y
+  ejercen/pagan por el modelo híbrido (ADR-041). El contrato se origina **desde el
+  presupuesto** (selector de partida en su alta). Cierra el outcome #2 (control de
+  3 capas de **todo** el gasto: compras + mano de obra). Cruza `dilesa-compras` ∩
+  `dilesa-contratos-obra` ∩ `cxp`. Ejecución por sprint (DB → UI alta → emisión a
+  CxP con `partida_id`, que cierra también el pendiente de ADR-039).
 
 ## Alcance v1
 
@@ -452,3 +463,18 @@ empresa === 'dilesa'`): RDB no carga partidas ni ve la sección (cero cambio de
   directo queda completo end-to-end: subir XML → asignar partida → pagar → suma
   ejercido+pagado de la partida. Generalizar a otras empresas constructora =
   cambiar el gate `empresa === 'dilesa'` por lista/prop (trivial, backlog).
+- **2026-06-05** — **Sprint "contratos de obra al control de partidas" promovido
+  (D15/ADR-042).** Discovery a fondo de la costura `dilesa-contratos-obra` ↔
+  `dilesa-compras`: los dos mundos (302 contratos + 275 estimaciones vs 483
+  partidas de costeo) nunca convergieron — 0 partidas con `contrato_id`, 0
+  facturas con `obra_estimacion_id`; el histórico tampoco ligaba (0/128). Beto
+  preguntó cómo ligar contrato↔presupuesto y cómo debería ser el procedimiento.
+  Visión cerrada: el **presupuesto es el centro**, el contrato de obra compromete
+  una partida igual que la OC, las estimaciones la ejercen/pagan. Decisiones de
+  Beto: **1:1** (contrato → una partida, `contratos_construccion.partida_id`
+  nuevo), estimación **hereda la partida** del contrato, **promover**. ADR-042
+  escrito. Ejecución por sprint (3 fases: DB `partida_id` + `comprometido`
+  extendido en `v_partida_control`; UI selector de partida en el alta del
+  contrato; emisión a CxP con `partida_id` — cierra el pendiente de ADR-039).
+  **Pendiente de arrancar la Fase 1 con OK de Beto (toca la vista de control —
+  cambio financiero).**
