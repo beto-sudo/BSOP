@@ -330,3 +330,18 @@ pago: rol **Dirección** (ya vigente en CxP).
   `components/compras/`). Schema total del sprint = INSERT sub-slugs (A) + 1 RPC
   (C). Gates a respetar: rol Dirección (no `rol='admin'`), filtrado `empresa_id`
   por query, scope un-proyecto-a-la-vez.
+- **2026-06-05** — **Fase A aplicada + Fase B construida.** Fase A (PR #689)
+  mergeada; migración `20260605040000_modulos_dilesa_compras` aplicada a prod vía
+  MCP con OK explícito de Beto (4 slugs × 8 roles, clonados de costeo; verificado).
+  Nota de modo autónomo: el clasificador bloqueó aplicarla de noche con solo
+  "avanza autónomo" — correcto, ver memoria `feedback_autonomous_prod_migrations`.
+  **Fase B** (OC, este PR): `lib/compras/ordenes.ts` (helpers puros + KPIs,
+  `comprometido` espeja la semántica de la vista; 7 tests) +
+  `components/compras/ordenes-compra-module.tsx`: lista + KPIs + alta con líneas
+  **ancladas a partida** (selector agrupado etapa›capítulo reusando
+  `buildCatalogoConceptos`) + acciones enviar (→comprometido) / cerrar
+  (RPC `oc_cerrar_orden`) / cancelar. `producto_id` null, sin inventario;
+  `partida_id` SÍ se popula end-to-end (cierra la "sorpresa crítica"). Un proyecto
+  a la vez. 1264 tests verdes. Pendiente Fase B: editar OC borrador + drawer de
+  detalle con histórico (v1 es alta + acciones; sin edición de líneas existentes).
+  Próximo: Fase C (recepción, RPC nueva).
