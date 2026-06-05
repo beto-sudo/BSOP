@@ -2632,7 +2632,7 @@ export type Database = {
           },
         ]
       }
-      obra_presupuesto: {
+      obra_presupuesto_deprecated: {
         Row: {
           concepto: string
           contrato_id: string | null
@@ -5181,6 +5181,59 @@ export type Database = {
           },
         ]
       }
+      conceptos_compra: {
+        Row: {
+          activo: boolean
+          codigo: string
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          id: string
+          nivel: string
+          nombre: string
+          notas: string | null
+          orden: number
+          padre_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          codigo: string
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          id?: string
+          nivel: string
+          nombre: string
+          notas?: string | null
+          orden?: number
+          padre_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          codigo?: string
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          id?: string
+          nivel?: string
+          nombre?: string
+          notas?: string | null
+          orden?: number
+          padre_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conceptos_compra_padre_id_fkey"
+            columns: ["padre_id"]
+            isOneToOne: false
+            referencedRelation: "conceptos_compra"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conciliaciones: {
         Row: {
           creado_por: string | null
@@ -6547,6 +6600,7 @@ export type Database = {
           motivo_cancelacion: string | null
           obra_estimacion_id: string | null
           orden_compra_id: string | null
+          partida_id: string | null
           pdf_url: string | null
           persona_id: string | null
           proveedor_id: string | null
@@ -6585,6 +6639,7 @@ export type Database = {
           motivo_cancelacion?: string | null
           obra_estimacion_id?: string | null
           orden_compra_id?: string | null
+          partida_id?: string | null
           pdf_url?: string | null
           persona_id?: string | null
           proveedor_id?: string | null
@@ -6623,6 +6678,7 @@ export type Database = {
           motivo_cancelacion?: string | null
           obra_estimacion_id?: string | null
           orden_compra_id?: string | null
+          partida_id?: string | null
           pdf_url?: string | null
           persona_id?: string | null
           proveedor_id?: string | null
@@ -6646,6 +6702,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "ordenes_compra"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facturas_partida_id_fkey"
+            columns: ["partida_id"]
+            isOneToOne: false
+            referencedRelation: "presupuesto_partidas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facturas_partida_id_fkey"
+            columns: ["partida_id"]
+            isOneToOne: false
+            referencedRelation: "v_partida_control"
+            referencedColumns: ["partida_id"]
           },
           {
             foreignKeyName: "facturas_persona_id_fkey"
@@ -7577,6 +7647,7 @@ export type Database = {
           id: string
           motivo_cancelacion: string | null
           orden_compra_id: string
+          partida_id: string | null
           precio_modificado_at: string | null
           precio_modificado_por: string | null
           precio_real: number | null
@@ -7596,6 +7667,7 @@ export type Database = {
           id?: string
           motivo_cancelacion?: string | null
           orden_compra_id: string
+          partida_id?: string | null
           precio_modificado_at?: string | null
           precio_modificado_por?: string | null
           precio_real?: number | null
@@ -7615,6 +7687,7 @@ export type Database = {
           id?: string
           motivo_cancelacion?: string | null
           orden_compra_id?: string
+          partida_id?: string | null
           precio_modificado_at?: string | null
           precio_modificado_por?: string | null
           precio_real?: number | null
@@ -7630,6 +7703,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "ordenes_compra"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordenes_compra_detalle_partida_id_fkey"
+            columns: ["partida_id"]
+            isOneToOne: false
+            referencedRelation: "presupuesto_partidas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordenes_compra_detalle_partida_id_fkey"
+            columns: ["partida_id"]
+            isOneToOne: false
+            referencedRelation: "v_partida_control"
+            referencedColumns: ["partida_id"]
           },
           {
             foreignKeyName: "ordenes_compra_detalle_producto_id_fkey"
@@ -8158,6 +8245,127 @@ export type Database = {
           {
             foreignKeyName: "personas_direcciones_persona_id_fkey"
             columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "v_empleados_full"
+            referencedColumns: ["persona_id"]
+          },
+        ]
+      }
+      presupuesto_partidas: {
+        Row: {
+          autorizado_at: string | null
+          autorizado_por: string | null
+          concepto_id: string | null
+          concepto_texto: string | null
+          contrato_id: string | null
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          estado: string
+          etapa: string | null
+          factura_ref: string | null
+          fecha_compromiso: string | null
+          fuente: string | null
+          gasto_real_iva: number | null
+          gasto_real_iva_tasa: number | null
+          gasto_real_subtotal: number | null
+          gasto_real_total: number | null
+          id: string
+          monto_estimado: number | null
+          notas: string | null
+          orden: number
+          presupuesto_aprobado: number | null
+          presupuesto_previo: number | null
+          proveedor_persona_id: string | null
+          proveedor_texto: string | null
+          proyecto_id: string | null
+          source_ref: string | null
+          tarea_origen_id: string | null
+          tipo_insumo: string | null
+          updated_at: string
+        }
+        Insert: {
+          autorizado_at?: string | null
+          autorizado_por?: string | null
+          concepto_id?: string | null
+          concepto_texto?: string | null
+          contrato_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          estado?: string
+          etapa?: string | null
+          factura_ref?: string | null
+          fecha_compromiso?: string | null
+          fuente?: string | null
+          gasto_real_iva?: number | null
+          gasto_real_iva_tasa?: number | null
+          gasto_real_subtotal?: number | null
+          gasto_real_total?: number | null
+          id?: string
+          monto_estimado?: number | null
+          notas?: string | null
+          orden?: number
+          presupuesto_aprobado?: number | null
+          presupuesto_previo?: number | null
+          proveedor_persona_id?: string | null
+          proveedor_texto?: string | null
+          proyecto_id?: string | null
+          source_ref?: string | null
+          tarea_origen_id?: string | null
+          tipo_insumo?: string | null
+          updated_at?: string
+        }
+        Update: {
+          autorizado_at?: string | null
+          autorizado_por?: string | null
+          concepto_id?: string | null
+          concepto_texto?: string | null
+          contrato_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          estado?: string
+          etapa?: string | null
+          factura_ref?: string | null
+          fecha_compromiso?: string | null
+          fuente?: string | null
+          gasto_real_iva?: number | null
+          gasto_real_iva_tasa?: number | null
+          gasto_real_subtotal?: number | null
+          gasto_real_total?: number | null
+          id?: string
+          monto_estimado?: number | null
+          notas?: string | null
+          orden?: number
+          presupuesto_aprobado?: number | null
+          presupuesto_previo?: number | null
+          proveedor_persona_id?: string | null
+          proveedor_texto?: string | null
+          proyecto_id?: string | null
+          source_ref?: string | null
+          tarea_origen_id?: string | null
+          tipo_insumo?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "presupuesto_partidas_concepto_id_fkey"
+            columns: ["concepto_id"]
+            isOneToOne: false
+            referencedRelation: "conceptos_compra"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presupuesto_partidas_proveedor_persona_id_fkey"
+            columns: ["proveedor_persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presupuesto_partidas_proveedor_persona_id_fkey"
+            columns: ["proveedor_persona_id"]
             isOneToOne: false
             referencedRelation: "v_empleados_full"
             referencedColumns: ["persona_id"]
@@ -8711,6 +8919,7 @@ export type Database = {
           empresa_id: string
           id: string
           notas: string | null
+          partida_id: string | null
           precio_estimado: number | null
           producto_id: string | null
           requisicion_id: string
@@ -8723,6 +8932,7 @@ export type Database = {
           empresa_id: string
           id?: string
           notas?: string | null
+          partida_id?: string | null
           precio_estimado?: number | null
           producto_id?: string | null
           requisicion_id: string
@@ -8735,12 +8945,27 @@ export type Database = {
           empresa_id?: string
           id?: string
           notas?: string | null
+          partida_id?: string | null
           precio_estimado?: number | null
           producto_id?: string | null
           requisicion_id?: string
           unidad?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "requisiciones_detalle_partida_id_fkey"
+            columns: ["partida_id"]
+            isOneToOne: false
+            referencedRelation: "presupuesto_partidas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "requisiciones_detalle_partida_id_fkey"
+            columns: ["partida_id"]
+            isOneToOne: false
+            referencedRelation: "v_partida_control"
+            referencedColumns: ["partida_id"]
+          },
           {
             foreignKeyName: "requisiciones_detalle_producto_id_fkey"
             columns: ["producto_id"]
@@ -9458,6 +9683,32 @@ export type Database = {
         }
         Relationships: []
       }
+      v_partida_control: {
+        Row: {
+          comprometido: number | null
+          concepto_id: string | null
+          concepto_texto: string | null
+          disponible: number | null
+          ejercido: number | null
+          empresa_id: string | null
+          estado: string | null
+          etapa: string | null
+          gasto_real_manual: number | null
+          pagado: number | null
+          partida_id: string | null
+          presupuesto_aprobado: number | null
+          proyecto_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "presupuesto_partidas_concepto_id_fkey"
+            columns: ["concepto_id"]
+            isOneToOne: false
+            referencedRelation: "conceptos_compra"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       cxc_cargo_ajustar: {
@@ -9850,6 +10101,7 @@ export type Database = {
         Row: {
           clase: string
           color: string | null
+          componentes: Json | null
           created_at: string
           dosis_objetivo: number | null
           estado: string
@@ -9867,6 +10119,7 @@ export type Database = {
         Insert: {
           clase: string
           color?: string | null
+          componentes?: Json | null
           created_at?: string
           dosis_objetivo?: number | null
           estado?: string
@@ -9884,6 +10137,7 @@ export type Database = {
         Update: {
           clase?: string
           color?: string | null
+          componentes?: Json | null
           created_at?: string
           dosis_objetivo?: number | null
           estado?: string
@@ -9946,7 +10200,9 @@ export type Database = {
       }
       protocolo_tomas: {
         Row: {
+          bac_ml: number | null
           compuesto_id: string
+          concentracion: number | null
           created_at: string
           dosis: number
           fecha: string
@@ -9954,9 +10210,13 @@ export type Database = {
           nota: string | null
           sitio: string | null
           unidad: string | null
+          unidades: number | null
+          vial_mg: number | null
         }
         Insert: {
+          bac_ml?: number | null
           compuesto_id: string
+          concentracion?: number | null
           created_at?: string
           dosis: number
           fecha: string
@@ -9964,9 +10224,13 @@ export type Database = {
           nota?: string | null
           sitio?: string | null
           unidad?: string | null
+          unidades?: number | null
+          vial_mg?: number | null
         }
         Update: {
+          bac_ml?: number | null
           compuesto_id?: string
+          concentracion?: number | null
           created_at?: string
           dosis?: number
           fecha?: string
@@ -9974,6 +10238,8 @@ export type Database = {
           nota?: string | null
           sitio?: string | null
           unidad?: string | null
+          unidades?: number | null
+          vial_mg?: number | null
         }
         Relationships: [
           {
@@ -10002,6 +10268,247 @@ export type Database = {
   maquinaria: {
     Tables: {
       [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+  peptides: {
+    Tables: {
+      insumos: {
+        Row: {
+          created_at: string
+          id: string
+          imported_at: string | null
+          productos: string | null
+          proveedor: string
+          url: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          imported_at?: string | null
+          productos?: string | null
+          proveedor: string
+          url?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          imported_at?: string | null
+          productos?: string | null
+          proveedor?: string
+          url?: string | null
+        }
+        Relationships: []
+      }
+      notas: {
+        Row: {
+          created_at: string
+          cuerpo: string | null
+          fecha: string | null
+          fuente: string | null
+          id: string
+          peptido: string | null
+          tags: string[] | null
+          tipo: string | null
+          titulo: string | null
+          vendor_codigo: string | null
+        }
+        Insert: {
+          created_at?: string
+          cuerpo?: string | null
+          fecha?: string | null
+          fuente?: string | null
+          id?: string
+          peptido?: string | null
+          tags?: string[] | null
+          tipo?: string | null
+          titulo?: string | null
+          vendor_codigo?: string | null
+        }
+        Update: {
+          created_at?: string
+          cuerpo?: string | null
+          fecha?: string | null
+          fuente?: string | null
+          id?: string
+          peptido?: string | null
+          tags?: string[] | null
+          tipo?: string | null
+          titulo?: string | null
+          vendor_codigo?: string | null
+        }
+        Relationships: []
+      }
+      peptidos: {
+        Row: {
+          aliases: string[] | null
+          cautelas: string | null
+          clase: string | null
+          created_at: string
+          descripcion: string | null
+          fuente: string | null
+          id: string
+          nombre: string
+          protocolo_tipico: string | null
+          reconstitucion: string | null
+          updated_at: string
+        }
+        Insert: {
+          aliases?: string[] | null
+          cautelas?: string | null
+          clase?: string | null
+          created_at?: string
+          descripcion?: string | null
+          fuente?: string | null
+          id?: string
+          nombre: string
+          protocolo_tipico?: string | null
+          reconstitucion?: string | null
+          updated_at?: string
+        }
+        Update: {
+          aliases?: string[] | null
+          cautelas?: string | null
+          clase?: string | null
+          created_at?: string
+          descripcion?: string | null
+          fuente?: string | null
+          id?: string
+          nombre?: string
+          protocolo_tipico?: string | null
+          reconstitucion?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tests: {
+        Row: {
+          batch: string | null
+          created_at: string
+          endotoxin: string | null
+          expected_mass_mg: number | null
+          file_name: string | null
+          id: string
+          imported_at: string | null
+          lab_url: string | null
+          mass_mg: number | null
+          peptido: string | null
+          purity_pct: number | null
+          test_date: string | null
+          test_lab: string | null
+          tfa: string | null
+          vendor_codigo: string | null
+        }
+        Insert: {
+          batch?: string | null
+          created_at?: string
+          endotoxin?: string | null
+          expected_mass_mg?: number | null
+          file_name?: string | null
+          id?: string
+          imported_at?: string | null
+          lab_url?: string | null
+          mass_mg?: number | null
+          peptido?: string | null
+          purity_pct?: number | null
+          test_date?: string | null
+          test_lab?: string | null
+          tfa?: string | null
+          vendor_codigo?: string | null
+        }
+        Update: {
+          batch?: string | null
+          created_at?: string
+          endotoxin?: string | null
+          expected_mass_mg?: number | null
+          file_name?: string | null
+          id?: string
+          imported_at?: string | null
+          lab_url?: string | null
+          mass_mg?: number | null
+          peptido?: string | null
+          purity_pct?: number | null
+          test_date?: string | null
+          test_lab?: string | null
+          tfa?: string | null
+          vendor_codigo?: string | null
+        }
+        Relationships: []
+      }
+      vendors: {
+        Row: {
+          china_warehouse: boolean | null
+          codigo: string
+          created_at: string
+          estado: string
+          eu_warehouse: boolean | null
+          fuente_url: string | null
+          garantia: string | null
+          id: string
+          imported_at: string | null
+          metodos_pago: string | null
+          moneda: string | null
+          nombre: string | null
+          nota_personal: string | null
+          notas: string | null
+          precio_mg: number | null
+          precio_mg_sale: number | null
+          primer_contacto: string | null
+          us_warehouse: boolean | null
+        }
+        Insert: {
+          china_warehouse?: boolean | null
+          codigo: string
+          created_at?: string
+          estado?: string
+          eu_warehouse?: boolean | null
+          fuente_url?: string | null
+          garantia?: string | null
+          id?: string
+          imported_at?: string | null
+          metodos_pago?: string | null
+          moneda?: string | null
+          nombre?: string | null
+          nota_personal?: string | null
+          notas?: string | null
+          precio_mg?: number | null
+          precio_mg_sale?: number | null
+          primer_contacto?: string | null
+          us_warehouse?: boolean | null
+        }
+        Update: {
+          china_warehouse?: boolean | null
+          codigo?: string
+          created_at?: string
+          estado?: string
+          eu_warehouse?: boolean | null
+          fuente_url?: string | null
+          garantia?: string | null
+          id?: string
+          imported_at?: string | null
+          metodos_pago?: string | null
+          moneda?: string | null
+          nombre?: string | null
+          nota_personal?: string | null
+          notas?: string | null
+          precio_mg?: number | null
+          precio_mg_sale?: number | null
+          primer_contacto?: string | null
+          us_warehouse?: boolean | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -12370,6 +12877,9 @@ export const Constants = {
     Enums: {},
   },
   maquinaria: {
+    Enums: {},
+  },
+  peptides: {
     Enums: {},
   },
   playtomic: {
