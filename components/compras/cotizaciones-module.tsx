@@ -810,11 +810,13 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
           empresaId={empresaId}
           empresaSlug="dilesa"
           puedeEscribir={puedeEscribir}
+          proveedoresDisponibles={proveedores}
           onClose={() => setCapturaId(null)}
           onSaved={() => {
             setCapturaId(null);
             void cargar();
           }}
+          onRefresh={() => void cargar()}
         />
       ) : null}
 
@@ -846,15 +848,19 @@ function CapturaPrecios({
   empresaId,
   empresaSlug,
   puedeEscribir,
+  proveedoresDisponibles,
   onClose,
   onSaved,
+  onRefresh,
 }: {
   cotizacion: CotizacionRow;
   empresaId: string;
   empresaSlug: EmpresaSlug;
   puedeEscribir: boolean;
+  proveedoresDisponibles: ProveedorOption[];
   onClose: () => void;
   onSaved: () => void;
+  onRefresh: () => void;
 }) {
   const toast = useToast();
   const [saving, setSaving] = useState(false);
@@ -973,6 +979,28 @@ function CapturaPrecios({
     onSaved();
   }
 
+  // Invitar otro proveedor a una RFQ ya creada (agrega una columna a la matriz).
+  async function invitarProveedor(proveedorId: string) {
+    const sb = createSupabaseBrowserClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: e } = await (sb.schema('erp') as any).from('cotizacion_proveedores').insert({
+      empresa_id: empresaId,
+      cotizacion_id: cotizacion.id,
+      proveedor_id: proveedorId,
+      estado: 'invitado',
+    });
+    if (e) {
+      toast.add({
+        title: 'Error',
+        description: getSupabaseErrorMessage(e, 'No se pudo invitar al proveedor.'),
+        type: 'error',
+      });
+      return;
+    }
+    toast.add({ title: 'Proveedor agregado', type: 'success' });
+    onRefresh();
+  }
+
   return (
     <div className="rounded-md border border-[var(--accent)]/40 bg-[var(--card)] p-4">
       <div className="mb-3 flex items-center justify-between">
@@ -994,6 +1022,25 @@ function CapturaPrecios({
           <X className="h-4 w-4" />
         </button>
       </div>
+
+      {puedeEscribir ? (
+        <div className="mb-3">
+          <Combobox
+            value={null}
+            onChange={(id) => {
+              if (id) void invitarProveedor(id);
+            }}
+            options={proveedoresDisponibles
+              .filter((p) => !cotizacion.proveedores.some((cp) => cp.proveedorId === p.id))
+              .map((p) => ({ value: p.id, label: p.label }))}
+            placeholder="Agregar otro proveedor a esta cotización…"
+            searchPlaceholder="Buscar proveedor…"
+            emptyText="Sin proveedores disponibles"
+            className="w-80"
+            aria-label="Agregar proveedor a la cotización"
+          />
+        </div>
+      ) : null}
 
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm">
