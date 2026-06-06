@@ -2304,11 +2304,16 @@ export type Database = {
           deleted_at: string | null
           empresa_id: string
           fecha_contrato: string
+          fecha_fin: string | null
+          fecha_inicio: string | null
+          fianza_pct: number | null
           fianzas_url: string | null
           id: string
           iva_tasa: number | null
           notas: string | null
+          objeto: string | null
           partida_id: string | null
+          periodicidad_estimaciones_dias: number | null
           proyecto_id: string | null
           retencion_pct: number
           tipo: string
@@ -2327,11 +2332,16 @@ export type Database = {
           deleted_at?: string | null
           empresa_id: string
           fecha_contrato: string
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          fianza_pct?: number | null
           fianzas_url?: string | null
           id?: string
           iva_tasa?: number | null
           notas?: string | null
+          objeto?: string | null
           partida_id?: string | null
+          periodicidad_estimaciones_dias?: number | null
           proyecto_id?: string | null
           retencion_pct?: number
           tipo?: string
@@ -2350,11 +2360,16 @@ export type Database = {
           deleted_at?: string | null
           empresa_id?: string
           fecha_contrato?: string
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          fianza_pct?: number | null
           fianzas_url?: string | null
           id?: string
           iva_tasa?: number | null
           notas?: string | null
+          objeto?: string | null
           partida_id?: string | null
+          periodicidad_estimaciones_dias?: number | null
           proyecto_id?: string | null
           retencion_pct?: number
           tipo?: string
