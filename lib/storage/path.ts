@@ -40,7 +40,8 @@ export type AdjuntoEntidad =
   | 'facturas'
   | 'proyecto_tareas'
   | 'proyecto_tarea_pasos'
-  | 'proyecto_planos';
+  | 'proyecto_planos'
+  | 'cotizaciones';
 
 export type BuildAdjuntoPathOpts = {
   empresa: EmpresaSlug;

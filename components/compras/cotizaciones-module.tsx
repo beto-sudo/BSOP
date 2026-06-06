@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { Combobox } from '@/components/ui/combobox';
+import { FileAttachments } from '@/components/file-attachments';
 import { usePermissions } from '@/components/providers';
 import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
@@ -42,6 +43,7 @@ import {
   type CotPrecio,
   type CotProveedor,
 } from '@/lib/compras/cotizaciones';
+import type { EmpresaSlug } from '@/lib/storage';
 
 const ESTADO_TONE: Record<CotizacionEstado, BadgeTone> = {
   abierta: 'info',
@@ -511,11 +513,14 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
     },
     {
       key: 'provCount',
-      label: 'Proveedores',
+      label: 'Respuestas',
       type: 'custom',
       align: 'right',
-      accessor: (r) => r.proveedores.length,
-      render: (r) => String(r.proveedores.length),
+      accessor: (r) => r.proveedores.filter((p) => p.estado !== 'invitado').length,
+      render: (r) => {
+        const resp = r.proveedores.filter((p) => p.estado !== 'invitado').length;
+        return `${resp}/${r.proveedores.length}`;
+      },
     },
     { key: 'fechaLimite', label: 'Límite', type: 'text', render: (r) => r.fechaLimite || '—' },
     ...(puedeEscribir
@@ -526,26 +531,20 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
             type: 'custom' as const,
             sortable: false,
             align: 'right' as const,
-            width: 'w-40',
+            width: 'w-12',
             render: (r: CotizacionRow) =>
               r.estado === 'abierta' || r.estado === 'comparada' ? (
-                <div className="flex items-center justify-end gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setCapturaId(r.id)}
-                    className="rounded border border-[var(--border)] px-2 py-1 text-xs text-[var(--text)]/80 hover:bg-[var(--card)]"
-                  >
-                    Capturar precios
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void cancelar(r)}
-                    aria-label={`Cancelar ${r.codigo}`}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded text-[var(--text)]/40 hover:bg-red-50 hover:text-red-600"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void cancelar(r);
+                  }}
+                  aria-label={`Cancelar ${r.codigo}`}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded text-[var(--text)]/40 hover:bg-red-50 hover:text-red-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               ) : null,
           },
         ]
@@ -561,8 +560,10 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)]">Cotizaciones</h1>
           <p className="text-sm text-[var(--text)]/60">
-            RFQ formal multi-proveedor: pide precio a N por las líneas (ancladas a partida), captura
-            la matriz y adjudica a OC o contrato (comparativa y adjudicación en la siguiente fase).
+            Solicita precio a varios proveedores y compara. Crea la RFQ con sus líneas, invita
+            proveedores, y <strong className="font-medium">haz clic en una cotización</strong> para
+            capturar lo que te cotizaron: precios por línea, archivo y condiciones. La adjudicación
+            (→ OC o contrato) llega en la siguiente fase.
           </p>
         </div>
       </header>
@@ -807,6 +808,8 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
           key={enCaptura.id}
           cotizacion={enCaptura}
           empresaId={empresaId}
+          empresaSlug="dilesa"
+          puedeEscribir={puedeEscribir}
           onClose={() => setCapturaId(null)}
           onSaved={() => {
             setCapturaId(null);
@@ -822,6 +825,7 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
         loading={loading}
         error={error}
         onRetry={() => void cargar()}
+        onRowClick={(r) => setCapturaId(r.id === capturaId ? null : r.id)}
         initialSort={{ key: 'fechaLimite', dir: 'desc' }}
         emptyTitle="Sin cotizaciones"
         emptyDescription="No hay RFQ que coincidan. Crea una con “Nueva cotización”."
@@ -840,11 +844,15 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
 function CapturaPrecios({
   cotizacion,
   empresaId,
+  empresaSlug,
+  puedeEscribir,
   onClose,
   onSaved,
 }: {
   cotizacion: CotizacionRow;
   empresaId: string;
+  empresaSlug: EmpresaSlug;
+  puedeEscribir: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -968,9 +976,15 @@ function CapturaPrecios({
   return (
     <div className="rounded-md border border-[var(--accent)]/40 bg-[var(--card)] p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
-          Capturar precios · {cotizacion.codigo}
-        </h2>
+        <div>
+          <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
+            Capturar y comparar · {cotizacion.codigo}
+          </h2>
+          <p className="mt-0.5 text-xs text-[var(--text)]/50">
+            Captura el precio de cada proveedor por línea (el mejor por renglón se resalta); sube su
+            archivo de cotización y condiciones abajo.
+          </p>
+        </div>
         <button
           type="button"
           onClick={onClose}
@@ -1041,44 +1055,58 @@ function CapturaPrecios({
         </table>
       </div>
 
-      {/* Datos de respuesta por proveedor */}
-      <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {cotizacion.proveedores.map((p) => (
-          <div key={p.id} className="rounded border border-[var(--border)] p-2">
-            <p className="mb-1.5 text-xs font-medium text-[var(--text)]">{p.proveedorNombre}</p>
-            <div className="flex flex-wrap gap-1.5">
-              <Input
-                value={respuesta[p.id]?.tiempoEntrega ?? ''}
-                onChange={(e) =>
-                  setRespuesta((prev) => ({
-                    ...prev,
-                    [p.id]: { ...prev[p.id], tiempoEntrega: e.target.value },
-                  }))
-                }
-                placeholder="Entrega"
-                className="w-28"
-              />
-              <Input
-                value={respuesta[p.id]?.condiciones ?? ''}
-                onChange={(e) =>
-                  setRespuesta((prev) => ({
-                    ...prev,
-                    [p.id]: { ...prev[p.id], condiciones: e.target.value },
-                  }))
-                }
-                placeholder="Condiciones"
-                className="w-32"
+      {/* Cotización recibida por proveedor: archivo (PDF/Excel) + condiciones */}
+      <div className="mt-5">
+        <p className="mb-2 text-sm font-medium text-[var(--text)]/70">
+          Cotización recibida por proveedor (archivo + condiciones)
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {cotizacion.proveedores.map((p) => (
+            <div key={p.id} className="rounded-md border border-[var(--border)] p-3">
+              <p className="mb-2 text-xs font-medium text-[var(--text)]">{p.proveedorNombre}</p>
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                <Input
+                  value={respuesta[p.id]?.tiempoEntrega ?? ''}
+                  onChange={(e) =>
+                    setRespuesta((prev) => ({
+                      ...prev,
+                      [p.id]: { ...prev[p.id], tiempoEntrega: e.target.value },
+                    }))
+                  }
+                  placeholder="Tiempo de entrega"
+                  className="w-32"
+                />
+                <Input
+                  value={respuesta[p.id]?.condiciones ?? ''}
+                  onChange={(e) =>
+                    setRespuesta((prev) => ({
+                      ...prev,
+                      [p.id]: { ...prev[p.id], condiciones: e.target.value },
+                    }))
+                  }
+                  placeholder="Condiciones de pago"
+                  className="w-36"
+                />
+              </div>
+              <FileAttachments
+                empresaId={empresaId}
+                empresaSlug={empresaSlug}
+                entidad="cotizaciones"
+                entidadId={p.id}
+                roles={[{ id: 'cotizacion', label: 'Archivo de cotización' }]}
+                variant="flat"
+                readOnly={!puedeEscribir}
               />
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
       <div className="mt-4 flex items-center justify-end gap-2">
         <Button variant="outline" onClick={onClose} disabled={saving}>
           Cerrar
         </Button>
-        <Button onClick={guardar} disabled={saving}>
+        <Button onClick={guardar} disabled={saving || !puedeEscribir}>
           {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
           Guardar precios
         </Button>

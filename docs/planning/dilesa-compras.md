@@ -542,3 +542,18 @@ Próximo: Fase 2 = UI de captura (`components/compras/cotizaciones-module.tsx` +
   format, schema). **Sin migración → preview-first sin auto-merge** (Beto revisa el preview
   visual). Próximo: Fase 3 = comparativa lado a lado + adjudicación → OC (`cotizacion_id` +
   herencia de precios) o contrato de obra (`partida_id` + `cotizacion_id`).
+- **2026-06-06** — **Ajustes UX de Fase 2 (feedback de Beto en el preview, mismo PR #706).**
+  Dos cambios pedidos: (1) **selector de proveedores con búsqueda** — reemplazado el grid de
+  chips toggle (no escala con 200+ proveedores) por el `Combobox` searchable del repo (buscar
+  y agregar uno a uno; invitados como chips removibles; el dropdown excluye a los ya
+  agregados). (2) **flujo de captura claro + recepción de archivos** — Beto no encontraba
+  dónde se "recibe/captura" la cotización. La captura dejó de estar escondida en un botón:
+  ahora **clic en la fila** de la RFQ expande el panel "Capturar y comparar" (patrón
+  `onRowClick` + panel inline en la página, como `tareas-checklist`); la columna muestra
+  **Respuestas X/N**; y cada proveedor tiene su **`<FileAttachments>`** (ADR-022, bucket
+  `adjuntos` + `erp.adjuntos`) para subir el PDF/Excel de su cotización — se agregó
+  `'cotizaciones'` a `AdjuntoEntidad` (`lib/storage/path.ts`), `entidadId` = la fila del
+  proveedor invitado. El campo `cotizacion_proveedores.adjunto_url` de la Fase 1 queda sin uso
+  (los adjuntos viven en `erp.adjuntos` por política; el campo se retira en un cleanup futuro).
+  Gate de escritura: el guardado de precios y el upload respetan `puedeEscribir`. 5 checks
+  verdes (1305 tests).
