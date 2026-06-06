@@ -35,6 +35,7 @@ import {
   type ProyectoOption,
   type ProyectoSelectorRow,
 } from '@/lib/dilesa/proyectos-selector';
+import { buildPartidaIndex, type PartidaGrupo } from '@/lib/compras/partidas';
 
 type Contratista = { id: string; nombre: string; abreviacion: string | null };
 
@@ -69,15 +70,25 @@ function NuevoContratoObraBody() {
   const [contratistas, setContratistas] = useState<Contratista[]>([]);
   const [proyectos, setProyectos] = useState<ProyectoOption[]>([]);
   const [seqByContratista, setSeqByContratista] = useState<Map<string, number>>(new Map());
+  // Partidas del presupuesto por proyecto (etapa›capítulo) para ligar el contrato (ADR-042).
+  const [partidasByProyecto, setPartidasByProyecto] = useState<Map<string, PartidaGrupo[]>>(
+    new Map()
+  );
 
   // ── Form ───────────────────────────────────────────────────────────────
   const [contratistaId, setContratistaId] = useState('');
   const [proyectoId, setProyectoId] = useState('');
+  const [partidaId, setPartidaId] = useState('');
   const [tipo, setTipo] = useState<string>('urbanizacion');
   const [fechaContrato, setFechaContrato] = useState(new Date().toISOString().slice(0, 10));
   const [valorTotal, setValorTotal] = useState('');
   const [anticipoPct, setAnticipoPct] = useState('');
   const [retencionPct, setRetencionPct] = useState('');
+  const [fianzaPct, setFianzaPct] = useState('');
+  const [periodicidadDias, setPeriodicidadDias] = useState('');
+  const [objeto, setObjeto] = useState('');
+  const [fechaInicio, setFechaInicio] = useState('');
+  const [fechaFin, setFechaFin] = useState('');
   const [codigoOverride, setCodigoOverride] = useState('');
   const [notas, setNotas] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -87,38 +98,57 @@ function NuevoContratoObraBody() {
     setLoadingMeta(true);
     setLoadError(null);
 
-    const [contratistasRes, datosRes, proyectosRes, contratosCountRes] = await Promise.all([
-      sb
-        .schema('erp')
-        .from('personas')
-        .select('id, nombre, apellido_paterno, apellido_materno')
-        .eq('empresa_id', DILESA_EMPRESA_ID)
-        .eq('tipo', 'contratista')
-        .eq('activo', true),
-      sb
-        .schema('dilesa')
-        .from('contratistas_datos')
-        .select('persona_id, abreviacion')
-        .eq('empresa_id', DILESA_EMPRESA_ID)
-        .is('deleted_at', null),
-      sb
-        .schema('dilesa')
-        .from('proyectos')
-        .select('id, nombre, tipo, proyecto_predecesor_id')
-        .eq('empresa_id', DILESA_EMPRESA_ID)
-        .is('deleted_at', null),
-      // Conteo de contratos de obra (no-vivienda) por contratista → seq del código.
-      sb
-        .schema('dilesa')
-        .from('contratos_construccion')
-        .select('contratista_id, tipo')
-        .eq('empresa_id', DILESA_EMPRESA_ID)
-        .neq('tipo', 'vivienda')
-        .is('deleted_at', null),
-    ]);
+    const [contratistasRes, datosRes, proyectosRes, contratosCountRes, partidasRes, catalogoRes] =
+      await Promise.all([
+        sb
+          .schema('erp')
+          .from('personas')
+          .select('id, nombre, apellido_paterno, apellido_materno')
+          .eq('empresa_id', DILESA_EMPRESA_ID)
+          .eq('tipo', 'contratista')
+          .eq('activo', true),
+        sb
+          .schema('dilesa')
+          .from('contratistas_datos')
+          .select('persona_id, abreviacion')
+          .eq('empresa_id', DILESA_EMPRESA_ID)
+          .is('deleted_at', null),
+        sb
+          .schema('dilesa')
+          .from('proyectos')
+          .select('id, nombre, tipo, proyecto_predecesor_id')
+          .eq('empresa_id', DILESA_EMPRESA_ID)
+          .is('deleted_at', null),
+        // Conteo de contratos de obra (no-vivienda) por contratista → seq del código.
+        sb
+          .schema('dilesa')
+          .from('contratos_construccion')
+          .select('contratista_id, tipo')
+          .eq('empresa_id', DILESA_EMPRESA_ID)
+          .neq('tipo', 'vivienda')
+          .is('deleted_at', null),
+        // Partidas del presupuesto + catálogo → selector de partida (ADR-042).
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (sb.schema('erp') as any)
+          .from('presupuesto_partidas')
+          .select('id, proyecto_id, concepto_id, concepto_texto')
+          .eq('empresa_id', DILESA_EMPRESA_ID)
+          .is('deleted_at', null),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (sb.schema('erp') as any)
+          .from('conceptos_compra')
+          .select('id, padre_id, nivel, codigo, nombre')
+          .eq('empresa_id', DILESA_EMPRESA_ID)
+          .is('deleted_at', null),
+      ]);
 
     const firstErr =
-      contratistasRes.error ?? datosRes.error ?? proyectosRes.error ?? contratosCountRes.error;
+      contratistasRes.error ??
+      datosRes.error ??
+      proyectosRes.error ??
+      contratosCountRes.error ??
+      partidasRes.error ??
+      catalogoRes.error;
     if (firstErr) {
       setLoadError(getSupabaseErrorMessage(firstErr, 'No se pudieron cargar los catálogos.'));
       setLoadingMeta(false);
@@ -143,6 +173,13 @@ function NuevoContratoObraBody() {
     setProyectos(
       buildProyectoOptions((proyectosRes.data ?? []) as unknown as ProyectoSelectorRow[])
     );
+    const { gruposByProyecto } = buildPartidaIndex(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (partidasRes.data ?? []) as any[],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (catalogoRes.data ?? []) as any[]
+    );
+    setPartidasByProyecto(gruposByProyecto);
 
     const seq = new Map<string, number>();
     for (const c of contratosCountRes.data ?? []) {
@@ -189,10 +226,16 @@ function NuevoContratoObraBody() {
           fecha_contrato: fechaContrato,
           contratista_id: contratistaId,
           proyecto_id: proyectoId,
+          partida_id: partidaId || null,
           tipo,
           valor_total: valorNum,
           anticipo_pct: anticipoPct.trim() ? Number(anticipoPct) : 0,
           retencion_pct: retencionPct.trim() ? Number(retencionPct) : 0,
+          fianza_pct: fianzaPct.trim() ? Number(fianzaPct) : null,
+          periodicidad_estimaciones_dias: periodicidadDias.trim() ? Number(periodicidadDias) : null,
+          objeto: objeto.trim() || null,
+          fecha_inicio: fechaInicio || null,
+          fecha_fin: fechaFin || null,
           notas: notas.trim() || null,
         })
         .select('id')
@@ -270,7 +313,10 @@ function NuevoContratoObraBody() {
             <select
               className={selectCls}
               value={proyectoId}
-              onChange={(e) => setProyectoId(e.target.value)}
+              onChange={(e) => {
+                setProyectoId(e.target.value);
+                setPartidaId('');
+              }}
             >
               <option value="">— selecciona —</option>
               {proyectos.map((p) => (
@@ -279,6 +325,30 @@ function NuevoContratoObraBody() {
                 </option>
               ))}
             </select>
+          </Field>
+          <Field label="Partida del presupuesto">
+            <select
+              className={selectCls}
+              value={partidaId}
+              onChange={(e) => setPartidaId(e.target.value)}
+              disabled={!proyectoId}
+            >
+              <option value="">
+                {proyectoId ? '— sin ligar —' : 'Selecciona proyecto primero'}
+              </option>
+              {(partidasByProyecto.get(proyectoId) ?? []).map((g) => (
+                <optgroup key={g.key} label={g.label}>
+                  {g.partidas.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            <Hint>
+              Liga el contrato a una partida para que su monto cuente en el costeo (ADR-042).
+            </Hint>
           </Field>
           <Field label="Tipo de obra *">
             <select className={selectCls} value={tipo} onChange={(e) => setTipo(e.target.value)}>
@@ -353,6 +423,54 @@ function NuevoContratoObraBody() {
               onChange={(e) => setNotas(e.target.value)}
             />
           </Field>
+        </div>
+      </Section>
+
+      <Section title="Alcance, plazo y garantía">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <Field label="Objeto del contrato">
+              <textarea
+                className="min-h-[60px] w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm"
+                value={objeto}
+                onChange={(e) => setObjeto(e.target.value)}
+                placeholder="Ej. Suministro y mano de obra de 225 m de muro de contención…"
+              />
+            </Field>
+          </div>
+          <Field label="Inicio de ejecución">
+            <Input
+              type="date"
+              value={fechaInicio}
+              onChange={(e) => setFechaInicio(e.target.value)}
+            />
+          </Field>
+          <Field label="Fin de ejecución">
+            <Input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Fianza %">
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                value={fianzaPct}
+                onChange={(e) => setFianzaPct(e.target.value)}
+                placeholder="0"
+              />
+            </Field>
+            <Field label="Estimaciones c/ N días">
+              <Input
+                type="number"
+                step="1"
+                min="0"
+                value={periodicidadDias}
+                onChange={(e) => setPeriodicidadDias(e.target.value)}
+                placeholder="14"
+              />
+            </Field>
+          </div>
         </div>
       </Section>
 

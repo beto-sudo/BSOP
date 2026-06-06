@@ -500,3 +500,16 @@ contrato-obra.tsx`) es para **vivienda** (lotes/prototipos/Anexo 3), no para obr
   acumular el drift que rompe el Supabase Preview — lección de [[reference_bsop_merge_flow_multisesion]]).
   SCHEMA_REF + types regenerados (5 columnas, sin drift). Próximo: Fase 2 (UI alta/edición de
   contrato con selector de partida + estos campos).
+- **2026-06-06** — **Sprint Contratos→partidas+PDF · Fase 2 (UI alta + edición/ligado).** Dos
+  cosas: (1) **Alta** (`nuevo-obra/page.tsx`): selector de **partida del presupuesto** (agrupado
+  etapa›capítulo vía `buildPartidaIndex`, depende del proyecto; resetea al cambiar de proyecto)
+  - sección "Alcance, plazo y garantía" con los 5 campos nuevos (`objeto`, `fecha_inicio`,
+    `fecha_fin`, `fianza_pct`, `periodicidad_estimaciones_dias`); el insert los popula +
+    `partida_id`. (2) **Edición/ligado** (`[id]/page.tsx`, detalle del contrato): sub-componente
+    `<LigarPartida>` — selector de partida + Guardar (`UPDATE partida_id`) en una Section nueva,
+    para **ligar los 302 contratos existentes** (incl. Maya) a su partida → la herramienta del
+    backfill de Fase 3. Respeta `puedeEscribir` (write del sub-slug `dilesa.construccion.contratos`).
+    El detalle era solo-lectura; ahora permite el ligado puntual. Una vez ligado, el `valor_total`
+    del contrato cuenta como comprometido en esa partida vía `v_partida_control` (cableado en Fase
+    0). 5 checks verdes (1305 tests). **Sin migración → preview-first.** Próximo: Fase 3 (Costeo
+    muestra el comprometido **por partida** + backfill de los 302 con Beto) y Fase 4 (PDF de obra).

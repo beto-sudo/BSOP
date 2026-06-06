@@ -26,11 +26,16 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Download, ExternalLink, FileText, HardHat } from 'lucide-react';
+import { ArrowLeft, Download, ExternalLink, FileText, HardHat, Loader2, Save } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/toast';
+import { usePermissions } from '@/components/providers';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
+import { buildPartidaIndex, type PartidaGrupo } from '@/lib/compras/partidas';
 import { ObraContratoDetalle } from '@/components/dilesa/obra-contrato-detalle';
 
 type Contrato = {
@@ -380,6 +385,14 @@ function DetailInner() {
       </Section>
 
       {contrato.tipo !== 'vivienda' ? (
+        <LigarPartida
+          contratoId={contrato.id}
+          proyectoId={contrato.proyecto_id}
+          partidaIdInicial={(contrato as { partida_id?: string | null }).partida_id ?? null}
+        />
+      ) : null}
+
+      {contrato.tipo !== 'vivienda' ? (
         <ObraContratoDetalle
           contratoId={contrato.id}
           valorTotal={contrato.valor_total}
@@ -556,5 +569,121 @@ function Kpi({ label, value, accent = false }: { label: string; value: string; a
       </div>
       <div className="mt-0.5 text-lg font-semibold tabular-nums text-[var(--text)]">{value}</div>
     </div>
+  );
+}
+
+/**
+ * Liga (o desliga) el contrato a una partida del presupuesto (ADR-042). Permite
+ * el backfill de los contratos existentes: al ligarlos, su `valor_total` cuenta
+ * como comprometido en esa partida vía `erp.v_partida_control`.
+ */
+function LigarPartida({
+  contratoId,
+  proyectoId,
+  partidaIdInicial,
+}: {
+  contratoId: string;
+  proyectoId: string | null;
+  partidaIdInicial: string | null;
+}) {
+  const { permissions } = usePermissions();
+  const toast = useToast();
+  const puedeEscribir =
+    permissions.isAdmin || permissions.modulos.get('dilesa.construccion.contratos')?.write === true;
+  const [grupos, setGrupos] = useState<PartidaGrupo[]>([]);
+  const [partidaId, setPartidaId] = useState(partidaIdInicial ?? '');
+  const [guardando, setGuardando] = useState(false);
+
+  useEffect(() => {
+    if (!proyectoId) return;
+    let activo = true;
+    const sb = createSupabaseBrowserClient();
+    void (async () => {
+      const [partidasRes, catRes] = await Promise.all([
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (sb.schema('erp') as any)
+          .from('presupuesto_partidas')
+          .select('id, proyecto_id, concepto_id, concepto_texto')
+          .eq('empresa_id', DILESA_EMPRESA_ID)
+          .is('deleted_at', null),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (sb.schema('erp') as any)
+          .from('conceptos_compra')
+          .select('id, padre_id, nivel, codigo, nombre')
+          .eq('empresa_id', DILESA_EMPRESA_ID)
+          .is('deleted_at', null),
+      ]);
+      if (!activo) return;
+      const { gruposByProyecto } = buildPartidaIndex(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (partidasRes.data ?? []) as any[],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (catRes.data ?? []) as any[]
+      );
+      setGrupos(gruposByProyecto.get(proyectoId) ?? []);
+    })();
+    return () => {
+      activo = false;
+    };
+  }, [proyectoId]);
+
+  async function guardar() {
+    if (guardando) return;
+    setGuardando(true);
+    const sb = createSupabaseBrowserClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (sb.schema('dilesa') as any)
+      .from('contratos_construccion')
+      .update({ partida_id: partidaId || null, updated_at: new Date().toISOString() })
+      .eq('id', contratoId);
+    if (error) {
+      toast.add({
+        title: 'Error',
+        description: getSupabaseErrorMessage(error, 'No se pudo guardar la partida.'),
+        type: 'error',
+      });
+    } else {
+      toast.add({ title: partidaId ? 'Partida ligada' : 'Partida desligada', type: 'success' });
+    }
+    setGuardando(false);
+  }
+
+  if (!proyectoId) return null;
+
+  return (
+    <section className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-5">
+      <h2 className="mb-1 text-sm font-medium uppercase tracking-wider text-muted-foreground">
+        Partida del presupuesto
+      </h2>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Liga este contrato a una partida del costeo para que su monto cuente como comprometido en
+        esa partida (ADR-042).
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          className="h-9 min-w-[260px] flex-1 rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 text-sm"
+          value={partidaId}
+          onChange={(e) => setPartidaId(e.target.value)}
+          disabled={!puedeEscribir}
+        >
+          <option value="">— sin ligar —</option>
+          {grupos.map((g) => (
+            <optgroup key={g.key} label={g.label}>
+              {g.partidas.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+        {puedeEscribir ? (
+          <Button onClick={guardar} disabled={guardando || partidaId === (partidaIdInicial ?? '')}>
+            {guardando ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+            Guardar
+          </Button>
+        ) : null}
+      </div>
+    </section>
   );
 }
