@@ -489,3 +489,14 @@ contrato-obra.tsx`) es para **vivienda** (lotes/prototipos/Anexo 3), no para obr
      (Fase 1); estrategia de backfill (asistido vs manual, Fase 3); si el PDF es plantilla
      genérica de obra o varía por tipo (Fase 4). **Estado:** plan documentado; pendiente
      arrancar Fase 1 (DB) con OK.
+- **2026-06-06** — **Sprint Contratos→partidas+PDF · Fase 1 (DB campos) aplicada a prod.**
+  Migración `20260606120000_contratos_construccion_campos_obra`: 5 columnas nullable en
+  `dilesa.contratos_construccion` — `objeto` (descripción del trabajo), `fecha_inicio` /
+  `fecha_fin` (plazo de ejecución), `fianza_pct` (fianza de cumplimiento) y
+  `periodicidad_estimaciones_dias` — para capturar el contrato completo (formato legal real)
+  y habilitar el PDF de obra (Fase 4). **Aditivo puro** (no afecta los 303 contratos;
+  validada en dry-run: 5 columnas creadas). Aplicada vía MCP con OK de Beto; **historial
+  registrado con el timestamp del archivo** (repair inmediato post-`apply_migration` para no
+  acumular el drift que rompe el Supabase Preview — lección de [[reference_bsop_merge_flow_multisesion]]).
+  SCHEMA_REF + types regenerados (5 columnas, sin drift). Próximo: Fase 2 (UI alta/edición de
+  contrato con selector de partida + estos campos).
