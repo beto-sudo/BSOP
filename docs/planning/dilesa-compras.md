@@ -557,3 +557,19 @@ Próximo: Fase 2 = UI de captura (`components/compras/cotizaciones-module.tsx` +
   (los adjuntos viven en `erp.adjuntos` por política; el campo se retira en un cleanup futuro).
   Gate de escritura: el guardado de precios y el upload respetan `puedeEscribir`. 5 checks
   verdes (1305 tests).
+- **2026-06-06** — **Fase 2: envío de la solicitud al proveedor (feedback de Beto, mismo
+  PR #706).** Tres pedidos más: (1) **agregar proveedores a una RFQ ya creada** — combobox
+  en el panel de captura que invita otro proveedor (insert + refresh sin cerrar). (2) **PDF
+  de Solicitud de Cotización** — componente `lib/dilesa/pdf/solicitud-cotizacion.tsx`
+  (reusa branding DILESA `HeaderBand`/`FooterBand`/`styles`); lleva **solo el listado** de
+  conceptos a cotizar (concepto/partida, descripción, cantidad, unidad — sin precios, el
+  proveedor responde en su formato) + folio/proyecto/fecha límite/destinatario + nota. (3)
+  **Envío por email** — endpoint `app/api/dilesa/cotizaciones/[id]/solicitud/route.tsx`:
+  GET `?proveedor=` descarga el PDF; POST `{cotProveedorId}` lo manda al `erp.personas.email`
+  del proveedor vía Resend (mismo patrón que estimaciones: `renderToBuffer` + adjunto base64
+  - `from` DILESA + `writeNotificationLog` con slug `dilesa_cotizacion`, fail-open sin
+    definición). UI: botones **PDF** y **Enviar** por proveedor en su tarjeta; el envío
+    (acción externa) pide **confirmación inline** y respeta `puedeEscribir`. Pendiente fino:
+    el `from`/`reply_to` usa defaults (`noreply@bsop.io` / `compras@dilesa.mx`) — afinar
+    cuando Beto defina el buzón; idealmente crear la definición `dilesa_cotizacion` en el
+    catálogo de notificaciones. 5 checks verdes (1305 tests). Sigue preview-first.

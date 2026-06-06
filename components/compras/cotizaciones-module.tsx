@@ -15,7 +15,18 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ClipboardList, Loader2, Plus, RefreshCw, Save, Search, Trash2, X } from 'lucide-react';
+import {
+  ClipboardList,
+  FileDown,
+  Loader2,
+  Mail,
+  Plus,
+  RefreshCw,
+  Save,
+  Search,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
 import { Input } from '@/components/ui/input';
@@ -887,8 +898,43 @@ function CapturaPrecios({
     return seed;
   });
 
+  // Confirmación de envío por email (acción externa) + estado de envío.
+  const [confirmEnvioId, setConfirmEnvioId] = useState<string | null>(null);
+  const [enviandoId, setEnviandoId] = useState<string | null>(null);
+
   const setCelda = (cotProvId: string, lineaId: string, val: string) =>
     setPrecios((prev) => ({ ...prev, [`${cotProvId}|${lineaId}`]: val }));
+
+  // Enviar la Solicitud de Cotización en PDF al email del proveedor (vía endpoint Resend).
+  async function enviarSolicitud(cotProveedorId: string) {
+    setConfirmEnvioId(null);
+    setEnviandoId(cotProveedorId);
+    try {
+      const res = await fetch(`/api/dilesa/cotizaciones/${cotizacion.id}/solicitud`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cotProveedorId }),
+      });
+      const json = (await res.json()) as { sentTo?: string; error?: string };
+      if (!res.ok) {
+        toast.add({
+          title: 'No se envió',
+          description: json.error ?? 'Error al enviar la solicitud.',
+          type: 'error',
+        });
+      } else {
+        toast.add({
+          title: 'Solicitud enviada',
+          description: json.sentTo ? `A ${json.sentTo}` : undefined,
+          type: 'success',
+        });
+      }
+    } catch {
+      toast.add({ title: 'Error', description: 'No se pudo enviar.', type: 'error' });
+    } finally {
+      setEnviandoId(null);
+    }
+  }
 
   // Total por proveedor con la matriz local (en edición).
   const totalLocal = (cotProvId: string): number =>
@@ -1144,6 +1190,52 @@ function CapturaPrecios({
                 variant="flat"
                 readOnly={!puedeEscribir}
               />
+              {/* Enviar la solicitud (PDF) al proveedor: descargar o por email */}
+              <div className="mt-2 flex items-center gap-1.5">
+                <a
+                  href={`/api/dilesa/cotizaciones/${cotizacion.id}/solicitud?proveedor=${p.id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 rounded border border-[var(--border)] px-2 py-1 text-xs text-[var(--text)]/80 hover:bg-[var(--bg)]"
+                >
+                  <FileDown className="h-3 w-3" /> PDF
+                </a>
+                {puedeEscribir ? (
+                  confirmEnvioId === p.id ? (
+                    <span className="inline-flex items-center gap-1 text-xs text-[var(--text)]/70">
+                      ¿Enviar por email?
+                      <button
+                        type="button"
+                        onClick={() => void enviarSolicitud(p.id)}
+                        className="rounded bg-[var(--accent)] px-1.5 py-0.5 text-white"
+                      >
+                        Sí
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmEnvioId(null)}
+                        className="rounded border border-[var(--border)] px-1.5 py-0.5"
+                      >
+                        No
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmEnvioId(p.id)}
+                      disabled={enviandoId === p.id}
+                      className="inline-flex items-center gap-1 rounded border border-[var(--border)] px-2 py-1 text-xs text-[var(--text)]/80 hover:bg-[var(--bg)] disabled:opacity-50"
+                    >
+                      {enviandoId === p.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Mail className="h-3 w-3" />
+                      )}
+                      Enviar
+                    </button>
+                  )
+                ) : null}
+              </div>
             </div>
           ))}
         </div>
