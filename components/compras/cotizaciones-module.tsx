@@ -3,12 +3,13 @@
 /**
  * CotizacionesModule — RFQ formal multi-proveedor (DILESA).
  *
- * Iniciativa `dilesa-compras` · Sprint Cotizaciones · Fase 2 (captura). Tab
+ * Iniciativa `dilesa-compras` · Sprint Cotizaciones (Fases 2-3). Tab
  * "Cotizaciones" del hub Compras. La RFQ es una **matriz**: N líneas (ancladas a
- * partida, D12) × M proveedores invitados, con un precio por celda. Aquí se
- * crea la RFQ, se invita a proveedores y se captura su respuesta + la matriz de
- * precios. La comparativa lado a lado y la adjudicación (→ OC o contrato) viven
- * en la Fase 3.
+ * partida, D12) × M proveedores invitados, con un precio por celda. Cubre el ciclo
+ * completo: crear la RFQ, invitar proveedores (y agregar más después), capturar su
+ * respuesta (precios + archivo + condiciones), comparar lado a lado (mejor precio
+ * resaltado + ranking), y **adjudicar** al ganador → genera una OC (tipo compra) o
+ * un contrato de obra (tipo obra), heredando los precios del proveedor elegido.
  *
  * Patrón del repo (igual que OrdenesCompraModule): client-side directo, fetch
  * paralelo + Map lookups, un proyecto a la vez, selector solo-con-presupuesto.
@@ -16,6 +17,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Award,
   ClipboardList,
   FileDown,
   Loader2,
@@ -45,8 +47,13 @@ import {
 } from '@/lib/dilesa/proyectos-selector';
 import { buildPartidaIndex, type PartidaGrupo } from '@/lib/compras/partidas';
 import {
+  adjudicaA,
   deriveCotizacionKpis,
   mejorProveedorLinea,
+  precioCelda,
+  rankingProveedores,
+  totalProveedor,
+  puedeAdjudicar,
   type CotizacionEstado,
   type CotizacionRow,
   type CotizacionTipo,
@@ -901,6 +908,9 @@ function CapturaPrecios({
   // Confirmación de envío por email (acción externa) + estado de envío.
   const [confirmEnvioId, setConfirmEnvioId] = useState<string | null>(null);
   const [enviandoId, setEnviandoId] = useState<string | null>(null);
+  // Confirmación + estado de adjudicación (genera OC o contrato).
+  const [confirmAdjId, setConfirmAdjId] = useState<string | null>(null);
+  const [adjudicandoId, setAdjudicandoId] = useState<string | null>(null);
 
   const setCelda = (cotProvId: string, lineaId: string, val: string) =>
     setPrecios((prev) => ({ ...prev, [`${cotProvId}|${lineaId}`]: val }));
@@ -1045,6 +1055,142 @@ function CapturaPrecios({
     }
     toast.add({ title: 'Proveedor agregado', type: 'success' });
     onRefresh();
+  }
+
+  // Adjudicar la RFQ a un proveedor: genera OC (compra) o contrato de obra (obra),
+  // marca la cotización 'adjudicada' y a los proveedores elegida/descartada.
+  async function adjudicar(cotProveedorId: string) {
+    setConfirmAdjId(null);
+    setAdjudicandoId(cotProveedorId);
+    const sb = createSupabaseBrowserClient();
+    const prov = cotizacion.proveedores.find((p) => p.id === cotProveedorId);
+    if (!prov) {
+      setAdjudicandoId(null);
+      return;
+    }
+    const total = totalProveedor(cotizacion, cotProveedorId);
+    try {
+      if (adjudicaA(cotizacion.tipo) === 'oc') {
+        const folio = `OC-${Date.now().toString(36).toUpperCase()}`;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const ocResp = await (sb.schema('erp') as any)
+          .from('ordenes_compra')
+          .insert({
+            empresa_id: empresaId,
+            codigo: folio,
+            cotizacion_id: cotizacion.id,
+            proveedor_id: prov.proveedorId,
+            estado: 'borrador',
+            total,
+          })
+          .select('id')
+          .single();
+        if (ocResp.error || !ocResp.data) {
+          throw new Error(
+            getSupabaseErrorMessage(ocResp.error, 'No se pudo crear la orden de compra.')
+          );
+        }
+        const ocId = ocResp.data.id as string;
+        const detalle = cotizacion.lineas.map((l) => {
+          const precio = precioCelda(cotizacion.precios, cotProveedorId, l.id);
+          return {
+            empresa_id: empresaId,
+            orden_compra_id: ocId,
+            partida_id: l.partidaId,
+            producto_id: null,
+            descripcion: l.descripcion.trim() || null,
+            unidad: l.unidad,
+            cantidad: l.cantidad,
+            precio_unitario: precio,
+            subtotal: (l.cantidad ?? 0) * precio,
+          };
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const detResp = await (sb.schema('erp') as any)
+          .from('ordenes_compra_detalle')
+          .insert(detalle);
+        if (detResp.error) {
+          throw new Error(
+            getSupabaseErrorMessage(detResp.error, 'OC creada pero faltaron líneas.')
+          );
+        }
+      } else {
+        // Contrato de obra: resolver la persona del proveedor + partida/proyecto.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: provRow } = await (sb.schema('erp') as any)
+          .from('proveedores')
+          .select('persona_id')
+          .eq('id', prov.proveedorId)
+          .maybeSingle();
+        const personaId = provRow?.persona_id as string | undefined;
+        if (!personaId) throw new Error('El proveedor elegido no tiene persona asociada.');
+        const partidaId = cotizacion.lineas.map((l) => l.partidaId).find(Boolean) ?? null;
+        let proyectoId: string | null = null;
+        if (partidaId) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data: partRow } = await (sb.schema('erp') as any)
+            .from('presupuesto_partidas')
+            .select('proyecto_id')
+            .eq('id', partidaId)
+            .maybeSingle();
+          proyectoId = (partRow?.proyecto_id as string | null) ?? null;
+        }
+        const folio = `CO-${Date.now().toString(36).toUpperCase()}`;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const coResp = await (sb.schema('dilesa') as any)
+          .from('contratos_construccion')
+          .insert({
+            empresa_id: empresaId,
+            codigo: folio,
+            fecha_contrato: new Date().toISOString().slice(0, 10),
+            contratista_id: personaId,
+            proyecto_id: proyectoId,
+            tipo: 'urbanizacion',
+            valor_total: total,
+            partida_id: partidaId,
+            cotizacion_id: cotizacion.id,
+          })
+          .select('id')
+          .single();
+        if (coResp.error || !coResp.data) {
+          throw new Error(
+            getSupabaseErrorMessage(coResp.error, 'No se pudo crear el contrato de obra.')
+          );
+        }
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (sb.schema('erp') as any)
+        .from('cotizaciones')
+        .update({
+          estado: 'adjudicada',
+          adjudicado_proveedor_id: prov.proveedorId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', cotizacion.id);
+      for (const p of cotizacion.proveedores) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (sb.schema('erp') as any)
+          .from('cotizacion_proveedores')
+          .update({ estado: p.id === cotProveedorId ? 'elegida' : 'descartada' })
+          .eq('id', p.id);
+      }
+      toast.add({
+        title: 'Cotización adjudicada',
+        description:
+          adjudicaA(cotizacion.tipo) === 'oc'
+            ? 'Orden de compra generada (borrador)'
+            : 'Contrato de obra generado',
+        type: 'success',
+      });
+      onSaved();
+    } catch (e) {
+      toast.add({
+        title: 'Error al adjudicar',
+        description: e instanceof Error ? e.message : 'Error desconocido.',
+        type: 'error',
+      });
+      setAdjudicandoId(null);
+    }
   }
 
   return (
@@ -1240,6 +1386,69 @@ function CapturaPrecios({
           ))}
         </div>
       </div>
+
+      {/* Comparación + adjudicación: ranking por total, elige el ganador → OC o contrato */}
+      {puedeAdjudicar(cotizacion) ? (
+        <div className="mt-5 border-t border-[var(--border)] pt-4">
+          <p className="mb-2 text-sm font-medium text-[var(--text)]/70">
+            Adjudicar — genera{' '}
+            {adjudicaA(cotizacion.tipo) === 'oc' ? 'una orden de compra' : 'un contrato de obra'}{' '}
+            con el proveedor elegido. Guarda los precios antes de adjudicar.
+          </p>
+          <div className="space-y-1.5">
+            {rankingProveedores(cotizacion).map((r, i) => (
+              <div
+                key={r.cotProveedorId}
+                className="flex flex-wrap items-center gap-3 rounded-md border border-[var(--border)] px-3 py-2 text-sm"
+              >
+                <span className="text-xs text-[var(--text)]/40">#{i + 1}</span>
+                <span className="min-w-0 flex-1 truncate font-medium text-[var(--text)]">
+                  {r.proveedorNombre}
+                </span>
+                {i === 0 ? <Badge tone="success">Más barato</Badge> : null}
+                <span className="tabular-nums text-[var(--text)]/80">
+                  {formatCurrency(r.total)}
+                </span>
+                {puedeEscribir ? (
+                  confirmAdjId === r.cotProveedorId ? (
+                    <span className="inline-flex items-center gap-1 text-xs text-[var(--text)]/70">
+                      ¿Adjudicar a este?
+                      <button
+                        type="button"
+                        onClick={() => void adjudicar(r.cotProveedorId)}
+                        className="rounded bg-[var(--accent)] px-1.5 py-0.5 text-white"
+                      >
+                        Sí
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmAdjId(null)}
+                        className="rounded border border-[var(--border)] px-1.5 py-0.5"
+                      >
+                        No
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmAdjId(r.cotProveedorId)}
+                      disabled={adjudicandoId !== null}
+                      className="inline-flex items-center gap-1 rounded-md bg-[var(--accent)] px-2.5 py-1 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
+                    >
+                      {adjudicandoId === r.cotProveedorId ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Award className="h-3 w-3" />
+                      )}
+                      Adjudicar
+                    </button>
+                  )
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="mt-4 flex items-center justify-end gap-2">
         <Button variant="outline" onClick={onClose} disabled={saving}>
