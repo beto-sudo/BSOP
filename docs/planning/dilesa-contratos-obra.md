@@ -8,11 +8,14 @@ proveedores/contratistas; futura emisión a CxP)
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-06-01
-**Última actualización:** 2026-06-02 (Ciclo de obra end-to-end: Capa A (#617) +
+**Última actualización:** 2026-06-06 (Ciclo de obra end-to-end: Capa A (#617) +
 Capa B (#631) + Sprint 3 Costeo (#639) + Sprint 4 captura (#644) + **puente CxP**
 backend (#651, en prod) + UI "Emitir a CxP" (#654) + **Sprint 5 captura de
-presupuesto** (este PR). Próximo: cotizaciones (dominio nuevo, promover con
-Beto); reasignar los 8 contratos placeholder.)
+presupuesto**. **Sprint promovido 2026-06-06: Contratos → partidas + PDF de obra**
+(ejecuta ADR-042 Fases 2-3 + PDF) — el monto de contrato no se ve por partida
+(302/303 sin `partida_id`) + falta el PDF de obra de monto global; plan de 4 fases
+documentado en Bitácora, pendiente arrancar Fase 1 con OK. Próximo aparte:
+reasignar los 8 contratos placeholder.)
 
 ## Problema
 
@@ -455,3 +458,34 @@ saldo; hoy v1 es la tabla de conceptos + KPIs de rollup.
   anteproyectos **ya convertidos** y etiquetando los no convertidos como
   `(anteproyecto)` (ver Bitácora 2026-06-03).
 - ~~ADR-038 → índice §5 de `ARCHITECTURE.md`~~ ✅ hecho (037/038/039, #637).
+- **2026-06-06** — **Sprint promovido: Contratos de obra → partidas + PDF** (ejecuta
+  ADR-042 Fases 2-3 + PDF de obra). Gatillado por Beto al revisar el contrato real
+  "Muro de contención (Maya)" de Lomas de las Delicias y notar 3 cosas: (a) el monto
+  del contrato ($860k) aparece en el KPI **"Contratado"** del Costeo pero **NO dentro de
+  ninguna partida**; (b) falta **generar el contrato de obra en PDF**; (c) el modelo no
+  captura todo lo del contrato real. **Diagnóstico (verificado en prod):** 302/303
+  contratos tienen `partida_id` NULL — la columna existe desde ADR-042 Fase 0 (sprint
+  cotizaciones, #703) pero el alta de contrato (`nuevo-obra/page`) no la asigna ni tiene
+  selector. El Costeo (`presupuesto_partidas` + KPI agregado de contratos por proyecto)
+  suma el contrato pero no lo liga a una partida. El PDF existente (`lib/dilesa/pdf/
+contrato-obra.tsx`) es para **vivienda** (lotes/prototipos/Anexo 3), no para obra de
+  monto global como Maya (`tipo='obra_cabecera'`, objeto descriptivo "225m muro").
+  **Plan — 4 fases (cada una su PR):**
+  1. **DB** — agregar a `dilesa.contratos_construccion`: `objeto` (descripción del
+     trabajo), `fecha_inicio`/`fecha_fin` (plazo), `fianza_pct`,
+     `periodicidad_estimaciones_dias`. (`partida_id` ya existe.) Migración con OK de Beto.
+  2. **UI alta/edición** — selector de partida (1:1, ADR-042, `buildPartidaIndex`) + los
+     campos nuevos en `nuevo-obra/page` + edición. El `comprometido` fluye a
+     `v_partida_control` por `partida_id` (ya cableado en Fase 0).
+  3. **Costeo por partida + backfill** — mostrar el comprometido de contratos **por
+     partida** en `costeo-module` (de `v_partida_control`), no solo el KPI agregado.
+     **Backfill** de los 302 contratos (ligar cada uno a su partida — con Beto, asistido
+     por proyecto/concepto).
+  4. **PDF de obra** — PDF de contrato de obra de **monto global** (declaraciones +
+     cláusulas + objeto + monto/anticipo/retención/fianza, sin lotes/prototipos),
+     reusando el formato legal del contrato real. Exponerlo desde la adjudicación de RFQ
+     (`cotizaciones-module`) + el módulo de contratos.
+     **Decisiones a confirmar con Beto antes de ejecutar:** campos exactos del modelo
+     (Fase 1); estrategia de backfill (asistido vs manual, Fase 3); si el PDF es plantilla
+     genérica de obra o varía por tipo (Fase 4). **Estado:** plan documentado; pendiente
+     arrancar Fase 1 (DB) con OK.
