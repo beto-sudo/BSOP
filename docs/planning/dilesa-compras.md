@@ -573,3 +573,22 @@ Próximo: Fase 2 = UI de captura (`components/compras/cotizaciones-module.tsx` +
     el `from`/`reply_to` usa defaults (`noreply@bsop.io` / `compras@dilesa.mx`) — afinar
     cuando Beto defina el buzón; idealmente crear la definición `dilesa_cotizacion` en el
     catálogo de notificaciones. 5 checks verdes (1305 tests). Sigue preview-first.
+- **2026-06-06** — **Fase 3 (comparativa + adjudicación) — cierra el sprint Cotizaciones.**
+  En el panel "Capturar y comparar" se agrega la sección **Adjudicar**: ranking de
+  proveedores que respondieron (ordenado por total efectivo vía `rankingProveedores`, el
+  más barato marcado) con botón **Adjudicar** por proveedor (confirmación inline, respeta
+  `puedeEscribir`). Al adjudicar, según `adjudicaA(tipo)`: **compra → OC** (insert
+  `erp.ordenes_compra` con `cotizacion_id` + `proveedor_id` elegido, estado `borrador`, +
+  `ordenes_compra_detalle` heredando `partida_id` y el **precio del proveedor elegido** por
+  línea desde la matriz — molde `requisiciones-module::generarOC`); **obra → contrato**
+  (insert `dilesa.contratos_construccion` con `contratista_id`=persona del proveedor,
+  `proyecto_id` resuelto de la partida, `valor_total`=total del elegido, `partida_id` de la
+  1ª línea, `cotizacion_id`, `tipo='urbanizacion'` — molde `nuevo-obra/page`). Luego marca
+  la RFQ `adjudicada` + `adjudicado_proveedor_id`, y a los proveedores `elegida`/`descartada`
+  (audit trail). **Sin migración** (las FKs de adjudicación entraron en Fase 1). La OC nace
+  borrador y sigue su flujo en el tab Órdenes; el contrato compromete su partida por ADR-042.
+  Limitaciones v1: el contrato toma la partida de la 1ª línea (1:1, ADR-042) y `tipo`
+  fijo `urbanizacion` (ajustable luego en el módulo de obra); la adjudicación usa los
+  **precios persistidos** (avisa "guarda antes de adjudicar"). 5 checks verdes (1305 tests).
+  **Preview-first.** Con esto el sprint Cotizaciones queda **completo** (Fases 0-3); cierra
+  el círculo P2P de DILESA.
