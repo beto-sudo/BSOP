@@ -524,3 +524,52 @@ contratos activos por partida_id` (join filtrado por `empresa_id`, activo =
     waitry** `20260605180000*…`→`20260605184000\_…`para resolver la colisión en`main`.
 Próximo: Fase 2 = UI de captura (`components/compras/cotizaciones-module.tsx` + page +
     TAB + ROUTE_TO_MODULE).
+- **2026-06-05** — **Sprint Cotizaciones · Fase 2 (UI de captura).** Tab "Cotizaciones"
+  del hub `/dilesa/compras` (4° tab, entre Requisiciones y Recepciones). Liberación del
+  sub-slug (4 lugares completados: ROUTE_TO_MODULE + page + TAB; el slug en `core.modulos`
+  y EXPECTED_DB_MODULE_SLUGS entraron en Fase 1). `components/compras/cotizaciones-module.tsx`
+  (molde de `ordenes-compra-module.tsx`): lista + KPIs (`deriveCotizacionKpis`), **alta de
+  RFQ** (proyecto solo-con-presupuesto · tipo compra|obra · descripción · fecha límite ·
+  líneas ancladas a partida con selector agrupado etapa›capítulo vía `buildPartidaIndex` ·
+  invitar N proveedores de `erp.proveedores` por chips) → insert `cotizaciones` +
+  `cotizacion_lineas` + `cotizacion_proveedores` (estado `invitado`); y **captura de la
+  matriz** (sub-componente `CapturaPrecios`): tabla líneas×proveedores con un input de
+  precio por celda (resalta el mejor precio por renglón vía `mejorProveedorLinea`), total
+  por proveedor en vivo, + datos de respuesta (entrega/condiciones) → upsert
+  `cotizacion_proveedor_precios` (onConflict proveedor+línea) + update
+  `cotizacion_proveedores` (pasa a `respondida`, `monto_total` derivado de la matriz).
+  Client-side directo, un proyecto a la vez. 5 checks verdes (typecheck, 1305 tests, lint,
+  format, schema). **Sin migración → preview-first sin auto-merge** (Beto revisa el preview
+  visual). Próximo: Fase 3 = comparativa lado a lado + adjudicación → OC (`cotizacion_id` +
+  herencia de precios) o contrato de obra (`partida_id` + `cotizacion_id`).
+- **2026-06-06** — **Ajustes UX de Fase 2 (feedback de Beto en el preview, mismo PR #706).**
+  Dos cambios pedidos: (1) **selector de proveedores con búsqueda** — reemplazado el grid de
+  chips toggle (no escala con 200+ proveedores) por el `Combobox` searchable del repo (buscar
+  y agregar uno a uno; invitados como chips removibles; el dropdown excluye a los ya
+  agregados). (2) **flujo de captura claro + recepción de archivos** — Beto no encontraba
+  dónde se "recibe/captura" la cotización. La captura dejó de estar escondida en un botón:
+  ahora **clic en la fila** de la RFQ expande el panel "Capturar y comparar" (patrón
+  `onRowClick` + panel inline en la página, como `tareas-checklist`); la columna muestra
+  **Respuestas X/N**; y cada proveedor tiene su **`<FileAttachments>`** (ADR-022, bucket
+  `adjuntos` + `erp.adjuntos`) para subir el PDF/Excel de su cotización — se agregó
+  `'cotizaciones'` a `AdjuntoEntidad` (`lib/storage/path.ts`), `entidadId` = la fila del
+  proveedor invitado. El campo `cotizacion_proveedores.adjunto_url` de la Fase 1 queda sin uso
+  (los adjuntos viven en `erp.adjuntos` por política; el campo se retira en un cleanup futuro).
+  Gate de escritura: el guardado de precios y el upload respetan `puedeEscribir`. 5 checks
+  verdes (1305 tests).
+- **2026-06-06** — **Fase 2: envío de la solicitud al proveedor (feedback de Beto, mismo
+  PR #706).** Tres pedidos más: (1) **agregar proveedores a una RFQ ya creada** — combobox
+  en el panel de captura que invita otro proveedor (insert + refresh sin cerrar). (2) **PDF
+  de Solicitud de Cotización** — componente `lib/dilesa/pdf/solicitud-cotizacion.tsx`
+  (reusa branding DILESA `HeaderBand`/`FooterBand`/`styles`); lleva **solo el listado** de
+  conceptos a cotizar (concepto/partida, descripción, cantidad, unidad — sin precios, el
+  proveedor responde en su formato) + folio/proyecto/fecha límite/destinatario + nota. (3)
+  **Envío por email** — endpoint `app/api/dilesa/cotizaciones/[id]/solicitud/route.tsx`:
+  GET `?proveedor=` descarga el PDF; POST `{cotProveedorId}` lo manda al `erp.personas.email`
+  del proveedor vía Resend (mismo patrón que estimaciones: `renderToBuffer` + adjunto base64
+  - `from` DILESA + `writeNotificationLog` con slug `dilesa_cotizacion`, fail-open sin
+    definición). UI: botones **PDF** y **Enviar** por proveedor en su tarjeta; el envío
+    (acción externa) pide **confirmación inline** y respeta `puedeEscribir`. Pendiente fino:
+    el `from`/`reply_to` usa defaults (`noreply@bsop.io` / `compras@dilesa.mx`) — afinar
+    cuando Beto defina el buzón; idealmente crear la definición `dilesa_cotizacion` en el
+    catálogo de notificaciones. 5 checks verdes (1305 tests). Sigue preview-first.

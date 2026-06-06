@@ -87,13 +87,14 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   // la página /registrar-tarea fue removida en favor del click directo).
   '/dilesa/construccion/contratos/nuevo': 'dilesa.construccion.contratos',
   '/dilesa/construccion/contratos/nuevo-obra': 'dilesa.construccion.contratos',
-  // Compras es un hub con 3 tabs (Sprint 2 `dilesa-compras`). El padre
+  // Compras es un hub con 4 tabs (`dilesa-compras`). El padre
   // `dilesa.compras` es umbrella del sidebar; cada tab tiene su sub-slug
   // (ADR-030). La URL default mapea al sub-slug del primer tab (Órdenes).
   // Modelo constructora-first: la línea ancla concepto+partida y la recepción
   // devenga contra la partida. Ver docs/planning/dilesa-compras.md.
   '/dilesa/compras': 'dilesa.compras.ordenes',
   '/dilesa/compras/requisiciones': 'dilesa.compras.requisiciones',
+  '/dilesa/compras/cotizaciones': 'dilesa.compras.cotizaciones',
   '/dilesa/compras/recepciones': 'dilesa.compras.recepciones',
 
   // RDB — home + operaciones
