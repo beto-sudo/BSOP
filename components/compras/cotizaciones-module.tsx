@@ -21,6 +21,7 @@ import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/compon
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
+import { Combobox } from '@/components/ui/combobox';
 import { usePermissions } from '@/components/providers';
 import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
@@ -730,37 +731,59 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
             <Plus className="h-3.5 w-3.5" /> Agregar línea
           </button>
 
-          {/* Proveedores a invitar */}
+          {/* Proveedores a invitar — buscar y agregar (combobox con búsqueda) */}
           <div className="mt-4">
             <p className="mb-2 text-sm font-medium text-[var(--text)]/70">
               Invitar proveedores ({proveedoresSel.size})
             </p>
-            <div className="flex max-h-32 flex-wrap gap-2 overflow-y-auto">
-              {proveedores.map((p) => {
-                const sel = proveedoresSel.has(p.id);
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() =>
-                      setProveedoresSel((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(p.id)) next.delete(p.id);
-                        else next.add(p.id);
-                        return next;
-                      })
-                    }
-                    className={`rounded-full border px-3 py-1 text-xs ${
-                      sel
-                        ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
-                        : 'border-[var(--border)] text-[var(--text)]/70 hover:bg-[var(--card)]'
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                );
-              })}
-            </div>
+            <Combobox
+              value={null}
+              onChange={(id) => {
+                if (!id) return;
+                setProveedoresSel((prev) => {
+                  const next = new Set(prev);
+                  next.add(id);
+                  return next;
+                });
+              }}
+              options={proveedores
+                .filter((p) => !proveedoresSel.has(p.id))
+                .map((p) => ({ value: p.id, label: p.label }))}
+              placeholder="Buscar y agregar proveedor…"
+              searchPlaceholder="Buscar proveedor…"
+              emptyText="Sin proveedores disponibles"
+              className="w-80"
+              aria-label="Agregar proveedor a la cotización"
+            />
+            {proveedoresSel.size > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {[...proveedoresSel].map((id) => {
+                  const label = proveedores.find((p) => p.id === id)?.label ?? '—';
+                  return (
+                    <span
+                      key={id}
+                      className="inline-flex items-center gap-1 rounded-full border border-[var(--accent)] bg-[var(--accent)]/10 px-2.5 py-1 text-xs text-[var(--accent)]"
+                    >
+                      {label}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setProveedoresSel((prev) => {
+                            const next = new Set(prev);
+                            next.delete(id);
+                            return next;
+                          })
+                        }
+                        aria-label={`Quitar ${label}`}
+                        className="text-[var(--accent)]/70 hover:text-[var(--accent)]"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-4 flex items-center justify-end gap-2">
