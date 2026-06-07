@@ -31,6 +31,7 @@ import { ModuleFilters, ModuleContent, ErrorBanner } from '@/components/module-p
 import { DesktopOnlyNotice } from '@/components/responsive';
 import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
+import { CancelarConMotivoDialog } from '@/components/shared/cancelar-con-motivo-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -445,12 +446,14 @@ export function CxpPagosModule({ empresaId }: CxpPagosModuleProps) {
         confirmVariant="default"
       />
 
-      {/* Cancelar — confirmación con motivo. Se monta on-demand con key para
-          arrancar con estado fresco sin reset-effect (React: reset por key). */}
+      {/* Cancelar — confirmación con motivo (audit trail, p2p-cancelaciones D1).
+          Se monta on-demand con key para arrancar con estado fresco. */}
       {cancelarPago && (
-        <CancelarDialog
+        <CancelarConMotivoDialog
           key={cancelarPago.id}
-          pago={cancelarPago}
+          title="¿Cancelar este pago?"
+          description="Se revierten las aplicaciones a las facturas (sus saldos vuelven a abrirse). No se puede cancelar un pago ya ejecutado."
+          confirmLabel="Cancelar pago"
           onClose={() => setCancelarPago(null)}
           onConfirm={(motivo) => doCancelar(cancelarPago, motivo)}
         />
@@ -641,67 +644,6 @@ function Field({ label, value, mono = false }: { label: string; value: string; m
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className={mono ? 'font-mono text-sm' : 'text-sm'}>{value}</div>
     </div>
-  );
-}
-
-// ── Dialog: cancelar (motivo) ──────────────────────────────────────────────────
-
-function CancelarDialog({
-  pago,
-  onClose,
-  onConfirm,
-}: {
-  /** Siempre presente: el padre monta este dialog on-demand con key. */
-  pago: Pago;
-  onClose: () => void;
-  onConfirm: (motivo: string) => Promise<void>;
-}) {
-  const [motivo, setMotivo] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleConfirm = async () => {
-    setSubmitting(true);
-    try {
-      await onConfirm(motivo);
-      onClose();
-    } catch {
-      // El error ya se mostró vía toast; deja el dialog abierto.
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <Dialog open onOpenChange={(v) => !v && !submitting && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>¿Cancelar este pago?</DialogTitle>
-          <DialogDescription>
-            Se revierten las aplicaciones a las facturas (sus saldos vuelven a abrirse). No se puede
-            cancelar un pago ya ejecutado.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-1.5">
-          <label className="text-xs text-muted-foreground" htmlFor="motivo-cancelacion">
-            Motivo (opcional)
-          </label>
-          <Input
-            id="motivo-cancelacion"
-            value={motivo}
-            onChange={(e) => setMotivo(e.target.value)}
-            placeholder="Ej. Error de captura, duplicado…"
-          />
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={submitting}>
-            Volver
-          </Button>
-          <Button variant="destructive" onClick={() => void handleConfirm()} disabled={submitting}>
-            {submitting ? 'Cancelando…' : 'Cancelar pago'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 
