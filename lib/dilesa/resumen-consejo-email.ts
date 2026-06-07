@@ -309,14 +309,17 @@ export function renderResumenConsejoHtml(
     .filter(Boolean)
     .join('\n');
 
+  // Layout full-width que se adapta al ancho de la pantalla (preferencia de Beto).
+  // El fix robusto del header para todos los clientes va en la estandarización de
+  // correos (iniciativa aparte).
   const header = opts.headerImageUrl
-    ? `<div style="background:#1a1a2e;"><img src="${opts.headerImageUrl}" alt="DILESA" width="720" style="display:block;width:100%;max-width:100%;height:auto;border:0;" /></div>`
+    ? `<div style="background:#1a1a2e;line-height:0;"><img src="${opts.headerImageUrl}" alt="DILESA" style="display:block;width:100%;height:auto;border:0;" /></div>`
     : '';
 
   return `<!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-  <div style="max-width:720px;margin:0 auto;background:#ffffff;">
+  <div style="width:100%;background:#ffffff;">
     ${header}
     <div style="background:#1a1a2e;padding:18px 32px 22px;">
       <h1 style="margin:0;font-size:19px;font-weight:700;color:#ffffff;">Resumen Diario Operación Dilesa 🏘️</h1>
