@@ -8,15 +8,17 @@ proveedores/contratistas; futura emisión a CxP)
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-06-01
-**Última actualización:** 2026-06-06 (Ciclo de obra end-to-end: Capa A (#617) +
+**Última actualización:** 2026-06-07 (Ciclo de obra end-to-end: Capa A (#617) +
 Capa B (#631) + Sprint 3 Costeo (#639) + Sprint 4 captura (#644) + **puente CxP**
 backend (#651, en prod) + UI "Emitir a CxP" (#654) + **Sprint 5 captura de
 presupuesto**. **Sprint promovido 2026-06-06: Contratos → partidas + PDF de obra**
 (ejecuta ADR-042 Fases 2-3 + PDF) — el monto de contrato no se ve por partida
 (302/303 sin `partida_id`) + falta el PDF de obra de monto global; plan de 4 fases
-documentado en Bitácora. **Fases 1-3 done** (#709 DB · #710 UI partida · #711 Costeo 3 capas +
-backfill de 30 contratos aplicado a prod 2026-06-06). Próximo: Fase 4 (PDF de obra de monto
-global). Aparte: reasignar los 8 contratos placeholder + 3 contratos de obra sin partida.)
+documentado en Bitácora. **Fases 1-4 done** (#709 DB · #710 UI partida · #711 Costeo 3 capas +
+backfill · #712 PDF de obra). **Sprint UI: edición de datos del contrato** desde el detalle
+(sección "Editar datos del contrato", solo obra) para no depender de SQL. Aparte: reasignar los 8
+contratos placeholder + 3 contratos de obra sin partida; capturar `objeto`/plazo de los contratos
+de obra existentes.)
 
 ## Problema
 
@@ -564,3 +566,26 @@ Los contratos de obra ya generan su contrato en PDF (antes solo vivienda podía)
   (vigente); testigos Francisco Rivera + Nelcy Martínez (vigentes); REPSE/registro patronal siempre
   se exigen (el blanco del PDF es solo fallback). **Pendiente menor:** capturar el `objeto` de los
   contratos de obra existentes (Maya y demás) para que su PDF salga completo (hoy usan placeholder).
+
+### 2026-06-07 — Sprint UI: edición de datos del contrato de obra — PR #714
+
+Los contratos de obra (no-vivienda) ya se editan desde la UI; antes el detalle era read-only salvo
+`<LigarPartida>` y los ~33 contratos históricos (objeto/plazo/fianza/periodicidad vacíos) había que
+corregirlos por SQL para que su PDF de obra (Fase 4) saliera completo. Resuelve el **Pendiente
+menor** que dejó abierto la Fase 4.
+
+- **Sección "Editar datos del contrato"** (`[id]/page.tsx`, sub-componente `<EditarDatosContrato>`):
+  solo para `tipo != 'vivienda'`, gated por **write** de `dilesa.construccion.contratos`. Calca
+  `<LigarPartida>` (useState + UPDATE directo) y el form de alta. Edita `objeto` (dropdown
+  `OBJETOS_COMUNES` + textarea), `fecha_inicio`/`fecha_fin`, `anticipo_pct`/`retencion_pct`/
+  `fianza_pct`, `periodicidad_estimaciones_dias`, `valor_total` y `notas`.
+- **Dirty-check** por snapshot normalizado (robusto al numeric-as-string de PostgREST); Guardar se
+  deshabilita sin cambios o con `valor_total <= 0`. Tras guardar sube el patch al detalle
+  (`onSaved`) → la ficha "Datos generales" y el saldo de `<ObraContratoDetalle>` se refrescan sin
+  recargar.
+- **Refactor:** `OBJETOS_COMUNES` extraído de `nuevo-obra/page.tsx` a `lib/dilesa/objetos-obra.ts`
+  (`.ts` plano compartido por alta + edición; sin duplicar). Decisión de secuencia: se mergeó la
+  Fase 4 (#712) **antes** de este sprint para reusar `OBJETOS_COMUNES` desde main sin choque en
+  `[id]/page.tsx`.
+- **Sin migración** (las 9 columnas ya existían desde Fase 1, #709). 5 checks verdes (1312 tests).
+  **UI visible → preview-first** (#714, sin auto-merge).
