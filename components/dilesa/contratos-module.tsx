@@ -45,6 +45,8 @@ export type ContratoRow = {
   contratista_id: string;
   proyecto_id: string | null;
   valor_total: number;
+  /** Cancelado (p2p-cancelaciones): badge en la lista; excluido de KPI/comprometido. */
+  cancelada_at: string | null;
   /** Computed: nombre del contratista (erp.personas). */
   contratistaNombre: string;
   contratistaAbreviacion: string | null;
@@ -128,7 +130,9 @@ export function ContratosModule({ empresaId }: { empresaId: string }) {
       sb
         .schema('dilesa')
         .from('contratos_construccion')
-        .select('id, codigo, fecha_contrato, contratista_id, proyecto_id, valor_total')
+        .select(
+          'id, codigo, fecha_contrato, contratista_id, proyecto_id, valor_total, cancelada_at'
+        )
         .eq('empresa_id', empresaId)
         .is('deleted_at', null),
       sb
@@ -191,6 +195,7 @@ export function ContratosModule({ empresaId }: { empresaId: string }) {
       return {
         id: c.id as string,
         codigo: c.codigo as string,
+        cancelada_at: (c.cancelada_at as string | null) ?? null,
         fecha_contrato: c.fecha_contrato as string,
         contratista_id: cid,
         proyecto_id: pid,
@@ -263,9 +268,21 @@ export function ContratosModule({ empresaId }: { empresaId: string }) {
     {
       key: 'codigo',
       label: 'Código',
-      type: 'text',
+      type: 'custom',
+      accessor: (c) => c.codigo,
       sticky: true,
       width: 'min-w-[240px]',
+      render: (c) =>
+        c.cancelada_at ? (
+          <span className="flex items-center gap-1.5">
+            <span className="text-[var(--text)]/60 line-through">{c.codigo}</span>
+            <span className="rounded bg-destructive/10 px-1 text-[10px] text-destructive">
+              cancelado
+            </span>
+          </span>
+        ) : (
+          c.codigo
+        ),
     },
     { key: 'fecha_contrato', label: 'Fecha', type: 'date' },
     {

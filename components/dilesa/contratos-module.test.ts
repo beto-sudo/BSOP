@@ -9,6 +9,7 @@ function c(overrides: Partial<ContratoRow>): ContratoRow {
     contratista_id: 'c',
     proyecto_id: null,
     valor_total: 0,
+    cancelada_at: null,
     contratistaNombre: 'Contratista',
     contratistaAbreviacion: null,
     proyectoNombre: 'P',
