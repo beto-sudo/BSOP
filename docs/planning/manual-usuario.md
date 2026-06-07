@@ -155,3 +155,16 @@ cero `manual|ayuda|help` en `app/` o `components/`).
   1312 tests, lint 0 errores, format, sync de slugs). PR a **preview sin
   auto-merge** (UI visible). Próximo: aplicar migración + validar en preview →
   Sprint 1 (resto del contenido de Ventas).
+- **2026-06-07** — **Sprint 0 mergeado (#720)** + migración aplicada a prod
+  (módulo `dilesa.manual`, `seccion='sistema'`, lectura a los 9 roles DILESA,
+  versión `20260607170000` registrada sin drift). Fix en el camino: la migración
+  chocaba con `modulos_seccion_check` de tesorería al extenderlo con `'ayuda'`;
+  se cambió a `'sistema'` (transversal, ya permitido) sin tocar el constraint.
+- **2026-06-07** — **Ajuste de UX (feedback de Beto):** el "?" se movió del
+  header de cada módulo al **header global** (entre la campanita y el menú de
+  usuario), ahora contextual a la pantalla actual vía `resolveHelpSlug`
+  (`lib/manual/help-routes.ts`, reusa `ROUTE_TO_MODULE`: slug de módulo ↔ ruta
+  del `.md`). Se quitó la sección "Ayuda" del sidebar y el "?" per-módulo
+  (revertido `<ModuleHeader helpSlug>`). ADR-043 M2/M4 actualizados. La portada
+  `/dilesa/manual` queda accesible por URL pero sin enlace en sidebar (pendiente
+  confirmar con Beto si se conserva). PR a preview sin auto-merge.

@@ -101,10 +101,6 @@ export const NAV_ITEMS: NavItem[] = [
           { label: 'Construcción', href: '/dilesa/construccion' },
         ],
       },
-      {
-        label: 'Ayuda',
-        children: [{ label: 'Manual', href: '/dilesa/manual' }],
-      },
     ],
   },
   {

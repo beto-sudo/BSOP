@@ -5,6 +5,7 @@ import { useTheme } from 'next-themes';
 import { useLocale } from '@/lib/i18n';
 import { AccountMenu } from './account-menu';
 import { InfoPill } from './info-pill';
+import { HeaderHelpButton } from '@/components/manual/help-drawer';
 import type { AuthUser } from './nav-config';
 
 /**
@@ -106,6 +107,9 @@ export function Header({
 
             {/* Notifications bell */}
             <NotificationsBell />
+
+            {/* Ayuda contextual de la pantalla actual */}
+            <HeaderHelpButton />
 
             <AccountMenu user={user} />
           </div>
