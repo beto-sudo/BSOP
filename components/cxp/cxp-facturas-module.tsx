@@ -20,7 +20,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FileUp, Link2, RefreshCw, Search, Upload, Wallet } from 'lucide-react';
+import { Ban, FileUp, Link2, RefreshCw, Search, Upload, Wallet } from 'lucide-react';
 
 import {
   ModuleFilters,
@@ -32,6 +32,8 @@ import {
 } from '@/components/module-page';
 import { DesktopOnlyNotice } from '@/components/responsive';
 import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
+import { CancelarConMotivoDialog } from '@/components/shared/cancelar-con-motivo-dialog';
+import { usePermissions } from '@/components/providers';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -539,6 +541,10 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
         onAsignar={async (partidaId) => {
           if (selected) await asignarPartida(selected.id, partidaId);
         }}
+        onCancelada={() => {
+          setDrawerOpen(false);
+          void fetchFacturas();
+        }}
       />
 
       <UploadXmlDialog
@@ -572,6 +578,7 @@ function FacturaDrawer({
   proyectoNombreMap,
   partidaProyectoMap,
   onAsignar,
+  onCancelada,
 }: {
   factura: Factura | null;
   empresa: EmpresaSlug;
@@ -584,7 +591,12 @@ function FacturaDrawer({
   proyectoNombreMap: Map<string, string>;
   partidaProyectoMap: Map<string, string>;
   onAsignar: (partidaId: string | null) => Promise<void>;
+  /** Refresca la lista + cierra el drawer tras cancelar la factura. */
+  onCancelada: () => void;
 }) {
+  const { permissions } = usePermissions();
+  const feedback = useActionFeedback();
+  const [mostrarCancelar, setMostrarCancelar] = useState(false);
   const [pagos, setPagos] = useState<PagoAplicado[]>([]);
   const [adjuntos, setAdjuntos] = useState<Adjunto[]>([]);
   const [loading, setLoading] = useState(false);
@@ -667,6 +679,30 @@ function FacturaDrawer({
   const pdfHref = factura?.pdf_url ? `/api/adjuntos/${factura.pdf_url}` : null;
 
   const b = factura ? estadoBadge(factura) : null;
+
+  // Cancelar factura (RPC con motivo, audit trail · p2p-cancelaciones D1). Solo
+  // admin (D2), y solo antes de cualquier pago aplicado (el RPC bloquea D3 si
+  // hay pagos). Cancelar revierte la cuenta por pagar.
+  const puedeCancelar =
+    permissions.isAdmin &&
+    factura != null &&
+    (factura.estado_cxp === 'borrador' || factura.estado_cxp === 'por_pagar');
+
+  const doCancelar = async (motivo: string) => {
+    if (!factura) return;
+    const sb = createSupabaseBrowserClient();
+    const { error } = await sb
+      .schema('erp')
+      .rpc('cxp_factura_cancelar', { p_factura_id: factura.id, p_motivo: motivo });
+    if (error) {
+      feedback.error(getSupabaseErrorMessage(error, 'No se pudo cancelar la factura.'), {
+        title: 'No se pudo cancelar',
+      });
+      throw error; // mantiene abierto el diálogo de motivo
+    }
+    feedback.success('Factura cancelada');
+    onCancelada();
+  };
 
   return (
     <DetailDrawer
@@ -963,9 +999,40 @@ function FacturaDrawer({
                 </section>
               </>
             )}
+
+            {/* Cancelar factura — destructivo, solo admin, antes de pagos */}
+            {puedeCancelar && (
+              <>
+                <Separator />
+                <section className="space-y-2">
+                  <Button
+                    variant="ghost"
+                    className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                    onClick={() => setMostrarCancelar(true)}
+                  >
+                    <Ban className="h-4 w-4" /> Cancelar factura
+                  </Button>
+                  <p className="text-[11px] text-muted-foreground">
+                    Revierte la cuenta por pagar. Solo disponible antes de programar pagos; queda
+                    registro del motivo para auditoría.
+                  </p>
+                </section>
+              </>
+            )}
           </div>
         )}
       </DetailDrawerContent>
+
+      {mostrarCancelar && factura && (
+        <CancelarConMotivoDialog
+          key={factura.id}
+          title={`¿Cancelar factura de ${proveedorLabel(factura)}?`}
+          description="La factura quedará cancelada y dejará de contar como cuenta por pagar. Se preserva el historial para auditoría."
+          confirmLabel="Cancelar factura"
+          onClose={() => setMostrarCancelar(false)}
+          onConfirm={doCancelar}
+        />
+      )}
     </DetailDrawer>
   );
 }

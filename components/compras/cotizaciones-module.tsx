@@ -36,6 +36,7 @@ import { Button } from '@/components/ui/button';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { Combobox } from '@/components/ui/combobox';
 import { FileAttachments } from '@/components/file-attachments';
+import { CancelarConMotivoDialog } from '@/components/shared/cancelar-con-motivo-dialog';
 import { usePermissions } from '@/components/providers';
 import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
@@ -138,6 +139,7 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
 
   // Captura de precios (matriz) de una RFQ existente
   const [capturaId, setCapturaId] = useState<string | null>(null);
+  const [cancelarCot, setCancelarCot] = useState<CotizacionRow | null>(null);
 
   const fetchData = useCallback(async (): Promise<FetchResult> => {
     const sb = createSupabaseBrowserClient();
@@ -477,12 +479,18 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
   }
 
   const cancelar = useCallback(
-    async (c: CotizacionRow) => {
+    async (c: CotizacionRow, motivo: string) => {
       const sb = createSupabaseBrowserClient();
+      const ahora = new Date().toISOString();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error: e } = await (sb.schema('erp') as any)
         .from('cotizaciones')
-        .update({ estado: 'cancelada', updated_at: new Date().toISOString() })
+        .update({
+          estado: 'cancelada',
+          cancelada_at: ahora,
+          motivo_cancelacion: motivo,
+          updated_at: ahora,
+        })
         .eq('id', c.id);
       if (e) {
         toast.add({
@@ -490,7 +498,7 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
           description: getSupabaseErrorMessage(e, 'No se pudo cancelar.'),
           type: 'error',
         });
-        return;
+        throw e; // mantiene abierto el diálogo de motivo
       }
       toast.add({ title: 'Cotización cancelada', description: c.codigo, type: 'success' });
       void cargar();
@@ -556,7 +564,7 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    void cancelar(r);
+                    setCancelarCot(r);
                   }}
                   aria-label={`Cancelar ${r.codigo}`}
                   className="inline-flex h-7 w-7 items-center justify-center rounded text-[var(--text)]/40 hover:bg-red-50 hover:text-red-600"
@@ -852,6 +860,17 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
         emptyIcon={<ClipboardList className="h-6 w-6" />}
         maxHeight="calc(100vh - 320px)"
       />
+
+      {cancelarCot ? (
+        <CancelarConMotivoDialog
+          key={cancelarCot.id}
+          title={`¿Cancelar ${cancelarCot.codigo}?`}
+          description="La cotización quedará cancelada. Se preserva el historial para auditoría."
+          confirmLabel="Cancelar cotización"
+          onClose={() => setCancelarCot(null)}
+          onConfirm={(motivo) => cancelar(cancelarCot, motivo)}
+        />
+      ) : null}
     </div>
   );
 }

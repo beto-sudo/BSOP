@@ -5,10 +5,10 @@
 **Schemas afectados:** `dilesa` (`obra_estimaciones`, `contratos_construccion`), `erp`
 (`recepciones`, y uniformar `requisiciones`/`cotizaciones`/`ordenes_compra`/
 `presupuesto_partidas`/`facturas`/`cxp_pagos`)
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-06-07
-**Última actualización:** 2026-06-07 (promovida + arranca Fase 1)
+**Última actualización:** 2026-06-07 (cerrada — Fases 1-4 mergeadas)
 
 ## Problema
 
@@ -106,3 +106,38 @@ Decisiones D1-D3 cerradas. Diagnóstico: 6 entidades ya cancelan, 3 faltan
 (estimación, contrato, recepción); falta `creado_por` en las tablas de obra.
 Arranca Fase 1 (base + estimación). Migraciones como archivo, aplicadas con
 cuidado (dry-run + repair); código/UI con auto-merge al verde.
+
+### 2026-06-07 — Fase 1: patrón base + cancelar estimación (PR #717)
+
+`<CancelarConMotivoDialog>` compartido + columnas `cancelada_at`/`cancelada_por`/
+`motivo_cancelacion`/`creado_por` en `dilesa.obra_estimaciones` + trigger
+`creado_por` + RPC `obra_estimacion_cancelar` (motivo obligatorio, gate
+`fn_is_admin() OR creado_por = auth.uid()`, bloquea si hay factura ligada). UI en
+`obra-contrato-detalle` (badge "cancelada", excluida del pagado/saldo y del costeo).
+
+### 2026-06-07 — Fase 2: cancelar contrato de obra (PR #721)
+
+Columnas + trigger en `dilesa.contratos_construccion` + RPC `contrato_obra_cancelar`
+(bloquea con estimaciones vivas). `v_partida_control` excluye contratos cancelados
+del comprometido. UI en el detalle del contrato (`CancelarContratoButton`, badge
+"Contrato cancelado") + columna tachada en la lista.
+
+### 2026-06-07 — Fase 3: recepción (sin código)
+
+Hallazgo: la recepción ya es **corregible** — es una `cantidad_recibida` acumulada
+y el RPC acepta cualquier total ≥ 0, así que bajar la cantidad revierte el ejercido.
+Beto lo cerró como "así está bien": no requiere fase de cancelación separada.
+
+### 2026-06-07 — Fase 4: uniformar motivo (PR #728)
+
+Motivo obligatorio en las 6 entidades que ya cancelaban. `ConfirmDialog`/`RowActions`
+ganan `requireMotivo`. Req/OC/Cotización/partida populan `cancelada_at` +
+`motivo_cancelacion` (migración `20260607200000`). Factura estrena UI de cancelación
+(solo admin, antes de pagos) sobre el RPC `cxp_factura_cancelar` existente. Pago migra
+del dialog custom al compartido (motivo ahora obligatorio).
+
+### 2026-06-07 — Cierre
+
+Iniciativa completa. Las 9 entidades del P2P son ahora reversibles con motivo
+auditable (3 nuevas con RPC + bloqueo por consecuencias D3; 6 uniformadas). Barrido
+de Reminders `Claude 🧭`: sin pendientes de esta iniciativa.

@@ -598,12 +598,13 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
   // Soft-delete de una partida. Patrón del repo: marca `deleted_at`, preserva
   // historial para auditoría. Devuelve true si borró (para cerrar el form).
   const eliminar = useCallback(
-    async (row: CosteoRow): Promise<boolean> => {
+    async (row: CosteoRow, motivo: string): Promise<boolean> => {
       const sb = createSupabaseBrowserClient();
+      const ahora = new Date().toISOString();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error: e } = await (sb.schema('erp') as any)
         .from('presupuesto_partidas')
-        .update({ deleted_at: new Date().toISOString() })
+        .update({ deleted_at: ahora, cancelada_at: ahora, motivo_cancelacion: motivo })
         .eq('id', row.id);
       if (e) {
         toast.add({
@@ -786,8 +787,8 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
           }}
           onDelete={
             editRow && puedeEscribir
-              ? async () => {
-                  const ok = await eliminar(editRow);
+              ? async (motivo) => {
+                  const ok = await eliminar(editRow, motivo ?? '');
                   if (ok) cerrarForm();
                 }
               : undefined
