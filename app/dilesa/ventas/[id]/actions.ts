@@ -329,6 +329,45 @@ async function regresarAFaseInner(
     .eq('id', ventaId);
   if (upErr) return { ok: false, error: upErr.message };
 
+  // Limpiar el pipeline visual: borrar las filas de `venta_fases` con
+  // posición > faseDestino. Sin esto, el detalle sigue mostrando las
+  // fases posteriores como completadas y el botón "Capturar Fase N"
+  // no aparece (porque `alcanzada=true` deshabilita `puedeCapturar`).
+  // Soft-delete para preservar bitácora histórica.
+  const { error: fasesErr } = await admin
+    .schema('dilesa')
+    .from('venta_fases')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('venta_id', ventaId)
+    .gt('posicion', faseDestino)
+    .is('deleted_at', null);
+  if (fasesErr) {
+    console.warn('[regresarAFase] no se pudieron limpiar venta_fases', {
+      ventaId,
+      error: fasesErr.message,
+    });
+  }
+
+  // Si regresamos a Fase 1 y la unidad estaba `asignada`, liberarla.
+  // Beto: regresar 2→1 funcionalmente es "soltar la asignación para
+  // poder re-asignar" (a la misma unidad u otra desde "+ Crear nueva
+  // solicitud para este cliente"). Idempotente (.eq('estado','asignada')).
+  if (faseDestino === 1 && v.unidad_id) {
+    const { error: unidadErr } = await admin
+      .schema('dilesa')
+      .from('unidades')
+      .update({ estado: 'terminada' })
+      .eq('id', v.unidad_id)
+      .eq('estado', 'asignada');
+    if (unidadErr) {
+      console.warn('[regresarAFase] no se pudo liberar unidad', {
+        ventaId,
+        unidadId: v.unidad_id,
+        error: unidadErr.message,
+      });
+    }
+  }
+
   // Si regresamos a Fase 1, mandamos el email de bienvenida otra vez
   // para que el cliente sepa que su solicitud está activa con plazo nuevo.
   // (Idempotencia: ya limpiamos notif_hold_creado_at arriba.)
