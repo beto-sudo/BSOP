@@ -38,6 +38,16 @@ function mockClient(opts?: {
       }
       if (s === 'dilesa' && table === 'ventas') {
         return {
+          // SELECT para leer fase_posicion actual antes del UPDATE
+          // (defensa "solo avanza" — ver marcar-fase.ts).
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({
+                data: { fase_posicion: 1 },
+                error: null,
+              })),
+            })),
+          })),
           update: vi.fn(() => ({
             eq: vi.fn(async () =>
               ventaOk ? { error: null } : { error: { message: opts!.ventaUpdateError } }
