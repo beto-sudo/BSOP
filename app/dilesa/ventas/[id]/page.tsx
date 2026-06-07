@@ -255,7 +255,9 @@ const FASE_ROLES: Record<string, string[]> = {
 const CAPTURAR_SLUG_BY_POSICION: Record<number, string> = {
   2: '2-asignada',
   3: '3-formalizada',
-  // 4–17 → próximos PRs del Sprint 7c
+  4: '4-solicitud-avaluo',
+  5: '5-avaluo-cerrado',
+  // 6–17 → próximos PRs del Sprint 7c
 };
 
 /** Las 17 fases canónicas en orden — para mostrar incluso las no alcanzadas. */
