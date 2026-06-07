@@ -138,3 +138,20 @@ cero `manual|ayuda|help` en `app/` o `components/`).
   decisiones (D1-D7): in-app + PDF on-demand, markdown versionado en repo, piloto
   end-to-end con el módulo Ventas, text-first, versionado por módulo + global.
   Próximo: Sprint 0 (fundación + ADR).
+- **2026-06-07** — **Sprint 0 (fundación) construido** (PR a preview). Pipeline
+  de rendering: deps `react-markdown` + `remark-gfm` + `gray-matter`;
+  `lib/manual/load.ts` (fs + frontmatter, anti-path-traversal); route handler
+  `/api/manual/[...slug]` (auth-gated); `outputFileTracingIncludes` para
+  `content/manual/**` (mismo patrón que ghostscript-wasm — R1 cerrado).
+  `<HelpButton>`/`<HelpDrawer>` sobre `<DetailDrawer>` + slot `helpSlug` en
+  `<ModuleHeader>`. Contenido golden `content/manual/dilesa/ventas/lista.md`
+  (v1.0.0) + botón "?" integrado en el header de Ventas. Portada
+  `/dilesa/manual` (índice + versión por módulo). RBAC: 3 lugares de código
+  (`NAV_ITEMS` sección Ayuda, `ROUTE_TO_MODULE`, `EXPECTED_DB_MODULE_SLUGS`) +
+  migración `20260607170000_modulo_dilesa_manual.sql` (módulo top-level +
+  backfill `lectura=true/escritura=false` a todos los roles DILESA) **dejada
+  como archivo para que Beto la aplique** (otorga permisos → no autónoma).
+  ADR-043 (M1-M7) + índice en `ARCHITECTURE.md` §5. 5 checks verdes (typecheck,
+  1312 tests, lint 0 errores, format, sync de slugs). PR a **preview sin
+  auto-merge** (UI visible). Próximo: aplicar migración + validar en preview →
+  Sprint 1 (resto del contenido de Ventas).

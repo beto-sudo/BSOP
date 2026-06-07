@@ -66,6 +66,11 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['@jspawn/ghostscript-wasm'],
   outputFileTracingIncludes: {
     '/api/documentos/[id]/extract': ['node_modules/@jspawn/ghostscript-wasm/**'],
+    // Manual de usuario: el contenido markdown vive en `content/manual/**` y
+    // se lee con `fs` en runtime (route handler de ayuda contextual + portada).
+    // Sin esto, Vercel no incluye los `.md` en el bundle de estas rutas.
+    '/api/manual/[...slug]': ['content/manual/**'],
+    '/dilesa/manual': ['content/manual/**'],
   },
   async headers() {
     return [

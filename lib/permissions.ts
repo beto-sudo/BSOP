@@ -96,6 +96,10 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   '/dilesa/compras/requisiciones': 'dilesa.compras.requisiciones',
   '/dilesa/compras/cotizaciones': 'dilesa.compras.cotizaciones',
   '/dilesa/compras/recepciones': 'dilesa.compras.recepciones',
+  // Manual de usuario (iniciativa `manual-usuario`). Módulo top-level visible
+  // para todo miembro de DILESA; la ayuda contextual por pantalla hereda el
+  // gate de cada módulo. Ver docs/planning/manual-usuario.md.
+  '/dilesa/manual': 'dilesa.manual',
 
   // RDB — home + operaciones
   '/rdb/home': 'rdb.home',
