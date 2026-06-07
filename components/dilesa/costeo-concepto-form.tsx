@@ -71,8 +71,11 @@ export function CosteoConceptoForm({
   editRow: CosteoRow | null;
   onClose: () => void;
   onSaved: () => void;
-  /** Borra la partida (solo en edición). Soft-delete + cierra el form. */
-  onDelete?: () => void | Promise<void>;
+  /**
+   * Borra la partida (solo en edición). Soft-delete + cierra el form.
+   * Recibe el motivo de cancelación capturado para el audit trail.
+   */
+  onDelete?: (motivo?: string) => void | Promise<void>;
 }) {
   const toast = useToast();
   const isEdit = editRow != null;
@@ -329,6 +332,7 @@ export function CosteoConceptoForm({
           title={`¿Eliminar “${editRow?.concepto ?? 'partida'}”?`}
           description="Marcará la partida de presupuesto como eliminada. Se preserva el historial para auditoría."
           confirmLabel="Eliminar"
+          requireMotivo
         />
       ) : null}
     </div>

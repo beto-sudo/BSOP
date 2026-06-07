@@ -447,6 +447,34 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
     [toast, cargar]
   );
 
+  const cancelar = useCallback(
+    async (oc: OcRow, motivo: string) => {
+      const sb = createSupabaseBrowserClient();
+      const ahora = new Date().toISOString();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: e } = await (sb.schema('erp') as any)
+        .from('ordenes_compra')
+        .update({
+          estado: 'cancelada',
+          cancelada_at: ahora,
+          motivo_cancelacion: motivo,
+          updated_at: ahora,
+        })
+        .eq('id', oc.id);
+      if (e) {
+        toast.add({
+          title: 'Error',
+          description: getSupabaseErrorMessage(e, 'No se pudo cancelar.'),
+          type: 'error',
+        });
+        return;
+      }
+      toast.add({ title: 'Orden cancelada', description: oc.codigo, type: 'success' });
+      void cargar();
+    },
+    [toast, cargar]
+  );
+
   const cerrar = useCallback(
     async (oc: OcRow) => {
       const sb = createSupabaseBrowserClient();
@@ -510,12 +538,13 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
                 onDelete={
                   r.estado === 'borrador' || r.estado === 'enviada'
                     ? {
-                        onConfirm: () => cambiarEstado(r, 'cancelada', 'Orden cancelada'),
+                        onConfirm: (motivo) => cancelar(r, motivo ?? ''),
                         label: 'Cancelar OC',
                         confirmTitle: `¿Cancelar ${r.codigo}?`,
                         confirmDescription:
                           'La orden quedará cancelada y dejará de comprometer presupuesto.',
                         confirmLabel: 'Cancelar OC',
+                        requireMotivo: true,
                       }
                     : undefined
                 }

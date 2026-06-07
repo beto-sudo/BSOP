@@ -4325,7 +4325,9 @@ export type Database = {
           expirada_at: string | null
           fase_actual: string | null
           fase_posicion: number | null
+          fecha_avaluo_cerrado: string | null
           fecha_escritura: string | null
+          fecha_solicitud_avaluo: string | null
           forma_pago: string | null
           gastos_escrituracion: number | null
           id: string
@@ -4340,6 +4342,7 @@ export type Database = {
           notif_hold_creado_at: string | null
           notif_hold_expirada_at: string | null
           notif_hold_promovido_at: string | null
+          notif_solicitud_avaluo_at: string | null
           numero_escritura: string | null
           ocupacion: string | null
           persona_id: string
@@ -4351,6 +4354,7 @@ export type Database = {
           uso_efectivo: string | null
           valor_comercial: number | null
           valor_escrituracion: number | null
+          valuador_id: string | null
           vendedor: string | null
           vendedor_usuario_id: string | null
         }
@@ -4377,7 +4381,9 @@ export type Database = {
           expirada_at?: string | null
           fase_actual?: string | null
           fase_posicion?: number | null
+          fecha_avaluo_cerrado?: string | null
           fecha_escritura?: string | null
+          fecha_solicitud_avaluo?: string | null
           forma_pago?: string | null
           gastos_escrituracion?: number | null
           id?: string
@@ -4392,6 +4398,7 @@ export type Database = {
           notif_hold_creado_at?: string | null
           notif_hold_expirada_at?: string | null
           notif_hold_promovido_at?: string | null
+          notif_solicitud_avaluo_at?: string | null
           numero_escritura?: string | null
           ocupacion?: string | null
           persona_id: string
@@ -4403,6 +4410,7 @@ export type Database = {
           uso_efectivo?: string | null
           valor_comercial?: number | null
           valor_escrituracion?: number | null
+          valuador_id?: string | null
           vendedor?: string | null
           vendedor_usuario_id?: string | null
         }
@@ -4429,7 +4437,9 @@ export type Database = {
           expirada_at?: string | null
           fase_actual?: string | null
           fase_posicion?: number | null
+          fecha_avaluo_cerrado?: string | null
           fecha_escritura?: string | null
+          fecha_solicitud_avaluo?: string | null
           forma_pago?: string | null
           gastos_escrituracion?: number | null
           id?: string
@@ -4444,6 +4454,7 @@ export type Database = {
           notif_hold_creado_at?: string | null
           notif_hold_expirada_at?: string | null
           notif_hold_promovido_at?: string | null
+          notif_solicitud_avaluo_at?: string | null
           numero_escritura?: string | null
           ocupacion?: string | null
           persona_id?: string
@@ -4455,6 +4466,7 @@ export type Database = {
           uso_efectivo?: string | null
           valor_comercial?: number | null
           valor_escrituracion?: number | null
+          valuador_id?: string | null
           vendedor?: string | null
           vendedor_usuario_id?: string | null
         }
@@ -4509,6 +4521,22 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      v_contratista_obra: {
+        Row: {
+          avance_esperado: number | null
+          avance_real: number | null
+          contratista: string | null
+          contratista_id: string | null
+          efectividad_pct: number | null
+          empresa_id: string | null
+          mo_contratado: number | null
+          mo_ejecutado: number | null
+          pct_ejecutado: number | null
+          vencidas: number | null
+          viviendas: number | null
+        }
+        Relationships: []
       }
       v_estimaciones_resumen: {
         Row: {
@@ -5929,6 +5957,47 @@ export type Database = {
             columns: ["requisicion_id"]
             isOneToOne: false
             referencedRelation: "requisiciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cuenta_saldos: {
+        Row: {
+          capturado_por: string | null
+          created_at: string
+          cuenta_id: string
+          empresa_id: string
+          fecha: string
+          id: string
+          notas: string | null
+          saldo: number
+        }
+        Insert: {
+          capturado_por?: string | null
+          created_at?: string
+          cuenta_id: string
+          empresa_id: string
+          fecha?: string
+          id?: string
+          notas?: string | null
+          saldo: number
+        }
+        Update: {
+          capturado_por?: string | null
+          created_at?: string
+          cuenta_id?: string
+          empresa_id?: string
+          fecha?: string
+          id?: string
+          notas?: string | null
+          saldo?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cuenta_saldos_cuenta_id_fkey"
+            columns: ["cuenta_id"]
+            isOneToOne: false
+            referencedRelation: "cuentas_bancarias"
             referencedColumns: ["id"]
           },
         ]
@@ -10068,6 +10137,27 @@ export type Database = {
       }
     }
     Views: {
+      v_cuenta_saldo_actual: {
+        Row: {
+          banco: string | null
+          capturado_at: string | null
+          cuenta_id: string | null
+          empresa_id: string | null
+          fecha_saldo: string | null
+          moneda_id: string | null
+          nombre: string | null
+          saldo: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cuenta_saldos_cuenta_id_fkey"
+            columns: ["cuenta_id"]
+            isOneToOne: false
+            referencedRelation: "cuentas_bancarias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_empleados_full: {
         Row: {
           antiguedad_anios: number | null

@@ -20,7 +20,7 @@
  * Sin campos nuevos en `dilesa.ventas` — el KYC se capturó en Fase 1.
  */
 
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, CheckCircle2, ExternalLink, Loader2, Upload, XCircle } from 'lucide-react';
@@ -85,6 +85,7 @@ export default function CapturarFase2Page() {
 
 function CapturarFase2Body() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const ventaId = params.id;
   const toast = useToast();
 
@@ -92,6 +93,8 @@ function CapturarFase2Body() {
   const [esLider, setEsLider] = useState<boolean | null>(null);
   const [adjuntosCargados, setAdjuntosCargados] = useState<Map<string, AdjuntoCargado>>(new Map());
   const [archivos, setArchivos] = useState<Partial<Record<RolRequerido, File>>>({});
+  /** Rol cuya zona está siendo hovered con un drag activo (para resaltar). */
+  const [dragOverRol, setDragOverRol] = useState<RolRequerido | null>(null);
   const [recibos, setRecibos] = useState<ReciboEnganche[]>([]);
   const [totalEnganchePagado, setTotalEnganchePagado] = useState<number>(0);
   const [loading, setLoading] = useState(true);
@@ -238,11 +241,13 @@ function CapturarFase2Body() {
       if (!res.ok) throw new Error(res.error ?? 'No se pudo autorizar.');
       toast.add({
         title: 'Asignación autorizada',
-        description: 'La venta pasó a Fase 2.',
+        description: 'La venta pasó a Fase 2. Continúa con la siguiente fase desde el detalle.',
         type: 'success',
       });
-      // Recargar para reflejar estado nuevo
-      cargar();
+      // Llevar a la ficha completa de la venta — ahí está el pipeline,
+      // los adjuntos y el botón de captura de la siguiente fase. Si nos
+      // quedáramos aquí, el banner "ya está en Fase 2" tapaba el flujo.
+      router.push(`/dilesa/ventas/${ventaId}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error desconocido';
       toast.add({ title: 'Error al autorizar', description: msg, type: 'error' });
@@ -319,10 +324,49 @@ function CapturarFase2Body() {
             const fileSeleccionado = archivos[rol];
             const completo = !!cargado || !!fileSeleccionado;
             const href = cargado ? getAdjuntoProxyUrl(cargado.url) : null;
+            const isDragOver = dragOverRol === rol;
             return (
               <div
                 key={rol}
-                className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--card)] px-4 py-3"
+                onDragOver={(e) => {
+                  // preventDefault es obligatorio para que `drop` se dispare;
+                  // sin esto el browser intenta navegar al archivo y nada
+                  // llega al handler. dataTransfer.dropEffect le da al usuario
+                  // el cursor "copy" estándar.
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'copy';
+                  if (dragOverRol !== rol) setDragOverRol(rol);
+                }}
+                onDragLeave={(e) => {
+                  // Solo limpiar si el drag salió DEL contenedor — los hijos
+                  // disparan leave/enter también y harían parpadear el ring.
+                  if (e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                    return;
+                  }
+                  setDragOverRol((current) => (current === rol ? null : current));
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverRol(null);
+                  const f = e.dataTransfer.files?.[0];
+                  if (!f) return;
+                  // Mismo filtro que el `accept` del input: PDF o imágenes.
+                  if (
+                    !(
+                      f.type === 'application/pdf' ||
+                      f.type.startsWith('image/') ||
+                      f.name.toLowerCase().endsWith('.pdf')
+                    )
+                  ) {
+                    return;
+                  }
+                  setArchivos((prev) => ({ ...prev, [rol]: f }));
+                }}
+                className={`flex items-center justify-between gap-3 rounded-lg border bg-[var(--card)] px-4 py-3 transition-colors ${
+                  isDragOver
+                    ? 'border-[var(--accent)] bg-[var(--accent)]/5 ring-2 ring-[var(--accent)]/40'
+                    : 'border-[var(--border)]'
+                }`}
               >
                 {/* Lado izquierdo: clickeable cuando hay adjunto cargado */}
                 {href ? (

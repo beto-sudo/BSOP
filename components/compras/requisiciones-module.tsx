@@ -454,12 +454,13 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
   );
 
   const cancelar = useCallback(
-    async (req: ReqRow) => {
+    async (req: ReqRow, motivo: string) => {
       const sb = createSupabaseBrowserClient();
+      const ahora = new Date().toISOString();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error: e } = await (sb.schema('erp') as any)
         .from('requisiciones')
-        .update({ deleted_at: new Date().toISOString() })
+        .update({ deleted_at: ahora, cancelada_at: ahora, motivo_cancelacion: motivo })
         .eq('id', req.id);
       if (e) {
         toast.add({
@@ -602,11 +603,12 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
                   onDelete={
                     estado !== 'con_oc'
                       ? {
-                          onConfirm: () => cancelar(r),
+                          onConfirm: (motivo) => cancelar(r, motivo ?? ''),
                           label: 'Cancelar requisición',
                           confirmTitle: `¿Cancelar ${r.codigo}?`,
                           confirmDescription: 'La requisición quedará cancelada (borrado suave).',
                           confirmLabel: 'Cancelar requisición',
+                          requireMotivo: true,
                         }
                       : undefined
                   }
