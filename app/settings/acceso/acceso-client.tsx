@@ -156,6 +156,7 @@ function modulosAsignablesParaRol(
 const SECCION_ORDER: readonly ModuloSeccion[] = [
   'operativa',
   'administracion',
+  'tesoreria',
   'rh',
   'compras',
   'inventario',
@@ -166,6 +167,7 @@ const SECCION_ORDER: readonly ModuloSeccion[] = [
 const SECCION_LABELS: Record<ModuloSeccion, string> = {
   operativa: 'Operativa',
   administracion: 'Administración',
+  tesoreria: 'Tesorería',
   rh: 'Recursos Humanos',
   compras: 'Compras',
   inventario: 'Inventario',
