@@ -52,6 +52,27 @@ const TIPO_ABREV: Record<string, string> = {
   tarea_menor: 'TAR',
 };
 
+/**
+ * Objetos de obra más comunes (frentes reales de DILESA). Al elegir uno se
+ * pre-llena el campo `objeto` (editable, p.ej. para agregar metros lineales);
+ * es la cláusula PRIMERA del contrato. Obligatorio en la captura.
+ */
+const OBJETOS_COMUNES = [
+  'Construcción de muro de contención',
+  'Construcción de barda perimetral',
+  'Electrificación de lotes (media y baja tensión y alumbrado público)',
+  'Electrificación de línea troncal',
+  'Pavimentación',
+  'Instalación de red de agua potable',
+  'Instalación de red de drenaje sanitario',
+  'Construcción de cordón y guarnición',
+  'Construcción de banquetas',
+  'Construcción de caseta de acceso',
+  'Suministro e instalación de portón y control de acceso',
+  'Fabricación e instalación de monolito y nomenclatura',
+  'Terracerías y movimiento de tierras',
+] as const;
+
 export default function Page() {
   return (
     <RequireAccess empresa="dilesa" modulo="dilesa.construccion.contratos" write>
@@ -82,9 +103,11 @@ function NuevoContratoObraBody() {
   const [tipo, setTipo] = useState<string>('urbanizacion');
   const [fechaContrato, setFechaContrato] = useState(new Date().toISOString().slice(0, 10));
   const [valorTotal, setValorTotal] = useState('');
-  const [anticipoPct, setAnticipoPct] = useState('');
-  const [retencionPct, setRetencionPct] = useState('');
-  const [fianzaPct, setFianzaPct] = useState('');
+  // Defaults: anticipo y fianza en 0 (los locales no llevan; se capturan si aplican),
+  // retención en 5 (el fondo de garantía estándar — la garantía real cuando no hay fianza).
+  const [anticipoPct, setAnticipoPct] = useState('0');
+  const [retencionPct, setRetencionPct] = useState('5');
+  const [fianzaPct, setFianzaPct] = useState('0');
   const [periodicidadDias, setPeriodicidadDias] = useState('');
   const [objeto, setObjeto] = useState('');
   const [fechaInicio, setFechaInicio] = useState('');
@@ -211,7 +234,13 @@ function NuevoContratoObraBody() {
   const codigoFinal = codigoOverride.trim() || codigoSugerido;
 
   const canSubmit =
-    !!contratistaId && !!proyectoId && !!tipo && !!fechaContrato && !!codigoFinal && valorNum > 0;
+    !!contratistaId &&
+    !!proyectoId &&
+    !!tipo &&
+    !!fechaContrato &&
+    !!codigoFinal &&
+    valorNum > 0 &&
+    !!objeto.trim();
 
   async function onSubmit() {
     if (!canSubmit || submitting) return;
@@ -231,9 +260,9 @@ function NuevoContratoObraBody() {
           valor_total: valorNum,
           anticipo_pct: anticipoPct.trim() ? Number(anticipoPct) : 0,
           retencion_pct: retencionPct.trim() ? Number(retencionPct) : 0,
-          fianza_pct: fianzaPct.trim() ? Number(fianzaPct) : null,
+          fianza_pct: fianzaPct.trim() ? Number(fianzaPct) : 0,
           periodicidad_estimaciones_dias: periodicidadDias.trim() ? Number(periodicidadDias) : null,
-          objeto: objeto.trim() || null,
+          objeto: objeto.trim(),
           fecha_inicio: fechaInicio || null,
           fecha_fin: fechaFin || null,
           notas: notas.trim() || null,
@@ -429,13 +458,32 @@ function NuevoContratoObraBody() {
       <Section title="Alcance, plazo y garantía">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <Field label="Objeto del contrato">
+            <Field label="Objeto del contrato *">
+              <select
+                className={`${selectCls} mb-2`}
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) setObjeto(e.target.value);
+                }}
+                aria-label="Objeto común"
+              >
+                <option value="">Elegir objeto común… (o escribe abajo)</option>
+                {OBJETOS_COMUNES.map((o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ))}
+              </select>
               <textarea
                 className="min-h-[60px] w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm"
                 value={objeto}
                 onChange={(e) => setObjeto(e.target.value)}
-                placeholder="Ej. Suministro y mano de obra de 225 m de muro de contención…"
+                placeholder="Ej. Construcción de 225 m de muro de contención…"
               />
+              <Hint>
+                Es la cláusula PRIMERA del contrato. Elige uno común y ajústalo (metros,
+                ubicación…).
+              </Hint>
             </Field>
           </div>
           <Field label="Inicio de ejecución">
