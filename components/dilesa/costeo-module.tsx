@@ -383,7 +383,8 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
         .from('obra_estimaciones')
         .select('contrato_id, monto_total')
         .eq('empresa_id', empresaId)
-        .is('deleted_at', null),
+        .is('deleted_at', null)
+        .is('cancelada_at', null),
       // Catálogo de conceptos (ADR-040) — cast `as any` (no está en types aún).
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (sb.schema('erp') as any)
