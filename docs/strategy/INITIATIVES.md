@@ -47,6 +47,8 @@
 
 | Tesorería (sección + Saldos Bancos) | `tesoreria` | todas (golden DILESA) | erp (`cuenta_saldos` + `v_cuenta_saldo_actual` nuevas; carga `cuentas_bancarias`), core.modulos (sección `tesoreria` + reubicar CxC/CxP + slug `dilesa.saldos-bancos` + backfill permisos) | planned | Sprint 1 — `erp.cuenta_saldos` (historial) + vista último saldo + carga de las 4 cuentas DILESA. Dependencia previa del lanzamiento de `dilesa-resumen-consejo` (ver [planning](../planning/tesoreria.md)) | 2026-06-07 |
 
+| Coordinación entre sesiones | `cross-session-coordination` | todas (infra/proceso) | ninguno (tooling + CI): `package.json`, `scripts/`, `.github/workflows/`, `CLAUDE.md`, `INITIATIVES.md` | planned | Sprint 1 (este PR): generador `npm run db:new` (timestamp anti-colisión vía `gh`) + Regla 0 en CLAUDE.md. Próximo: Sprint 2 — auto-gen de INITIATIVES.md + check de CI (ver [planning](../planning/cross-session-coordination.md)) | 2026-06-07 |
+
 ## Roadmap UI (orden de ejecución secuencial)
 
 > El roadmap UI son iniciativas con sufijo "(UI)" arriba. La cola es

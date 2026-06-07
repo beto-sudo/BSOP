@@ -193,7 +193,34 @@ exista) son hotspots de conflicto: ambos PRs editan la misma tabla, el
 primero que mergea le gana la línea al segundo, y el segundo termina
 con `This branch has conflicts that must be resolved`.
 
-Dos reglas para mantener la fricción baja sin infraestructura nueva:
+El hotspot más peligroso son las **migraciones**: dos sesiones que eligen el
+mismo `YYYYMMDDHHMMSS` colisionan el PK de `schema_migrations` y **rompen
+Supabase Preview / prod** (pasó el 2026-06-07 con `20260607190000`, usado por
+dos PRs a la vez). Reglas para mantener la fricción baja:
+
+#### Regla 0: timestamps de migración sin colisión — `npm run db:new`
+
+**Nunca** copies a mano un `YYYYMMDDHHMMSS` de otra migración ni inventes uno.
+Siempre crea migraciones con:
+
+```bash
+npm run db:new "<slug_snake_case>"   # ej: npm run db:new "modulo_dilesa_manual"
+```
+
+El generador elige un timestamp estrictamente mayor que **toda** migración que
+ya exista — localmente **y en los PRs abiertos de otras sesiones** (las ve vía
+`gh`). Así dos sesiones en paralelo no eligen el mismo. Residual: dos sesiones
+en el mismo segundo antes de abrir su PR — por eso **abre tu PR pronto**.
+(Lógica en `scripts/lib/migration-version.ts` + `scripts/new-migration.ts`;
+iniciativa `cross-session-coordination`.)
+
+Convenciones de coordinación complementarias (la memoria compartida entre
+sesiones es este `CLAUDE.md` — todas lo leen al arrancar):
+
+- **Branch = slug de iniciativa** (`claude/<slug>-…`) → `gh pr list` revela quién
+  trabaja en qué (es el "registro" de sesiones, sin archivo nuevo que mantener).
+- **Una iniciativa = una sesión.** Antes de arrancar, corre `gh pr list` para no
+  pisar una iniciativa que otra sesión ya tiene abierta.
 
 #### Regla 1: minimizar ediciones a `INITIATIVES.md`
 
