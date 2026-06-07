@@ -355,15 +355,15 @@ function DetailInner() {
             </p>
           ) : null}
         </div>
-        {contrato.tipo === 'vivienda' ? (
-          <a
-            href={`/api/dilesa/construccion/contratos/${contrato.id}/pdf`}
-            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40 hover:text-[var(--text)]"
-          >
-            <Download className="h-4 w-4" />
-            Descargar contrato (PDF)
-          </a>
-        ) : null}
+        {/* Ambos tipos generan PDF: vivienda con lotes+ANEXO 3, obra de monto
+            global con objeto descriptivo (el endpoint branchea por `tipo`). */}
+        <a
+          href={`/api/dilesa/construccion/contratos/${contrato.id}/pdf`}
+          className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40 hover:text-[var(--text)]"
+        >
+          <Download className="h-4 w-4" />
+          Descargar contrato (PDF)
+        </a>
       </header>
 
       <Section title="Datos generales">

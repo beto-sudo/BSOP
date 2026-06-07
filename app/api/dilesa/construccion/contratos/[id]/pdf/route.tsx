@@ -27,6 +27,10 @@ import {
   type Anexo3Prototipo,
   type Anexo3Tarea,
 } from '@/lib/dilesa/pdf/contrato-obra';
+import {
+  ContratoObraGlobalPDF,
+  type ContratoObraGlobalData,
+} from '@/lib/dilesa/pdf/contrato-obra-global';
 import { formatMontoEnLetras } from '@/lib/format/numero-a-letras';
 
 const MESES_ES = [
@@ -69,7 +73,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { data: contrato, error: cErr } = await sb
     .schema('dilesa')
     .from('contratos_construccion')
-    .select('id, codigo, fecha_contrato, contratista_id, proyecto_id, valor_total')
+    .select(
+      'id, codigo, fecha_contrato, contratista_id, proyecto_id, valor_total, tipo, objeto, fecha_inicio, fecha_fin, anticipo_pct, retencion_pct, fianza_pct, periodicidad_estimaciones_dias'
+    )
     .eq('id', id)
     .is('deleted_at', null)
     .maybeSingle();
@@ -107,6 +113,59 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         .eq('contrato_id', contrato.id)
         .is('deleted_at', null),
     ]);
+
+  // ── Branch: contrato de obra de MONTO GLOBAL (no-vivienda) ──
+  // La vivienda se describe por lotes/prototipos + ANEXO 3 de precios unitarios;
+  // la obra (urbanización, cabecera, tarea menor) por su objeto descriptivo, sin
+  // lotes ni anexos. Genérico para los 3 tipos no-vivienda.
+  if ((contrato.tipo as string) !== 'vivienda') {
+    const nombreCtr =
+      [persona?.nombre, persona?.apellido_paterno, persona?.apellido_materno]
+        .filter(Boolean)
+        .join(' ')
+        .trim() || '(sin nombre)';
+    const esMoralG = /moral/i.test((datos?.persona_fisica_o_moral as string | null) ?? '');
+    const monto = Number(contrato.valor_total ?? 0);
+    const anticipoPct = Number(contrato.anticipo_pct ?? 0);
+    const anticipoMonto = Math.round(monto * anticipoPct) / 100; // pct sobre el total
+    const globalData: ContratoObraGlobalData = {
+      folio: (contrato.codigo as string) ?? id,
+      fechaFirmaTexto: fechaLarga(contrato.fecha_contrato as string | null),
+      fechaInicioTexto: fechaLarga(
+        (contrato.fecha_inicio as string | null) ?? (contrato.fecha_contrato as string | null)
+      ),
+      fechaFinTexto: fechaLarga(contrato.fecha_fin as string | null),
+      objeto: (contrato.objeto as string | null) ?? '',
+      proyectoNombre: (proyecto?.nombre as string | null) ?? '',
+      contratista: {
+        nombre: nombreCtr.toUpperCase(),
+        esMoral: esMoralG,
+        representanteLegal: (datos?.representante_legal as string | null) || null,
+        rfc: (persona?.rfc as string | null) || null,
+        repse: (datos?.repse as string | null) || null,
+        registroPatronal: (datos?.registro_patronal as string | null) || null,
+        domicilio: (datos?.domicilio as string | null) || null,
+      },
+      montoTotal: monto,
+      montoTotalEnLetra: formatMontoEnLetras(monto),
+      anticipoMonto,
+      anticipoEnLetra: formatMontoEnLetras(anticipoMonto),
+      anticipoPct,
+      retencionPct: Number(contrato.retencion_pct ?? 0),
+      fianzaPct: Number(contrato.fianza_pct ?? 0),
+      periodicidadDias: Number(contrato.periodicidad_estimaciones_dias ?? 14),
+    };
+    const bufG = await renderToBuffer(<ContratoObraGlobalPDF data={globalData} />);
+    const fnameG = `contrato-obra-${(contrato.codigo as string)?.replace(/[^\w.-]+/g, '_') || id}.pdf`;
+    return new Response(new Uint8Array(bufG), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${fnameG}"`,
+        'Cache-Control': 'no-store',
+      },
+    });
+  }
 
   const construccionIds = [...new Set((lotesRows ?? []).map((l) => l.construccion_id as string))];
   if (construccionIds.length === 0) {
