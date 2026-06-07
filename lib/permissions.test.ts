@@ -263,6 +263,10 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   // ROUTE_TO_MODULE + page llegan con la UI (Fase 2). Migración
   // 20260605191000_erp_cotizaciones_rfq.sql (INSERT slug + backfill permisos).
   'dilesa.compras.cotizaciones',
+  // Manual de usuario (iniciativa `manual-usuario`). Módulo top-level
+  // read-only visible para todo miembro de DILESA. Migración
+  // 20260607170000_modulo_dilesa_manual.sql.
+  'dilesa.manual',
   // Sub-slugs por fase del pipeline (Sprint 7a captura por fase)
   'dilesa.ventas.fase01_solicitud',
   'dilesa.ventas.fase02_asignada',

@@ -49,6 +49,8 @@
 
 | Coordinación entre sesiones | `cross-session-coordination` | todas (infra/proceso) | ninguno (tooling + CI): `package.json`, `scripts/`, `.github/workflows/`, `CLAUDE.md`, `INITIATIVES.md` | planned | Sprint 1 (este PR): generador `npm run db:new` (timestamp anti-colisión vía `gh`) + Regla 0 en CLAUDE.md. Próximo: Sprint 2 — auto-gen de INITIATIVES.md + check de CI (ver [planning](../planning/cross-session-coordination.md)) | 2026-06-07 |
 
+| Manual de usuario in-app | `manual-usuario` | DILESA (golden; piloto Ventas) | core.modulos (slug `dilesa.manual` + backfill); contenido en repo (markdown), no DB | planned | Sprint 0 (fundación + ADR-043) en PR a preview: pipeline de rendering markdown + `<HelpButton>` contextual + portada + migración (pendiente aplicar). Próximo: validar preview + Sprint 1 (resto del contenido de Ventas) (ver [planning](../planning/manual-usuario.md)) | 2026-06-07 |
+
 ## Roadmap UI (orden de ejecución secuencial)
 
 > El roadmap UI son iniciativas con sufijo "(UI)" arriba. La cola es
