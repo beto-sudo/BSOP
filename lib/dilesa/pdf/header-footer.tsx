@@ -69,3 +69,47 @@ export function Folio({ value }: { value: string }) {
     </Text>
   );
 }
+
+/**
+ * Watermark diagonal "DESASIGNADA"/"EXPIRADA"/etc. que invalida
+ * visualmente cualquier impresión del PDF cuando la venta ya no está
+ * activa. Se renderiza en TODAS las páginas (prop `fixed`) y queda
+ * detrás del contenido por orden de inserción (debe ir DESPUÉS del
+ * Header pero ANTES del body para quedar como background).
+ *
+ * Por qué no esconder los botones: LFPIORPI exige conservar el
+ * expediente histórico. Marcamos el doc en lugar de ocultarlo, así
+ * el operador puede auditar pero nadie lo usa como válido por error.
+ */
+export function Watermark({ text }: { text: string }) {
+  if (!text) return null;
+  return (
+    <View
+      fixed
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+        // @ts-expect-error — @react-pdf permite pointerEvents
+        pointerEvents: 'none',
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 90,
+          fontWeight: 700,
+          color: '#dc2626',
+          opacity: 0.18,
+          letterSpacing: 6,
+          transform: 'rotate(-30deg)',
+        }}
+      >
+        {text}
+      </Text>
+    </View>
+  );
+}

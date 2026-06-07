@@ -24,7 +24,7 @@
  */
 import { Document, Page, StyleSheet, Text, View } from '@react-pdf/renderer';
 import { styles, colors } from './styles';
-import { HeaderBand, FooterBand, Folio } from './header-footer';
+import { HeaderBand, FooterBand, Folio, Watermark } from './header-footer';
 import {
   CUENTA_DILESA,
   ESCRITURAS_CONSTITUTIVAS_DILESA,
@@ -73,6 +73,9 @@ export type PromesaData = {
   };
 
   folio: string; // "CLM-M3-L16-LDLE-ISC-5/24/2026 9:35:36 AM"
+
+  /** Si la venta está desasignada/expirada, texto a estampar como watermark. */
+  watermark?: string | null;
 };
 
 const fmtMoney = new Intl.NumberFormat('es-MX', {
@@ -96,6 +99,7 @@ export function PromesaCompraventaPDF({ data }: { data: PromesaData }) {
     <Document title={`Promesa de Compraventa — ${data.inmueble.identificacionInventario}`}>
       <Page size="LETTER" style={styles.page} wrap>
         <HeaderBand title="CONTRATO DE PROMESA DE COMPRAVENTA" fecha={data.fechaTexto} />
+        {data.watermark ? <Watermark text={data.watermark} /> : null}
 
         {/* ── Header del contrato (Fix 1) ── */}
         <Text style={contratoStyles.encabezado}>
@@ -561,6 +565,7 @@ export function PromesaCompraventaPDF({ data }: { data: PromesaData }) {
       {/* ── Anexo 3: Cédula de Materiales (multi-página automático) ── */}
       <Page size="LETTER" style={styles.page} wrap>
         <HeaderBand title="ANEXO 3 — CÉDULA DE MATERIALES" fecha={data.fechaTexto} />
+        {data.watermark ? <Watermark text={data.watermark} /> : null}
         <Text style={contratoStyles.parrafo}>
           Cédula de características generales, materiales y acabados de la vivienda — referida en la
           Declaración I y en los Documentos Anexos del presente contrato. Los materiales y acabados

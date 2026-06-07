@@ -18,7 +18,7 @@
  */
 import { Document, Page, Text, View } from '@react-pdf/renderer';
 import { styles, colors } from './styles';
-import { HeaderBand, FooterBand, Folio } from './header-footer';
+import { HeaderBand, FooterBand, Folio, Watermark } from './header-footer';
 
 export type SolicitudData = {
   fechaTexto: string; // "24 de Mayo del 2026"
@@ -55,6 +55,8 @@ export type SolicitudData = {
   // firma
   clienteNombre: string;
   folio: string; // ej. JHM-M3-L9-LDLE-ISC-5/24/2026 9:34:28 AM
+  /** Si la venta está desasignada/expirada, texto a estampar como watermark. */
+  watermark?: string | null;
 };
 
 const moneyFmt = new Intl.NumberFormat('es-MX', {
@@ -70,6 +72,7 @@ export function SolicitudAsignacionPDF({ data }: { data: SolicitudData }) {
     <Document title={`Solicitud de Asignación — ${data.identificacionInventario}`}>
       <Page size="LETTER" style={styles.page}>
         <HeaderBand title="SOLICITUD DE ASIGNACIÓN" fecha={data.fechaTexto} />
+        {data.watermark ? <Watermark text={data.watermark} /> : null}
 
         {/* ── Datos de la vivienda ── */}
         <Text style={styles.sectionTitle}>DATOS DE LA VIVIENDA</Text>

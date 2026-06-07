@@ -66,7 +66,7 @@ export async function GET(
     .schema('dilesa')
     .from('ventas')
     .select(
-      'id, persona_id, unidad_id, vendedor_usuario_id, tipo_credito, vendedor, monto_credito_titular, monto_credito_cotitular, productos_adicionales, precio_asignacion, created_at, ine_numero'
+      'id, persona_id, unidad_id, vendedor_usuario_id, tipo_credito, vendedor, monto_credito_titular, monto_credito_cotitular, productos_adicionales, precio_asignacion, created_at, ine_numero, estado'
     )
     .eq('id', id)
     .is('deleted_at', null)
@@ -74,6 +74,17 @@ export async function GET(
   if (vErr || !venta) {
     return NextResponse.json({ error: 'Venta no encontrada' }, { status: 404 });
   }
+
+  // Si la venta ya no está activa (desasignada o expirada), estampamos
+  // un watermark en el PDF para invalidarlo visualmente. LFPIORPI exige
+  // conservar el expediente histórico, por eso no escondemos el botón;
+  // marcamos el doc para que nadie lo use como válido por error.
+  const watermarkText: string | null =
+    venta.estado === 'desasignada'
+      ? 'DESASIGNADA'
+      : venta.estado === 'expirada'
+        ? 'EXPIRADA'
+        : null;
 
   // Persona (cliente) cross-schema — FICU + Promesa necesitan todos los KYC
   // fields que el form de Sprint 7c-2 persistió aquí (no en `dilesa.ventas`).
@@ -180,6 +191,7 @@ export async function GET(
       fechaTexto,
       clienteNombre,
       identificacionInventario,
+      watermark: watermarkText,
     };
     const buf = await renderToBuffer(<AvisoPrivacidadPDF data={data} />);
     return pdfResponse(buf, `aviso-privacidad-${identificacionInventario || id}.pdf`);
@@ -302,6 +314,7 @@ export async function GET(
         .join(
           ''
         )}-${identificacionInventario}-${ahora.toLocaleString('es-MX', { timeZone: TZ_MX })}`,
+      watermark: watermarkText,
     };
     const buf = await renderToBuffer(<PromesaCompraventaPDF data={data} />);
     return pdfResponse(buf, `promesa-compraventa-${identificacionInventario || id}.pdf`);
@@ -355,6 +368,7 @@ export async function GET(
       clasificacionRiesgo: riesgo.clasificacion,
       clienteNombre,
       identificacionInventario,
+      watermark: watermarkText,
     };
     const buf = await renderToBuffer(<FicuPDF data={data} />);
     return pdfResponse(buf, `ficu-${identificacionInventario || id}.pdf`);
@@ -410,6 +424,7 @@ export async function GET(
     frenteVerde: false,
     esquina: false,
     precioM2Excedente: 0,
+    watermark: watermarkText,
     ...pdfDataExtra,
   };
 

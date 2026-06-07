@@ -4,12 +4,14 @@
  */
 import { Document, Link, Page, Text, View } from '@react-pdf/renderer';
 import { styles, colors } from './styles';
-import { HeaderBand, FooterBand } from './header-footer';
+import { HeaderBand, FooterBand, Watermark } from './header-footer';
 
 export type AvisoPrivacidadData = {
   fechaTexto: string; // "24 de Mayo del 2026"
   clienteNombre: string;
   identificacionInventario: string; // M3-L9-LDLE-ISC
+  /** Si la venta está desasignada/expirada, texto a estampar como watermark. */
+  watermark?: string | null;
 };
 
 export function AvisoPrivacidadPDF({ data }: { data: AvisoPrivacidadData }) {
@@ -17,6 +19,7 @@ export function AvisoPrivacidadPDF({ data }: { data: AvisoPrivacidadData }) {
     <Document title={`Aviso de Privacidad — ${data.identificacionInventario}`}>
       <Page size="LETTER" style={styles.page}>
         <HeaderBand title="AVISO DE PRIVACIDAD" fecha={data.fechaTexto} />
+        {data.watermark ? <Watermark text={data.watermark} /> : null}
 
         <Text style={paragraphStyle}>
           DILESA es una empresa respetuosa de los derechos sobre los datos personales de las
