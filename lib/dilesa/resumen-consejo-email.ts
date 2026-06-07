@@ -310,13 +310,13 @@ export function renderResumenConsejoHtml(
     .join('\n');
 
   const header = opts.headerImageUrl
-    ? `<div style="background:#1a1a2e;"><img src="${opts.headerImageUrl}" alt="DILESA" style="display:block;width:100%;height:auto;" /></div>`
+    ? `<div style="background:#1a1a2e;"><img src="${opts.headerImageUrl}" alt="DILESA" width="720" style="display:block;width:100%;max-width:100%;height:auto;border:0;" /></div>`
     : '';
 
   return `<!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-  <div style="width:100%;background:#ffffff;">
+  <div style="max-width:720px;margin:0 auto;background:#ffffff;">
     ${header}
     <div style="background:#1a1a2e;padding:18px 32px 22px;">
       <h1 style="margin:0;font-size:19px;font-weight:700;color:#ffffff;">Resumen Diario Operación Dilesa 🏘️</h1>
@@ -416,9 +416,15 @@ export async function fetchResumenConsejoData(
     (productosRes.data ?? []).map((p: { id: string; nombre: string }) => [p.id, p.nombre])
   );
 
-  // Avances: solo desarrollos con unidades (lotes_total > 0), ordenados por nombre
+  // Avances: desarrollos con unidades (lotes_total > 0), EXCLUYENDO los 100%
+  // terminados (construcción y ventas al 100% — ya no son operación activa).
   const avances: AvanceRow[] = (avancesRes.data ?? [])
-    .filter((a: Record<string, unknown>) => Number(a.lotes_total) > 0)
+    .filter((a: Record<string, unknown>) => {
+      if (Number(a.lotes_total) <= 0) return false;
+      const terminado =
+        Number(a.avance_const_pct ?? 0) >= 100 && Number(a.avance_vts_pct ?? 0) >= 100;
+      return !terminado;
+    })
     .map((a: Record<string, unknown>) => ({
       proyecto: proyNombre.get(a.proyecto_id as string) ?? '—',
       avance_urb_pct: a.avance_urb_pct as number | null,
