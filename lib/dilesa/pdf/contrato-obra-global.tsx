@@ -266,18 +266,26 @@ export function ContratoObraGlobalPDF({ data }: { data: ContratoObraGlobalData }
           n="SÉPTIMA"
           titulo="ANTICIPO PARA INICIO DE OBRA"
           texto={
-            <>
-              Para el inicio de la obra objeto del presente instrumento “EL CLIENTE” pagará como
-              anticipo a cuenta del valor total de la obra la cantidad de{' '}
-              <Text style={cStyles.bold}>
-                {money(data.anticipoMonto)} ({data.anticipoEnLetra})
-              </Text>
-              , impuesto al valor agregado incluido, equivalente al{' '}
-              <Text style={cStyles.bold}>{num(data.anticipoPct)}%</Text> del importe total del
-              presente contrato, obligándose “EL CONTRATISTA” a utilizarlo única y exclusivamente en
-              dichos trabajos. La amortización de los anticipos se llevará a cabo en cada estimación
-              parcial de pago de avance.
-            </>
+            data.anticipoPct > 0 ? (
+              <>
+                Para el inicio de la obra objeto del presente instrumento “EL CLIENTE” pagará como
+                anticipo a cuenta del valor total de la obra la cantidad de{' '}
+                <Text style={cStyles.bold}>
+                  {money(data.anticipoMonto)} ({data.anticipoEnLetra})
+                </Text>
+                , impuesto al valor agregado incluido, equivalente al{' '}
+                <Text style={cStyles.bold}>{num(data.anticipoPct)}%</Text> del importe total del
+                presente contrato, obligándose “EL CONTRATISTA” a utilizarlo única y exclusivamente
+                en dichos trabajos. La amortización de los anticipos se llevará a cabo en cada
+                estimación parcial de pago de avance.
+              </>
+            ) : (
+              <>
+                Las partes acuerdan que para la ejecución de la obra objeto del presente contrato no
+                se otorgará anticipo a “EL CONTRATISTA”, por lo que los trabajos se pagarán
+                íntegramente mediante las estimaciones de avance conforme a la cláusula OCTAVA.
+              </>
+            )
           }
         />
 
@@ -288,7 +296,7 @@ export function ContratoObraGlobalPDF({ data }: { data: ContratoObraGlobalData }
             <>
               Las partes convienen que los trabajos objeto del presente contrato se paguen mediante
               la formulación de estimaciones que abarcarán períodos de ejecución no mayores de{' '}
-              <Text style={cStyles.bold}>{num(data.periodicidadDias)} (catorce) días</Text>, término
+              <Text style={cStyles.bold}>{num(data.periodicidadDias)} días naturales</Text>, término
               que iniciaría a partir del inicio de la obra; las que serán presentadas a la
               supervisión para su revisión y aprobación. Las estimaciones se pagarán en un plazo no
               mayor a 5 (cinco) días hábiles, contados a partir de la fecha de entrega de la factura
@@ -307,12 +315,22 @@ export function ContratoObraGlobalPDF({ data }: { data: ContratoObraGlobalData }
           n="NOVENA"
           titulo="GARANTÍAS"
           texto={
-            <>
-              “EL CONTRATISTA” entregará a “EL CLIENTE” fianza de cumplimiento por el{' '}
-              <Text style={cStyles.bold}>{num(data.fianzaPct)}%</Text> del monto total del contrato,
-              misma que podrá ser cancelada al término de la obra y una vez que se halle amortizado
-              el total del anticipo.
-            </>
+            data.fianzaPct > 0 ? (
+              <>
+                “EL CONTRATISTA” entregará a “EL CLIENTE” fianza de cumplimiento por el{' '}
+                <Text style={cStyles.bold}>{num(data.fianzaPct)}%</Text> del monto total del
+                contrato, misma que podrá ser cancelada al término de la obra y una vez que se halle
+                amortizado el total del anticipo, sin perjuicio del fondo de garantía retenido
+                conforme a la cláusula OCTAVA.
+              </>
+            ) : (
+              <>
+                La correcta ejecución de los trabajos queda garantizada mediante el fondo de
+                garantía que “EL CLIENTE” retiene de cada estimación conforme a la cláusula OCTAVA
+                del presente contrato, el cual se devolverá a “EL CONTRATISTA” en los términos ahí
+                señalados. Las partes acuerdan que no se requiere fianza de cumplimiento adicional.
+              </>
+            )
           }
         />
 

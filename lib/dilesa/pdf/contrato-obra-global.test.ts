@@ -59,6 +59,13 @@ describe('contrato-obra-global (PDF de obra de monto global — Fase 4)', () => 
     expect(src).not.toMatch(/\bgap:\s/);
   });
 
+  it('fianza y anticipo son condicionales al pct (contratistas locales sin fianza/anticipo)', () => {
+    // Si fianza_pct/anticipo_pct = 0, la cláusula no obliga lo que no se exige
+    // (la garantía pasa a ser el fondo de retención de la cláusula OCTAVA).
+    expect(src).toContain('data.fianzaPct > 0');
+    expect(src).toContain('data.anticipoPct > 0');
+  });
+
   it('parametriza los valores variables del contrato', () => {
     for (const campo of [
       'objeto',
