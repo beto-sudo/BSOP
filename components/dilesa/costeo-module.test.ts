@@ -14,6 +14,8 @@ function r(overrides: Partial<CosteoRow>): CosteoRow {
     presupuestoActualizado: null,
     presupuesto: 0,
     gastoReal: 0,
+    comprometido: 0,
+    ejercido: 0,
     proveedorPersonaId: null,
     proveedor: null,
     fechaCompromiso: null,
@@ -148,6 +150,21 @@ describe('groupCosteo (Costeo DILESA — agrupado etapa›capítulo)', () => {
     expect(etapa?.gastoReal).toBe(500);
     expect(etapa?.capitulos[0]?.presupuesto).toBe(1000);
     expect(etapa?.capitulos[0]?.gastoReal).toBe(500);
+  });
+
+  it('suma comprometido y ejercido por capítulo y etapa (3 capas — ADR-042)', () => {
+    const grupos = groupCosteo(
+      [
+        r({ conceptoId: 'agua', comprometido: 800, ejercido: 300 }),
+        r({ conceptoId: 'agua', comprometido: 200, ejercido: 0 }),
+      ],
+      CATALOGO
+    );
+    const etapa = grupos[0];
+    expect(etapa?.comprometido).toBe(1000);
+    expect(etapa?.ejercido).toBe(300);
+    expect(etapa?.capitulos[0]?.comprometido).toBe(1000);
+    expect(etapa?.capitulos[0]?.ejercido).toBe(300);
   });
 
   it('ordena las partidas dentro del capítulo por código de concepto', () => {
