@@ -32,6 +32,7 @@ export type ModuloSeccion =
   | 'compras'
   | 'inventario'
   | 'operaciones'
+  | 'tesoreria'
   | 'sistema';
 
 export type Modulo = {
