@@ -46,8 +46,11 @@ type ToggleAction = {
  * destructive row actions in the app — do NOT wire `window.confirm`.
  */
 type DeleteAction = {
-  /** Called only after the user confirms. Can be async. */
-  onConfirm: () => void | Promise<void>;
+  /**
+   * Called only after the user confirms. Can be async. Receives the captured
+   * motivo when `requireMotivo` is set (undefined otherwise).
+   */
+  onConfirm: (motivo?: string) => void | Promise<void>;
   /** Menu item label. Defaults to "Eliminar". */
   label?: string;
   /** Dialog title. Defaults to "¿Eliminar registro?". */
@@ -59,6 +62,13 @@ type DeleteAction = {
   confirmDescription?: React.ReactNode;
   /** Confirm button label. Defaults to "Eliminar". */
   confirmLabel?: string;
+  /**
+   * Si true, el diálogo pide un motivo obligatorio (audit trail) y lo pasa
+   * a `onConfirm`. Usado por la iniciativa p2p-cancelaciones.
+   */
+  requireMotivo?: boolean;
+  /** Placeholder del campo de motivo (solo si `requireMotivo`). */
+  motivoPlaceholder?: string;
   disabled?: boolean;
 };
 
@@ -202,6 +212,8 @@ export function RowActions({
             'Esta acción marcará el registro como eliminado. Se preserva el historial para auditoría.'
           }
           confirmLabel={onDelete.confirmLabel ?? 'Eliminar'}
+          requireMotivo={onDelete.requireMotivo}
+          motivoPlaceholder={onDelete.motivoPlaceholder}
         />
       )}
     </>
