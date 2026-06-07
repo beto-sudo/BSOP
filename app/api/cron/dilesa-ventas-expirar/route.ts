@@ -213,7 +213,22 @@ export async function GET(req: NextRequest) {
       .order('posicion', { ascending: true })
       .limit(1);
     const proximo = (cola ?? [])[0] as ColaRow | undefined;
-    if (!proximo) continue;
+    if (!proximo) {
+      // Sin cola: liberar la unidad para que vuelva al inventario disponible.
+      // Sin esto, la unidad queda en `asignada` aunque ninguna venta activa
+      // la tenga apartada, y nadie puede recrear solicitud (mismo bug que
+      // arregló PR #670 en `desasignarVenta`). `.eq('estado','asignada')`
+      // hace el UPDATE idempotente — si por alguna razón la unidad ya
+      // cambió de estado, no la pisamos.
+      const { error: uErr } = await sb
+        .schema('dilesa')
+        .from('unidades')
+        .update({ estado: 'terminada' })
+        .eq('id', exp.unidad_id)
+        .eq('estado', 'asignada');
+      if (uErr) summary.errors.push(`liberar unidad ${exp.unidad_id}: ${uErr.message}`);
+      continue;
+    }
 
     // Promover: setear expira_at fresco (2 días hábiles desde ahora)
     const nuevoExpira = calcularExpiraAt(new Date());
