@@ -37,6 +37,20 @@ type Resultado = {
   cliente: string;
   unidad: string | null;
   saldo: number;
+  estado: string;
+};
+
+/**
+ * Estados de venta donde NO tiene sentido capturar abonos — el cliente
+ * ya no está en proceso y el renglón solo se conserva como historial.
+ * Las mostramos en el listado (auditoría) pero con badge + botón
+ * disabled.
+ */
+const NO_COBRABLES = new Set(['desasignada', 'expirada']);
+
+const ESTADO_LABEL: Record<string, string> = {
+  desasignada: 'Desasignada',
+  expirada: 'Expirada',
 };
 
 export default function CobranzaPagosPage() {
@@ -95,7 +109,7 @@ function PagosBody() {
     const { data: ventas } = await sb
       .schema('dilesa')
       .from('ventas')
-      .select('id, empresa_id, persona_id, unidad_id')
+      .select('id, empresa_id, persona_id, unidad_id, estado')
       .in('persona_id', personaIds)
       .is('deleted_at', null);
     const ventaIds = (ventas ?? []).map((v) => v.id);
@@ -140,8 +154,16 @@ function PagosBody() {
         cliente: nombrePorPersona.get(v.persona_id) ?? '(sin nombre)',
         unidad: v.unidad_id ? (unidadPorId.get(v.unidad_id) ?? null) : null,
         saldo: saldoPorVenta.get(v.id) ?? 0,
+        estado: (v.estado as string) ?? 'activa',
       }))
-      .sort((a, b) => b.saldo - a.saldo);
+      // Cobrables (activas, etc.) primero; desasignadas/expiradas al final
+      // para que el operador vea primero las relevantes.
+      .sort((a, b) => {
+        const aNoCobr = NO_COBRABLES.has(a.estado) ? 1 : 0;
+        const bNoCobr = NO_COBRABLES.has(b.estado) ? 1 : 0;
+        if (aNoCobr !== bNoCobr) return aNoCobr - bNoCobr;
+        return b.saldo - a.saldo;
+      });
 
     setResultados(res);
     setBuscado(true);
@@ -197,24 +219,47 @@ function PagosBody() {
               </tr>
             </thead>
             <tbody>
-              {resultados.map((r) => (
-                <tr key={r.ventaId} className="border-b border-[var(--border)]/40">
-                  <td className="py-1.5 pr-2">{r.cliente}</td>
-                  <td className="py-1.5 pr-2 text-[var(--text)]/70">{r.unidad ?? '—'}</td>
-                  <td className="py-1.5 pr-2 text-right tabular-nums">
-                    {moneyFmt.format(r.saldo)}
-                  </td>
-                  <td className="py-1.5 pl-2 text-right">
-                    <button
-                      type="button"
-                      onClick={() => setAbono(r)}
-                      className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 text-xs text-[var(--text)] hover:bg-[var(--panel)]"
-                    >
-                      Registrar abono
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {resultados.map((r) => {
+                const noCobrable = NO_COBRABLES.has(r.estado);
+                return (
+                  <tr
+                    key={r.ventaId}
+                    className={`border-b border-[var(--border)]/40 ${
+                      noCobrable ? 'text-[var(--text)]/40' : ''
+                    }`}
+                  >
+                    <td className="py-1.5 pr-2">
+                      <span className="inline-flex items-center gap-2">
+                        {r.cliente}
+                        {noCobrable ? (
+                          <span className="rounded-md border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700">
+                            {ESTADO_LABEL[r.estado] ?? r.estado}
+                          </span>
+                        ) : null}
+                      </span>
+                    </td>
+                    <td className="py-1.5 pr-2">{r.unidad ?? '—'}</td>
+                    <td className="py-1.5 pr-2 text-right tabular-nums">
+                      {moneyFmt.format(r.saldo)}
+                    </td>
+                    <td className="py-1.5 pl-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => setAbono(r)}
+                        disabled={noCobrable}
+                        title={
+                          noCobrable
+                            ? `Venta ${ESTADO_LABEL[r.estado] ?? r.estado} — sólo historial, no se permiten abonos`
+                            : undefined
+                        }
+                        className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 text-xs text-[var(--text)] hover:bg-[var(--panel)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[var(--card)]"
+                      >
+                        Registrar abono
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         ) : null}
