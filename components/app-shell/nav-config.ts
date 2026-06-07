@@ -54,12 +54,18 @@ export const NAV_ITEMS: NavItem[] = [
           { label: 'Tareas', href: '/dilesa/admin/tasks' },
           { label: 'Juntas', href: '/dilesa/admin/juntas' },
           { label: 'Documentos', href: '/dilesa/admin/documentos' },
-          // CxC (Cuentas por Cobrar) — hub con 2 tabs (Pagos / Saldos).
-          // El slug/URL internos siguen siendo `cobranza`.
+        ],
+      },
+      {
+        // Tesorería agrupa el ciclo de efectivo: CxC (ingresos), CxP (egresos)
+        // y Saldos Bancos (posición de caja). Ver iniciativa `tesoreria`.
+        label: 'Tesorería',
+        children: [
+          // CxC — hub con 2 tabs. URL/slug internos siguen siendo `cobranza`.
           { label: 'CxC', href: '/dilesa/cobranza' },
-          // CxP (Cuentas por Pagar) — hub con 3 tabs (Facturas / Saldos /
-          // Proveedores). El padre `dilesa.cxp` es umbrella del sidebar.
+          // CxP — hub con 5 tabs. El padre `dilesa.cxp` es umbrella del sidebar.
           { label: 'CxP', href: '/dilesa/cxp' },
+          { label: 'Saldos Bancos', href: '/dilesa/saldos-bancos' },
         ],
       },
       {
