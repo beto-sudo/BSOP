@@ -6,7 +6,7 @@
 **Estado:** planned
 **Dueño:** Beto
 **Creada:** 2026-06-07
-**Última actualización:** 2026-06-07 (promovida a `planned` — alcance v1 cerrado con Beto: bancos por captura manual, paridad 1:1 con Coda primero y mejoras en fase 2, envío a `consejo@dilesa.mx` ~20:00 CST de lunes a sábado, sin envío en domingo.)
+**Última actualización:** 2026-06-07 (promovida a `planned`; mismo día se refinó: RUV/Seguro resuelto (Coda correcto, BSOP tiene el % ÷10 → fix en Sprint 0) y el bloque de bancos pasa a depender del módulo Saldos Bancos de la nueva iniciativa hermana `tesoreria` — el correo espera ese módulo para lanzar los 7 bloques. Paridad 1:1 primero + mejoras en Fase 2; envío a `consejo@dilesa.mx` ~20:00 CST L–S, domingo no.)
 
 ## Problema
 
@@ -68,12 +68,12 @@ cuadrar con Coda antes de publicar. Reconciliar en Sprint 0.
 
 ## Decisiones registradas (cierre de alcance v1 con Beto, 2026-06-07)
 
-- **D1 — Bancos por captura manual.** Igual que hoy en Coda: el saldo de
-  las 4 cuentas se captura/actualiza a mano (los timestamps de "última
-  actualización" en Coda ya eran dispares — Monex mismo día, Finamex
-  desde noviembre). BSOP carga las 4 cuentas en `erp.cuentas_bancarias`
-  y expone una captura mínima de `saldo_actual`. No hay sync bancario en
-  v1 (eso vive en la futura `conciliacion-bancaria`/tesorería).
+- **D1 — Bancos vía el módulo Saldos Bancos (iniciativa `tesoreria`).**
+  El bloque #1 ya **no** se resuelve con captura mínima interna: lo provee
+  el módulo Saldos Bancos de la iniciativa hermana `tesoreria` (captura
+  manual con historial, puente hasta `conciliacion-bancaria`). El correo
+  lee `erp.v_cuenta_saldo_actual`. Por eso el lanzamiento del correo
+  **depende** de `tesoreria` (ver D5).
 - **D2 — Paridad primero, mejoras después.** v1 replica 1:1 el correo
   Coda para poder apagar Coda rápido. Las mejoras (resumen ejecutivo,
   CxC/CxP, deep links, split pipeline vivo/histórico, alertas) van a una
@@ -81,6 +81,19 @@ cuadrar con Coda antes de publicar. Reconciliar en Sprint 0.
 - **D3 — Destinatario y horario.** `consejo@dilesa.mx`, ~20:00 CST,
   **lunes a sábado**. **Domingo NO se envía.** Remitente con branding
   DILESA (reusa `lib/juntas/email.ts`).
+- **D4 — RUV/Seguro: el bueno es Coda; BSOP tiene el % ÷10.** Confirmado
+  con Beto. `registro_ruv = 0.3%` y `seguro_calidad = 0.65%` del valor
+  comercial; en `dilesa.productos` quedaron capturados como 0.03% y
+  0.065% (punto decimal corrido), de ahí el factor 10 exacto verificado
+  en 4 prototipos. Fix en Sprint 0: recalcular ambos con el % correcto
+  vía migración, aplicada con OK explícito de Beto (dato de referencia
+  que afecta el margen reportado).
+- **D5 — El correo espera al módulo Saldos Bancos (paridad total).** Beto
+  cambió el D1 original ("lanzar sin bancos"): el correo no se lanza ni se
+  apaga Coda hasta tener los 7 bloques, incluyendo bancos vía `tesoreria`.
+  Los Sprints 0–1 (vistas margen/inventario + fix RUV/Seguro + plantilla
+  de las 6 secciones derivables) avanzan en paralelo; el lanzamiento
+  (Sprint 3) espera al módulo.
 
 ## Modelo conceptual
 
@@ -166,9 +179,10 @@ hora de envío se acepta en v1.
 
 1. `dilesa.v_margen_prototipo` + `dilesa.v_inventario_prototipo`
    (`security_invoker=on`), afinadas contra los números del correo Coda.
-2. Reconciliar RUV/Seguro 10×: investigar de dónde salió el 1/10 en la
-   migración de costos; decidir si se corrige el dato en `dilesa.productos`
-   o se ajusta en la vista. Beto valida el número final.
+2. Fix RUV/Seguro (D4 cerrada): el bueno es Coda. `registro_ruv = 0.3%`
+   y `seguro_calidad = 0.65%` del valor comercial; en `dilesa.productos`
+   quedaron a 0.03%/0.065% (÷10). `UPDATE dilesa.productos` recalculando
+   ambos con el % correcto, aplicado con OK explícito de Beto.
 3. Aplicar vía `supabase db push` tras OK de Beto; regenerar
    `SCHEMA_REF.md` + `types/supabase.ts`.
 
@@ -180,20 +194,17 @@ hora de envío se acepta en v1.
    (tubería, asignaciones del mes, margen, inventario).
 3. Modo `TEST_TO` para iterar plantilla sin mandar al Consejo.
 
-### Sprint 2 — Bancos (captura manual) + cron + envío + log
+### Sprint 2 — Cron + envío + log + bloque de bancos
 
-1. Cargar las 4 cuentas DILESA en `erp.cuentas_bancarias` (BBVA, BBVA
-   Dólares, Finamex, Monex) con `moneda_id` correcto.
-2. Captura mínima admin-only de `saldo_actual` + `updated_at` (sección
-   "Saldos Bancos" del correo lee de aquí, mostrando "última
-   actualización" para hacer visible el dato stale). **D4 abierta:**
-   dónde vive la captura (panel en `settings/empresas` vs mini-módulo
-   tesorería) — cerrar al arrancar Sprint 2.
-3. Ruta cron `/api/cron/dilesa-resumen-consejo` (auth Bearer, guard de
+1. Ruta cron `/api/cron/dilesa-resumen-consejo` (auth Bearer, guard de
    domingo en `America/Matamoros`, `maxDuration`).
-4. Envío Resend a `consejo@dilesa.mx` + `core.notification_log` +
+2. Bloque #1 (Saldos Bancos) lee `erp.v_cuenta_saldo_actual` del módulo
+   Saldos Bancos (iniciativa `tesoreria`), mostrando la antigüedad del
+   último snapshot para hacer visible un saldo stale. **Depende de que
+   `tesoreria` Sprints 1–3 estén listos** (ver D5).
+3. Envío Resend a `consejo@dilesa.mx` + `core.notification_log` +
    registrar slug en el registry de notificaciones.
-5. Alta del cron en `vercel.json`.
+4. Alta del cron en `vercel.json`.
 
 ### Sprint 3 — Cutover + closeout
 
