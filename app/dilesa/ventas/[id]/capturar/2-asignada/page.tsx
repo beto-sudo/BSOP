@@ -20,7 +20,7 @@
  * Sin campos nuevos en `dilesa.ventas` — el KYC se capturó en Fase 1.
  */
 
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, CheckCircle2, ExternalLink, Loader2, Upload, XCircle } from 'lucide-react';
@@ -85,6 +85,7 @@ export default function CapturarFase2Page() {
 
 function CapturarFase2Body() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const ventaId = params.id;
   const toast = useToast();
 
@@ -240,11 +241,13 @@ function CapturarFase2Body() {
       if (!res.ok) throw new Error(res.error ?? 'No se pudo autorizar.');
       toast.add({
         title: 'Asignación autorizada',
-        description: 'La venta pasó a Fase 2.',
+        description: 'La venta pasó a Fase 2. Continúa con la siguiente fase desde el detalle.',
         type: 'success',
       });
-      // Recargar para reflejar estado nuevo
-      cargar();
+      // Llevar a la ficha completa de la venta — ahí está el pipeline,
+      // los adjuntos y el botón de captura de la siguiente fase. Si nos
+      // quedáramos aquí, el banner "ya está en Fase 2" tapaba el flujo.
+      router.push(`/dilesa/ventas/${ventaId}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error desconocido';
       toast.add({ title: 'Error al autorizar', description: msg, type: 'error' });
