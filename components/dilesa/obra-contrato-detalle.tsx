@@ -25,7 +25,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Plus, Receipt, Send } from 'lucide-react';
+import { Ban, Loader2, Plus, Receipt, Send } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { usePermissions } from '@/components/providers';
 import { Input } from '@/components/ui/input';
@@ -34,6 +34,7 @@ import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency } from '@/lib/format';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
+import { CancelarConMotivoDialog } from '@/components/shared/cancelar-con-motivo-dialog';
 
 export type ObraEstimacion = {
   id: string;
@@ -45,6 +46,9 @@ export type ObraEstimacion = {
   es_anticipo: boolean;
   es_finiquito: boolean;
   nota_pago: string | null;
+  /** Cancelada (p2p-cancelaciones): visible con badge, excluida del saldo. */
+  cancelada_at: string | null;
+  motivo_cancelacion: string | null;
 };
 
 /** Estado CxP de la factura de egreso ligada → etiqueta + estilo del badge. */
@@ -100,7 +104,7 @@ export function ObraContratoDetalle({
       .schema('dilesa')
       .from('obra_estimaciones')
       .select(
-        'id, orden, etiqueta, fecha, factura_ref, monto_total, es_anticipo, es_finiquito, nota_pago'
+        'id, orden, etiqueta, fecha, factura_ref, monto_total, es_anticipo, es_finiquito, nota_pago, cancelada_at, motivo_cancelacion'
       )
       .eq('empresa_id', DILESA_EMPRESA_ID)
       .eq('contrato_id', contratoId)
@@ -123,6 +127,8 @@ export function ObraContratoDetalle({
       es_anticipo: Boolean(r.es_anticipo),
       es_finiquito: Boolean(r.es_finiquito),
       nota_pago: (r.nota_pago as string | null) ?? null,
+      cancelada_at: (r.cancelada_at as string | null) ?? null,
+      motivo_cancelacion: (r.motivo_cancelacion as string | null) ?? null,
     }));
     setEstimaciones(rows);
 
@@ -150,11 +156,34 @@ export function ObraContratoDetalle({
     void cargar();
   }, [cargar]);
 
+  // El saldo excluye las estimaciones canceladas (p2p-cancelaciones).
   const pagado = useMemo(
-    () => estimaciones.reduce((s, e) => s + (e.monto_total ?? 0), 0),
+    () => estimaciones.reduce((s, e) => s + (e.cancelada_at ? 0 : (e.monto_total ?? 0)), 0),
     [estimaciones]
   );
   const saldo = valorTotal - pagado;
+  /** Estimación que se está cancelando (monta el diálogo de motivo on-demand). */
+  const [cancelando, setCancelando] = useState<ObraEstimacion | null>(null);
+
+  // Cancelar una estimación con motivo (RPC valida gating + que no tenga factura CxP).
+  const cancelarEstimacion = useCallback(
+    async (estId: string, motivo: string) => {
+      const { error: e } = await sb
+        .schema('dilesa')
+        .rpc('obra_estimacion_cancelar', { p_estimacion_id: estId, p_motivo: motivo });
+      if (e) {
+        toast.add({
+          title: 'No se pudo cancelar',
+          description: getSupabaseErrorMessage(e, 'Error al cancelar la estimación.'),
+          type: 'error',
+        });
+        throw e; // mantiene el diálogo abierto
+      }
+      toast.add({ title: 'Estimación cancelada', type: 'success' });
+      await cargar();
+    },
+    [sb, toast, cargar]
+  );
   const montoNum = Number(monto) || 0;
   const canSubmit = etiqueta.trim().length > 0 && montoNum !== 0;
 
@@ -360,14 +389,18 @@ export function ObraContratoDetalle({
                 <th className="py-1.5 pr-3 text-right">Monto</th>
                 <th className="py-1.5 pr-3">Nota</th>
                 <th className="py-1.5 pr-3">CxP</th>
+                <th className="py-1.5 pr-3" />
               </tr>
             </thead>
             <tbody>
               {estimaciones.map((e) => (
-                <tr key={e.id} className="border-b border-[var(--border)]/40">
+                <tr
+                  key={e.id}
+                  className={`border-b border-[var(--border)]/40 ${e.cancelada_at ? 'opacity-55' : ''}`}
+                >
                   <td className="py-1.5 pr-3 tabular-nums text-[var(--text)]/50">{e.orden}</td>
                   <td className="py-1.5 pr-3">
-                    {e.etiqueta}
+                    <span className={e.cancelada_at ? 'line-through' : ''}>{e.etiqueta}</span>
                     {e.es_anticipo ? (
                       <span className="ml-1.5 rounded bg-[var(--accent)]/10 px-1 text-[10px] text-[var(--accent)]">
                         anticipo
@@ -376,6 +409,14 @@ export function ObraContratoDetalle({
                     {e.es_finiquito ? (
                       <span className="ml-1.5 rounded bg-[var(--accent)]/10 px-1 text-[10px] text-[var(--accent)]">
                         finiquito
+                      </span>
+                    ) : null}
+                    {e.cancelada_at ? (
+                      <span
+                        title={e.motivo_cancelacion ?? undefined}
+                        className="ml-1.5 rounded bg-destructive/10 px-1 text-[10px] text-destructive"
+                      >
+                        cancelada
                       </span>
                     ) : null}
                   </td>
@@ -389,6 +430,7 @@ export function ObraContratoDetalle({
                   <td className="py-1.5 pr-3 text-[var(--text)]/60">{e.nota_pago ?? '—'}</td>
                   <td className="py-1.5 pr-3">
                     {(() => {
+                      if (e.cancelada_at) return <span className="text-[var(--text)]/30">—</span>;
                       const fac = facturaByEst.get(e.id);
                       if (fac) {
                         const meta = ESTADO_CXP[fac.estado] ?? {
@@ -425,12 +467,37 @@ export function ObraContratoDetalle({
                       return <span className="text-[var(--text)]/30">—</span>;
                     })()}
                   </td>
+                  <td className="py-1.5 pr-3 text-right">
+                    {!e.cancelada_at && puedeCrear ? (
+                      <button
+                        type="button"
+                        onClick={() => setCancelando(e)}
+                        title="Cancelar estimación"
+                        className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] px-2 py-0.5 text-[11px] text-[var(--text)]/60 hover:border-destructive hover:text-destructive"
+                      >
+                        <Ban className="h-3 w-3" />
+                        Cancelar
+                      </button>
+                    ) : null}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      {cancelando ? (
+        <CancelarConMotivoDialog
+          key={cancelando.id}
+          title="Cancelar estimación"
+          description={`Se cancelará «${cancelando.etiqueta}». Quedará visible como cancelada y dejará de contar en el saldo. No se puede deshacer.`}
+          confirmLabel="Cancelar estimación"
+          placeholder="Ej. error de captura, monto equivocado…"
+          onClose={() => setCancelando(null)}
+          onConfirm={(motivo) => cancelarEstimacion(cancelando.id, motivo)}
+        />
+      ) : null}
     </section>
   );
 }

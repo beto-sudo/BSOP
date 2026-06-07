@@ -2584,7 +2584,10 @@ export type Database = {
       }
       obra_estimaciones: {
         Row: {
+          cancelada_at: string | null
+          cancelada_por: string | null
           contrato_id: string
+          creado_por: string | null
           created_at: string
           deleted_at: string | null
           empresa_id: string
@@ -2597,6 +2600,7 @@ export type Database = {
           iva: number | null
           iva_tasa: number | null
           monto_total: number
+          motivo_cancelacion: string | null
           nota_pago: string | null
           orden: number
           retencion: number
@@ -2605,7 +2609,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cancelada_at?: string | null
+          cancelada_por?: string | null
           contrato_id: string
+          creado_por?: string | null
           created_at?: string
           deleted_at?: string | null
           empresa_id: string
@@ -2618,6 +2625,7 @@ export type Database = {
           iva?: number | null
           iva_tasa?: number | null
           monto_total?: number
+          motivo_cancelacion?: string | null
           nota_pago?: string | null
           orden?: number
           retencion?: number
@@ -2626,7 +2634,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cancelada_at?: string | null
+          cancelada_por?: string | null
           contrato_id?: string
+          creado_por?: string | null
           created_at?: string
           deleted_at?: string | null
           empresa_id?: string
@@ -2639,6 +2650,7 @@ export type Database = {
           iva?: number | null
           iva_tasa?: number | null
           monto_total?: number
+          motivo_cancelacion?: string | null
           nota_pago?: string | null
           orden?: number
           retencion?: number
@@ -4658,6 +4670,10 @@ export type Database = {
       fn_tarea_terminada_esta_pagada: {
         Args: { p_tarea_id: string }
         Returns: boolean
+      }
+      obra_estimacion_cancelar: {
+        Args: { p_estimacion_id: string; p_motivo: string }
+        Returns: undefined
       }
     }
     Enums: {
