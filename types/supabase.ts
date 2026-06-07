@@ -5933,6 +5933,47 @@ export type Database = {
           },
         ]
       }
+      cuenta_saldos: {
+        Row: {
+          capturado_por: string | null
+          created_at: string
+          cuenta_id: string
+          empresa_id: string
+          fecha: string
+          id: string
+          notas: string | null
+          saldo: number
+        }
+        Insert: {
+          capturado_por?: string | null
+          created_at?: string
+          cuenta_id: string
+          empresa_id: string
+          fecha?: string
+          id?: string
+          notas?: string | null
+          saldo: number
+        }
+        Update: {
+          capturado_por?: string | null
+          created_at?: string
+          cuenta_id?: string
+          empresa_id?: string
+          fecha?: string
+          id?: string
+          notas?: string | null
+          saldo?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cuenta_saldos_cuenta_id_fkey"
+            columns: ["cuenta_id"]
+            isOneToOne: false
+            referencedRelation: "cuentas_bancarias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cuentas_bancarias: {
         Row: {
           activo: boolean
@@ -10068,6 +10109,27 @@ export type Database = {
       }
     }
     Views: {
+      v_cuenta_saldo_actual: {
+        Row: {
+          banco: string | null
+          capturado_at: string | null
+          cuenta_id: string | null
+          empresa_id: string | null
+          fecha_saldo: string | null
+          moneda_id: string | null
+          nombre: string | null
+          saldo: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cuenta_saldos_cuenta_id_fkey"
+            columns: ["cuenta_id"]
+            isOneToOne: false
+            referencedRelation: "cuentas_bancarias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_empleados_full: {
         Row: {
           antiguedad_anios: number | null
