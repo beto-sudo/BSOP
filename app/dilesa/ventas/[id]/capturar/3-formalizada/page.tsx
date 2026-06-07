@@ -19,7 +19,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Loader2, Save, Upload } from 'lucide-react';
+import { CheckCircle2, Loader2, Save, Upload, XCircle } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
@@ -67,7 +67,6 @@ function CapturarFase3Body() {
   const [fase2Cerrada, setFase2Cerrada] = useState<boolean | null>(null);
   const [yaCerrada, setYaCerrada] = useState<boolean>(false);
 
-  const [precioAsignacion, setPrecioAsignacion] = useState<string>('');
   const [descuentoTotal, setDescuentoTotal] = useState<string>('');
   const [fechaContrato, setFechaContrato] = useState<string>(new Date().toISOString().slice(0, 10));
   const [archivo, setArchivo] = useState<File | null>(null);
@@ -105,7 +104,6 @@ function CapturarFase3Body() {
       }
       const v = vRow as unknown as VentaCtx;
       setVenta(v);
-      if (v.precio_asignacion != null) setPrecioAsignacion(String(v.precio_asignacion));
       if (v.descuento_total != null) setDescuentoTotal(String(v.descuento_total));
 
       // Persona + Unidad (para el header) y enforcement (Fase 2 cerrada + Fase 3 no cerrada)
@@ -183,11 +181,16 @@ function CapturarFase3Body() {
         });
         return;
       }
-      const precio = Number(precioAsignacion);
+      // El precio de asignación NO se modifica aquí — viene del cálculo de
+      // Fase 1 (fn_calcular_precio_venta) y se persiste al crear la venta.
+      // Si por algún motivo está vacío en la venta, no podemos cerrar Fase 3
+      // (algo se rompió en Fase 1; el operador debe ir al detalle y avisar).
+      const precio = Number(venta.precio_asignacion ?? 0);
       if (!Number.isFinite(precio) || precio <= 0) {
         toast.add({
-          title: 'Precio de asignación inválido',
-          description: 'Captura un monto mayor a cero.',
+          title: 'Precio de asignación faltante',
+          description:
+            'Esta venta no tiene precio de asignación capturado en Fase 1. Regresa a Fase 1 antes de continuar.',
           type: 'error',
         });
         return;
@@ -239,7 +242,7 @@ function CapturarFase3Body() {
       });
       router.push(`/dilesa/ventas/${venta.id}`);
     },
-    [archivo, descuentoTotal, fechaContrato, precioAsignacion, router, sb, toast, venta]
+    [archivo, descuentoTotal, fechaContrato, router, sb, toast, venta]
   );
 
   // ── Render ─────────────────────────────────────────────────────────
@@ -318,16 +321,11 @@ function CapturarFase3Body() {
 
           <Section title="Campos requeridos">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="Precio de asignación *">
-                <Input
-                  type="number"
-                  step="1"
-                  min="0"
-                  value={precioAsignacion}
-                  onChange={(e) => setPrecioAsignacion(e.target.value)}
-                  required
-                />
-                <Hint>{money(Number(precioAsignacion) || 0)}</Hint>
+              <Field label="Precio de asignación">
+                <div className="flex h-9 items-center rounded-md border border-[var(--border)] bg-[var(--bg)]/30 px-3 text-sm font-medium tabular-nums text-[var(--text)]">
+                  {money(venta.precio_asignacion)}
+                </div>
+                <Hint>Se acarrea de la solicitud (Fase 1) — no editable aquí.</Hint>
               </Field>
               <Field label="Descuento total">
                 <Input
@@ -402,6 +400,12 @@ function Hint({ children }: { children: React.ReactNode }) {
   return <p className="text-[11px] text-[var(--text)]/50">{children}</p>;
 }
 
+/**
+ * Slot de documento estandarizado — mismo patrón visual que Fase 2
+ * (check + label + botón "Subir PDF"/"Cambiar" + drag-drop sobre la
+ * tarjeta completa). Mantener consistente para que el operador navegue
+ * las fases sin re-aprender la UI.
+ */
 function FileSlot({
   label,
   archivo,
@@ -411,24 +415,65 @@ function FileSlot({
   archivo: File | null;
   onChange: (f: File | null) => void;
 }) {
+  const [dragOver, setDragOver] = useState(false);
+  const completo = !!archivo;
   return (
-    <label className="flex cursor-pointer items-center gap-3 rounded-md border border-dashed border-[var(--border)] bg-[var(--bg)]/30 p-4 hover:bg-[var(--bg)]/50">
-      <Upload className="size-5 text-[var(--text)]/50" />
-      <div className="flex-1">
-        <div className="text-sm font-medium">{label}</div>
-        <div className="text-xs text-[var(--text)]/60">
-          {archivo
-            ? `${archivo.name} · ${(archivo.size / 1024).toFixed(0)} KB`
-            : 'Arrastra el archivo o haz click para seleccionarlo.'}
-        </div>
+    <div
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        if (!dragOver) setDragOver(true);
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+        setDragOver(false);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragOver(false);
+        const f = e.dataTransfer.files?.[0];
+        if (!f) return;
+        if (
+          !(
+            f.type === 'application/pdf' ||
+            f.type.startsWith('image/') ||
+            f.name.toLowerCase().endsWith('.pdf')
+          )
+        ) {
+          return;
+        }
+        onChange(f);
+      }}
+      className={`flex items-center justify-between gap-3 rounded-lg border bg-[var(--card)] px-4 py-3 transition-colors ${
+        dragOver
+          ? 'border-[var(--accent)] bg-[var(--accent)]/5 ring-2 ring-[var(--accent)]/40'
+          : 'border-[var(--border)]'
+      }`}
+    >
+      <div className="flex flex-1 items-center gap-2 text-sm">
+        {completo ? (
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+        ) : (
+          <XCircle className="h-4 w-4 shrink-0 text-[var(--text)]/35" />
+        )}
+        <span className="font-medium">{label}</span>
+        {archivo ? (
+          <span className="ml-1 truncate text-xs text-[var(--text)]/60">
+            {archivo.name} · {(archivo.size / 1024).toFixed(0)} KB
+          </span>
+        ) : null}
       </div>
-      <input
-        type="file"
-        accept="application/pdf,image/*"
-        className="sr-only"
-        onChange={(e) => onChange(e.target.files?.[0] ?? null)}
-      />
-    </label>
+      <label className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40 hover:text-[var(--text)]">
+        <Upload className="h-3.5 w-3.5" />
+        {archivo ? 'Cambiar' : 'Subir PDF'}
+        <input
+          type="file"
+          accept="application/pdf,image/*"
+          className="hidden"
+          onChange={(e) => onChange(e.target.files?.[0] ?? null)}
+        />
+      </label>
+    </div>
   );
 }
 
