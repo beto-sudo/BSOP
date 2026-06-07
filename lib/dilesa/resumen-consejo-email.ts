@@ -400,7 +400,7 @@ export async function fetchResumenConsejoData(
       .is('deleted_at', null)
       .gte('fecha', inicioMes)
       .in('fase', ['Asignada', 'Escriturada']),
-    erp.from('v_estimaciones_resumen').select('*').eq('empresa_id', empresaId),
+    dilesa.from('v_estimaciones_resumen').select('*').eq('empresa_id', empresaId),
     erp.from('v_cuenta_saldo_actual').select('*').eq('empresa_id', empresaId),
   ]);
 
@@ -564,4 +564,34 @@ export async function fetchResumenConsejoData(
   }));
 
   return { saldos, avances, margen, inventario, tuberia, asignaciones, contratistas };
+}
+
+// ── Envío ────────────────────────────────────────────────────────────────────
+
+/**
+ * Envío genérico vía Resend (sendMinutaEmail está acoplada a juntas). Sin estado
+ * de juntas/notification_log — el caller decide la trazabilidad.
+ */
+export async function sendResumenEmail(
+  resendKey: string,
+  payload: { html: string; subject: string; from: string; recipients: string[] }
+): Promise<{ ok: boolean; id?: string; error?: unknown }> {
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${resendKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: payload.from,
+      to: payload.recipients,
+      subject: payload.subject,
+      html: payload.html,
+    }),
+  });
+  if (!res.ok) {
+    return { ok: false, error: await res.text().catch(() => res.statusText) };
+  }
+  const data = (await res.json()) as { id?: string };
+  return { ok: true, id: data.id };
 }
