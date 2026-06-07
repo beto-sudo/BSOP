@@ -7,8 +7,9 @@
 -- 302 tenían `partida_id` NULL; pero 269 de ellos son `tipo='vivienda'`, que NO se
 -- ligan a partidas de obra por diseño (se costean por lote/prototipo — ADR-042 deja
 -- `partida_id` nullable para ellos). El backfill real son los **33 contratos de obra**
--- (urbanización/cabecera/tarea_menor). De esos 33, este script liga los **29** con
--- destino claro; los **4 restantes** quedan NULL (decisión de negocio de Beto, abajo).
+-- (urbanización/cabecera/tarea_menor). De esos 33, este script liga **30** (29 por match
+-- automático + Maya a la barda perimetral seed por decisión de Beto); los **3 restantes**
+-- quedan NULL (decisión de negocio, abajo).
 --
 -- MÉTODO DE MATCH (contrato → partida del MISMO proyecto, N:1 — ADR-042 §1):
 --   - kw+monto  : keyword del frente (del código `OBRA-<proy>-<FRENTE>-<id>`) consistente
@@ -61,7 +62,13 @@ WITH mapeo(codigo, partida_id, metodo) AS (
     ('OBRA-LDS-ESTRELLA-L3',              '6921cfd9-52f3-43e1-ab8a-a90cf5f59507'::uuid, 'solo-monto'), -- Construcción de cordón guarnición (M.O.)
     ('OBRA-LDS-PAVIMENTACION-C4',         '5b20f274-fed5-4a61-89e2-f5a526d6aaba'::uuid, 'kw+monto'),   -- Pavimentación
     ('OBRA-LDS-PORTON-I4',                '28d075d4-1c2f-48c7-beb8-1ce8ee143a78'::uuid, 'kw-ancla'),   -- Control de acceso para porton y puerta peatonal
-    ('OBRA-LDS-PORTON-C4',                '28d075d4-1c2f-48c7-beb8-1ce8ee143a78'::uuid, 'kw-ancla')    -- Control de acceso para porton y puerta peatonal
+    ('OBRA-LDS-PORTON-C4',                '28d075d4-1c2f-48c7-beb8-1ce8ee143a78'::uuid, 'kw-ancla'),   -- Control de acceso para porton y puerta peatonal
+    -- ── Lomas de las Delicias (decisión de Beto, Fase 3) ───────────────────
+    -- Muro de contención (Maya) → "Barda perimetral" seed (el muro del catálogo).
+    -- Delicias NO tiene presupuesto de obra capturado (todas sus partidas en $0) →
+    -- disponible = −$860k = alarma intencional de "contratado sin presupuesto", hasta
+    -- capturar el cuadro de Delicias. Reasignable con <LigarPartida>.
+    ('2026/1-DIE-MAYA-CAB#1',             '9dee092a-90e6-45b7-a017-316dda56b7af'::uuid, 'seed-alarma') -- Barda perimetral
 )
 UPDATE dilesa.contratos_construccion c
 SET partida_id = m.partida_id
@@ -73,12 +80,8 @@ WHERE c.codigo = m.codigo
   AND c.deleted_at IS NULL
   AND c.partida_id IS NULL;            -- idempotente: no re-liga lo ya ligado
 
--- ── 4 contratos SIN MATCH (NO se ligan aquí — decisión de Beto) ────────────
+-- ── 3 contratos SIN MATCH (NO se ligan aquí — decisión de Beto) ────────────
 --   OBRA-LDLE-URBANIZACIÓN-C5  ($617,567)  frente genérico; sin concepto evidente.
 --   OBRA-LDLE-VANDALIZADAS-C4  ($0)        reparación; al ser $0 no afecta el comprometido.
 --   OBRA-LDS-ESTRELLA-P3       ($12,042)   sin concepto del proyecto que cuadre.
---   2026/1-DIE-MAYA-CAB#1      ($860,000)  Muro de contención (Lomas de las Delicias):
---     su proyecto solo tiene el catálogo seed sin montos → necesita capturar el
---     presupuesto de obra de Delicias antes de ligar (o ligar a una partida seed y
---     que el disponible quede negativo como alarma). Se liga con <LigarPartida> una
---     vez decidido el concepto destino.
+--   (Se ligan con <LigarPartida> desde el detalle del contrato cuando se decida el destino.)
