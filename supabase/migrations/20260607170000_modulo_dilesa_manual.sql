@@ -22,8 +22,29 @@
 
 BEGIN;
 
--- ─── Módulo top-level ─────────────────────────────────────────────────
--- `seccion = 'ayuda'` (texto libre; agrupa en la UI de gestión de permisos).
+-- ─── Paso 0: extender el CHECK de secciones para incluir 'ayuda' ──────
+-- `core.modulos.seccion` tiene un CHECK con la taxonomía de secciones
+-- (ADR-014). El sidebar de DILESA ahora tiene una sección "Ayuda" (Manual);
+-- para que /settings/acceso la refleje, el ENUM debe incluir 'ayuda'.
+-- DROP + ADD porque los CHECK no son ALTERables in-place (mismo patrón que
+-- 20260430210000_modulos_seccion_operativa.sql). ADR-014 extendido: 8 secciones.
+
+ALTER TABLE core.modulos
+  DROP CONSTRAINT IF EXISTS modulos_seccion_check;
+
+ALTER TABLE core.modulos
+  ADD CONSTRAINT modulos_seccion_check CHECK (seccion IN (
+    'operativa',
+    'administracion',
+    'rh',
+    'compras',
+    'inventario',
+    'operaciones',
+    'sistema',
+    'ayuda'
+  ));
+
+-- ─── Paso 1: módulo top-level ─────────────────────────────────────────
 
 INSERT INTO core.modulos (slug, nombre, descripcion, empresa_id, seccion)
 SELECT
@@ -36,7 +57,7 @@ FROM core.empresas e
 WHERE e.slug = 'dilesa'
 ON CONFLICT (empresa_id, slug) DO NOTHING;
 
--- ─── Backfill defensivo de permisos por rol ───────────────────────────
+-- ─── Paso 2: backfill defensivo de permisos por rol ───────────────────
 -- Una fila por rol de DILESA con lectura=true (la ayuda es para todos) y
 -- escritura=false (el contenido se edita por PR, no desde la UI). Idempotente.
 
