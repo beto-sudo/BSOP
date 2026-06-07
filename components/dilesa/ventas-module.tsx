@@ -41,6 +41,7 @@ type VentaRow = {
   valor_comercial: number | null;
   tipo_credito: string | null;
   vendedor: string | null;
+  vendedor_usuario_id: string | null;
   numero_escritura: string | null;
   fecha_escritura: string | null;
 };
@@ -169,7 +170,7 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
       .schema('dilesa')
       .from('ventas')
       .select(
-        'id, persona_id, unidad_id, estado, fase_actual, fase_posicion, valor_escrituracion, valor_comercial, tipo_credito, vendedor, numero_escritura, fecha_escritura'
+        'id, persona_id, unidad_id, estado, fase_actual, fase_posicion, valor_escrituracion, valor_comercial, tipo_credito, vendedor, vendedor_usuario_id, numero_escritura, fecha_escritura'
       )
       .eq('empresa_id', empresaId)
       .is('deleted_at', null);
@@ -240,11 +241,38 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
       personaMap.set(p.id as string, nombre || '(sin nombre)');
     }
 
+    // Vendedores cross-schema — resolución desde `core.usuarios` por FK.
+    // Las ventas creadas en BSOP llevan `vendedor_usuario_id` (FK) pero
+    // tienen el campo legacy `vendedor` (text) vacío. Las migradas de
+    // Coda al revés. Resolvemos prioritizando la FK y caemos al text legacy.
+    const vendedorIds = [
+      ...new Set(ventasArr.map((v) => v.vendedor_usuario_id).filter((x): x is string => !!x)),
+    ];
+    const usuarioMap = new Map<string, string>();
+    if (vendedorIds.length > 0) {
+      const { data: usuarios } = await sb
+        .schema('core')
+        .from('usuarios')
+        .select('id, first_name, last_name, email')
+        .in('id', vendedorIds);
+      for (const u of usuarios ?? []) {
+        const nombreCompleto = [u.first_name, u.last_name].filter(Boolean).join(' ').trim();
+        const fallback = (u.email as string | null) ?? '';
+        usuarioMap.set(u.id as string, nombreCompleto || fallback);
+      }
+    }
+
     return {
       data: ventasArr.map((v) => {
         const u = v.unidad_id ? unidadMap.get(v.unidad_id) : null;
+        // Vendedor: priorizamos la FK a core.usuarios (ventas nuevas);
+        // si no hay, fallback al campo legacy text (ventas migradas de Coda).
+        const vendedorResuelto = v.vendedor_usuario_id
+          ? (usuarioMap.get(v.vendedor_usuario_id) ?? v.vendedor ?? null)
+          : v.vendedor;
         return {
           ...v,
+          vendedor: vendedorResuelto,
           cliente: personaMap.get(v.persona_id) ?? '(sin comprador)',
           unidadIdentificador: u?.identificador ?? null,
           proyectoNombre: u?.proyecto_id ? (proyectoMap.get(u.proyecto_id) ?? '') : '',

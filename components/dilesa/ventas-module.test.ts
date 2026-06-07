@@ -13,6 +13,7 @@ function row(overrides: Partial<VentaListaRow>): VentaListaRow {
     valor_comercial: null,
     tipo_credito: null,
     vendedor: null,
+    vendedor_usuario_id: null,
     numero_escritura: null,
     fecha_escritura: null,
     cliente: 'Test',

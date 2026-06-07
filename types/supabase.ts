@@ -2097,6 +2097,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "construccion_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "v_margen_prototipo"
+            referencedColumns: ["prototipo_id"]
+          },
+          {
             foreignKeyName: "construccion_unidad_id_fkey"
             columns: ["unidad_id"]
             isOneToOne: true
@@ -2296,10 +2303,13 @@ export type Database = {
       contratos_construccion: {
         Row: {
           anticipo_pct: number
+          cancelada_at: string | null
+          cancelada_por: string | null
           coda_row_id: string | null
           codigo: string
           contratista_id: string
           cotizacion_id: string | null
+          creado_por: string | null
           created_at: string
           deleted_at: string | null
           empresa_id: string
@@ -2310,6 +2320,7 @@ export type Database = {
           fianzas_url: string | null
           id: string
           iva_tasa: number | null
+          motivo_cancelacion: string | null
           notas: string | null
           objeto: string | null
           partida_id: string | null
@@ -2324,10 +2335,13 @@ export type Database = {
         }
         Insert: {
           anticipo_pct?: number
+          cancelada_at?: string | null
+          cancelada_por?: string | null
           coda_row_id?: string | null
           codigo: string
           contratista_id: string
           cotizacion_id?: string | null
+          creado_por?: string | null
           created_at?: string
           deleted_at?: string | null
           empresa_id: string
@@ -2338,6 +2352,7 @@ export type Database = {
           fianzas_url?: string | null
           id?: string
           iva_tasa?: number | null
+          motivo_cancelacion?: string | null
           notas?: string | null
           objeto?: string | null
           partida_id?: string | null
@@ -2352,10 +2367,13 @@ export type Database = {
         }
         Update: {
           anticipo_pct?: number
+          cancelada_at?: string | null
+          cancelada_por?: string | null
           coda_row_id?: string | null
           codigo?: string
           contratista_id?: string
           cotizacion_id?: string | null
+          creado_por?: string | null
           created_at?: string
           deleted_at?: string | null
           empresa_id?: string
@@ -2366,6 +2384,7 @@ export type Database = {
           fianzas_url?: string | null
           id?: string
           iva_tasa?: number | null
+          motivo_cancelacion?: string | null
           notas?: string | null
           objeto?: string | null
           partida_id?: string | null
@@ -2584,7 +2603,10 @@ export type Database = {
       }
       obra_estimaciones: {
         Row: {
+          cancelada_at: string | null
+          cancelada_por: string | null
           contrato_id: string
+          creado_por: string | null
           created_at: string
           deleted_at: string | null
           empresa_id: string
@@ -2597,6 +2619,7 @@ export type Database = {
           iva: number | null
           iva_tasa: number | null
           monto_total: number
+          motivo_cancelacion: string | null
           nota_pago: string | null
           orden: number
           retencion: number
@@ -2605,7 +2628,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cancelada_at?: string | null
+          cancelada_por?: string | null
           contrato_id: string
+          creado_por?: string | null
           created_at?: string
           deleted_at?: string | null
           empresa_id: string
@@ -2618,6 +2644,7 @@ export type Database = {
           iva?: number | null
           iva_tasa?: number | null
           monto_total?: number
+          motivo_cancelacion?: string | null
           nota_pago?: string | null
           orden?: number
           retencion?: number
@@ -2626,7 +2653,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cancelada_at?: string | null
+          cancelada_por?: string | null
           contrato_id?: string
+          creado_por?: string | null
           created_at?: string
           deleted_at?: string | null
           empresa_id?: string
@@ -2639,6 +2669,7 @@ export type Database = {
           iva?: number | null
           iva_tasa?: number | null
           monto_total?: number
+          motivo_cancelacion?: string | null
           nota_pago?: string | null
           orden?: number
           retencion?: number
@@ -2909,6 +2940,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "productos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plantilla_tareas_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "v_margen_prototipo"
+            referencedColumns: ["prototipo_id"]
           },
           {
             foreignKeyName: "plantilla_tareas_tarea_id_fkey"
@@ -3858,6 +3896,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "proyectos_prototipo_referencia_id_fkey"
+            columns: ["prototipo_referencia_id"]
+            isOneToOne: false
+            referencedRelation: "v_margen_prototipo"
+            referencedColumns: ["prototipo_id"]
+          },
+          {
             foreignKeyName: "proyectos_proyecto_padre_id_fkey"
             columns: ["proyecto_padre_id"]
             isOneToOne: false
@@ -4082,6 +4127,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "productos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unidades_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "v_margen_prototipo"
+            referencedColumns: ["prototipo_id"]
           },
           {
             foreignKeyName: "unidades_proyecto_id_fkey"
@@ -4472,6 +4524,68 @@ export type Database = {
         }
         Relationships: []
       }
+      v_inventario_prototipo: {
+        Row: {
+          empresa_id: string | null
+          en_inventario: number | null
+          inventario_asignado: number | null
+          inventario_construccion: number | null
+          inventario_disponible: number | null
+          inventario_terminado: number | null
+          prototipo_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "unidades_producto_id_fkey"
+            columns: ["prototipo_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unidades_producto_id_fkey"
+            columns: ["prototipo_id"]
+            isOneToOne: false
+            referencedRelation: "v_margen_prototipo"
+            referencedColumns: ["prototipo_id"]
+          },
+        ]
+      }
+      v_margen_prototipo: {
+        Row: {
+          costo_comercializacion: number | null
+          costo_materiales: number | null
+          costo_mo: number | null
+          costo_terreno: number | null
+          costo_total: number | null
+          costo_urbanizacion: number | null
+          empresa_id: string | null
+          margen_pct: number | null
+          nombre: string | null
+          prototipo_id: string | null
+          proyecto_id: string | null
+          registro_ruv: number | null
+          seguro_calidad: number | null
+          utilidad: number | null
+          valor_comercial: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "productos_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "productos_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_proyecto_avances"
+            referencedColumns: ["proyecto_id"]
+          },
+        ]
+      }
       v_proyecto_avance: {
         Row: {
           avance_pct: number | null
@@ -4586,6 +4700,10 @@ export type Database = {
       }
     }
     Functions: {
+      contrato_obra_cancelar: {
+        Args: { p_contrato_id: string; p_motivo: string }
+        Returns: undefined
+      }
       fn_backfill_cxc: {
         Args: never
         Returns: {
@@ -4658,6 +4776,10 @@ export type Database = {
       fn_tarea_terminada_esta_pagada: {
         Args: { p_tarea_id: string }
         Returns: boolean
+      }
+      obra_estimacion_cancelar: {
+        Args: { p_estimacion_id: string; p_motivo: string }
+        Returns: undefined
       }
     }
     Enums: {
@@ -5742,6 +5864,8 @@ export type Database = {
       cotizaciones: {
         Row: {
           adjudicado_proveedor_id: string | null
+          cancelada_at: string | null
+          cancelada_por: string | null
           codigo: string | null
           creado_por: string | null
           created_at: string
@@ -5751,12 +5875,15 @@ export type Database = {
           estado: string
           fecha_limite: string | null
           id: string
+          motivo_cancelacion: string | null
           requisicion_id: string | null
           tipo: string
           updated_at: string
         }
         Insert: {
           adjudicado_proveedor_id?: string | null
+          cancelada_at?: string | null
+          cancelada_por?: string | null
           codigo?: string | null
           creado_por?: string | null
           created_at?: string
@@ -5766,12 +5893,15 @@ export type Database = {
           estado?: string
           fecha_limite?: string | null
           id?: string
+          motivo_cancelacion?: string | null
           requisicion_id?: string | null
           tipo?: string
           updated_at?: string
         }
         Update: {
           adjudicado_proveedor_id?: string | null
+          cancelada_at?: string | null
+          cancelada_por?: string | null
           codigo?: string | null
           creado_por?: string | null
           created_at?: string
@@ -5781,6 +5911,7 @@ export type Database = {
           estado?: string
           fecha_limite?: string | null
           id?: string
+          motivo_cancelacion?: string | null
           requisicion_id?: string | null
           tipo?: string
           updated_at?: string
@@ -7808,6 +7939,8 @@ export type Database = {
       ordenes_compra: {
         Row: {
           autorizada_at: string | null
+          cancelada_at: string | null
+          cancelada_por: string | null
           cerrada_at: string | null
           cerrada_por: string | null
           codigo: string | null
@@ -7823,6 +7956,7 @@ export type Database = {
           id: string
           iva: number | null
           moneda_id: string | null
+          motivo_cancelacion: string | null
           proveedor_id: string | null
           requisicion_id: string | null
           subtotal: number | null
@@ -7832,6 +7966,8 @@ export type Database = {
         }
         Insert: {
           autorizada_at?: string | null
+          cancelada_at?: string | null
+          cancelada_por?: string | null
           cerrada_at?: string | null
           cerrada_por?: string | null
           codigo?: string | null
@@ -7847,6 +7983,7 @@ export type Database = {
           id?: string
           iva?: number | null
           moneda_id?: string | null
+          motivo_cancelacion?: string | null
           proveedor_id?: string | null
           requisicion_id?: string | null
           subtotal?: number | null
@@ -7856,6 +7993,8 @@ export type Database = {
         }
         Update: {
           autorizada_at?: string | null
+          cancelada_at?: string | null
+          cancelada_por?: string | null
           cerrada_at?: string | null
           cerrada_por?: string | null
           codigo?: string | null
@@ -7871,6 +8010,7 @@ export type Database = {
           id?: string
           iva?: number | null
           moneda_id?: string | null
+          motivo_cancelacion?: string | null
           proveedor_id?: string | null
           requisicion_id?: string | null
           subtotal?: number | null
@@ -8522,6 +8662,8 @@ export type Database = {
         Row: {
           autorizado_at: string | null
           autorizado_por: string | null
+          cancelada_at: string | null
+          cancelada_por: string | null
           concepto_id: string | null
           concepto_texto: string | null
           contrato_id: string | null
@@ -8539,6 +8681,7 @@ export type Database = {
           gasto_real_total: number | null
           id: string
           monto_estimado: number | null
+          motivo_cancelacion: string | null
           notas: string | null
           orden: number
           presupuesto_aprobado: number | null
@@ -8554,6 +8697,8 @@ export type Database = {
         Insert: {
           autorizado_at?: string | null
           autorizado_por?: string | null
+          cancelada_at?: string | null
+          cancelada_por?: string | null
           concepto_id?: string | null
           concepto_texto?: string | null
           contrato_id?: string | null
@@ -8571,6 +8716,7 @@ export type Database = {
           gasto_real_total?: number | null
           id?: string
           monto_estimado?: number | null
+          motivo_cancelacion?: string | null
           notas?: string | null
           orden?: number
           presupuesto_aprobado?: number | null
@@ -8586,6 +8732,8 @@ export type Database = {
         Update: {
           autorizado_at?: string | null
           autorizado_por?: string | null
+          cancelada_at?: string | null
+          cancelada_por?: string | null
           concepto_id?: string | null
           concepto_texto?: string | null
           contrato_id?: string | null
@@ -8603,6 +8751,7 @@ export type Database = {
           gasto_real_total?: number | null
           id?: string
           monto_estimado?: number | null
+          motivo_cancelacion?: string | null
           notas?: string | null
           orden?: number
           presupuesto_aprobado?: number | null
@@ -9115,6 +9264,8 @@ export type Database = {
       requisiciones: {
         Row: {
           autorizada_at: string | null
+          cancelada_at: string | null
+          cancelada_por: string | null
           codigo: string | null
           created_at: string
           deleted_at: string | null
@@ -9124,6 +9275,7 @@ export type Database = {
           fecha_requerida: string | null
           id: string
           justificacion: string | null
+          motivo_cancelacion: string | null
           prioridad_id: string | null
           solicitante_id: string | null
           subtipo: string | null
@@ -9131,6 +9283,8 @@ export type Database = {
         }
         Insert: {
           autorizada_at?: string | null
+          cancelada_at?: string | null
+          cancelada_por?: string | null
           codigo?: string | null
           created_at?: string
           deleted_at?: string | null
@@ -9140,6 +9294,7 @@ export type Database = {
           fecha_requerida?: string | null
           id?: string
           justificacion?: string | null
+          motivo_cancelacion?: string | null
           prioridad_id?: string | null
           solicitante_id?: string | null
           subtipo?: string | null
@@ -9147,6 +9302,8 @@ export type Database = {
         }
         Update: {
           autorizada_at?: string | null
+          cancelada_at?: string | null
+          cancelada_por?: string | null
           codigo?: string | null
           created_at?: string
           deleted_at?: string | null
@@ -9156,6 +9313,7 @@ export type Database = {
           fecha_requerida?: string | null
           id?: string
           justificacion?: string | null
+          motivo_cancelacion?: string | null
           prioridad_id?: string | null
           solicitante_id?: string | null
           subtipo?: string | null
