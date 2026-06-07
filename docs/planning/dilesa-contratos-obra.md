@@ -14,8 +14,9 @@ backend (#651, en prod) + UI "Emitir a CxP" (#654) + **Sprint 5 captura de
 presupuesto**. **Sprint promovido 2026-06-06: Contratos → partidas + PDF de obra**
 (ejecuta ADR-042 Fases 2-3 + PDF) — el monto de contrato no se ve por partida
 (302/303 sin `partida_id`) + falta el PDF de obra de monto global; plan de 4 fases
-documentado en Bitácora, pendiente arrancar Fase 1 con OK. Próximo aparte:
-reasignar los 8 contratos placeholder.)
+documentado en Bitácora. **Fases 1-3 done** (#709 DB · #710 UI partida · #711 Costeo 3 capas +
+backfill de 30 contratos aplicado a prod 2026-06-06). Próximo: Fase 4 (PDF de obra de monto
+global). Aparte: reasignar los 8 contratos placeholder + 3 contratos de obra sin partida.)
 
 ## Problema
 
@@ -513,3 +514,30 @@ contrato-obra.tsx`) es para **vivienda** (lotes/prototipos/Anexo 3), no para obr
     del contrato cuenta como comprometido en esa partida vía `v_partida_control` (cableado en Fase
     0). 5 checks verdes (1305 tests). **Sin migración → preview-first.** Próximo: Fase 3 (Costeo
     muestra el comprometido **por partida** + backfill de los 302 con Beto) y Fase 4 (PDF de obra).
+
+### 2026-06-06 — Sprint Contratos→partidas+PDF · Fase 3 (Costeo por partida + backfill) — PR #711
+
+El Costeo de Construcción muestra el control de **3 capas por partida** (ADR-042) y los
+contratos de obra históricos quedaron ligados a su partida.
+
+- **UI** (`costeo-module.tsx`): query paralela a `erp.v_partida_control` + lookup Map por
+  `partida_id`; cada renglón (y subtotal de capítulo/etapa) muestra **Comprometido** (Σ OC +
+  contratos ligados) · **Ejercido** (recibido + facturas directas) · **Disponible** (presupuesto
+  − comprometido; **rojo si negativo** = sobre-contratación). Sustituyen las columnas "% ejec" y
+  "Proveedor"; KPIs de rollup intactos. 5 checks verdes (1306 tests). **UI visible →
+  preview-first** (PR #711, sin auto-merge).
+- **Diagnóstico que corrigió el handoff:** de los 302 contratos sin `partida_id`, **269 son
+  vivienda** (NO van a partidas de obra por diseño ADR-042 — se costean por lote/prototipo). El
+  backfill real eran **33 de obra** (22 urbanización + 10 cabecera + 1 tarea menor).
+- **Backfill `20260606190000`** (DML idempotente, **aplicado a prod + registrado en historial**):
+  liga **30** contratos por match keyword-del-frente + monto al centavo (valida proyecto). De los
+  33: 29 por match automático + **Maya** ($860k muro de contención) ligado a la partida seed
+  "Barda perimetral" de Lomas de las Delicias por decisión de Beto → disponible −$860k (alarma de
+  contratado-sin-presupuesto, hasta capturar el cuadro de Delicias). **3 quedan sin ligar**
+  (URBANIZACIÓN-C5 $617k, VANDALIZADAS-C4 $0, ESTRELLA-P3 $12k) — se ligan con `<LigarPartida>`
+  cuando se decida el concepto.
+- **Verificado en prod:** 31 obra ligados / 3 sin ligar / 269 vivienda sin ligar; SIMAS cuadra al
+  centavo (disponible $0); Maya −$860k. **Nota:** electrificación/pavimentación LDLE muestran
+  disponible negativo porque varios contratos del frente se agruparon en el concepto ancla (el
+  hermano queda sin comprometido) — reasignable con `<LigarPartida>` si se quiere precisión.
+- **Pendiente:** Fase 4 (PDF de contrato de obra de monto global).
