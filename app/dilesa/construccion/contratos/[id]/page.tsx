@@ -31,11 +31,13 @@ import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { usePermissions } from '@/components/providers';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { buildPartidaIndex, type PartidaGrupo } from '@/lib/compras/partidas';
+import { OBJETOS_COMUNES } from '@/lib/dilesa/objetos-obra';
 import { ObraContratoDetalle } from '@/components/dilesa/obra-contrato-detalle';
 
 type Contrato = {
@@ -50,6 +52,12 @@ type Contrato = {
   tipo: string;
   anticipo_pct: number | null;
   retencion_pct: number | null;
+  partida_id: string | null;
+  objeto: string | null;
+  fecha_inicio: string | null;
+  fecha_fin: string | null;
+  fianza_pct: number | null;
+  periodicidad_estimaciones_dias: number | null;
 };
 
 type Lote = {
@@ -385,10 +393,17 @@ function DetailInner() {
       </Section>
 
       {contrato.tipo !== 'vivienda' ? (
+        <EditarDatosContrato
+          contrato={contrato}
+          onSaved={(patch) => setContrato((prev) => (prev ? { ...prev, ...patch } : prev))}
+        />
+      ) : null}
+
+      {contrato.tipo !== 'vivienda' ? (
         <LigarPartida
           contratoId={contrato.id}
           proyectoId={contrato.proyecto_id}
-          partidaIdInicial={(contrato as { partida_id?: string | null }).partida_id ?? null}
+          partidaIdInicial={contrato.partida_id}
         />
       ) : null}
 
@@ -685,5 +700,269 @@ function LigarPartida({
         ) : null}
       </div>
     </section>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
+        {label}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Hint({ children }: { children: React.ReactNode }) {
+  return <p className="mt-1 text-[11px] text-[var(--text)]/50">{children}</p>;
+}
+
+/**
+ * Editar los datos de un contrato de obra (no-vivienda) con UPDATE directo
+ * (mismo patrón que <LigarPartida>). Los contratos históricos importados de
+ * Excel llegaron sin objeto/plazo/fianza/periodicidad, así que su PDF de obra
+ * (Fase 4) salía incompleto y había que corregirlos por SQL. Esta sección los
+ * captura desde la UI. Gated por write del sub-slug `dilesa.construccion.contratos`.
+ * Tras guardar sube el patch al detalle (onSaved) para que la ficha y el saldo
+ * de obra reflejen los cambios sin recargar.
+ */
+function EditarDatosContrato({
+  contrato,
+  onSaved,
+}: {
+  contrato: Contrato;
+  onSaved: (patch: Partial<Contrato>) => void;
+}) {
+  const { permissions } = usePermissions();
+  const toast = useToast();
+  const puedeEscribir =
+    permissions.isAdmin || permissions.modulos.get('dilesa.construccion.contratos')?.write === true;
+
+  const [objeto, setObjeto] = useState(contrato.objeto ?? '');
+  const [fechaInicio, setFechaInicio] = useState(contrato.fecha_inicio ?? '');
+  const [fechaFin, setFechaFin] = useState(contrato.fecha_fin ?? '');
+  const [valorTotal, setValorTotal] = useState(
+    contrato.valor_total == null ? '' : String(contrato.valor_total)
+  );
+  const [anticipoPct, setAnticipoPct] = useState(
+    contrato.anticipo_pct == null ? '' : String(contrato.anticipo_pct)
+  );
+  const [retencionPct, setRetencionPct] = useState(
+    contrato.retencion_pct == null ? '' : String(contrato.retencion_pct)
+  );
+  const [fianzaPct, setFianzaPct] = useState(
+    contrato.fianza_pct == null ? '' : String(contrato.fianza_pct)
+  );
+  const [periodicidadDias, setPeriodicidadDias] = useState(
+    contrato.periodicidad_estimaciones_dias == null
+      ? ''
+      : String(contrato.periodicidad_estimaciones_dias)
+  );
+  const [notas, setNotas] = useState(contrato.notas ?? '');
+  const [guardando, setGuardando] = useState(false);
+
+  const patch = useMemo(
+    () => ({
+      objeto: objeto.trim() || null,
+      fecha_inicio: fechaInicio || null,
+      fecha_fin: fechaFin || null,
+      anticipo_pct: anticipoPct.trim() === '' ? 0 : Number(anticipoPct),
+      retencion_pct: retencionPct.trim() === '' ? 0 : Number(retencionPct),
+      fianza_pct: fianzaPct.trim() === '' ? null : Number(fianzaPct),
+      periodicidad_estimaciones_dias:
+        periodicidadDias.trim() === '' ? null : Math.round(Number(periodicidadDias)),
+      valor_total: valorTotal.trim() === '' ? 0 : Number(valorTotal),
+      notas: notas.trim() || null,
+    }),
+    [
+      objeto,
+      fechaInicio,
+      fechaFin,
+      anticipoPct,
+      retencionPct,
+      fianzaPct,
+      periodicidadDias,
+      valorTotal,
+      notas,
+    ]
+  );
+
+  // Snapshot normalizado del contrato actual para detectar cambios (dirty). Tras
+  // guardar, onSaved actualiza el prop `contrato` → snapshot == patch → dirty false.
+  const snapshot = useMemo(
+    () => ({
+      objeto: contrato.objeto?.trim() || null,
+      fecha_inicio: contrato.fecha_inicio || null,
+      fecha_fin: contrato.fecha_fin || null,
+      anticipo_pct: Number(contrato.anticipo_pct ?? 0),
+      retencion_pct: Number(contrato.retencion_pct ?? 0),
+      fianza_pct: contrato.fianza_pct == null ? null : Number(contrato.fianza_pct),
+      periodicidad_estimaciones_dias:
+        contrato.periodicidad_estimaciones_dias == null
+          ? null
+          : Number(contrato.periodicidad_estimaciones_dias),
+      valor_total: Number(contrato.valor_total ?? 0),
+      notas: contrato.notas?.trim() || null,
+    }),
+    [contrato]
+  );
+
+  const valido =
+    [patch.anticipo_pct, patch.retencion_pct, patch.valor_total].every((n) => Number.isFinite(n)) &&
+    (patch.fianza_pct == null || Number.isFinite(patch.fianza_pct)) &&
+    (patch.periodicidad_estimaciones_dias == null ||
+      Number.isFinite(patch.periodicidad_estimaciones_dias)) &&
+    patch.valor_total > 0;
+  const dirty = JSON.stringify(patch) !== JSON.stringify(snapshot);
+
+  async function guardar() {
+    if (guardando || !dirty || !valido) return;
+    setGuardando(true);
+    const sb = createSupabaseBrowserClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (sb.schema('dilesa') as any)
+      .from('contratos_construccion')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', contrato.id);
+    if (error) {
+      toast.add({
+        title: 'Error',
+        description: getSupabaseErrorMessage(error, 'No se pudieron guardar los datos.'),
+        type: 'error',
+      });
+    } else {
+      toast.add({ title: 'Datos del contrato guardados', type: 'success' });
+      onSaved(patch);
+    }
+    setGuardando(false);
+  }
+
+  if (!puedeEscribir) return null;
+
+  const selectCls =
+    'h-9 w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm';
+
+  return (
+    <Section title="Editar datos del contrato">
+      <p className="-mt-2 mb-4 text-xs text-[var(--text)]/50">
+        Completa el alcance, plazo, montos y garantía del contrato de obra. Estos datos alimentan el
+        PDF del contrato (objeto, fechas, anticipo, retención y fianza).
+      </p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="sm:col-span-2">
+          <Field label="Objeto del contrato">
+            <select
+              className={`${selectCls} mb-2`}
+              value=""
+              onChange={(e) => {
+                if (e.target.value) setObjeto(e.target.value);
+              }}
+              aria-label="Objeto común"
+            >
+              <option value="">Elegir objeto común… (o escribe abajo)</option>
+              {OBJETOS_COMUNES.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </select>
+            <textarea
+              className="min-h-[60px] w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm"
+              value={objeto}
+              onChange={(e) => setObjeto(e.target.value)}
+              placeholder="Ej. Construcción de 225 m de muro de contención…"
+            />
+            <Hint>
+              Es la cláusula PRIMERA del contrato. Elige uno común y ajústalo (metros, ubicación…).
+            </Hint>
+          </Field>
+        </div>
+        <Field label="Inicio de ejecución">
+          <Input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
+        </Field>
+        <Field label="Fin de ejecución">
+          <Input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} />
+        </Field>
+        <Field label="Valor total (c/IVA)">
+          <Input
+            type="number"
+            step="0.01"
+            min="0"
+            value={valorTotal}
+            onChange={(e) => setValorTotal(e.target.value)}
+            placeholder="0.00"
+          />
+          <Hint>
+            {patch.valor_total > 0
+              ? moneyFmt.format(patch.valor_total)
+              : 'Monto total del contrato.'}
+          </Hint>
+        </Field>
+        <div className="grid grid-cols-2 gap-3 sm:col-span-2 sm:grid-cols-4">
+          <Field label="Anticipo %">
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              value={anticipoPct}
+              onChange={(e) => setAnticipoPct(e.target.value)}
+              placeholder="0"
+            />
+          </Field>
+          <Field label="Retención %">
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              value={retencionPct}
+              onChange={(e) => setRetencionPct(e.target.value)}
+              placeholder="0"
+            />
+          </Field>
+          <Field label="Fianza %">
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              value={fianzaPct}
+              onChange={(e) => setFianzaPct(e.target.value)}
+              placeholder="0"
+            />
+          </Field>
+          <Field label="Estimaciones c/ N días">
+            <Input
+              type="number"
+              step="1"
+              min="0"
+              value={periodicidadDias}
+              onChange={(e) => setPeriodicidadDias(e.target.value)}
+              placeholder="14"
+            />
+          </Field>
+        </div>
+        <div className="sm:col-span-2">
+          <Field label="Notas">
+            <textarea
+              className="min-h-[60px] w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm"
+              value={notas}
+              onChange={(e) => setNotas(e.target.value)}
+            />
+          </Field>
+        </div>
+      </div>
+      <div className="mt-4 flex items-center justify-end gap-3">
+        {patch.valor_total <= 0 ? (
+          <span className="text-xs text-[var(--text)]/50">El valor total debe ser mayor a 0.</span>
+        ) : null}
+        <Button onClick={guardar} disabled={guardando || !dirty || !valido}>
+          {guardando ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+          Guardar cambios
+        </Button>
+      </div>
+    </Section>
   );
 }
