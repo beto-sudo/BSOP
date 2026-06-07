@@ -17,7 +17,7 @@
  */
 import { Document, G, Page, Path, StyleSheet, Svg, Text, View } from '@react-pdf/renderer';
 import { styles, colors } from './styles';
-import { HeaderBand, FooterBand } from './header-footer';
+import { HeaderBand, FooterBand, Watermark } from './header-footer';
 import type { CriterioRiesgo, Nivel } from '../ficu/riesgo';
 
 export type DomicilioFicu = {
@@ -75,6 +75,9 @@ export type FicuData = {
   // Firma + folio
   clienteNombre: string;
   identificacionInventario: string;
+
+  /** Si la venta está desasignada/expirada, texto a estampar como watermark. */
+  watermark?: string | null;
 };
 
 const COLOR_SEGMENTO = ['#4f81bd', '#9bbb59', '#c0504d', '#8064a2', '#f79646'];
@@ -84,6 +87,7 @@ export function FicuPDF({ data }: { data: FicuData }) {
     <Document title={`FICU — ${data.clienteNombre} — ${data.identificacionInventario}`}>
       <Page size="LETTER" style={styles.page}>
         <HeaderBand title="FORMATO DE IDENTIFICACIÓN DE CLIENTES" fecha={data.fechaTexto} />
+        {data.watermark ? <Watermark text={data.watermark} /> : null}
 
         {/* ── Datos personales ── */}
         <DataRow label="Nombre(s):" value={data.nombres} />
