@@ -66,10 +66,13 @@ export type AsignacionRow = {
 
 export type ContratistaRow = {
   contratista: string;
-  estimaciones: number;
-  monto_bruto: number;
-  retencion: number;
-  monto_neto: number;
+  viviendas: number;
+  mo_contratado: number | null;
+  mo_ejecutado: number | null;
+  pct_ejecutado: number | null;
+  avance_real: number | null;
+  efectividad_pct: number | null;
+  vencidas: number;
 };
 
 export type ResumenConsejoData = {
@@ -269,20 +272,22 @@ function renderAsignaciones(rows: AsignacionRow[]): string {
 
 function renderContratistas(rows: ContratistaRow[]): string {
   return renderSection(
-    'Resumen Operación Contratistas',
+    'Operación Contratistas (obra en construcción)',
     [
       { label: 'Contratista' },
-      { label: 'Estimaciones', align: 'right' },
-      { label: 'Monto bruto', align: 'right' },
-      { label: 'Retención', align: 'right' },
-      { label: 'Monto neto', align: 'right' },
+      { label: 'Viviendas', align: 'right' },
+      { label: 'Monto contrato (MO)', align: 'right' },
+      { label: 'Ejecutado', align: 'right' },
+      { label: 'Efectividad', align: 'right' },
+      { label: 'Vencidas', align: 'right' },
     ],
     rows.map((r) => [
       r.contratista,
-      fmtInt(r.estimaciones),
-      fmtMoney(r.monto_bruto),
-      fmtMoney(r.retencion),
-      fmtMoney(r.monto_neto),
+      fmtInt(r.viviendas),
+      fmtMoney(r.mo_contratado),
+      `${fmtMoney(r.mo_ejecutado)} (${fmtPct(r.pct_ejecutado)})`,
+      fmtPct(r.efectividad_pct),
+      fmtInt(r.vencidas),
     ])
   );
 }
@@ -375,7 +380,7 @@ export async function fetchResumenConsejoData(
     ventasRes,
     fasesCatRes,
     fasesMesRes,
-    estimRes,
+    contratistaRes,
     saldosRes,
   ] = await Promise.all([
     dilesa.from('proyectos').select('id,nombre').eq('empresa_id', empresaId).is('deleted_at', null),
@@ -400,7 +405,7 @@ export async function fetchResumenConsejoData(
       .is('deleted_at', null)
       .gte('fecha', inicioMes)
       .in('fase', ['Asignada', 'Escriturada']),
-    dilesa.from('v_estimaciones_resumen').select('*').eq('empresa_id', empresaId),
+    dilesa.from('v_contratista_obra').select('*').eq('empresa_id', empresaId),
     erp.from('v_cuenta_saldo_actual').select('*').eq('empresa_id', empresaId),
   ]);
 
@@ -522,39 +527,21 @@ export async function fetchResumenConsejoData(
     asignaciones.push(...[...acc.values()].sort((x, y) => x.nombre.localeCompare(y.nombre)));
   }
 
-  // Contratistas: v_estimaciones_resumen agregado por contratista + nombre
-  const estimByContratista = new Map<string, ContratistaRow>();
-  const contratistaIds = [
-    ...new Set((estimRes.data ?? []).map((e: { contratista_id: string }) => e.contratista_id)),
-  ];
-  const personas = contratistaIds.length
-    ? await erp
-        .from('personas')
-        .select('id,nombre')
-        .in('id', contratistaIds as string[])
-    : { data: [] };
-  const personaNombre = new Map<string, string>(
-    (personas.data ?? []).map((p: { id: string; nombre: string | null }) => [p.id, p.nombre ?? '—'])
-  );
-  for (const e of estimRes.data ?? []) {
-    const ee = e as Record<string, unknown>;
-    const nombre = personaNombre.get(ee.contratista_id as string) ?? '—';
-    const row = estimByContratista.get(nombre) ?? {
-      contratista: nombre,
-      estimaciones: 0,
-      monto_bruto: 0,
-      retencion: 0,
-      monto_neto: 0,
-    };
-    row.estimaciones += Number(ee.estimaciones_count ?? 0);
-    row.monto_bruto += Number(ee.monto_bruto_total ?? 0);
-    row.retencion += Number(ee.retencion_total ?? 0);
-    row.monto_neto += Number(ee.monto_neto_total ?? 0);
-    estimByContratista.set(nombre, row);
-  }
-  const contratistas = [...estimByContratista.values()].sort((x, y) =>
-    x.contratista.localeCompare(y.contratista)
-  );
+  // Contratistas con obra en construcción (vista dilesa.v_contratista_obra):
+  // viviendas activas, monto de contrato (MO), ejecutado, efectividad vs
+  // calendario y vencidas. Ordenado por número de viviendas.
+  const contratistas: ContratistaRow[] = (contratistaRes.data ?? [])
+    .map((c: Record<string, unknown>) => ({
+      contratista: (c.contratista as string | null) ?? '—',
+      viviendas: Number(c.viviendas ?? 0),
+      mo_contratado: c.mo_contratado as number | null,
+      mo_ejecutado: c.mo_ejecutado as number | null,
+      pct_ejecutado: c.pct_ejecutado as number | null,
+      avance_real: c.avance_real as number | null,
+      efectividad_pct: c.efectividad_pct as number | null,
+      vencidas: Number(c.vencidas ?? 0),
+    }))
+    .sort((x, y) => y.viviendas - x.viviendas);
 
   const saldos: SaldoBancoRow[] = (saldosRes.data ?? []).map((s: Record<string, unknown>) => ({
     nombre: s.nombre as string,
