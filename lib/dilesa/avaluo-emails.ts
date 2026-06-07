@@ -28,6 +28,8 @@ const RESEND_FROM = 'DILESA <noreply@bsop.io>';
 export interface AvaluoSolicitudContext {
   ventaId: string;
   empresaId: string;
+  /** URL absoluta del magic link para que el valuador suba el dictamen. */
+  uploadUrl: string;
   /** Email del valuador (recipient principal). */
   valuadorEmail: string;
   /** Nombre comercial de la casa valuadora (saludo). */
@@ -174,6 +176,29 @@ function renderTemplate(ctx: AvaluoSolicitudContext): { subject: string; html: s
     ],
   });
 
+  // CTA principal: botón con el magic link. Tabla por compatibilidad con
+  // Outlook (no soporta border-radius en <a>). Centrado con align="center".
+  const ctaSubir = `
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0"
+           align="center" style="margin: 24px auto;">
+      <tr>
+        <td align="center" bgcolor="${ctx.branding.colorPrimario}"
+            style="border-radius: 6px; padding: 12px 24px;">
+          <a href="${escapeHtml(ctx.uploadUrl)}"
+             style="color: ${ctx.branding.colorInverso}; font-size: 15px;
+                    font-weight: 700; text-decoration: none; display: inline-block;
+                    letter-spacing: 0.5px;">
+            Subir avalúo aquí →
+          </a>
+        </td>
+      </tr>
+    </table>
+    <p style="text-align: center; font-size: 12px; color: ${ctx.branding.colorSecundario};
+              margin: -8px 0 16px;">
+      El enlace expira en 30 días y permite subir solo este avalúo.
+    </p>
+  `;
+
   const bodyHtml = `
     <p style="font-size: 15px;">Estimado(a) <b>${escapeHtml(saludoNombre)}</b>,</p>
     <p>Por medio del presente solicitamos sus amables servicios para realizar el
@@ -185,9 +210,14 @@ function renderTemplate(ctx: AvaluoSolicitudContext): { subject: string; html: s
     ${datosCliente}
     ${datosContactoVentas}
     <p style="margin-top: 20px;">Una vez concluido el avalúo, le agradeceremos
-       hacer llegar el dictamen al gerente de ventas indicado arriba para su
-       captura en nuestro sistema. Quedamos atentos a cualquier solicitud
-       adicional de información.</p>
+       <b>cargar el dictamen directamente en nuestro sistema</b> usando el siguiente
+       enlace seguro. No necesita iniciar sesión — solo abra el enlace, ingrese
+       el monto del avalúo y suba el PDF.</p>
+    ${ctaSubir}
+    <p style="margin-top: 16px; font-size: 13px; color: ${ctx.branding.colorSecundario};">
+      Si prefiere, también puede enviar el dictamen por correo al gerente de
+      ventas indicado arriba y nosotros lo capturamos por usted.
+    </p>
     <p style="margin-top: 24px;">Agradecemos su atención y quedamos a sus órdenes,<br/>
        <b>Equipo DILESA</b></p>
   `.trim();
