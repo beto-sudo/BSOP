@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import type { buttonVariants } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import type { VariantProps } from 'class-variance-authority';
 
 type ConfirmButtonVariant = NonNullable<VariantProps<typeof buttonVariants>['variant']>;
@@ -24,9 +25,10 @@ export type ConfirmDialogProps = {
   onOpenChange: (open: boolean) => void;
   /**
    * Triggered when the user confirms. Can be async; the button disables
-   * itself while the promise resolves.
+   * itself while the promise resolves. Receives the captured motivo when
+   * `requireMotivo` is set (undefined otherwise).
    */
-  onConfirm: () => void | Promise<void>;
+  onConfirm: (motivo?: string) => void | Promise<void>;
   /** Dialog title. Keep it short (“¿Eliminar departamento?”). */
   title: React.ReactNode;
   /** Optional longer explanation. Supports ReactNode for formatting. */
@@ -41,6 +43,13 @@ export type ConfirmDialogProps = {
    * Use "default" for non-destructive but still-needs-confirm actions.
    */
   confirmVariant?: ConfirmButtonVariant;
+  /**
+   * Si true, pide un motivo obligatorio (audit trail) y lo pasa a `onConfirm`.
+   * Usado por la iniciativa p2p-cancelaciones para cancelar con motivo.
+   */
+  requireMotivo?: boolean;
+  /** Placeholder del campo de motivo (solo si `requireMotivo`). */
+  motivoPlaceholder?: string;
 };
 
 /**
@@ -72,18 +81,28 @@ export function ConfirmDialog({
   confirmLabel = 'Eliminar',
   cancelLabel = 'Cancelar',
   confirmVariant = 'destructive',
+  requireMotivo = false,
+  motivoPlaceholder = 'Motivo (ej. error de captura, duplicado…)',
 }: ConfirmDialogProps) {
   const [loading, setLoading] = React.useState(false);
+  const [motivo, setMotivo] = React.useState('');
+
+  // Limpia el motivo cada vez que el diálogo se reabre.
+  React.useEffect(() => {
+    if (open) setMotivo('');
+  }, [open]);
+
+  const canConfirm = !requireMotivo || motivo.trim().length > 0;
 
   const handleConfirm = React.useCallback(async () => {
     setLoading(true);
     try {
-      await onConfirm();
+      await onConfirm(requireMotivo ? motivo.trim() : undefined);
       onOpenChange(false);
     } finally {
       setLoading(false);
     }
-  }, [onConfirm, onOpenChange]);
+  }, [onConfirm, onOpenChange, requireMotivo, motivo]);
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -92,11 +111,25 @@ export function ConfirmDialog({
           <AlertDialogTitle>{title}</AlertDialogTitle>
           {description ? <AlertDialogDescription>{description}</AlertDialogDescription> : null}
         </AlertDialogHeader>
+        {requireMotivo ? (
+          <div className="space-y-1.5">
+            <label className="text-xs text-muted-foreground" htmlFor="confirm-motivo">
+              Motivo *
+            </label>
+            <Input
+              id="confirm-motivo"
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              placeholder={motivoPlaceholder}
+              autoFocus
+            />
+          </div>
+        ) : null}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={loading}>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction
             variant={confirmVariant}
-            disabled={loading}
+            disabled={loading || !canConfirm}
             onClick={(event) => {
               // Prevent AlertDialog from auto-closing before the async work
               // completes. We close it manually in `handleConfirm`.
