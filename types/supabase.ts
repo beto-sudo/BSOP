@@ -2296,10 +2296,13 @@ export type Database = {
       contratos_construccion: {
         Row: {
           anticipo_pct: number
+          cancelada_at: string | null
+          cancelada_por: string | null
           coda_row_id: string | null
           codigo: string
           contratista_id: string
           cotizacion_id: string | null
+          creado_por: string | null
           created_at: string
           deleted_at: string | null
           empresa_id: string
@@ -2310,6 +2313,7 @@ export type Database = {
           fianzas_url: string | null
           id: string
           iva_tasa: number | null
+          motivo_cancelacion: string | null
           notas: string | null
           objeto: string | null
           partida_id: string | null
@@ -2324,10 +2328,13 @@ export type Database = {
         }
         Insert: {
           anticipo_pct?: number
+          cancelada_at?: string | null
+          cancelada_por?: string | null
           coda_row_id?: string | null
           codigo: string
           contratista_id: string
           cotizacion_id?: string | null
+          creado_por?: string | null
           created_at?: string
           deleted_at?: string | null
           empresa_id: string
@@ -2338,6 +2345,7 @@ export type Database = {
           fianzas_url?: string | null
           id?: string
           iva_tasa?: number | null
+          motivo_cancelacion?: string | null
           notas?: string | null
           objeto?: string | null
           partida_id?: string | null
@@ -2352,10 +2360,13 @@ export type Database = {
         }
         Update: {
           anticipo_pct?: number
+          cancelada_at?: string | null
+          cancelada_por?: string | null
           coda_row_id?: string | null
           codigo?: string
           contratista_id?: string
           cotizacion_id?: string | null
+          creado_por?: string | null
           created_at?: string
           deleted_at?: string | null
           empresa_id?: string
@@ -2366,6 +2377,7 @@ export type Database = {
           fianzas_url?: string | null
           id?: string
           iva_tasa?: number | null
+          motivo_cancelacion?: string | null
           notas?: string | null
           objeto?: string | null
           partida_id?: string | null
@@ -4598,6 +4610,10 @@ export type Database = {
       }
     }
     Functions: {
+      contrato_obra_cancelar: {
+        Args: { p_contrato_id: string; p_motivo: string }
+        Returns: undefined
+      }
       fn_backfill_cxc: {
         Args: never
         Returns: {

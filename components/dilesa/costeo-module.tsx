@@ -377,7 +377,8 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
         .from('contratos_construccion')
         .select('id, proyecto_id, valor_total')
         .eq('empresa_id', empresaId)
-        .is('deleted_at', null),
+        .is('deleted_at', null)
+        .is('cancelada_at', null),
       sb
         .schema('dilesa')
         .from('obra_estimaciones')

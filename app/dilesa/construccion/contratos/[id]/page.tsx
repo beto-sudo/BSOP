@@ -26,7 +26,17 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Download, ExternalLink, FileText, HardHat, Loader2, Save } from 'lucide-react';
+import {
+  ArrowLeft,
+  Ban,
+  Download,
+  ExternalLink,
+  FileText,
+  HardHat,
+  Loader2,
+  Save,
+} from 'lucide-react';
+import { CancelarConMotivoDialog } from '@/components/shared/cancelar-con-motivo-dialog';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -58,6 +68,8 @@ type Contrato = {
   fecha_fin: string | null;
   fianza_pct: number | null;
   periodicidad_estimaciones_dias: number | null;
+  cancelada_at: string | null;
+  motivo_cancelacion: string | null;
 };
 
 type Lote = {
@@ -363,15 +375,28 @@ function DetailInner() {
             </p>
           ) : null}
         </div>
-        {/* Ambos tipos generan PDF: vivienda con lotes+ANEXO 3, obra de monto
-            global con objeto descriptivo (el endpoint branchea por `tipo`). */}
-        <a
-          href={`/api/dilesa/construccion/contratos/${contrato.id}/pdf`}
-          className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40 hover:text-[var(--text)]"
-        >
-          <Download className="h-4 w-4" />
-          Descargar contrato (PDF)
-        </a>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Ambos tipos generan PDF: vivienda con lotes+ANEXO 3, obra de monto
+              global con objeto descriptivo (el endpoint branchea por `tipo`). */}
+          <a
+            href={`/api/dilesa/construccion/contratos/${contrato.id}/pdf`}
+            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40 hover:text-[var(--text)]"
+          >
+            <Download className="h-4 w-4" />
+            Descargar contrato (PDF)
+          </a>
+          <CancelarContratoButton
+            contratoId={contrato.id}
+            tipo={contrato.tipo}
+            canceladaAt={contrato.cancelada_at}
+            motivo={contrato.motivo_cancelacion}
+            onCancelado={() =>
+              setContrato((prev) =>
+                prev ? { ...prev, cancelada_at: new Date().toISOString() } : prev
+              )
+            }
+          />
+        </div>
       </header>
 
       <Section title="Datos generales">
@@ -964,5 +989,82 @@ function EditarDatosContrato({
         </Button>
       </div>
     </Section>
+  );
+}
+
+// ── Cancelar contrato (p2p-cancelaciones · Fase 2) ──────────────────────────
+
+function CancelarContratoButton({
+  contratoId,
+  tipo,
+  canceladaAt,
+  motivo,
+  onCancelado,
+}: {
+  contratoId: string;
+  tipo: string;
+  canceladaAt: string | null;
+  motivo: string | null;
+  onCancelado: () => void;
+}) {
+  const { permissions } = usePermissions();
+  const toast = useToast();
+  const puedeEscribir =
+    permissions.isAdmin || permissions.modulos.get('dilesa.construccion.contratos')?.write === true;
+  const [cancelando, setCancelando] = useState(false);
+
+  if (tipo === 'vivienda') return null;
+
+  if (canceladaAt) {
+    return (
+      <span
+        title={motivo ?? undefined}
+        className="inline-flex items-center gap-1.5 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-1.5 text-sm font-medium text-destructive"
+      >
+        <Ban className="h-4 w-4" />
+        Contrato cancelado
+      </span>
+    );
+  }
+  if (!puedeEscribir) return null;
+
+  const doCancelar = async (motivoTxt: string) => {
+    const sb = createSupabaseBrowserClient();
+    const { error } = await sb
+      .schema('dilesa')
+      .rpc('contrato_obra_cancelar', { p_contrato_id: contratoId, p_motivo: motivoTxt });
+    if (error) {
+      toast.add({
+        title: 'No se pudo cancelar',
+        description: getSupabaseErrorMessage(error, 'Error al cancelar el contrato.'),
+        type: 'error',
+      });
+      throw error;
+    }
+    toast.add({ title: 'Contrato cancelado', type: 'success' });
+    onCancelado();
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setCancelando(true)}
+        className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm font-medium text-[var(--text)]/70 hover:border-destructive hover:text-destructive"
+      >
+        <Ban className="h-4 w-4" />
+        Cancelar contrato
+      </button>
+      {cancelando ? (
+        <CancelarConMotivoDialog
+          title="Cancelar contrato de obra"
+          description="El contrato quedará visible como cancelado y dejará de comprometer su partida. Si tiene estimaciones registradas, primero hay que cancelarlas."
+          confirmLabel="Cancelar contrato"
+          placeholder="Ej. obra no ejecutada, error de captura…"
+          onClose={() => setCancelando(false)}
+          onConfirm={doCancelar}
+        />
+      ) : null}
+    </>
   );
 }
