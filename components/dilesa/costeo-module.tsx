@@ -29,6 +29,14 @@
  * Carga cross-schema con queries paralelas + lookups Map (mismo patrón que
  * contratos-module — evita embeds de PostgREST). Los KPIs son reactivos a los
  * filtros (ADR-034); el contratado/saldo refleja los proyectos visibles.
+ *
+ * Control de 3 capas por partida (ADR-042, sprint Contratos→partidas · Fase 3):
+ * cada renglón muestra Comprometido (Σ OC + contratos de obra ligados por
+ * `partida_id`) · Ejercido (recibido + facturas directas) · Disponible
+ * (presupuesto − comprometido; rojo si negativo = sobre-contratación), leídos de
+ * `erp.v_partida_control` por un lookup Map paralelo. Por eso el monto de un
+ * contrato de obra (p.ej. Maya) ya aparece dentro de su partida, no solo en el
+ * KPI agregado "Contratado".
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -66,8 +74,19 @@ export type CosteoRow = {
   presupuestoActualizado: number | null;
   /** presupuesto_actualizado ?? presupuesto_previo (numeric, c/IVA). Derivado. */
   presupuesto: number | null;
-  /** gasto_real_total (numeric, c/IVA). */
+  /** gasto_real_total (numeric, c/IVA) — captura manual del traspaso (Excel). */
   gastoReal: number | null;
+  /**
+   * Comprometido de la partida (Σ OC enviada/parcial/cerrada + Σ contratos de
+   * obra ligados por `partida_id`) — `erp.v_partida_control` (ADR-042). 0 si la
+   * partida no tiene ni OC ni contratos.
+   */
+  comprometido: number;
+  /**
+   * Ejercido/devengado de la partida (recibido de OC + facturas directas) —
+   * `erp.v_partida_control` (ADR-041). 0 si nada devengado.
+   */
+  ejercido: number;
   /** Proveedor estructurado (persona_id) — preferido sobre el texto libre. */
   proveedorPersonaId: string | null;
   /** Proveedor en texto libre (legacy del traspaso; fallback de display). */
@@ -97,6 +116,8 @@ export type CosteoCapitulo = {
   partidas: CosteoRow[];
   presupuesto: number;
   gastoReal: number;
+  comprometido: number;
+  ejercido: number;
 };
 
 /** Una etapa agrupada con sus capítulos y subtotales. */
@@ -107,6 +128,8 @@ export type CosteoEtapa = {
   capitulos: CosteoCapitulo[];
   presupuesto: number;
   gastoReal: number;
+  comprometido: number;
+  ejercido: number;
 };
 
 /**
@@ -128,6 +151,8 @@ export function groupCosteo(
     capitulos: Map<string, { cap: CosteoCapitulo; orderKey: string }>;
     presupuesto: number;
     gastoReal: number;
+    comprometido: number;
+    ejercido: number;
   };
   const etapas = new Map<string, EtapaAcc>();
 
@@ -146,6 +171,8 @@ export function groupCosteo(
         capitulos: new Map(),
         presupuesto: 0,
         gastoReal: 0,
+        comprometido: 0,
+        ejercido: 0,
       };
       etapas.set(etapaKey, e);
     }
@@ -160,6 +187,8 @@ export function groupCosteo(
           partidas: [],
           presupuesto: 0,
           gastoReal: 0,
+          comprometido: 0,
+          ejercido: 0,
         },
         orderKey: res ? res.capituloCodigo : '￿',
       };
@@ -171,8 +200,12 @@ export function groupCosteo(
     c.cap.partidas.push(r);
     c.cap.presupuesto += p;
     c.cap.gastoReal += g;
+    c.cap.comprometido += r.comprometido;
+    c.cap.ejercido += r.ejercido;
     e.presupuesto += p;
     e.gastoReal += g;
+    e.comprometido += r.comprometido;
+    e.ejercido += r.ejercido;
   }
 
   return [...etapas.values()]
@@ -183,6 +216,8 @@ export function groupCosteo(
       nombre: e.nombre,
       presupuesto: e.presupuesto,
       gastoReal: e.gastoReal,
+      comprometido: e.comprometido,
+      ejercido: e.ejercido,
       capitulos: [...e.capitulos.values()]
         .sort((a, b) => a.orderKey.localeCompare(b.orderKey))
         .map(({ cap }) => {
@@ -240,9 +275,26 @@ export function deriveKpis(
   ];
 }
 
-/** % de ejecución de un subtotal de grupo (gasto ÷ presupuesto). */
-function pctEjec(gasto: number, presupuesto: number): string {
-  return presupuesto > 0 ? formatPercent(gasto / presupuesto) : '—';
+/** Monto del costeo: '—' cuando es exactamente 0, moneda si no (ADR-034). */
+function fmtMonto(n: number): string {
+  return n === 0 ? '—' : formatCurrency(n);
+}
+
+/**
+ * Disponible de una partida/grupo = presupuesto − comprometido. Negativo =
+ * sobre-contratación (se comprometió más de lo presupuestado) → `alerta`. '—'
+ * solo cuando no hay ni presupuesto ni comprometido.
+ */
+function disponibleCell(
+  presupuesto: number,
+  comprometido: number
+): {
+  text: string;
+  alerta: boolean;
+} {
+  if (presupuesto === 0 && comprometido === 0) return { text: '—', alerta: false };
+  const d = presupuesto - comprometido;
+  return { text: formatCurrency(d), alerta: d < 0 };
 }
 
 type FetchResult = {
@@ -301,6 +353,7 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
       estimacionesRes,
       catalogoRes,
       proveedoresRes,
+      controlRes,
     ] = await Promise.all([
       // Capa A migrada al modelo canónico erp.presupuesto_partidas (ADR-040).
       // Cast `as any`: la tabla aún no está en types (se difiere al workflow
@@ -346,6 +399,14 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
         .eq('empresa_id', empresaId)
         .eq('activo', true)
         .is('deleted_at', null),
+      // Control de 3 capas por partida (ADR-042): comprometido = Σ OC + Σ
+      // contratos de obra ligados por partida_id; ejercido = recibido + facturas
+      // directas. La vista ya filtra deleted_at y deriva por empresa.
+      sb
+        .schema('erp')
+        .from('v_partida_control')
+        .select('partida_id, comprometido, ejercido')
+        .eq('empresa_id', empresaId),
     ]);
 
     const firstErr =
@@ -354,9 +415,22 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
       contratosRes.error ??
       estimacionesRes.error ??
       catalogoRes.error ??
-      proveedoresRes.error;
+      proveedoresRes.error ??
+      controlRes.error;
     if (firstErr) {
       return { error: getSupabaseErrorMessage(firstErr, 'No se pudo cargar el costeo.') };
+    }
+
+    // Control de 3 capas por partida_id (ADR-042). Lookup Map: evita embed
+    // cross-schema (la vista vive en erp; las partidas también, pero el patrón
+    // del módulo es queries paralelas + Map).
+    const controlByPartida = new Map<string, { comprometido: number; ejercido: number }>();
+    for (const c of controlRes.data ?? []) {
+      if (!c.partida_id) continue;
+      controlByPartida.set(c.partida_id, {
+        comprometido: Number(c.comprometido ?? 0),
+        ejercido: Number(c.ejercido ?? 0),
+      });
     }
 
     // proyectoMap resuelve nombres de TODOS los proyectos (para la tabla de
@@ -444,6 +518,7 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
             : null;
       const gastoReal = r.gasto_real_total != null ? Number(r.gasto_real_total) : null;
       const pid = (r.proyecto_id as string | null) ?? null;
+      const ctrl = controlByPartida.get(r.id as string);
       return {
         id: r.id as string,
         proyecto_id: pid,
@@ -456,6 +531,8 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
           r.presupuesto_aprobado != null ? Number(r.presupuesto_aprobado) : null,
         presupuesto,
         gastoReal,
+        comprometido: ctrl?.comprometido ?? 0,
+        ejercido: ctrl?.ejercido ?? 0,
         proveedorPersonaId: (r.proveedor_persona_id as string | null) ?? null,
         proveedor: (r.proveedor_texto as string | null) ?? null,
         fechaCompromiso: (r.fecha_compromiso as string | null) ?? null,
@@ -620,17 +697,6 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
     [filtrados, catalogo.byConcepto]
   );
 
-  // Resuelve el proveedor a mostrar: estructurado → texto libre → "—".
-  const proveedorDisplay = useCallback(
-    (r: CosteoRow): string => {
-      if (r.proveedorPersonaId) {
-        return proveedorNombreById.get(r.proveedorPersonaId) ?? r.proveedor ?? '—';
-      }
-      return r.proveedor || '—';
-    },
-    [proveedorNombreById]
-  );
-
   // Al buscar, ignora el colapsado para que los matches sean visibles.
   const isSearching = q.length > 0;
   // Click en la fila abre la edición (solo si puede escribir).
@@ -757,10 +823,11 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
             <thead className="sticky top-0 z-10 bg-[var(--card)] text-xs uppercase tracking-wide text-[var(--text)]/50">
               <tr className="border-b border-[var(--border)]">
                 <th className="px-3 py-2.5 text-left">Concepto</th>
-                <th className="w-36 px-3 py-2.5 text-right">Presupuesto</th>
-                <th className="w-36 px-3 py-2.5 text-right">Gasto real</th>
-                <th className="w-20 px-3 py-2.5 text-right">% ejec.</th>
-                <th className="w-56 px-3 py-2.5 text-left">Proveedor</th>
+                <th className="w-32 px-3 py-2.5 text-right">Presupuesto</th>
+                <th className="w-32 px-3 py-2.5 text-right">Comprometido</th>
+                <th className="w-32 px-3 py-2.5 text-right">Ejercido</th>
+                <th className="w-32 px-3 py-2.5 text-right">Disponible</th>
+                <th className="w-32 px-3 py-2.5 text-right">Gasto real</th>
               </tr>
             </thead>
             <tbody>
@@ -774,7 +841,6 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
                     collapsed={collapsed}
                     isSearching={isSearching}
                     onToggle={toggleGrupo}
-                    proveedorDisplay={proveedorDisplay}
                     onRowClick={onRowClick}
                   />
                 );
@@ -787,6 +853,27 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
   );
 }
 
+// ─── Celda de disponible (rojo si sobre-contratado) ─────────────────────────
+
+function DisponibleTd({
+  presupuesto,
+  comprometido,
+  pad,
+  normalColor,
+}: {
+  presupuesto: number;
+  comprometido: number;
+  pad: string;
+  normalColor: string;
+}) {
+  const { text, alerta } = disponibleCell(presupuesto, comprometido);
+  return (
+    <td className={`${pad} text-right tabular-nums ${alerta ? 'text-red-600' : normalColor}`}>
+      {text}
+    </td>
+  );
+}
+
 // ─── Fragmento de grupo (etapa + sus capítulos + partidas) ──────────────────
 
 function GrupoFragment({
@@ -795,7 +882,6 @@ function GrupoFragment({
   collapsed,
   isSearching,
   onToggle,
-  proveedorDisplay,
   onRowClick,
 }: {
   etapa: CosteoEtapa;
@@ -803,7 +889,6 @@ function GrupoFragment({
   collapsed: Set<string>;
   isSearching: boolean;
   onToggle: (key: string) => void;
-  proveedorDisplay: (r: CosteoRow) => string;
   onRowClick?: (r: CosteoRow) => void;
 }) {
   return (
@@ -821,15 +906,23 @@ function GrupoFragment({
           </button>
         </td>
         <td className="px-3 py-2 text-right font-semibold tabular-nums text-[var(--text)]">
-          {etapa.presupuesto === 0 ? '—' : formatCurrency(etapa.presupuesto)}
+          {fmtMonto(etapa.presupuesto)}
         </td>
         <td className="px-3 py-2 text-right font-semibold tabular-nums text-[var(--text)]">
-          {etapa.gastoReal === 0 ? '—' : formatCurrency(etapa.gastoReal)}
+          {fmtMonto(etapa.comprometido)}
         </td>
+        <td className="px-3 py-2 text-right font-semibold tabular-nums text-[var(--text)]">
+          {fmtMonto(etapa.ejercido)}
+        </td>
+        <DisponibleTd
+          presupuesto={etapa.presupuesto}
+          comprometido={etapa.comprometido}
+          pad="px-3 py-2 font-semibold"
+          normalColor="text-[var(--text)]"
+        />
         <td className="px-3 py-2 text-right font-semibold tabular-nums text-[var(--text)]/70">
-          {pctEjec(etapa.gastoReal, etapa.presupuesto)}
+          {fmtMonto(etapa.gastoReal)}
         </td>
-        <td className="px-3 py-2" />
       </tr>
 
       {!etapaCollapsed &&
@@ -841,7 +934,6 @@ function GrupoFragment({
               cap={cap}
               capCollapsed={capCollapsed}
               onToggle={onToggle}
-              proveedorDisplay={proveedorDisplay}
               onRowClick={onRowClick}
             />
           );
@@ -856,13 +948,11 @@ function CapituloFragment({
   cap,
   capCollapsed,
   onToggle,
-  proveedorDisplay,
   onRowClick,
 }: {
   cap: CosteoCapitulo;
   capCollapsed: boolean;
   onToggle: (key: string) => void;
-  proveedorDisplay: (r: CosteoRow) => string;
   onRowClick?: (r: CosteoRow) => void;
 }) {
   return (
@@ -883,15 +973,23 @@ function CapituloFragment({
           </button>
         </td>
         <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]/80">
-          {cap.presupuesto === 0 ? '—' : formatCurrency(cap.presupuesto)}
+          {fmtMonto(cap.presupuesto)}
         </td>
         <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]/80">
-          {cap.gastoReal === 0 ? '—' : formatCurrency(cap.gastoReal)}
+          {fmtMonto(cap.comprometido)}
         </td>
+        <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]/80">
+          {fmtMonto(cap.ejercido)}
+        </td>
+        <DisponibleTd
+          presupuesto={cap.presupuesto}
+          comprometido={cap.comprometido}
+          pad="px-3 py-1.5"
+          normalColor="text-[var(--text)]/80"
+        />
         <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]/60">
-          {pctEjec(cap.gastoReal, cap.presupuesto)}
+          {fmtMonto(cap.gastoReal)}
         </td>
-        <td className="px-3 py-1.5" />
       </tr>
 
       {!capCollapsed &&
@@ -909,12 +1007,20 @@ function CapituloFragment({
               {r.presupuesto == null ? '—' : formatCurrency(r.presupuesto)}
             </td>
             <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]">
+              {fmtMonto(r.comprometido)}
+            </td>
+            <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]">
+              {fmtMonto(r.ejercido)}
+            </td>
+            <DisponibleTd
+              presupuesto={r.presupuesto ?? 0}
+              comprometido={r.comprometido}
+              pad="px-3 py-1.5"
+              normalColor="text-[var(--text)]"
+            />
+            <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]/70">
               {r.gastoReal == null ? '—' : formatCurrency(r.gastoReal)}
             </td>
-            <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]/70">
-              {r.ratio == null ? '—' : formatPercent(r.ratio)}
-            </td>
-            <td className="px-3 py-1.5 text-[var(--text)]/80">{proveedorDisplay(r)}</td>
           </tr>
         ))}
     </>
