@@ -3,11 +3,11 @@
 **Slug:** `dilesa-compras`
 **Empresas:** DILESA (golden); componente compartido pensado para rollout a las 5 empresas
 **Schemas afectados:** `erp` (catálogo de conceptos nuevo, cotizaciones/RFQ nuevas, binding `partida_id` en líneas de compra, posible generalización del presupuesto), `dilesa` (`proyecto_presupuesto_partidas`, integración con el checklist de anteproyecto), `core.modulos` (sub-slugs RBAC del módulo nuevo)
-**Estado:** in_progress
-**Próximo hito:** **Sprint 0 en prod**: ADR-040 + `erp.conceptos_compra` (3 etapas / 18 capítulos / 71 conceptos, seed de `obra_presupuesto`). Próximo: Sprint 1 — cerrar D9 (unificar presupuesto en `erp`, coordinar con `dilesa-contratos-obra`) + binding `partida_id` + vista `v_partida_control` (3 capas)
+**Estado:** done
+**Próximo hito:** — (cerrada 2026-06-08)
 **Dueño:** Beto
 **Creada:** 2026-06-04
-**Última actualización:** 2026-06-05 (**Sprint 2 completo y mergeado** (#693: Fase D Requisiciones + gasto suelto + selector solo-con-presupuesto + clonación de catálogo a 5 proyectos). **Sprint "gasto directo"** para registrar pagos fuera del proceso (req→OC) y que sumen al control: **Fase 1 (DB)** aplicada a prod y mergeada (#696: ADR-041 + vista `ejercido` **híbrido** = recibido de OC + facturas con partida sin OC; D14) + fix de colisión de timestamp que rompía previews. **Fase 2 (UI)** sección "Partida del presupuesto" en el drawer de factura de CxP — **mergeada (#697)**; el flujo de gasto directo quedó completo (subir XML → asignar partida → pagar → suma ejercido+pagado). **Sprint "contratos de obra al control de partidas" promovido** (D15/ADR-042): el contrato compromete una partida (1:1), las estimaciones la ejercen/pagan — pendiente de arrancar Fase 1 (DB) con OK de Beto. **Sprint Cotización RFQ arrancado**: Fase 0 (ADR-042, contrato de obra ↔ partida) aplicada a prod; próximo Fase 1 = schema RFQ.)
+**Última actualización:** 2026-06-08 (**cerrada** — ciclo procure-to-pay completo en prod, círculo P2P de DILESA cerrado)
 
 ## Problema
 
@@ -246,6 +246,8 @@ pago: rol **Dirección** (ya vigente en CxP).
   de proveedor liga (cuando aplica) a su OC y a su partida.
 
 ## Bitácora
+
+- **2026-06-08 (cierre de la iniciativa)** — Ciclo P2P de DILESA completo en prod — Sprints 0-3 (catálogo de conceptos, binding partida, vista de control 3 capas, UI del ciclo) + gasto directo + sprint RFQ/Cotizaciones Fases 0-3 (#705 schema, #706 UI captura+envío, #707 comparativa+adjudicación→OC/contrato). La adjudicación cierra el círculo P2P. Follow-ups menores (editar OC borrador, ajuste F4 de `v_partida_control` con OCs canceladas, rollout del componente compartido a RDB) quedan en backlog, no bloquean. Cerrada por instrucción de Beto tras auditoría de estado real (el header estaba stale respecto al trabajo ya en prod).
 
 - **2026-06-04** — Iniciativa promovida a `planned`. Discovery a fondo del
   ciclo P2P existente (RDB golden en `erp.*`, DILESA solo CxP) y de las piezas

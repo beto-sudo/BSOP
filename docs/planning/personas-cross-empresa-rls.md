@@ -3,11 +3,11 @@
 **Slug:** `personas-cross-empresa-rls`
 **Empresas:** todas
 **Schemas afectados:** `core` (nueva función `fn_persona_visible`), `erp` (policy `erp_personas_select`)
-**Estado:** in_progress
-**Próximo hito:** Sprint A — migración `core.fn_persona_visible` + replace policy `erp_personas_select` + regen `SCHEMA_REF` + smoke en preview con login Pablo HM
+**Estado:** done
+**Próximo hito:** — (cerrada 2026-06-08)
 **Dueño:** Beto
 **Creada:** 2026-05-04
-**Última actualización:** 2026-05-04 (promovida tras debug del bug de Pablo HM en `/inicio`; Sprint A en preparación)
+**Última actualización:** 2026-06-08 (**cerrada** — Sprint A vivo en prod desde 2026-05-04, verificado en DB; caso de Pablo HM resuelto)
 
 ## Problema
 
@@ -86,6 +86,8 @@ Memoria del repo dice "auditar resto de empleados Deportivo" — Pablo no es nec
 - Reescribir email-match a `persona_id`. Solo si decidimos limpiarlo.
 
 ## Bitácora
+
+- **2026-06-08 (cierre de la iniciativa)** — Sprint A en prod desde 2026-05-04 (#408) y verificado en la DB el 2026-06-08: existe `core.fn_persona_visible` y la policy `erp_personas_select` tiene el predicate `fn_has_empresa(empresa_id) OR fn_persona_visible(id) OR fn_is_admin()`. El caso que la originó (Pablo HM, empleado RDB / persona DILESA, no veía sus tareas en /inicio) quedó resuelto por el hotfix puntual + este fix estructural. Smoke de login de Pablo en /inicio recomendado como verificación opcional, no bloquea el cierre (la lógica está verificada). Cerrada por instrucción de Beto tras auditoría de estado real (el header estaba stale respecto al trabajo ya en prod).
 
 - **2026-05-04** — Iniciativa promovida tras debug del bug de Pablo HM. Confirmado por SQL: empleado en RDB, persona en DILESA (legacy migración JP 2026-04-27), `usuarios_empresas` solo en RDB → JOIN de `v_empleados_full` filtra por RLS. Beto eligió Fix 1 opción B (mover persona a RDB, hotfix puntual) + Fix 3 estructural (esta iniciativa).
 
