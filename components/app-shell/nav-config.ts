@@ -99,6 +99,9 @@ export const NAV_ITEMS: NavItem[] = [
           // Contratistas / Prototipos) — el sidebar muestra solo la entry
           // del padre; las tabs viven en el layout (sprint tabs+protos).
           { label: 'Construcción', href: '/dilesa/construccion' },
+          // RUV (Registro Único de Vivienda · INFONAVIT) — módulo propio,
+          // operado por Asistente de Proyectos. Iniciativa `dilesa-ruv`.
+          { label: 'RUV', href: '/dilesa/ruv' },
         ],
       },
     ],

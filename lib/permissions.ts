@@ -55,6 +55,10 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   '/dilesa/cobranza/aging': 'dilesa.cobranza.aging',
   // Saldos Bancos — módulo plano de Tesorería (iniciativa `tesoreria`).
   '/dilesa/saldos-bancos': 'dilesa.saldos-bancos',
+  // RUV (Registro Único de Vivienda · INFONAVIT) — módulo plano. Iniciativa
+  // `dilesa-ruv`. Capa de oferta + checklist de documentos encima de
+  // dilesa.construccion (que ya tiene CUV + hitos del trámite por vivienda).
+  '/dilesa/ruv': 'dilesa.ruv',
   // CxP (Cuentas por Pagar) es un hub con 5 tabs (ADR-030). El padre
   // `dilesa.cxp` queda como umbrella en sidebar; cada tab tiene su sub-slug.
   // La URL default `/dilesa/cxp` mapea al sub-slug del primer tab

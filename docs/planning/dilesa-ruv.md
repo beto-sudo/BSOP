@@ -2,13 +2,12 @@
 
 **Slug:** `dilesa-ruv`
 **Empresas:** DILESA
-**Schemas afectados:** `dilesa` (3+ tablas nuevas), `core.modulos`
-(slug nuevo + backfill de permisos)
-**Estado:** proposed
-**Próximo hito:** Sprint 0 (bloqueante) — deep-dive de las 3 tablas en Coda (1,557 rows: 1132 CUV + 169 docs + 256 urgencias) + confirmar D1 (schema preciso, tablas auxiliares, plan de adjuntos). D2 cerrada (RBAC: operadora + Gerente de Proyectos + Dirección + Beto admin)
+**Schemas afectados:** `dilesa` (3 tablas nuevas: `ruv_frentes`, `ruv_documentos_catalogo`, `ruv_frente_documentos` + columna `construccion.frente_id` + vista `v_ruv_frente_avance`), `core.modulos` (slug nuevo + backfill de permisos)
+**Estado:** in_progress
+**Próximo hito:** Sprint 1 construido (migración `20260608214309_dilesa_ruv_modulo.sql` + RBAC los-4-lugares de ADR-014 + page skeleton). Falta: **Beto aplica la migración** (crea el rol nuevo "Asistente de Proyectos" + permisos D2) → regenero `types/supabase.ts` + `SCHEMA_REF.md` → **Sprint 2** (import de 93 frentes + 27 docs del catálogo + backfill de `construccion.frente_id`). D2 cerrada (RBAC)
 **Dueño:** Beto
 **Creada:** 2026-05-26
-**Última actualización:** 2026-05-26 (D2 scope RBAC cerrado: operadora actual + gerente de proyectos + dirección + Beto admin; D1 sigue bloqueante con Sprint 0 deep-dive de Coda; estado se mantiene `proposed`)
+**Última actualización:** 2026-06-08 (Sprint 1 construido: migración con las 3 tablas + `construccion.frente_id` + vista `v_ruv_frente_avance` + módulo `dilesa.ruv` + rol nuevo "Asistente de Proyectos" + permisos D2; código RBAC (`nav-config` / `ROUTE_TO_MODULE` / `EXPECTED_DB_MODULE_SLUGS`) + page skeleton con gate. CI local verde (typecheck/test/lint/format). La migración crea rol+permisos → la aplica Beto; tras aplicar, regenero types/SCHEMA_REF y arranco Sprint 2)
 
 ## Problema
 
@@ -62,6 +61,12 @@ Problemas operativos del estado actual:
    al cierre de Sprint 3 si entra a v1 o queda para v1.1.
 
 ## Modelo conceptual
+
+> ⚠️ **Superseded por el [Anexo Sprint 0](#anexo-sprint-0--shape-real-de-coda-2026-06-08)
+> (2026-06-08).** El schema tentativo de abajo asumía `cuvs` como entidad rica +
+> `documentos_ruv` como trámites + `urgencias_ruv`. El deep-dive reveló un modelo
+> distinto (Frente RUV céntrico). Se conserva esta sección como registro del
+> razonamiento previo; el schema vigente es el del anexo.
 
 ### Schema base (Sprint 1)
 
@@ -140,27 +145,20 @@ por `unidad.proyecto_id = <proyecto>`. Requiere:
 
 ## Decisiones (D1 abierta · D2 cerrada)
 
-### D1 — Schema preciso (resuelve Sprint 0 deep-dive de Coda) 🔒 Abierta
+### D1 — Schema preciso ✅ Cerrada (2026-06-08)
 
-Antes del Sprint 1, hacer el deep-dive de las 3 tablas en Coda:
+Deep-dive ✅ ejecutado (ver [Anexo Sprint 0](#anexo-sprint-0--shape-real-de-coda-2026-06-08)).
+Resuelto todo: shape real de las tablas, mapeo a `dilesa.unidades`/`proyectos`,
+campos calculados → vistas, adjuntos descartados, Urgencias fuera de v1.
 
-- Exportar los 1,557 registros + columnas reales (no solo el
-  inventario top-level).
-- Identificar columnas calculadas / relaciones / fórmulas que el
-  módulo de Coda haga implícitamente.
-- Verificar si hay tablas auxiliares (DTUs, pagos seguro de calidad,
-  paquetes RUV) que `INVENTORY.md` menciona pero no aparecen en el
-  módulo principal.
-- Verificar si hay enlaces a documentos / archivos adjuntos en
-  Coda (probable que sí — patrón habitual en sistemas de trámite).
-- Definir si los adjuntos viajan en este Sprint o se difieren.
-
-Output esperado: shape definitivo del schema + lista de
-columnas/enum-values + plan de adjuntos.
-
-Beto ofreció apuntar a las tablas específicas en Coda cuando el deep-dive
-arranque — se aprovecha al inicio del Sprint 0 para no perder tiempo
-buscando.
+**Mapeo CUV↔vivienda resuelto** (dato de Beto): la liga vive en la tabla
+**Inventario** de Coda (`grid--AHYMPQI7Z`, col `CUV`/`c-16p9m_gEo5`), que es la
+misma que ya está migrada a `dilesa.unidades` — y el detalle por vivienda (CUV +
+hitos DTU/seguro/extracción/paquete + frente como texto) **ya vive en
+`dilesa.construccion`**. ⟹ No se migra CUV ni hitos. Schema final mínimo: solo
+`ruv_frentes` + `ruv_documentos_catalogo` + `ruv_frente_documentos` + columna
+`construccion.frente_id` + 1 vista (ver anexo). **Listo para pasar a `planned`**
+pendiente del OK de Beto al schema final.
 
 ### D2 — Scope RBAC ✅ Cerrada
 
@@ -222,6 +220,147 @@ filtro adicional al backfill.
   detalle del proyecto.
 - Closeout: planning doc + INITIATIVES.md + barrido de Reminders.
 
+## Anexo Sprint 0 — Shape real de Coda (2026-06-08)
+
+Deep-dive ejecutado con `scripts/explore-dilesa-ruv-coda.ts` contra el doc
+Coda DILESA (`ZNxWl_DI2D`). Beto apuntó a las tablas:
+`Frente RUV` (`grid-blmDCCczmb`), `CUV` (`grid-Z75H_uv0ZJ`),
+`Documentos Necesarios` (`grid-QmS5nK8G4f`). Urgencias RUV no es tabla: es un
+reporte en `canvas-Nu4e4FeF_d` (varias tablas) → se arma después.
+
+### Lo que realmente hay (vs lo que el inventario decía)
+
+| Tabla Coda                | Rows reales | Rol real                                                        | Lo que el inventario asumía |
+| ------------------------- | ----------: | --------------------------------------------------------------- | --------------------------- |
+| **Frente RUV**            |          93 | **Entidad central**: la "oferta" de viviendas ante INFONAVIT    | (no contemplada)            |
+| **Documentos Necesarios** |          27 | **Catálogo** de tipos de documento requeridos para registro     | "169 trámites por vivienda" |
+| **CUV**                   |        1143 | **Listado plano** de Claves Únicas de Vivienda (solo el número) | "1132 entidad rica"         |
+| Urgencias RUV             |         n/a | Reporte en canvas, no tabla base                                | "256 rows"                  |
+
+El conteo "1,557 rows" del inventario top-level estaba mal interpretado.
+
+### Frente RUV (93 rows, 18 columnas) — la oferta INFONAVIT
+
+Campos **base** (capturados, se migran):
+
+- `Frente RUV` (text) — nombre, ej "LOMAS DE LOS ENCINOS 35"
+- `ID Oferta` (number) — folio INFONAVIT de la oferta, ej `50294004`
+- `ID Orden` (number) — folio de orden, ej `50294004001` (= ID Oferta + "001")
+- `Fecha Inicio`, `Fecha Fin` (date)
+- `Fraccionamiento` (lookup, 5 valores) — **mapea 1:1 a `dilesa.proyectos`**
+- `Viviendas en Oferta` (number)
+- `Inventario en Oferta` (text multi-valor: `M20-L1-,M20-L2-,…`) — **resuelve a
+  `dilesa.unidades` por `manzana`+`numero_lote` dentro del proyecto**
+
+Campos **calculados** (fórmula en Coda → en BSOP son **vistas derivadas**, NO
+columnas): `Documentos Cargados`, `Documentos Pendientes`,
+`#Documentos Pendientes`, `Vivienda En Construcción`, `Vivienda Terminada`,
+`Vivienda por Arrancar`, `DTU's Liberados`, `Avance de Construccion` (%),
+`Avance de DTU's` (%). Todos se derivan del estado de las unidades ligadas al
+frente (`dilesa.unidades.estado` + `producto_id`).
+
+Adjunto `Plano Frente RUV` (image): **0% lleno** → no hay archivos legacy.
+
+### Descubrimiento clave: el RUV se enchufa a datos que YA tenemos en BSOP
+
+- **Fraccionamiento → proyecto.** Los 5 valores (Loma Verde, Loma Verde 2,
+  Lomas de los Encinos, Lomas del Sol, Lomas del Valle) existen idénticos en
+  `dilesa.proyectos` (prefijos de identificador: LV, LV2, LDLE, LDS, LDV).
+- **Inventario en Oferta → unidades.** Verificado: frente "Lomas de los Encinos
+  35" lista `M20-L1-…M20-L18-`; en `dilesa.unidades` (proyecto Lomas de los
+  Encinos) existen `manzana='20'`, `numero_lote='1'..'18'`, identificadores
+  `M20-L1-LDLE…M20-L18-LDLE`, todos `estado='terminada'`, `es_casa=false` →
+  coincide con las 18 "viviendas por arrancar" del frente (lotes urbanizados sin
+  casa). El match es por `(proyecto, manzana, numero_lote)`.
+- **Implicación:** el avance de construcción/DTU del RUV no se migra; se
+  **calcula** sobre las unidades ligadas. El módulo RUV es una capa de trámite
+  encima del inventario existente.
+
+### Documentos Necesarios (27 rows) — catálogo, no trámites
+
+Los 27 tipos de documento del paquete RUV (Pago Registro Paquete, Póliza de
+Seguro, Plano Topográfico, … Acabados). Columnas `Frente RUV Cargado` /
+`Frente RUV Pendiente` son la relación inversa M:N frente↔documento, **derivada y
+mayormente vacía** (`Documentos Cargados` está 8% lleno en Frente RUV). `Descripción`
+vacía; `*Documento` es un botón de Coda (ignorar). → Se migra como **catálogo**;
+el estado cargado/pendiente por frente se **recaptura** en BSOP (no vale la pena
+traer la relación parcial/derivada).
+
+### CUV — liga resuelta (la tabla plana es redundante)
+
+La tabla `CUV` (`grid-Z75H_uv0ZJ`, 1143 filas) es solo un listado de números, sin
+liga → **se ignora**. La liga real (dato de Beto) vive en la tabla **Inventario**
+(`grid--AHYMPQI7Z`, columna `CUV` = `c-16p9m_gEo5`), que es la **misma tabla que
+ya migramos a `dilesa.unidades`** (vía `ID Lote` → `identificador`). Inventario
+trae por vivienda: `CUV`, `Frente RUV`, `ID Lote`, y los hitos del trámite
+(Fecha DTU, Seguro Calidad, Extracción, Paquete RUV). Ojo: algunos `CUV` en
+Inventario son refs rotas de Coda (`#r971`) → filtrar por `^\d{16}$`.
+
+**Y lo mejor: ese detalle por vivienda YA ESTÁ en BSOP.** El módulo Construcción
+ya migró Inventario a `dilesa.construccion` (1372 filas, 1:1 con vivienda, FK
+`unidad_id` + trazabilidad `coda_row_id`), con columnas:
+`cuv`, `frente_ruv` (texto), `fecha_dtu`, `fecha_seguro_calidad`,
+`fecha_extraccion`, `fecha_paquete_ruv`. Cobertura actual: 974 CUVs válidos,
+1219 con fecha DTU, 1036 con frente (61 frentes distintos de los 93).
+
+⟹ **El CUV y los hitos del trámite no se migran — ya existen.** Lo único que no
+está en BSOP es la **oferta (Frente RUV)** como entidad y el **catálogo de
+documentos**. El módulo RUV es, en esencia, una capa de lectura/gestión encima de
+`dilesa.construccion` + `dilesa.unidades`.
+
+> **Reconciliación pendiente (Sprint 2, no bloquea diseño):** 1143 CUVs en
+> Inventario vs 974 en `dilesa.construccion`. La brecha (~169) son viviendas con
+> CUV en Coda sin fila de construcción en BSOP (o sync de construcción atrasado).
+> Auditar al importar; no detiene el módulo.
+
+### Schema final (vigente) — reemplaza el "Modelo conceptual" tentativo
+
+Mínimo, porque el detalle por vivienda (CUV + hitos) ya existe en
+`dilesa.construccion`. Solo se crea lo que falta: la **oferta** y el **catálogo
+de documentos**.
+
+```
+dilesa.ruv_frentes            (~93)   — NUEVA. La oferta INFONAVIT (entidad central)
+  id, empresa_id, proyecto_id (FK dilesa.proyectos), nombre (unique por empresa),
+  id_oferta (bigint), id_orden (bigint), fecha_inicio (date), fecha_fin (date),
+  viviendas_oferta (int), coda_id, created_at, updated_at, deleted_at
+
+dilesa.ruv_documentos_catalogo (27)   — NUEVA. Catálogo de tipos de documento
+  id, nombre (unique), orden (int), descripcion, activo (bool)
+
+dilesa.ruv_frente_documentos  (M:N)   — NUEVA. Estado de cada doc por frente
+  id, frente_id (FK), documento_catalogo_id (FK),
+  estado (enum: cargado | pendiente), fecha_carga, archivo_url (Storage futuro), notas
+
+-- Liga vivienda→oferta: reusar lo que ya existe, no crear tabla nueva
+dilesa.construccion.frente_id (uuid FK → ruv_frentes)   — NUEVA COLUMNA
+  -- backfill matcheando construccion.frente_ruv (texto) → ruv_frentes.nombre
+  -- el CUV y los hitos (fecha_dtu/seguro_calidad/extraccion/paquete_ruv) ya están aquí
+```
+
+`dilesa.ruv_cuvs` y `dilesa.ruv_frente_unidades` del borrador anterior **se
+descartan**: el CUV con su liga (`unidad_id`) y los hitos ya viven en
+`dilesa.construccion`; la pertenencia vivienda→frente se resuelve por
+`construccion.frente_id`.
+
+Vista derivada `dilesa.v_ruv_frente_avance` — por frente, agregando
+`construccion` ⋈ `unidades`: # viviendas, CUVs emitidos, DTUs liberados,
+% avance de construcción, documentos pendientes (desde `ruv_frente_documentos`).
+Sustituye los campos-fórmula de Coda.
+
+### Deltas al plan de sprints (alcance MUY reducido)
+
+- **Sprint 1**: 3 tablas nuevas + 1 columna (`construccion.frente_id`) + 1 vista
+  - sidebar/RBAC. (No 5 tablas; el grueso ya existe.) RBAC sin cambios (D2).
+- **Sprint 2 (import)**: solo 2 fuentes — los **93 frentes** + el **catálogo de
+  27 docs** — y el **backfill de `construccion.frente_id`** por nombre. El CUV y
+  los hitos NO se importan (ya están). Auditar la brecha 1143↔974 CUV.
+- **La tabla CUV plana de Coda (`grid-Z75H_uv0ZJ`) se ignora** (redundante).
+- **Riesgo #4 (adjuntos) → descartado** (0% cargados en Coda).
+- **Riesgo #1 (complejidad oculta) → materializado y resuelto a favor**: el
+  modelo cambió, pero se apoya casi entero en datos ya migrados
+  (`dilesa.construccion` + `dilesa.unidades` + `dilesa.proyectos`).
+
 ## Riesgos
 
 1. **Sprint 0 puede revelar complejidad oculta.** Coda permite
@@ -257,6 +396,34 @@ NULL` + flag de revisión manual, **no** bloquear el import.
   a las tablas específicas en Coda cuando el deep-dive arranque — se
   aprovecha al inicio del Sprint 0. D1 sigue bloqueante (deep-dive
   pendiente).
+- **2026-06-08 (Sprint 0 ejecutado)** — Deep-dive de Coda hecho con
+  `scripts/explore-dilesa-ruv-coda.ts`. Hallazgos en el
+  [Anexo Sprint 0](#anexo-sprint-0--shape-real-de-coda-2026-06-08): el
+  modelo real es **Frente RUV céntrico** (93 ofertas), Documentos Necesarios
+  es un catálogo de 27 tipos, CUV es un listado plano de 1143 claves. El
+  Inventario en Oferta y los 5 fraccionamientos **resuelven 1:1 a
+  `dilesa.unidades`/`dilesa.proyectos`** → avances derivables por vista.
+  Adjuntos descartados (0% en Coda). Estado se mantiene `proposed`.
+- **2026-06-08 (D1 cerrada)** — Beto indicó que la liga CUV↔vivienda vive en la
+  tabla Inventario de Coda (`grid--AHYMPQI7Z`, col `c-16p9m_gEo5`). Verificado:
+  esa tabla ya está migrada a `dilesa.unidades`, y el detalle RUV por vivienda
+  (CUV + hitos DTU/seguro/extracción/paquete + frente texto) **ya existe en
+  `dilesa.construccion`** (1372 filas, FK `unidad_id`; 974 CUVs válidos, 1219
+  con DTU). Schema final reducido a 3 tablas nuevas + 1 columna + 1 vista. La
+  tabla CUV plana de Coda se descarta. Sprints 1-2 con alcance mucho menor.
+  Sonda: `scripts/probe-dilesa-ruv-cuv-liga.ts`. Listo para `planned` pendiente
+  del OK de Beto.
+- **2026-06-08 (Sprint 1 construido)** — Beto autorizó arrancar. Migración
+  `20260608214309_dilesa_ruv_modulo.sql`: 3 tablas (`ruv_frentes`,
+  `ruv_documentos_catalogo`, `ruv_frente_documentos`) con RLS canónica +
+  `construccion.frente_id` (FK) + vista `v_ruv_frente_avance` + módulo
+  `dilesa.ruv` (sección operaciones) + **rol nuevo "Asistente de Proyectos"**
+  (la operadora, dato de Beto) + permisos D2 (Dirección + Gerente de Proyectos +
+  Asistente de Proyectos; admin por bypass). Código: `nav-config` (entry RUV en
+  Inmobiliario), `ROUTE_TO_MODULE`, `EXPECTED_DB_MODULE_SLUGS`, page skeleton
+  `app/dilesa/ruv/page.tsx` con `<RequireAccess modulo="dilesa.ruv">`. CI local
+  verde. La migración crea rol+permisos → **la aplica Beto** (no autónomo). Tras
+  aplicar: regenerar types/SCHEMA_REF + arrancar Sprint 2 (import). PR pendiente.
 
 ## Decisiones registradas
 

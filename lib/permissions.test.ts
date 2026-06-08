@@ -222,6 +222,9 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   'dilesa.cxp.proveedores',
   // Saldos Bancos — módulo plano de Tesorería (iniciativa `tesoreria`).
   'dilesa.saldos-bancos',
+  // RUV (Registro Único de Vivienda) — módulo plano (iniciativa `dilesa-ruv`,
+  // Sprint 1). Migración 20260608214309_dilesa_ruv_modulo.sql.
+  'dilesa.ruv',
   'dilesa.construccion',
   // Sub-slugs del hub Construcción (sprint tabs+protos, ADR-030). El padre
   // `dilesa.construccion` queda como umbrella en sidebar; cada tab
