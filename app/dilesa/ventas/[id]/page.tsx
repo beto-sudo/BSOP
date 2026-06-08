@@ -85,6 +85,7 @@ type Venta = {
   monto_credito_cotitular: number | null;
   credito_titular_ref: string | null;
   credito_cotitular_ref: string | null;
+  monto_credito_directo: number | null;
   enganche_requerido: number | null;
   descuento_total: number | null;
   comision_vendedor: number | null;
@@ -832,6 +833,13 @@ function DetailInner() {
         {venta.unidad_id ? (
           <PdfDownloadLink ventaId={venta.id} tipo="poliza-garantia" label="Póliza de Garantía" />
         ) : null}
+        {venta.monto_credito_directo != null && Number(venta.monto_credito_directo) > 0 ? (
+          <PdfDownloadLink
+            ventaId={venta.id}
+            tipo="pagare-credito-directo"
+            label="Pagaré (crédito directo)"
+          />
+        ) : null}
       </div>
 
       <MovimientosAdministrativos
@@ -1495,7 +1503,8 @@ function PdfDownloadLink({
     | 'promesa-compraventa'
     | 'solicitud-avaluo'
     | 'solicitud-dictamen'
-    | 'poliza-garantia';
+    | 'poliza-garantia'
+    | 'pagare-credito-directo';
   label: string;
 }) {
   return (

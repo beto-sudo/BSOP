@@ -30,6 +30,10 @@ import {
   type SolicitudDictamenData,
 } from '@/lib/dilesa/pdf/solicitud-dictamen';
 import { PolizaGarantiaPDF, type PolizaGarantiaData } from '@/lib/dilesa/pdf/poliza-garantia';
+import {
+  PagareCreditoDirectoPDF,
+  type PagareCreditoDirectoData,
+} from '@/lib/dilesa/pdf/pagare-credito-directo';
 import { evaluarRiesgo } from '@/lib/dilesa/ficu/riesgo';
 import { formatMontoEnLetras } from '@/lib/format/numero-a-letras';
 import { loadGerenteVentas } from '@/lib/dilesa/gerente-ventas';
@@ -42,6 +46,7 @@ const TIPOS = [
   'solicitud-avaluo',
   'solicitud-dictamen',
   'poliza-garantia',
+  'pagare-credito-directo',
 ] as const;
 type TipoPdf = (typeof TIPOS)[number];
 
@@ -372,6 +377,119 @@ export async function GET(
     };
     const buf = await renderToBuffer(<PolizaGarantiaPDF data={data} />);
     return pdfResponse(buf, `poliza-garantia-${identificacionInventario || id}.pdf`);
+  }
+
+  if (tipo === 'pagare-credito-directo') {
+    // Campos del crédito directo (Sprint 7h PR2) — casteo el row (columnas
+    // nuevas, no dependo de la regen de types antes del typecheck local).
+    const { data: cdRow } = await sb
+      .schema('dilesa')
+      .from('ventas')
+      .select(
+        'monto_credito_directo, cd_plan_pagos, cd_tiie28_pct, cd_spread_moratorio_pct, cd_interes_ordinario_pct, cd_fecha_suscripcion, cd_aval_nombre, cd_aval_domicilio'
+      )
+      .eq('id', id)
+      .maybeSingle();
+    const cd = (cdRow ?? null) as {
+      monto_credito_directo: number | null;
+      cd_plan_pagos: Array<{ num?: number; fecha?: string; monto?: number }> | null;
+      cd_tiie28_pct: number | null;
+      cd_spread_moratorio_pct: number | null;
+      cd_interes_ordinario_pct: number | null;
+      cd_fecha_suscripcion: string | null;
+      cd_aval_nombre: string | null;
+      cd_aval_domicilio: string | null;
+    } | null;
+    const montoTotal = Number(cd?.monto_credito_directo ?? 0);
+    if (!cd || montoTotal <= 0) {
+      return NextResponse.json(
+        { error: 'La venta no tiene crédito directo configurado.' },
+        { status: 400 }
+      );
+    }
+
+    const money2 = new Intl.NumberFormat('es-MX', {
+      style: 'currency',
+      currency: 'MXN',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    const fmtFechaLarga = (iso: string | null): string => {
+      if (!iso) return '—';
+      const [y, m, d] = iso.split('-').map(Number);
+      if (!y || !m || !d) return iso;
+      return `${d} de ${(MESES_ES[m - 1] ?? '').toLowerCase()} de ${y}`;
+    };
+
+    // Empresa (beneficiario del pagaré).
+    const { data: empRow2 } = await sb
+      .schema('core')
+      .from('empresas')
+      .select(
+        'razon_social, nombre, domicilio_calle, domicilio_numero_ext, domicilio_colonia, domicilio_municipio, domicilio_estado'
+      )
+      .eq('id', venta.empresa_id)
+      .maybeSingle();
+    const emp = (empRow2 ?? null) as {
+      razon_social: string | null;
+      nombre: string | null;
+      domicilio_calle: string | null;
+      domicilio_numero_ext: string | null;
+      domicilio_colonia: string | null;
+      domicilio_municipio: string | null;
+      domicilio_estado: string | null;
+    } | null;
+    const beneficiario = (emp?.razon_social || emp?.nombre || 'DILESA').toUpperCase();
+    const beneficiarioDomicilio =
+      [
+        [emp?.domicilio_calle, emp?.domicilio_numero_ext].filter(Boolean).join(' '),
+        emp?.domicilio_colonia,
+        emp?.domicilio_municipio,
+        emp?.domicilio_estado,
+      ]
+        .filter(Boolean)
+        .join(', ') || null;
+    const lugarSuscripcion =
+      [emp?.domicilio_municipio, emp?.domicilio_estado].filter(Boolean).join(', ') ||
+      'Piedras Negras, Coahuila';
+
+    const parcialidades = (Array.isArray(cd.cd_plan_pagos) ? cd.cd_plan_pagos : []).map((p, i) => ({
+      num: Number(p?.num ?? i + 1),
+      fechaTexto: fmtFechaLarga(p?.fecha ?? null),
+      montoFmt: money2.format(Number(p?.monto ?? 0)),
+    }));
+
+    const tiie = cd.cd_tiie28_pct != null ? Number(cd.cd_tiie28_pct) : null;
+    const spread = cd.cd_spread_moratorio_pct != null ? Number(cd.cd_spread_moratorio_pct) : 4;
+    const tasaMoratoria = tiie != null ? Math.round((tiie + spread) * 100) / 100 : null;
+    const fechaSuscripcion = cd.cd_fecha_suscripcion ?? new Date().toISOString().slice(0, 10);
+
+    const data: PagareCreditoDirectoData = {
+      folio: `PG-${identificacionInventario || id}`,
+      lugarSuscripcion,
+      fechaSuscripcionTexto: fmtFechaLarga(fechaSuscripcion),
+      beneficiario,
+      beneficiarioDomicilio,
+      deudorNombre: clienteNombre,
+      deudorDomicilio: (persona?.domicilio as string | null) ?? null,
+      deudorIdentificacion: persona?.curp || persona?.rfc || null,
+      identificacionInventario,
+      fraccionamiento: pdfFraccionamiento,
+      domicilioOficial: pdfDomicilioOficial,
+      montoTotalFmt: money2.format(montoTotal),
+      montoTotalLetra: formatMontoEnLetras(montoTotal),
+      parcialidades,
+      interesOrdinarioPct:
+        cd.cd_interes_ordinario_pct != null ? Number(cd.cd_interes_ordinario_pct) : null,
+      tiie28Pct: tiie,
+      spreadMoratorioPct: spread,
+      tasaMoratoriaPct: tasaMoratoria,
+      avalNombre: cd.cd_aval_nombre ?? null,
+      avalDomicilio: cd.cd_aval_domicilio ?? null,
+      watermark: watermarkText,
+    };
+    const buf = await renderToBuffer(<PagareCreditoDirectoPDF data={data} />);
+    return pdfResponse(buf, `pagare-${identificacionInventario || id}.pdf`);
   }
 
   if (tipo === 'aviso-privacidad') {

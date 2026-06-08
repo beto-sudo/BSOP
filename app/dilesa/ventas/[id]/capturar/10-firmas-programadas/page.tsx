@@ -1,30 +1,32 @@
 'use client';
 
 /**
- * Captura Fase 10 — Firmas Programadas (Sprint 7h, PR1).
+ * Captura Fase 10 — Firmas Programadas (Sprint 7h).
  *
  * Gerencia Ventas (o Dirección) programa la fecha + hora de firma ya
  * acordada con el notario (el notario viene de Fase 7). Se listan y
  * totalizan los depósitos del cliente (CxC `erp.cxc_pagos`) como
- * referencia de cobertura de la operación.
+ * referencia de cobertura.
+ *
+ * PR2 — Crédito directo: si crédito institución + depósitos < precio, DILESA
+ * puede financiar el saldo. Se configura el monto + plan de pagos + interés
+ * moratorio (TIIE 28d + spread) y se genera el Pagaré PDF para imprimir,
+ * firmar y subir.
  *
  * Captura:
  *   - `fecha_firma_programada` + `hora_firma_programada`
- *   - Sin docs requeridos (la Póliza de Garantía se genera como PDF desde
- *     la hoja del cliente; no se sube aquí).
+ *   - Crédito directo (si aplica): monto, plan de pagos (jsonb), tasas, aval.
+ *   - Doc opcional: pagaré firmado (rol `pagare_credito_directo`).
  *
- * Cobertura: crédito institución (titular+cotitular) + depósitos vs
- * precio de asignación. Si queda saldo, en PR2 se habilitará el crédito
- * directo con pagaré.
- *
- * Enforcement: Fase 9 (Validación Patronal) debe estar cerrada.
+ * Enforcement: Fase 9 (Validación Patronal) cerrada. Si hay saldo, el crédito
+ * directo debe estar configurado para cerrar la fase.
  * Acceso: `dilesa.ventas.fase10_firmas_programadas`.
  */
 
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Download, Loader2, Save } from 'lucide-react';
+import { CheckCircle2, Download, Loader2, Plus, Save, Trash2, Upload, XCircle } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
@@ -34,6 +36,8 @@ import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { CapturarFaseHeader } from '@/components/dilesa/capturar-fase-header';
 import { marcarFase } from '@/lib/dilesa/captura/marcar-fase';
+
+type PlanPagoJson = { num?: number; fecha?: string; monto?: number };
 
 type VentaCtx = {
   id: string;
@@ -45,6 +49,14 @@ type VentaCtx = {
   notario_id: string | null;
   fecha_firma_programada: string | null;
   hora_firma_programada: string | null;
+  monto_credito_directo: number | null;
+  cd_plan_pagos: PlanPagoJson[] | null;
+  cd_tiie28_pct: number | null;
+  cd_spread_moratorio_pct: number | null;
+  cd_interes_ordinario_pct: number | null;
+  cd_fecha_suscripcion: string | null;
+  cd_aval_nombre: string | null;
+  cd_aval_domicilio: string | null;
 };
 
 type Deposito = {
@@ -55,6 +67,8 @@ type Deposito = {
   referencia: string | null;
 };
 
+type PlanRow = { fecha: string; monto: string };
+
 const moneyFmt = new Intl.NumberFormat('es-MX', {
   style: 'currency',
   currency: 'MXN',
@@ -62,6 +76,7 @@ const moneyFmt = new Intl.NumberFormat('es-MX', {
 });
 const money = (n: number | null | undefined): string =>
   n == null ? '—' : moneyFmt.format(Number(n));
+const hoy = () => new Date().toISOString().slice(0, 10);
 
 export default function CapturarFase10Page() {
   return (
@@ -89,6 +104,19 @@ function CapturarFase10Body() {
   const [fechaFirma, setFechaFirma] = useState<string>('');
   const [horaFirma, setHoraFirma] = useState<string>('');
 
+  // ── Crédito directo ──
+  const [montoCD, setMontoCD] = useState<string>('');
+  const [planPagos, setPlanPagos] = useState<PlanRow[]>([]);
+  const [fechaSuscripcion, setFechaSuscripcion] = useState<string>(hoy());
+  const [tiie, setTiie] = useState<string>('');
+  const [spread, setSpread] = useState<string>('4');
+  const [ordinario, setOrdinario] = useState<string>('0');
+  const [avalNombre, setAvalNombre] = useState<string>('');
+  const [avalDomicilio, setAvalDomicilio] = useState<string>('');
+  const [cdGuardado, setCdGuardado] = useState<boolean>(false);
+  const [savingCD, setSavingCD] = useState<boolean>(false);
+  const [pagareArchivo, setPagareArchivo] = useState<File | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -106,7 +134,7 @@ function CapturarFase10Body() {
         .schema('dilesa')
         .from('ventas')
         .select(
-          'id, persona_id, unidad_id, precio_asignacion, monto_credito_titular, monto_credito_cotitular, notario_id, fecha_firma_programada, hora_firma_programada'
+          'id, persona_id, unidad_id, precio_asignacion, monto_credito_titular, monto_credito_cotitular, notario_id, fecha_firma_programada, hora_firma_programada, monto_credito_directo, cd_plan_pagos, cd_tiie28_pct, cd_spread_moratorio_pct, cd_interes_ordinario_pct, cd_fecha_suscripcion, cd_aval_nombre, cd_aval_domicilio'
         )
         .eq('id', ventaId)
         .is('deleted_at', null)
@@ -199,10 +227,39 @@ function CapturarFase10Body() {
             .trim() || null
         );
       }
-      setDepositos((dRes.data ?? []) as unknown as Deposito[]);
+      const deps = (dRes.data ?? []) as unknown as Deposito[];
+      setDepositos(deps);
       const posiciones = (fRes.data ?? []).map((f) => f.posicion as number);
       setFase9Cerrada(posiciones.includes(9));
       setYaCerrada(posiciones.includes(10));
+
+      // Prefill crédito directo: desde lo persistido, o desde el saldo si aún
+      // no se configura.
+      const totalDep = deps.reduce((s, d) => s + Number(d.monto_total ?? 0), 0);
+      const credInst =
+        Number(v.monto_credito_titular ?? 0) + Number(v.monto_credito_cotitular ?? 0);
+      const saldoLocal = Number(v.precio_asignacion ?? 0) - credInst - totalDep;
+
+      if (v.monto_credito_directo != null) {
+        setMontoCD(String(v.monto_credito_directo));
+        const plan = Array.isArray(v.cd_plan_pagos) ? v.cd_plan_pagos : [];
+        setPlanPagos(
+          plan.length > 0
+            ? plan.map((p) => ({ fecha: p?.fecha ?? '', monto: String(p?.monto ?? '') }))
+            : [{ fecha: '', monto: String(v.monto_credito_directo) }]
+        );
+        setCdGuardado(true);
+      } else if (saldoLocal > 0.0049) {
+        setMontoCD(saldoLocal.toFixed(2));
+        setPlanPagos([{ fecha: '', monto: saldoLocal.toFixed(2) }]);
+        setCdGuardado(false);
+      }
+      if (v.cd_tiie28_pct != null) setTiie(String(v.cd_tiie28_pct));
+      if (v.cd_spread_moratorio_pct != null) setSpread(String(v.cd_spread_moratorio_pct));
+      if (v.cd_interes_ordinario_pct != null) setOrdinario(String(v.cd_interes_ordinario_pct));
+      if (v.cd_fecha_suscripcion) setFechaSuscripcion(v.cd_fecha_suscripcion);
+      if (v.cd_aval_nombre) setAvalNombre(v.cd_aval_nombre);
+      if (v.cd_aval_domicilio) setAvalDomicilio(v.cd_aval_domicilio);
 
       setLoading(false);
     })();
@@ -222,8 +279,116 @@ function CapturarFase10Body() {
   const precio = Number(venta?.precio_asignacion ?? 0);
   const cobertura = creditoInstitucion + totalDepositos;
   const saldo = precio - cobertura;
+  const aplicaCD = saldo > 0.0049;
 
-  // ── Submit ───────────────────────────────────────────────────────
+  const sumaPlan = useMemo(
+    () => planPagos.reduce((s, r) => s + (Number(r.monto) || 0), 0),
+    [planPagos]
+  );
+  const montoCDNum = Number(montoCD) || 0;
+  const planCuadra = Math.abs(sumaPlan - montoCDNum) < 0.01 && montoCDNum > 0;
+
+  // Cualquier edición del crédito directo invalida el "guardado" (hay que
+  // re-guardar antes de generar el pagaré con datos frescos).
+  const touchCD = useCallback(() => setCdGuardado(false), []);
+
+  const setPlanRow = useCallback(
+    (i: number, patch: Partial<PlanRow>) => {
+      setPlanPagos((rows) => rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+      touchCD();
+    },
+    [touchCD]
+  );
+  const addPlanRow = useCallback(() => {
+    setPlanPagos((rows) => [...rows, { fecha: '', monto: '' }]);
+    touchCD();
+  }, [touchCD]);
+  const removePlanRow = useCallback(
+    (i: number) => {
+      setPlanPagos((rows) => (rows.length <= 1 ? rows : rows.filter((_, idx) => idx !== i)));
+      touchCD();
+    },
+    [touchCD]
+  );
+
+  const guardarCreditoDirecto = useCallback(async () => {
+    if (!venta) return;
+    if (montoCDNum <= 0) {
+      toast.add({
+        title: 'Monto inválido',
+        description: 'Captura el monto del crédito directo.',
+        type: 'error',
+      });
+      return;
+    }
+    if (planPagos.some((r) => !r.fecha || !(Number(r.monto) > 0))) {
+      toast.add({
+        title: 'Plan de pagos incompleto',
+        description: 'Cada pago necesita fecha y monto mayor a cero.',
+        type: 'error',
+      });
+      return;
+    }
+    if (!planCuadra) {
+      toast.add({
+        title: 'El plan no cuadra',
+        description: `La suma de los pagos (${money(sumaPlan)}) debe igualar el monto del crédito (${money(montoCDNum)}).`,
+        type: 'error',
+      });
+      return;
+    }
+    setSavingCD(true);
+    const planJson = planPagos.map((r, i) => ({
+      num: i + 1,
+      fecha: r.fecha,
+      monto: Math.round((Number(r.monto) || 0) * 100) / 100,
+    }));
+    const { error: upErr } = await sb
+      .schema('dilesa')
+      .from('ventas')
+      .update({
+        monto_credito_directo: Math.round(montoCDNum * 100) / 100,
+        cd_plan_pagos: planJson,
+        cd_tiie28_pct: tiie === '' ? null : Number(tiie),
+        cd_spread_moratorio_pct: spread === '' ? null : Number(spread),
+        cd_interes_ordinario_pct: ordinario === '' ? null : Number(ordinario),
+        cd_fecha_suscripcion: fechaSuscripcion || null,
+        cd_aval_nombre: avalNombre.trim() || null,
+        cd_aval_domicilio: avalDomicilio.trim() || null,
+      })
+      .eq('id', venta.id);
+    setSavingCD(false);
+    if (upErr) {
+      toast.add({
+        title: 'No se pudo guardar el crédito directo',
+        description: getSupabaseErrorMessage(upErr, 'Error desconocido.'),
+        type: 'error',
+      });
+      return;
+    }
+    setCdGuardado(true);
+    toast.add({
+      title: 'Crédito directo guardado',
+      description: 'Ya puedes generar el pagaré.',
+      type: 'success',
+    });
+  }, [
+    avalDomicilio,
+    avalNombre,
+    fechaSuscripcion,
+    montoCDNum,
+    ordinario,
+    planCuadra,
+    planPagos,
+    sb,
+    spread,
+    sumaPlan,
+    tiie,
+    toast,
+    venta,
+  ]);
+
+  // ── Submit (cerrar fase) ─────────────────────────────────────────
   const onSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
@@ -244,6 +409,15 @@ function CapturarFase10Body() {
         });
         return;
       }
+      if (aplicaCD && !cdGuardado) {
+        toast.add({
+          title: 'Falta configurar el crédito directo',
+          description:
+            'Hay un saldo por cubrir. Configura y guarda el crédito directo antes de cerrar la fase.',
+          type: 'error',
+        });
+        return;
+      }
 
       setSubmitting(true);
       const { data: userRes } = await sb.auth.getUser();
@@ -253,7 +427,7 @@ function CapturarFase10Body() {
         ventaId: venta.id,
         faseNombre: 'Firmas Programadas',
         faseposicion: 10,
-        docs: [],
+        docs: pagareArchivo ? [{ rol: 'pagare_credito_directo', archivo: pagareArchivo }] : [],
         camposVenta: {
           fecha_firma_programada: fechaFirma,
           hora_firma_programada: horaFirma,
@@ -278,7 +452,7 @@ function CapturarFase10Body() {
       });
       router.push(`/dilesa/ventas/${venta.id}`);
     },
-    [fechaFirma, horaFirma, router, sb, toast, venta]
+    [aplicaCD, cdGuardado, fechaFirma, horaFirma, pagareArchivo, router, sb, toast, venta]
   );
 
   // ── Render ───────────────────────────────────────────────────────
@@ -317,7 +491,7 @@ function CapturarFase10Body() {
         identificacionInventario={identificacionInv}
         faseposicion={10}
         faseNombre="Firmas Programadas"
-        descripcion="Programa la fecha y hora de firma acordada con el notario. Genera la Póliza de Garantía desde la hoja del cliente."
+        descripcion="Programa la fecha y hora de firma acordada con el notario. Genera la Póliza de Garantía y, si hay saldo, el crédito directo con su pagaré."
       />
 
       {yaCerrada ? (
@@ -382,9 +556,8 @@ function CapturarFase10Body() {
 
           <Section title="Documento para el notario">
             <p className="text-sm text-[var(--text)]/70">
-              La <span className="font-medium">Póliza de Garantía</span> se genera como PDF desde la
-              hoja del cliente (botón en la sección de documentos) para llevarla al expediente del
-              notario.
+              La <span className="font-medium">Póliza de Garantía</span> se genera como PDF para
+              llevarla al expediente del notario.
             </p>
             <a
               href={`/api/dilesa/ventas/${venta.id}/pdf/poliza-garantia`}
@@ -437,7 +610,6 @@ function CapturarFase10Body() {
               </div>
             )}
 
-            {/* Resumen de cobertura */}
             <div className="mt-4 space-y-1 rounded-md border border-[var(--border)] bg-[var(--bg)]/20 p-3 text-sm">
               <CoberturaRow label="Precio de asignación" value={money(precio)} />
               <CoberturaRow
@@ -448,24 +620,226 @@ function CapturarFase10Body() {
               <div className="my-1 border-t border-[var(--border)]" />
               <CoberturaRow label="Cobertura total" value={money(cobertura)} />
               <CoberturaRow
-                label={saldo > 0.0049 ? 'Saldo pendiente' : 'Saldo'}
+                label={aplicaCD ? 'Saldo pendiente' : 'Saldo'}
                 value={money(saldo)}
                 strong
-                tone={saldo > 0.0049 ? 'warn' : 'ok'}
+                tone={aplicaCD ? 'warn' : 'ok'}
               />
             </div>
-
-            {saldo > 0.0049 ? (
-              <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-300">
-                Queda un saldo por cubrir. La opción de <strong>crédito directo</strong> (pagaré por
-                el saldo) se habilitará en una actualización próxima de esta fase.
-              </p>
-            ) : (
-              <p className="mt-2 text-[11px] text-emerald-600 dark:text-emerald-400">
-                La operación queda cubierta con el crédito y los depósitos.
-              </p>
-            )}
           </Section>
+
+          {aplicaCD ? (
+            <Section title="Crédito directo (DILESA financia el saldo)">
+              <p className="mb-3 text-xs text-[var(--text)]/60">
+                Configura el monto y el plan de pagos, guarda, genera el pagaré, imprímelo y súbelo
+                firmado.
+              </p>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field label="Monto del crédito directo *">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={montoCD}
+                    onChange={(e) => {
+                      setMontoCD(e.target.value);
+                      touchCD();
+                    }}
+                  />
+                  <Hint>Saldo a cubrir: {money(saldo)}</Hint>
+                </Field>
+                <Field label="Fecha de suscripción del pagaré">
+                  <Input
+                    type="date"
+                    value={fechaSuscripcion}
+                    onChange={(e) => {
+                      setFechaSuscripcion(e.target.value);
+                      touchCD();
+                    }}
+                  />
+                </Field>
+              </div>
+
+              {/* Plan de pagos */}
+              <div className="mt-4">
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
+                    Plan de pagos *
+                  </span>
+                  <button
+                    type="button"
+                    onClick={addPlanRow}
+                    className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] px-2 py-1 text-xs text-[var(--text)]/80 hover:bg-[var(--bg)]/40"
+                  >
+                    <Plus className="h-3 w-3" /> Agregar pago
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {planPagos.map((r, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="w-5 text-xs text-[var(--text)]/50">{i + 1}.</span>
+                      <Input
+                        type="date"
+                        value={r.fecha}
+                        onChange={(e) => setPlanRow(i, { fecha: e.target.value })}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="Monto"
+                        value={r.monto}
+                        onChange={(e) => setPlanRow(i, { monto: e.target.value })}
+                        className="w-36"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removePlanRow(i)}
+                        disabled={planPagos.length <= 1}
+                        className="rounded-md p-1.5 text-[var(--text)]/50 hover:bg-[var(--bg)]/40 hover:text-red-500 disabled:opacity-30"
+                        title="Quitar"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <p
+                  className={`mt-2 text-[11px] ${
+                    planCuadra
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : 'text-amber-700 dark:text-amber-300'
+                  }`}
+                >
+                  Suma del plan: {money(sumaPlan)} / {money(montoCDNum)}{' '}
+                  {planCuadra ? '✓ cuadra' : '— debe igualar el monto del crédito'}
+                </p>
+              </div>
+
+              {/* Intereses */}
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <Field label="TIIE 28d (%)">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={tiie}
+                    onChange={(e) => {
+                      setTiie(e.target.value);
+                      touchCD();
+                    }}
+                  />
+                  <Hint>Tasa vigente a la suscripción</Hint>
+                </Field>
+                <Field label="Spread moratorio (%)">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={spread}
+                    onChange={(e) => {
+                      setSpread(e.target.value);
+                      touchCD();
+                    }}
+                  />
+                  <Hint>Mínimo 4, editable a más</Hint>
+                </Field>
+                <Field label="Interés ordinario (%)">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={ordinario}
+                    onChange={(e) => {
+                      setOrdinario(e.target.value);
+                      touchCD();
+                    }}
+                  />
+                  <Hint>Default 0</Hint>
+                </Field>
+              </div>
+              {tiie !== '' ? (
+                <p className="mt-1 text-[11px] text-[var(--text)]/60">
+                  Moratorio total ≈ {(Number(tiie) + (Number(spread) || 0)).toFixed(2)}% anual (TIIE
+                  + spread).
+                </p>
+              ) : null}
+
+              {/* Aval */}
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field label="Aval — nombre (opcional)">
+                  <Input
+                    value={avalNombre}
+                    onChange={(e) => {
+                      setAvalNombre(e.target.value);
+                      touchCD();
+                    }}
+                  />
+                </Field>
+                <Field label="Aval — domicilio (opcional)">
+                  <Input
+                    value={avalDomicilio}
+                    onChange={(e) => {
+                      setAvalDomicilio(e.target.value);
+                      touchCD();
+                    }}
+                  />
+                </Field>
+              </div>
+
+              {/* Acciones CD */}
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={guardarCreditoDirecto}
+                  disabled={savingCD}
+                >
+                  {savingCD ? (
+                    <>
+                      <Loader2 className="mr-2 size-4 animate-spin" /> Guardando…
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 size-4" /> Guardar crédito directo
+                    </>
+                  )}
+                </Button>
+                {cdGuardado ? (
+                  <a
+                    href={`/api/dilesa/ventas/${venta.id}/pdf/pagare-credito-directo`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40 hover:text-[var(--text)]"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Generar pagaré
+                  </a>
+                ) : (
+                  <span className="text-[11px] text-[var(--text)]/50">
+                    Guarda el crédito directo para habilitar el pagaré.
+                  </span>
+                )}
+              </div>
+
+              {/* Subir pagaré firmado */}
+              <div className="mt-4">
+                <FileSlot
+                  label="Pagaré firmado (opcional — súbelo cuando lo tengas)"
+                  archivo={pagareArchivo}
+                  onChange={setPagareArchivo}
+                />
+              </div>
+            </Section>
+          ) : (
+            <Section title="Crédito directo">
+              <p className="text-sm text-emerald-600 dark:text-emerald-400">
+                La operación queda cubierta con el crédito y los depósitos — no se requiere crédito
+                directo.
+              </p>
+            </Section>
+          )}
 
           <div className="flex items-center justify-end gap-3">
             <Link
@@ -514,6 +888,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+function Hint({ children }: { children: React.ReactNode }) {
+  return <p className="text-[11px] text-[var(--text)]/50">{children}</p>;
+}
+
 function CoberturaRow({
   label,
   value,
@@ -537,6 +915,77 @@ function CoberturaRow({
         {label}
       </span>
       <span className={`${strong ? 'font-semibold' : 'font-medium'} ${toneClass}`}>{value}</span>
+    </div>
+  );
+}
+
+function FileSlot({
+  label,
+  archivo,
+  onChange,
+}: {
+  label: string;
+  archivo: File | null;
+  onChange: (f: File | null) => void;
+}) {
+  const [dragOver, setDragOver] = useState(false);
+  const completo = !!archivo;
+  return (
+    <div
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        if (!dragOver) setDragOver(true);
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+        setDragOver(false);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragOver(false);
+        const f = e.dataTransfer.files?.[0];
+        if (!f) return;
+        if (
+          !(
+            f.type === 'application/pdf' ||
+            f.type.startsWith('image/') ||
+            f.name.toLowerCase().endsWith('.pdf')
+          )
+        ) {
+          return;
+        }
+        onChange(f);
+      }}
+      className={`flex items-center justify-between gap-3 rounded-lg border bg-[var(--card)] px-4 py-3 transition-colors ${
+        dragOver
+          ? 'border-[var(--accent)] bg-[var(--accent)]/5 ring-2 ring-[var(--accent)]/40'
+          : 'border-[var(--border)]'
+      }`}
+    >
+      <div className="flex flex-1 items-center gap-2 text-sm">
+        {completo ? (
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+        ) : (
+          <XCircle className="h-4 w-4 shrink-0 text-[var(--text)]/35" />
+        )}
+        <span className="font-medium">{label}</span>
+        {archivo ? (
+          <span className="ml-1 truncate text-xs text-[var(--text)]/60">
+            {archivo.name} · {(archivo.size / 1024).toFixed(0)} KB
+          </span>
+        ) : null}
+      </div>
+      <label className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40 hover:text-[var(--text)]">
+        <Upload className="h-3.5 w-3.5" />
+        {archivo ? 'Cambiar' : 'Subir PDF'}
+        <input
+          type="file"
+          accept="application/pdf,image/*"
+          className="hidden"
+          onChange={(e) => onChange(e.target.files?.[0] ?? null)}
+        />
+      </label>
     </div>
   );
 }
