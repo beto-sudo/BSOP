@@ -41,6 +41,8 @@ type VentaCtx = {
   notario_id: string | null;
   credito_titular_ref: string | null;
   credito_cotitular_ref: string | null;
+  monto_credito_titular: number | null;
+  monto_credito_cotitular: number | null;
   gastos_escrituracion: number | null;
 };
 
@@ -77,6 +79,8 @@ function CapturarFase8Body() {
   const [fechaDictamen, setFechaDictamen] = useState<string>(new Date().toISOString().slice(0, 10));
   const [archivo, setArchivo] = useState<File | null>(null);
   // Confirmar/editar (acarrean de Fase 6) + capturar gastos de escrituración.
+  const [montoTitular, setMontoTitular] = useState<string>('');
+  const [montoCotitular, setMontoCotitular] = useState<string>('');
   const [creditoTitularRef, setCreditoTitularRef] = useState<string>('');
   const [creditoCotitularRef, setCreditoCotitularRef] = useState<string>('');
   const [gastosEscrituracion, setGastosEscrituracion] = useState<string>('');
@@ -97,7 +101,7 @@ function CapturarFase8Body() {
         .schema('dilesa')
         .from('ventas')
         .select(
-          'id, persona_id, unidad_id, notario_id, credito_titular_ref, credito_cotitular_ref, gastos_escrituracion'
+          'id, persona_id, unidad_id, notario_id, credito_titular_ref, credito_cotitular_ref, monto_credito_titular, monto_credito_cotitular, gastos_escrituracion'
         )
         .eq('id', ventaId)
         .is('deleted_at', null)
@@ -115,6 +119,8 @@ function CapturarFase8Body() {
       }
       const v = vRow as unknown as VentaCtx;
       setVenta(v);
+      if (v.monto_credito_titular != null) setMontoTitular(String(v.monto_credito_titular));
+      if (v.monto_credito_cotitular != null) setMontoCotitular(String(v.monto_credito_cotitular));
       if (v.credito_titular_ref) setCreditoTitularRef(v.credito_titular_ref);
       if (v.credito_cotitular_ref) setCreditoCotitularRef(v.credito_cotitular_ref);
       if (v.gastos_escrituracion != null) setGastosEscrituracion(String(v.gastos_escrituracion));
@@ -220,6 +226,8 @@ function CapturarFase8Body() {
         docs: [{ rol: 'carta_instruccion_notarial', archivo }],
         camposVenta: {
           fecha_dictaminada: fechaDictamen,
+          monto_credito_titular: montoTitular.trim() ? Number(montoTitular) : null,
+          monto_credito_cotitular: montoCotitular.trim() ? Number(montoCotitular) : null,
           credito_titular_ref: creditoTitularRef.trim() || null,
           credito_cotitular_ref: creditoCotitularRef.trim() || null,
           gastos_escrituracion: gastosNum,
@@ -247,6 +255,8 @@ function CapturarFase8Body() {
     [
       archivo,
       fechaDictamen,
+      montoTitular,
+      montoCotitular,
       creditoTitularRef,
       creditoCotitularRef,
       gastosEscrituracion,
@@ -271,6 +281,8 @@ function CapturarFase8Body() {
         .schema('dilesa')
         .from('ventas')
         .update({
+          monto_credito_titular: montoTitular.trim() ? Number(montoTitular) : null,
+          monto_credito_cotitular: montoCotitular.trim() ? Number(montoCotitular) : null,
           credito_titular_ref: creditoTitularRef.trim() || null,
           credito_cotitular_ref: creditoCotitularRef.trim() || null,
           gastos_escrituracion: gastosNum,
@@ -292,7 +304,17 @@ function CapturarFase8Body() {
       });
       router.push(`/dilesa/ventas/${venta.id}`);
     },
-    [creditoTitularRef, creditoCotitularRef, gastosEscrituracion, router, sb, toast, venta]
+    [
+      montoTitular,
+      montoCotitular,
+      creditoTitularRef,
+      creditoCotitularRef,
+      gastosEscrituracion,
+      router,
+      sb,
+      toast,
+      venta,
+    ]
   );
 
   if (loading) {
@@ -343,6 +365,28 @@ function CapturarFase8Body() {
           <form onSubmit={onActualizarDatos} className="mt-4 space-y-6">
             <Section title="Datos del crédito y escrituración">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field label="Monto Crédito Titular">
+                  <Input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={montoTitular}
+                    onChange={(e) => setMontoTitular(e.target.value)}
+                    placeholder="0"
+                  />
+                  <Hint>{money(Number(montoTitular) || 0)}</Hint>
+                </Field>
+                <Field label="Monto Crédito Co-Titular">
+                  <Input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={montoCotitular}
+                    onChange={(e) => setMontoCotitular(e.target.value)}
+                    placeholder="0"
+                  />
+                  <Hint>{money(Number(montoCotitular) || 0)}</Hint>
+                </Field>
                 <Field label="Número de Crédito Titular e Institución">
                   <Input
                     value={creditoTitularRef}
@@ -455,6 +499,28 @@ function CapturarFase8Body() {
               Acarreados de Inscrita (Fase 6). Confirma o corrige si el banco cambió algo.
             </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label="Monto Crédito Titular">
+                <Input
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={montoTitular}
+                  onChange={(e) => setMontoTitular(e.target.value)}
+                  placeholder="0"
+                />
+                <Hint>{money(Number(montoTitular) || 0)}</Hint>
+              </Field>
+              <Field label="Monto Crédito Co-Titular">
+                <Input
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={montoCotitular}
+                  onChange={(e) => setMontoCotitular(e.target.value)}
+                  placeholder="0"
+                />
+                <Hint>{money(Number(montoCotitular) || 0)}</Hint>
+              </Field>
               <Field label="Número de Crédito Titular e Institución">
                 <Input
                   value={creditoTitularRef}
