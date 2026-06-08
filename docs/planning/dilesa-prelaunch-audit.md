@@ -3,11 +3,11 @@
 **Slug:** `dilesa-prelaunch-audit`
 **Empresas:** DILESA
 **Schemas afectados:** ninguno (audit puro, no toca código en sí)
-**Estado:** proposed
-**Próximo hito:** Snapshot 2026-05-26. **La ventana pre-cutover (2026-05-31) ya pasó** — revisar con Beto si se cierra como `done` (audit consumido) o se reusa para un nuevo pre-cutover
+**Estado:** done
+**Próximo hito:** — (cerrada 2026-06-08)
 **Dueño:** Beto
 **Creada:** 2026-05-26
-**Última actualización:** 2026-05-26 (análisis nocturno autónomo)
+**Última actualización:** 2026-06-08 (**cerrada** — audit pre-cutover consumido; la ventana ya pasó y el cutover de DILESA ocurrió)
 
 ## Problema
 
@@ -268,6 +268,8 @@ post-cutover documentado.
 ## Bitácora
 
 (append-only)
+
+- **2026-06-08 (cierre de la iniciativa)** — Audit puro (0 schemas) que sirvió su propósito: snapshot del 2026-05-26 para la ventana pre-cutover del 31-may. Esa ventana ya pasó y el cutover de DILESA (Coda → BSOP) se completó. El propio header pedía cerrarlo. Si se necesita un nuevo pre-cutover (p.ej. otra empresa), se abre una iniciativa fresca reusando el formato. Cerrada por instrucción de Beto tras auditoría de estado real (el header estaba stale respecto al trabajo ya en prod).
 
 - **2026-05-26** — Iniciativa creada como audit pre-cutover. Análisis
   paralelo de 3 agentes Explore (UI / DB / iniciativas) + validación

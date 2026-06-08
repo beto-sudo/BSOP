@@ -4,18 +4,11 @@
 **Empresas:** DILESA (Desarrollo Inmobiliario Los Encinos S.A. de C.V.)
 **Schemas afectados:** `dilesa` (rediseño completo del schema, deprecación de
 las tablas viejas), `core.empresas` (lectura)
-**Estado:** in_progress
-**Próximo hito:** Sprints 1-4 + Fase 4.5 (expediente) en prod. Import de Coda completo: 1,425 ventas, 1,300 clientes, 11,878 adjuntos. Sprint 7c-2 (Fase 1 KYC) mergeado. Próximo: Sprint 7c-3 (Fase 2+)
+**Estado:** done
+**Próximo hito:** — (cerrada 2026-06-08)
 **Dueño:** Beto
 **Creada:** 2026-05-08
-**Última actualización:** 2026-06-05 (PR #700: fichas de detalle de unidad
-y activo con drill-down desde Inventario y Portafolio + botones de
-movimiento "Traspasar al portafolio" / "Regresar a ventas" SOLO admin
-(UI + enforcement en server action). Antes, PR #698: workflow unidad ↔
-portafolio — columna `modalidad` + RPCs `fn_liberar_unidad_portafolio` /
-`fn_regresar_unidad_proyecto` + 8 activos backfill (2 casas LDV + 6 lotes
-comerciales), LDV → completado. Sprint 7c-2 KYC FICU sigue vigente como
-base del flujo de ventas.)
+**Última actualización:** 2026-06-08 (**cerrada** — core del portafolio en prod (schema v2 + import Coda completo + UI + workflow unidad↔portafolio); el "Sprint 7c-3" del header era scope de otra iniciativa)
 
 ## Problema
 
@@ -490,6 +483,8 @@ lotificación (agosto 2023, vigente).
 ## Bitácora
 
 (append-only, escrito por Claude Code al ejecutar)
+
+- **2026-06-08 (cierre de la iniciativa)** — Core del portafolio entregado en prod — demolición del schema v1 → schema v2 (22 tablas) → import completo de Coda (1,425 ventas, 1,300 clientes, 11,878 adjuntos) → UI de lectura + fichas de detalle de unidad/activo en drawers (#700) + workflow de liberar/regresar unidad↔portafolio con backfill de 8 activos (#698). El "Sprint 7c-3 (Fase 2+)" que arrastraba el header es trabajo de Ventas/KYC que pertenece a la iniciativa hermana `dilesa-proyectos-anteproyectos`, no a este slug — por eso se cierra (Beto lo confirmó). Cerrada por instrucción de Beto tras auditoría de estado real (el header estaba stale respecto al trabajo ya en prod).
 
 - **2026-05-21 — Iniciativa promovida a `planned`.** Tras brainstorm
   (modelo Portafolio ↔ Proyectos con jerarquía padre/hijo, validado contra

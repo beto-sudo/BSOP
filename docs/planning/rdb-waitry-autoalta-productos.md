@@ -3,11 +3,11 @@
 **Slug:** `rdb-waitry-autoalta-productos`
 **Empresas:** RDB
 **Schemas afectados:** `rdb` (ingesta `waitry_productos` — webhook o trigger), `erp` (`productos`)
-**Estado:** in_progress
-**Próximo hito:** Sprint 1+2 en prod: trigger `trg_waitry_zzz_autoalta_producto` (auto-crea el producto faltante sin categoría, idempotente + fail-open) + filtro/contador Sin categoría en `/rdb/productos`. D1-D4 cerradas. Próximo: observar volumen de auto-altas; Sprint 3 (aviso) opcional
+**Estado:** done
+**Próximo hito:** — (cerrada 2026-06-08)
 **Dueño:** Beto
 **Creada:** 2026-06-05
-**Última actualización:** 2026-06-05
+**Última actualización:** 2026-06-08 (**cerrada** — Sprints 0-2 en prod, verificado E2E; Sprint 3 era explícitamente opcional)
 
 > Promovida el 2026-06-05 al diagnosticar por qué el reporte de ventas por
 > categoría de RDB seguía mostrando "Sin categoría" pese a que Pablo ya había
@@ -170,6 +170,8 @@ backfills manuales), por ser la vía **desbloqueada** (no necesita el NDA de Wai
   venta de un producto nuevo no genere un movimiento legacy.
 
 ## Bitácora
+
+- **2026-06-08 (cierre de la iniciativa)** — Sprints 0-2 en prod y verificados E2E — trigger `trg_waitry_zzz_autoalta_producto` + función `erp.fn_trg_waitry_autoalta_producto` (auto-crea el producto faltante sin categoría, idempotente + fail-open) + contador/filtro "Sin categoría" en `/rdb/productos` (#704). D1-D4 cerradas. El Sprint 3 (aviso/notificación) era explícitamente opcional y condicional a que el Sprint 2 no bastara — no es un pendiente comprometido. Cerrada por instrucción de Beto tras auditoría de estado real (el header estaba stale respecto al trabajo ya en prod).
 
 ### 2026-06-05 · Promoción + backfill puntual
 
