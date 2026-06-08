@@ -4,6 +4,7 @@
 **Empresas:** todas (cross-empresa por diseño)
 **Schemas afectados:** `analytics` (gold layer), lecturas desde `erp`, `dilesa`, `rdb`, `playtomic`, `core`
 **Estado:** blocked
+**Próximo hito:** Sprint 0 — desbloquear export del bootstrap (Metabase + Caddy + Postgres) desde Cowork al repo Analytics
 **Dueño:** Beto
 **Creada:** 2026-04-25
 **Última actualización:** 2026-04-26

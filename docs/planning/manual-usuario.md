@@ -3,7 +3,8 @@
 **Slug:** `manual-usuario`
 **Empresas:** DILESA (golden; piloto = módulo Ventas). Sistema cross-empresa, pensado para rollout a las 5 empresas.
 **Schemas afectados:** `core.modulos` (slug nuevo `dilesa.manual` + backfill defensivo de permisos). El **contenido vive en el repo** (markdown versionado con git), **no** en la DB.
-**Estado:** planned
+**Estado:** in_progress
+**Próximo hito:** Sprint 0 (fundación + ADR-043) mergeado (#720, preview). Próximo: Beto aplica la migración `20260607170000_modulo_dilesa_manual.sql` + valida en preview → Sprint 1 (resto del contenido de Ventas: ~8 docs)
 **Dueño:** Beto
 **Creada:** 2026-06-07
 **Última actualización:** 2026-06-07 (promoción — enfoque cerrado con Beto: in-app + PDF, markdown en repo, piloto end-to-end con Ventas)
@@ -155,3 +156,28 @@ cero `manual|ayuda|help` en `app/` o `components/`).
   1312 tests, lint 0 errores, format, sync de slugs). PR a **preview sin
   auto-merge** (UI visible). Próximo: aplicar migración + validar en preview →
   Sprint 1 (resto del contenido de Ventas).
+- **2026-06-07** — **Sprint 0 mergeado (#720)** + migración aplicada a prod
+  (módulo `dilesa.manual`, `seccion='sistema'`, lectura a los 9 roles DILESA,
+  versión `20260607170000` registrada sin drift). Fix en el camino: la migración
+  chocaba con `modulos_seccion_check` de tesorería al extenderlo con `'ayuda'`;
+  se cambió a `'sistema'` (transversal, ya permitido) sin tocar el constraint.
+- **2026-06-07** — **Ajuste de UX (feedback de Beto):** el "?" se movió del
+  header de cada módulo al **header global** (entre la campanita y el menú de
+  usuario), ahora contextual a la pantalla actual vía `resolveHelpSlug`
+  (`lib/manual/help-routes.ts`, reusa `ROUTE_TO_MODULE`: slug de módulo ↔ ruta
+  del `.md`). Se quitó la sección "Ayuda" del sidebar y el "?" per-módulo
+  (revertido `<ModuleHeader helpSlug>`). ADR-043 M2/M4 actualizados. La portada
+  `/dilesa/manual` queda accesible por URL pero sin enlace en sidebar (pendiente
+  confirmar con Beto si se conserva). PR a preview sin auto-merge.
+- **2026-06-07** — **Bug "manual vacío" + contenido completo de DILESA.** Bug
+  cazado: `actualizado: 2026-06-07` sin comillas lo parsea YAML como `Date`, no
+  string; el loader exigía `typeof string` → descartaba TODOS los docs →
+  "no hay ayuda" en todo. Fix: `coerceStr()` normaliza Date/número → string +
+  `lib/manual/load.test.ts` dinámico (valida que cada `.md` cargue). Verificado
+  además que `outputFileTracingIncludes` empaca los `.md` en el deploy.
+  **Contenido: 32 docs cubriendo TODAS las superficies navegables de DILESA**
+  (RH, Administración, Ventas ×5, Construcción ×6, Compras ×5, CxP ×5, CxC ×2,
+  Portafolio, Anteproyectos, Proyectos). Redactados leyendo el código real de
+  cada módulo (un explorador por grupo) en lenguaje de usuario. Pendiente:
+  revisión de Beto del detalle de negocio, sub-forms de captura (fases), y
+  rollout a las otras 4 empresas.

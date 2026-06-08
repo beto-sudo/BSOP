@@ -4,6 +4,7 @@
 **Empresas:** RDB
 **Schemas afectados:** `playtomic` (nueva tabla `payment_assignments` + vista calculada de cobertura), lectura de `rdb.waitry_pedidos` + `rdb.waitry_productos` + `rdb.waitry_pagos`
 **Estado:** in_progress
+**Próximo hito:** S2-CSV live (import + cobertura combinada Waitry+CSV + filtro dashboard, 551 → 441 pendientes). Próximo: **S2-Waitry-write** — server actions de asignación manual contra Waitry para los ~441 que no cubre el CSV
 **Dueño:** Beto
 **Creada:** 2026-05-04
 **Última actualización:** 2026-05-19 (automatización del download del CSV vía web — cron Vercel)

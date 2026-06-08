@@ -4,6 +4,7 @@
 **Empresas:** todas
 **Schemas afectados:** `core` (nueva función `fn_persona_visible`), `erp` (policy `erp_personas_select`)
 **Estado:** in_progress
+**Próximo hito:** Sprint A — migración `core.fn_persona_visible` + replace policy `erp_personas_select` + regen `SCHEMA_REF` + smoke en preview con login Pablo HM
 **Dueño:** Beto
 **Creada:** 2026-05-04
 **Última actualización:** 2026-05-04 (promovida tras debug del bug de Pablo HM en `/inicio`; Sprint A en preparación)

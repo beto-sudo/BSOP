@@ -29,14 +29,19 @@ de planning correspondiente**:
   táctica nueva, con fecha y razón.
 - **Header**: `Estado` y `Última actualización`.
 
-Reflejá el cambio de estado en `docs/strategy/INITIATIVES.md` también
-(columna `Estado`, `Próximo hito`, `Última actualización`). Si la
-iniciativa quedó completa, movela a la sección `## Done` con fecha de
-cierre y outcome — no borres su doc de planning, queda como referencia.
+La tabla `## Activas` de `docs/strategy/INITIATIVES.md` se **auto-genera**
+desde los headers de los planning docs (ver Regla 1). NO la edites a mano:
+actualizá el header de tu planning doc (`Estado`, `Próximo hito`, `Última
+actualización`) y corré `npm run initiatives:gen` (o dejá que CI marque el
+drift con `initiatives:check`). Si la iniciativa quedó completa, poné
+`Estado: done` en el header del planning doc (sale de Activas sola) y agregá
+su entrada a la sección `## Done` **a mano** (append-only, no derivable de
+headers) con fecha de cierre y outcome — no borres su doc de planning, queda
+como referencia.
 
 **Barrido obligatorio de Reminders al cerrar (`* → done`):** antes de
-mover el estado a `done` en `INITIATIVES.md` (o de reportar el cierre
-en chat), correr:
+poner `Estado: done` en el header del planning doc (lo que la saca de la
+tabla Activas) o de reportar el cierre en chat, correr:
 
 ```bash
 remindctl show all --list "Claude 🧭" --json
@@ -187,16 +192,22 @@ CI normal tarda ~1-2 min en este repo. Si después de 5 min sigue
 
 ### Trabajando con múltiples PRs en paralelo
 
-Cuando hay 2+ PRs abiertos al mismo tiempo, los archivos compartidos
-(`docs/strategy/INITIATIVES.md`, y `docs/strategy/ROADMAP.md` cuando
-exista) son hotspots de conflicto: ambos PRs editan la misma tabla, el
-primero que mergea le gana la línea al segundo, y el segundo termina
-con `This branch has conflicts that must be resolved`.
+Cuando hay 2+ PRs abiertos al mismo tiempo, dos archivos eran **hotspots de
+conflicto** entre sesiones. Ambos ya están **resueltos por tooling** (iniciativa
+`cross-session-coordination`), pero entendé el porqué:
 
-El hotspot más peligroso son las **migraciones**: dos sesiones que eligen el
-mismo `YYYYMMDDHHMMSS` colisionan el PK de `schema_migrations` y **rompen
-Supabase Preview / prod** (pasó el 2026-06-07 con `20260607190000`, usado por
-dos PRs a la vez). Reglas para mantener la fricción baja:
+- **Migraciones** (`supabase/migrations/`): dos sesiones que elegían el mismo
+  `YYYYMMDDHHMMSS` colisionaban el PK de `schema_migrations` y **rompían Supabase
+  Preview / prod** (pasó el 2026-06-07 con `20260607190000`, usado por dos PRs a
+  la vez). → **Regla 0** (`npm run db:new`) lo elimina por construcción.
+- **`docs/strategy/INITIATIVES.md`**: toda promoción / cambio de estado editaba la
+  misma tabla `## Activas` → conflictos de merge recurrentes. → **Regla 1**
+  (auto-generación desde los headers) lo elimina: cada sesión solo toca su propio
+  planning doc.
+
+Con esos dos tooled, la coordinación restante son un puñado de **convenciones de
+sesión** (abajo): no hay candado global, así que dependen de que toda sesión lea
+este `CLAUDE.md` al arrancar. Reglas para mantener la fricción baja:
 
 #### Regla 0: timestamps de migración sin colisión — `npm run db:new`
 
@@ -214,35 +225,52 @@ en el mismo segundo antes de abrir su PR — por eso **abre tu PR pronto**.
 (Lógica en `scripts/lib/migration-version.ts` + `scripts/new-migration.ts`;
 iniciativa `cross-session-coordination`.)
 
-Convenciones de coordinación complementarias (la memoria compartida entre
-sesiones es este `CLAUDE.md` — todas lo leen al arrancar):
+#### Convenciones de sesión (el "registro" de quién hace qué)
 
-- **Branch = slug de iniciativa** (`claude/<slug>-…`) → `gh pr list` revela quién
-  trabaja en qué (es el "registro" de sesiones, sin archivo nuevo que mantener).
-- **Una iniciativa = una sesión.** Antes de arrancar, corre `gh pr list` para no
+La memoria compartida entre sesiones es este `CLAUDE.md` (todas lo leen al
+arrancar) + el estado en GitHub. No hay candado global; estas convenciones
+mantienen la fricción baja:
+
+- **Branch = slug de iniciativa** (`claude/<slug>-…`; sufijo `-s2`/`-s3` por
+  sprint). Así `gh pr list` revela quién trabaja en qué — es el registro de
+  sesiones, sin archivo nuevo que mantener.
+- **Una iniciativa = una sesión.** Antes de arrancar, corré `gh pr list` para no
   pisar una iniciativa que otra sesión ya tiene abierta.
+- **Editá solo tu planning doc**, nunca la tabla `## Activas` a mano (Regla 1).
+  Un archivo por iniciativa → las sesiones casi nunca tocan el mismo archivo.
+- **Rebase antes de push** sobre `origin/main` cuando toques un hotspot
+  (`docs/strategy/*`, migraciones) — ver Regla 2.
+- **Abre tu PR pronto.** Es lo que hace que las otras sesiones (y `db:new`, vía
+  `gh`) vean tu trabajo en curso. El residual de colisión vive en la ventana
+  "trabajo local sin PR todavía".
 
-#### Regla 1: minimizar ediciones a `INITIATIVES.md`
+#### Regla 1: la tabla `## Activas` se auto-genera — no la edites a mano
 
-Toco `docs/strategy/INITIATIVES.md` solo en **transiciones de estado
-mayores** de la iniciativa:
+`docs/strategy/INITIATIVES.md` **dejó de ser un hotspot** (Pieza 2 de
+`cross-session-coordination`, 2026-06-07): la tabla `## Activas` se regenera
+con `npm run initiatives:gen` desde los headers de `docs/planning/*.md`. El
+flujo para cualquier cambio de estado / hito de una iniciativa:
 
-- `proposed → planned` (alcance v1 cerrado).
-- `planned → in_progress` (primer PR de ejecución abierto).
-- `in_progress → done` (última fase mergeada — la fila se mueve a la
-  sección `## Done`).
-- `* → blocked` o `blocked → *`.
+1. Editá SOLO el header de tu planning doc: `Estado`, `Próximo hito`,
+   `Última actualización` (un archivo por iniciativa → las sesiones casi
+   nunca chocan).
+2. Corré `npm run initiatives:gen` para regenerar la tabla (o dejá que CI
+   lo marque: `initiatives:check` falla si quedó desincronizada).
+3. Commiteá el `INITIATIVES.md` regenerado junto con tu cambio de header.
 
-**NO toco `INITIATIVES.md` en cada commit/PR intermedio del mismo
-estado.** Si una iniciativa está `in_progress` y cierro un hito menor,
-solo actualizo `docs/planning/<slug>.md` (que casi nunca conflicta —
-un archivo por iniciativa). El próximo hito y la última actividad se
-infieren del header del planning doc.
+Reglas duras:
 
-Resultado: ~70% menos ediciones al archivo hotspot. Toco
-`INITIATIVES.md` solo cuando promuevo una iniciativa nueva o cuando
-cruza una transición mayor de estado. Los hitos intermedios viven solo
-en el planning doc.
+- **NUNCA edites la región entre `<!-- initiatives:activas:start -->` y
+  `<!-- initiatives:activas:end -->` a mano** — el generador la sobrescribe.
+  Toda iniciativa con estado `proposed`/`planned`/`in_progress`/`blocked`
+  aparece sola; las `done` salen solas.
+- Toda iniciativa activa **debe** tener `**Próximo hito:**` en su header, o
+  `initiatives:check` falla en CI (con el slug + campo faltante).
+- La sección `## Done` y el resto del archivo (note, Convenciones, Roadmap
+  UI) **sí** se mantienen a mano — no son derivables de headers.
+- Promover una iniciativa nueva = crear su `docs/planning/<slug>.md` con
+  header completo (incl. `Próximo hito`) + correr el generador. Ya **no** se
+  agrega la fila a mano.
 
 #### Regla 2: rebase preventivo sobre `origin/main`
 
@@ -256,11 +284,12 @@ git rebase origin/main
 
 Si hay conflicto, resolverlo en local antes de pushear:
 
-- **Para `INITIATIVES.md`** (datos de estado): tomar la versión de
-  `origin/main` (`git checkout --theirs docs/strategy/INITIATIVES.md`)
-  como verdad por orden de merge, luego reaplicar mi edición encima
-  si todavía aplica. Si mi edición ya quedó obsoleta (ej. otro PR ya
-  movió la fila a `done`), la descarto.
+- **Para la tabla `## Activas` de `INITIATIVES.md`** (auto-generada): no
+  resuelvas el conflicto a mano — tomá `origin/main`
+  (`git checkout --theirs docs/strategy/INITIATIVES.md`) y volvé a correr
+  `npm run initiatives:gen`, que regenera la tabla desde TODOS los headers
+  actuales (incluido tu cambio) sin pelear por líneas. Para conflictos en la
+  sección `## Done` (mantenida a mano), resolvé manualmente.
 - **Para cualquier otro archivo**: resolver manualmente y verificar
   con `npm run format:check` + `npm run typecheck` antes de seguir.
 
@@ -282,21 +311,24 @@ git push
 gh pr checks <PR> --watch --interval 15
 ```
 
-#### Cuándo escalar a auto-generación
+#### Auto-generación de `INITIATIVES.md` (implementada 2026-06-07)
 
-Si después de ~2 semanas con Reglas 1+2 seguimos teniendo conflicts en
-`INITIATIVES.md` con frecuencia, escalar a una alternativa:
+La escalada que estaba prevista aquí **ya se construyó** (Pieza 2 de
+`cross-session-coordination`):
 
-1. Cada `docs/planning/<slug>.md` ya tiene un header parseable.
-2. Crear `npm run initiatives:gen` que lea todos los headers y
-   regenere `INITIATIVES.md` automáticamente.
-3. CI valida con `npm run initiatives:check` que el archivo está en
-   sync.
-4. Resultado: cero edits manuales a `INITIATIVES.md`. Conflicts solo
-   posibles si dos PRs tocan el mismo planning doc — extremadamente
-   raro.
+1. Cada `docs/planning/<slug>.md` tiene un header parseable.
+2. `npm run initiatives:gen` lee todos los headers y regenera la tabla
+   `## Activas` entre los marcadores `<!-- initiatives:activas:start/end -->`.
+3. CI valida con `npm run initiatives:check` (`.github/workflows/ci.yml`,
+   step "Initiatives index — drift check") que la tabla está en sync.
+4. Resultado: cero edits manuales a la tabla Activas. Conflictos solo
+   posibles si dos PRs tocan el mismo planning doc — extremadamente raro.
 
-Hasta entonces, Reglas 1+2 deberían ser suficientes.
+La lógica vive en `scripts/lib/initiatives.ts` (pura, con tests en
+`scripts/lib/initiatives.test.ts`) + `scripts/gen-initiatives.ts` (CLI;
+formatea con prettier para que `format:check` pase). El orden de la tabla es
+alfabético por slug (determinista, estable: un cambio de estado mueve una
+celda, no una fila). La sección `## Done` se mantiene a mano.
 
 ---
 

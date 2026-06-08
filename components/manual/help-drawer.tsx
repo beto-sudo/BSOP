@@ -4,9 +4,11 @@ import { useEffect, useState } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { HelpCircle } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page/detail-drawer';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { resolveHelpSlug } from '@/lib/manual/help-routes';
 
 /**
  * Ayuda contextual del Manual de usuario (iniciativa `manual-usuario`).
@@ -90,7 +92,7 @@ function HelpDrawer({
   open,
   onOpenChange,
 }: {
-  slug: string;
+  slug: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -100,7 +102,8 @@ function HelpDrawer({
   useEffect(() => {
     // Fetch solo al abrir (lazy). El setState vive en los callbacks async —
     // nunca síncrono en el cuerpo del effect (evita cascading renders).
-    if (!open) return;
+    // Sin slug (pantalla sin ayuda) no hay nada que cargar.
+    if (!open || !slug) return;
     let active = true;
     fetch(`/api/manual/${slug}`)
       .then((r) => (r.ok ? (r.json() as Promise<ManualDocResponse>) : Promise.reject(r.status)))
@@ -135,12 +138,12 @@ function HelpDrawer({
       }
     >
       <DetailDrawerContent>
-        {state === 'loading' ? (
-          <p className="text-sm text-muted-foreground">Cargando ayuda…</p>
-        ) : state === 'error' ? (
+        {!slug || state === 'error' ? (
           <p className="text-sm text-muted-foreground">
             Todavía no hay ayuda para esta pantalla. Si tienes una duda, avísanos y la agregamos.
           </p>
+        ) : state === 'loading' ? (
+          <p className="text-sm text-muted-foreground">Cargando ayuda…</p>
         ) : (
           <div className="text-sm">
             <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
@@ -202,6 +205,34 @@ export function HelpButton({
       )}
       {/* Siempre montado (controlado por `open`) para que el Sheet anime
           entrada/salida; el fetch del contenido es lazy (solo al abrir). */}
+      <HelpDrawer slug={slug} open={open} onOpenChange={setOpen} />
+    </>
+  );
+}
+
+/**
+ * Botón "?" global del header (entre la campanita y el menú de usuario).
+ *
+ * Es contextual: deriva la ayuda de la pantalla ACTUAL con `usePathname()`
+ * (vía `resolveHelpSlug`, que reusa `ROUTE_TO_MODULE`). En pantallas sin doc
+ * el drawer muestra "todavía no hay ayuda". Estilo alineado a los íconos del
+ * header (tema/idioma/campanita).
+ */
+export function HeaderHelpButton() {
+  const pathname = usePathname();
+  const slug = resolveHelpSlug(pathname);
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="Ayuda de esta pantalla"
+        title="Ayuda"
+        className="flex h-7 w-7 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--text)]/70 transition hover:border-[var(--accent)] hover:text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 dark:text-white/70 dark:hover:text-white"
+      >
+        <HelpCircle className="h-3.5 w-3.5" />
+      </button>
       <HelpDrawer slug={slug} open={open} onOpenChange={setOpen} />
     </>
   );

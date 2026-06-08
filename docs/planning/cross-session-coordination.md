@@ -3,10 +3,11 @@
 **Slug:** `cross-session-coordination`
 **Empresas:** todas (infraestructura del repo / proceso)
 **Schemas afectados:** ninguno (tooling + convenciones + CI). Toca `package.json`, `scripts/`, `.github/workflows/`, `CLAUDE.md`, `docs/strategy/INITIATIVES.md`.
-**Estado:** planned
+**Estado:** done
+**Próximo hito:** Cerrada 2026-06-07 — 3 piezas entregadas (#732 `db:new` · #744 auto-gen de INITIATIVES.md · Sprint 3 convenciones en este PR)
 **Dueño:** Beto
 **Creada:** 2026-06-07
-**Última actualización:** 2026-06-07 (promoción — Beto pidió que varias sesiones autónomas en paralelo no choquen; alcance v1 = generador de migraciones gh-aware + auto-gen de INITIATIVES.md + convenciones en CLAUDE.md)
+**Última actualización:** 2026-06-07 (Sprint 3 — convenciones de sesión afinadas en CLAUDE.md (branch=slug, 1 iniciativa/sesión, `gh pr list` previo, rebase antes de push) + closeout; **iniciativa cerrada**, las 3 piezas en prod)
 
 ## Problema
 
@@ -59,6 +60,13 @@ serializar, lo que mata el paralelismo).
   cada PR), no solo migraciones locales — así ve migraciones de otras sesiones
   aún no mergeadas. Residual: dos sesiones en el mismo segundo antes de abrir PR
   (mitigado por "abre tu PR pronto").
+- **D4 — Diseño A: tabla Activas auto-generada, `## Done` a mano** (cerrada con
+  Beto). Orden alfabético por slug (determinista y estable: un cambio de estado
+  mueve una celda, no una fila → diffs mínimos). El nombre legible sale del H1
+  (sin campo extra en el header). La columna "Próximo hito" agrega un link
+  `(ver [planning](...))` derivado del slug. `## Done` queda hand-maintained
+  (historia append-only, no derivable de headers). Toda iniciativa activa debe
+  tener `**Próximo hito:**` o `initiatives:check` falla en CI.
 
 ## Riesgos
 
@@ -81,15 +89,47 @@ serializar, lo que mata el paralelismo).
 
 - **Sprint 1 — Generador de migraciones (Pieza 1).** `scripts/lib/migration-version.ts`
   (pura + tests), `scripts/new-migration.ts` (CLI gh-aware), `npm run db:new` y la
-  Regla 0 en `CLAUDE.md`. **(Este PR.)**
-- **Sprint 2 — Auto-gen de INITIATIVES.md (Pieza 2).** `scripts/gen-initiatives.ts`
-  (lee headers de `docs/planning/*.md` → regenera la tabla) + `initiatives:gen` /
-  `initiatives:check` + step en CI + regla en `CLAUDE.md`. PR aislado.
+  Regla 0 en `CLAUDE.md`. **(#732, mergeado.)**
+- **Sprint 2 — Auto-gen de INITIATIVES.md (Pieza 2).** `scripts/lib/initiatives.ts`
+  (parser + render + tests) + `scripts/gen-initiatives.ts` (CLI) → regenera la tabla
+  `## Activas` desde los headers + `initiatives:gen` / `initiatives:check` + step en
+  CI + Regla 1 reescrita en `CLAUDE.md`. **(Este PR.)**
 - **Sprint 3 — Convenciones + closeout.** Afinar la sección de coordinación en
-  `CLAUDE.md` (branch=slug, 1 iniciativa/sesión, `gh pr list` previo) y cerrar.
+  `CLAUDE.md` (branch=slug, 1 iniciativa/sesión, `gh pr list` previo, rebase antes
+  de push) y cerrar la iniciativa. **(Este PR — cerrada.)**
 
 ## Bitácora
 
 - **2026-06-07** — Iniciativa promovida a `planned` tras la colisión
   `20260607190000` (#721 ↔ #725) que rompió Supabase Preview de varios PRs.
-  Sprint 1 (generador de migraciones) construido en este PR.
+  Sprint 1 (generador de migraciones) mergeado en #732.
+- **2026-06-07** — **Sprint 2 (Pieza 2) construido** (este PR): auto-gen de la
+  tabla `## Activas` de `INITIATIVES.md` desde los headers de los planning docs.
+  `scripts/lib/initiatives.ts` (parser de headers + render + reemplazo entre
+  marcadores `<!-- initiatives:activas:start/end -->`, 20 tests) +
+  `scripts/gen-initiatives.ts` (CLI, formatea con prettier) + `initiatives:gen` /
+  `initiatives:check` + step "Initiatives index — drift check" en CI + Regla 1
+  reescrita en `CLAUDE.md`. Migración de datos: `**Próximo hito:**` agregado al
+  header de las 22 iniciativas activas (prosa extraída de la tabla previa,
+  refrescada donde el header era más nuevo) + 4 headers stale corregidos a `done`
+  (`a11y-baseline`, `access-denied-ux`, `detail-page`, `module-page-submodules` —
+  ya estaban en §Done/Roadmap). Tabla regenerada = 22 filas: las 19 previas +
+  `cross-session-coordination` + `manual-usuario` (Sprint 0 #720) +
+  `dilesa-prelaunch-audit`; salió `dilesa-proyectos-checklist-inline` (done) y se
+  reparó la fila de `salud-protocolo` (venía embebida por la tabla malformada).
+  Verificado por contenido: slugs de la tabla == headers activos (22, 1:1), cero
+  `done` colados, todo fuera de los marcadores byte-idéntico, generador idempotente.
+  Estado `planned → in_progress`. Pendiente: Beto decide si `dilesa-prelaunch-audit`
+  (ventana pre-cutover ya pasó) se marca `done`.
+- **2026-06-07** — **Sprint 3 (convenciones + closeout) — iniciativa CERRADA** (este
+  PR). Afinada la sección "Trabajando con múltiples PRs en paralelo" de `CLAUDE.md`:
+  intro reescrito (los 2 hotspots históricos —migraciones e INITIATIVES.md— ahora
+  resueltos por Regla 0 y Regla 1) + nueva subsección "Convenciones de sesión"
+  (branch=slug, 1 iniciativa/sesión, `gh pr list` previo, editar solo tu planning
+  doc, rebase antes de push, abre tu PR pronto). Estado `in_progress → done`: header
+  a `done`, removida de la tabla `## Activas` por el generador (22 → 21) y agregada a
+  mano a `## Done`. Las 3 piezas del Outcome quedan entregadas (#732, #744, este PR).
+  Barrido de Reminders `Claude 🧭`: sin entradas del slug (las sub-tareas vivían en
+  TodoWrite por la regla global). Métricas: instrumentadas (db:new + initiatives:check
+  en CI); "cero colisiones / cero conflictos" se observa en operación. Follow-up vivo
+  (no de esta iniciativa): Beto decide si `dilesa-prelaunch-audit` se marca `done`.

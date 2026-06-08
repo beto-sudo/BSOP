@@ -4,6 +4,7 @@
 **Empresas:** DILESA
 **Schemas afectados:** ninguno (audit puro, no toca código en sí)
 **Estado:** proposed
+**Próximo hito:** Snapshot 2026-05-26. **La ventana pre-cutover (2026-05-31) ya pasó** — revisar con Beto si se cierra como `done` (audit consumido) o se reusa para un nuevo pre-cutover
 **Dueño:** Beto
 **Creada:** 2026-05-26
 **Última actualización:** 2026-05-26 (análisis nocturno autónomo)
